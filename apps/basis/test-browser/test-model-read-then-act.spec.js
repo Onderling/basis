@@ -33,5 +33,5 @@ test('the read-then-act look on web, through the real model route', async ({ pag
   // the second request carries what the read found (the look's line), and the tools the circle offers
   expect(JSON.stringify(asked[1])).toContain('melkproef');
   expect(asked[0].tools).toContain('completeTask');
-  expect(said).toMatch(/Completed:\s*melkproef/i);
+  expect(said).toMatch(/Ticked off:\s*melkproef/i);
 });

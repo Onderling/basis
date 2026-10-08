@@ -1,6 +1,8 @@
 /**
  * botFeeds — the household bot keeps each person's agenda link filled: it renders their file (`personFeed.js`), seals
- * it to their link's key and puts it on the household's companion, which serves it at `/feed/<id>.<k>.ics`.
+ * it to their link's key and puts it on the household's companion, which serves it through the relay at
+ * `/feed/<node>/<id>.<k>.ics`. WHICH companion, and where it serves, is read from the contact the bot holds
+ * (`feedCompanion.js`) each time — never configured; no such contact, no link.
  *
  * - `/agenda-link` ALWAYS mints: a new id and key, the old file dropped, the link sent to the person's PRIVATE chat only
  *   and never shown again (their thread keeps a placeholder, never the link).
@@ -22,11 +24,12 @@ export const FEED_PUSH_DELAY_MS = param({ key: 'assistant.feedPushDelayMs', scop
  * @param {() => Promise<object[]>} a.events        the household's calendar-event items
  * @param {() => Promise<Array<{id: string}>>} a.people   the household's people
  * @param {() => Promise<string>} [a.calendarName]  the name the calendar app shows (the household's)
- * @param {(id: string, envelope: string) => Promise<{ok: boolean}>} a.put    the companion's `feed.put`
- * @param {(id: string) => Promise<{ok: boolean}>} a.drop                 the companion's `feed.drop`
- * @param {string} a.base     the public address the companion is served at (`https://…`)
+ * @param {() => Promise<{node: string, base: string}|null>} a.companion   the companion the bot holds as a contact:
+ *   its address and where its links are served (`feedCompanion.js`), or null
+ * @param {(node: string, id: string, envelope: string) => Promise<{ok: boolean}>} a.put    that companion's `feed.put`
+ * @param {(node: string, id: string) => Promise<{ok: boolean}>} a.drop                 that companion's `feed.drop`
  */
-export function createBotFeeds({ threads, events, people, calendarName = async () => '', put, drop, base, now = Date.now,
+export function createBotFeeds({ threads, events, people, calendarName = async () => '', companion, put, drop, now = Date.now,
   setTimer = (fn, ms) => { const h = setTimeout(fn, ms); h?.unref?.(); return h; }, clearTimer = (h) => clearTimeout(h) }) {
   let timer = null;
 
@@ -35,11 +38,15 @@ export function createBotFeeds({ threads, events, people, calendarName = async (
     return sealPersonFeed(ics, link.k);
   }
 
+  const where = async () => (await Promise.resolve(companion?.()).catch(() => null)) ?? null;
+
   /** Re-render one person's file; `{ok}`. */
   async function push(person) {
     const link = threads.feedLinkOf(person);
     if (!link) return { ok: false, reason: 'no-link' };
-    const r = await put(link.id, await fileFor(person, link)).catch(() => null);
+    const at = await where();
+    if (!at) return { ok: false, reason: 'no-companion' };
+    const r = await put(at.node, link.id, await fileFor(person, link)).catch(() => null);
     return r?.ok ? { ok: true } : { ok: false, reason: 'companion' };
   }
 
@@ -55,7 +62,8 @@ export function createBotFeeds({ threads, events, people, calendarName = async (
   async function end(person) {
     const link = threads.feedLinkOf(person);
     if (!link) return { ok: true, had: false };
-    await drop(link.id).catch(() => null);
+    const at = await where();
+    if (at) await drop(at.node, link.id).catch(() => null);
     await threads.setFeedLink(person, null);
     return { ok: true, had: true };
   }
@@ -63,13 +71,15 @@ export function createBotFeeds({ threads, events, people, calendarName = async (
   return {
     /** A new link for this person (the old one goes dark): `{ok, urls}` or `{ok: false, reason}`. */
     async mint(person) {
+      const at = await where();
+      if (!at) return { ok: false, reason: 'no-companion' };
       const before = threads.feedLinkOf(person);
       const link = mintFeedLink();
-      const r = await put(link.id, await fileFor(person, link)).catch(() => null);
+      const r = await put(at.node, link.id, await fileFor(person, link)).catch(() => null);
       if (!r?.ok) return { ok: false, reason: 'companion' };
       await threads.setFeedLink(person, link);
-      if (before) await drop(before.id).catch(() => null);
-      return { ok: true, urls: feedUrls(base, link) };
+      if (before) await drop(at.node, before.id).catch(() => null);
+      return { ok: true, urls: feedUrls(at.base, at.node, link) };
     },
     push,
     pushAll,

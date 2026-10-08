@@ -71,6 +71,8 @@ function _effectiveTtl(requested, ceiling) {
  * @param {object}    [opts]
  * @param {number}    [opts.timeout=30000]
  * @param {number}    [opts.ttl]   — suggested task TTL ms (receiver may cap)
+ * @param {boolean}   [opts.quiet] — write no console line naming the peer (a caller whose peer must appear in no log:
+ *                                   the relay asking a node for a link's file)
  * @param {object}    [opts.token] — a capability token to present (a CapabilityToken or its JSON); else the
  *                                   agent's token registry is asked
  * @returns {Task}
@@ -116,7 +118,7 @@ export function invokeAgentSkill(agent, peerId, skillId, parts, opts = {}) {
         return;
       }
 
-      console.log(`[invokeAgentSkill] ${skillId} → ${peerId.slice(0,12)} via ${t?.constructor?.name}`);
+      if (!opts.quiet) console.log(`[invokeAgentSkill] ${skillId} → ${peerId.slice(0,12)} via ${t?.constructor?.name}`);
       const rs = await t.request(
         peerId,
         {
@@ -144,7 +146,7 @@ export function invokeAgentSkill(agent, peerId, skillId, parts, opts = {}) {
       // mark the (peer, transport) pair degraded for 30 s so the next call
       // via RoutingStrategy falls through to the next-best live transport.
       if (!err.message?.includes('pubKey')) {
-        console.warn(`[invokeAgentSkill] ${skillId} → ${peerId.slice(0,12)} FAILED:`, err.message);
+        if (!opts.quiet) console.warn(`[invokeAgentSkill] ${skillId} → ${peerId.slice(0,12)} FAILED:`, err.message);
         if (!opts._overrideTransport) {
           _reportFailure(agent, peerId, err);
         }

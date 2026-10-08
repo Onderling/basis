@@ -55,9 +55,10 @@ describe('the person\'s agenda file', () => {
     expect(openForLink(envelope, b.k)).toBeNull();
   });
 
-  it('the link as pasted: https for Google, webcal for an iPhone', () => {
-    expect(feedUrls('https://relay.example.org/', { id: 'I', k: 'K' })).toEqual({
-      https: 'https://relay.example.org/feed/I.K.ics', webcal: 'webcal://relay.example.org/feed/I.K.ics',
+  it('the link as pasted: https for Google, webcal for an iPhone — at the relay, naming the companion that holds it', () => {
+    const node = 'N'.repeat(43);
+    expect(feedUrls('https://relay.example.org/', node, { id: 'I', k: 'K' })).toEqual({
+      https: `https://relay.example.org/feed/${node}/I.K.ics`, webcal: `webcal://relay.example.org/feed/${node}/I.K.ics`,
     });
   });
 });

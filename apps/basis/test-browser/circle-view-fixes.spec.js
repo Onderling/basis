@@ -5,7 +5,7 @@ import { bootCircle } from './helpers.js';
 //   #2 infra ops (/me) scoped out → graceful, not a raw "circle.bot.failed" key / crash
 //   #3 bare picker command (/complete-task) lists options, not «couldn't find ""»
 //   #4 feedback echoes the user's own messages — RETIRED with the in-circle feedback mount (F2 2026-07-08)
-//   #5 add vs complete replies are distinct (Added: / Completed:), not an identical "✓ X"
+//   #5 add vs complete replies are distinct (Added: / Ticked off:), not an identical "✓ X"
 test.setTimeout(70000);
 
 async function openCircleComposer(page) {
@@ -22,12 +22,12 @@ async function send(page, text) {
 }
 const blob = async (page) => (await page.locator('.circle-view__bubble').allTextContents()).join(' | ');
 
-test('#5 add vs complete replies are distinct (Added: / Completed:)', async ({ page }) => {
+test('#5 add vs complete replies are distinct (Added: / Ticked off:)', async ({ page }) => {
   await openCircleComposer(page);
   await send(page, '@assistant add distinctmilk');
   expect(await blob(page)).toMatch(/Added:\s*distinctmilk/i);
   await send(page, '@assistant done distinctmilk');
-  expect(await blob(page)).toMatch(/Completed:\s*distinctmilk/i);
+  expect(await blob(page)).toMatch(/Ticked off:\s*distinctmilk/i);
 });
 
 test('#2 /me typed in a circle answers through the typed door — no raw locale key, no page crash', async ({ page }) => {

@@ -13,8 +13,9 @@ that mechanism (or extend it, and update its row). If two rows almost fit, that 
 building a third.
 
 **"Used today by"** names a PRODUCTION file that reaches the mechanism (not a test, not a demo). A row with no such file
-says **inert** — built, tested, reached by nothing. An inert row is a finding: adopt it, or retire it with a decision
-line. It is never deleted quietly. (Measured 2026-10-07 by a sweep of the code. A guard that holds this table to the
+says **inert** — built, tested, reached by nothing. An inert row is kept: its PURPOSE is written beside it (what future
+need it serves), so the next builder adopts it instead of building a second one. It is never deleted quietly (Frits,
+2026-10-09: think about the purpose, never retire). (Measured 2026-10-07 by a sweep of the code. A guard that holds this table to the
 code is the next step.)
 
 **The base the rows ride on.** Almost every row between agents goes out through one send:
@@ -41,8 +42,9 @@ addresses, sizes, timing and ciphertext — never content.
 |---|---|---|---|---|---|
 | talk one-to-one with a contact or a bot | contact threads over the points on the contact card | `contactThreadChannel.js` | the relay: address and size; the other end: the text | `bin/device-runner.mjs`, mobile `agentBundle.js`, `src/index.js` | a circle (→ the lanes) |
 | have a bot write first (a reminder, a link sent privately) | the door's reach to a person's own chat | `doorReach.js` (`createPersonReach`) | Telegram learns the text on a Telegram door; the inbox path learns the turn | `bin/device-runner.mjs` | anything a person did not ask the bot for |
-| call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` (`peer.invoke`) | the callee learns the op, its args and the token | `core/src/Agent.js`, the box (`bin/device-runner.mjs`), `screenView.js`, the box's agenda link through the runner (`feed.put`) | a broadcast |
+| call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` (`peer.invoke`) | the callee learns the op, its args and the token | `core/src/Agent.js`, the box (`bin/device-runner.mjs`), `screenView.js`, the box's agenda link through the runner (`feed.put`, presenting the token its companion's owner granted it) | a broadcast |
 | let another person's agent act for me on one task | a task grant | `packages/core/src/permissions/TaskGrant.js` | the holder learns the scope | `apps/tasks-v0/src/Agent.js` (loaded by `realAgent.js`), `mandate.js`, mobile `CircleLauncherScreen.js` | standing access (→ surface grants) |
+| fetch a file a contact posted, straight from them | the attachment fetch over the one-to-one channel (`attachment-request` / `attachment-response`) | `packages/chat-p2p/src/wireChat.js`, stoop `src/lib/Attachments.js` | the relay: address and size; the poster: who asked, and for which file | stoop `src/Agent.js` (wires it), web `circleApp.js` (refreshes the noticeboard when the bytes land) | a file for many, or a link a program opens (→ the blob gate) — its purpose: a file straight to ONE contact over hold-forward, with no bucket, edge or gate in between |
 | ask the people in the room (Nearby) | the nearby ask channel over the local network | `nearbyAskChannel.js` | any peer on the LAN: the ask's text and tags | `nearbyRoomBinding.js` (composed by the mobile shell and `src/index.js`) | anything private |
 
 ## Between my own devices
@@ -59,7 +61,7 @@ addresses, sizes, timing and ciphertext — never content.
 
 | I want to… | Mechanism | Lives in | Who learns what | Used today by | Not for |
 |---|---|---|---|---|---|
-| serve something at a link to a program that holds no key (a calendar app) | a link-sealed blob in the companion's bucket, opened at serve time with the key the request brings (`/feed/<id>.<k>.ics`) | `@onderling/blob-gateway` `linkSeal.js` (`sealForLink`); companion `feedShelf.js` | the companion: what it serves, while it serves it; at rest only ciphertext; whoever holds the link reads it | `companion-node/src/index.js` (when `COMPANION_FEEDS` is on); the bot's agenda link (`personFeed.js` seals it, the bot puts it) | anything an agent could fetch itself (→ the blob bucket) |
+| serve something at a link to a program that holds no key (a calendar app) | a link-sealed blob in the companion's bucket, opened at serve time with the key the request brings; the link is at the RELAY (`/feed/<node>/<id>.<k>.ics`), which forwards it to the node over its live session (`feed.serve`, the companion's one public op) and holds nothing — the companion's own `/feed/<id>.<k>.ics` route stands until it moves off the public box | `@onderling/blob-gateway` `linkSeal.js` (`sealForLink`), `linkPath.js`; companion `feedShelf.js`; relay `feedForward.js` | the companion: what it serves, while it serves it; at rest only ciphertext; the relay: the request in flight, as the proxy in front of it (no log, no store); whoever holds the link reads it | `companion-node/src/index.js` (when `COMPANION_FEEDS` is on); `relay/src/server.js` (the forward; both relay boot doors turn it on); the bot's agenda link (`personFeed.js` seals it, the bot puts it, the link built from the companion's contact: `feedCompanion.js`) | anything an agent could fetch itself (→ the blob bucket) |
 
 ## Inside one host
 
@@ -77,16 +79,20 @@ addresses, sizes, timing and ciphertext — never content.
 
 ## Inert — built, reached by nothing in production (measured 2026-10-07; all KEPT, Frits 2026-10-07 — before building something like them, use these)
 
-| What it would do | Mechanism | Lives in | Only reached by |
-|---|---|---|---|
-| pub/sub for skills | `SkillsPubSub` | `packages/core/src/SkillsPubSub.js` | the core index re-export |
-| stream a task's output | streaming | `packages/core/src/protocol/streaming.js` | the core index re-export |
-| go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `callWithHop.js` | `mesh-demo`, `sdk-smoke` (its seal, `security/tunnelSeal.js`, is live: task exchange, `tunnelReceiveSealed`, the link seal) |
-| fetch from several recipients at once | the relay's multi-recipient queue | `packages/relay/src/MultiRecipientQueue.js` | no client sends `multi-request` |
-| drop sealed mail for an away owner at a companion | the sealed inbox | `apps/companion-node/src/sealedInbox.js` | tests (`boot.js` never turns it on) |
-| serve the photo edge over HTTP | the blob gate's HTTP mount | `blob-gateway/httpGate.js`, `relay/blobGateMount.js`, companion `mediaEdge.js` | tests (no shipped boot passes a `blobGate`) |
-| carry items the old way | the secure-mesh envelope adapter | `apps/basis/src/core/sync/secureMeshEnvelopeAdapter.js` | half: its SEND is superseded (task and noticeboard writes go through the task lane), its INBOUND handler is still wired in `realAgent.js` — a retire candidate; probe what still arrives through it first |
-| BLE, MQTT transports | the transports | `@onderling/transports` | `mesh-demo` (basis builds them with `ble: false`) |
+| What it would do | Mechanism | Lives in | Only reached by | Its purpose — the need it is kept for |
+|---|---|---|---|---|
+| pub/sub for skills | `SkillsPubSub` | `packages/core/src/SkillsPubSub.js` | the core index re-export | a person's own feed of what changed for them across circles, without polling — the per-person feed topic the household-in-your-own-app design settled on (served by the person's companion) |
+| stream a task's output | streaming | `packages/core/src/protocol/streaming.js` | the core index re-export | an answer that arrives in pieces: a model's long reply shown as it is written, or a large export/restore read in chunks instead of one message |
+| go through a third agent | the hop tunnel | `packages/core/src/routing/hopTunnel.js`, `callWithHop.js` | `mesh-demo`, `sdk-smoke` (its seal, `security/tunnelSeal.js`, is live: task exchange, `tunnelReceiveSealed`, the link seal) | reach someone through a friend when no relay is shared — two households on different relays, or a phone that only its owner's companion can see |
+| fetch from several recipients at once | the relay's multi-recipient queue | `packages/relay/src/MultiRecipientQueue.js` | no client sends `multi-request` | one fetch for many addresses after being away — a device or a companion catching up on every circle address it holds in one round trip |
+| drop sealed mail for an away owner at a companion | the sealed inbox | `apps/companion-node/src/sealedInbox.js` | tests (`boot.js` never turns it on) | mail for an owner whose phone is off, held by their own always-on companion — live once companions run beside the bot on the household's tablet |
+| serve the photo edge over HTTP | the blob gate's HTTP mount | `blob-gateway/httpGate.js`, `relay/blobGateMount.js`, companion `mediaEdge.js` | tests (no shipped boot passes a `blobGate`) | a file or photo at a link a program without a key can open (as the agenda link is) — sending a file to a contact once the media edge is deployed |
+| carry items the old way | the secure-mesh envelope adapter | `apps/basis/src/core/sync/secureMeshEnvelopeAdapter.js` | nothing: its SEND is superseded (task and noticeboard writes go through the task lane) and its INBOUND wire is cut since #510 — the handler exists, the router no longer calls it | with notify-envelope's pending-upload queue: a real Solid pod behind a writer that is offline (the task lane already carries whatever a store holds, of any type) |
+| BLE, MQTT transports | the transports | `@onderling/transports` | `mesh-demo` (basis builds them with `ble: false`) | BLE: two phones in one room with no network at all (the nearby room without Wi-Fi). MQTT: a household's own broker, or small devices (a sensor, a doorbell) as peers |
+
+**Which goes live first:** the sealed inbox and the pub/sub feed — both arrive with the companion beside the bot on the
+household's tablet (the inbox holds mail for an away owner; the feed carries "what changed for me"). The rest wait for
+the need named beside them.
 
 **Transports actually built by the shells:** the relay WebSocket everywhere; NKN on web (when its script loads) and
 mobile, never on the box; WebRTC rendezvous on web and mobile; mDNS on mobile (browse by default) and on a companion
@@ -96,6 +102,9 @@ started with `--nearby`.
 
 - **The relay:** the forward queue (SQLite at `QUEUE_DB`, else memory), push tokens (SQLite at `PUSH_TOKENS_DB`, else
   memory), the blob gate's ACL (memory by default) and whatever bucket it is handed.
-- **The companion** (its config dir): `host-identity.json`; `sealed-inbox.json` when the inbox is on; `feeds/` (a
+- **The companion** (its config dir): `host-identity.json` (with the tokens it issued, which it revoked, and which an
+  agent it granted holds); `owner.json` once claimed (the owner root's public key and
+  the devices it revoked); `sealed-inbox.json` when the inbox is on; `feeds/` (a
   file bucket, ciphertext only) when feeds are on. Its media bucket and registry pseudo-pod are in memory.
-- **A device:** its outbox (the hold-forward queue), the device log, the stores — all sealed at rest on the box.
+- **A device:** its outbox (the hold-forward queue), the device log, the stores — all sealed at rest on the box; a
+  household box also keeps the grants its companions gave it (`companion-grants.json`).

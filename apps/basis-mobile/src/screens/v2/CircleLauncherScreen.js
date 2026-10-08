@@ -2054,6 +2054,7 @@ export default function CircleLauncherScreen({
         eventLog={eventLog}
         circles={circles}
         recipeStore={recipeStore}
+        onStoopEvent={bundle?.onStoopEvent}
         emitMemberProps={bundle?.emitMemberProps}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
@@ -2561,7 +2562,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, onStoopEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -4007,7 +4008,7 @@ function CircleDetail({
               host-wired handler; each shell wires its own mechanism for a
               destination (e.g. `contacts` → setScreenPanel here, openCircleScreenPanel
               on web — the doorgeefluik model).  web ≡ mobile by construction. */}
-          {circleActionsMobile(basisManifest, { policy, availability: circleAvailability })
+          {circleActionsMobile(basisManifest, { policy, availability: circleAvailability, isAdmin: mandateViewer.isAdmin })
             .filter((action) => action.id !== 'back')
             .map((action) => {
               const handlers = {
@@ -4028,6 +4029,8 @@ function CircleDetail({
                   testID={`circle-detail-${token}`}
                 >
                   <Text style={styles.moreItemText}>{t(action.labelKey)}</Text>
+                  {/* why it is greyed (an admin-only entry for a member) — said beside it, not left to a dead tap */}
+                  {action.reasonKey ? <Text style={styles.moreItemReason}>{t(action.reasonKey)}</Text> : null}
                 </Pressable>
               );
             })}
@@ -4101,7 +4104,7 @@ function CircleDetail({
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
-          <CircleNoticeboard callSkill={stoopCall} media={circleMedia}
+          <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
@@ -4435,7 +4438,8 @@ function CircleDetail({
         {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
             ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
             offers nothing that works. */}
-        {chatComposerVisible(activeTab) ? (<>   {/* the composer is the conversation's — hidden under Leden and the other tabs */}
+        {chatComposerVisible(activeTab) ? (<>
+        {/* the composer is the conversation's — hidden under Leden and the other tabs */}
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (
@@ -5676,6 +5680,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   moreMenu:       { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, padding: 4, marginTop: 4, marginBottom: 4 },
   moreItem:       { paddingVertical: 9, paddingHorizontal: 12 },
   moreItemText:   { fontSize: 13, color: theme.color.ink },
+  moreItemReason: { fontSize: 11, color: theme.color.inkSoft, marginTop: 2 },
   // Bulletin restyle — the CONVERSATION stream is ONE bot card (mirror of onderling.org's
   // .chatbox / web's circle-view__chat-card). The header strip + the bordered scroll
   // are stacked siblings sharing a 2px-ink frame so they read as one card.

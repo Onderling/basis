@@ -33,10 +33,18 @@ export const SEAMS = Object.freeze([
   // The agent speaks in the person's language only when the shell hands it its translator: without one, its own lines
   // (list and calendar defaults, task confirmations, a paused circle) come out as keys or English. The box passed it;
   // web and mobile did not (found 2026-09-29).
+  // A card handed to the install at build or boot goes into its contacts the way a scanned card does: the alpha's
+  // feedback contact on web and mobile, and on the box a household bot's companion (its card says where the bot's
+  // agenda links are served). The box lacked it until the bot read its companion from its contacts (2026-10-09).
+  { id: 'seeded-contact', pattern: /seedContactCard\(/, why: 'a card the install is handed is a contact on every shell, through the one scanned-card path' },
   { id: 'agent-translator', pattern: /createRealHouseholdAgent\(\{(?:(?!\n\s*\}\);)[\s\S])*?\n\s+t(?::\s*[\w.]+)?,/, why: 'the agent\'s own lines follow the person\'s language' },
   // A person's node folds a circle's appointments onto that circle's ONE store (`PERSON_NODE_STORE_OPTS`, beside the box's
   // `HOUSEHOLD_BOT_STORE_OPTS`): without it a person's app reads only its own calendar and never the appointments its
   // circles hold — the household bot's included (B3, 2026-10-05).
+  // The address-fallback offer remembers a decline across restarts. Both person shells composed the offer without
+  // its memory, so every boot forgot the decline and offered again — one more bubble in the circle's conversation
+  // per app start (found 2026-10-08 on a phone). The box makes no offer: a hosted bot has no person to ask.
+  { id: 'fallback-offer-memory', pattern: /fallbackOfferStateIo\(/, shells: ['web', 'mobile'], why: 'a declined fallback offer stays declined for its cooldown, not until the next app start' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).

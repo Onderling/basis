@@ -13,10 +13,10 @@
  * an id or a path.
  */
 import { hashHex } from '@onderling/core';
-import { openForLink, isLinkSealed } from '@onderling/blob-gateway';
+import { openForLink, isLinkSealed, LINK_TOKEN, parseFeedLinkPath } from '@onderling/blob-gateway';
 
-/** An id or a key as the link carries them: base64url, at least 128 bits (`randomKey()` gives exactly that). */
-export const FEED_TOKEN = /^[A-Za-z0-9_-]{22,64}$/;
+/** An id or a key as the link carries them — the link grammar's own word (`@onderling/blob-gateway`'s `linkPath.js`). */
+export const FEED_TOKEN = LINK_TOKEN;
 /** The largest sealed file the shelf takes (a household's agenda is a few kilobytes). */
 const MAX_SEALED_CHARS = 512 * 1024;
 
@@ -54,8 +54,8 @@ export function createFeedShelf({ bucket }) {
   };
 }
 
-/** The route's path: `/feed/<id>.<k>.ics` → `{id, k}`, or null. */
+/** This node's own route: `/feed/<id>.<k>.ics` → `{id, k}`, or null (the relay's form, with a node, is not this route's). */
 export function parseFeedPath(pathname) {
-  const m = /^\/feed\/([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.ics$/.exec(String(pathname ?? ''));
-  return m ? { id: m[1], k: m[2] } : null;
+  const at = parseFeedLinkPath(pathname);
+  return at && at.node === null ? { id: at.id, k: at.k } : null;
 }

@@ -3,9 +3,10 @@
  *
  * Original intent (S6.5): a recipient holding only an attachment's thumbnail
  * gets the full image. The original mechanism — a plaintext `attachment-request`
- * / `attachment-response` chat round-trip served by the author — was superseded
- * by the sealed path below and removed on 2026-10-07 (stoop is key-agnostic
- * and never holds plaintext bytes to serve).
+ * / `attachment-response` chat round-trip served by the author — is REMOVED:
+ * stoop is key-agnostic and no longer serves plaintext bytes, so the chat-p2p
+ * plaintext handlers are structurally INERT (stoop no longer injects
+ * `attachmentSupport`).
  *
  * The sealed replacement preserves the intent: the SEALED inline thumbnail
  * travels ON the pointer, and the full sealed blob lives in the circle media
@@ -13,7 +14,7 @@
  * through its own gateway — no author round-trip, no plaintext on the wire.
  */
 import { describe, it, expect } from 'vitest';
-import { AgentIdentity, InternalBus, InternalTransport } from '@onderling/core';
+import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { openBlob, openThumbnail } from '@onderling/blob-gateway';
 import { createNeighbourhoodAgent } from '../src/index.js';
@@ -34,6 +35,9 @@ async function buildBundle({ bus = new InternalBus(), actor = ANNE } = {}) {
   bundle.pubKey = id.pubKey;
   return bundle;
 }
+
+const callSkill = (agent, skillId, args, asWebid) =>
+  agent.skills.get(skillId).handler({ parts: args === undefined ? [] : [DataPart(args)], from: asWebid, agent, envelope: null });
 
 describe('sealed recipient round-trip — open the sealed pointer through the circle gateway', () => {
   it('a recipient opens the sealed thumbnail + full blob to the original bytes; no plaintext on the received item', async () => {
@@ -65,6 +69,23 @@ describe('sealed recipient round-trip — open the sealed pointer through the ci
       ref: stored.source, gate: circle.gate, token: 't', opener: circle.opener, fetch: circle.fetchImpl,
     });
     expect(Array.from(opened.bytes)).toEqual(Array.from(plaintextBytes));
+
+    await bob.close?.();
+  });
+
+  it('the chat-p2p plaintext round-trip is inert: requestAttachment serves no bytes', async () => {
+    const circle = makeSealCircle();
+    const { att } = await makeSealedImageAttachment(circle, { createdBy: ANNE });
+    const bob = await buildBundle({ actor: BOB });
+    const [mirrored] = await bob.itemStore.addItems([{
+      type: 'request', text: 'ladder', visibility: 'household',
+      source: { fromPubKey: 'pubkey-anne', broadcast: true, attachments: [att] },
+    }], { actor: 'pubkey-anne' });
+
+    // The old plaintext byte-fetch skill cannot surface bytes for a sealed pointer:
+    // there is no local cache `ref` and no author will serve plaintext (handlers inert).
+    const got = await callSkill(bob.agent, 'getAttachmentDataUrl', { itemId: mirrored.id, attId: att.id }, BOB);
+    expect(got.error).toBe('no-bytes');
 
     await bob.close?.();
   });

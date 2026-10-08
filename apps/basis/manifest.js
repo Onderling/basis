@@ -908,7 +908,9 @@ export const basisManifest = {
    */
   actions: [
     { id: 'back',     labelKey: 'circle.back',                 target: { kind: 'nav', to: 'back' } },
-    { id: 'invite',   labelKey: 'circle.invite.menu',          target: { kind: 'nav', to: 'invite' } },
+    { id: 'invite',   labelKey: 'circle.invite.menu',          target: { kind: 'nav', to: 'invite' },     role: 'admin' },
+    // settings + admin carry NO role: a member opens settings to adopt a pending policy, and the admin panel is the roster every
+    // member reads (its controls are decided per viewer). Only invite is reserved — it refuses a member when opened.
     { id: 'settings', labelKey: 'circle.settings.title',       target: { kind: 'op',  opId: 'settings' } },
     { id: 'lists',    labelKey: 'circle.lists.title',          target: { kind: 'nav', to: 'lists' } },
     { id: 'contacts', labelKey: 'circle.screen.open.contacts', target: { kind: 'nav', to: 'contacts' } },

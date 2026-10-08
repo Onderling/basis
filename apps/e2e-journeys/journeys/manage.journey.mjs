@@ -1,8 +1,10 @@
 // J-manage: the companion-node management surface (6d), surface ① — the OWNER
-// manages the node by invoking owner-gated ops OVER THE RELAY (exactly how
-// basis would); a non-owner is denied. This is the manifest half of the
+// claims the node with the code it printed, then manages it by invoking owner-gated
+// ops OVER THE RELAY (exactly how basis would), each call a statement signed by one
+// of the owner's devices; a non-owner is denied. This is the manifest half of the
 // "one contract, two projectors" design (plans/NOTE-companion-node-management.md).
-import { Agent, AgentIdentity, Parts, DataPart } from '@onderling/core';
+import { Agent, AgentIdentity, Parts, DataPart, Bootstrap } from '@onderling/core';
+import { ownerDevice }        from '../../companion-node/test/support/ownerDevice.js';
 import { VaultMemory }        from '@onderling/vault';
 import { RelayTransport }     from '@onderling/transports';
 import { startCompanionNode } from '../../companion-node/src/index.js';
@@ -25,24 +27,31 @@ export async function run({ relayUrl }) {
   const node = await startCompanionNode({
     relayUrl, configDir: cfg, gate: false,
     inbox: true, inboxOwnerPubKey: owner.address,           // a real tenant to report
-    management: true, managementOwnerPubKey: owner.address, // owner-gated management
+    management: true,                                       // claimed below, with the code it prints
     manageHttp: true,                                       // surface ② — the online /manage web
   });
   const C = node.agent.address;
   owner.addPeer(C, C);    node.agent.addPeer(owner.address, owner.address);
   attacker.addPeer(C, C); node.agent.addPeer(attacker.address, attacker.address);
   const invoke = async (from, op, data) => Parts.data(await from.invoke(C, op, [DataPart(data ?? {})], { timeout: 9000 }));
+  // the owner's phone: a device of the person's root, signing each management call
+  const phone = ownerDevice(Bootstrap.create().bootstrap, 'phone');
+  const signed = (op, data = {}) => ({ ...data, auth: phone.auth(C, op, data) });
 
   try {
     await owner.start(); await attacker.start(); await wait(1800);
     check('owner + non-owner + node on the relay',
       owner.transport.connected && attacker.transport.connected && node.agent.transport.connected);
 
+    // The owner claims the node with the code it printed (a statement by their device).
+    const claimed = await invoke(owner, 'manage.claimOwner', signed('manage.claimOwner', { code: node.claimCode() }));
+    check('the owner claims the node with its code', claimed?.ok === true && node.claimCode() === null);
+
     // Owner manages over the relay (the basis path).
-    const status = await invoke(owner, 'node.status', {});
+    const status = await invoke(owner, 'node.status', signed('node.status'));
     check('owner reads node.status over the relay', status?.ok === true && status.connected === true && typeof status.uptimeMs === 'number');
 
-    const tenants = await invoke(owner, 'node.listTenants', {});
+    const tenants = await invoke(owner, 'node.listTenants', signed('node.listTenants'));
     const sealed = (tenants?.tenants ?? []).find((t) => t.id === 'sealed-inbox');
     check('owner lists tenants (sealed-inbox reported ON)', tenants?.ok === true && sealed?.on === true);
 
@@ -54,7 +63,7 @@ export async function run({ relayUrl }) {
     check('a NON-owner is denied grant.revoke (owner-gated)', badRevoke?.ok === false && badRevoke?.error === 'forbidden');
 
     // The owner CAN reach grant.revoke (validates input; gate is off here so no ledger).
-    const ownerRevoke = await invoke(owner, 'grant.revoke', {});
+    const ownerRevoke = await invoke(owner, 'grant.revoke', signed('grant.revoke'));
     check('owner reaches grant.revoke (reachable + validates)', ownerRevoke?.ok === false && ownerRevoke?.error === 'tokenId required');
 
     // ── SURFACE ② — the online /manage web + owner-pairing flow ────────────────
@@ -73,7 +82,7 @@ export async function run({ relayUrl }) {
     const { code } = await (await fetch(`${base}/manage/pair/start`, { method: 'POST' })).json();
     check('browser starts pairing → gets a code', typeof code === 'string' && code.length > 0);
 
-    const approve = await invoke(owner, 'manage.approvePairing', { code });
+    const approve = await invoke(owner, 'manage.approvePairing', signed('manage.approvePairing', { code }));
     check('owner approves the browser from the phone (over the relay)', approve?.ok === true);
 
     const nonOwnerApprove = await invoke(attacker, 'manage.approvePairing', { code });

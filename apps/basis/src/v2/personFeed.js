@@ -3,14 +3,14 @@
  * key only their link carries.
  *
  * The bot renders it from its own projection — `remindedFor` decides whom an appointment concerns, as for the reminders
- * — and hands the sealed file to the household's companion, which serves it at `/feed/<id>.<k>.ics` and can open it
- * only with the `k` a request brings. The file leaves for a calendar service (Google, Apple), so it says as little as
+ * — and hands the sealed file to the household's companion, which serves it through the relay at
+ * `/feed/<node>/<id>.<k>.ics` and can open it only with the `k` a request brings. The file leaves for a calendar service (Google, Apple), so it says as little as
  * an appointment needs: its title as written, start, end, place. No attendees, no other people's names, no notes, no
  * description, no categories. From 30 days back to everything ahead; a cancelled one stays for those 30 days as
  * cancelled, so a calendar app removes it rather than keeping a stale copy.
  */
 import { buildIcsForEvents } from '@onderling/calendar-emission';
-import { randomKey, sealForLink } from '@onderling/blob-gateway';
+import { randomKey, sealForLink, feedLinkPath } from '@onderling/blob-gateway';
 import { remindedFor } from './reminderOccurrences.js';
 
 /** How far back the file reaches (a passed or cancelled appointment stays this long). */
@@ -59,8 +59,13 @@ export function sealPersonFeed(ics, k) {
   return sealForLink(ics, k);
 }
 
-/** The link as a person pastes it: `https://…` for Google, `webcal://…` for an iPhone. */
-export function feedUrls(base, { id, k }) {
-  const https = `${String(base).replace(/\/+$/, '')}/feed/${id}.${k}.ics`;
+/**
+ * The link as a person pastes it: `https://…` for Google, `webcal://…` for an iPhone.
+ * @param {string} base   where the companion's links are served (its card's `serves`: the relay's public address)
+ * @param {string} node   the companion's address — the relay forwards the request to it
+ * @param {{id: string, k: string}} link
+ */
+export function feedUrls(base, node, { id, k }) {
+  const https = `${String(base).replace(/\/+$/, '')}${feedLinkPath({ node, id, k })}`;
   return { https, webcal: https.replace(/^https?:\/\//, 'webcal://') };
 }

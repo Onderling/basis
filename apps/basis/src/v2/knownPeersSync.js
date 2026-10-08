@@ -45,6 +45,8 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
 
 /** The contact fields that cross: what another device needs to hold the same person. Never a blob. */
 const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
+  // a node's: where its agenda links are served
+  'serves',
   'shareLocation', 'allowHopThrough', 'allowAutomatching',
   // the hidden mark and WHEN it last changed — the one field-pair a sibling may change on a row this device holds (L106)
   'hidden', 'hiddenAt',

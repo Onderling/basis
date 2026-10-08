@@ -18,8 +18,9 @@ Peer-to-peer chat over `agent.transport.sendOneWay`.
 - Optional broadcast-post fan-out (Stoop's contact-broadcast
   pattern; opt-in via the `broadcast-post` subtype).
 - Optional contact-add hint (`contact-add-request` subtype).
-- Attachment *pointers* in `extras` (an app's sealed media item); the
-  substrate never carries, stores or serves plaintext image bytes.
+- Optional in-message attachment passing (`attachment-request` /
+  `attachment-response` subtypes), with attachment-ref helpers
+  injected by the app.
 
 ## What's NOT in scope
 
@@ -34,7 +35,8 @@ Peer-to-peer chat over `agent.transport.sendOneWay`.
 {
   type:         'p2p-chat' | 'stoop-chat' (legacy),
   subtype:      'chat-message' | 'reveal-request' | 'reveal-accept'
-                | 'broadcast-post' | 'contact-add-request',
+                | 'broadcast-post' | 'contact-add-request'
+                | 'attachment-request' | 'attachment-response',
   threadId:     <string>,
   body:         <string>,
   fromWebid:    <string>,
@@ -72,22 +74,33 @@ The double-accept default keeps a mixed-version network working: a
 Stoop-V1 peer sending `'stoop-chat'` is still readable by a peer
 running the new substrate, and vice versa.
 
-## Attachments
+## Attachment support (optional)
 
-Chat carries no plaintext image bytes. An app seals an image through its circle
-media gateway and passes the resulting opaque pointer in `extras`; the
-recipient opens it through its own gateway.
+Apps that ship in-message attachments wire helpers in:
 
-The earlier plaintext route — an `attachmentSupport` option that let the
-author answer an `attachment-request` with base64 bytes and stored inline
-`dataB64` from a chat-message — was superseded by that sealed path and
-removed on 2026-10-07.
+```js
+import { wireChat } from '@onderling/chat-p2p';
+import { attachmentPath, readAttachmentBytesB64, MAX_CHAT_BYTES_PER_ATT }
+       from './lib/Attachments.js';
+
+const chat = wireChat({
+  ...,
+  attachmentSupport: {
+    attachmentPath,             // (itemId, attId, mime) → string
+    readAttachmentBytesB64,     // ({dataSource, ref}) → base64
+    maxBytesPerAttachment:      MAX_CHAT_BYTES_PER_ATT,
+  },
+});
+```
+
+When `attachmentSupport` is absent, the attachment-related code
+paths silently no-op — the substrate's chat surface is unaffected.
 
 ## Tests
 
 5 substrate-side smoke tests pin the envelope-type contract.
 End-to-end behaviour (send/receive, dedup, thread isolation,
-reveal, broadcast-post, eviction) is exercised by
+reveal, broadcast-post, attachments, eviction) is exercised by
 Stoop's existing 429-test suite via the shim in
 `apps/stoop/src/chat/wireChat.js`.
 
@@ -96,7 +109,6 @@ Stoop's existing 429-test suite via the shim in
 Stoop V1 Phase 14 invented `wireChat` — peer chat over
 `core.taskExchange` + `agent.sendOneWay`. Phase 24/27 added contact
 broadcast + auto-skill-match notifications. Phase 35 added the
-eviction filter. Phase 39 added attachment support (since replaced
-by sealed media pointers). Tasks V1
+eviction filter. Phase 39 added attachment support. Tasks V1
 needs the same wire shape, so the rule-of-two trigger fires and
 the substrate is born.

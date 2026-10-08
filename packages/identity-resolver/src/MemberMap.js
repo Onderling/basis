@@ -312,6 +312,9 @@ export class MemberMap extends Emitter {
       // A message to a contact rides these before any kring's relay; two people who share no kring
       // have no other route. The same whitelist lesson as `peerAddr` above: named here or dropped.
       points:      Array.isArray(m.points) ? m.points.filter((u) => typeof u === 'string' && u) : [],
+      // serves: for a NODE (a household's companion), the public https address its agenda links are served at — from
+      // its card. A household bot builds a person's link from it (`feedCompanion.js`). Same whitelist lesson.
+      serves:      (typeof m.serves === 'string' && /^https?:\/\/[^\s]+$/.test(m.serves)) ? m.serves : null,
       // personKey: the contact's CURRENT rotating person key `{version, pubKey, linkKeyPub?}` — from their card, or a
       // pulled chain (2026-09-16). What a direct message to them is sealed to; `linkKeyPub` is the PINNED public half
       // of the key that vouches for their rotations (never replaced once set). Same whitelist lesson: named here or dropped.

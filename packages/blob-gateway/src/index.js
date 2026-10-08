@@ -29,6 +29,8 @@ export {
 } from './bytes.js';
 // a blob that opens with the key a link carries (a reader that is no agent: a calendar app)
 export { sealForLink, openForLink, isLinkSealed } from './linkSeal.js';
+// …and the path such a link has (built by the writer, read by whoever serves it: a companion or the relay)
+export { LINK_TOKEN, LINK_NODE, feedLinkPath, parseFeedLinkPath } from './linkPath.js';
 
 // REAL adapters that satisfy the injected contracts (Objective S, second slice).
 // Kept behind subpath exports so this core entry stays browser-safe (the S3 +

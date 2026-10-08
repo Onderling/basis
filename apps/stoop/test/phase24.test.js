@@ -10,7 +10,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
-import { decodeContactCard } from '../src/lib/contactCard.js';
+import { decodeContactCard, encodeContactCard } from '../src/lib/contactCard.js';
 
 const ANNE = 'https://id.example/anne';
 const BOB  = 'https://id.example/bob';
@@ -224,6 +224,22 @@ describe('Stoop V2 Phase 24 — QR contact-share', () => {
     // …and again from the LIST, which is what a shell actually paints from.
     const listed = (await callSkill(dst.bundle.agent, 'listContacts', {}, 'https://id.example/dst2')).contacts;
     expect(listed.find((c) => c.webid === ANNE)?.peerAddr).toBe('nkn-anne-native-addr');
+  });
+
+  it('a NODE\'s card keeps where it serves: a household\'s companion, added by its card, says where its links are', async () => {
+    // A companion's card (apps/companion-node/src/card.js) is a contact card with `serves` — the public address its
+    // agenda links are served at. A household bot builds a person's link from the contact it holds, so the field must
+    // survive the add and the list like every other.
+    const dst = await buildBundle('https://id.example/dst-node');
+    const node = 'N'.repeat(43);
+    const payload = 'onderling-contact://' + encodeContactCard({ webid: node, pubKey: node, peerAddr: node, relays: ['wss://relay.example.org'], serves: 'https://relay.example.org' });
+    const add = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload }, 'https://id.example/dst-node');
+    expect(add.contact.serves).toBe('https://relay.example.org');
+    const listed = (await callSkill(dst.bundle.agent, 'listContacts', {}, 'https://id.example/dst-node')).contacts;
+    expect(listed.find((c) => c.webid === node)?.serves).toBe('https://relay.example.org');
+    // not an http(s) address: not kept
+    const odd = 'onderling-contact://' + encodeContactCard({ webid: 'M'.repeat(43), serves: 'javascript:alert(1)' });
+    expect((await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: odd }, 'https://id.example/dst-node')).contact.serves ?? null).toBeNull();
   });
 
   it('EVERY field the card carries survives the add — the store must not quietly drop any of them', async () => {

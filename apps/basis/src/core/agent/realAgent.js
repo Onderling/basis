@@ -24,14 +24,16 @@
  */
 
 import {
-  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
+  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
+  signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
   deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
+import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -122,7 +124,8 @@ import {
   ROSTER_SEED_SUBTYPES, buildRosterSeedRequest, makeRosterSeedServer, makeRosterSeedReceiver,
 } from '../../v2/rosterSeed.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
-import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
+import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
+import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -164,6 +167,7 @@ import {
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, profileHasOtherDevices, setDeviceDelegation as registrySetDeviceDelegation,
+  ownedNodesOf, setOwnedNode,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -2868,13 +2872,106 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (migrated) selfEnrolledThisSession = true;
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
+      // Every node the person owns (a companion) hears of it too — the root's own tombstone, so the revoked device
+      // stops managing it; the person revokes once. Best-effort per node: one that is away hears it next time.
+      const nodesTold = await tellOwnedNodesRevoked(root, deviceId);
       return [DataPart({
-        ok: true, deviceId, known, revokedIn, circles: revokedIn.length,
+        ok: true, deviceId, known, revokedIn, circles: revokedIn.length, nodesTold,
         ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven
+
+  /* ─── The nodes a person OWNS (a companion): claimed with the code the node printed ─────────────────
+   * A node is managed by a statement signed with a DEVICE's delegation key, its root-signed delegation alongside
+   * (`signDeviceStatement`): the node checks the chain to the owner root it recorded at the claim, so every device of
+   * the person manages it and a revoked one does not. The profile key, which every device holds, is not used. */
+  const invokeNode = async (node, op, data) => {
+    const peer = secureAgentRef.current?.peer;
+    if (typeof peer?.invoke !== 'function') return null;
+    try {
+      const res = await Promise.race([
+        peer.invoke(node, op, [DataPart(data)]),
+        new Promise((r) => { setTimeout(() => r(null), 15_000); }),
+      ]);
+      return res ? (Parts.data(res) ?? null) : null;
+    } catch { return null; }
+  };
+  /** A management call to a node this person owns, signed by this device. Null when this device cannot sign. */
+  const signedForNode = async (node, op, args = {}) => {
+    const signer = await grantsSignerPromise;
+    const delegation = enrolledDevice?.record ?? null;
+    if (!signer?.identity || !delegation) return null;
+    const auth = signDeviceStatement({
+      domain: STATEMENT_DOMAINS.COMPANION_MANAGE, node, op, args, delegation, sign: (m) => signer.identity.sign(m),
+    });
+    return { ...args, auth };
+  };
+  async function tellOwnedNodesRevoked(root, deviceId) {
+    let nodes = [];
+    try { nodes = Object.keys(ownedNodesOf(await agentsRegistryRef?.lookup?.('default'))); } catch { nodes = []; }
+    if (!nodes.length) return 0;
+    const revocation = signDeviceRevocation(root.secret, { profileId: 'default', deviceId });
+    const told = await Promise.all(nodes.map((node) => invokeNode(node, 'manage.revokeDevice', { revocation })));
+    return told.filter((r) => r?.ok === true).length;
+  }
+  hostAgent.register('claimCompanion', async ({ parts }) => {
+    const claim = parseCompanionClaim(parts?.[0]?.data?.claim);
+    if (!claim) return [DataPart({ ok: false, outcome: 'bad-claim' })];
+    const data = await signedForNode(claim.node, 'manage.claimOwner', { code: claim.code });
+    if (!data) return [DataPart({ ok: false, outcome: 'no-device-key' })];
+    const res = await invokeNode(claim.node, 'manage.claimOwner', data);
+    if (!res) return [DataPart({ ok: false, outcome: 'unreachable' })];
+    if (res.ok !== true) {
+      const outcome = ['already-owned', 'invalid-code', 'stale', 'unsigned'].includes(res.error) ? res.error : 'unsigned';
+      return [DataPart({ ok: false, outcome })];
+    }
+    // the person's own list of the nodes they own: every device manages them, and each hears of a revoked device
+    try {
+      const cur = await agentsRegistryRef?.lookup?.('default');
+      if (cur) {
+        await agentsRegistryRef.register({
+          ...cur, properties: setOwnedNode(cur.properties ?? {}, { address: claim.node, claimedAt: new Date().toISOString() }),
+        });
+      }
+    } catch (err) { console.warn('[claimCompanion] the node is yours, but this device could not write it down:', err?.message ?? err); }
+    return [DataPart({ ok: true, outcome: 'ok', node: claim.node })];
+  }, { visibility: 'private' });   // makes this person a node's owner: owner-only
+
+  /* ─── What a node the person owns lets ANOTHER agent do there (a household bot putting agenda files) ──────────────
+   * Granted by FAMILY, never by op: the node names its families and maps each to its ops itself; it mints one token per
+   * op to the agent's key and delivers them over the relay. Both ops sign a statement with THIS device's delegation key
+   * — only for a node the person's own list says they own — and are never delegable (renderA2A's withhold list). */
+  const ownedNode = async (node) => {
+    if (typeof node !== 'string' || !node) return false;
+    try { return Object.prototype.hasOwnProperty.call(ownedNodesOf(await agentsRegistryRef?.lookup?.('default')), node); } catch { return false; }
+  };
+  /** Ask a node the person owns `op`, signed by this device: `{res}` or `{outcome}` naming why it was not asked/answered. */
+  const askOwnedNode = async (node, op, args) => {
+    if (!(await ownedNode(node))) return { outcome: 'not-owned' };
+    const data = await signedForNode(node, op, args);
+    if (!data) return { outcome: 'no-device-key' };
+    const res = await invokeNode(node, op, data);
+    return res ? { res } : { outcome: 'unreachable' };
+  };
+  hostAgent.register('companionGrantChoices', async ({ parts }) => {
+    const { node } = parts?.[0]?.data ?? {};
+    const { res, outcome } = await askOwnedNode(node, 'grants.families', {});
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true || !Array.isArray(res.families)) return [DataPart({ ok: false, outcome: res.error === 'stale' ? 'stale' : 'forbidden' })];
+    return [DataPart({ ok: true, outcome: 'ok', families: res.families.filter((f) => typeof f === 'string') })];
+  }, { visibility: 'private' });   // signs for the person's node: owner-only
+  hostAgent.register('grantCompanion', async ({ parts }) => {
+    const { node, to, families } = parts?.[0]?.data ?? {};
+    if (typeof to !== 'string' || !to || !Array.isArray(families) || families.length === 0) return [DataPart({ ok: false, outcome: 'bad-args' })];
+    const { res, outcome } = await askOwnedNode(node, 'grants.mint', { to, families });
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true) {
+      return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    }
+    return [DataPart({ ok: true, outcome: 'ok', ops: res.ops ?? [], delivery: res.delivery ?? null })];
+  }, { visibility: 'private' });   // hands another agent standing authority on the person's node: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
@@ -6301,9 +6398,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // activates the already-built pod-routing write-through). Pass {podRoot, webid, fetch}.
     attachStoopPod: (opts) => (typeof stoopAgent?.attachPod === 'function' ? stoopAgent.attachPod(opts) : Promise.resolve({ ok: false })),
     detachStoopPod: () => stoopAgent?.detachPod?.(),
-    // Subscribe to events the inner stoop agent emits. The stoop agent extends core.Emitter (on/off). Returns an
-    // unsubscribe fn; a no-op when stoop isn't composed. (Its one former event, the attachment-fetched notice of the
-    // removed attachment fetch route, is gone with that route.)
+    // S6.4 — subscribe to events the inner stoop agent emits (e.g.
+    // 'stoop:attachment-fetched' when a recipient's requested attachment bytes
+    // arrive over the 1:1 channel). The stoop agent extends core.Emitter
+    // (on/off). Returns an unsubscribe fn; a no-op when stoop isn't composed.
     onStoopEvent: (event, handler) => {
       const a = stoopAgent?.bundle?.agent;
       if (!a || typeof a.on !== 'function' || typeof handler !== 'function') return () => {};

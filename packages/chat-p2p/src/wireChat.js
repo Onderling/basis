@@ -5,7 +5,7 @@
  * (Tasks V1 = rule-of-two consumer per
  * `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
  * Stoop's wireChat.js is now a thin shim that pre-binds Stoop's
- * envelope type.
+ * envelope-type + Phase 39 attachment helpers.
  *
  * Originally Stoop V1 Phase 14 (2026-05-06).
  *
@@ -14,7 +14,8 @@
  *   {
  *     type:         'p2p-chat' | 'stoop-chat' (legacy),
  *     subtype:      'chat-message' | 'reveal-request' | 'reveal-accept'
- *                    | 'broadcast-post' | 'contact-add-request',
+ *                    | 'broadcast-post' | 'contact-add-request'
+ *                    | 'attachment-request' | 'attachment-response',
  *     threadId:     <string>,           // typically the originating post's id
  *     body:         <string>,           // user-typed message body (subtype: chat-message)
  *     fromWebid:    <string>,
@@ -32,12 +33,12 @@
  * default so a mixed-version network keeps working. Apps tweak via
  * `emitEnvelopeType` + `acceptedEnvelopeTypes` constructor args.
  *
- * **Attachments.** Chat carries no image bytes. Images are sealed through
- * the circle media gateway and travel as an opaque pointer inside the
- * caller's `extras`; the recipient opens them through its own gateway.
- * The earlier plaintext route (an `attachment-request` answered by the
- * author with base64 bytes, and inline `dataB64` on a chat-message) was
- * superseded by that sealed path and removed on 2026-10-07.
+ * **Attachments.** Optional. When an app passes
+ * `attachmentSupport: { attachmentPath, readAttachmentBytesB64,
+ * maxBytesPerAttachment }`, the substrate wires the
+ * `attachment-request` / `attachment-response` flow and the inline
+ * chat-message attachment path. When `attachmentSupport` is absent,
+ * those code paths are no-ops.
  */
 
 import nacl from 'tweetnacl';
@@ -48,6 +49,18 @@ const DEFAULT_EMIT_ENVELOPE_TYPE = 'p2p-chat';
 
 /** Default accepted envelope types (new + legacy). */
 const DEFAULT_ACCEPTED_ENVELOPE_TYPES = Object.freeze(['p2p-chat', 'stoop-chat']);
+
+/** Tiny base64 helper — same shape as Attachments.js so we don't
+ *  drag a dependency. */
+function _b64decode(s) {
+  if (typeof atob === 'function') {
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  return new Uint8Array(Buffer.from(s, 'base64'));
+}
 
 function dataArgsOf(parts) {
   if (!Array.isArray(parts)) return null;
@@ -81,6 +94,7 @@ function freshNonce() {
 export function wireChat({
   agent, itemStore, members, muted, metrics, localActor, localStableId,
   evictionRoster = null,
+  dataSource     = null,
   // Connectivity Phase 2 / Wave B — host-injected hold-forward sender (basis's
   // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`). When wired, a 1:1 DM to a
   // briefly-offline peer is HELD locally and flushed on reconnect (the offline-ladder
@@ -92,8 +106,17 @@ export function wireChat({
   // Phase 6 substrate parameters (Tasks V1 lift):
   emitEnvelopeType      = DEFAULT_EMIT_ENVELOPE_TYPE,
   acceptedEnvelopeTypes = DEFAULT_ACCEPTED_ENVELOPE_TYPES,
+  attachmentSupport     = null,
 }) {
   const acceptedSet = new Set(acceptedEnvelopeTypes);
+
+  // Optional attachment helpers (per-app glue).  When `dataSource` and
+  // these are all supplied, the inline-chat-message + attachment-
+  // request / -response flows are active.  Otherwise those paths
+  // silently no-op.
+  const attachmentPath           = attachmentSupport?.attachmentPath ?? null;
+  const readAttachmentBytesB64   = attachmentSupport?.readAttachmentBytesB64 ?? null;
+  const maxBytesPerAttachment    = attachmentSupport?.maxBytesPerAttachment ?? Infinity;
 
   /** Track recently-seen nonces so resends don't duplicate items. */
   const seenNonces = new Set();
@@ -105,7 +128,8 @@ export function wireChat({
   // two 1:1 DM paths are ONE implementation. wireChat keeps only its own
   // concerns: the exact wire shape (`buildChatWire`, so `emitEnvelopeType` and
   // every wire field stay byte-identical), the exact persisted item
-  // (`buildChatItem`), and the accepted-types /
+  // (`buildChatItem`, which also owns the Phase-39 inline-attachment byte-write —
+  // the generic core never learns about attachments), and the accepted-types /
   // subtype handling on RECEIVE (`handleIncoming`, below). The shared
   // `seenNonces` set is injected so send-side and receive-side dedup are one set.
 
@@ -121,8 +145,8 @@ export function wireChat({
       fromStableId: ex.fromStableId ?? null,
       sentAt:       env.ts,
       nonce:        env.id,
-      // Caller-supplied extra wire fields (contact-add-request metadata, a sealed
-      // `attachment` pointer, `attachments` fanout metadata, …).
+      // Phase 24.6 / 39 — caller-supplied extra wire fields (contact-add-request
+      // metadata, `attachment` inline bytes, `attachments` fanout metadata, …).
       ...(ex.wireExtras && typeof ex.wireExtras === 'object' ? ex.wireExtras : {}),
     };
     return { type: 'message', parts: [{ type: 'DataPart', data: payload }] };
@@ -133,11 +157,35 @@ export function wireChat({
    * ONLY for `chat-message` (other subtypes are send-only: return null so the
    * core skips persistence, matching the pre-fold behaviour where reveal /
    * contact-add-request stored nothing on the sender side). Runs AFTER a
-   * successful send.
+   * successful send, so the inline-attachment byte-write (Phase 39) keeps its
+   * original ordering: bytes are only written once the message is on the wire.
    */
   async function buildChatItem(env, { to }) {
     if (env.kind !== 'chat-message') return null;
     const ex = (env && typeof env.extras === 'object' && env.extras) || {};
+    // Phase 39 — sender stores its own copy of any inline attachment so its
+    // thread render shows the image immediately.
+    let senderAttachment = null;
+    const inline = ex.wireExtras?.attachment;
+    if (dataSource && attachmentPath && inline && typeof inline.dataB64 === 'string') {
+      const att = inline;
+      const time = Date.now().toString(36).padStart(9, '0');
+      const rand = Math.random().toString(36).slice(2, 10);
+      const attId = `att-${time}-${rand}`;
+      const ref = attachmentPath(env.id, attId, att.mime ?? 'image/jpeg');
+      try {
+        await dataSource.write(ref, _b64decode(att.dataB64));
+        senderAttachment = {
+          id:        attId,
+          mime:      att.mime,
+          bytes:     att.bytes ?? Math.floor(att.dataB64.length * 0.75),
+          width:     att.width  ?? 0,
+          height:    att.height ?? 0,
+          thumbnail: att.thumbnail ?? null,
+          ref,
+        };
+      } catch { /* keep the message body even if attachment fails */ }
+    }
     return {
       type:       'chat-message',
       text:       env.body,
@@ -150,6 +198,7 @@ export function wireChat({
         toPubKey:     ex.toPubKey ?? to,
         sentAt:       env.ts,
         nonce:        env.id,
+        ...(senderAttachment ? { attachments: [senderAttachment] } : {}),
       },
     };
   }
@@ -202,6 +251,36 @@ export function wireChat({
     if (data.nonce) seenNonces.add(data.nonce);
 
     if (data.subtype === 'chat-message') {
+      // Phase 39 — chat-message may carry an inline attachment with
+      // full bytes.  Persist the bytes to a freshly-allocated path
+      // BEFORE storing the chat-message item, so the item carries
+      // a `ref` from the start (no fetch round-trip needed).
+      let storedAttachment = null;
+      if (dataSource && attachmentPath && data.attachment && typeof data.attachment === 'object'
+          && typeof data.attachment.dataB64 === 'string') {
+        const att = data.attachment;
+        // Generate an attId locally on the receiver side — chat
+        // attachments are 1:1 and the sender doesn't need to know
+        // our path.
+        const time = Date.now().toString(36).padStart(9, '0');
+        const rand = Math.random().toString(36).slice(2, 10);
+        const attId = `att-${time}-${rand}`;
+        const itemIdStub = data.nonce ?? attId;   // chat items don't pre-exist; use nonce as group key
+        const ref = attachmentPath(itemIdStub, attId, att.mime ?? 'image/jpeg');
+        try {
+          await dataSource.write(ref, _b64decode(att.dataB64));
+          storedAttachment = {
+            id:        attId,
+            mime:      att.mime,
+            bytes:     att.bytes ?? Math.floor(att.dataB64.length * 0.75),
+            width:     att.width  ?? 0,
+            height:    att.height ?? 0,
+            thumbnail: att.thumbnail ?? null,
+            ref,
+          };
+        } catch { /* drop attachment, keep message body */ }
+      }
+
       await itemStore.addItems([{
         type:       'chat-message',
         text:       data.body ?? '',
@@ -213,10 +292,12 @@ export function wireChat({
           fromPubKey,
           sentAt:       data.sentAt ?? Date.now(),
           nonce:        data.nonce ?? null,
+          ...(storedAttachment ? { attachments: [storedAttachment] } : {}),
         },
       }], { actor: data.fromWebid ?? `pubkey:${fromPubKey?.slice?.(0, 12) ?? '?'}` });
       agent.emit('stoop:chat-message', {
         threadId: data.threadId, fromWebid: data.fromWebid, body: data.body,
+        hasAttachment: !!storedAttachment,
       });
       metrics?.record?.('chat-received');
       return;
@@ -320,7 +401,7 @@ export function wireChat({
           skillTags:    Array.isArray(data.skillTags) ? data.skillTags : [],
           viaAutoMatch: !isContact,    // sender wasn't in my contacts → loose-contact path
           notifyWorthy,
-          // Attachment pointers (sealed; opened through the circle media gateway).
+          // Phase 39 — attachment metadata (no `ref` until fetched).
           attachments:  Array.isArray(data.attachments) ? data.attachments : [],
         },
         ...(typeof data.dueAt === 'number' ? { dueAt: data.dueAt } : {}),
@@ -331,6 +412,109 @@ export function wireChat({
       metrics?.record?.(notifyWorthy
         ? 'contact-broadcast-received-notify'
         : 'contact-broadcast-received-silent');
+      return;
+    }
+
+    if (data.subtype === 'attachment-request') {
+      // Phase 39 — recipient wants the full bytes for an attachment
+      // they only have the thumbnail of.  Look up the ORIGINATING
+      // item in our local store; if we're the original author and
+      // the bytes are local, ship them back via attachment-response.
+      // Other actors silently ignore — only the author serves bytes.
+      // Substrate guard: skip the whole flow when an app didn't wire
+      // attachment support.
+      if (!dataSource || !readAttachmentBytesB64) return;
+      if (muted && (
+        (data.fromStableId && muted.has(data.fromStableId)) ||
+        (data.fromWebid    && muted.has(data.fromWebid))
+      )) return;
+
+      const itemId = data.itemId;
+      const attId  = data.attId;
+      if (typeof itemId !== 'string' || typeof attId !== 'string') return;
+
+      const ours = await itemStore.getById(itemId).catch(() => null);
+      // Author check: addedBy must equal localActor (we're the
+      // sender of the post).  Mirrored items don't pass.
+      if (!ours || ours.addedBy !== localActor) return;
+      const attachments = Array.isArray(ours.source?.attachments) ? ours.source.attachments : [];
+      const att = attachments.find(a => a?.id === attId);
+      if (!att || !att.ref) return;
+
+      const dataB64 = await readAttachmentBytesB64({ dataSource, ref: att.ref }).catch(() => null);
+      if (!dataB64) return;
+
+      try {
+        // Same per-peer routing as the main send() path — without
+        // this, the attachment-response goes via the primary slot
+        // and never reaches the requesting peer.
+        const t = await agent.transportFor(fromPubKey);
+        await t.sendOneWay(fromPubKey, {
+          type:  'message',
+          parts: [{ type: 'DataPart', data: {
+            type:         emitEnvelopeType,
+            subtype:      'attachment-response',
+            itemId,
+            attId,
+            mime:         att.mime,
+            width:        att.width,
+            height:       att.height,
+            bytes:        att.bytes,
+            dataB64,
+            fromWebid:    localActor,
+            fromStableId: localStableId ?? null,
+            sentAt:       Date.now(),
+          }}],
+        });
+      } catch { /* swallow — recipient retries */ }
+      metrics?.record?.('attachment-served');
+      return;
+    }
+
+    if (data.subtype === 'attachment-response') {
+      // Phase 39 — we asked for bytes; the author shipped them.
+      // Validate, write to OUR local cache, emit an event the UI
+      // listens to so the modal flips from "loading…" to the image.
+      // Substrate guard: skip when the app didn't wire attachment support.
+      if (!dataSource || !attachmentPath) return;
+      const itemId = data.itemId;
+      const attId  = data.attId;
+      const dataB64 = data.dataB64;
+      if (typeof itemId !== 'string' || typeof attId !== 'string'
+          || typeof dataB64 !== 'string') return;
+      // Defensive size cap on inbound bytes (defence in depth — the
+      // sender is supposed to honour the post's max).
+      const approxBytes = Math.floor(dataB64.length * 0.75);
+      if (approxBytes > maxBytesPerAttachment * 4) return;     // hard cap (4× the soft cap)
+
+      const mime = data.mime ?? 'image/jpeg';
+      const ref  = attachmentPath(itemId, attId, mime);
+      try {
+        const bytes = _b64decode(dataB64);
+        await dataSource.write(ref, bytes);
+      } catch { return; }
+
+      // Patch the local item (mirrored or own) with the ref so the
+      // next render shows the full image.
+      const ours = await itemStore.getById(itemId).catch(() => null);
+      if (ours) {
+        const attachments = Array.isArray(ours.source?.attachments) ? ours.source.attachments : [];
+        const idx = attachments.findIndex(a => a?.id === attId);
+        if (idx >= 0) {
+          const updated = {
+            ...ours,
+            source: {
+              ...(ours.source ?? {}),
+              attachments: attachments.map((a, i) => i === idx ? { ...a, ref } : a),
+            },
+          };
+          // Same write-trick as postRequest: rewrite at the item-store path.
+          await dataSource.write(`mem://neighbourhood/items/${itemId}.json`, JSON.stringify(updated))
+            .catch(() => { /* best-effort */ });
+        }
+      }
+      agent.emit('stoop:attachment-fetched', { itemId, attId, ref });
+      metrics?.record?.('attachment-fetched');
       return;
     }
 
@@ -417,8 +601,9 @@ export function wireChat({
         fromStableId: localStableId ?? null,
         toWebid,                 // persist-only routing fields
         toPubKey,
-        // Extra wire fields: contact-add-request metadata, a sealed `attachment`
-        // pointer on a chat-message, `attachments` pointers on a broadcast-post fanout.
+        // Phase 24.6 — extra fields for contact-add-request envelopes.
+        // Phase 39 — `attachment` carries inline-bytes chat-image;
+        // `attachments` carries metadata-only on a broadcast-post fanout.
         wireExtras: (args.extras && typeof args.extras === 'object') ? args.extras : null,
       },
     };

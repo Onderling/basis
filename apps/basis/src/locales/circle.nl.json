@@ -4968,6 +4968,10 @@
     }
   },
   "op": {
+    "admin_only": {
+      "text": "Alleen een beheerder van deze kring kan dit.",
+      "doc": "A ⋯ menu entry reserved for the circle's admins, shown greyed to a member with this sentence beside it (invite keeps its own, more specific one). Names the role, never the people who hold it."
+    },
     "not_in_this_circle": {
       "text": "Dat kan niet in deze kring — die app doet hier niet mee. Een beheerder kan dat aanzetten in de instellingen.",
       "doc": "Said when a person invokes an op whose APP this circle does not compose. It used to answer \"I couldn't turn that into an action\", which blames the person for the circle's configuration. Names what is wrong AND who can change it, because a refusal a person cannot act on is only slightly better than silence."
@@ -7003,6 +7007,46 @@
     "submit": "Dit apparaat intrekken",
     "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
     "failed": "Intrekken is mislukt."
+  },
+  "companionClaim": {
+    "title": "Een companion claimen",
+    "ceremony": "Companion wordt geclaimd",
+    "body": "Plak de regel die je companion in zijn log toont, na 'Claim:' (code@adres). Hij wordt van jou: elk apparaat van je kan hem beheren, een ingetrokken apparaat niet.",
+    "placeholder": "ABCD-EFGH@…",
+    "submit": "Claimen",
+    "button": "Companion claimen",
+    "done": "Deze companion is nu van jou. Elk apparaat van je kan hem beheren.",
+    "failed": "Claimen lukte niet.",
+    "outcome_bad_claim": "Dat is geen claim-regel. Kopieer alles na 'Claim:' — de code, de @ en het adres.",
+    "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_already_owned": "Deze companion heeft al een eigenaar.",
+    "outcome_invalid_code": "De code klopt niet of is verlopen. Haal de nieuwste regel uit het log (elke tien minuten een nieuwe).",
+    "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
+    "outcome_unsigned": "De companion nam de ondertekening van dit apparaat niet aan."
+  },
+  "companionGrant": {
+    "nodes": "Mijn agents",
+    "node_row": "Companion {{short}}",
+    "give": "Toegang geven",
+    "to_label": "Aan wie",
+    "to_none": "Nog niemand om toegang aan te geven. Voeg eerst de bot toe als contact (zijn kaartje), of koppel hem met /koppel.",
+    "may_do": "Mag:",
+    "loading": "Even vragen wat deze companion kan geven…",
+    "confirm": "Toegang geven",
+    "nothing_ticked": "Vink aan wat het mag.",
+    "family_agenda_files": "agenda-bestanden plaatsen",
+    "done": "Toegang gegeven. De companion stuurt het door; het geldt tot je het intrekt (na een jaar opnieuw aanvinken).",
+    "failed": "Toegang geven lukte niet.",
+    "outcome_not_owned": "Deze companion staat niet op jouw naam. Claim hem eerst.",
+    "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_forbidden": "De companion nam de ondertekening van dit apparaat niet aan.",
+    "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
+    "outcome_unknown_family": "Dat kan deze companion niet geven.",
+    "outcome_bad_target": "Aan die ontvanger kan de companion geen toegang geven.",
+    "outcome_bad_args": "Kies aan wie, en vink aan wat het mag.",
+    "outcome_gate_off": "Deze companion draait zonder toegangscontrole en geeft dus geen toegang."
   },
   "wizard": {
     "recovery": {

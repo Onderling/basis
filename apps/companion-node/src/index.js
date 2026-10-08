@@ -53,7 +53,8 @@
  *            in-memory Map, not a pod-backed resource).  Both are R1.5/R2.
  */
 import { Agent, AgentIdentity, Parts, PodCapabilityToken, RoutingStrategy,
-         PolicyEngine, TrustRegistry, TokenRegistry, CapabilityToken } from '@onderling/core';
+         PolicyEngine, TrustRegistry, TokenRegistry, CapabilityToken,
+         verifyDeviceStatement, verifyDeviceRevocation, createNonceWindow, STATEMENT_DOMAINS } from '@onderling/core';
 import { RelayTransport }              from '@onderling/transports';
 import { startRelay }                  from '@onderling/relay';
 import { VaultNodeFs }                 from '@onderling/vault';
@@ -77,8 +78,16 @@ import { ScopedPodClient, closedPodClient } from './scopedPodClient.js';
 import { ACCEPT_DELEGATION_OP }        from './authorizePod.js';
 import { makeMemoryRegistryPod }       from './registryPod.js';
 import { buildDevMediaEdge }           from './mediaEdge.js';
+import { createOwnerClaim, ownerFile, CLAIM_TTL_MS } from './ownerClaim.js';
+import { companionCard }               from './card.js';
+import { createNodeGrants, GRANT_FAMILIES } from './grants.js';
 
 const IDENTITY_FILE = 'host-identity.json';
+
+/** The op a link is served with — the ONE public op on this node (see where it is registered). */
+export const FEED_SERVE_OP = 'feed.serve';
+/** `feed.serve`'s one answer to every failure: unknown id, wrong key, no file, bad arguments, a throw. */
+const FEED_MISS = Object.freeze({ ok: false });
 
 /**
  * R3.0 — bound the host→device `pod.proxyRequest` invoke so an OFFLINE device
@@ -229,14 +238,21 @@ export async function startCompanionNode(opts = {}) {
     inboxThrottleMs,            // min gap between wakes per owner (M1 batching); default 30s
     // ── 6d — MANAGEMENT surface (owner-gated node ops) ───────────────────────
     management         = false, // enable node.status / node.listTenants / grant.revoke (OFF by default)
-    managementOwnerPubKey,      // the ONLY key allowed to manage; default podOwnerPubKey ?? inboxOwnerPubKey
+    claimedOwner,               // COMPOSITION, not configuration: `{root}` for a node composed in-process already
+                                // claimed (tests, walks); a shipped boot never passes it — the owner CLAIMS the node
+    onClaimCode,                // told each new claim, as `<code>@<node address>` — the one string the owner pastes
     manageHttp         = false, // surface ② — serve the /manage web (true → random port, or a port number)
     manageHttpHost     = '127.0.0.1',
-    // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served at /feed/ ──
-    feeds              = false, // needs management (the owner) and the manage HTTP server (the route)
+    // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served as `feed.serve` ──
+    feeds              = false, // needs management (the owner); the manage HTTP server adds this node's own /feed route
     feedBucket,                 // the bucket the files live in (tests, or a real R2/S3); default a file bucket under configDir
+    // where this node's links are served, as its card says: the public https address of the relay it dials (mapped
+    // from `relayUrl`), or this explicit override (a node that dials its relay by an inside name, e.g. `ws://relay:8787`)
+    publicUrl,
   } = opts;
   const bootAt = Date.now();
+  // the agenda files are put by an agent the owner granted, its token checked by the gate: no gate, no feeds
+  if (feeds && !gate) throw new Error('companion-node: feeds need the gate (a put is allowed by a token the gate verifies)');
 
   // ── 1. Host identity — persisted so the pubKey is stable across restarts ──
   const vault = identityVault
@@ -531,8 +547,8 @@ export async function startCompanionNode(opts = {}) {
   let trustRegistry = null;
   let tokenRegistry = null;
   let policyEngine  = null;
+  const permVault = permissionsVault ?? vault;     // multi-key store; reuse identity vault by default
   if (gate) {
-    const permVault = permissionsVault ?? vault;   // multi-key store; reuse identity vault by default
     trustRegistry   = new TrustRegistry(permVault);
     tokenRegistry   = new TokenRegistry(permVault);
 
@@ -567,6 +583,7 @@ export async function startCompanionNode(opts = {}) {
 
   let manageServer = null;   // 6d surface ② — the /manage HTTP tenant (assigned below when manageHttp is ON)
   async function stop() {
+    if (claimTimer) { clearInterval(claimTimer); claimTimer = null; }
     if (nearbyMdns) { try { await nearbyMdns.stop(); } catch { /* best-effort */ } }
     if (manageServer) { try { await manageServer.stop(); } catch { /* best-effort */ } }
     try { await agent.stop?.(); } catch { /* best-effort */ }
@@ -631,13 +648,69 @@ export async function startCompanionNode(opts = {}) {
   //     "one contract, two projectors" design — plans/NOTE-companion-node-management.md).
   //     Same deny-by-default / opaque-`forbidden` posture as `inbox.drain`. BOTH the
   //     in-app (basis over the relay) and the online interface project THESE.
-  const mgmtOwner = managementOwnerPubKey ?? podOwnerPubKey ?? inboxOwnerPubKey ?? null;
+  // Who manages the node: the OWNER ROOT that claimed it with the code it printed (recorded in its config dir), or —
+  // for a node composed in-process already claimed — the root it was handed. Unclaimed, nobody does. Every management
+  // call carries a statement signed by one of the owner's DEVICES with its root-signed delegation alongside
+  // (`verifyDeviceStatement`): the node checks the chain to the recorded root, its own address and the op, refuses a
+  // device the root has revoked and a replayed nonce. Every device of the person manages; losing one loses nothing.
+  const ownerClaim = management
+    ? createOwnerClaim({
+      ...(claimedOwner?.root ? { load: () => ({ root: claimedOwner.root }), save: () => {} } : ownerFile(join(resolveConfigDir(configDir), 'owner.json'))),
+      onCode: typeof onClaimCode === 'function' ? (code) => onClaimCode(`${code}@${agent.address}`) : null,
+    })
+    : null;
+  const mgmtOwner = () => ownerClaim?.owner() ?? null;
+  const manageNonces = createNonceWindow();
+  let claimTimer = null;
   let feedShelf = null;
   if (management) {
-    if (!mgmtOwner) {
-      throw new Error('companion-node: management requires managementOwnerPubKey (or podOwnerPubKey / inboxOwnerPubKey)');
+    const MANAGE = STATEMENT_DOMAINS.COMPANION_MANAGE;
+    /** The op's arguments and the statement that authorises them. */
+    const argsOf = (ctx) => { const { auth, ...args } = Parts.data(ctx?.parts) ?? {}; return { auth, args }; };
+    /** 'ok', 'stale' (the device's clock is off — worth saying), or 'forbidden' (everything else, opaquely). */
+    const ownerVerdict = (ctx, op) => {
+      const root = mgmtOwner();
+      if (!root) return 'forbidden';
+      // the node's own /manage page, in-process, for a browser session the owner approved
+      if (ctx?.manageSession === true) return 'ok';
+      const { auth, args } = argsOf(ctx);
+      const v = verifyDeviceStatement(auth, {
+        domain: MANAGE, node: agent.address, op, args, root, isRevoked: ownerClaim.isRevoked, nonces: manageNonces,
+      });
+      return v.ok ? 'ok' : (v.reason === 'stale' ? 'stale' : 'forbidden');
+    };
+    /** Register a management op: refused unless the owner's device asked for exactly this. */
+    const managed = (op, fn) => agent.register(op, async (ctx) => {
+      const verdict = ownerVerdict(ctx, op);
+      return verdict === 'ok' ? fn(ctx) : { ok: false, error: verdict };
+    });
+
+    // `manage.claimOwner` — the one op an unclaimed node answers to a stranger: a device statement over the code it
+    // printed makes the device's OWNER ROOT the node's owner, once. An unsigned claim, or one whose chain does not
+    // verify, is refused before the code is read (and does not burn it); a wrong code counts toward burning it.
+    agent.register('manage.claimOwner', async (ctx) => {
+      if (mgmtOwner()) return { ok: false, error: 'already-owned' };
+      const { auth, args } = argsOf(ctx);
+      const v = verifyDeviceStatement(auth, { domain: MANAGE, node: agent.address, op: 'manage.claimOwner', args, nonces: manageNonces });
+      // a clock that is off is the one refusal worth naming: the person can fix it
+      if (!v.ok) return { ok: false, error: v.reason === 'stale' ? 'stale' : 'unsigned' };
+      return ownerClaim.claim({ code: args.code, root: v.root });
+    });
+    // `manage.revokeDevice` — the owner root's own tombstone for one of its devices, delivered by anyone (it carries
+    // its authority: the root's signature); from then on that device's statements are refused here.
+    agent.register('manage.revokeDevice', async (ctx) => {
+      const root = mgmtOwner();
+      const { revocation } = Parts.data(ctx?.parts) ?? {};
+      if (!root || !verifyDeviceRevocation(revocation, root)) return { ok: false, error: 'forbidden' };
+      ownerClaim.revoke(revocation.deviceId);
+      return { ok: true };
+    });
+    // while unclaimed, a code that ran out is replaced and the new one told — the operator reads it off the log
+    if (!mgmtOwner()) {
+      ownerClaim.code();
+      claimTimer = setInterval(() => { if (mgmtOwner()) { clearInterval(claimTimer); claimTimer = null; } else ownerClaim.code(); }, CLAIM_TTL_MS);
+      claimTimer.unref?.();
     }
-    const ownerOnly = (ctx) => (ctx?.originFrom ?? ctx?.from) === mgmtOwner;
     const tenants = () => [
       { id: 'folio-agent',  on: true },
       { id: 'media-edge',   on: !!mediaEdgeCfg },
@@ -647,8 +720,7 @@ export async function startCompanionNode(opts = {}) {
     ];
 
     // `node.status` — OWNER-GATED health/status probe.
-    agent.register('node.status', async (ctx) => {
-      if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
+    managed('node.status', async (ctx) => {
       return {
         ok:         true,
         connected:  agent.transport?.connected ?? false,
@@ -660,15 +732,25 @@ export async function startCompanionNode(opts = {}) {
     });
 
     // `node.listTenants` — OWNER-GATED: what the node hosts + on/off.
-    agent.register('node.listTenants', async (ctx) => {
-      if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
+    managed('node.listTenants', async (ctx) => {
       return { ok: true, tenants: tenants() };
     });
 
+    // `grants.mint` — OWNER-GATED: let another agent (a household bot) do a FAMILY of this node's ops — one token per
+    // op, issuer this node, subject that agent, no wildcard (`grants.js`); delivered to the agent over the relay.
+    const nodeGrants = tokenRegistry ? createNodeGrants({ identity, agent, tokenRegistry, vault: permVault }) : null;
+    managed('grants.mint', async (ctx) => {
+      if (!nodeGrants) return { ok: false, error: 'gate-off' };
+      const { args } = argsOf(ctx);
+      return nodeGrants.mint({ to: args.to, families: args.families });
+    });
+
+    // `grants.families` — OWNER-GATED: the families the owner's app offers to tick, as this node names them.
+    managed('grants.families', async () => ({ ok: true, families: Object.keys(GRANT_FAMILIES) }));
+
     // `grant.revoke` — OWNER-GATED live per-token revocation (the R2 seam J-companion
     // proved). The management UI's "revoke" button drives this.
-    agent.register('grant.revoke', async (ctx) => {
-      if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
+    managed('grant.revoke', async (ctx) => {
       const { tokenId } = Parts.data(ctx?.parts) ?? {};
       if (!tokenId)       return { ok: false, error: 'tokenId required' };
       if (!tokenRegistry) return { ok: false, error: 'gate-off' };
@@ -677,21 +759,30 @@ export async function startCompanionNode(opts = {}) {
     });
 
     // ── a person's agenda as a link (the owner's files, blind at rest: `feedShelf.js`) ─────────────
-    // `feed.put` / `feed.drop` — OWNER-GATED, refused before the body is read; the node never logs an id.
+    // `feed.put` / `feed.drop` — a TOKEN for exactly that op, minted here (`grants.mint`): the gate refuses the call
+    // before the body is read — no token, another op's token, another node's, a revoked one. The node never logs an id.
+    // `feed.serve` — the link itself, asked by the relay a calendar app fetched it from: THE ONE PUBLIC OP on this node.
+    // No token, no admission, no statement: `k` is the capability (whoever holds the link reads the agenda — exactly
+    // what this node's own `/feed` route has always taken it to be). Every failure is one identical miss.
     if (feeds) {
       const { createFeedShelf } = await import('./feedShelf.js');
       const { makeFileBlobBucket } = await import('./mediaEdge.js');
       feedShelf = createFeedShelf({ bucket: feedBucket ?? makeFileBlobBucket(join(resolveConfigDir(configDir), 'feeds')) });
       agent.register('feed.put', async (ctx) => {
-        if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
         const { id, envelope } = Parts.data(ctx?.parts) ?? {};
         return feedShelf.put(id, envelope);
-      });
+      }, { policy: 'requires-token' });
       agent.register('feed.drop', async (ctx) => {
-        if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
         const { id } = Parts.data(ctx?.parts) ?? {};
         return feedShelf.drop(id);
-      });
+      }, { policy: 'requires-token' });
+      agent.register(FEED_SERVE_OP, async (ctx) => {
+        try {
+          const { id, k } = Parts.data(ctx?.parts) ?? {};
+          const ics = await feedShelf.open(id, k);
+          return typeof ics === 'string' ? { ok: true, ics } : { ...FEED_MISS };
+        } catch { return { ...FEED_MISS }; }
+      }, { visibility: 'public', policy: 'always-allow', description: 'A person\'s agenda file, opened with the key their link carries.' });
     }
 
     // ── surface ② — the ONLINE /manage interface (node-served HTTP tenant) ──────
@@ -708,8 +799,7 @@ export async function startCompanionNode(opts = {}) {
         host: manageHttpHost,
         feed: feedShelf,
       });
-      agent.register('manage.approvePairing', async (ctx) => {
-        if (!ownerOnly(ctx)) return { ok: false, error: 'forbidden' };
+      managed('manage.approvePairing', async (ctx) => {
         const { code } = Parts.data(ctx?.parts) ?? {};
         if (!code) return { ok: false, error: 'code required' };
         return manageServer.approvePairing(code);
@@ -756,8 +846,10 @@ export async function startCompanionNode(opts = {}) {
     // owner-gated; drains to the owner device on reconnect via `inbox.drain`.
     inbox: sealedInbox,
     inboxOwnerPubKey: inbox ? inboxOwnerPubKey : null,
-    // the owner's agenda files (null when `feeds` is off): sealed, served at /feed/<id>.<k>.ics
+    // the owner's agenda files (null when `feeds` is off): sealed, served by `feed.serve` (and this node's own /feed route)
     feeds: feedShelf,
+    // this node as a contact: its address, the relay it is found on, and — with `feeds` — where its links are served
+    card: companionCard({ address: agent.address, relayUrl, publicUrl, feeds: !!feedShelf }),
     // R2 — the inbound gate + its authority surface (all null when gate is OFF).
     gate,
     policyEngine,
@@ -767,7 +859,12 @@ export async function startCompanionNode(opts = {}) {
     revokeToken,
     // 6d — management surface (owner-gated node ops); null owner when OFF.
     management,
-    managementOwnerPubKey: management ? mgmtOwner : null,
+    /** The owner root's pubKey once claimed (null while unclaimed, or when management is off). */
+    get managementOwnerRoot() { return management ? mgmtOwner() : null; },
+    /** The code to claim this node with, or null once it has an owner (or when management is off). */
+    claimCode: () => ownerClaim?.code() ?? null,
+    /** What the owner pastes into their app: `<code>@<node address>`, or null once owned. */
+    claimString: () => { const c = ownerClaim?.code() ?? null; return c ? `${c}@${agent.address}` : null; },
     // 6d surface ② — the online /manage interface (null when OFF).
     // The local-network radio (null when `nearby` is OFF): `{transport, nearbyPeers, state, stop}`.
     // `nearbyPeers` is the same peer source the phone's mesh builder hands the nearby surface.

@@ -63,16 +63,21 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
     /**
      * Admit a person on a door: their contact, created on first sight. Admitting again keeps the contact and its
      * role, and takes a new display name when one is given.
-     * @param {{channel: string, uid: string|number, displayName?: string|null}} who
+     * An inbox-door person admitted with a device statement (`linkedRoot`, the ROOT it chains to — "an agent they
+     * admitted with") keeps that root on the row; from then on the row is theirs only through a statement (`find`).
+     * @param {{channel: string, uid: string|number, displayName?: string|null, linkedRoot?: string|null}} who
      */
-    async admit({ channel, uid, displayName = null, role: asked = null } = {}) {
+    async admit({ channel, uid, displayName = null, role: asked = null, linkedRoot = null } = {}) {
       if (!isChannel(channel)) throw new Error(`botUsers: unknown channel "${channel}" (one of ${CHANNELS.join(', ')})`);
       const u = uid == null ? '' : String(uid).trim();
       if (!u) throw new Error('botUsers: a uid is required');
       const id = idOf(channel, u);
       const name = typeof displayName === 'string' && displayName.trim() ? displayName.trim() : null;
+      const root = channel === 'web' && typeof linkedRoot === 'string' && linkedRoot ? linkedRoot : null;
       const known = await store.get(id);
       if (known) {
+        // admitted again with a statement: a row without a root takes it (a row with another root keeps its own)
+        if (root && !known.linkedRoot) return changed(await store.put({ ...known, hidden: false, linkedRoot: root, ...(name ? { displayName: name } : {}) }));
         // Admitted again after a revoke (a new code): the row comes back, with the role it had.
         const back = known.hidden ? { ...known, hidden: false } : known;
         if (known.hidden && typeof store.unhide === 'function') await store.unhide(id);
@@ -84,7 +89,7 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
       const anyAdmin = (await store.list()).some((r) => r?.role === ROLES.ADMIN);
       // the admin is the named one, or the first; anyone else the role their code carried (an invite's), else a member
       const role = named || (adminUid == null && !anyAdmin) ? ROLES.ADMIN : (['member', 'coordinator', 'observer'].includes(asked) ? asked : ROLES.MEMBER);
-      return changed(await store.put({ id, type: 'contact', channel, uid: u, role, ...(name ? { displayName: name } : {}) }));
+      return changed(await store.put({ id, type: 'contact', channel, uid: u, role, ...(name ? { displayName: name } : {}), ...(root ? { linkedRoot: root } : {}) }));
     },
     /** Every admitted person (a revoked one is not), in the order they were admitted. */
     async list() { return (await store.list()).filter((r) => r && isChannel(r.channel) && !r.hidden); },
@@ -97,10 +102,19 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
      * @param {string} uid
      * @param {{linkedRoot?: string|null}} [o]
      */
+    /** An inbox-door row admitted the OLD way (no root): its person re-links with `/start <code>` from their app. */
+    async needsRelink(channel, uid) {
+      if (channel !== 'web') return false;
+      const row = await store.get(idOf(channel, String(uid ?? '').trim()));
+      return !!row && !row.hidden && !row.linkedRoot;
+    },
     async find(channel, uid, { linkedRoot = null } = {}) {
       const u = String(uid ?? '').trim();
       const row = await store.get(idOf(channel, u));
-      if (row && !row.hidden) return row;
+      // an inbox-door row admitted WITH a statement is found only through one chaining to its root: the key a turn came
+      // from is held by every device of the person, a revoked one too
+      // — and a row admitted the old way (no root) is not kept by its key at all: it re-links with `/start <code>`
+      if (row && !row.hidden) return (channel === 'web' && (!row.linkedRoot || row.linkedRoot !== linkedRoot)) ? null : row;
       if (channel !== 'web' || typeof linkedRoot !== 'string' || !linkedRoot) return null;
       return (await store.list()).find((r) => r && !r.hidden && r.linkedRoot === linkedRoot) ?? null;
     },
@@ -181,7 +195,7 @@ export function contactBookStore(callSkill) {
     ...(c.hidden ? { hidden: true } : {}),
     // a door row that linked its person's Basis identity (`/koppel`): the root a turn is checked against, and the chat
     // identity that names them in the household's circle; an inbox-door row's key is its id
-    ...(c.channel !== 'web' && typeof c.linkedRoot === 'string' && c.linkedRoot ? { linkedRoot: c.linkedRoot } : {}),
+    ...(typeof c.linkedRoot === 'string' && c.linkedRoot ? { linkedRoot: c.linkedRoot } : {}),
     ...(c.channel !== 'web' && typeof c.pubKey === 'string' && c.pubKey ? { pubKey: c.pubKey } : {}),
   });
   return {
@@ -219,7 +233,7 @@ export function contactBookStore(callSkill) {
  * @returns {(who: {channel: string, uid: string, displayName?: string|null, text?: string}) =>
  *           Promise<string | {id: string, consumed: true} | {refused: string}>}
  */
-export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, admission = null, bootstrapUids = [] }) {
+export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, admission = null, bootstrapUids = [], onAdmittedWith = null }) {
   if (!users || typeof users.admit !== 'function') throw new TypeError('createDoorAdmit: users are required');
   if (typeof setDoorCaller !== 'function') throw new TypeError('createDoorAdmit: setDoorCaller is required');
   const tiered = new Map();   // callerId → the role last set in the gate
@@ -251,10 +265,19 @@ export function createDoorAdmit({ users, setDoorCaller, clearDoorCaller = null, 
     // The code: a field on the message (the bot's inbox — from the card), or `/start <code>` (Telegram's link).
     const m = /^\/start(?:@\S+)?\s+(\S+)/.exec(String(who?.text ?? '').trim());
     const code = typeof who?.admission === 'string' && who.admission ? who.admission : m?.[1];
-    if (!code) return { refused: 'needs-code', id };
+    // a row admitted the old way (no root) is not kept by its key: one line to re-link, then the same /start as anyone
+    if (!code) return { refused: (typeof users.needsRelink === 'function' && await users.needsRelink(who.channel, uid)) ? 'relink' : 'needs-code', id };
+    // at the inbox door an admission is the person's own signed act (`/start <code>` from their app): without a device
+    // statement it would make a row nobody can speak as — refused before the code is spent
+    if (who.channel === 'web' && !linkedRoot) return { refused: 'relink', id };
     const r = await admission.redeem(code);
     if (!r.ok) return { refused: r.reason, id };
-    return { id: await tier(await users.admit({ ...who, role: r.role ?? null })), consumed: true };
+    const row = await users.admit({ ...who, role: r.role ?? null, ...(linkedRoot ? { linkedRoot } : {}) });
+    // admitted WITH a device statement: the person's app hears it from the bot ("an agent I admitted with")
+    if (linkedRoot && row?.linkedRoot === linkedRoot && typeof onAdmittedWith === 'function') {
+      try { await onAdmittedWith(row, who); } catch { /* the admission stands; the app hears it on a later /start */ }
+    }
+    return { id: await tier(row), consumed: true };
   };
   /** The role this door last gave a person (their thread's tools follow it), or null (not admitted here). */
   admit.roleOf = (id) => tiered.get(id) ?? null;

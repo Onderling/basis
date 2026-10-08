@@ -52,3 +52,15 @@ describe('contact card codec', () => {
     expect(decodeContactCard(null)).toBeNull();
   });
 });
+
+describe('a card may say it is a bot — for display only', () => {
+  it('round-trips as one flag, costs two bytes, and is absent otherwise', () => {
+    const base = { webid: 'Abcdefghijklmnopqrstuvwxyz0123456789-_ABCDE', peerAddr: 'Abcdefghijklmnopqrstuvwxyz0123456789-_ABCDE' };
+    const plain = encodeContactCard(base);
+    const bot = encodeContactCard({ ...base, bot: true });
+    expect(decodeContactCard(bot).bot).toBe(true);
+    expect(decodeContactCard(plain).bot).toBeUndefined();
+    expect(bot.length - plain.length).toBeLessThanOrEqual(3);
+    expect(bot).not.toMatch(/eyJ/);   // not the JSON catch-all
+  });
+});

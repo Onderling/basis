@@ -17,6 +17,7 @@ import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/co
 import { VaultMemory } from '@onderling/vault';
 import { createSecureAgent } from '@onderling/secure-agent';
 import { createScreenView, screenAddressFor } from '../src/v2/screenView.js';
+import { addBoxCard } from './support/addBoxCard.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
@@ -57,7 +58,8 @@ describe('a screen across a restart of the box', () => {
   it('paired, the box restarted, the kept tokens still act; paired again after the page lost its record, the new grant acts', async () => {
     const card = cardFrom(box.out);
     const send = (text, extra = {}) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
-    await send('hallo', { admission: /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(box.out)?.[1] });
+    await addBoxCard(ann, box.out);
+    await send(`/start ${/\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(box.out)?.[1]}`);
     await until(async () => ((await botSaid(ann)).length ? true : null), { timeout: 30_000, step: 300 });
 
     const pair = async (store) => {

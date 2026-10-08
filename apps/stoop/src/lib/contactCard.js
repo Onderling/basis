@@ -30,6 +30,8 @@ const F = Object.freeze({
   webid: 1, pubKey: 2, stableId: 3, handle: 4, displayName: 5, avatarUrl: 6, trustOffer: 7,
   peerAddr: 8, peerAddrIsWebid: 9, relay: 10, pkVersion: 11, pkPubKey: 12, pkLinkKeyPub: 13,
   personKeyLinks: 14, rest: 15,
+  // a card may say it is a BOT (a household bot's inbox) — for display and the add-flow's words only, never for trust
+  bot: 16,
 });
 const PLAIN = ['webid', 'pubKey', 'stableId', 'handle', 'displayName', 'avatarUrl'];
 const PK_KEYS = ['version', 'pubKey', 'linkKeyPub'];
@@ -49,6 +51,7 @@ export function encodeContactCard(card) {
   };
   for (const k of PLAIN) if (c[k] != null) field(F[k], String(c[k]));
   if (c.trustOffer != null && c.trustOffer !== DEFAULT_TRUST) field(F.trustOffer, String(c.trustOffer));
+  if (c.bot === true) out.push(F.bot, 0);
   if (c.peerAddr != null) {
     if (c.peerAddr === c.webid) out.push(F.peerAddrIsWebid, 0);
     else field(F.peerAddr, String(c.peerAddr));
@@ -68,7 +71,7 @@ export function encodeContactCard(card) {
   } else if (pk != null) rest.personKey = pk;
   if (c.personKeyLinks != null) field(F.personKeyLinks, JSON.stringify(c.personKeyLinks));
   if (relays === null && c.relays != null) rest.relays = c.relays;
-  const known = new Set([...PLAIN, 'trustOffer', 'peerAddr', 'relays', 'personKey', 'personKeyLinks']);
+  const known = new Set([...PLAIN, 'trustOffer', 'peerAddr', 'relays', 'personKey', 'personKeyLinks', 'bot']);
   for (const [k, v] of Object.entries(c)) if (!known.has(k) && v != null) rest[k] = v;
   if (Object.keys(rest).length) field(F.rest, JSON.stringify(rest));
   return b64urlEncode(out);
@@ -100,6 +103,7 @@ export function decodeContactCard(body) {
       else if (id === F.trustOffer) card.trustOffer = str;
       else if (id === F.peerAddr) card.peerAddr = str;
       else if (id === F.peerAddrIsWebid) card.peerAddr = true;   // resolved once the webid is known
+      else if (id === F.bot) card.bot = true;
       else if (id === F.relay) (card.relays ??= []).push(str);
       else if (id === F.pkVersion) pk.version = Number(str);
       else if (id === F.pkPubKey) pk.pubKey = str;

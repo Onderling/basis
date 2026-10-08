@@ -19,6 +19,7 @@ import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { buildCircleInviteUri } from '../src/v2/circleInvite.js';
 import { removeCircleMember } from '../src/v2/circleMembershipHygiene.js';
 import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { addBoxCard } from './support/addBoxCard.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const CIRCLE = 'huize-rood';
@@ -60,7 +61,8 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(card?.peerAddr, 'the runner printed no card').toBeTruthy();
     send = (text, extra = {}) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
     const code = /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)?.[1];
-    await send('hallo', { admission: code });
+    await addBoxCard(ann, out);
+    await send(`/start ${code}`);
     const welcomed = await until(async () => ((await botTurns(ann)).length >= 1 ? true : null), { timeout: 30_000, step: 500 });
     expect(welcomed, `Ann was not let in. Runner:\n${out.slice(-1200)}`).toBe(true);
   }, 240_000);

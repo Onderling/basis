@@ -92,6 +92,18 @@ describe('a companion is claimed by its owner', () => {
     expect((await laptop.ask('node.status')).res.ok, 'a fresh device of the same root').toBe(true);
   });
 
+  it('a statement from a device whose clock is off is refused as STALE — the one refusal worth naming', async () => {
+    const host = await node(configDir());
+    const phone = await device(host, ann, 'phone');
+    const late = () => Date.now() - 20 * 60 * 1000;
+    const claimLate = ownerDevice(ann, 'phone').auth(host.agent.address, 'manage.claimOwner', { code: host.claimCode() }, { now: late });
+    expect((await phone.ask('manage.claimOwner', { code: host.claimCode() }, { statement: claimLate })).res).toEqual({ ok: false, error: 'stale' });
+    expect(host.claimString()).toMatch(new RegExp(`^[A-Z2-9]{4}-[A-Z2-9]{4}@${host.agent.address.replace(/[-_]/g, '\\$&')}$`));
+    expect((await phone.ask('manage.claimOwner', { code: host.claimCode() })).res).toEqual({ ok: true });
+    const statusLate = ownerDevice(ann, 'phone').auth(host.agent.address, 'node.status', {}, { now: late });
+    expect((await phone.ask('node.status', {}, { statement: statusLate })).res).toEqual({ ok: false, error: 'stale' });
+  });
+
   it('the owner and the tombstones survive a restart; the record names no device key', async () => {
     const dir = configDir();
     const first = await node(dir);

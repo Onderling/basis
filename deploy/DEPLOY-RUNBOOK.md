@@ -308,7 +308,7 @@ Client-side (your apps, not on the VM):
 The companion node can serve an owner-only web dashboard (node status · tenants ·
 revoke a grant) at **`https://<RELAY_DOMAIN>/manage`**, fronted by Caddy on the same
 domain. The node is **claimed** by its owner, never configured with one: started
-unclaimed it prints a claim code in its log (`docker compose … logs companion | grep -m1 'Claim code'`),
+unclaimed it prints a claim code in its log (`docker compose … logs companion | grep 'Claim:' | tail -1`),
 valid ten minutes; enter it in your app and your owner root becomes the node's owner — every device of
 yours manages it from then on, a device you revoke does not.
 

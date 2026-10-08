@@ -233,7 +233,7 @@ export async function startCompanionNode(opts = {}) {
     management         = false, // enable node.status / node.listTenants / grant.revoke (OFF by default)
     claimedOwner,               // COMPOSITION, not configuration: `{root}` for a node composed in-process already
                                 // claimed (tests, walks); a shipped boot never passes it — the owner CLAIMS the node
-    onClaimCode,                // told each new claim code (the banner prints it); the code is never logged otherwise
+    onClaimCode,                // told each new claim, as `<code>@<node address>` — the one string the owner pastes
     manageHttp         = false, // surface ② — serve the /manage web (true → random port, or a port number)
     manageHttpHost     = '127.0.0.1',
     // ── a person's agenda as a link: sealed files the owner (a household bot) puts, served at /feed/ ──
@@ -644,7 +644,7 @@ export async function startCompanionNode(opts = {}) {
   const ownerClaim = management
     ? createOwnerClaim({
       ...(claimedOwner?.root ? { load: () => ({ root: claimedOwner.root }), save: () => {} } : ownerFile(join(resolveConfigDir(configDir), 'owner.json'))),
-      onCode: typeof onClaimCode === 'function' ? onClaimCode : null,
+      onCode: typeof onClaimCode === 'function' ? (code) => onClaimCode(`${code}@${agent.address}`) : null,
     })
     : null;
   const mgmtOwner = () => ownerClaim?.owner() ?? null;
@@ -655,18 +655,23 @@ export async function startCompanionNode(opts = {}) {
     const MANAGE = STATEMENT_DOMAINS.COMPANION_MANAGE;
     /** The op's arguments and the statement that authorises them. */
     const argsOf = (ctx) => { const { auth, ...args } = Parts.data(ctx?.parts) ?? {}; return { auth, args }; };
-    const ownerOnly = (ctx, op) => {
+    /** 'ok', 'stale' (the device's clock is off — worth saying), or 'forbidden' (everything else, opaquely). */
+    const ownerVerdict = (ctx, op) => {
       const root = mgmtOwner();
-      if (!root) return false;
+      if (!root) return 'forbidden';
       // the node's own /manage page, in-process, for a browser session the owner approved
-      if (ctx?.manageSession === true) return true;
+      if (ctx?.manageSession === true) return 'ok';
       const { auth, args } = argsOf(ctx);
-      return verifyDeviceStatement(auth, {
+      const v = verifyDeviceStatement(auth, {
         domain: MANAGE, node: agent.address, op, args, root, isRevoked: ownerClaim.isRevoked, nonces: manageNonces,
-      }).ok;
+      });
+      return v.ok ? 'ok' : (v.reason === 'stale' ? 'stale' : 'forbidden');
     };
-    /** Register a management op: refused, opaquely, unless the owner's device asked for exactly this. */
-    const managed = (op, fn) => agent.register(op, async (ctx) => (ownerOnly(ctx, op) ? fn(ctx) : { ok: false, error: 'forbidden' }));
+    /** Register a management op: refused unless the owner's device asked for exactly this. */
+    const managed = (op, fn) => agent.register(op, async (ctx) => {
+      const verdict = ownerVerdict(ctx, op);
+      return verdict === 'ok' ? fn(ctx) : { ok: false, error: verdict };
+    });
 
     // `manage.claimOwner` — the one op an unclaimed node answers to a stranger: a device statement over the code it
     // printed makes the device's OWNER ROOT the node's owner, once. An unsigned claim, or one whose chain does not
@@ -675,7 +680,8 @@ export async function startCompanionNode(opts = {}) {
       if (mgmtOwner()) return { ok: false, error: 'already-owned' };
       const { auth, args } = argsOf(ctx);
       const v = verifyDeviceStatement(auth, { domain: MANAGE, node: agent.address, op: 'manage.claimOwner', args, nonces: manageNonces });
-      if (!v.ok) return { ok: false, error: 'unsigned' };
+      // a clock that is off is the one refusal worth naming: the person can fix it
+      if (!v.ok) return { ok: false, error: v.reason === 'stale' ? 'stale' : 'unsigned' };
       return ownerClaim.claim({ code: args.code, root: v.root });
     });
     // `manage.revokeDevice` — the owner root's own tombstone for one of its devices, delivered by anyone (it carries
@@ -820,6 +826,8 @@ export async function startCompanionNode(opts = {}) {
     get managementOwnerRoot() { return management ? mgmtOwner() : null; },
     /** The code to claim this node with, or null once it has an owner (or when management is off). */
     claimCode: () => ownerClaim?.code() ?? null,
+    /** What the owner pastes into their app: `<code>@<node address>`, or null once owned. */
+    claimString: () => { const c = ownerClaim?.code() ?? null; return c ? `${c}@${agent.address}` : null; },
     // 6d surface ② — the online /manage interface (null when OFF).
     // The local-network radio (null when `nearby` is OFF): `{transport, nearbyPeers, state, stop}`.
     // `nearbyPeers` is the same peer source the phone's mesh builder hands the nearby surface.

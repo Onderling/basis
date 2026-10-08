@@ -52,7 +52,7 @@ if (nearbyError) { console.error(`\n  ${nearbyError}\n`); process.exit(1); }
 // the claim code goes to this log only — the person who can read the node's log is the one who may claim it
 const node = await startCompanionNode({
   relayUrl, port, host, management, manageHttp, manageHttpHost, nearby, feeds,
-  onClaimCode: (code) => { console.log(`  Claim code:   ${code}  (valid 10 minutes — enter it in your app to become this node's owner)`); },
+  onClaimCode: (claim) => { console.log(`  Claim:        ${claim}  (valid 10 minutes — paste it in your app to become this node's owner)`); },
 });
 
 console.log('');

@@ -1,6 +1,6 @@
 # deploy/roles/companion.yml — the companion node as a box ROLE (hosts the relocatable agent over the
 # mesh; a sealed inbox for its owner). Connects OUT to the relay on the compose network. Its owner
-# CLAIMS it with the code it prints in its log (`logs companion | grep -m1 'Claim code'`), from their
+# CLAIMS it with the code it prints in its log (`logs companion | grep 'Claim:' | tail -1`), from their
 # app; relay.caddy routes /manage* to it.
 services:
   companion:

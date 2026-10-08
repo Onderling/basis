@@ -24,14 +24,16 @@
  */
 
 import {
-  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
+  Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
+  signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
   deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
+import { parseCompanionClaim } from '../../v2/companionClaim.js';
 import { deviceSharedCopyOpener } from '../../v2/sharedCopyOpener.js';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -164,6 +166,7 @@ import {
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, profileHasOtherDevices, setDeviceDelegation as registrySetDeviceDelegation,
+  ownedNodesOf, setOwnedNode,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -2868,13 +2871,72 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (migrated) selfEnrolledThisSession = true;
         } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
       }
+      // Every node the person owns (a companion) hears of it too — the root's own tombstone, so the revoked device
+      // stops managing it; the person revokes once. Best-effort per node: one that is away hears it next time.
+      const nodesTold = await tellOwnedNodesRevoked(root, deviceId);
       return [DataPart({
-        ok: true, deviceId, known, revokedIn, circles: revokedIn.length,
+        ok: true, deviceId, known, revokedIn, circles: revokedIn.length, nodesTold,
         ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'private' });   // retires a device's keys everywhere: owner-only, phrase-proven
+
+  /* ─── The nodes a person OWNS (a companion): claimed with the code the node printed ─────────────────
+   * A node is managed by a statement signed with a DEVICE's delegation key, its root-signed delegation alongside
+   * (`signDeviceStatement`): the node checks the chain to the owner root it recorded at the claim, so every device of
+   * the person manages it and a revoked one does not. The profile key, which every device holds, is not used. */
+  const invokeNode = async (node, op, data) => {
+    const peer = secureAgentRef.current?.peer;
+    if (typeof peer?.invoke !== 'function') return null;
+    try {
+      const res = await Promise.race([
+        peer.invoke(node, op, [DataPart(data)]),
+        new Promise((r) => { setTimeout(() => r(null), 15_000); }),
+      ]);
+      return res ? (Parts.data(res) ?? null) : null;
+    } catch { return null; }
+  };
+  /** A management call to a node this person owns, signed by this device. Null when this device cannot sign. */
+  const signedForNode = async (node, op, args = {}) => {
+    const signer = await grantsSignerPromise;
+    const delegation = enrolledDevice?.record ?? null;
+    if (!signer?.identity || !delegation) return null;
+    const auth = signDeviceStatement({
+      domain: STATEMENT_DOMAINS.COMPANION_MANAGE, node, op, args, delegation, sign: (m) => signer.identity.sign(m),
+    });
+    return { ...args, auth };
+  };
+  async function tellOwnedNodesRevoked(root, deviceId) {
+    let nodes = [];
+    try { nodes = Object.keys(ownedNodesOf(await agentsRegistryRef?.lookup?.('default'))); } catch { nodes = []; }
+    if (!nodes.length) return 0;
+    const revocation = signDeviceRevocation(root.secret, { profileId: 'default', deviceId });
+    const told = await Promise.all(nodes.map((node) => invokeNode(node, 'manage.revokeDevice', { revocation })));
+    return told.filter((r) => r?.ok === true).length;
+  }
+  hostAgent.register('claimCompanion', async ({ parts }) => {
+    const claim = parseCompanionClaim(parts?.[0]?.data?.claim);
+    if (!claim) return [DataPart({ ok: false, outcome: 'bad-claim' })];
+    const data = await signedForNode(claim.node, 'manage.claimOwner', { code: claim.code });
+    if (!data) return [DataPart({ ok: false, outcome: 'no-device-key' })];
+    const res = await invokeNode(claim.node, 'manage.claimOwner', data);
+    if (!res) return [DataPart({ ok: false, outcome: 'unreachable' })];
+    if (res.ok !== true) {
+      const outcome = ['already-owned', 'invalid-code', 'stale', 'unsigned'].includes(res.error) ? res.error : 'unsigned';
+      return [DataPart({ ok: false, outcome })];
+    }
+    // the person's own list of the nodes they own: every device manages them, and each hears of a revoked device
+    try {
+      const cur = await agentsRegistryRef?.lookup?.('default');
+      if (cur) {
+        await agentsRegistryRef.register({
+          ...cur, properties: setOwnedNode(cur.properties ?? {}, { address: claim.node, claimedAt: new Date().toISOString() }),
+        });
+      }
+    } catch (err) { console.warn('[claimCompanion] the node is yours, but this device could not write it down:', err?.message ?? err); }
+    return [DataPart({ ok: true, outcome: 'ok', node: claim.node })];
+  }, { visibility: 'private' });   // makes this person a node's owner: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),

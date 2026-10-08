@@ -67,6 +67,7 @@ export const householdManifest = {
     register: 'write',
     'enroll-device': 'write',
     'revoke-device': 'write',
+    'claim-companion': 'write',
     'reveal-owner-phrase': 'write',
     'restore-owner-phrase': 'write',
     'replace-device': 'write',
@@ -332,6 +333,18 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'claimCompanion', group: 'device',
+      verb: 'claim-companion',
+      writes: { scope: 'device' },   // the person's own list of the nodes they own; the node records its owner itself
+      // Become the owner of a companion node: the claim it printed (`<code>@<address>`), signed by THIS device's
+      // delegation key with its root-signed delegation alongside — the node records the person's owner ROOT, so
+      // every device of theirs manages it and a revoked one does not. Reached through the claim-companion flow.
+      params: [
+        { name: 'claim', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'listRecoveryCircles', group: 'device',
       verb: 'list-recovery-circles',
       // The circles a recovery file would carry, with their names — what the export door lists with its
@@ -578,6 +591,22 @@ export const householdManifest = {
       ],
       steps: [
         { id: 'ceremony', op: 'replaceDevice', labelKey: 'circle.replace.ceremony' },
+      ],
+    },
+    {
+      id: 'claim-companion',
+      kind: 'ceremony',
+      scope: 'device',
+      labelKey: 'circle.companionClaim.title',
+      effects: [
+        { kind: 'send',  target: 'companion-claim' },
+        { kind: 'write', target: 'registry' },
+      ],
+      produces: [
+        { name: 'node', kind: 'string', from: '$steps.ceremony.node' },
+      ],
+      steps: [
+        { id: 'ceremony', op: 'claimCompanion', labelKey: 'circle.companionClaim.ceremony' },
       ],
     },
     {

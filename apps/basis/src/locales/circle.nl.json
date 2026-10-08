@@ -6903,6 +6903,23 @@
     "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
     "failed": "Intrekken is mislukt."
   },
+  "companionClaim": {
+    "title": "Een companion claimen",
+    "ceremony": "Companion wordt geclaimd",
+    "body": "Plak de regel die je companion in zijn log toont, na 'Claim:' (code@adres). Hij wordt van jou: elk apparaat van je kan hem beheren, een ingetrokken apparaat niet.",
+    "placeholder": "ABCD-EFGH@…",
+    "submit": "Claimen",
+    "button": "Companion claimen",
+    "done": "Deze companion is nu van jou. Elk apparaat van je kan hem beheren.",
+    "failed": "Claimen lukte niet.",
+    "outcome_bad_claim": "Dat is geen claim-regel. Kopieer alles na 'Claim:' — de code, de @ en het adres.",
+    "outcome_no_device_key": "Dit apparaat heeft nog geen eigen apparaatsleutel. Open de app opnieuw en probeer het nog eens.",
+    "outcome_unreachable": "De companion antwoordt niet. Staat hij aan en is hij met de relay verbonden?",
+    "outcome_already_owned": "Deze companion heeft al een eigenaar.",
+    "outcome_invalid_code": "De code klopt niet of is verlopen. Haal de nieuwste regel uit het log (elke tien minuten een nieuwe).",
+    "outcome_stale": "De klok van dit apparaat loopt meer dan vijf minuten anders dan die van de companion. Zet de tijd van je apparaat goed en probeer het opnieuw.",
+    "outcome_unsigned": "De companion nam de ondertekening van dit apparaat niet aan."
+  },
   "wizard": {
     "recovery": {
       "after_restore_hint": {

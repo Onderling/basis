@@ -14,6 +14,6 @@ export function ownerDevice(root, deviceId) {
   const sign = (m) => nacl.sign.detached(new TextEncoder().encode(m), kp.secretKey);
   return {
     delegation,
-    auth: (node, op, args = {}) => signDeviceStatement({ domain: STATEMENT_DOMAINS.COMPANION_MANAGE, node, op, args, delegation, sign }),
+    auth: (node, op, args = {}, { now } = {}) => signDeviceStatement({ domain: STATEMENT_DOMAINS.COMPANION_MANAGE, node, op, args, delegation, sign, ...(now ? { now } : {}) }),
   };
 }

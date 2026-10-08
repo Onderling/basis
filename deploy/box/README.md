@@ -60,7 +60,7 @@ companion keeps the ciphertext only. Pairing the two is a one-time step:
 2. **The companion, claimed by you.** In `.env`: `COMPANION_FEEDS=on`; add `companion@<repo>` to `ROLES` in
    `box.conf` if it is not there; then `FORCE=1 /opt/onderling/repos/<repo>/deploy/box/update.sh`. Its address:
    `docker compose -p onderling logs companion | grep -m1 'Host agent'`; its claim code (ten minutes, then a new one):
-   `docker compose -p onderling logs companion | grep 'Claim code' | tail -1`. Claiming it from your app and granting
+   `docker compose -p onderling logs companion | grep 'Claim:' | tail -1`. Claiming it from your app and granting
    the bot its place there land with the pairing work; until then this step cannot be finished.
 3. **The bot, told where.** On the household's box, in `.env`: `ONDERLING_FEED_COMPANION=<the companion's address>`
    and `ONDERLING_FEED_BASE_URL=https://<relay-domain>`; then `FORCE=1 …/update.sh`.

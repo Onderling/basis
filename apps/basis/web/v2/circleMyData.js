@@ -30,6 +30,8 @@ export function renderCircleMyData(container, {
   onExportRecovery,
   onImportRecovery,
   onReplaceDevice,
+  // Become the owner of a companion node (the claim it printed), signed by this device.
+  onClaimCompanion,
   devices = [],
   onRevokeDevice,
   // What THIS device keeps of what the owner's devices sync (sync-policy §11): `{ silos: {chat,tasks,contacts}: bool,
@@ -205,6 +207,8 @@ export function renderCircleMyData(container, {
     ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
     // The replace ceremony: after a restore, retire every other device in one act.
     ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
+    // A companion node of your own: claim it with the line it prints in its log.
+    ['cc-mydata__claim-companion', 'circle.companionClaim.button', onClaimCompanion],
     // The member's choice of which device others deliver to first (their primary contact address).
     ['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary],
   ].filter(([, , fn]) => typeof fn === 'function');

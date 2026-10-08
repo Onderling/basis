@@ -1479,7 +1479,7 @@ export default function CircleLauncherScreen({
     refreshMutedMap();
   }, [overrideStore, refreshMutedMap]);
 
-  const onLeaveCircle = useCallback((cid, circle) => {
+  const onLeaveCircle = useCallback((cid, circle, onLeft = null) => {
     const name = circle?.name ?? cid;
     Alert.alert(
       t('circle.tile.menu.leave'),
@@ -1513,6 +1513,7 @@ export default function CircleLauncherScreen({
               if (cur[cid]) setPinnedMap(await pinStore.toggle(cid));
             } catch { /* tolerate */ }
             load();
+            onLeft?.();   // a caller inside the circle (the admin panel) goes back to the list
           },
         },
       ],
@@ -1800,6 +1801,8 @@ export default function CircleLauncherScreen({
         groupId={selected.id}
         resolvePicture={circlePictureResolver(selected.id)}
         onBack={() => setView('detail')}
+        // a member's own row offers LEAVING (the shared decision): the same leave the tile menu runs, with its confirm
+        onLeave={() => onLeaveCircle(selected.id, selected, () => setView('list'))}
       />
     );
   }

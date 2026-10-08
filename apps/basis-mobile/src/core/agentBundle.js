@@ -813,6 +813,8 @@ export async function bootAgentBundle(opts = {}) {
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
     sealFor: agent.contactSeal?.sealFor ?? null,
     openFor: agent.contactSeal?.openFor ?? null,
+    // a turn to a bot my identity is linked to (`/koppel`) carries this device's statement over it (web parity)
+    authFor: agent.linkedTurnAuth ?? null,
     localActor: 'me',
     // A DM is addressed to a PERSON but arrives at ONE device: pass every turn, sent or received, to
     // this person's other devices so the thread reads the same on all of them (web parity).

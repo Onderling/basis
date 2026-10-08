@@ -100,6 +100,14 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     setHolders((h) => ({ ...h, [node]: { ...(r ?? { ok: false, message: t('circle.companionGrant.failed') }), said } }));
   }, [callSkill]);
   useEffect(() => { for (const c of companions) loadHolders(c.node); }, [companions, loadHolders]);
+  // THE IDENTITY LINK (`/koppel`) — this person's Basis identity linked to their row on a household bot: the link the
+  // bot sent, pasted here; the shared view says which bot and makes the line (this device's statement) and the code;
+  // the bot's statement makes the bot a contact (the agent's lane entry), and "linked" is said here when it lands.
+  // {text, view, made, linked} | null. Web parity: the `#koppel-bot=` sheet (identityLinkSheet.js).
+  const [botLink, setBotLink] = useState(null);
+  useEffect(() => agent?.identityLinks?.onLinked?.((e) => {
+    if (!e?.unlinked) setBotLink((b) => (b?.view?.bot?.ok && b.view.bot.botAddress === e.bot ? { ...b, linked: true } : b));
+  }), [agent]);
   const [connections, setConnections] = useState([]);  // paired views ("gekoppelde apparaten")
   const [offerText, setOfferText] = useState('');      // the pasted onderling-connect:// code
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
@@ -453,6 +461,60 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
           <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
         </Pressable>
+        {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
+        {agent?.identityLinks ? (
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
+            <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
+          </Pressable>
+        ) : null}
+        {botLink ? (
+          <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
+            {!botLink.view?.bot?.ok ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
+                <TextInput
+                  style={styles.relayInput}
+                  value={botLink.text}
+                  onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  testID="mydata-link-bot-input"
+                />
+                {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
+              </View>
+            ) : null}
+            {botLink.view?.bot?.ok && !botLink.made ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
+                <Pressable
+                  style={styles.action}
+                  testID="mydata-link-bot-make"
+                  onPress={async () => {
+                    const made = await botLink.view.offer().catch(() => ({ ok: false }));
+                    setBotLink((b) => ({ ...b, made }));
+                  }}
+                >
+                  <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
+            {botLink.made?.ok && !botLink.linked ? (
+              <View>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
+                <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
+                <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
+                  <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
+                </Pressable>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
+                <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
+                <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
+              </View>
+            ) : null}
+            {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
+          </View>
+        ) : null}
         {/* The member's choice of which device others deliver to first — their primary contact address. */}
         <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
@@ -479,7 +541,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       )}
 
       {/* MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there: "give
-          access" asks the node what it can give, then who (a contact) and the ticks. Web parity: circleMyData.js. */}
+          access" asks the node what it can give, then who (a contact — a bot linked above is one) and the ticks. Web
+          parity: circleMyData.js. */}
       {companions.length > 0 && (
         <Section title={t('circle.companionGrant.nodes')}>
           {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}

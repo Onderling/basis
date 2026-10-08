@@ -8333,6 +8333,7 @@
     "make": "Maak de koppelregel",
     "paste_this": "Plak deze regel in je eigen chat met {{bot}}:",
     "copy": "Kopieer",
+    "share": "Delen",
     "code": "De bot vraagt daarna welke code je app toont. Kies deze:",
     "waiting": "Wachten op de bot…",
     "no_device_key": "Dit apparaat kan nog geen koppelregel maken (het heeft nog geen eigen apparaatsleutel). Open de app opnieuw en probeer het nog eens.",

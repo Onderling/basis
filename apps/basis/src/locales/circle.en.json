@@ -8333,6 +8333,7 @@
     "make": "Make the link line",
     "paste_this": "Paste this line into your own chat with {{bot}}:",
     "copy": "Copy",
+    "share": "Share",
     "code": "The bot then asks which code your app shows. Pick this one:",
     "waiting": "Waiting for the bot…",
     "no_device_key": "This device cannot make a link line yet (it has no device key of its own). Open the app again and try once more.",

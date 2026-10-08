@@ -4653,6 +4653,10 @@
     "agenda_link_none_here": "Dit huishouden heeft geen agenda-link.",
     "agenda_link_failed": "De agenda-link kon ik nu niet maken. Probeer het straks nog eens.",
     "agenda_calendar_name": "Huishouden",
+    "agenda_grant_ended": {
+      "text": "De companion geeft me geen toegang meer tot de agenda-bestanden (de toegang is ingetrokken). De agenda-links blijven staan zoals ze waren, maar volgen geen wijzigingen meer — tot de eigenaar van de companion opnieuw toegang geeft.",
+      "doc": "To the bot's admin, once, when the household companion refuses the token the bot presented (its owner revoked the grant). Not repeated until a new grant arrives."
+    },
     "menu_head": "Je instellingen (tik om te wijzigen):",
     "menu_household": "Voor het hele huishouden:",
     "menu_on_screen": "Je instellingen staan op je gekoppelde scherm. Een ander scherm koppelen: /scherm.",
@@ -6941,7 +6945,11 @@
     "outcome_unknown_family": "Dat kan deze companion niet geven.",
     "outcome_bad_target": "Aan die ontvanger kan de companion geen toegang geven.",
     "outcome_bad_args": "Kies aan wie, en vink aan wat het mag.",
-    "outcome_gate_off": "Deze companion draait zonder toegangscontrole en geeft dus geen toegang."
+    "outcome_gate_off": "Deze companion draait zonder toegangscontrole en geeft dus geen toegang.",
+    "granted": "Toegang gegeven aan",
+    "may": "mag: {{what}}",
+    "revoke": "intrekken",
+    "revoked": "Ingetrokken. Wat het hier nog probeert, weigert de companion."
   },
   "wizard": {
     "recovery": {

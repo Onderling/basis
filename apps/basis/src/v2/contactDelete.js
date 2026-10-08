@@ -9,7 +9,10 @@
  *      hidden mark's own carry);
  *   2. this side LEAVES the pair circle — a `leave` on its membership lane: the route and its keys stop, the other
  *      side's roster loses you, and the person's other devices follow the leave (siblings-follow, v0.1.18);
- *   3. the thread stays on disk; nothing is erased.
+ *   3. what the person GRANTED that contact on a node of theirs (a bot putting agenda files on their companion) ends:
+ *      every key the contact is reached at is revoked on every node the person owns — best-effort, a node away keeps
+ *      it until the person revokes it there (My data);
+ *   4. the thread stays on disk; nothing is erased.
  *
  * If they write again, the pair roster brings the circle back — the SAME circle, re-joined — and the row returns
  * like a hidden contact does, with "je had dit contact verwijderd" above the turn, because `deletedAt` is on record.
@@ -31,6 +34,7 @@ export async function deleteContact({ agent, callSkill = null, contactWebid, pai
   if ((!agent && typeof callSkill !== 'function') || typeof contactWebid !== 'string' || !contactWebid) return { ok: false, left: false, error: 'missing-args' };
   const hid = await call('stoop', 'setContactHidden', { webid: contactWebid, hidden: true, deleted: true }).catch((e) => ({ error: e?.message ?? String(e) }));
   if (hid?.error) return { ok: false, left: false, error: hid.error };
+  await revokeGrantsOf(call, contactWebid);
   let left = false;
   if (pairCircleId) {
     const r = await leaveCircleLocally({ agent, callSkill: call, circleId: pairCircleId, unregister });
@@ -52,4 +56,17 @@ export function returnedMarkerKey(turn, deletedAt) {
   if (turn?.returned !== true) return null;
   const deleted = Number.isFinite(deletedAt) && (!Number.isFinite(turn?.ts) || turn.ts >= deletedAt);
   return deleted ? 'circle.contacts.returned_deleted_marker' : 'circle.contacts.returned_marker';
+}
+
+/** Every key a contact is reached at: its card's address, its key, its webid when that is a key. */
+const AGENT_KEY = /^[A-Za-z0-9_-]{43}$/;
+async function revokeGrantsOf(call, contactWebid) {
+  let row = null;
+  try {
+    const r = await call('stoop', 'listContacts', {});
+    const rows = Array.isArray(r?.contacts) ? r.contacts : (Array.isArray(r?.items) ? r.items : []);
+    row = rows.find((c) => c?.webid === contactWebid) ?? null;
+  } catch { row = null; }
+  const keys = [...new Set([row?.peerAddr, row?.pubKey, contactWebid].filter((k) => typeof k === 'string' && AGENT_KEY.test(k)))];
+  await Promise.all(keys.map((to) => Promise.resolve(call('household', 'revokeCompanionGrant', { to })).catch(() => null)));
 }

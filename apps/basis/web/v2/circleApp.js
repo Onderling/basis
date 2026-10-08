@@ -21,7 +21,7 @@
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
 import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
-import { loadCompanionGrantPicker, companionGrantText } from '../../src/v2/companionGrant.js';
+import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText } from '../../src/v2/companionGrant.js';
 import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
@@ -4593,6 +4593,11 @@ async function showMyData() {
       linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
     }),
     onGrantCompanion: async (args) => companionGrantText(await rawCallSkill('household', 'grantCompanion', args).catch(() => null), t),
+    onLoadCompanionGrants: (node) => loadCompanionGrantRows({
+      callSkill: rawCallSkill, node, t,
+      linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
+    }),
+    onRevokeCompanionGrant: async ({ node, to }) => companionRevokeText(await rawCallSkill('household', 'revokeCompanionGrant', { node, to }).catch(() => null), t),
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.

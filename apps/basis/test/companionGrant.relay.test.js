@@ -11,7 +11,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { Agent, AgentIdentity, CapabilityToken } from '@onderling/core';
+import { Agent, AgentIdentity, CapabilityToken, Parts } from '@onderling/core';
+import { randomKey, sealForLink } from '@onderling/blob-gateway';
 import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
 import { startJourneyRelay } from './support/testRelay.js';
@@ -60,5 +61,25 @@ describe('a person grants an agent a place on their companion', () => {
     const tokens = msg.payload.tokens.map((t) => CapabilityToken.fromJSON(t));
     expect(tokens.map((t) => t.skill).sort()).toEqual(['feed.drop', 'feed.put']);
     for (const t of tokens) { expect(t.issuer).toBe(node); expect(t.subject).toBe(bot.pubKey); }
+  }, 90_000);
+
+  it('the person sees who holds what on their node, and revokes it: the agent\'s next call is refused', async () => {
+    const node = host.agent.address;
+    const call = (op, args) => web.agent.callSkill('household', op, args);
+    // (the claim and the grant of the test above stand)
+    expect(await call('companionGrantList', { node })).toEqual({ ok: true, outcome: 'ok', grants: [{ to: bot.pubKey, families: ['agenda-files'] }] });
+    expect(await call('companionGrantList', { node: 'X'.repeat(43) })).toMatchObject({ ok: false, outcome: 'not-owned' });
+    await bot.hello(node);
+    const tokens = got[got.length - 1].payload.tokens;
+    const put = tokens.find((t) => t.skill === 'feed.put');
+    const file = { id: randomKey(), envelope: sealForLink('BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n', randomKey()) };
+    expect(Parts.data(await bot.invoke(node, 'feed.put', file, { token: put }))).toEqual({ ok: true });
+
+    expect(await call('revokeCompanionGrant', { node, to: bot.pubKey })).toMatchObject({ ok: true, outcome: 'ok', revoked: 2 });
+    await expect(bot.invoke(node, 'feed.put', file, { token: put })).rejects.toThrow(/revoked/i);
+    expect(await call('companionGrantList', { node })).toMatchObject({ ok: true, grants: [] });
+    // without a node: every node the person owns is asked (nothing left to revoke here)
+    expect(await call('revokeCompanionGrant', { to: bot.pubKey })).toMatchObject({ ok: true, revoked: 0, nodes: 1 });
+    expect(await call('revokeCompanionGrant', { node })).toMatchObject({ ok: false, outcome: 'bad-args' });
   }, 90_000);
 });

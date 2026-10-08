@@ -2972,6 +2972,30 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return [DataPart({ ok: true, outcome: 'ok', ops: res.ops ?? [], delivery: res.delivery ?? null })];
   }, { visibility: 'private' });   // hands another agent standing authority on the person's node: owner-only
+  hostAgent.register('companionGrantList', async ({ parts }) => {
+    const { node } = parts?.[0]?.data ?? {};
+    const { res, outcome } = await askOwnedNode(node, 'grants.list', {});
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true || !Array.isArray(res.grants)) return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    const grants = res.grants.filter((g) => typeof g?.to === 'string').map((g) => ({ to: g.to, families: Array.isArray(g.families) ? g.families.filter((f) => typeof f === 'string') : [] }));
+    return [DataPart({ ok: true, outcome: 'ok', grants })];
+  }, { visibility: 'private' });   // signs for the person's node: owner-only
+  hostAgent.register('revokeCompanionGrant', async ({ parts }) => {
+    const { node, to } = parts?.[0]?.data ?? {};
+    if (typeof to !== 'string' || !to) return [DataPart({ ok: false, outcome: 'bad-args' })];
+    // one node, or every node the person owns (a contact deleted: whatever it held anywhere ends)
+    let nodes = [];
+    if (node != null) nodes = [node];
+    else { try { nodes = Object.keys(ownedNodesOf(await agentsRegistryRef?.lookup?.('default'))); } catch { nodes = []; } }
+    const answers = await Promise.all(nodes.map((n) => askOwnedNode(n, 'grants.revoke', { to })));
+    if (node != null) {
+      const { res, outcome } = answers[0];
+      if (!res) return [DataPart({ ok: false, outcome })];
+      if (res.ok !== true) return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    }
+    const done = answers.filter((a) => a.res?.ok === true);
+    return [DataPart({ ok: true, outcome: 'ok', revoked: done.reduce((n, a) => n + (Number(a.res.revoked) || 0), 0), nodes: done.length })];
+  }, { visibility: 'private' });   // ends another agent's authority on the person's node: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),

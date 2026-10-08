@@ -1,5 +1,5 @@
 /**
- * THE OWED WALKS, ON THE LIVE BUILD — https://onderling.org/basis over wss://relay.onderling.org (2026-09-23).
+ * THE OWED WALKS, ON THE LIVE BUILD — https://onderling.org/basis over the public relay (2026-09-23).
  *
  * Not the harness: the published bytes, the public relay, three browser contexts. A throwaway person (two of
  * their devices, enrolled by the real add-a-device ceremony) and a second person who is in their circle — so the
@@ -9,7 +9,7 @@
  *   (3) SHARE TO A CIRCLE — a disclosed property said on the lane lands on a co-member's roster row, and withdrawing it takes it away.
  *
  * Nothing here touches Frits' account: the identities are fresh per run and the circle is created here.
- * Run: LIVE_WALK=1 npx playwright test --project=relay test-browser/walk-live-v0118.spec.js
+ * Run: LIVE_WALK=1 LIVE_RELAY_URL=wss://<relay-domain> npx playwright test --project=relay test-browser/walk-live-v0118.spec.js
  *
  * STEP4b (taking a disclosure back) went GREEN on v0.1.19-alpha, 2026-09-23 — the release that carries the fix.
  * It was deliberately red before that: a live walk says what is out there, not what is in the branch.
@@ -18,7 +18,8 @@ import { test, expect } from '@playwright/test';
 import { gotoCircles, createCircle, getInvite, joinFromInvite, openCircleMatching, toChat } from './peerHarness.js';
 
 const APP = process.env.LIVE_APP_URL || 'https://onderling.org/basis/';
-test.skip(!process.env.LIVE_WALK, 'set LIVE_WALK=1 to walk the live build');
+const LIVE_RELAY = process.env.LIVE_RELAY_URL ?? '';   // the relay the enroll offer names — an argument, never a literal
+test.skip(!process.env.LIVE_WALK || !LIVE_RELAY, 'set LIVE_WALK=1 and LIVE_RELAY_URL to walk the live build');
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, g]) => window.onderlingCall(a, o, g), [app, op, args]);
 const log = (step, verdict, detail = '') => console.log(`### ${step}: ${verdict}${detail ? ` — ${detail}` : ''}`);
@@ -79,7 +80,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
     log('STEP2 B joins', 'PASS', `${gid} has both`);
 
     // ── A's SECOND DEVICE, by the real add-a-device ceremony ───────────────────────────────────────
-    const offer = await call(A.page, 'household', 'buildEnrollOffer', { relayUrl: 'wss://relay.onderling.org' });
+    const offer = await call(A.page, 'household', 'buildEnrollOffer', { relayUrl: LIVE_RELAY });
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
     const phrase = (await call(A.page, 'household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect(phrase, 'the phrase is readable on A').toBeTruthy();

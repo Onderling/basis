@@ -24,6 +24,9 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { isOwnTelegramChat } from './doorBridges.js';
 import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
+import { feedCompanionOf } from './feedCompanion.js';
+import { CONTACT_SCHEME } from './contactCardLink.js';
+import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
@@ -177,6 +180,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-link-confirm') return linkConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-inapp') return inAppOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-unlink') return unlinkOp(caller ?? ctx?.threadId, ctx);
+      if (op === 'assistant-companion') return companionOp(args?.card);
       if (op === 'assistant-forget') return forgetOp(caller ?? ctx?.threadId, ctx);
       if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
@@ -1083,7 +1087,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const r = await link.pasted(person, offer, question);
     if (r.ok && r.already) return { ok: true, message: tp('circle.bot.link_already') };
     if (r.ok) return { ok: true, message: tp('circle.bot.link_asked') };
-    const key = { 'another-bot': 'link_another_bot', 'key-on-another-row': 'link_key_taken', 'row-has-a-key': 'link_row_has_key' }[r.reason] ?? 'link_not_an_offer';
+    const key = { 'another-bot': 'link_another_bot', 'key-on-another-row': 'link_key_taken', 'row-has-a-key': 'link_row_has_key', revoked: 'link_revoked', stale: 'link_stale' }[r.reason] ?? 'link_not_an_offer';
     return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`) } };
   }
 
@@ -1102,7 +1106,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       };
     }
     if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
-    const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing' }[r.reason] ?? 'link_failed';
+    const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing', revoked: 'link_revoked' }[r.reason] ?? 'link_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };
   }
 
@@ -1136,6 +1140,21 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const r = await link.unlink(person, { isPrivate: await fromPrivateDoor(person, ctx) });
     if (r.ok) return { ok: true, message: tp('circle.bot.unlink_done') };
     return { ok: false, error: { code: r.reason, message: tp(r.reason === 'not-private' ? 'circle.bot.link_not_private' : 'circle.bot.unlink_nothing') } };
+  }
+
+  /**
+   * The household's companion, handed to the bot (`assistant-companion {card}`, the admin's, from their app): a card that
+   * says where a node's agenda links are served becomes a contact of the bot — the companion its links are built from
+   * (`feedCompanion.js`), and the one whose grant it keeps (`companionGrant.js`). Anything else is not a companion's.
+   */
+  async function companionOp(card) {
+    const c = typeof card === 'string' ? card.trim() : '';
+    let body = null;
+    try { body = c.startsWith(CONTACT_SCHEME) ? decodeContactCard(c.slice(CONTACT_SCHEME.length)) : null; } catch { body = null; }
+    if (!body || !feedCompanionOf([body])) return { ok: false, error: { code: 'not-a-companion', message: t('circle.bot.companion_not_one') } };
+    const r = await callSkill('stoop', 'addContactFromQr', { payload: c });
+    if (!r?.contact || r?.error) return { ok: false, error: { code: 'not-added', message: t('circle.bot.companion_not_one') } };
+    return { ok: true, message: t('circle.bot.companion_set') };
   }
 
   /**

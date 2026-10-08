@@ -33,10 +33,14 @@ export const SEAMS = Object.freeze([
   // The agent speaks in the person's language only when the shell hands it its translator: without one, its own lines
   // (list and calendar defaults, task confirmations, a paused circle) come out as keys or English. The box passed it;
   // web and mobile did not (found 2026-09-29).
-  // A card handed to the install at build or boot goes into its contacts the way a scanned card does: the alpha's
-  // feedback contact on web and mobile, and on the box a household bot's companion (its card says where the bot's
-  // agenda links are served). The box lacked it until the bot read its companion from its contacts (2026-10-09).
-  { id: 'seeded-contact', pattern: /seedContactCard\(/, why: 'a card the install is handed is a contact on every shell, through the one scanned-card path' },
+  // A card handed to the install at build goes into its contacts the way a scanned card does: the alpha's feedback
+  // contact on web and mobile. The box had it for a household bot's companion until the bot's admin could hand the
+  // companion over from their app (the identity link's `identity-link.companion`); a box is handed nothing at boot.
+  { id: 'seeded-contact', pattern: /seedContactCard\(/, shells: ['web', 'mobile'], why: 'a card the install is handed is a contact on every person\'s shell, through the one scanned-card path' },
+  // A turn to a household bot the person's identity is linked to (`/koppel`) carries a statement from THIS device over
+  // exactly that turn: the bot takes it as the person only by that, so a device they revoke stops speaking as them. A
+  // shell whose contact channel lacks it sends turns the bot takes for a stranger's.
+  { id: 'linked-turn-auth', pattern: /authFor:\s*agent\.linkedTurnAuth/, why: 'a person\'s turns to the bot their identity is linked to count as them — from every device of theirs but one they revoked' },
   { id: 'agent-translator', pattern: /createRealHouseholdAgent\(\{(?:(?!\n\s*\}\);)[\s\S])*?\n\s+t(?::\s*[\w.]+)?,/, why: 'the agent\'s own lines follow the person\'s language' },
   // A person's node folds a circle's appointments onto that circle's ONE store (`PERSON_NODE_STORE_OPTS`, beside the box's
   // `HOUSEHOLD_BOT_STORE_OPTS`): without it a person's app reads only its own calendar and never the appointments its

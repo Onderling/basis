@@ -1,5 +1,6 @@
 /**
- * A statement a person's DEVICE signs for a party outside their own devices — a companion node they own — to check.
+ * A statement a person's DEVICE signs for a party outside their own devices — a companion node they own, a household
+ * bot their identity is linked to — to check.
  *
  * Every device of a person holds the profile key (a revoked one too), so a party that must tell the person's devices
  * apart, and refuse a revoked one, cannot go by that key. It goes by the device's DELEGATION key instead: the
@@ -20,6 +21,8 @@ import { encode as b64encode } from '../crypto/b64.js';
 export const STATEMENT_DOMAINS = Object.freeze({
   /** managing a companion node the person owns (claim it, read its status, revoke a device, pair a browser) */
   COMPANION_MANAGE: 'companion-manage',
+  /** speaking to a household bot as the person whose identity is linked there (the link itself, a turn, a call) */
+  IDENTITY_LINK: 'identity-link',
 });
 
 /** How far a statement's time may sit from the receiver's clock. */

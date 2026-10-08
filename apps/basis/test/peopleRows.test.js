@@ -15,7 +15,7 @@ import { readHousehold } from '../src/v2/screenHousehold.js';
 
 const ROWS = [
   { id: 'telegram:1', displayName: 'Frits', role: 'admin', channel: 'telegram' },
-  { id: 'telegram:7', displayName: 'Bert', role: 'member', channel: 'telegram', pubKey: 'K7' },
+  { id: 'telegram:7', displayName: 'Bert', role: 'member', channel: 'telegram', pubKey: 'K7', linkedRoot: 'R7' },
   { id: 'telegram:9', displayName: 'Cas', role: 'observer', channel: 'telegram' },
 ];
 

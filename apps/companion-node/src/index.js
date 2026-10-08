@@ -731,6 +731,12 @@ export async function startCompanionNode(opts = {}) {
       };
     });
 
+    // `node.card` — OWNER-GATED: this node as a contact (its card: its address, the relay it is found on, where its
+    // links are served). The owner's app hands it to the household bot it grants (the bot keeps a grant only from a
+    // companion it holds as a contact, and builds its agenda links from the card). Everything on it is public; it is
+    // asked of the node so the app never has to be told it by hand.
+    managed('node.card', async () => ({ ok: true, card: companionCard({ address: agent.address, relayUrl, publicUrl, feeds: !!feedShelf }) }));
+
     // `node.listTenants` — OWNER-GATED: what the node hosts + on/off.
     managed('node.listTenants', async (ctx) => {
       return { ok: true, tenants: tenants() };

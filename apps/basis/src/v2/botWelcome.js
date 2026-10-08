@@ -84,6 +84,7 @@ export const WELCOME_SAYS = Object.freeze({
 });
 export const WELCOME_LEAVES = Object.freeze({
   'assistant-agenda-link': "off unless the admin switches it on (/huishouden agenda on); asked while off, it says so",
+  'assistant-companion': "no command: the admin's own app hands the bot its companion, in the same act as the grant there",
   'assistant-planned': "asked when wanted ('wat ga je me sturen?'); /help lists it — the reminders line says when reminders come",
   entryReminders: "asked in words ('herinner iedereen ook de avond ervoor aan de tandarts'); the reminders line says when reminders come",
   cancelReminder: "the undo of a reminder of one's own: /gepland numbers them, /help lists /schrap",

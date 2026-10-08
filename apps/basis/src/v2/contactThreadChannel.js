@@ -121,6 +121,11 @@ export function createContactThreadChannel({
   // the person on every device. Both optional: without them a message carries no name, as before.
   myCard = null,
   onCard = null,
+  // A TURN TO A BOT MY IDENTITY IS LINKED TO CARRIES ITS PROOF (`/koppel`): `authFor(peerAddr, {text, messageId})` →
+  // a statement from THIS DEVICE over exactly that turn (its delegation key; the root-signed delegation beside it), or
+  // null for anyone else — the bot accepts a turn as the person only by it, so a device the person revoked is a
+  // stranger there. It rides inside the seal when there is one. Absent: turns carry none, as before.
+  authFor = null,
 } = {}) {
   const hiddenNow = async (contactId) => {
     if (typeof isHidden !== 'function' || !contactId) return false;
@@ -192,6 +197,7 @@ export function createContactThreadChannel({
     if (env.extras?.pairRequest === true && !env.extras?.sealed) payload.pairRequest = true;
     if (typeof env.extras?.card === 'string' && !env.extras?.sealed) payload.card = env.extras.card;
     if (typeof env.extras?.admission === 'string' && !env.extras?.sealed) payload.admission = env.extras.admission;
+    if (env.extras?.auth && typeof env.extras.auth === 'object' && !env.extras?.sealed) payload.auth = env.extras.auth;
     // Sealed to the PERSON: the wire carries the box and no text — a device that holds the profile key but not the
     // person key (a revoked one) receives an envelope it cannot read.
     if (env.extras?.sealed) { payload.sealed = env.extras.sealed; payload.text = ''; }
@@ -260,6 +266,11 @@ export function createContactThreadChannel({
       // write back, the person key — inside the seal when there is one (below), in the clear otherwise. A name
       // changed later travels as my `member-props` on the pair roster's lane, which every device of theirs folds; the
       // card is not re-sent for it (it was, 2026-09-21, for one release, before the lane carried names).
+      // A bot my identity is linked to: this device's statement over exactly this turn (after the floor: the words
+      // that leave are the words it covers).
+      if (typeof authFor === 'function') {
+        try { const a = await authFor(peerAddr, { text: floored.text, messageId: id }); if (a && typeof a === 'object') envelope.extras.auth = a; } catch { /* the turn goes without it: a stranger's there */ }
+      }
       let cardOnBoard = null;
       if (typeof myCard === 'function' && !cardSentTo.has(peerAddr)) {
         try { const c = await myCard(); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
@@ -268,10 +279,10 @@ export function createContactThreadChannel({
       // pair roster's material with it: an invite is a join secret).
       if (typeof sealFor === 'function') {
         try {
-          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}) };
+          const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}), ...(envelope.extras.auth ? { auth: envelope.extras.auth } : {}) };
           const s = await sealFor(peerAddr, content);
-          // Sealed: the code travels inside the box only (it admits whoever holds it).
-          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; }
+          // Sealed: the code travels inside the box only (it admits whoever holds it), and the turn's proof with it.
+          if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; delete envelope.extras.auth; }
         } catch { /* unsealed, as before */ }
       }
       const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
@@ -504,6 +515,8 @@ export function createContactThreadChannel({
       let card = typeof payload.card === 'string' ? payload.card : null;
       // A code for a bot's door (from its card), riding the first message beside the text.
       let admission = typeof payload.admission === 'string' ? payload.admission : null;
+      // A linked person's proof over this turn (their device's statement) — for a bot's door to check, never trusted here.
+      let auth = payload.auth && typeof payload.auth === 'object' ? payload.auth : null;
       if (payload.sealed && typeof payload.sealed === 'object') {
         // sealed to the person: open with my key for the version it names, or drop — never hand a box up as text
         const content = typeof openFor === 'function' ? await openFor(payload.sealed, fromAddr).catch(() => null) : null;
@@ -513,6 +526,7 @@ export function createContactThreadChannel({
         if (content.pairRequest === true) pairRequest = true;
         if (typeof content.card === 'string') card = content.card;
         if (typeof content.admission === 'string') admission = content.admission;
+        if (content.auth && typeof content.auth === 'object') auth = content.auth;
       }
       // The sender's card — taken only when it names the person this message is from (the shell's read of the
       // address); the shell adds it to the book. Never on the thread; the words go on regardless.
@@ -539,6 +553,7 @@ export function createContactThreadChannel({
         replyTo:   payload.replyTo,
         messageId: payload.messageId,
         ...(admission ? { admission } : {}),
+        ...(auth ? { auth } : {}),
       });
     };
   }

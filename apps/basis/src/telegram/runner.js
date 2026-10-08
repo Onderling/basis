@@ -494,6 +494,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
           channel: msg?.channel ?? 'telegram', uid: String(msg?.sender?.bridgeUid || chatId),
           displayName: msg?.sender?.displayName ?? null, text,
           ...(typeof msg?.admission === 'string' ? { admission: msg.admission } : {}),
+          // the root a linked person's device statement chains to, as the door verified it (the inbox door only)
+          ...(typeof msg?.linkedRoot === 'string' && msg.linkedRoot ? { linkedRoot: msg.linkedRoot } : {}),
         });
       } catch (err) {
         // A failing admission is SAID, never passed off as "I only understand commands": the reason on the console and

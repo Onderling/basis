@@ -21,6 +21,9 @@ export const COMPANION_GRANT_SUBTYPE = 'companion-grant';
 /** The outcomes of a grant from the app, as the app words them (`circle.companionGrant.outcome_<outcome>`). */
 export const COMPANION_GRANT_OUTCOMES = Object.freeze([
   'ok', 'bad-args', 'not-owned', 'no-device-key', 'unreachable', 'forbidden', 'stale', 'unknown-family', 'bad-target', 'gate-off',
+  // a household bot the person's identity is linked to is handed the companion first: it refused (not its admin, or
+  // otherwise), or did not answer
+  'not-bot-admin', 'bot-refused', 'bot-unreachable',
 ]);
 
 /**
@@ -122,16 +125,16 @@ export function createCompanionGrants({ vault, self, callSkill }) {
 const AGENT_KEY = /^[A-Za-z0-9_-]{43}$/;
 
 /**
- * The agents a person can grant a place on their node: their contacts (a bot added by its card) and the bots their
- * identity is linked to (`/koppel`), each by the key it is reached at — the address on its card first, which is the
- * key it calls with. Hidden contacts, rows with no such key, and the node itself are left out; one row per key.
+ * The agents a person can grant a place on their node: their contacts — a bot added by its card, and a bot their
+ * identity is linked to (`/koppel`, a contact row since the link) — each by the key it is reached at: the address on
+ * its card first, which is the key it calls with. Hidden contacts, rows with no such key, and the node itself are left
+ * out; one row per key.
  * @param {object} a
  * @param {Array<{webid?: string, pubKey?: string, peerAddr?: string, displayName?: string, handle?: string, hidden?: boolean}>} [a.contacts]
- * @param {Array<{bot: string, botName?: string|null}>} [a.linkedBots]
  * @param {string} [a.node]  the node being granted on (never a target of its own grant)
  * @returns {Array<{key: string, label: string}>}
  */
-export function companionGrantTargets({ contacts = [], linkedBots = [], node = null } = {}) {
+export function companionGrantTargets({ contacts = [], node = null } = {}) {
   const out = new Map();
   const add = (key, label) => {
     if (!AGENT_KEY.test(key ?? '') || key === node || out.has(key)) return;
@@ -142,7 +145,6 @@ export function companionGrantTargets({ contacts = [], linkedBots = [], node = n
     const key = [c.peerAddr, c.pubKey, c.webid].find((k) => typeof k === 'string' && AGENT_KEY.test(k));
     add(key, c.displayName || c.handle || null);
   }
-  for (const b of Array.isArray(linkedBots) ? linkedBots : []) add(b?.bot, b?.botName || null);
   return [...out.values()];
 }
 
@@ -168,17 +170,16 @@ export function companionFamilyChoices(families, t) {
  * @param {object} a
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill
  * @param {string} a.node
- * @param {Array<{bot: string, botName?: string|null}>} [a.linkedBots]  the bots this identity is linked to (`/koppel`)
  * @param {(key: string, o?: object) => string} a.t
  */
-export async function loadCompanionGrantPicker({ callSkill, node, linkedBots = [], t }) {
+export async function loadCompanionGrantPicker({ callSkill, node, t }) {
   const [choices, book] = await Promise.all([
     Promise.resolve(callSkill('household', 'companionGrantChoices', { node })).catch(() => null),
     Promise.resolve(callSkill('stoop', 'listContacts', {})).catch(() => null),
   ]);
   if (choices?.ok !== true) return { ok: false, message: companionGrantText(choices, t) };
   const contacts = Array.isArray(book?.contacts) ? book.contacts : (Array.isArray(book?.items) ? book.items : []);
-  return { ok: true, targets: companionGrantTargets({ contacts, linkedBots, node }), choices: companionFamilyChoices(choices.families, t) };
+  return { ok: true, targets: companionGrantTargets({ contacts, node }), choices: companionFamilyChoices(choices.families, t) };
 }
 
 /** The line a grant (or the picker's read) ends on: done, or its outcome worded (`circle.companionGrant.outcome_*`). */
@@ -195,22 +196,21 @@ export function companionGrantText(r, t) {
 
 /**
  * What a node the person owns has granted, as My data's lines under it: one per agent, named as the person knows it (a
- * contact, a linked bot — else the start of its key), with what it may do worded from the node's families. Asked of
+ * contact — a linked bot is one — else the start of its key), with what it may do worded from the node's families. Asked of
  * the node (one truth). `{ok: true, rows: [{to, label, may}]}`, or `{ok: false, message}` worded from the outcome.
  * @param {object} a
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill
  * @param {string} a.node
- * @param {Array<{bot: string, botName?: string|null}>} [a.linkedBots]
  * @param {(key: string, o?: object) => string} a.t
  */
-export async function loadCompanionGrantRows({ callSkill, node, linkedBots = [], t }) {
+export async function loadCompanionGrantRows({ callSkill, node, t }) {
   const [list, book] = await Promise.all([
     Promise.resolve(callSkill('household', 'companionGrantList', { node })).catch(() => null),
     Promise.resolve(callSkill('stoop', 'listContacts', {})).catch(() => null),
   ]);
   if (list?.ok !== true) return { ok: false, message: companionGrantText(list, t) };
   const contacts = Array.isArray(book?.contacts) ? book.contacts : (Array.isArray(book?.items) ? book.items : []);
-  const names = new Map(companionGrantTargets({ contacts, linkedBots, node }).map((x) => [x.key, x.label]));
+  const names = new Map(companionGrantTargets({ contacts, node }).map((x) => [x.key, x.label]));
   const rows = (Array.isArray(list.grants) ? list.grants : []).map((g) => ({
     to: g.to,
     label: names.get(g.to) ?? `${String(g.to).slice(0, 8)}…`,

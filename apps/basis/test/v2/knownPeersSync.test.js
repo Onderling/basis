@@ -35,6 +35,7 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
       setPersona: async (webid, persona, { revealPreset = null, personaAt } = {}) => {
         book.set(webid, { ...book.get(webid), persona, ...(revealPreset ? { revealPreset } : {}), personaAt });
       },
+      setLinked: async (webid, linkedRow, linkedAt) => { book.set(webid, { ...book.get(webid), linkedRow, linkedAt }); },
     },
     onLanded: (s) => landed.push(s),
     onRefused: (reason, from) => refused.push({ reason, from }),
@@ -224,5 +225,23 @@ describe('a deletion follows the person too (L114)', () => {
       contacts: [{ webid: 'w', hidden: true, hiddenAt: 2000, deletedAt: 2000 }],
     });
     expect(r.book.get('w')).toMatchObject({ hidden: true, hiddenAt: 2000, deletedAt: 2000 });
+  });
+});
+
+describe('the identity link follows the person', () => {
+  it('a bot linked on one device is linked on a device that already held it as a contact; the newer change wins', async () => {
+    const r = rig();
+    // the tablet already had the bot as a plain contact (added by its card)
+    r.book.set('bot', { webid: 'bot', displayName: 'Huisbot' });
+    expect(knownPeersToWire({ contacts: [{ webid: 'bot', linkedRow: 'telegram:9', linkedAt: 2000 }] }).contacts[0]).toMatchObject({ linkedRow: 'telegram:9', linkedAt: 2000 });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
+      subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'bot', linkedRow: 'telegram:9', linkedAt: 2000 }],
+    });
+    expect(r.book.get('bot')).toMatchObject({ displayName: 'Huisbot', linkedRow: 'telegram:9', linkedAt: 2000 });
+    // older news (an unlink from before the link) leaves it; a newer unlink clears it
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'bot', linkedRow: null, linkedAt: 1500 }] });
+    expect(r.book.get('bot').linkedRow).toBe('telegram:9');
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'bot', linkedRow: null, linkedAt: 3000 }] });
+    expect(r.book.get('bot').linkedRow).toBeNull();
   });
 });

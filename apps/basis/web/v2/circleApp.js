@@ -20,9 +20,7 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
-import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../src/v2/companionGrant.js';
-import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
@@ -2323,6 +2321,8 @@ function buildCircleBot(agent) {
     // Direct messages sealed to the PERSON's current key (2026-09-16); absent a known key the turn goes as before.
     sealFor: agent.contactSeal?.sealFor ?? null,
     openFor: agent.contactSeal?.openFor ?? null,
+    // a turn to a bot my identity is linked to (`/koppel`) carries this device's statement over it
+    authFor: agent.linkedTurnAuth ?? null,
     // what THIS device keeps of contact turns and of a file's bytes (Mij / My data → sync selection)
     selection: makeSyncSelection({ getParamValue: (k) => agent.getParamValue?.(k) }),
     localActor: LOCAL_ACTOR,
@@ -4595,15 +4595,9 @@ async function showMyData() {
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
     companionsPending,
-    onOpenCompanionGrant: (node) => loadCompanionGrantPicker({
-      callSkill: rawCallSkill, node, t,
-      linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
-    }),
+    onOpenCompanionGrant: (node) => loadCompanionGrantPicker({ callSkill: rawCallSkill, node, t }),
     onGrantCompanion: async (args) => companionGrantText(await rawCallSkill('household', 'grantCompanion', args).catch(() => null), t),
-    onLoadCompanionGrants: (node) => loadCompanionGrantRows({
-      callSkill: rawCallSkill, node, t,
-      linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
-    }),
+    onLoadCompanionGrants: (node) => loadCompanionGrantRows({ callSkill: rawCallSkill, node, t }),
     onRevokeCompanionGrant: async ({ node, to }) => companionRevokeText(await rawCallSkill('household', 'revokeCompanionGrant', { node, to }).catch(() => null), t),
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
@@ -8664,13 +8658,13 @@ async function boot() {
           ? agent.sendPeerMessage(addr, env)
           : Promise.reject(new Error('agent.sendPeerMessage unavailable'));
 
-      // A bot's `/koppel` link (the identity link): the sheet it opens, told when the bot's statement lands
+      // A bot's `/koppel` link (the identity link): the sheet it opens, told when the bot's statement lands — the
+      // statement itself rides the lane table (`agent.identityLinks`), which makes the bot a contact in the book
       let identityLinkSheet = null;
-      const identityLinkViewFor = (link) => createIdentityLinkView({ link, personKey: agent.identity?.chat?.pubKey ?? agent.pubKey, signOffer: (o) => agent.signLinkOffer(o), storage: window.localStorage });
+      const identityLinkViewFor = (link) => agent.identityLinks?.view(link) ?? { bot: { ok: false } };
+      agent.identityLinks?.onLinked?.((e) => { if (!e?.unlinked) identityLinkSheet?.linked(); });
       const peerMessageRouter = makePeerRouter({
         handlers: {
-          // the household bot's statement that this person's Basis identity is linked to their row there (or unlinked)
-          [IDENTITY_LINK_SUBTYPE]: (from, payload) => { if (identityLinkViewFor('').received(from, payload) && !payload?.unlinked) identityLinkSheet?.linked(); },
           // The five signed lanes and the personal ones, from the ONE table every shell builds
           // (`buildCircleLanes`). What stays below is what only THIS shell can answer: bubbles,
           // wizard stashes, the nearby room, and the threads it paints.

@@ -149,6 +149,11 @@ describe('a companion grants its agenda files to a bot', () => {
     const fam = (auth) => app.agent.invoke(node$, 'grants.families', auth ? { auth } : {}).then(Parts.data);
     expect(await fam(owner.auth(node$, 'grants.families'))).toEqual({ ok: true, families: Object.keys(GRANT_FAMILIES) });
     expect(await fam(), 'unsigned').toEqual({ ok: false, error: 'forbidden' });
+    // …and the node as a contact, which the owner's app hands the bot with the grant: its card, to the owner only
+    const card = (auth) => app.agent.invoke(node$, 'node.card', auth ? { auth } : {}).then(Parts.data);
+    expect(await card(owner.auth(node$, 'node.card'))).toEqual({ ok: true, card: host.card });
+    expect(host.card).toMatch(/^onderling-contact:\/\//);
+    expect(await card(), 'unsigned').toEqual({ ok: false, error: 'forbidden' });
 
     expect(await ask(args), 'unsigned').toEqual({ ok: false, error: 'forbidden' });
     const eve = ownerDevice(Bootstrap.create().bootstrap, 'laptop');

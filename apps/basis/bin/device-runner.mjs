@@ -27,8 +27,6 @@
  *   ONDERLING_TELEGRAM_API_ROOT optional — a Bot API server of one's own (Telegram's self-hosted one); default Telegram's
  *   ONDERLING_WALK_LOG_TURNS off|redacted|full — conversation turns in the walk log (default off; the flag wins)
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
- *   ONDERLING_SEEDED_CONTACT_CARD optional — a contact card (`onderling-contact://…`) added to this device's contacts at
- *                            boot, once (the box's form of web's and mobile's seeded contact)
  *   BASIS_APP_URL            the web app: a household bot's screen and identity links go into it (the role defaults it to
  *                            the public app); without it a screen cannot be connected and an offer prints without a link
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
@@ -67,7 +65,8 @@ import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { createPersonReach } from '../src/v2/doorReach.js';
 import { createBotScreens, encodeScreenLaunchLink, SCREEN_CALL_BUDGET } from '../src/v2/botScreens.js';
-import { createIdentityLink } from '../src/v2/botIdentityLink.js';
+import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '../src/v2/botIdentityLink.js';
+import { IDENTITY_LINK_REVOKE_SUBTYPE, LINKED_COMPANION_OP } from '../src/v2/identityLink.js';
 import { createBotCircles, botCircleHandle } from '../src/v2/botCircles.js';
 import { createCircleDoors } from '../src/v2/circleDoor.js';
 import { composeCircleRunner } from '../src/telegram/circleRunner.js';
@@ -105,7 +104,6 @@ import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createBotFeeds } from '../src/v2/botFeeds.js';
 import { loadFeedCompanion } from '../src/v2/feedCompanion.js';
 import { createCompanionGrants, COMPANION_GRANT_SUBTYPE } from '../src/v2/companionGrant.js';
-import { seedContactCard } from '../src/v2/seededContact.js';
 import { DataPart, Parts } from '@onderling/core';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
 import { REMINDERS_KEY, QUIET_KEY, remindersModeFrom, quietHoursFrom, ROLES_KEY, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, inAppModeFrom, CALENDAR_FEED_KEY, calendarFeedFrom } from '../src/v2/botSettings.js';
@@ -165,6 +163,10 @@ const appUrl   = (process.env.BASIS_APP_URL ?? '').trim();
 const screenOffer = { handle: null };
 // …and so does a companion's grant (its owner let this bot put agenda files there), before the bot keeps grants.
 const companionGrantDoor = { accept: null };
+// …and a linked person's device revocation (the root's tombstone), before the identity link that keeps it exists; the
+// inbox door, composed early too, checks a linked person's turn with the same identity link, once it is there.
+const linkRevokeDoor = { handle: null };
+const linkedTurn = { verify: null };
 
 /** The vault key: the environment if set, else one generated once beside the vault — the machine that
  *  runs unattended holds it, which is the same trust as the disk the vault itself is on. */
@@ -279,7 +281,10 @@ const agent = await createRealHouseholdAgent({
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
   onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
   writeOrigin: () => writeOrigin.getStore() ?? null,
-  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true, acceptPeerSkillCalls: SCREEN_CALL_BUDGET } : {}),
+  ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true,
+    // other agents' calls: a screen's (each demands a token), and the one call a linked person's app makes without a
+    // token — its device statement is the authority, checked by the identity link before anything (`identity-link.companion`)
+    acceptPeerSkillCalls: { ...SCREEN_CALL_BUDGET, alsoSkills: [LINKED_COMPANION_OP] } } : {}),
   // the person's own store, sealed on disk (the own-devices scope): ONE per node — the calendar's own appointments
   // and the planned book read the same one, and it reaches the person's other devices
   ownStore: () => (ownStoreOnDisk.ref ??= (async () => createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }))()),
@@ -305,11 +310,8 @@ const agent = await createRealHouseholdAgent({
 try { deviceLog.setRetention(retentionFromDays(agent.getParamValue?.('retention.chatDays'))); } catch { /* the defaults stand */ }
 // `ctx` carries a door's person (`{caller}`) to the host gate — dropping it here would run every door call as the owner.
 const callSkill = (app, op, args, ctx) => agent.callSkill(app, op, args, ctx);
-// A card handed to this install, added to its contacts the way a scanned card is — the seam web (VITE_SEEDED_CONTACT_CARD)
-// and mobile (EXPO_PUBLIC_SEEDED_CONTACT_CARD) have, here the box's. On a household bot that is how it holds the
-// household's companion until its owner's app hands it over (the companion's card says where it serves the links).
-await seedContactCard({ payload: process.env.ONDERLING_SEEDED_CONTACT_CARD, callSkill })
-  .catch((err) => console.warn(`device-runner: the seeded contact was not added (${err?.message ?? err})`));
+// A household bot's companion is not configured here: the person linked as its admin hands it the companion's card
+// from their app, in the same act as granting it the agenda files there (`identity-link.companion`, below).
 
 // The walk log — one JSON line per event, so a run can be read afterwards rather than retold.
 // `--walk-log` names a FILE (stamped before its extension) or a DIRECTORY (a trailing slash, or one that
@@ -450,6 +452,8 @@ if (relayUrl) {
   });
   contactChannel = createContactThreadChannel({
     pair: pairRoster,
+    // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
+    authFor: agent.linkedTurnAuth ?? null,
     sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
     itemStore:  createContactDmStore({ dataSource: dmSource, localActor: 'me' }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
@@ -578,7 +582,7 @@ if (relayUrl) {
     const landed = landTurn(m);
     Promise.resolve(landed).then((r) => {
       if (r?.deduped) return;
-      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId });
+      inboxDoor.feed({ contactId: agent.identityOfAddress?.(m.fromAddr) ?? m.fromAddr, fromAddr: m.fromAddr, text: m.text, admission: m.admission, messageId: m.messageId, ...(m.auth ? { auth: m.auth } : {}) });
     }).catch(() => {});
   };
 
@@ -669,6 +673,8 @@ if (relayUrl) {
       [SCREEN_WAITING_SUBTYPE]: () => {},
       // a companion's owner granted this bot ops there: the companion sends the tokens; kept only from a companion contact
       [COMPANION_GRANT_SUBTYPE]: (from, payload) => companionGrantDoor.accept?.(from, payload),
+      // a linked person revoked one of their devices: the root's tombstone, which any party may deliver
+      [IDENTITY_LINK_REVOKE_SUBTYPE]: (from, payload) => linkRevokeDoor.handle?.(payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -812,7 +818,11 @@ if (String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === 'function') {
 }
 // The bot's inbox door follows the profile: a person's node never answers its inbox.
 if (contactChannel) {
-  inboxDoor = await createInboxDoor({ profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn) });
+  inboxDoor = await createInboxDoor({
+    profileKind: () => agent.profileKind(), sendTurn: (turn) => contactChannel.sendTurn(turn),
+    // a turn from a person whose Basis identity is linked to a row here: the root its device statement chains to
+    linkedRootOf: (turn) => linkedTurn.verify?.(turn) ?? null,
+  });
 }
 
 // ── The host's one clock: every timed thing this box does is a job on it, started in the order added ──────────
@@ -1081,9 +1091,12 @@ if (tgToken || inboxDoor.bridge) {
     tell: (viewPubKey, o) => agent.sendPeerMessage(viewPubKey, { subtype: SCREEN_STEP_UP_SUBTYPE, ...o }),
   }) : null;
   // A Telegram person links their Basis identity (`/koppel`): their app offers, their private chat confirms by the code.
-  // Identity only: a turn signed by that key is their row. The bot's statement goes to the app's key.
+  // Identity only: the row records their ROOT, and a turn from their app is theirs when a device statement chains to
+  // it — not from a device the root revoked (its tombstone, kept here on disk). The bot's statement goes to the app.
+  const linkTombstones = isFunctionProfile ? createLinkTombstones({ vault: new VaultNodeFs(path.join(dataDir, 'identity-link-tombstones.json'), vaultPassphrase()) }) : null;
+  await linkTombstones?.load();
   const identityLink = isFunctionProfile ? createIdentityLink({
-    users: botUsers,
+    users: botUsers, tombstones: linkTombstones,
     botAddress: () => agent.identity?.chat?.pubKey ?? null,
     ask: (person, { text, buttons }) => reach.sendToPerson(person, { text, buttons, rememberAs: text }),
     sendPrivately: (person, text) => reach.sendToPerson(person, { text, noPreview: true }),
@@ -1245,6 +1258,16 @@ if (tgToken || inboxDoor.bridge) {
     },
   });
   doorCallRef.fn = doorCall;
+  if (identityLink) {
+    linkedTurn.verify = (turn) => identityLink.verifyTurn(turn);
+    linkRevokeDoor.handle = async (payload) => {
+      const r = await identityLink.revoked(payload?.revocation).catch(() => ({ ok: false, reason: 'error' }));
+      walkLog({ kind: 'identity-link-revoke', ok: r.ok, ...(r.ok ? {} : { reason: r.reason }) });
+    };
+    // the linked admin's app hands the bot its companion (in the same act as its grant there): one call, a device
+    // statement over the card, through this door's own call as the linked row — a member is refused there
+    agent.exposeToPeers([linkedCompanionSkill({ link: identityLink, doorCall, id: LINKED_COMPANION_OP, log: walkLog })]);
+  }
   // ONE place this box hears that an item it holds changed — its own write or a member's that landed — handed to each
   // consumer with the item before and after: the screens' nudge, the planned work's event rows.
   const changeConsumers = [];

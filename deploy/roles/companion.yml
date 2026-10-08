@@ -14,9 +14,10 @@ services:
       COMPANION_NODE_CONFIG_DIR: "/data/companion"
       COMPANION_MANAGE_HTTP_PORT: "8790"
       COMPANION_MANAGE_HTTP_HOST: "0.0.0.0"
-      # on → the owner (a household bot) may put people's sealed agenda files; a link opens them through the relay
-      # (`/feed/<node>/…`, forwarded to this node) and, until the companion moves off this box, at its own /feed (relay.caddy)
-      COMPANION_FEEDS: "${COMPANION_FEEDS:-}"
+      # on (the role's default) → an agent the owner GRANTED (their household bot) may put people's sealed agenda files;
+      # a link opens them through the relay (`/feed/<node>/…`, forwarded to this node) and, until the companion moves off
+      # this box, at its own /feed (relay.caddy). Nothing is put without the owner's grant. `off` in .env turns it off.
+      COMPANION_FEEDS: "${COMPANION_FEEDS:-on}"
       # where its links are served, for its card: it dials the relay by the inside name above, so it says the public one
       COMPANION_PUBLIC_URL: "${COMPANION_PUBLIC_URL:-https://${RELAY_DOMAIN}}"
     volumes:

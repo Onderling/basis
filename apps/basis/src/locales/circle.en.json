@@ -4405,6 +4405,30 @@
       "text": "Say which appointment or chore, and when — for example: remind me an hour before the dentist.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
+    "remind_everyone_set": {
+      "text": "I'll remind everyone {{when}}: {{text}}.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_today": {
+      "text": "today at {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_tomorrow": {
+      "text": "tomorrow at {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_usage": {
+      "text": "Say when and what — for example: remind everyone at 19:45: dinner.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_failed": {
+      "text": "That didn't work: the reminder for everyone was not saved.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "announce_say": {
+      "text": "Reminder for everyone: {{title}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
     "overview_on": {
       "text": "The weekly overview is on (Sunday 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4790,7 +4814,7 @@
           "assistant-forget": "forget our conversation now (what you put on a list stays)",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
           "assistant-circles": "the circles the bot is in",
-          "remindMe": "your own reminder for one appointment or chore",
+          "remindMe": "your own reminder for one appointment or chore, or one for everyone at a time",
           "assistant-planned": "what I will send you this week (reminders, the week overview)"
         }
       }

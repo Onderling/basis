@@ -105,13 +105,15 @@ export const assistantManifest = {
     },
     {
       // a person's own reminders for ONE appointment or chore (their layer; nobody else's): "herinner me een uur van
-      // tevoren aan de tandarts" → item "tandarts", rules "60"; "ook de avond ervoor" → rules "ook avond"
+      // tevoren aan de tandarts" → item "tandarts", rules "60"; "ook de avond ervoor" → rules "ook avond". With `who:
+      // everyone`, a reminder for the whole household at a time: "herinner iedereen om 19:45: eten" → item "eten",
+      // rules "19:45" — a household row the host runs, said to everyone at its moment (it names nobody)
       id:     'remindMe',
       verb:   'remind-me',
       writes: { scope: 'device' },
-      params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }],
+      params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }, { name: 'who', kind: 'string', required: false }],
       surfaces: {
-        chat:  { reply: 'text', hint: 'This person\'s own reminder for one appointment or chore. item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it.' },
+        chat:  { reply: 'text', hint: 'This person\'s own reminder for one appointment or chore. item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it. With who: everyone, a reminder for EVERYONE in the household at a time: item = what to say, rules = the time ("19:45", "in 10 minutes") — for "remind everyone at 19:45: dinner".' },
       },
     },
     {

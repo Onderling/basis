@@ -4405,6 +4405,30 @@
       "text": "Zeg welke afspraak of welk klusje, en wanneer — bijvoorbeeld: herinner me een uur van tevoren aan de tandarts.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
+    "remind_everyone_set": {
+      "text": "Ik herinner iedereen {{when}}: {{text}}.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_today": {
+      "text": "vandaag om {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_tomorrow": {
+      "text": "morgen om {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_usage": {
+      "text": "Zeg hoe laat en wat — bijvoorbeeld: herinner iedereen om 19:45: eten.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_failed": {
+      "text": "Dat lukte niet: de herinnering voor iedereen is niet bewaard.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "announce_say": {
+      "text": "Herinnering voor iedereen: {{title}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
     "overview_on": {
       "text": "Het weekoverzicht staat aan (zondag 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4790,7 +4814,7 @@
           "assistant-forget": "ons gesprek nu vergeten (wat je op een lijst zette, blijft)",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
           "assistant-circles": "de kringen waar de bot in zit",
-          "remindMe": "een eigen herinnering voor één afspraak of klusje",
+          "remindMe": "een eigen herinnering voor één afspraak of klusje, of één voor iedereen op een tijd",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)"
         }
       }

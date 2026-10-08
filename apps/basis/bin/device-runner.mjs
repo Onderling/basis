@@ -1135,6 +1135,8 @@ if (tgToken || inboxDoor.bridge) {
     announcer,
     intentions: {
       book: planned, sendToPerson: (id, m) => reach.sendToPerson(id, m), quietOf: (id) => threads.quietOf?.(id) || reminderSettings().quiet, tz: boxTz,
+      // a reminder for everyone is a household row in the household's own circle (signed by this box, like the announce rows)
+      householdScope: agent.householdCircleId ?? null,
       // `/gepland` reads what is coming from the household's items and its people
       sources: () => agent.reminderSources(), users: () => botUsers.list(),
     },

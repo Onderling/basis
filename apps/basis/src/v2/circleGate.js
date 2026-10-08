@@ -111,6 +111,11 @@ const GATE_RULES = [
     const lang = greetingLang(lettersOnly(text));
     return { opId: 'assistant-hello', args: lang ? { lang } : {}, appOrigin: 'assistant' };
   } },
+  // "herinner iedereen om 19:45: eten": a reminder for the whole household at a time — the household says it, to everyone
+  { id: 'assistant.remindMe.everyone', name: 'assistant:remindMe(everyone-at)', build: (m) => {
+    const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
+    return m.time && text ? { opId: 'remindMe', args: { who: 'everyone', item: text, rules: m.time }, appOrigin: 'assistant' } : null;
+  } },
   // "wat moet Bob doen" / "welke klusjes heeft Ann": someone's own chores, by their name — before the list read, which
   // would take "klusjes" for the list; "ik", "je" and the like name nobody (the plain rule below, or the model)
   { id: 'tasks.listMine.who', name: 'tasks:listMine(who)', build: (m) => {

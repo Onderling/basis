@@ -497,6 +497,10 @@
     "text": "Kringen laden…",
     "doc": "Shown while circles are being fetched."
   },
+  "back_me": {
+    "text": "← Mij",
+    "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
+  },
   "back": {
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
@@ -7955,10 +7959,6 @@
     "error": {
       "text": "Je contact kon nu niet worden gemaakt.",
       "doc": "When getContactShareQr fails (no identity yet)."
-    },
-    "back": {
-      "text": "← Mij",
-      "doc": "Back to the Mij screen."
     },
     "opened_added": {
       "text": "{{name}} is toegevoegd aan je contacten.",

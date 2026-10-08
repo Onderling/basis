@@ -80,6 +80,7 @@ import { discoverPodRoot, createPodWriter } from '../../src/web/podStorage.js';
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
+import { DEVELOPER_PARAM_KEY } from '../../src/v2/paramsService.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import {
   normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS, daysToMs,
@@ -4157,6 +4158,9 @@ async function _showActiveScreen() {
 // until the mobile mirror lands.
 async function showMij() {
   showTabBar('mij');
+  // The Advanced screen is a developer tool (raw parameter keys): offered only when the developer switch is on.
+  let developer = false;
+  try { developer = (await circleHouseholdAgent?.callSkill?.('params', 'get-param', { key: DEVELOPER_PARAM_KEY }))?.value === true; } catch { /* off */ }
   let profile = {};
   let geocodeResult = null;
   let busy = false;
@@ -4242,7 +4246,7 @@ async function showMij() {
     // `/unblock <key>`, typed from memory.
     onBlocked: showBlocked,
     // The advanced surface — every surface-less op + the settable params (the default place).
-    onAdvanced: showAdvanced,
+    onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
     version: APP_VERSION,
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
     onShareContact: showShareMyContact,

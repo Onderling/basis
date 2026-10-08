@@ -28,7 +28,7 @@ export function renderShareMyContact(container, { payload = null, link = null, q
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'cc-share__back cc-btn cc-btn--quiet';
-  back.textContent = tr('circle.shareContact.back');
+  back.textContent = tr('circle.back_me');   // the one 'back to Me' key every screen under Me uses
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
 

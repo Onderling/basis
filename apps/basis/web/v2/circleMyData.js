@@ -38,8 +38,14 @@ export function renderCircleMyData(container, {
   // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
   // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
   companions = [],
+  // "intrekken onderweg bij n companion(s)" while a deleted contact's revokes have not reached every node; null = none
+  companionsPending = null,
   onOpenCompanionGrant = null,
   onGrantCompanion = null,
+  // Who the node granted, as lines under it: `onLoadCompanionGrants(node)` → `{ok, rows: [{to, label, may}]}` or
+  // `{ok: false, message}`; `onRevokeCompanionGrant({node, to})` revokes and resolves to the line to show.
+  onLoadCompanionGrants = null,
+  onRevokeCompanionGrant = null,
   // What THIS device keeps of what the owner's devices sync (sync-policy §11): `{ silos: {chat,tasks,contacts}: bool,
   // fileBytes: 'full'|'description', kringenOff: Set<string>, kringen: [{id, name}] }` + `onSetSync({ silo?, value?, fileBytes?, kringId?, on? })`.
   syncSelection = null,
@@ -262,6 +268,13 @@ export function renderCircleMyData(container, {
   // linked bot) and the ticks. The node mints the tokens; nothing here decides what a family is.
   if (typeof onOpenCompanionGrant === 'function' && typeof onGrantCompanion === 'function' && Array.isArray(companions) && companions.length) {
     const sec = section(tr('circle.companionGrant.nodes'));
+    if (companionsPending) {
+      const p = document.createElement('p');
+      p.className = 'cc-mydata__companion-pending';
+      p.style.cssText = 'font-size:.9em;opacity:.8;margin:.2rem 0;';
+      p.textContent = companionsPending;
+      sec.appendChild(p);
+    }
     for (const c of companions) {
       const row = document.createElement('div');
       row.className = 'cc-mydata__companion';
@@ -277,6 +290,48 @@ export function renderCircleMyData(container, {
       give.textContent = tr('circle.companionGrant.give');
       head.append(name, give);
       row.appendChild(head);
+      // who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken"
+      const holders = document.createElement('div');
+      holders.className = 'cc-mydata__companion-holders';
+      holders.style.cssText = 'font-size:.9em;';
+      row.appendChild(holders);
+      const paintHolders = async (said = null) => {
+        if (typeof onLoadCompanionGrants !== 'function') return;
+        const r = await onLoadCompanionGrants(c.node);
+        holders.innerHTML = '';
+        if (said) {
+          const p = document.createElement('p');
+          p.style.cssText = 'opacity:.8;margin:.2rem 0;';
+          p.textContent = said;
+          holders.appendChild(p);
+        }
+        if (!r?.ok) {
+          const p = document.createElement('p');
+          p.style.cssText = 'opacity:.75;margin:.2rem 0;';
+          p.textContent = r?.message ?? '';
+          holders.appendChild(p);
+          return;
+        }
+        for (const h of r.rows) {
+          const line = document.createElement('div');
+          line.className = 'cc-mydata__companion-holder';
+          line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.1rem 0;';
+          const what = document.createElement('span');
+          what.textContent = `${h.label} — ${h.may}`;
+          const rev = document.createElement('button');
+          rev.type = 'button';
+          rev.className = 'cc-mydata__companion-revoke';
+          rev.textContent = tr('circle.companionGrant.revoke');
+          rev.addEventListener('click', async () => {
+            rev.disabled = true;
+            const line2 = typeof onRevokeCompanionGrant === 'function' ? await onRevokeCompanionGrant({ node: c.node, to: h.to }) : null;
+            await paintHolders(line2);
+          });
+          line.append(what, rev);
+          holders.appendChild(line);
+        }
+      };
+      paintHolders();
       const panel = document.createElement('div');
       panel.className = 'cc-mydata__companion-panel';
       panel.hidden = true;
@@ -339,6 +394,7 @@ export function renderCircleMyData(container, {
           const line = await onGrantCompanion({ node: c.node, to: to.value, families });
           panel.innerHTML = '';
           say(line);
+          paintHolders();
         });
       });
       sec.appendChild(row);

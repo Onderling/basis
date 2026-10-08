@@ -50,6 +50,31 @@ describe('the bot keeps its companion\'s grant', () => {
     expect(await grants.tokenFor(companion.pubKey, 'feed.drop')).toBeNull();
   });
 
+  it('a refusal of a token it presented drops that companion\'s grant and is told once; not a refusal, or not ours, is not', async () => {
+    const { companion, grants, both } = await setup();
+    const msg = await both();
+    await grants.accept(companion.pubKey, msg);
+    const put = await grants.tokenFor(companion.pubKey, 'feed.put');
+    // the companion away, or slow: no refusal — the grant stays
+    expect(await grants.refused(companion.pubKey, put, new Error('Timeout waiting for reply to x'))).toEqual({ dropped: false, tell: false });
+    expect(await grants.tokenFor(companion.pubKey, 'feed.put')).not.toBeNull();
+    // refused by the gate: the grant is gone, said once — two calls in flight with the same token are one telling
+    const [a, b] = await Promise.all([
+      grants.refused(companion.pubKey, put, new Error('Token has been revoked')),
+      grants.refused(companion.pubKey, put, new Error('Token has been revoked')),
+    ]);
+    expect([a, b].filter((r) => r.tell)).toHaveLength(1);
+    expect([a, b].filter((r) => r.dropped)).toHaveLength(1);
+    expect(await grants.tokenFor(companion.pubKey, 'feed.put')).toBeNull();
+    expect(await grants.tokenFor(companion.pubKey, 'feed.drop')).toBeNull();
+    // with nothing presented, a refusal is not a revocation to tell of
+    expect(await grants.refused(companion.pubKey, null, new Error('Skill "feed.put" requires a capability token'))).toEqual({ dropped: false, tell: false });
+    // a new grant: told again on its own refusal
+    await grants.accept(companion.pubKey, await both());
+    const again = await grants.tokenFor(companion.pubKey, 'feed.put');
+    expect(await grants.refused(companion.pubKey, again, new Error('Token has been revoked'))).toEqual({ dropped: true, tell: true });
+  });
+
   it('refused whole: not a companion contact, another issuer, another agent, another subject, a wildcard, a broken signature', async () => {
     const { companion, stranger, bot, grants, both } = await setup();
     const unknown = await ident();
@@ -117,5 +142,40 @@ describe('the picker, read through the waist', () => {
     expect(companionGrantText({ ok: true }, t)).toBe('gegeven');
     expect(companionGrantText({ ok: false, outcome: 'whatever' }, t)).toBe('mislukt');
     expect(companionGrantText(null, t)).toBe('mislukt');
+  });
+});
+
+describe('the lines under a node: who may do what there', () => {
+  const BOT = 'B'.repeat(43); const OTHER = 'O'.repeat(43); const NODE = 'N'.repeat(43);
+  const t = (k, o) => ({ 'circle.companionGrant.family_agenda_files': 'agenda-bestanden plaatsen', 'circle.companionGrant.may': `mag: ${o?.what}`, 'circle.companionGrant.revoked': 'ingetrokken', 'circle.companionGrant.failed': 'mislukt', 'circle.companionGrant.outcome_unreachable': 'weg' }[k] ?? k);
+  it('one row per agent the node names, by the name the person knows; the node away is said', async () => {
+    const { loadCompanionGrantRows, companionRevokeText } = await import('../../src/v2/companionGrant.js');
+    const callSkill = async (app, op, args) => {
+      if (op === 'companionGrantList') return args.node === NODE ? { ok: true, grants: [{ to: BOT, families: ['agenda-files'] }, { to: OTHER, families: ['agenda-files'] }] } : { ok: false, outcome: 'unreachable' };
+      if (op === 'listContacts') return { contacts: [{ webid: BOT, peerAddr: BOT, displayName: 'Huishoudbot' }] };
+      return null;
+    };
+    expect(await loadCompanionGrantRows({ callSkill, node: NODE, t })).toEqual({ ok: true, rows: [
+      { to: BOT, label: 'Huishoudbot', may: 'mag: agenda-bestanden plaatsen' },
+      { to: OTHER, label: 'OOOOOOOO…', may: 'mag: agenda-bestanden plaatsen' },
+    ] });
+    expect(await loadCompanionGrantRows({ callSkill, node: 'X'.repeat(43), t })).toEqual({ ok: false, message: 'weg' });
+    expect(companionRevokeText({ ok: true }, t)).toBe('ingetrokken');
+    expect(companionRevokeText({ ok: false, outcome: 'unreachable' }, t)).toBe('weg');
+  });
+});
+
+describe('revokes still on their way', () => {
+  it('"onderweg bij n": the number of nodes still owed one; nothing owed, no line', async () => {
+    const { pendingRevokeLine } = await import('../../src/v2/companionGrant.js');
+    const { setOwnedNode, addPendingRevokes, clearPendingRevoke } = await import('@onderling/agent-registry');
+    const t = (k, o) => `${k}:${o?.count}`;
+    const A = 'A'.repeat(43); const B = 'B'.repeat(43); const BOT = 'K'.repeat(43); const BOT2 = 'L'.repeat(43);
+    let p = setOwnedNode(setOwnedNode({}, { address: A, claimedAt: 'x' }), { address: B, claimedAt: 'x' });
+    expect(pendingRevokeLine({ properties: p }, t)).toBeNull();
+    p = addPendingRevokes(p, [BOT, BOT2]);
+    expect(pendingRevokeLine({ properties: p }, t)).toBe('circle.companionGrant.pending:2');
+    p = clearPendingRevoke(clearPendingRevoke(p, A, BOT), A, BOT2);
+    expect(pendingRevokeLine({ properties: p }, t)).toBe('circle.companionGrant.pending:1');
   });
 });

@@ -13,6 +13,7 @@
  */
 import { CapabilityToken, TokenRegistry } from '@onderling/core';
 import { loadCompanions } from './feedCompanion.js';
+import { pendingRevokesOf } from '@onderling/agent-registry';
 
 /** The message a companion's grant arrives in. The companion names the same one (`GRANT_DELIVERY_SUBTYPE`). */
 export const COMPANION_GRANT_SUBTYPE = 'companion-grant';
@@ -21,6 +22,15 @@ export const COMPANION_GRANT_SUBTYPE = 'companion-grant';
 export const COMPANION_GRANT_OUTCOMES = Object.freeze([
   'ok', 'bad-args', 'not-owned', 'no-device-key', 'unreachable', 'forbidden', 'stale', 'unknown-family', 'bad-target', 'gate-off',
 ]);
+
+/**
+ * Whether a failed call to a companion is its GATE refusing the token (revoked, expired, not its own, missing) — as
+ * opposed to the companion being away or slow, which says nothing about the grant. The gate's refusals all name the
+ * token (`PolicyEngine`'s words); a timeout or an unreachable route does not.
+ */
+export function isTokenRefusal(err) {
+  return /token/i.test(String(err?.message ?? err ?? ''));
+}
 
 /** An op a grant may name: exact, never a wildcard (`*`) or a prefix (`feed.*`). */
 const EXACT_OP = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)+$/;
@@ -58,6 +68,8 @@ export function checkCompanionGrant(from, payload, { self }) {
  */
 export function createCompanionGrants({ vault, self, callSkill }) {
   const registry = new TokenRegistry(vault);
+  /** Grants (by a token's id) already being ended after a refusal — so it is told once. */
+  const ending = new Set();
   const heldKey = (node) => `companion-grant-held:${node}`;
   const held = async (node) => { try { const v = JSON.parse((await vault.get(heldKey(node))) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
 
@@ -85,6 +97,20 @@ export function createCompanionGrants({ vault, self, callSkill }) {
     /** The token to present for `op` at that companion, or null. */
     async tokenFor(node, op) {
       return (await registry.get(node, op))?.toJSON() ?? null;
+    },
+    /**
+     * A call to `node` failed. When its gate refused a token this bot PRESENTED from the grant it holds, the grant is
+     * over (revoked, or no longer that companion's): drop it, and say so once — `tell` is true for exactly one caller
+     * per grant, however many calls were in flight with it. Not a refusal (away, slow), or nothing presented: nothing.
+     * @returns {Promise<{dropped: boolean, tell: boolean}>}
+     */
+    async refused(node, presented, err) {
+      const id = presented?.id ?? null;
+      if (!id || !isTokenRefusal(err) || ending.has(id)) return { dropped: false, tell: false };
+      ending.add(id);   // before any await: a second call with the same token stops here
+      if (!(await held(node)).includes(id)) return { dropped: false, tell: false };
+      await dropFor(node);
+      return { dropped: true, tell: true };
     },
     dropFor,
   };
@@ -165,4 +191,45 @@ export function companionGrantText(r, t) {
     if (said && said !== key) return said;
   }
   return t('circle.companionGrant.failed');
+}
+
+/**
+ * What a node the person owns has granted, as My data's lines under it: one per agent, named as the person knows it (a
+ * contact, a linked bot — else the start of its key), with what it may do worded from the node's families. Asked of
+ * the node (one truth). `{ok: true, rows: [{to, label, may}]}`, or `{ok: false, message}` worded from the outcome.
+ * @param {object} a
+ * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill
+ * @param {string} a.node
+ * @param {Array<{bot: string, botName?: string|null}>} [a.linkedBots]
+ * @param {(key: string, o?: object) => string} a.t
+ */
+export async function loadCompanionGrantRows({ callSkill, node, linkedBots = [], t }) {
+  const [list, book] = await Promise.all([
+    Promise.resolve(callSkill('household', 'companionGrantList', { node })).catch(() => null),
+    Promise.resolve(callSkill('stoop', 'listContacts', {})).catch(() => null),
+  ]);
+  if (list?.ok !== true) return { ok: false, message: companionGrantText(list, t) };
+  const contacts = Array.isArray(book?.contacts) ? book.contacts : (Array.isArray(book?.items) ? book.items : []);
+  const names = new Map(companionGrantTargets({ contacts, linkedBots, node }).map((x) => [x.key, x.label]));
+  const rows = (Array.isArray(list.grants) ? list.grants : []).map((g) => ({
+    to: g.to,
+    label: names.get(g.to) ?? `${String(g.to).slice(0, 8)}…`,
+    may: t('circle.companionGrant.may', { what: companionFamilyChoices(g.families, t).map((c) => c.label).join(', ') }),
+  }));
+  return { ok: true, rows };
+}
+
+/** The line a revoke ends on. */
+export function companionRevokeText(r, t) {
+  return r?.ok === true ? t('circle.companionGrant.revoked') : companionGrantText(r, t);
+}
+
+/**
+ * The line My data shows while revokes are still on their way (a contact deleted while a node was away): "intrekken
+ * onderweg bij n companion(s)", n = the nodes still owed one; null when nothing is owed.
+ * @param {object} entry  the person's own registry entry (`{properties}`)
+ */
+export function pendingRevokeLine(entry, t) {
+  const nodes = new Set(pendingRevokesOf(entry).map((p) => p.node));
+  return nodes.size ? t('circle.companionGrant.pending', { count: nodes.size }) : null;
 }

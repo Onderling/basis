@@ -70,6 +70,8 @@ export const householdManifest = {
     'claim-companion': 'write',
     'list-companion-grants': 'read',
     'grant-companion': 'write',
+    'read-companion-grants': 'read',
+    'revoke-companion-grant': 'write',
     'reveal-owner-phrase': 'write',
     'restore-owner-phrase': 'write',
     'replace-device': 'write',
@@ -367,6 +369,28 @@ export const householdManifest = {
         { name: 'node', kind: 'string', required: true },
         { name: 'to',   kind: 'string', required: true },
         { name: 'families', kind: 'object', required: true, schema: { type: 'array', items: { type: 'string' } } },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'companionGrantList', group: 'device',
+      verb: 'read-companion-grants',
+      // Who holds a grant on a node the person owns, and for which families — asked of the node (one truth), signed by
+      // THIS device. The line under each agent on My data ("mag: agenda-bestanden plaatsen · intrekken").
+      params: [
+        { name: 'node', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'revokeCompanionGrant', group: 'device',
+      verb: 'revoke-companion-grant',
+      writes: { scope: 'person' },   // nothing on this device: the node revokes the agent's tokens
+      // End what an agent holds on a node the person owns (`grants.revoke`), signed by THIS device: on `node`, or on
+      // every node the person owns (a contact deleted). The agent's next call there is refused.
+      params: [
+        { name: 'to',   kind: 'string', required: true },
+        { name: 'node', kind: 'string' },
       ],
       surfaces: {},
     },

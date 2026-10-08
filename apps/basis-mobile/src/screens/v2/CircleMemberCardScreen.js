@@ -93,7 +93,7 @@ export default function CircleMemberCardScreen({
     <View style={styles.page} testID={self ? 'circle-selfview' : 'circle-memberpersona'}>
       <View style={styles.bar}>
         <Pressable onPress={onBack} accessibilityRole="button" testID="circle-membercard-back">
-          <Text style={styles.back}>{t('circle.back')}</Text>
+          <Text style={styles.back}>{t('circle.membercard_close')}</Text>
         </Pressable>
         {!self && typeof onReport === 'function' ? (
           <Pressable onPress={() => onReport(member)} accessibilityRole="button" testID="circle-membercard-report">

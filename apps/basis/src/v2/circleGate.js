@@ -114,7 +114,15 @@ const GATE_RULES = [
   // "herinner iedereen om 19:45: eten": a reminder for the whole household at a time — the household says it, to everyone
   { id: 'assistant.remindMe.everyone', name: 'assistant:remindMe(everyone-at)', build: (m) => {
     const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
-    return m.time && text ? { opId: 'remindMe', args: { who: 'everyone', item: text, rules: m.time }, appOrigin: 'assistant' } : null;
+    const when = m.time ?? m.span;
+    return when && text ? { opId: 'remindMe', args: { who: 'everyone', item: text, rules: when }, appOrigin: 'assistant' } : null;
+  } },
+  // "herinner me over 10 minuten dat ik de gootsteen ontstop" / "remind me at 8 to call mum": a reminder of one's own at a
+  // time, about anything — no appointment or chore needed (one about an appointment, "een uur van tevoren", is the model's)
+  { id: 'assistant.remindMe.me', name: 'assistant:remindMe(me-at)', build: (m) => {
+    const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
+    const when = [m.day, m.time ?? m.span].filter(Boolean).join(' ');
+    return (m.time || m.span) && text ? { opId: 'remindMe', args: { who: 'me', item: text, rules: when }, appOrigin: 'assistant' } : null;
   } },
   // "wat moet Bob doen" / "welke klusjes heeft Ann": someone's own chores, by their name — before the list read, which
   // would take "klusjes" for the list; "ik", "je" and the like name nobody (the plain rule below, or the model)

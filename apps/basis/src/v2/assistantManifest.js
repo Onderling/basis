@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'forget-conversation': 'write', greet: 'read', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'forget-conversation': 'write', greet: 'read', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'say-reminder': 'read', 'cancel-reminder': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'agenda-link': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -113,7 +113,26 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }, { name: 'who', kind: 'string', required: false }],
       surfaces: {
-        chat:  { reply: 'text', hint: 'This person\'s own reminder for one EXISTING appointment or chore (no own reminder at a bare time without one). item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it. With who: everyone, a reminder for EVERYONE in the household at a time: item = what to say, rules = the time ("19:45", "in 10 minutes") — for "remind everyone at 19:45: dinner".' },
+        chat:  { reply: 'text', hint: 'A reminder. For this person\'s own reminder of one EXISTING appointment or chore: item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it. For a reminder of their own about ANYTHING at a time (no appointment or chore needed) — "remind me in 10 minutes to call mum": who: me, item = what to say, rules = the time ("over 10 minuten", "20:00", "morgen om 8:00"). With who: everyone, a reminder for EVERYONE in the household at a time: item = what to say, rules = the time — for "remind everyone at 19:45: dinner". Never for someone else.' },
+      },
+    },
+    {
+      // a reminder a person set for themselves ("herinner me over 10 minuten: …"), at its moment. No surface: the host's
+      // runner calls it, as the person whose row it is; anyone calling it reaches only themself (their own chat)
+      id:     'sayReminder',
+      verb:   'say-reminder',
+      params: [{ name: 'say', kind: 'string', required: false }, { name: 'occurrence', kind: 'string', required: false }],
+      surfaces: {},
+    },
+    {
+      // one of a person's own reminders away (`/schrap 1`, `/schrap gootsteen`): by its number in `/gepland`, or its words
+      id:     'cancelReminder',
+      verb:   'cancel-reminder',
+      writes: { scope: 'device' },
+      params: [{ name: 'which', kind: 'string', required: false }],
+      surfaces: {
+        slash: { command: '/schrap', body: 'argline' },
+        chat:  { reply: 'text', hint: 'Take away one of this person\'s OWN reminders at a time (one they set with remindMe who: me): which = its number in /gepland, or words of it — for "stop that reminder about the sink".' },
       },
     },
     {

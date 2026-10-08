@@ -18,7 +18,7 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-planned'];
+const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-planned'];
 const ADMIN_EXTRA = ['reassignTask', 'removeTask', 'editTask'];
 
 describe('the bot\'s slim map', () => {
@@ -33,7 +33,7 @@ describe('the bot\'s slim map', () => {
     expect(tools('coordinator')).toEqual([...MEMBER, 'reassignTask', 'editTask'].sort());
     // the screen ops are on the observer's column (a read screen) but slash only: never a tool the model holds
     // and the planned overview is the host runner's: no surface at all, never a tool
-    const RUNNER_ONLY = ['sendWeekOverview'];
+    const RUNNER_ONLY = ['sendWeekOverview', 'sayReminder'];
     // …and emptying one's own thread (`/vergeet`) is typed, never a tool: the model is not handed a delete
     const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-forget'];
     // …and a greeting is the gate's (no surface): answered without the model, never a tool it holds

@@ -86,7 +86,7 @@ const COLUMNS = {
     // "wat moet ik nog doen" / "wat moet Bob doen" (their own, by name), and "wie doet de lamp" (the chores' open read, with words)
     'listMine', 'listOpen', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
-    'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-reminders', 'remindMe', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
+    'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'sayReminder', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
     // who is in the household (names as the household allows): anyone in it may ask
     'assistant-people',
     // what the bot will send them this week (their own; an admin also the household's rules)

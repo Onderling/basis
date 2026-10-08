@@ -92,7 +92,7 @@ import { createChangeFeed } from '../src/v2/changeFeed.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { exportDirFiles } from '../src/v2/exportDirFiles.js';
 import { createExportRequestJob } from '../src/v2/exportRequest.js';
-import { seedAnnounceRows, isAnnounceRow, ANNOUNCE_OP, HOUSEHOLD_ACTS_AS, HOST_CALL } from '../src/v2/announceRows.js';
+import { seedAnnounceRows, isAnnounceRow, runRowThroughDoor } from '../src/v2/announceRows.js';
 import { createCircleRowGate } from '../src/v2/circleRowGate.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 import { moveOverviewSwitchesToRows, switchWeekOverview } from '../src/v2/weekOverviewRows.js';
@@ -1379,12 +1379,7 @@ if (tgToken || inboxDoor.bridge) {
       mayRun: (o, scope, row) => circleRows.mayRun(o, scope, row),
       // the announce row runs as the host itself (and only that op ever carries the host's mark); a person's row as that
       // person, through their own column of the door
-      run: async (o) => {
-        if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
-        // as the person, through their own column of the door (a member's key maps to the row of the person it names)
-        const as = (await circleRows.callerFor(o.actsAs)) ?? o.actsAs;
-        return doorCall(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
-      },
+      run: runRowThroughDoor({ door: doorCall, callerFor: (actsAs) => circleRows.callerFor(actsAs) }),
       // the walk log keeps what ran, for whom (the last digits) and how it went — never what it said
       onFired: (e) => walkLog({ kind: 'intention', ts: new Date().toISOString(), op: e.op, to: String(e.actsAs).slice(-4), row: String(e.row).slice(-6), slot: String(e.occurrence).split(':').slice(1).join(':') || null, outcome: e.outcome, ...(e.reason ? { reason: e.reason } : {}) }),
     });

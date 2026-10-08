@@ -4425,6 +4425,54 @@
       "text": "That didn't work: the reminder for everyone was not saved.",
       "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
     },
+    "remind_me_at_set": {
+      "text": "I'll remind you {{when}}: {{text}}. To drop it: /schrap.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_at_usage": {
+      "text": "Say when and what — for example: remind me in 10 minutes to check the oven, or: remind me tomorrow at 8:00: bins.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_not_yours": {
+      "text": "I only remind you yourself, or everyone in the household — never someone else on your behalf.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_at_day": {
+      "text": "{{day}} at {{time}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "announce_mine": {
+      "text": "Reminder: {{title}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_me": {
+      "text": "reminder \"{{text}}\" (to drop it: /schrap {{n}})",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_everyone": {
+      "text": "reminder for everyone: \"{{text}}\"",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_done": {
+      "text": "Dropped: the reminder \"{{text}}\".",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_none": {
+      "text": "You have no reminders of your own set.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_usage": {
+      "text": "Which one? {{items}} — /schrap with its number or a word of it.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_not_found": {
+      "text": "No reminder of yours with \"{{which}}\". You have: {{items}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_which": {
+      "text": "Which one do you mean? {{items}} — /schrap with its number.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
     "announce_say": {
       "text": "Reminder for everyone: {{title}}",
       "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
@@ -4841,8 +4889,9 @@
           "assistant-forget": "forget our conversation now (what you put on a list stays)",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
           "assistant-circles": "the circles the bot is in",
-          "remindMe": "your own reminder for one appointment or chore, or one for everyone at a time",
-          "assistant-planned": "what I will send you this week (reminders, the week overview)"
+          "remindMe": "a reminder of your own: at a time (\"in 10 minutes: …\"), for an appointment or chore, or one for everyone",
+          "assistant-planned": "what I will send you this week (reminders, the week overview)",
+          "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)"
         }
       }
     },

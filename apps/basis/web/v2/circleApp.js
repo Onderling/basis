@@ -1771,6 +1771,12 @@ if (typeof window !== 'undefined') {
       ? Promise.resolve(rawCallSkill(appOrigin, opId, args)).catch((e) => ({ error: String(e?.message ?? e) }))
       : Promise.resolve({ error: 'callSkill-not-ready' })
   );
+  // A circle's policy as this device holds it — read and patched through the store, since the stored values are sealed
+  // at rest and a walk can no longer read localStorage as JSON.
+  window.onderlingCirclePolicy = {
+    get: (circleId) => policyStore.get(circleId),
+    update: (circleId, patch) => policyStore.update(circleId, patch),
+  };
   // What the "share to this circle" button does, as a seam a walk can drive (the button lives inside a panel).
   window.onderlingShareToCircle = (circleId, personaId = 'default') => shareCircleRelease(circleId, personaId);
   /** Invoke one of the ops the surface offers — the same `{opId, args}` a tap compiles to. */

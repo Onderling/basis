@@ -16,13 +16,13 @@ test('the read-then-act look on web, through the real model route', async ({ pag
   await page.addInitScript((script) => { window.__onderlingTestModel = { script }; }, SCRIPT);
   await bootCircle(page, 'Model Kring', { tasks: true });
   // the circle allows a model (a new circle forbids one; the alpha settings do not show the switch)
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    const ids = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k?.startsWith('cc.circlePolicy.')) continue;
-      const p = JSON.parse(localStorage.getItem(k) || '{}');
-      localStorage.setItem(k, JSON.stringify({ ...p, llmTool: 'user' }));
+      if (k?.startsWith('cc.circlePolicy.')) ids.push(k.slice('cc.circlePolicy.'.length));
     }
+    for (const id of ids) await window.onderlingCirclePolicy.update(id, { llmTool: 'user' });
   });
   await sendCircle(page, '@assistant add melkproef');
   const before = await page.locator('.circle-view__bubble').count();

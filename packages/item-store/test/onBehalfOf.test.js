@@ -15,7 +15,7 @@ import { MemorySource } from '@onderling/core';
 
 import { CircleItemStore } from '../src/CircleItemStore.js';
 import { addTasks } from '../src/taskCrud.js';
-import { claim, markComplete, submit, approve, reject } from '../src/taskLifecycle.js';
+import { claim, markComplete, submit, approve, reject, claimConfirmationStatement } from '../src/taskLifecycle.js';
 import { PermissionDeniedError } from '../src/errors.js';
 
 const ROOT = 'pod://circle/';
@@ -111,5 +111,39 @@ describe('complete · submit · approve · reject — onBehalfOf: the item says 
     const t = await claimed(store);
     await expect(markComplete(store, [{ id: t.id }], { actor: 'https://id.example/stranger', onBehalfOf: ANN, rolePolicy: policy }))
       .rejects.toBeInstanceOf(PermissionDeniedError);
+  });
+});
+
+describe('the write records the PERSON as its writer; the authority facts do not move', () => {
+  const sign = (msg) => `sig(${msg})`;
+  it('a claim for Ann is written by Ann; the signed confirmation is the one it always was', async () => {
+    const store = mkCis();
+    const [t] = await addTasks(store, [{ text: 'dishes' }], { actor: HOST });
+    const res = await claim(store, t.id, { actor: HOST, onBehalfOf: ANN, rolePolicy: hostOnly, sign });
+    expect(res.updatedBy).toBe(ANN);
+    expect((await store.get(t.id)).updatedBy).toBe(ANN);
+    // the authority of the claim: who pre-delegated it, its sequence, and the signature over (task, claimant, at, seq)
+    expect(res.confirmedBy).toBe(HOST);
+    expect(res.claimSeq).toBe(1);
+    expect(res.confirmedSig).toBe(sign(claimConfirmationStatement({
+      taskId: t.id, confirmedAssignee: ANN, confirmedAt: res.confirmedAt, claimSeq: 1,
+    })));
+  });
+
+  it('with nobody named the authority is the writer, as before', async () => {
+    const store = mkCis();
+    const [t] = await addTasks(store, [{ text: 'dishes' }], { actor: HOST });
+    const res = await claim(store, t.id, { actor: HOST, rolePolicy: hostOnly });
+    expect(res.updatedBy).toBe(HOST);
+  });
+
+  it('an add and a completion for Bo are written by Bo; the item\'s own addedBy stays the authority', async () => {
+    const store = mkCis();
+    const [t] = await addTasks(store, [{ text: 'bins out' }], { actor: HOST, onBehalfOf: BO, rolePolicy: hostOnly });
+    expect(t.createdBy).toBe(BO);
+    expect(t.addedBy).toBe(HOST);
+    await claim(store, t.id, { actor: HOST, onBehalfOf: BO, rolePolicy: hostOnly });
+    const [done] = await markComplete(store, [{ id: t.id }], { actor: HOST, onBehalfOf: BO });
+    expect(done.updatedBy).toBe(BO);
   });
 });

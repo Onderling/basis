@@ -432,6 +432,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
         </Pressable>
+        {/* A companion node of your own: claim it with the line it prints in its log. */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
+          <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
+        </Pressable>
         {/* The member's choice of which device others deliver to first — their primary contact address. */}
         <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
@@ -784,6 +788,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       )}
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
       <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
+      <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+        placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
       <RevokeDeviceModal
         visible={!!revokeTarget}
         deviceId={revokeTarget}

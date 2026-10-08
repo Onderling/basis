@@ -4919,6 +4919,10 @@
     }
   },
   "op": {
+    "admin_only": {
+      "text": "Only an admin of this circle can do this.",
+      "doc": "A ⋯ menu entry reserved for the circle's admins, shown greyed to a member with this sentence beside it (invite keeps its own, more specific one). Names the role, never the people who hold it."
+    },
     "not_in_this_circle": {
       "text": "That is not something this circle does — the app it belongs to is not switched on here. An admin can turn it on in the settings.",
       "doc": "Said when a person invokes an op whose APP this circle does not compose. It used to answer \"I couldn't turn that into an action\", which blames the person for the circle's configuration. Names what is wrong AND who can change it, because a refusal a person cannot act on is only slightly better than silence."

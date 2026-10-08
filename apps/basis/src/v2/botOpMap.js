@@ -248,7 +248,7 @@ export function opMapPromptLines(map = BOT_OP_MAP) {
   const mine = (map.member ?? []).map(bareOf);
   const theirs = (map.admin ?? []).filter((q) => !(map.member ?? []).includes(q)).map(bareOf);
   return [
-    `EVERY member may use these tools — call the tool; never say that only the admin can, or that you cannot do or change what one of them does: ${mine.join(', ')}.`,
+    `EVERY member may use these tools, for what each one does — call the tool; never say that only the admin can, or that they cannot change a setting one of these sets: ${mine.join(', ')}.`,
     ...(theirs.length ? [`These are the admin's (the household's roles decide who else; a line for this person below says when they lack them): ${theirs.join(', ')}.`] : []),
   ];
 }

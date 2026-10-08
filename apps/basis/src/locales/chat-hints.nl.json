@@ -117,7 +117,7 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "remindMe": {
-      "text": "Een eigen herinnering van dit lid voor één afspraak of klusje. item = woorden uit de titel; rules in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om de eigen weer weg te halen. Voor 'herinner me een uur van tevoren aan de tandarts'. Met who: everyone een herinnering voor IEDEREEN in huis op een tijd: item = wat er gezegd wordt, rules = de tijd (\"19:45\", \"over 10 minuten\"). Voor 'herinner iedereen om 19:45: eten'.",
+      "text": "Een eigen herinnering van dit lid voor één BESTAANDE afspraak of klusje; geen eigen herinnering op een los tijdstip zonder afspraak of klusje ('herinner me over 10 minuten' kan niet: zeg dat, en bied aan het in de agenda of op een lijst te zetten). item = woorden uit de titel; rules in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om de eigen weer weg te halen. Voor 'herinner me een uur van tevoren aan de tandarts'. Met who: everyone een herinnering voor IEDEREEN in huis op een tijd: item = wat er gezegd wordt, rules = de tijd (\"19:45\", \"over 10 minuten\"). Voor 'herinner iedereen om 19:45: eten'.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "assistant-planned": {

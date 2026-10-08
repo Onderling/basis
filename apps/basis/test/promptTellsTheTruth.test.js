@@ -16,6 +16,8 @@ import { HOUSEHOLD_TEMPLATE } from '../src/v2/householdTemplate.js';
 import { BOT_OP_MAP, roleHintsFor, opMapPromptLines } from '../src/v2/botOpMap.js';
 import { botPromptLines } from '../src/v2/botPrompt.js';
 import { initLocalisation, t } from '../src/localisation.js';
+import { assistantManifest } from '../src/v2/assistantManifest.js';
+import chatHintsNl from '../src/locales/chat-hints.nl.json' with { type: 'json' };
 
 const bare = (q) => q.slice(q.indexOf('.') + 1);
 const MEMBER = BOT_OP_MAP.member.map(bare);
@@ -86,5 +88,23 @@ describe('the household prompt tells the model the truth, for every op on the ma
   it('never a promise to change how the bot works', () => {
     expect(prompt).toMatch(/Beloof NOOIT/);
     expect(prompt).toMatch(/beheerder/);
+  });
+
+  it('remindMe stays NARROW: an existing appointment or chore (or, with who: everyone, the household at a time) — never "remind me of anything at any time"', () => {
+    // every place the model reads about remindMe: the prompt lines naming it, the tool's English hint, its Dutch hint
+    const lineAbout = lines.filter((l) => names(l, 'remindMe') && !/every member may use/i.test(l));
+    const english = assistantManifest.operations.find((o) => o.id === 'remindMe').surfaces.chat.hint;
+    const dutch = chatHintsNl.assistant.remindMe.text;
+    for (const d of [lineAbout.join('\n'), english]) {
+      expect(d, d).toMatch(/appointment or chore/i);
+      expect(d, d).toMatch(/who: everyone/);
+      // said outright: a reminder for oneself at a bare time ("remind me in 10 minutes") does not exist
+      expect(d, d).toMatch(/no (own|personal) reminder at a bare time/i);
+    }
+    expect(dutch).toMatch(/afspraak of klusje/);
+    expect(dutch).toMatch(/who: everyone/);
+    expect(dutch).toMatch(/geen eigen herinnering op een los tijdstip/i);
+    // the member line says the tools are theirs, not that a tool does whatever is asked of it
+    expect(availableLine()).not.toMatch(/never say .*cannot do/i);
   });
 });

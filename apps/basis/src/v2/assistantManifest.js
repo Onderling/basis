@@ -113,7 +113,7 @@ export const assistantManifest = {
       writes: { scope: 'device' },
       params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }, { name: 'who', kind: 'string', required: false }],
       surfaces: {
-        chat:  { reply: 'text', hint: 'This person\'s own reminder for one appointment or chore. item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it. With who: everyone, a reminder for EVERYONE in the household at a time: item = what to say, rules = the time ("19:45", "in 10 minutes") — for "remind everyone at 19:45: dinner".' },
+        chat:  { reply: 'text', hint: 'This person\'s own reminder for one EXISTING appointment or chore (no own reminder at a bare time without one). item = words of its title; rules in words: "60" (minutes before), "ochtend", "avond" (the evening before), "7:30", "ook …" to add to the usual ones, "gewoon" to drop their own for it. With who: everyone, a reminder for EVERYONE in the household at a time: item = what to say, rules = the time ("19:45", "in 10 minutes") — for "remind everyone at 19:45: dinner".' },
       },
     },
     {

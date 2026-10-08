@@ -4405,6 +4405,30 @@
       "text": "Zeg welke afspraak of welk klusje, en wanneer — bijvoorbeeld: herinner me een uur van tevoren aan de tandarts.",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
+    "remind_everyone_set": {
+      "text": "Ik herinner iedereen {{when}}: {{text}}.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_today": {
+      "text": "vandaag om {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_tomorrow": {
+      "text": "morgen om {{time}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_usage": {
+      "text": "Zeg hoe laat en wat — bijvoorbeeld: herinner iedereen om 19:45: eten.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "remind_everyone_failed": {
+      "text": "Dat lukte niet: de herinnering voor iedereen is niet bewaard.",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
+    "announce_say": {
+      "text": "Herinnering voor iedereen: {{title}}",
+      "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
+    },
     "overview_on": {
       "text": "Het weekoverzicht staat aan (zondag 18:00).",
       "doc": "The household bot's reminders and weekly overview: what it writes first, and a person's own switches."
@@ -4470,12 +4494,36 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
+      "text": "Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
       "text": "Herinneringen staan voor dit huishouden uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_rule": {
+      "text": "Herinneringen: {{rules}}. Anders voor jou: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_morning": {
+      "text": "om {{time}} alles van die dag (klusjes en afspraken)",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_evening": {
+      "text": "de avond ervoor om {{time}} bij een afspraak vóór {{until}}",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_before": {
+      "text": "{{n}} minuten voor iets met een tijd",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_at": {
+      "text": "om {{time}} op de dag zelf",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_none": {
+      "text": "Herinneringen: het huishouden stuurt er geen. Zelf aanzetten: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
     },
     "welcome_overview": {
       "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
@@ -4709,7 +4757,6 @@
     "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
     "reminder_chore_soon": "Zo meteen: {{text}}, om {{time}}.",
-    "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, {{lead}} minuten van tevoren, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",
     "value_lead_off": "geen",
@@ -4790,7 +4837,7 @@
           "assistant-forget": "ons gesprek nu vergeten (wat je op een lijst zette, blijft)",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
           "assistant-circles": "de kringen waar de bot in zit",
-          "remindMe": "een eigen herinnering voor één afspraak of klusje",
+          "remindMe": "een eigen herinnering voor één afspraak of klusje, of één voor iedereen op een tijd",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)"
         }
       }

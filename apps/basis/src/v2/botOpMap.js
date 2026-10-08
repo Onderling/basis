@@ -94,7 +94,7 @@ const COLUMNS = {
   ],
   admin: ['reassignTask', 'removeTask', 'editTask'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: ['listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
+  observer: ['listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
 };
 
 /** The bot app that declares this op id, when exactly one does. */
@@ -233,6 +233,24 @@ function narrowMenu(menu, opsById) {
     out.push(e);
   }
   return out;
+}
+
+/**
+ * Who may do what, as the model is told it — GENERATED from the map the host gate reads, so a line can never lag it
+ * (a household's log, 2026-10: a member told "only the admin can" make a list, a reminder refused, "I cannot change
+ * that" about their own reminders — each op on the member column). One line for the member column, one for the admin's
+ * (whose role decides under the household's roles; a person's own line, `roleHintsFor`, says what THEY lack). The
+ * same for every person, so it sits in the stable part of the prompt. LLM-facing.
+ * @param {{member: readonly string[], admin: readonly string[]}} [map]
+ * @returns {string[]}
+ */
+export function opMapPromptLines(map = BOT_OP_MAP) {
+  const mine = (map.member ?? []).map(bareOf);
+  const theirs = (map.admin ?? []).filter((q) => !(map.member ?? []).includes(q)).map(bareOf);
+  return [
+    `EVERY member may use these tools, for what each one does — call the tool; never say that only the admin can, or that they cannot change a setting one of these sets: ${mine.join(', ')}.`,
+    ...(theirs.length ? [`These are the admin's (the household's roles decide who else; a line for this person below says when they lack them): ${theirs.join(', ')}.`] : []),
+  ];
 }
 
 /**

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 47
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 48
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -34,6 +34,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `image-entrypoints` | — | an image's entrypoint imports only Node builtins and relative paths |
 | `integration-index` | — | the integration index stays in sync with reality |
 | `journeys-reach-users` | — | a journey walks a corridor a PERSON can walk |
+| `jsx-raw-text` | — | no stray text straight inside a fragment or an opening tag in React Native code |
 | `kind-appenders` | — | every declared entry kind must have a production APPENDER |
 | `lanes-sign-per-circle` | — | a lane module never names the profile identity — a statement on a lane signs with the |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |

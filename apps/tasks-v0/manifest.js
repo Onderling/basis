@@ -416,10 +416,12 @@ export const tasksManifest = {
         { name: 'requiredSkill', kind: 'string' },
         { name: 'assignee',      kind: 'string' },
         { name: 'status',        kind: 'string' },
+        // words of the task ("wie doet de lamp" → text: lamp): the open tasks whose words hold them
+        { name: 'text',          kind: 'string' },
       ],
       surfaces: {
         chat: {
-          hint: 'List open tasks with computed status; filters: type/requiredSkill/assignee/status.',
+          hint: 'List open tasks with computed status; filters: type/requiredSkill/assignee/status/text. Who does a task, and when: text = words of the task ("who does the lamp" → text: lamp).',
           // (DESIGN gap, closed 2026-05-27) — tasks-v0's slot in
           // the morning brief.  /brief fans across apps that declare
           // `surfaces.chat.brief`; the `tasks_briefSummary` skill
@@ -434,7 +436,9 @@ export const tasksManifest = {
       id:        'listMine',
       verb:      'list',
       appliesTo: { type: 'task' },
-      params:    [],
+      // `who`: someone else's open tasks, by the name the person uses for them (resolved through the people the
+      // asker may name); absent → the caller's own
+      params:    [{ name: 'who', kind: 'string' }],
       surfaces: {
         // Part G (2026-06-17) — slash/brief/search/screen folded in from the
         // former mockTasksManifest.  NB the chat-shell semantic of /mytasks is
@@ -443,7 +447,7 @@ export const tasksManifest = {
         slash: { command: '/mytasks' },
         chat: {
           reply: 'list',
-          hint:  'List open tasks assigned to the calling actor.',
+          hint:  'List open tasks assigned to the calling actor; who = a person\'s name for theirs ("what does Bob have to do" → who: Bob).',
           // C4 (drift fix 2026-06-25): the canonical /brief decl lives on `listOpen`
           // (summarySkill 'tasks_briefSummary', order 20 — the registered skill). This op
           // carried a SECOND brief folded in from the old mock manifest ('briefSummary', not a

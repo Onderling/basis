@@ -4102,11 +4102,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   let ownCalendarReady = null;
   let circleTasks = null;      // the bot's chores over the circle store, made on first use
   /**
-   * A chores read for a door's person: each chore's holder, named when the household's names setting lets this person
-   * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
-   * entry the person (and their model) reads.
-   */
-  /**
    * A door call's circle and actor. The circle door (`ctx.doorCircleId`, host-set) gates a circle-scoped caller id and
    * acts as the member's own ref (`ctx.doorActor`, host-set), so the chores and appointments they touch carry their ref
    * in the circle's own data; every other door acts as its caller.
@@ -4119,17 +4114,70 @@ export async function createRealHouseholdAgent(opts = {}) {
     return (Array.isArray(r?.members) ? r.members : []).filter((m) => m?.webid).map((m) => ({ webid: m.webid, displayName: m.handle ?? m.displayName ?? null, role: m.role ?? null, channel: 'circle' }));
   }
 
+  /** The household's book: every contact the bot keeps (its people, by the door they came in through). */
+  const contactsBook = () => callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+
+  /**
+   * The people a door's person may name, and whether they may: in a circle the bot joined, its roster (whose handles are
+   * every member's to see); else the household's book, under its names ceiling (`assistant.names`) — naming someone is
+   * seeing them. With their roles, for the chore rules that also ask who may give a chore to whom. The ONE read every
+   * "who" in a door's call is resolved through (a chore's person, an appointment's people, whose chores are asked for).
+   * @param {string|null} caller  the person asking (null: the bot's owner)
+   * @param {string|null} [inCircle]
+   */
+  async function peopleBook(caller, inCircle = null) {
+    const people = inCircle ? await circlePeople(inCircle) : await contactsBook();
+    const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
+    const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
+    const policy = buildStandardRolePolicy(roles);
+    const callerRole = caller ? (roles[caller] ?? null) : null;
+    const roleMayAssign = caller ? policy.canReassign(caller) : true;
+    const mayName = inCircle ? true : mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
+    return { known, roles, policy, roleMayAssign, mayName };
+  }
+
+  /**
+   * One person, by the words a door's person used for them: "mij" (themself), their name, or — for someone without one —
+   * the id the bot shows for them (`/users`), exactly. Who the bot knows is never listed on a miss: a directory is not
+   * implied by anyone's own disclosure.
+   * @returns {{ok: true, id: string|null, name: string|null, self: boolean} | {ok: false, reason: 'names-hidden'|'unknown'}}
+   */
+  function personIn(book, words, caller) {
+    const w = String(words ?? '').trim();
+    if (isSelfWord(w)) return { ok: true, id: caller ?? null, name: null, self: true };
+    if (!book.mayName) return { ok: false, reason: 'names-hidden' };
+    const byId = book.known.filter((c) => c.webid === w);
+    const hit = byId.length ? byId : book.known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === w.toLowerCase());
+    if (hit.length !== 1) return { ok: false, reason: 'unknown' };
+    return { ok: true, id: hit[0].webid, name: hit[0].displayName ?? null, self: Boolean(caller) && hit[0].webid === caller };
+  }
+
+  /**
+   * How a door's person sees the people of a chore or an appointment: id → `{you: true}` (themself), `{name}` (one the
+   * household's names setting lets them see), or `{someone: true}` — never the id. In a circle the bot joined, the
+   * household's book and its names setting are not the circle's: nobody is named but the reader — the household's
+   * names never reach a circle, whoever is in both.
+   */
+  async function readerNamer(caller, inCircle = null) {
+    const known = inCircle ? [] : (await contactsBook()).filter((c) => c && !c.hidden && c.webid);
+    const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
+    const mayName = !inCircle && mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole: roles[caller] ?? null, roleMayAssign: buildStandardRolePolicy(roles).canReassign(caller) });
+    return (id) => {
+      if (caller && id === caller) return { you: true };
+      const name = mayName ? (known.find((c) => c.webid === id)?.displayName ?? null) : null;
+      return name ? { name } : { someone: true };
+    };
+  }
+
+  /**
+   * A chores read for a door's person: each chore's holder, named when the household's names setting lets this person
+   * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
+   * entry the person (and their model) reads.
+   */
   async function withChoreHolders(items, caller, inCircle = null) {
     if (!items.some((i) => Array.isArray(i?.holders))) return items;
     const tr = agentT;
-    // In a circle the bot joined, the household's book and its names setting are not the circle's: nobody is named but
-    // the reader ("you") — the household's names never reach a circle, whoever is in both.
-    const people = inCircle ? [] : await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
-    const known = people.filter((c) => c && !c.hidden && c.webid);
-    const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
-    const policy = buildStandardRolePolicy(roles);
-    const mayName = !inCircle && mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole: roles[caller] ?? null, roleMayAssign: policy.canReassign(caller) });
-    const nameOf = (id) => (id === caller ? tr('circle.lists.chore_you') : (known.find((c) => c.webid === id)?.displayName ?? null));
+    const nameOf = await readerNamer(caller, inCircle);
     return items.map((i) => {
       if (!Array.isArray(i?.holders)) return i;
       const { holders, ...base } = i;
@@ -4137,8 +4185,38 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the reader's own — never anyone's id
       const rest = { ...base, state: holders.length ? 'claimed' : 'open', ...(holders.includes(caller) ? { yours: true } : {}) };
       if (!holders.length) return { ...rest, label: tr('circle.lists.chore_open', { text: i.label }) };
-      const names = holders.map((h) => (h === caller || mayName ? nameOf(h) : null)).filter(Boolean);
+      const names = holders.map(nameOf).filter((p) => !p.someone).map((p) => (p.you ? tr('circle.lists.chore_you') : p.name));
       return { ...rest, label: names.length ? tr('circle.lists.chore_held', { text: i.label, who: names.join(', ') }) : tr('circle.lists.chore_taken', { text: i.label }) };
+    });
+  }
+
+  /** What of a chore a door's person reads: its words, its day, its state — never a person's id (`heldBy` says who). */
+  const CHORE_READ_FIELDS = Object.freeze(['id', 'type', 'text', 'title', 'label', 'dueAt', 'state', 'status', 'openDeps', 'blockedBy', 'createdAt', 'containedBy']);
+  const holdersOfTask = (it) => [...new Set([...(Array.isArray(it?.assignees) ? it.assignees : []), it?.assignee].filter(Boolean))];
+
+  /** The chores' read (open · mine) for a door's person: each row with who holds it as they may see them, and whether it is theirs. */
+  async function choresForReader(items, caller, inCircle = null) {
+    const nameOf = await readerNamer(caller, inCircle);
+    return items.map((it) => {
+      const holders = holdersOfTask(it);
+      const row = Object.fromEntries(CHORE_READ_FIELDS.filter((f) => it?.[f] !== undefined).map((f) => [f, it[f]]));
+      return { ...row, heldBy: holders.map(nameOf), ...(caller && holders.includes(caller) ? { yours: true } : {}) };
+    });
+  }
+
+  /**
+   * The agenda's read for a door's person: who comes to each appointment as they may see them — the people it names and
+   * whoever said they come, never one who said they do not — or, for one that names nobody, everyone (the household's
+   * agenda is shared). The ids it was handed stay here.
+   */
+  async function eventsForReader(items, caller, inCircle = null) {
+    const nameOf = await readerNamer(caller, inCircle);
+    return items.map(({ attendees, rsvp, ...e }) => {
+      const named = Array.isArray(attendees) ? attendees.filter((a) => typeof a === 'string' && a) : [];
+      if (!named.length) return { ...e, everyone: true };
+      const answered = rsvp && typeof rsvp === 'object' ? rsvp : {};
+      const coming = Object.entries(answered).filter(([, r]) => r === 'accepted' || r === 'tentative').map(([who]) => who);
+      return { ...e, comes: [...new Set([...named, ...coming])].filter((who) => answered[who] !== 'declined').map(nameOf) };
     });
   }
 
@@ -4152,19 +4230,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     const parts = String(words ?? '').split(/\s*(?:,|&|\ben\b|\band\b)\s*/i).map((w) => w.trim()).filter(Boolean);
     const EVERYONE = /^(iedereen|allemaal|alle(n)?|everyone|everybody|all)$/i;
     if (!parts.length || parts.every((w) => EVERYONE.test(w))) return { ok: true, ids: [] };
-    const people = await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
-    const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
-    const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
-    const callerRole = caller ? (roles[caller] ?? null) : null;
-    const roleMayAssign = caller ? buildStandardRolePolicy(roles).canReassign(caller) : true;
-    const mayName = mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
+    const book = await peopleBook(caller);
     const ids = [];
     for (const w of parts.filter((x) => !EVERYONE.test(x))) {
-      if (isSelfWord(w)) { if (caller) ids.push(caller); continue; }
-      if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
-      const hit = known.filter((c) => c.webid === w || String(c.displayName ?? '').trim().toLowerCase() === w.toLowerCase());
-      if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: w }) };
-      ids.push(hit[0].webid);
+      const p = personIn(book, w, caller);
+      if (p.ok && p.self) { if (caller) ids.push(caller); continue; }
+      if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
+      if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: w }) };
+      ids.push(p.id);
     }
     return { ok: true, ids: [...new Set(ids)] };
   }
@@ -4182,27 +4255,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     let who = null;
     let whoName = null;
     if (typeof assignee === 'string' && assignee.trim()) {
-      const people = inCircle ? await circlePeople(inCircle) : await callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
-      const known = people.filter((c) => c && !c.hidden && c.webid && c.channel);
-      const roles = Object.fromEntries(known.filter((c) => c.role).map((c) => [c.webid, c.role]));
-      const policy = buildStandardRolePolicy(roles);
-      const callerRole = caller ? (roles[caller] ?? null) : null;
-      const roleMayAssign = caller ? policy.canReassign(caller) : true;
       // Whether this person may SEE the others' names is the household's ceiling (`assistant.names`); naming someone
       // is seeing them, so where names are hidden a chore is given by name only by those who may see them.
-      // (in a circle the roster's handles are every member's to see)
-      const mayName = inCircle ? true : mayNamePeople({ setting: paramsService.register.valueOf(NAMES_KEY), callerId: caller, callerRole, roleMayAssign });
-      if (isSelfWord(assignee)) who = caller ?? 'me';
+      const book = await peopleBook(caller, inCircle);
+      const { roles, policy, roleMayAssign } = book;
+      const p = personIn(book, assignee, caller);
+      if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
+      if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
+      if (p.self) who = caller ?? 'me';
       else {
-        if (!mayName) return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
-        const name = assignee.trim().toLowerCase();
-        // by their name, or — for someone without one — by the id the bot shows for them (`/users`), exactly
-        const byId = known.filter((c) => c.webid === assignee.trim());
-        const hit = byId.length ? byId : known.filter((c) => String(c.displayName ?? '').trim().toLowerCase() === name);
-        // Who the bot knows is never listed on a miss: a directory is not implied by anyone's own disclosure.
-        if (hit.length !== 1) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
-        who = hit[0].webid;
-        whoName = hit[0].displayName ?? null;
+        who = p.id;
+        whoName = p.name;
       }
       const allowed = assignAllowed({
         policy: inCircle ? 'roles' : paramsService.register.valueOf(ASSIGN_POLICY_KEY),
@@ -4253,6 +4316,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   const TASK_BY_ID_OPS = new Set(['claimTask', 'completeTask', 'reassignTask', 'removeTask', 'editTask', 'unclaimTask']);
+  /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
+  const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
@@ -4266,6 +4331,36 @@ export async function createRealHouseholdAgent(opts = {}) {
       const { circleId: _circle, groupId: _group, ...pinned } = args ?? {};
       args = typeof ctx.doorCircleId === 'string' && ctx.doorCircleId ? { ...pinned, circleId: ctx.doorCircleId } : pinned;
       if (appOrigin === 'tasks' || appOrigin === 'calendar') args = { ...args, actor: actorOf(ctx) };
+    }
+    // "wat moet Bob doen": someone's own chores, by the name the person asking uses — found among the people they may
+    // name (naming someone is seeing them), on every shell; "mij", or no name, is their own.
+    if (appOrigin === 'tasks' && opId === 'listMine' && typeof args?.who === 'string' && args.who.trim()) {
+      const { who, ...rest } = args;
+      const reader = actorOf(ctx);
+      const inCircle = doorCircleOf(ctx);
+      const p = personIn(await peopleBook(reader, inCircle), who, reader);
+      const tr = agentT;
+      if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden_read'), refusal: refuse('door-settings', 'setting:names') };
+      if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: who.trim() }) };
+      if (p.self || !p.id) args = rest;
+      else {
+        // the read itself, as the host (the door's gate ran above), for the one named; then put through the reader's eyes
+        const { caller: _caller, ...asHost } = ctx ?? {};
+        const r = await callSkill('tasks', 'listMine', { ...rest, actor: p.id }, asHost);
+        if (!Array.isArray(r?.items)) return r;
+        const theirs = r.items.filter((it) => holdersOfTask(it).includes(p.id));
+        return { ...r, items: reader ? await choresForReader(theirs, reader, inCircle) : theirs, whose: p.name ?? who.trim() };
+      }
+    }
+    // The people reads, for a door's person: who holds a chore and who comes to an appointment, as the household's names
+    // setting lets them see — `{you}` · `{name}` · `{someone}` — never anyone's id.
+    if (typeof ctx?.caller === 'string' && ctx.caller && READER_READS.has(`${appOrigin}.${opId}`)) {
+      const reader = actorOf(ctx);
+      const inCircle = doorCircleOf(ctx);
+      const { caller: _caller, ...asHost } = ctx;
+      const r = await callSkill(appOrigin, opId, args, asHost);
+      if (!Array.isArray(r?.items)) return r;
+      return { ...r, items: appOrigin === 'calendar' ? await eventsForReader(r.items, reader, inCircle) : await choresForReader(r.items, reader, inCircle) };
     }
     // A household bot's chores are named in a person's words ("ik doe het vuilnis"): an op on ONE task takes the words
     // for its id — the task by id, else by its words (`matchEntry`) among the circle's open tasks; words that name no

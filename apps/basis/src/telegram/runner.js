@@ -27,7 +27,7 @@ import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
 import { householdListType, coerceListArgs } from '../v2/circleGate.js';
-import { replyFact, replyLines } from '../v2/replyLine.js';
+import { replyFact, replyLines, isReadFamily } from '../v2/replyLine.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -172,9 +172,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const rendered = renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() });
     // An op of the families a person reads one line for (`replyLine`): that line, the same for the gate's pick and the
     // model's. A line that folds waits for the rest of its turn.
-    const fact = !reply?.error && rendered.kind === 'text' ? replyFact(reply?.payload, { opId: ready.opId, args: ready.args }) : null;
+    // The people reads ("wie doet de lamp") are worded the same way: their line in place of the list they would paint.
+    const fact = !reply?.error && (rendered.kind === 'text' || isReadFamily(ready.opId)) ? replyFact(reply?.payload, { opId: ready.opId, args: ready.args }) : null;
     if (fact?.fold && turns.has(chatId)) { (turns.get(chatId).lines ??= []).push(fact); return; }
-    await paint(chatId, fact ? { ...rendered, text: replyLines([fact], { t: tc(chatId) })[0] ?? rendered.text } : rendered);
+    const line = fact ? replyLines([fact], { t: tc(chatId) })[0] : null;
+    await paint(chatId, line ? { ...rendered, kind: 'text', text: line } : rendered);
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to

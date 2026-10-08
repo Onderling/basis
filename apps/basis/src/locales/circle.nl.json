@@ -4737,12 +4737,13 @@
           "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)"
         },
         "tasks": {
-          "listMine": "je eigen klusjes",
+          "listMine": "je eigen klusjes, of die van een ander (of zeg: wat moet Bob doen)",
           "claimTask": "een klusje oppakken (of zeg: ik doe de ramen)",
           "completeTask": "een klusje afmelden (of zeg: ramen is klaar)",
           "editTask": "een klusje aanpassen",
           "removeTask": "een klusje weghalen",
-          "reassignTask": "een klusje aan een ander geven"
+          "reassignTask": "een klusje aan een ander geven",
+          "listOpen": "wie een klusje doet, en wanneer (of zeg: wie doet de lamp)"
         },
         "calendar": {
           "addEvent": "een afspraak zetten (of zeg: tandarts morgen om 10 uur)",
@@ -4754,7 +4755,7 @@
         },
         "assistant": {
           "assistant-people": "wie er in dit huishouden zitten",
-          "weekOverview": "jouw week: klusjes, afspraken, boodschappen",
+          "weekOverview": "jouw week: klusjes, afspraken, boodschappen — of één dag (of zeg: wie is er zaterdag)",
           "assistant-menu": "je instellingen, met knoppen",
           "assistant-reminders": "herinneringen aan of uit, of wanneer (60 · ochtend · avond · ook …)",
           "assistant-overview": "het zondagsoverzicht aan of uit",
@@ -4864,7 +4865,11 @@
     "link_failed": "Koppelen lukte niet.",
     "unlink_done": "Ontkoppeld: berichten van die Basis-app tellen niet meer als jou, en zijn schermen zijn los.",
     "unlink_nothing": "Er is geen Basis-app aan je gekoppeld.",
-    "users_linked": "gekoppelde app: ja"
+    "users_linked": "gekoppelde app: ja",
+    "day_unread": {
+      "text": "Welke dag bedoel je met '{{day}}'? Zeg bijvoorbeeld 'zaterdag' of 'morgen'.",
+      "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    }
   },
   "op": {
     "not_in_this_circle": {
@@ -8157,6 +8162,10 @@
         "text": "✓ Kring \"{{circle}}\" aangemaakt. Hij staat in /circles als \"wacht nog\"; helemaal actief wordt hij pas als meerdere kringen tegelijk kunnen.",
         "doc": "Confirmation of /circle-new."
       }
+    },
+    "names_hidden_read": {
+      "text": "Namen zijn hier niet zichtbaar: je kunt alleen je eigen klusjes opvragen.",
+      "doc": "A household bot's reply when someone asks for another person's chores by name and the household's names setting does not let them see names."
     }
   },
   "refusal": {
@@ -8383,6 +8392,78 @@
     "chore_edited": {
       "text": "Klusje '{{title}}' is aangepast.",
       "doc": "A chore was changed; its words as they are now."
+    },
+    "who_held": {
+      "text": "Klusje '{{title}}' is van {{who}}{{when}}.",
+      "doc": "Who does a chore (\"wie doet de lamp\"): the one chore the words fit, who holds it and its day. {{who}}: the holders as the reader may see them (\"jou\", a name, \"iemand\"); {{when}}: \", za 10 okt\" or empty."
+    },
+    "who_open": {
+      "text": "Klusje '{{title}}' heeft nog niemand{{when}}.",
+      "doc": "Who does a chore: the one chore the words fit, and nobody holds it. {{when}}: \", za 10 okt\" or empty."
+    },
+    "who_none": {
+      "text": "Er is geen open klusje met '{{text}}'.",
+      "doc": "Who does a chore: no open chore holds the words the person used."
+    },
+    "who_several": {
+      "text": "{{count}} klusjes met '{{text}}': {{chores}}.",
+      "doc": "Who does a chore: several open chores hold the words; {{chores}} is one row each (who_row_held / who_row_open), joined by \"; \"."
+    },
+    "who_row_held": {
+      "text": "{{title}} ({{who}}{{when}})",
+      "doc": "One chore in the several-chores line: its words, who holds it and its day (\", za 10 okt\" or empty)."
+    },
+    "who_row_open": {
+      "text": "{{title}} (nog niemand{{when}})",
+      "doc": "One chore in the several-chores line that nobody holds; its day as \", za 10 okt\" or empty."
+    },
+    "who_you": {
+      "text": "jou",
+      "doc": "The reader themselves among the people of a chore or an appointment (\"is van jou\")."
+    },
+    "who_someone": {
+      "text": "iemand",
+      "doc": "A person the reader may not name (the household's names setting): never their id."
+    },
+    "who_everyone": {
+      "text": "iedereen",
+      "doc": "An appointment that names nobody: it is for the whole household."
+    },
+    "who_nobody": {
+      "text": "nog niemand",
+      "doc": "A chore on a day that nobody holds yet."
+    },
+    "mine_list": {
+      "text": "{{name}} doet: {{chores}}.",
+      "doc": "Someone else's open chores (\"wat moet Bob doen\"), by the name asked. {{chores}}: one row each (mine_row / mine_row_due), joined by \"; \"."
+    },
+    "mine_none": {
+      "text": "{{name}} heeft geen open klusjes.",
+      "doc": "Someone else's open chores: they hold none."
+    },
+    "mine_row": {
+      "text": "{{title}}",
+      "doc": "One chore in someone's chores line, without a day."
+    },
+    "mine_row_due": {
+      "text": "{{title}} ({{when}})",
+      "doc": "One chore in someone's chores line, with its day (\"za 10 okt\")."
+    },
+    "day_head": {
+      "text": "Op {{when}}:",
+      "doc": "One day's read (\"wie is er zaterdag\"): its first line, the day as \"za 10 okt\"."
+    },
+    "day_event": {
+      "text": "• {{time}} {{title}} — {{who}}",
+      "doc": "One appointment that day: its time, its title and who comes (\"iedereen\" when it names nobody)."
+    },
+    "day_chore": {
+      "text": "• klusje {{title}} — {{who}}",
+      "doc": "One chore due that day and who does it (\"nog niemand\" when nobody holds it)."
+    },
+    "day_none": {
+      "text": "Op {{when}} staat er niets.",
+      "doc": "One day's read: no appointments and no chores that day."
     }
   }
 }

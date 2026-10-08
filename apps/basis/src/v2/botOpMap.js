@@ -25,7 +25,8 @@ export const BOT_OP_MAP = Object.freeze({
     'makeChore',
     // at a shop: the general list and that shop's own (a read)
     'shopVisit',
-    'listMine', 'claimTask', 'completeTask',
+    // "wat moet ik nog doen" / "wat moet Bob doen" (their own, by name), and "wie doet de lamp" (the chores' open read, with words)
+    'listMine', 'listOpen', 'claimTask', 'completeTask',
     'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent',
     'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-reminders', 'remindMe', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
     // who is in the household (names as the household allows): anyone in it may ask
@@ -35,7 +36,7 @@ export const BOT_OP_MAP = Object.freeze({
   ]),
   admin: Object.freeze(['reassignTask', 'removeTask', 'editTask']),
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: Object.freeze(['listLists', 'listEntries', 'shopVisit', 'listMine', 'listEvents', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned']),
+  observer: Object.freeze(['listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned']),
 });
 
 const MEMBER = new Set(BOT_OP_MAP.member);
@@ -112,6 +113,9 @@ export function botOffers(appOrigin, op, role, preset = 'standard') {
     if (role === 'observer') return botRoleAllows(role, id);
     return op?.visibility !== 'trusted' || role == null || role === 'admin';
   }
+  // household is the bot's TEMPLATE now, not an app it offers: none of its own ops (its item types, its chore copy) is on
+  // the map — `listOpen` there is the chores' read (tasks), never household's of the same name
+  if (appOrigin === 'household') return false;
   if (!botOpLevel(id)) return false;
   // one rule for what a role reaches — the same the host gate asks
   return botRoleAllows(role, id, preset);

@@ -46,6 +46,7 @@ import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
+import { useRelayQuestion } from './RelayQuestionModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
@@ -155,6 +156,12 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       setRelayNote(t('circle.mydata.relay_saved_reload', { url: saved || t('circle.mydata.relay_off') }));
     } catch (e) { setRelayNote(t('circle.mydata.relay_error', { msg: e?.message ?? '' })); }
   }, [callSkill, relayStore, relayInput, onSetRelay]);
+  // The relay question (there is no default relay): an add-device offer asks when this device knows none, and the
+  // answer goes through the same one set-relay implementation as the field above.
+  const { askRelayIfNone, relayQuestionModal } = useRelayQuestion(useCallback(
+    (url) => (typeof onSetRelay === 'function' ? onSetRelay({ url }) : relayStore.set(url)),
+    [onSetRelay, relayStore],
+  ));
 
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.
@@ -950,7 +957,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           }}
         />
       )}
-      <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
+      <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
+      {relayQuestionModal}
       <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
       <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
         placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />

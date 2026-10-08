@@ -473,6 +473,18 @@ export function bootRelayUrls({ stored = null, list = [] } = {}) {
 }
 
 /**
+ * The relay this device knows, from what it holds right now: the saved setting, else the build/boot argument, else a
+ * relay a circle recorded — `bootRelayUrl`'s order. Null when it knows none (there is no default relay).
+ *
+ * @param {{ saved?: string|null, arg?: string|null, list?: Array<object> }} known
+ * @returns {string|null}
+ */
+export function knownRelayUrl({ saved = null, arg = null, list = [] } = {}) {
+  const given = [saved, arg].find((v) => typeof v === 'string' && v.trim()) ?? null;
+  return bootRelayUrl({ stored: given, list });
+}
+
+/**
  * The relay question — asked only when this device knows NO relay at all.
  *
  * There is no default relay: a relay is a setting the person makes, an invite or enroll offer carries one, or the
@@ -495,11 +507,7 @@ export function createRelayQuestion({ read } = {}) {
     async check() {
       if (deferred) return { ask: false };
       let known = null;
-      try {
-        const { saved = null, arg = null, list = [] } = (await read?.()) ?? {};
-        const given = [saved, arg].find((v) => typeof v === 'string' && v.trim()) ?? null;
-        known = bootRelayUrl({ stored: given, list });
-      } catch { known = null; }
+      try { known = knownRelayUrl((await read?.()) ?? {}); } catch { known = null; }
       return { ask: !known };
     },
     /** "Later": not again this session. */

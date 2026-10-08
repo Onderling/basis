@@ -143,6 +143,10 @@ describe('the bot joins a circle on its admin\'s word', () => {
     // what a shell does when its roster changes (production's roster feed): the new member's per-circle key bound
     await bindCircleAddressKeysFor({ agent: ann.agent, circleId: BLUE });
     const forgotBefore = walkLog(dataDir).filter((e) => e.kind === 'circle-forgotten').length;
+    // the removal fans to the member's per-circle address: wait until Ann's roster holds it, or the statement has nowhere
+    // to go (a removed member gets no catch-up afterwards) — the race behind this walk's occasional red
+    const bound = await until(async () => ((await readRoster(ann, BLUE)).find((m) => m.webid === row.webid)?.circleAddresses?.length ? true : null), { timeout: 60_000, step: 500 });
+    expect(bound, 'Ann never learned the bot\'s address in the second circle').toBe(true);
 
     const removed = await removeCircleMember({ agent: ann.agent, circleId: BLUE, memberWebid: row.webid });
     expect(removed.ok, JSON.stringify(removed)).toBe(true);

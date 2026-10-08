@@ -510,7 +510,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       if (r && typeof r === 'object' && r.refused) {
         // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then
         // silence. A message that carried a code is told why it failed, every time: that is a new question.
-        if (msg?.refuseOnce && threads && r.id && r.refused === 'needs-code') {
+        if (msg?.refuseOnce && threads && r.id && (r.refused === 'needs-code' || r.refused === 'relink')) {
           if (threads.refused(r.id)) return;
           threads.markRefused(r.id);
         }

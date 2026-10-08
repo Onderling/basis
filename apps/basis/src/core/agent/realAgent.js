@@ -2919,6 +2919,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     return auth ? { ...args, auth } : null;
   };
   /** Is this address a household bot the person's identity is linked to (`/koppel`) — a contact row marked so? */
+  /** Typing `/start <code>` to a bot: the admission by its card's code. */
+  const ADMISSION_TURN = /^\/start(?:@\S+)?\s+\S+$/;
+  /** Whether a contact's card says it is a bot (display only — the admission still has to be the person's own act). */
+  const claimsBot = async (address) => {
+    if (typeof address !== 'string' || !address) return false;
+    try { return (await rawContacts()).some((c) => c?.bot === true && (c.webid === address || c.peerAddr === address) && !c.hidden); } catch { return false; }
+  };
   const isLinkedBot = async (address) => {
     if (typeof address !== 'string' || !address) return false;
     try { return linkedBotsOf(await rawContacts()).includes(address); } catch { return false; }
@@ -5079,6 +5086,9 @@ export async function createRealHouseholdAgent(opts = {}) {
           for (const u of wanted) if (on.includes(u) && !relays.includes(u)) relays.push(u);
           if (relays.length) realArgs = { ...realArgs, relays };
         }
+        // a FUNCTION profile (a household bot) says so on its card — for display and the add-flow's words only; what a
+        // person's app signs to is decided by their own admission, never by this claim
+        try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -6533,9 +6543,18 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @param {string} peerAddr
      * @param {{text: string, messageId: string}} turn
      */
-    linkedTurnAuth: async (peerAddr, { text, messageId } = {}) => (
-      (await isLinkedBot(peerAddr)) ? deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId }) : null
-    ),
+    linkedTurnAuth: async (peerAddr, { text, messageId } = {}) => {
+      const statement = () => deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId });
+      // an agent this person admitted themselves WITH (linked, or admitted by its card's code): every turn is signed
+      if (await isLinkedBot(peerAddr)) return statement();
+      // the admission itself: the person typed `/start <code>` to a contact whose card says it is a bot — their own act,
+      // the one turn to a not-yet-admitted contact that carries a statement; this device then waits for the bot's word
+      if (ADMISSION_TURN.test(String(text ?? '').trim()) && await claimsBot(peerAddr)) {
+        identityLinks.expectAdmission(peerAddr);
+        return statement();
+      }
+      return null;
+    },
     /** The person's identity links: the offer's view, the bot's statement → a contact row (every shell spreads `handlers`). */
     identityLinks,
     /** Whether this install is an ENROLLED device (a delegation under the owner root) — read by a

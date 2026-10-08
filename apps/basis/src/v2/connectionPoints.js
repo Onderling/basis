@@ -353,16 +353,14 @@ export function recordJoinedCirclePoints({ store, invite, circleId } = {}) {
  * @param {Array<object>} [a.list]  `store.list()` — newest first, carrying `kind`/`adopted`/`active`
  * @returns {string|null}
  */
-export function bootRelayUrl({ stored = null, list = [], fallback = null } = {}) {
+export function bootRelayUrl({ stored = null, list = [] } = {}) {
   const explicit = typeof stored === 'string' ? stored.trim() : '';
   if (explicit) return explicit;
   const points = Array.isArray(list) ? list : [];
   const usable = points.filter((p) => p?.kind !== POINT_KIND.POD && p?.adopted !== false && isUrl(p?.url, POINT_KIND.RELAY));
   const active = usable.find((p) => p?.active === true);
   if (active) return active.url;
-  // `list()` is newest first; with nothing saved and nothing recorded, the shell's default relay (`fallback`, the
-  // public one) — last, so a circle's own relay always wins over it. No fallback ⇒ null, as before.
-  return usable[0]?.url ?? (typeof fallback === 'string' && fallback.trim() ? fallback.trim() : null);
+  return usable[0]?.url ?? null;      // `list()` is newest first
 }
 
 /**
@@ -464,8 +462,8 @@ export function contactRelayScope({ to, circlesForPeer, circlePointsFor, contact
  * @param {Array<object>} [a.list]     `store.list()`
  * @returns {string[]}  unique, the primary first; `[]` when there is no relay at all
  */
-export function bootRelayUrls({ stored = null, list = [], fallback = null } = {}) {
-  const primary = bootRelayUrl({ stored, list, fallback });
+export function bootRelayUrls({ stored = null, list = [] } = {}) {
+  const primary = bootRelayUrl({ stored, list });
   const out = primary ? [primary] : [];
   for (const p of (Array.isArray(list) ? list : [])) {
     if (p?.kind === POINT_KIND.POD || p?.adopted === false || !isUrl(p?.url, POINT_KIND.RELAY)) continue;

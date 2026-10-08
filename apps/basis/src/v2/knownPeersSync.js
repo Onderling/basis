@@ -47,6 +47,8 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
 const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
   // a node's: where its agenda links are served
   'serves',
+  // a card that says it is a bot (display only)
+  'bot',
   // the identity link: on a person's row for a household bot, the row their identity is linked to there (every device
   // of theirs then speaks to it as them, and a device revoke reaches it); on a bot's row for a person, their root
   // (and WHEN the link last changed: the third field-set a sibling may change on a row this device holds, newer wins)

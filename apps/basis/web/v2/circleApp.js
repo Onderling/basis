@@ -80,7 +80,7 @@ import { discoverPodRoot, createPodWriter } from '../../src/web/podStorage.js';
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
-import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl, effectiveRelayUrl, DEFAULT_RELAY_URL } from '../../src/v2/relayPref.js';
+import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import {
   normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS, daysToMs,
 } from '../../src/v2/retentionPref.js';
@@ -1018,7 +1018,7 @@ async function applyRelayUrl(url) {
   // register is the authority (device-params consolidation). Same-value echoes are idempotent.
   circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'relay.url', value: saved ?? '' })
     .catch(() => { /* the cache stands */ });
-  CIRCLE_RELAY_URL = effectiveRelayUrl(saved, CIRCLE_RELAY_ENV);   // cleared ⇒ back to the public relay, not none
+  CIRCLE_RELAY_URL = resolveRelayUrl(saved, CIRCLE_RELAY_ENV);
   if (_peerAgent) {
     try { await tryConnectPeerTransport(_peerAgent, _peerRouter); }
     catch (err) { return { ok: false, error: err?.message ?? String(err), effective: CIRCLE_RELAY_URL }; }
@@ -1544,7 +1544,6 @@ let   CIRCLE_RELAY_URL      = bootRelayUrl({
       return createConnectionPoints({ initial: localStorageConnectionPointsIo().load(), save: () => {} }).list();
     } catch { return []; }
   })(),
-  fallback: DEFAULT_RELAY_URL,   // nothing saved and nothing recorded: the public relay, never none
 });
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 /**
@@ -1629,7 +1628,7 @@ function applyTransportMode(mode) {
 // drives the route × capability grey-out). transportKnown is always true here (we can read relay
 // + mode), so the private-DM grey-out is a REAL disable, not the missing-data seam.
 function currentTransportState() {
-  const relayUrl = effectiveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV) || '';
+  const relayUrl = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV) || '';
   // canWakePush: false — web has no killed-app state to wake; an open tab already receives live.
   // (The wake-nudges toggle greys with its honest why; listed in web-mobile-exceptions.)
   return { mode: readTransportMode(), relayUrl, relayConnected: !!CIRCLE_RELAY_URL, canWakePush: false };
@@ -4885,7 +4884,7 @@ async function showCircleInvite(circleId) {
   }
   // Scannable deep-link: a phone camera opens the hosted app with ?join=<invite> (+ the admin's current
   // relay, so one scan configures transport AND joins). showJoinCircle tolerates the raw invite too (paste).
-  const relayForLink = effectiveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
+  const relayForLink = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
   const deepLink = inviteDeepLink(location, r.uri, relayForLink);   // wherever THIS app is served (a path under a site too)
   const canvas = document.createElement('canvas');
   canvas.width = 220; canvas.height = 220;

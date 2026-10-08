@@ -34,7 +34,7 @@
 // realAgent.js.
 import { createLocalBuiltins }   from '../../../basis/src/core/localBuiltins.js';
 import AsyncStorage              from '@react-native-async-storage/async-storage';
-import { effectiveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
+import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 
 // Media mobile twin (2026-07) — the sealed-media upgrade gate (shared
 // handler decides; we only compose) + the RN identity-shaped encoder.
@@ -241,7 +241,7 @@ export function buildMobileLocalBuiltins({
       await agent.connectPeerTransport({
         nknLib,
         // T3a — the in-app relay setting (Settings → Mij) wins over the env var (no rebuild); unset → NKN-only.
-        relayUrl: effectiveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL),
+        relayUrl: resolveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL),
         rendezvous: true,                                             // T5.2d
         rtcLib,
       });

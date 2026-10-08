@@ -95,6 +95,13 @@ export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date
       },
     }),
     received,
+    /**
+     * This device just typed `/start <code>` to a bot (the admission by its card's code), signed: it waits for that
+     * bot's statement as it does after a `/koppel` offer — the statement, not this guess, is what marks the contact.
+     */
+    expectAdmission(botAddress, { botName = null } = {}) {
+      if (typeof botAddress === 'string' && botAddress && !pending.has(botAddress)) pending.set(botAddress, { botName, admission: true });
+    },
     /** The peer router's entry (spread into the shared lane table, every shell). */
     handlers: { [IDENTITY_LINK_SUBTYPE]: (from, payload) => { received(from, payload).catch(() => {}); } },
     /** Told when a bot's statement was taken (`{bot, row, botName}` or `{bot, unlinked: true}`); returns the unsubscribe. */

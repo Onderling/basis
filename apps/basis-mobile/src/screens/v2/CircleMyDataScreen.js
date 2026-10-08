@@ -49,7 +49,7 @@ import EnrollDeviceModal from './EnrollDeviceModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
-import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText } from '../../../../basis/src/v2/companionGrant.js';
+import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
@@ -90,6 +90,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
   const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
+  const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
   // the open grant on one node: {node, picker (null while asked), to, picked: family ids, line (how it ended)}
   const [grant, setGrant] = useState(null);
   // who each node granted: { [node]: {ok, rows: [{to, label, may}]} | {ok: false, message}, said?: string }
@@ -261,6 +262,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     // the nodes this person claimed (their own list; each node keeps its owner itself)
     setCompanions(Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
       .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` })));
+    setCompanionsPending(pendingRevokeLine({ properties: profProps?.properties ?? {} }, t));
     // The paired views. A read, never an authority: the grants live in the agent's durable
     // registry and the acting door reads THAT, so a stale list can only look stale.
     const conns = await callSkill('household', 'listSurfaceGrants', {}).catch(() => null);
@@ -480,6 +482,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           access" asks the node what it can give, then who (a contact) and the ticks. Web parity: circleMyData.js. */}
       {companions.length > 0 && (
         <Section title={t('circle.companionGrant.nodes')}>
+          {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
           {companions.map((c) => {
             const open = grant?.node === c.node ? grant : null;
             const picker = open?.picker ?? null;

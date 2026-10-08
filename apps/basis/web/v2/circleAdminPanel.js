@@ -18,7 +18,7 @@
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
 // decision (web ≡ mobile); the panel paints it and works nothing out for itself.
-import { roleControlFor } from '../../src/v2/circleRoleControl.js';
+import { roleControlFor, removeControlFor, announceControlFor } from '../../src/v2/circleRoleControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { paintFace } from './faceView.js';
 
@@ -33,6 +33,7 @@ export function renderCircleAdminPanel(container, {
   viewerWebid = null,
   t,
   onRemove,
+  onLeave,
   onSetRole,
   onAnnounce,
   onUnmute,
@@ -129,11 +130,19 @@ export function renderCircleAdminPanel(container, {
         setRole.addEventListener('click', () => { if (typeof onSetRole === 'function') onSetRole(m, control); });
         li.appendChild(setRole);
       }
+      // What the row's action IS for this viewer (one shared decision): an admin removes; a member's own row is LEAVING;
+      // someone else's row is greyed for a member, with the reason — the skill would refuse it anyway.
+      const rc = removeControlFor({ members, member: m, myRef: viewerWebid });
       const rm = document.createElement('button');
       rm.type = 'button';
-      rm.className = 'cc-admin__member-remove';
-      rm.textContent = tr('circle.admin.remove');
-      rm.addEventListener('click', () => { if (typeof onRemove === 'function') onRemove(m); });
+      rm.className = rc.kind === 'leave' ? 'cc-admin__member-leave' : 'cc-admin__member-remove';
+      rm.textContent = tr(rc.labelKey);
+      if (rc.disabled) { rm.disabled = true; if (rc.reasonKey) rm.title = tr(rc.reasonKey); }
+      rm.addEventListener('click', () => {
+        if (rc.disabled) return;
+        if (rc.kind === 'leave') { if (typeof onLeave === 'function') onLeave(); }
+        else if (typeof onRemove === 'function') onRemove(m);
+      });
       li.appendChild(rm);
       list.appendChild(li);
     }
@@ -159,9 +168,16 @@ export function renderCircleAdminPanel(container, {
   post.type = 'submit';
   post.className = 'cc-admin__announce-post';
   post.textContent = tr('circle.admin.announce_post');
+  // Posting the circle's announcement is the admin's (the skill refuses a member): greyed for anyone else, with why.
+  const ann = announceControlFor({ members, myRef: viewerWebid });
+  if (ann.disabled) {
+    post.disabled = true; area.disabled = true;
+    if (ann.reasonKey) { post.title = tr(ann.reasonKey); area.placeholder = tr(ann.reasonKey); }
+  }
   form.appendChild(post);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (ann.disabled) return;
     const text = area.value.trim();
     if (!text) return;
     area.value = '';

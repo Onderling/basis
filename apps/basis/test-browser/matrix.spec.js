@@ -60,10 +60,11 @@ const CORE = [
       const [A, B] = peers;
       const res = await H.pair(A, B, { name: 'Peer Circle' });
       test.skip(!res.joinerHasTile, 'B never joined — pairing precondition');
-      // GOTCHA: tasks are OFF by policy default → enableFeature('tasks') on both before /addtask.
+      // GOTCHA: tasks are OFF by policy default → the ADMIN (A) switches them on before /addtask; B receives the policy
+      // over the governance lane (a member's own Save is greyed — every other device would drop it).
       await H.reopenCircle(A.page, /peer.?circle/i); await H.enableFeature(A.page, 'tasks');
       await H.reopenCircle(A.page, /peer.?circle/i);
-      await H.reopenCircle(B.page, /peer.?circle/i); await H.enableFeature(B.page, 'tasks');
+      await B.page.waitForTimeout(3500);   // the policy crosses the lane
       await H.reopenCircle(B.page, /peer.?circle/i);
       await H.addTask(A.page, 'verf kopen');
       await B.page.waitForTimeout(3500);

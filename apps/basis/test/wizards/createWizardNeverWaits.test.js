@@ -22,3 +22,17 @@ describe('the mobile create wizard never waits on bookkeeping', () => {
     expect(onCreate).toMatch(/withinMs\(persistPolicy\(result\.groupId, [^)]*\)\), POLICY_WRITE_BOUND_MS\)/);
   });
 });
+
+describe("the agent answers the create before it writes the restore list", () => {
+  const AGENT = readFileSync(fileURLToPath(new URL('../../src/core/agent/realAgent.js', import.meta.url)), 'utf8');
+  const createBlock = AGENT.slice(AGENT.indexOf("if (realOpId === 'createGroupV2' && !out?.error)"), AGENT.indexOf('return out;', AGENT.indexOf("if (realOpId === 'createGroupV2' && !out?.error)")));
+  it('the restore-list write is not awaited in the create path', () => {
+    expect(createBlock).toMatch(/setProfileCircleMembership/);
+    expect(createBlock).not.toMatch(/await callSkill\('agents', 'setProfileCircleMembership'/);
+  });
+  it('a write that did not land is healed at the next boot, right after the reopen', () => {
+    const at = AGENT.indexOf('\n  await reopenMemberCircles();\n');
+    expect(at).toBeGreaterThan(-1);
+    expect(AGENT.slice(at, at + 600)).toMatch(/healRestoreList\(\{/);
+  });
+});

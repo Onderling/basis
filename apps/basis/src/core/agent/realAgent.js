@@ -59,6 +59,7 @@ import {
 import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
+import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
 import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
@@ -3492,6 +3493,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     return { reopened };
   }
   await reopenMemberCircles();
+  // Every circle this device is in belongs on the restore list. A create writes its record after answering; one
+  // that did not land (an agents store that was down) is written here, at the next boot. Not awaited: boot does
+  // not wait on it, and each write is bounded.
+  healRestoreList({
+    circleIds: async () => circleIdsFrom(await rawStoop('listMyCircles', {}))
+      .filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId),
+    memberships: () => readSelfCircleMemberships(),
+    addressFor: circleAddressFor,
+    write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address }),
+    log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
+  }).catch(() => { /* the next boot tries again */ });
 
   // Pre-seed the demo circle with 4 starter tasks — the demo + journey
   // fixtures expect /mytasks to show these out of the box.  DEMO-ONLY: a real
@@ -5227,14 +5239,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         const circleId = out?.groupId ?? realArgs.groupId;
         const address = realArgs.circleAddress ?? null;
         if (circleId && address) {
-          try {
-            // No handle: a founder has none yet (they never redeemed an invite), and restore does not
-            // need one — the circle id and this device's address are what re-open a circle. A handle
-            // the person chooses later merges into the same record through the ordinary setter.
-            await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address });
-          } catch (err) {
-            if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list: ${err?.message ?? err}`);
-          }
+          // No handle: a founder has none yet (they never redeemed an invite), and restore does not
+          // need one — the circle id and this device's address are what re-open a circle. A handle
+          // the person chooses later merges into the same record through the ordinary setter.
+          //
+          // NOT awaited: the create answers first. Inside the create's wait, an agents store that did not
+          // answer held "Creating circle…" for minutes over a circle that already existed (walk, 2026-10-09).
+          // A write that fails here is not lost — `healRestoreList` puts the circle on the list at the next boot.
+          Promise.resolve().then(() => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address }))
+            .catch((err) => {
+              if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list yet (the next boot retries): ${err?.message ?? err}`);
+            });
         }
       }
       return out;

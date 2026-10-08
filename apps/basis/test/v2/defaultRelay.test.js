@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_RELAY_URL, effectiveRelayUrl, resolveRelayUrl } from '../../src/v2/relayPref.js';
+import { DEFAULT_RELAY_URL, effectiveRelayUrl, resolveRelayUrl, relayDefaultFrom } from '../../src/v2/relayPref.js';
 import { bootRelayUrl, bootRelayUrls } from '../../src/v2/connectionPoints.js';
 
 describe('the default relay', () => {
@@ -23,6 +23,16 @@ describe('the default relay', () => {
     expect(effectiveRelayUrl(null, '')).toBe(DEFAULT_RELAY_URL);
     expect(effectiveRelayUrl('ws://saved:1', 'wss://env.example')).toBe('ws://saved:1');
     expect(effectiveRelayUrl('', 'wss://env.example')).toBe('wss://env.example');
+  });
+
+  it('a composition can blank the default (tests stay hermetic): set but empty means NO default', () => {
+    // The browser harness builds the app with VITE_CIRCLE_RELAY_DEFAULT='' — a "no-relay" project has no relay at all,
+    // and no test can dial the production relay.
+    expect(relayDefaultFrom('')).toBe('');
+    expect(effectiveRelayUrl(null, '', '')).toBeNull();
+    expect(relayDefaultFrom(undefined)).toBe(DEFAULT_RELAY_URL);
+    expect(relayDefaultFrom(null)).toBe(DEFAULT_RELAY_URL);
+    expect(relayDefaultFrom('ws://127.0.0.1:8788')).toBe('ws://127.0.0.1:8788');
   });
 
   it('resolveRelayUrl itself stays default-free — the settings field shows only what was saved', () => {
@@ -40,9 +50,16 @@ describe('the default relay', () => {
 
 describe('who dials it', () => {
   const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
-  it('web and mobile boot with the default as their fallback', () => {
-    expect(read('../../web/v2/circleApp.js')).toMatch(/fallback: DEFAULT_RELAY_URL/);
-    expect(read('../../../basis-mobile/src/core/agentBundle.js')).toMatch(/fallback: DEFAULT_RELAY_URL/);
+  it('web and mobile boot with the default as their fallback — the default a composition may blank', () => {
+    for (const rel of ['../../web/v2/circleApp.js', '../../../basis-mobile/src/core/agentBundle.js']) {
+      const src = read(rel);
+      expect(src).toMatch(/relayDefaultFrom\(/);
+      expect(src).toMatch(/fallback: RELAY_DEFAULT/);
+    }
+  });
+
+  it('the browser tests are built with the default blanked', () => {
+    expect(read('../../playwright.config.js').match(/VITE_CIRCLE_RELAY_DEFAULT: ''/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
   it('the box does NOT dial it: with no ONDERLING_RELAY_URL it stays local-only, and its banner names the default', () => {
     const src = read('../../bin/device-runner.mjs');

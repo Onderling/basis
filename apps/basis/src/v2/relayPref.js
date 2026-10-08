@@ -56,8 +56,17 @@ export function resolveRelayUrl(...candidates) {
  * default as the last candidate. For the places that ADVERTISE or REPORT the relay (an invite link, the transport
  * state); the settings field keeps `resolveRelayUrl(saved, '')` so it shows only what was saved.
  */
-export function effectiveRelayUrl(saved, envUrl) {
-  return resolveRelayUrl(saved, envUrl, DEFAULT_RELAY_URL);
+export function effectiveRelayUrl(saved, envUrl, defaultUrl = DEFAULT_RELAY_URL) {
+  return resolveRelayUrl(saved, envUrl, defaultUrl);
+}
+
+/**
+ * The default a shell dials, from its build-time composition: `VITE_/EXPO_PUBLIC_CIRCLE_RELAY_DEFAULT`, when SET, replaces
+ * the public default — and set but EMPTY means no default at all. That is how the browser tests stay hermetic (a
+ * "no-relay" project has no relay, and nothing under test dials the production relay). Unset ⇒ the public relay.
+ */
+export function relayDefaultFrom(envValue) {
+  return typeof envValue === 'string' ? envValue.trim() : DEFAULT_RELAY_URL;
 }
 
 /**

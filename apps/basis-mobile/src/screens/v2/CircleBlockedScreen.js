@@ -13,13 +13,15 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 
 export default function CircleBlockedScreen({ callSkill, circles = [], onBack }) {
   const theme = useTheme();
-  const styles = makeStyles(theme);
+  const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
+  const styles = makeStyles(theme, insets);
   const [rows, setRows] = useState(null);   // null = loading
 
   const load = useCallback(async () => {
@@ -48,7 +50,7 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
 
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-blocked-screen">
-      <Pressable onPress={onBack} testID="blocked-back"><Text style={styles.back}>{t('circle.back')}</Text></Pressable>
+      <Pressable onPress={onBack} testID="blocked-back"><Text style={styles.back}>{t('circle.back_me')}</Text></Pressable>
       <Text style={styles.title}>{t('circle.blocked.title')}</Text>
       <Text style={styles.note}>{t('circle.blocked.note')}</Text>
       {rows === null ? (
@@ -67,8 +69,8 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  wrap:        { flex: 1, backgroundColor: theme.color.paper },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  wrap:        { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
   content:     { padding: 16, paddingBottom: 48 },
   back:        { fontSize: 15, color: theme.color.accent, marginBottom: 10 },
   title:       { fontSize: 20, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },

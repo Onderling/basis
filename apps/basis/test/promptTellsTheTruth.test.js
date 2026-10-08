@@ -90,7 +90,7 @@ describe('the household prompt tells the model the truth, for every op on the ma
     expect(prompt).toMatch(/beheerder/);
   });
 
-  it('remindMe stays NARROW: an existing appointment or chore (or, with who: everyone, the household at a time) — never "remind me of anything at any time"', () => {
+  it('remindMe says exactly what it does: an existing appointment or chore, one of your own at a bare time (who: me), everyone at a time — never for someone else', () => {
     // every place the model reads about remindMe: the prompt lines naming it, the tool's English hint, its Dutch hint
     const lineAbout = lines.filter((l) => names(l, 'remindMe') && !/every member may use/i.test(l));
     const english = assistantManifest.operations.find((o) => o.id === 'remindMe').surfaces.chat.hint;
@@ -98,12 +98,17 @@ describe('the household prompt tells the model the truth, for every op on the ma
     for (const d of [lineAbout.join('\n'), english]) {
       expect(d, d).toMatch(/appointment or chore/i);
       expect(d, d).toMatch(/who: everyone/);
-      // said outright: a reminder for oneself at a bare time ("remind me in 10 minutes") does not exist
-      expect(d, d).toMatch(/no (own|personal) reminder at a bare time/i);
+      // a reminder of one's own at a bare time exists now: said, with its form
+      expect(d, d).toMatch(/who: me/);
+      expect(d, d).toMatch(/no appointment or chore needed/i);
+      expect(d, d).not.toMatch(/no (own|personal) reminder at a bare time/i);
     }
     expect(dutch).toMatch(/afspraak of klusje/);
     expect(dutch).toMatch(/who: everyone/);
-    expect(dutch).toMatch(/geen eigen herinnering op een los tijdstip/i);
+    expect(dutch).toMatch(/who: me/);
+    expect(dutch).not.toMatch(/geen eigen herinnering op een los tijdstip/i);
+    // the prompt says how it goes away again
+    expect(lineAbout.join('\n')).toMatch(/cancelReminder/);
     // the member line says the tools are theirs, not that a tool does whatever is asked of it
     expect(availableLine()).not.toMatch(/never say .*cannot do/i);
   });

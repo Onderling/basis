@@ -16,7 +16,7 @@ import { assistantManifest } from './assistantManifest.js';
 import { createIntentionBook } from './intentionBook.js';
 import { createOwnDevicesStore } from './ownDevicesStore.js';
 import { WEEK_OVERVIEW_OP, weekOverviewOn, switchWeekOverview } from './weekOverviewRows.js';
-import { ANNOUNCE_OP, HOST_CALL, ANNOUNCE_ROWS, isAnnounceRow, HOUSEHOLD_ACTS_AS, REMIND_EVERYONE_LABEL, REMIND_EVERYONE_WINDOW_MIN } from './announceRows.js';
+import { ANNOUNCE_OP, HOST_CALL, ANNOUNCE_ROWS, isAnnounceRow, HOUSEHOLD_ACTS_AS, REMIND_EVERYONE_LABEL, REMIND_ME_LABEL, SAY_REMINDER_OP, TIMED_REMINDER_WINDOW_MIN } from './announceRows.js';
 import { inQuiet } from './botReminders.js';
 import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
 import { peopleRows } from './botPeople.js';
@@ -53,35 +53,48 @@ export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxIt
  */
 /** The words a `who` says "the whole household" with. */
 const EVERYONE_WORDS = new Set(['everyone', 'everybody', 'all', 'iedereen', 'allemaal']);
+/** …and the words it says "me, the one asking" with. */
+const ME_WORDS = new Set(['me', 'mij', 'ik', 'myself', 'mezelf', 'i']);
 
 /**
- * When a reminder for everyone is said, from its words: a clock time ("19:45", "om half 8", "at 7:45 pm" — the bounded
- * date reader's times; today, or tomorrow when it has passed) or a span from now ("over 10 minuten", "in 10 minutes",
+ * When a timed reminder (one's own, or for everyone) is said, from its words: a clock time ("19:45", "om half 8",
+ * "at 7:45 pm" — the bounded date reader's times; today, or tomorrow when it has passed), a day and a time ("morgen om
+ * 8:00", "zaterdag 10:00" — a moment already past is no answer), or a span from now ("over 10 minuten", "in 10 minutes",
  * "over een uur"). Null for anything else — never a guess.
- * @returns {{at: number, time: string, tomorrow: boolean}|null}
+ * @returns {{at: number, time: string, days: number, tomorrow: boolean}|null}  `days`: how many days from today
  */
 export function momentFromWords(words, { now, tz }) {
   const w = String(words ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!w) return null;
   const pad = (n) => String(n).padStart(2, '0');
+  const DAY = 86_400_000;
+  const today = wallClockInTz(now, tz);
+  const dayNumber = (x) => Date.UTC(x.year, x.month - 1, x.day) / DAY;
   const describe = (at) => {
     const a = wallClockInTz(at, tz);
-    const n = wallClockInTz(now, tz);
-    return { at, time: `${pad(a.hour)}:${pad(a.minute)}`, tomorrow: a.year !== n.year || a.month !== n.month || a.day !== n.day };
+    const days = dayNumber(a) - dayNumber(today);
+    return { at, time: `${pad(a.hour)}:${pad(a.minute)}`, days, tomorrow: days === 1 };
   };
   const span = /^(?:over|in) (\d{1,3}) ?(?:minuten|minuut|min|minutes|minute|m)$/.exec(w);
   if (span) return Number(span[1]) > 0 ? describe(now + Number(span[1]) * 60_000) : null;
   if (/^(?:over|in) (?:een|an|1) (?:uur|hour)$/.test(w)) return describe(now + 3_600_000);
-  const read = readDayAndTime(`vandaag ${w}`);
-  if (!read?.time || read.rest) return null;
-  const [hour, minute] = read.time.split(':').map(Number);
-  const day = wallClockInTz(now, tz);
-  let at = utcInstantForWallClock({ year: day.year, month: day.month, day: day.day, hour, minute, tz });
-  if (at <= now) {
-    const next = new Date(Date.UTC(day.year, day.month - 1, day.day) + 86_400_000);
-    at = utcInstantForWallClock({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate(), hour, minute, tz });
+  const onDay = (offset, time) => {
+    const [hour, minute] = time.split(':').map(Number);
+    const d = new Date(Date.UTC(today.year, today.month - 1, today.day) + offset * DAY);
+    return utcInstantForWallClock({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), hour, minute, tz });
+  };
+  // a day named: the reader counts days on this process's clock; the offset is applied on the household's
+  const named = readDayAndTime(w, { now: () => new Date(now) });
+  if (named?.day && named.time && !named.rest) {
+    const local = new Date(now);
+    const offset = Math.round((Date.parse(`${named.day}T00:00:00Z`) - Date.UTC(local.getFullYear(), local.getMonth(), local.getDate())) / DAY);
+    const at = onDay(offset, named.time);
+    return at > now ? describe(at) : null;
   }
-  return describe(at);
+  const read = readDayAndTime(`vandaag ${w}`, { now: () => new Date(now) });
+  if (!read?.time || read.rest) return null;
+  const at = onDay(0, read.time);
+  return describe(at > now ? at : onDay(1, read.time));
 }
 
 /** A switch in the door's words: "uit" is off (never "not off, so on"); a word it does not know is null. */
@@ -238,6 +251,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       }
       if (op === 'assistant-reminders') return remindersOp(threadId, args, tp);
       if (op === 'remindMe') return remindMeOp(threadId, args, ctx, tp);
+      if (op === 'cancelReminder') return cancelReminderOp(threadId, args?.which ?? args?._match, tp);
+      // a reminder the person set, at its moment (the host's runner calls it as them): to them only, in their own chat
+      if (op === SAY_REMINDER_OP) {
+        if (announcer) return announcer.remind(threadId, args?.say, { occurrence: args?.occurrence ?? null });
+        if (typeof intentions.sendToPerson !== 'function') return { ok: false, error: 'unwired' };
+        const r = await intentions.sendToPerson(threadId, { text: tp('circle.bot.announce_mine', { title: String(args?.say ?? '') }) });
+        return r?.ok ? { ok: true } : { ok: false, reason: r?.reason ?? 'not-sent' };
+      }
       if (op === 'assistant-planned') return plannedOp(threadId, tp);
       if (op === 'assistant-overview') {
         const mode = switchOf(args?.mode ?? args?._match);
@@ -304,8 +325,15 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         if (o.personId === person) lines.push({ at: o.at, text: tp('circle.bot.planned_reminder', { when: when(o.at), title: o.text, rule: describeRules([o.rule], tp) }) });
       }
     }
-    for (const o of upcoming({ rows: book.rows().filter((r) => r.actsAs === person), now: at, tz, horizon })) {
-      const what = tp(`circle.bot.planned_${String(o.label ?? 'row').replace(/-/g, '_')}`);
+    // their own rows (the week overview, a reminder they set — numbered as `/schrap` takes them), and a reminder for
+    // everyone, which reaches them too
+    const own = ownReminders(person).map((r) => r.id);
+    const theirs = (r) => r.actsAs === person || (r.label === REMIND_EVERYONE_LABEL && r.op === ANNOUNCE_OP);
+    for (const o of upcoming({ rows: book.rows().filter(theirs), now: at, tz, horizon })) {
+      const say = String(o.args?.say ?? '');
+      const what = o.label === REMIND_ME_LABEL ? tp('circle.bot.planned_remind_me', { text: say, n: own.indexOf(o.rowId) + 1 })
+        : o.label === REMIND_EVERYONE_LABEL ? tp('circle.bot.planned_remind_everyone', { text: say })
+          : tp(`circle.bot.planned_${String(o.label ?? 'row').replace(/-/g, '_')}`);
       lines.push({ at: o.at, text: tp(o.state === 'skipped' ? 'circle.bot.planned_skipped' : 'circle.bot.planned_row', { when: when(o.at), what }) });
     }
     lines.sort((a, b) => a.at - b.at);
@@ -351,11 +379,17 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * calendar and the lists, read as them), written on their thread row only. "gewoon" drops their own for it.
    */
   async function remindMeOp(person, args, ctx, tp) {
-    if (EVERYONE_WORDS.has(String(args?.who ?? '').trim().toLowerCase())) return remindEveryoneOp(args, tp);
+    const who = String(args?.who ?? '').trim().toLowerCase();
+    if (EVERYONE_WORDS.has(who)) return remindEveryoneOp(person, args, tp);
+    // a person sets their own reminders: one acting as someone else is never theirs to set
+    if (who && !ME_WORDS.has(who)) return { ok: false, error: { code: 'not-yours', message: tp('circle.bot.remind_me_not_yours') } };
+    if (ME_WORDS.has(who)) return remindMineOp(person, args, tp);
     const q = String(args?.item ?? '').trim().toLowerCase();
     const words = String(args?.rules ?? '').trim();
     const usual = /^(gewoon|normaal|usual|normal)$/i.test(words);
     const layer = usual ? null : reminderLayerFromWords(words);
+    // no `who`, and the words are a moment rather than reminder rules ("over 10 minuten"): a reminder of their own
+    if (q && !usual && !layer && momentFromWords(words, { now: now(), tz: intentions.tz ?? 'UTC' })) return remindMineOp(person, args, tp);
     if (!q || (!usual && !layer)) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.remind_me_usage') } };
     const asThem = (a, o, x) => callSkill(a, o, x, { ...ctx, caller: person, threadId: person }).catch(() => null);
     const rows = (r) => (Array.isArray(r?.items) ? r.items : []);
@@ -368,7 +402,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     }
     const titleOf = (i) => String(i?.title ?? i?.label ?? i?.text ?? '');
     const hits = [...seen.values()].filter((i) => i.id === args?.item || titleOf(i).toLowerCase().includes(q));
-    if (!hits.length) return { ok: false, error: { code: 'not-found', message: tp('circle.bot.remind_me_not_found', { item: args.item }) } };
+    if (!hits.length) {
+      // no appointment or chore by those words, and a time that is a moment ("7:30"): a reminder of their own at it
+      if (!usual && momentFromWords(words, { now: now(), tz: intentions.tz ?? 'UTC' })) return remindMineOp(person, args, tp);
+      return { ok: false, error: { code: 'not-found', message: tp('circle.bot.remind_me_not_found', { item: args.item }) } };
+    }
     if (hits.length > 1) return { ok: true, message: tp('circle.bot.remind_me_which', { items: hits.map(titleOf).join(' · ') }) };
     const [hit] = hits;
     threads.setReminderExtra(person, hit.id, layer);
@@ -381,7 +419,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
    * one timed row in the household's circle (the host signs it), acting as the household, whose op is the announcer: at
    * its moment everyone hears the words, once. A time already past today is tomorrow's. It names nobody.
    */
-  async function remindEveryoneOp(args, tp) {
+  async function remindEveryoneOp(person, args, tp) {
     // only a door that announces (a household bot) has an everyone to say it to
     if (!announcer) return { ok: false, error: { code: 'unwired', message: tp('circle.bot.remind_everyone_failed') } };
     const text = String(args?.item ?? '').trim();
@@ -391,14 +429,63 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     try {
       await book.intend({
         trigger: { at: new Date(moment.at).toISOString() }, op: ANNOUNCE_OP, appOrigin: 'assistant', args: { say: text },
-        actsAs: HOUSEHOLD_ACTS_AS, label: REMIND_EVERYONE_LABEL, window: REMIND_EVERYONE_WINDOW_MIN * 60_000,
+        actsAs: HOUSEHOLD_ACTS_AS, label: REMIND_EVERYONE_LABEL, window: TIMED_REMINDER_WINDOW_MIN * 60_000,
         ...(intentions.householdScope ? { scope: intentions.householdScope } : {}),
       });
     } catch {
       return { ok: false, error: { code: 'not-saved', message: tp('circle.bot.remind_everyone_failed') } };
     }
-    const when = tp(moment.tomorrow ? 'circle.bot.remind_everyone_tomorrow' : 'circle.bot.remind_everyone_today', { time: moment.time });
-    return { ok: true, message: tp('circle.bot.remind_everyone_set', { when, text }) };
+    return { ok: true, message: tp('circle.bot.remind_everyone_set', { when: whenWords(moment, tp, threads?.langOf?.(person) ?? 'nl'), text }) };
+  }
+
+  /** A moment in a person's words: "vandaag om 19:45", "morgen om 8:00", "za 10:00". */
+  function whenWords(moment, tp, lang = 'nl') {
+    if (moment.days <= 0) return tp('circle.bot.remind_everyone_today', { time: moment.time });
+    if (moment.days === 1) return tp('circle.bot.remind_everyone_tomorrow', { time: moment.time });
+    const day = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'nl-NL', { timeZone: intentions.tz ?? 'UTC', weekday: 'long', day: 'numeric', month: 'short' }).format(new Date(moment.at));
+    return tp('circle.bot.remind_at_day', { day, time: moment.time });
+  }
+
+  /**
+   * `remindMe` for oneself at a bare time ("herinner me over 10 minuten dat ik de gootsteen ontstop") — no appointment or
+   * chore needed: ONE timed row acting as the PERSON, on the host's own store (where a Telegram-only person's rows live,
+   * like their week overview), fired by the host's tick at its moment: said in their own private chat, held through their
+   * quiet hours. `/gepland` lists it; `/schrap` takes it away.
+   */
+  async function remindMineOp(person, args, tp) {
+    const text = String(args?.item ?? '').trim();
+    const moment = momentFromWords(args?.rules, { now: now(), tz: intentions.tz ?? 'UTC' });
+    if (!person || !text || !moment) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.remind_me_at_usage') } };
+    try {
+      await book.intend({
+        trigger: { at: new Date(moment.at).toISOString() }, op: SAY_REMINDER_OP, appOrigin: 'assistant', args: { say: text },
+        actsAs: person, label: REMIND_ME_LABEL, window: TIMED_REMINDER_WINDOW_MIN * 60_000,
+      });
+    } catch {
+      return { ok: false, error: { code: 'not-saved', message: tp('circle.bot.remind_everyone_failed') } };
+    }
+    return { ok: true, message: tp('circle.bot.remind_me_at_set', { when: whenWords(moment, tp, threads?.langOf?.(person) ?? 'nl'), text }) };
+  }
+
+  /** A person's own timed reminders still to come, the soonest first (what `/gepland` numbers and `/schrap` takes). */
+  function ownReminders(person) {
+    return book.rows()
+      .filter((r) => r.actsAs === person && r.op === SAY_REMINDER_OP && r.state === 'open')
+      .sort((a, b) => Date.parse(a.trigger?.at ?? 0) - Date.parse(b.trigger?.at ?? 0));
+  }
+
+  /** `/schrap <nummer | woorden>`: one of the person's own reminders away — by its number in `/gepland`, or its words. */
+  async function cancelReminderOp(person, which, tp) {
+    const open = ownReminders(person);
+    const w = String(which ?? '').trim().toLowerCase();
+    const list = () => open.map((r, i) => `${i + 1}. ${r.args?.say ?? ''}`).join(' · ');
+    if (!open.length) return { ok: false, error: { code: 'not-found', message: tp('circle.bot.cancel_reminder_none') } };
+    if (!w) return { ok: false, error: { code: 'invalid-argument', message: tp('circle.bot.cancel_reminder_usage', { items: list() }) } };
+    const hits = /^\d+$/.test(w) ? [open[Number(w) - 1]].filter(Boolean) : open.filter((r) => String(r.args?.say ?? '').toLowerCase().includes(w));
+    if (!hits.length) return { ok: false, error: { code: 'not-found', message: tp('circle.bot.cancel_reminder_not_found', { which: which, items: list() }) } };
+    if (hits.length > 1) return { ok: true, message: tp('circle.bot.cancel_reminder_which', { items: list() }) };
+    try { await book.cancel(hits[0].id); } catch { return { ok: false, error: { code: 'not-saved', message: tp('circle.bot.settings_failed') } }; }
+    return { ok: true, message: tp('circle.bot.cancel_reminder_done', { text: hits[0].args?.say ?? '' }) };
   }
 
   /** The translator for a person: their fixed `/taal` language, else the door's. */

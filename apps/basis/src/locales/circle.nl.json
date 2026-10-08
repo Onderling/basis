@@ -4425,6 +4425,54 @@
       "text": "Dat lukte niet: de herinnering voor iedereen is niet bewaard.",
       "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
     },
+    "remind_me_at_set": {
+      "text": "Ik herinner je {{when}}: {{text}}. Weg ermee: /schrap.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_at_usage": {
+      "text": "Zeg wanneer en wat — bijvoorbeeld: herinner me over 10 minuten dat ik de gootsteen ontstop, of: herinner me morgen om 8:00: vuilnis.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_me_not_yours": {
+      "text": "Ik herinner alleen jou zelf, of iedereen in huis — nooit iemand anders namens jou.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "remind_at_day": {
+      "text": "{{day}} om {{time}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "announce_mine": {
+      "text": "Herinnering: {{title}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_me": {
+      "text": "herinnering \"{{text}}\" (weg: /schrap {{n}})",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "planned_remind_everyone": {
+      "text": "herinnering voor iedereen: \"{{text}}\"",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_done": {
+      "text": "Weg: de herinnering \"{{text}}\".",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_none": {
+      "text": "Je hebt geen eigen herinneringen staan.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_usage": {
+      "text": "Welke? {{items}} — /schrap met het nummer of een woord ervan.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_not_found": {
+      "text": "Geen eigen herinnering met \"{{which}}\". Je hebt: {{items}}",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
+    "cancel_reminder_which": {
+      "text": "Welke bedoel je? {{items}} — /schrap met het nummer.",
+      "doc": "A reminder of one's own at a time (remindMe with who: me — no appointment or chore needed), what /gepland says of it, and /schrap, which takes it away."
+    },
     "announce_say": {
       "text": "Herinnering voor iedereen: {{title}}",
       "doc": "A reminder for everyone in the household at a time (remindMe with who: everyone): what the bot says when it is set, and at its moment."
@@ -4837,8 +4885,9 @@
           "assistant-forget": "ons gesprek nu vergeten (wat je op een lijst zette, blijft)",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
           "assistant-circles": "de kringen waar de bot in zit",
-          "remindMe": "een eigen herinnering voor één afspraak of klusje, of één voor iedereen op een tijd",
-          "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)"
+          "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
+          "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
+          "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
         }
       }
     },

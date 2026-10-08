@@ -20,16 +20,40 @@
     "doc": "A reminder for everyone in the household at a time: \"remind everyone at 19:45: dinner\" (the words after the colon are what is said).",
     "patterns": [
       "remind everyone {time}: {text}",
-      "remind everyone {time} (to|that|about) {text}"
+      "remind everyone {time} (to|that|about) {text}",
+      "remind everyone {span}: {text}"
     ],
     "examples": [
       "remind everyone at 19:45: dinner",
       "Remind everyone at 7 pm: dinner",
-      "remind everyone at 19:30 to take the bins out"
+      "remind everyone at 19:30 to take the bins out",
+      "remind everyone in 10 minutes: dinner"
     ],
     "not": [
       "remind me at 19:45 about the dentist",
       "remind everyone about the dentist"
+    ]
+  },
+  "assistant.remindMe.me": {
+    "doc": "A reminder of one's own at a time, about anything (\"remind me at 8 to call mum\"): a span, a clock time, or a day and a time; the words after it are what is said.",
+    "patterns": [
+      "remind me {time}: {text}",
+      "remind me {span}: {text}",
+      "remind me {day} {time}: {text}",
+      "remind me {time} (to|that|about) {text}",
+      "remind me {span} (to|that|about) {text}",
+      "remind me {day} {time} (to|that|about) {text}"
+    ],
+    "examples": [
+      "remind me at 8 to call mum",
+      "remind me in 10 minutes to check the oven",
+      "remind me tomorrow at 8:00: bins",
+      "Remind me at 7:45 pm: pills"
+    ],
+    "not": [
+      "remind me an hour before the dentist",
+      "remind everyone at 19:45: dinner",
+      "remind me about the dentist"
     ]
   },
   "lists.addToList.named": {

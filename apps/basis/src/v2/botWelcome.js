@@ -86,6 +86,8 @@ export const WELCOME_LEAVES = Object.freeze({
   'assistant-agenda-link': "off unless the admin switches it on (/huishouden agenda on); asked while off, it says so",
   'assistant-planned': "asked when wanted ('wat ga je me sturen?'); /help lists it — the reminders line says when reminders come",
   entryReminders: "asked in words ('herinner iedereen ook de avond ervoor aan de tandarts'); the reminders line says when reminders come",
+  cancelReminder: "the undo of a reminder of one's own: /gepland numbers them, /help lists /schrap",
+  sayReminder: "not typed: the host's runner says a person's own reminder to them at its moment",
   remindMe: "asked in words ('herinner me een uur van tevoren aan de tandarts'); the reminders line says how to change your own",
   sendWeekOverview: "not typed: the host's runner sends it to whoever switched the overview on (said on the overview line)",
   'assistant-hello': "not typed: the gate answers a greeting (\"hoi\") with the welcome's own first line",

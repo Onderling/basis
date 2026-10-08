@@ -34,8 +34,18 @@ export const isAnnounceRow = (row) => row?.op === ANNOUNCE_OP && row?.actsAs ===
  * words to say (`args.say`). It acts as the household like the announce rows, and is said to everyone at its moment.
  */
 export const REMIND_EVERYONE_LABEL = 'remind-everyone';
-/** How long after its moment a reminder for everyone may still be said (a box that was off): after that it is skipped. */
-export const REMIND_EVERYONE_WINDOW_MIN = param({ key: 'assistant.remindEveryoneWindowMinutes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
+/**
+ * A reminder of one's own at a time ("herinner me over 10 minuten: …"): a timed row acting as the PERSON, on the host's
+ * own store (where a Telegram-only person's rows live), whose op says the words in their private chat.
+ */
+export const REMIND_ME_LABEL = 'remind-me';
+/** The door's op a reminder of one's own runs at its moment (the host's runner calls it, as the person). */
+export const SAY_REMINDER_OP = 'sayReminder';
+/**
+ * How long after its moment a timed reminder (one's own, or for everyone) may still be said (a box that was off): after
+ * that it is skipped.
+ */
+export const TIMED_REMINDER_WINDOW_MIN = param({ key: 'assistant.timedReminderWindowMinutes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
 
 /**
  * Write the household's announce rows once, into the circle store named by `scope`, each watching THAT circle only: a
@@ -62,4 +72,20 @@ export async function seedAnnounceRows(book, scope) {
     made += 1;
   }
   return made;
+}
+
+/**
+ * How a host's runner hands a due row to its door — ONE composition for the box and its tests: the household's announce
+ * rows (and its reminders for everyone) run as the host itself (only that op ever carries the host's mark); a person's row
+ * as that person, through their own column of the door.
+ * @param {{door: (app: string, op: string, args: object, ctx: object) => Promise<any>, callerFor?: (actsAs: string) => Promise<string|null>}} a
+ * @returns {(o: {op: string, appOrigin?: string, actsAs: string, args?: object, id: string}) => Promise<any>}
+ */
+export function runRowThroughDoor({ door, callerFor = async () => null }) {
+  return async (o) => {
+    if (o.op === ANNOUNCE_OP && o.actsAs === HOUSEHOLD_ACTS_AS) return door(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { [HOST_CALL]: true });
+    // as the person, through their own column of the door (a member's key maps to the row of the person it names)
+    const as = (await callerFor(o.actsAs)) ?? o.actsAs;
+    return door(o.appOrigin ?? 'assistant', o.op, { ...o.args, occurrence: o.id }, { caller: as, threadId: as });
+  };
 }

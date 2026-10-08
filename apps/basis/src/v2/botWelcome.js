@@ -7,14 +7,15 @@
  * or off for the household) and, for the admin, where the household's settings are. A bot without the calendar never
  * offers the Agenda; an observer reads along and is told only that.
  */
-import { QUIET_HOURS } from './botReminders.js';
+import { QUIET_HOURS, reminderRuleLine } from './botReminders.js';
+import { HOUSEHOLD_RULES_DEFAULT } from './botSettings.js';
 
 /**
  * @param {object} a
  * @param {Set<string>} a.ops  the op ids this person's role reaches
  * @param {Array<{name: string, defaultChild?: string|null}>} a.lists  the template's lists (`templateLists`)
  * @param {string|null} [a.role]
- * @param {{reminders?: string, quiet?: string}} [a.settings]
+ * @param {{reminders?: string, quiet?: string, rules?: string[]}} [a.settings]  `rules`: the household's reminder rules
  * @param {(key: string, vars?: object) => string} a.t
  * @returns {string[]}
  */
@@ -44,8 +45,10 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
   if (role !== 'observer' && has('assistant-reminders')) {
     if (settings.reminders === 'off') lines.push(t('circle.bot.welcome_reminders_off'));
     else {
+      // when, in one line from the household's rules as they stand (the same line /help says), then the quiet hours
+      lines.push(reminderRuleLine({ rules: Array.isArray(settings.rules) ? settings.rules : HOUSEHOLD_RULES_DEFAULT, t }));
       const [from, to] = String(settings.quiet || QUIET_HOURS).split('-');
-      lines.push(Number(settings.lead) > 0 ? t('circle.bot.welcome_reminders_on_lead', { from, to, lead: settings.lead }) : t('circle.bot.welcome_reminders_on', { from, to }));
+      lines.push(t('circle.bot.welcome_reminders_on', { from, to }));
     }
     // the weekly overview is off until the person switches it on: its own line, after either reminders line
     if (has('assistant-overview')) lines.push(t('circle.bot.welcome_overview'));

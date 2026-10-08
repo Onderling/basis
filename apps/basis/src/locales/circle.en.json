@@ -4494,12 +4494,36 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "When something has a date, I remind you: at 08:00 everything of that day, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
+      "text": "Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
       "text": "Reminders are off for this household.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_rule": {
+      "text": "Reminders: {{rules}}. Your own way: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_morning": {
+      "text": "at {{time}} everything of that day (chores and appointments)",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_evening": {
+      "text": "the evening before at {{time}} for an appointment before {{until}}",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_before": {
+      "text": "{{n}} minutes before anything with a time",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_at": {
+      "text": "at {{time}} on the day itself",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_none": {
+      "text": "Reminders: the household sends none. Your own: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
     },
     "welcome_overview": {
       "text": "Want a weekly overview, Sundays at 18:00? Switch it on with /overzicht aan.",
@@ -4733,7 +4757,6 @@
     "screen_confirm_none": "None of these",
     "reminder_event_soon": "Soon: {{title}}, {{time}}.",
     "reminder_chore_soon": "Coming up: {{text}}, at {{time}}.",
-    "welcome_reminders_on_lead": "When something has a date, I remind you: at 08:00 everything of that day, {{lead}} minutes before it, and the evening before (19:00) for an appointment early in the morning. Between {{from}} and {{to}} I send nothing. Your own way: /herinneringen 60 (an hour before), /herinneringen also evening, or /herinneringen off.",
     "menu_lead": "Reminder beforehand",
     "value_lead_min": "{{n}} minutes",
     "value_lead_off": "none",

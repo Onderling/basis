@@ -4494,12 +4494,36 @@
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_on": {
-      "text": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
+      "text": "Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
     },
     "welcome_reminders_off": {
       "text": "Herinneringen staan voor dit huishouden uit.",
       "doc": "The household bot's first message to a new person, derived from what this bot does for them (one line per thing their tools reach) and the reminder settings."
+    },
+    "reminder_rule": {
+      "text": "Herinneringen: {{rules}}. Anders voor jou: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_morning": {
+      "text": "om {{time}} alles van die dag (klusjes en afspraken)",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_evening": {
+      "text": "de avond ervoor om {{time}} bij een afspraak vóór {{until}}",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_before": {
+      "text": "{{n}} minuten voor iets met een tijd",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_at": {
+      "text": "om {{time}} op de dag zelf",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
+    },
+    "reminder_rule_none": {
+      "text": "Herinneringen: het huishouden stuurt er geen. Zelf aanzetten: /herinneringen.",
+      "doc": "When the household bot reminds, in one line (the welcome and /help): the household's reminder rules as they stand, each with its real moment."
     },
     "welcome_overview": {
       "text": "Wil je elke zondag om 18:00 een weekoverzicht? Zet het aan met /overzicht aan.",
@@ -4733,7 +4757,6 @@
     "screen_confirm_none": "Geen van deze",
     "reminder_event_soon": "Zo meteen: {{title}}, {{time}}.",
     "reminder_chore_soon": "Zo meteen: {{text}}, om {{time}}.",
-    "welcome_reminders_on_lead": "Staat er een datum bij, dan herinner ik je eraan: 's ochtends om 08:00 alles van die dag, {{lead}} minuten van tevoren, en de avond ervoor (19:00) bij een afspraak vroeg in de ochtend. Tussen {{from}} en {{to}} stuur ik niets. Zelf anders: /herinneringen 60 (een uur van tevoren), /herinneringen ook avond, of /herinneringen uit.",
     "menu_lead": "Herinnering vooraf",
     "value_lead_min": "{{n}} minuten",
     "value_lead_off": "geen",

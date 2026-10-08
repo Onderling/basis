@@ -4435,7 +4435,8 @@ function CircleDetail({
         {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
             ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
             offers nothing that works. */}
-        {chatComposerVisible(activeTab) ? (<>   {/* the composer is the conversation's — hidden under Leden and the other tabs */}
+        {chatComposerVisible(activeTab) ? (<>
+        {/* the composer is the conversation's — hidden under Leden and the other tabs */}
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (

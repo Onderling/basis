@@ -126,7 +126,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       lastReads.saw(turns.get(chatId)?.thread ?? threadFor(chatId), { title: rendered.title ?? null, lines: items.map((it) => it?.label) });
       // A read of a named list says which list, always — one list or five in a turn.
       const head = rendered.title ? [`${rendered.title}:`] : [];
-      if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n')); return; }
+      // "Ververs": the same read again, as a new message — a list message goes stale the moment someone ticks a line
+      // elsewhere (asked for by a household member). A quick reply: the read's own slash line, decided by the gate like
+      // a typed one. Telegram carries a button's data in 64 bytes; a list whose name does not fit simply has none.
+      const refreshLine = rendered.title && (!offered || offered.has('listEntries')) ? `/list-entries ${rendered.title}` : null;
+      const refresh = refreshLine && new TextEncoder().encode(refreshLine).length <= 64
+        ? [{ id: refreshLine, label: tc(chatId)('circle.telegram.refresh') }] : [];
+      if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n'), refresh.length ? refresh : undefined); return; }
       const lines = [...head, ...items.map((it, i) => `${i + 1}. ${it.label}`)];
       const buttons = [];
       // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
@@ -136,7 +142,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         const short = name.length > 18 ? `${name.slice(0, 17)}…` : name;
         for (const b of (it.buttons ?? []).filter(onMap)) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
       });
-      await say(chatId, lines.join('\n'), buttons);
+      await say(chatId, lines.join('\n'), [...buttons, ...refresh]);
       return;
     }
     const text = rendered.text ?? (rendered.error ? rendered.error.message : '');

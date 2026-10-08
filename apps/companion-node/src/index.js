@@ -745,6 +745,14 @@ export async function startCompanionNode(opts = {}) {
       return nodeGrants.mint({ to: args.to, families: args.families });
     });
 
+    // `grants.revoke` — OWNER-GATED: everything one agent holds here, revoked; its next call is refused.
+    managed('grants.revoke', async (ctx) => {
+      if (!nodeGrants) return { ok: false, error: 'gate-off' };
+      return nodeGrants.revoke({ to: argsOf(ctx).args.to });
+    });
+    // `grants.list` — OWNER-GATED: who holds a grant here, and for which families (what the owner's app shows).
+    managed('grants.list', async () => (nodeGrants ? { ok: true, grants: await nodeGrants.list() } : { ok: false, error: 'gate-off' }));
+
     // `grants.families` — OWNER-GATED: the families the owner's app offers to tick, as this node names them.
     managed('grants.families', async () => ({ ok: true, families: Object.keys(GRANT_FAMILIES) }));
 

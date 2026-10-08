@@ -6,6 +6,7 @@
 .npmrc
 apps/companion-node/
 apps/folio/
+apps/stoop/
 deploy/companion-node/
 deploy/roles/companion.
 package-lock.json

@@ -59,7 +59,7 @@ Env vars for `src/boot.js`:
 | `PORT` | `0` (OS-assigned) | local-relay port (ignored when `COMPANION_RELAY_URL` is set) |
 | `HOST` | `127.0.0.1` | local-relay bind host |
 | `COMPANION_NODE_CONFIG_DIR` | `~/.config/onderling-companion` | where the host keypair is persisted |
-| `COMPANION_FEEDS` | *(off)* | `on` → an agent its owner GRANTED (`grants.mint`, from the owner's app: one token per op, `src/grants.js`) may put people's sealed agenda files; a link (`https://<relay>/feed/<node>/<id>.<k>.ics`) is forwarded here by the relay as `feed.serve` — the node's ONE public op (the link's key is the capability) |
+| `COMPANION_FEEDS` | *(off)* | `on` → an agent its owner GRANTED (`grants.mint`, from the owner's app: one token per op, `src/grants.js`; `grants.list` says who holds what, `grants.revoke` ends an agent's grant) may put people's sealed agenda files; a link (`https://<relay>/feed/<node>/<id>.<k>.ics`) is forwarded here by the relay as `feed.serve` — the node's ONE public op (the link's key is the capability) |
 | `COMPANION_PUBLIC_URL` | *(mapped from `COMPANION_RELAY_URL`)* | the relay's public https address, for the node's card (`serves`), when it dials the relay by an inside name |
 
 The banner prints the node's **card** (`Card: onderling-contact://…`): its address, its relay, and with feeds on where

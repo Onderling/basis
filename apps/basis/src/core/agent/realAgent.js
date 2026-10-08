@@ -4243,6 +4243,45 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /**
+   * The person a chore is GIVEN to, by the words a door's person said ("mij", "Bob", the id `/users` shows): resolved
+   * through the one people read (`peopleBook` + `personIn`), then the chore rules — who may give a chore to whom, and
+   * whether the one who gets it is someone their own role lets hold one (an observer looks, and holds no chore). Every
+   * way a chore gets its who goes through here: an add that names a person, a chore given to someone.
+   * `{ok: true, who, whoName}` — `who` the person's id, `whoName` their name — or the refusal a person reads; a word that
+   * names nobody is refused, never kept as a holder.
+   * `mayGive: false` — an op whose own door gate already decided who may give a chore (reassigning is the admin's, or
+   * every member's under the flat roles): the add's rule of who may name whom is not asked again.
+   */
+  async function choreHolderFor(assignee, ctx, { mayGive = true } = {}) {
+    const tr = agentT;
+    const caller = actorOf(ctx);
+    // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
+    const inCircle = doorCircleOf(ctx);
+    // Whether this person may SEE the others' names is the household's ceiling (`assistant.names`); naming someone
+    // is seeing them, so where names are hidden a chore is given by name only by those who may see them.
+    const book = await peopleBook(caller, inCircle);
+    const { roles, policy, roleMayAssign } = book;
+    const p = personIn(book, assignee, caller);
+    if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
+    if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: String(assignee).trim() }) };
+    const who = p.self ? (caller ?? 'me') : p.id;
+    const whoName = p.self ? null : p.name;
+    const allowed = !mayGive || assignAllowed({
+      policy: inCircle ? 'roles' : paramsService.register.valueOf(ASSIGN_POLICY_KEY),
+      roleMayAssign, callerId: caller, assigneeId: who,
+    });
+    if (!allowed) {
+      // under `roles` the op's own rule said no (the tasks app's reassign rule); otherwise the household's setting did
+      const byRole = inCircle || assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
+      return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
+    }
+    if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
+      return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? String(assignee).trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
+    }
+    return { ok: true, who, whoName };
+  }
+
+  /**
    * The add of a chore with its person and its day (see the lists branch of `callSkill`) — or a line already there made
    * one (`makeChore`). A who or a when said on a line that is not a chore yet makes it one, in place: the same item.
    */
@@ -4250,36 +4289,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     const tr = agentT;
     const { assignee, due, ...rest } = args;
     const caller = actorOf(ctx);
-    // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
-    const inCircle = doorCircleOf(ctx);
     let who = null;
     let whoName = null;
     if (typeof assignee === 'string' && assignee.trim()) {
-      // Whether this person may SEE the others' names is the household's ceiling (`assistant.names`); naming someone
-      // is seeing them, so where names are hidden a chore is given by name only by those who may see them.
-      const book = await peopleBook(caller, inCircle);
-      const { roles, policy, roleMayAssign } = book;
-      const p = personIn(book, assignee, caller);
-      if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden'), refusal: refuse('door-settings', 'setting:names') };
-      if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: assignee.trim() }) };
-      if (p.self) who = caller ?? 'me';
-      else {
-        who = p.id;
-        whoName = p.name;
-      }
-      const allowed = assignAllowed({
-        policy: inCircle ? 'roles' : paramsService.register.valueOf(ASSIGN_POLICY_KEY),
-        roleMayAssign, callerId: caller, assigneeId: who,
-      });
-      if (!allowed) {
-        // under `roles` the op's own rule said no (the tasks app's reassign rule); otherwise the household's setting did
-        const byRole = inCircle || assignPolicyFrom(paramsService.register.valueOf(ASSIGN_POLICY_KEY)) === 'roles';
-        return { ok: false, error: tr('circle.tasks.assign_refused'), refusal: byRole ? refuse('op-rule', 'cannot-reassign') : refuse('door-settings', 'setting:assign') };
-      }
-      // …and the one who gets it must be someone their OWN role lets claim (an observer looks, and holds no chore).
-      if (who !== 'me' && roles[who] !== undefined && !policy.canClaim(who)) {
-        return { ok: false, error: tr('circle.tasks.assignee_cannot', { name: whoName ?? assignee.trim() }), refusal: refuse('op-rule', 'assignee-cannot-claim') };
-      }
+      const given = await choreHolderFor(assignee, ctx);
+      if (!given.ok) return given;
+      ({ who, whoName } = given);
     }
     let made = await callSkill('lists', opId, rest, ctx);
     if (!made?.ok || !made.itemId) return made;
@@ -4400,6 +4415,18 @@ export async function createRealHouseholdAgent(opts = {}) {
         args = { ...args, id: task.id };
         namedTask = words(task) || null;
       }
+    }
+    // A chore given to someone by the words a person said ("geef de ramen aan Bob") goes to the person those words name,
+    // read as an add's who is read — never the word itself as its holder. No one named: the chore is given up. The
+    // reply says who got it as the asker may see them (`readerNamer`: themself, a name, or only that it was given).
+    let givenTo = null;
+    if (appOrigin === 'tasks' && opId === 'reassignTask' && opts.tasksCircleId && typeof args?.newAssignee === 'string' && args.newAssignee.trim()) {
+      const given = await choreHolderFor(args.newAssignee, ctx, { mayGive: false });
+      if (!given.ok) return given;
+      args = { ...args, newAssignee: given.who };
+      const caller = actorOf(ctx);
+      const seen = (given.who === 'me' || (caller && given.who === caller)) ? { you: true } : (await readerNamer(caller, doorCircleOf(ctx)))(given.who);
+      givenTo = seen.you ? { holder: 'self' } : seen.name ? { holder: 'named', name: seen.name } : { holder: 'given' };
     }
     // §1b 1d — generic-capability dispatch. A synthetic op-id (`__generic__:app:atom:noun`)
     // carries a manifest-DECLARED noun that has no bespoke op-id; decode it at the waist and
@@ -4567,7 +4594,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }));
         await ensureCircleSync(resolveCircleId(args ?? {}));
         const data = await ops[opId](args ?? {});
-        return adaptTasksReply(opId, data, { actor: args?.actor ?? null, named: namedTask, args: args ?? {} });
+        return adaptTasksReply(opId, data, { actor: args?.actor ?? null, named: namedTask, givenTo, args: args ?? {} });
       }
       const realOpId = TASKS_OP_ALIAS[opId] ?? opId;
       // Per-op arg normalisation between the chat-shell vocabulary
@@ -4713,7 +4740,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first = Array.isArray(result) ? result[0] : null;
       const data  = first?.data ?? null;
       if (data && noteHint) data.noteHint = noteHint;
-      const adapted = adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask, args: realArgs ?? args ?? {} });
+      const adapted = adaptTasksReply(opId, data, { actor: realArgs?.actor ?? args?.actor ?? null, named: namedTask, givenTo, args: realArgs ?? args ?? {} });
       // On a household bot "wat moet ik nog doen" is MINE: the open chores this person claimed (the chat-shell reading of
       // `listMine` — everything open — stays for the painting shells, which show every chore on their own screen).
       const mineOf = opts.tasksCircleId && opId === 'listMine' ? (args?.actor ?? null) : null;
@@ -5252,7 +5279,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   /** The chore actions whose bare `{ok}` the door words itself (see `adaptTasksReply`). */
   const WORDED_BY_DOOR = Object.freeze({ reassignTask: 'reassigned', removeTask: 'removed', editTask: 'edited' });
-  function adaptTasksReply(opId, data, { actor = null, named = null, args = {} } = {}) {
+  function adaptTasksReply(opId, data, { actor = null, named = null, givenTo = null, args = {} } = {}) {
     if (data == null) return null;
     // In the person's words: every shell hands the agent its translator.
     const tr = agentT;
@@ -5329,8 +5356,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       const title = (opId === 'editTask' && (args?.text || args?.title)) || task?.text || task?.title || named || args?.id || '';
       const key = WORDED_BY_DOOR[opId];
       const message = typeof opts.t === 'function' ? opts.t(`circle.tasks.reply.${key}`, { title, note: '' }) : `✓ ${key}: ${title}`;
-      // the chore's words, and who it went to as the person named them: the door words the line (`replyLine`)
-      const to = opId === 'reassignTask' && typeof args?.newAssignee === 'string' && args.newAssignee.trim() ? { to: args.newAssignee.trim() } : {};
+      // the chore's words, and who it went to: the door words the line (`replyLine`). A household bot read the person
+      // from the words (`givenTo`: as the asker may see them); elsewhere the words as they were said.
+      const to = opId !== 'reassignTask' ? {}
+        : givenTo ? { chore: { title, ...givenTo, ...(task?.dueAt ? { dueAt: task.dueAt } : {}) } }
+          : (typeof args?.newAssignee === 'string' && args.newAssignee.trim() ? { to: args.newAssignee.trim() } : {});
       return { ok: true, message, title, ...to, ...(task ? { task: { ...task, type: 'task', state: _statusToChatState(task.status, task) } } : {}), ...(args?.id ? { itemId: args.id } : {}), _sync: simulateSync() };
     }
     if (verbMap[opId] && task) {

@@ -12,7 +12,7 @@ const KEY = (c) => Buffer.alloc(32, c).toString('base64url');   // a 32-byte key
 const REAL = {
   webid: KEY(1), pubKey: KEY(2), stableId: 'c_eKyns55717SbtEm9CWuA',
   handle: 'frits', displayName: 'Frits de Roos', avatarUrl: null, trustOffer: 'bekend',
-  peerAddr: KEY(1), relays: ['wss://relay.onderling.org'],
+  peerAddr: KEY(1), relays: ['wss://relay.test'],
   personKey: { version: 1, pubKey: KEY(3), linkKeyPub: KEY(4) },
 };
 const legacyLength = (card) => Buffer.from(JSON.stringify(card)).toString('base64url').length;

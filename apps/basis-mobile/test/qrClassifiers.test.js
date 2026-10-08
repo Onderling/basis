@@ -35,9 +35,9 @@ describe('basis-mobile QR classifiers', () => {
   it('classifies the app’s OWN deep link (?join=…&relay=…) and hands back the invite + its relay', () => {
     // 2026-09-08: the hosted app's invite QR is `…?join=<enc>&relay=<ws url>`. The scanner matched
     // `?invite=` only, so scanning the app's own QR with the app did nothing at all.
-    const r = classifyQrPayload('https://onderling.org/basis/?join=onderling-invite%3A%2F%2Fabc&relay=wss%3A%2F%2Frelay.onderling.org', CL);
+    const r = classifyQrPayload('https://onderling.org/basis/?join=onderling-invite%3A%2F%2Fabc&relay=wss%3A%2F%2Frelay.test', CL);
     expect(r.kind).toBe('invite');
-    expect(r.payload).toEqual({ inviteUri: 'onderling-invite://abc', relayUrl: 'wss://relay.onderling.org' });
+    expect(r.payload).toEqual({ inviteUri: 'onderling-invite://abc', relayUrl: 'wss://relay.test' });
   });
 
   it('a scheme URI still comes back as the bare string the wizard has always decoded', () => {

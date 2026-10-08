@@ -10,9 +10,9 @@ const LOC = { origin: 'https://onderling.org', pathname: '/basis/index.html' };
 
 describe('parseInviteDeepLink', () => {
   it('reads back exactly what inviteDeepLink writes, relay included', () => {
-    const link = inviteDeepLink(LOC, 'onderling-invite://abc-123', 'wss://relay.onderling.org');
+    const link = inviteDeepLink(LOC, 'onderling-invite://abc-123', 'wss://relay.test');
     expect(link.startsWith(`${appBaseUrl(LOC)}?join=`)).toBe(true);
-    expect(parseInviteDeepLink(link)).toEqual({ inviteUri: 'onderling-invite://abc-123', relayUrl: 'wss://relay.onderling.org' });
+    expect(parseInviteDeepLink(link)).toEqual({ inviteUri: 'onderling-invite://abc-123', relayUrl: 'wss://relay.test' });
   });
 
   it('a link without a relay, and the older ?invite= form, both parse', () => {

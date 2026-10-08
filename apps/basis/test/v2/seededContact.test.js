@@ -7,7 +7,7 @@ import { seedContactCard, seededContactWebid } from '../../src/v2/seededContact.
 import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
 
 const card = (obj) => 'onderling-contact://' + encodeContactCard(obj);
-const FRITS = card({ webid: 'frits-key', pubKey: 'frits-key', displayName: 'Frits', relays: ['wss://relay.onderling.org'] });
+const FRITS = card({ webid: 'frits-key', pubKey: 'frits-key', displayName: 'Frits', relays: ['wss://relay.test'] });
 
 function rig({ known = [] } = {}) {
   const calls = [];

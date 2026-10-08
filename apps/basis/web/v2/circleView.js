@@ -60,6 +60,7 @@ import { circleActions } from '../../src/v2/actionProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { paintFace } from './faceView.js';
+import { timeWords } from '../../src/v2/whenWords.js';
 
 export function renderCircleView(container, {
   circle = {},
@@ -1179,7 +1180,9 @@ function renderBubble(row, {
 
 function formatTimeLabel(ts) {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return '';
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // The household's clock, the same on every shell ("23:22") — not the BROWSER's locale, which painted "11:22 PM"
+  // in a Dutch screen whenever the browser itself was English.
+  return timeWords(ts);
 }
 
 /**

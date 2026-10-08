@@ -3450,7 +3450,7 @@
         "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
       },
       "agents": {
-        "text": "Agents",
+        "text": "Bots",
         "doc": "P1.7 — author chip: only what the agents said."
       }
     }

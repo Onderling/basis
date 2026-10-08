@@ -291,6 +291,7 @@ import { bindCircleGovernance, openPolicyProposals } from '../../../../basis/src
 import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
+import { launcherListPaint } from './launcherListPaint.js';
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -516,6 +517,9 @@ export default function CircleLauncherScreen({
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
+  // The boot retry loop has an answer (circles found, or its tries used up): only then is an empty list
+  // "No circles yet." rather than "not known yet" — see `launcherListPaint`.
+  const [launcherSettled, setLauncherSettled] = useState(false);
   const [selected, setSelected] = useState(null);
   // The OPEN circle, readable from a closure that outlives a render — the mounted waist ops need "which
   // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
@@ -1282,6 +1286,8 @@ export default function CircleLauncherScreen({
       const n = await load();
       if (!cancelled && n === 0 && resolveSkill && (tries += 1) < 5) {
         setTimeout(() => { if (!cancelled) tick(); }, 1200);
+      } else if (!cancelled && resolveSkill) {
+        setLauncherSettled(true);
       }
     };
     tick();
@@ -2138,6 +2144,7 @@ export default function CircleLauncherScreen({
     );
   }
 
+  const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
     <WithTabBar active="circles" onSelect={onTab} badges={tabBadges}>
       <View style={styles.page} testID="circle-launcher">
@@ -2151,7 +2158,7 @@ export default function CircleLauncherScreen({
             And reloads are common exactly where the miss was seen: joining from an invite link bumps
             `circlesRevision`, and the boot retry re-runs `load()` up to five times.
             So the placeholder is for an EMPTY list only — a refresh now repaints in place. */}
-        {loading && circles.length === 0 ? (
+        {listPaint === 'loading' ? (
           <Text style={styles.muted}>{t('circle.loading')}</Text>
         ) : (
           <ScrollView
@@ -2177,7 +2184,7 @@ export default function CircleLauncherScreen({
                 {t('circle.boot_failed', { reason: String(bootError) })}
               </Text>
             ) : null}
-            {circles.length === 0 && !bootError ? (
+            {listPaint === 'empty' ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
               renderLauncherGroups(bySight.shown, {
@@ -4437,7 +4444,8 @@ function CircleDetail({
         {/* The "+" menu — the projected entries, in the composer, exactly as web paints them. Rendered
             ABOVE the row so it opens upward like the web dropdown; absent entirely when this circle
             offers nothing that works. */}
-        {chatComposerVisible(activeTab) ? (<>   {/* the composer is the conversation's — hidden under Leden and the other tabs */}
+        {chatComposerVisible(activeTab) ? (<>
+        {/* the composer is the conversation's — hidden under Leden and the other tabs */}
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (

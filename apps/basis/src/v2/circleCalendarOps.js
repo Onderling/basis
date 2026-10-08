@@ -52,7 +52,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
   const stamp = (e) => {
     const d = new Date(e.startsAt);
     return Number.isNaN(d.getTime()) ? String(e.startsAt ?? '')
-      : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}${d.getHours() || d.getMinutes() ? ` ${pad(d.getHours())}:${pad(d.getMinutes())}` : ''}`;   // a whole day: no time
   };
   const label = (e) => `${stamp(e)} · ${e.title}`;
   /** The event a call names — its id, or its words among the open ones. */

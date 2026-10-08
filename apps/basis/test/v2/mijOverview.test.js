@@ -1,7 +1,8 @@
 /**
- * "Mijn overzicht" on the Mij tab — the two cross-circle blocks the Schermen tab used to seed ("Mijn dingen": my
- * chores across every circle; "Mijn agenda": the circles' appointments and my own), declared once in shared code and
- * materialized through the one screen materializer. No screens book behind it: nothing to rename, delete or add.
+ * "Mijn overzicht" on the Mij tab — Gepland's rows on top (the coming days, appointments and dated chores), and below
+ * them the one cross-circle block the Schermen tab used to seed: "Mijn dingen", my chores across every circle (undated
+ * ones too). Declared once in shared code and materialized through the one screen materializer. "Mijn agenda" is not
+ * here: Gepland already shows the appointments, with the own store and a window. No screens book behind it.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -32,42 +33,36 @@ function world() {
 }
 
 describe('Mijn overzicht — the Mij tab\'s cross-circle blocks', () => {
-  it('declares exactly two blocks: my chores (task, mine) and my agenda (calendar-event, all)', () => {
-    expect(MIJ_OVERVIEW_BLOCKS.map((b) => [b.type, b.config.noun, b.config.scope])).toEqual([
-      ['items', 'task', 'mine'],
-      ['items', 'calendar-event', 'all'],
-    ]);
-    expect(MIJ_OVERVIEW_BLOCKS.map((b) => b.titleKey)).toEqual(['circle.screens.seed_my_things', 'circle.screens.seed_my_calendar']);
+  it('declares exactly one block: my chores (task, mine) — the appointments are Gepland\'s', () => {
+    expect(MIJ_OVERVIEW_BLOCKS.map((b) => [b.type, b.config.noun, b.config.scope])).toEqual([['items', 'task', 'mine']]);
+    expect(MIJ_OVERVIEW_BLOCKS.map((b) => b.titleKey)).toEqual(['circle.screens.seed_my_things']);
   });
 
-  it('materializes both through the one cross-circle projection, each carrying its title', async () => {
+  it('materializes it through the one cross-circle projection, carrying its title', async () => {
     const w = world();
-    const [things, agenda] = await mijOverviewBlocks({ callSkill: w.callSkill, me: ME });
+    const blocks = await mijOverviewBlocks({ callSkill: w.callSkill, me: ME });
+    expect(blocks).toHaveLength(1);
+    const [things] = blocks;
     expect(things).toMatchObject({ type: 'items', status: 'ok', titleKey: 'circle.screens.seed_my_things', content: { noun: 'task' } });
     // only the chore I hold, tagged with its circle
     expect(things.content.items.map((i) => [i.label, i.circleName])).toEqual([['afwas', 'Huis']]);
-    expect(agenda).toMatchObject({ type: 'items', status: 'ok', titleKey: 'circle.screens.seed_my_calendar', content: { noun: 'calendar-event' } });
-    // the circles' appointments and my own, soonest first
-    expect(agenda.content.items.map((i) => [i.label, i.circleId])).toEqual([['training', 'club'], ['hardlopen', null]]);
+    // no appointment is read for it (Gepland reads those)
+    expect(w.calls.some(([app]) => app === 'calendar')).toBe(false);
     // the circles come from the same list Gepland reads
     expect(w.calls).toContainEqual(['stoop', 'listMyCircles', null]);
   });
 
-  it('with no circles both blocks are present and empty (never a missing section)', async () => {
+  it('with no circles the block is present and empty (never a missing section)', async () => {
     const callSkill = async (app, op) => (app === 'stoop' && op === 'listMyCircles' ? { circles: [] } : { items: [] });
     const blocks = await mijOverviewBlocks({ callSkill, me: ME });
-    expect(blocks.map((b) => [b.titleKey, b.status])).toEqual([
-      ['circle.screens.seed_my_things', 'empty'],
-      ['circle.screens.seed_my_calendar', 'empty'],
-    ]);
+    expect(blocks.map((b) => [b.titleKey, b.status])).toEqual([['circle.screens.seed_my_things', 'empty']]);
   });
 
-  it('a materializer that throws still yields both blocks, each saying it could not load', async () => {
+  it('a materializer that throws still yields the block, saying it could not load', async () => {
     // a circles answer that throws when it is read
     const callSkill = async (app, op) => (app === 'stoop' && op === 'listMyCircles' ? { get circles() { throw new Error('boom'); } } : { items: [] });
     const blocks = await mijOverviewBlocks({ callSkill, me: ME });
-    expect(blocks.map((b) => b.titleKey)).toEqual(['circle.screens.seed_my_things', 'circle.screens.seed_my_calendar']);
-    expect(blocks.map((b) => b.status)).toEqual(['error', 'error']);
+    expect(blocks.map((b) => [b.titleKey, b.status])).toEqual([['circle.screens.seed_my_things', 'error']]);
   });
 
   it('every title it names is worded in nl and en', () => {
@@ -79,6 +74,5 @@ describe('Mijn overzicht — the Mij tab\'s cross-circle blocks', () => {
       expect(textAt(en, b.titleKey), b.titleKey).toBeTruthy();
     }
     expect(textAt(nl, 'circle.screens.seed_my_things')).toBe('Mijn dingen');
-    expect(textAt(nl, 'circle.screens.seed_my_calendar')).toBe('Mijn agenda');
   });
 });

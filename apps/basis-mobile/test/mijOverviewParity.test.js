@@ -48,7 +48,7 @@ describe('Mijn overzicht — parity', () => {
     }
   });
 
-  it('the overview shows the two cross-circle blocks', () => {
-    expect(MIJ_OVERVIEW_BLOCKS.map((b) => b.config.noun)).toEqual(['task', 'calendar-event']);
+  it('the overview shows one cross-circle block — my chores; the appointments are Gepland\'s', () => {
+    expect(MIJ_OVERVIEW_BLOCKS.map((b) => b.config.noun)).toEqual(['task']);
   });
 });

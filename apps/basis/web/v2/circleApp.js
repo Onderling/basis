@@ -4150,7 +4150,7 @@ async function showMij() {
   // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
   let planned = null;
   let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
-  // Mijn overzicht: my chores and my appointments across every circle (the shared blocks); null while they load
+  // Mijn overzicht, below Gepland: my chores across every circle (the shared block); null while it loads
   let overview = null;
 
   async function load() {

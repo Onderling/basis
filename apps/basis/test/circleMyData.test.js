@@ -254,4 +254,16 @@ describe('renderCircleMyData', () => {
     expect(el.querySelector('.cc-mydata__companion-holder')).toBeNull();
     expect(el.querySelector('.cc-mydata__companion-holders').textContent).toContain('ingetrokken');
   });
+
+  it('my agents: while revokes are on their way, the section says so', () => {
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }], companionsPending: 'onderweg bij 1',
+      onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }), onGrantCompanion: async () => '',
+    });
+    expect(el.querySelector('.cc-mydata__companion-pending').textContent).toBe('onderweg bij 1');
+    const none = renderCircleMyData(document.createElement('div'), {
+      t, companions: [{ node: 'N'.repeat(43), short: 'a' }], onOpenCompanionGrant: async () => ({}), onGrantCompanion: async () => '',
+    });
+    expect(none.querySelector('.cc-mydata__companion-pending')).toBeNull();
+  });
 });

@@ -6949,7 +6949,11 @@
     "granted": "Access given to",
     "may": "may: {{what}}",
     "revoke": "revoke",
-    "revoked": "Revoked. The companion refuses whatever it tries here from now on."
+    "revoked": "Revoked. The companion refuses whatever it tries here from now on.",
+    "pending": {
+      "text": "Revoking — on its way to {{count}} companion(s)",
+      "doc": "My data → Mijn agents: revokes of a deleted contact that did not reach a node yet (it was away); told when it answers again."
+    }
   },
   "wizard": {
     "recovery": {

@@ -13,6 +13,7 @@
  */
 import { CapabilityToken, TokenRegistry } from '@onderling/core';
 import { loadCompanions } from './feedCompanion.js';
+import { pendingRevokesOf } from '@onderling/agent-registry';
 
 /** The message a companion's grant arrives in. The companion names the same one (`GRANT_DELIVERY_SUBTYPE`). */
 export const COMPANION_GRANT_SUBTYPE = 'companion-grant';
@@ -221,4 +222,14 @@ export async function loadCompanionGrantRows({ callSkill, node, linkedBots = [],
 /** The line a revoke ends on. */
 export function companionRevokeText(r, t) {
   return r?.ok === true ? t('circle.companionGrant.revoked') : companionGrantText(r, t);
+}
+
+/**
+ * The line My data shows while revokes are still on their way (a contact deleted while a node was away): "intrekken
+ * onderweg bij n companion(s)", n = the nodes still owed one; null when nothing is owed.
+ * @param {object} entry  the person's own registry entry (`{properties}`)
+ */
+export function pendingRevokeLine(entry, t) {
+  const nodes = new Set(pendingRevokesOf(entry).map((p) => p.node));
+  return nodes.size ? t('circle.companionGrant.pending', { count: nodes.size }) : null;
 }

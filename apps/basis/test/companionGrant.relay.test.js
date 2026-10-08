@@ -16,6 +16,7 @@ import { randomKey, sealForLink } from '@onderling/blob-gateway';
 import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
 import { startJourneyRelay } from './support/testRelay.js';
+import { pendingRevokesOf } from '@onderling/agent-registry';
 import { bootRealAgentNode, connectNodesOverRelay, teardown, until } from './support/pairRealAgents.js';
 import { startCompanionNode } from '../../companion-node/src/index.js';
 import { COMPANION_GRANT_SUBTYPE } from '../src/v2/companionGrant.js';
@@ -78,8 +79,40 @@ describe('a person grants an agent a place on their companion', () => {
     expect(await call('revokeCompanionGrant', { node, to: bot.pubKey })).toMatchObject({ ok: true, outcome: 'ok', revoked: 2 });
     await expect(bot.invoke(node, 'feed.put', file, { token: put })).rejects.toThrow(/revoked/i);
     expect(await call('companionGrantList', { node })).toMatchObject({ ok: true, grants: [] });
-    // without a node: every node the person owns is asked (nothing left to revoke here)
-    expect(await call('revokeCompanionGrant', { to: bot.pubKey })).toMatchObject({ ok: true, revoked: 0, nodes: 1 });
+    // without a node (a contact deleted): owed to every node the person owns, told in the background — never waited on
+    expect(await call('revokeCompanionGrant', { to: bot.pubKey })).toMatchObject({ ok: true, outcome: 'pending', pending: 1 });
+    const owed = async () => pendingRevokesOf({ properties: (await web.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {} });
+    expect(await until(async () => ((await owed()).length === 0 ? true : null), { timeout: 20_000, step: 200 }), 'told, and no longer owed').toBe(true);
     expect(await call('revokeCompanionGrant', { node })).toMatchObject({ ok: false, outcome: 'bad-args' });
   }, 90_000);
+
+  it('a revoke owed to a node that is away never waits: it is kept, and lands when the node answers again', async () => {
+    const node = host.agent.address;
+    const call = (op, args) => web.agent.callSkill('household', op, args);
+    const before = got.length;
+    expect(await call('grantCompanion', { node, to: bot.pubKey, families: ['agenda-files'] })).toMatchObject({ ok: true });
+    const put = (await until(async () => got[before] ?? null, { timeout: 15_000, step: 100 })).payload.tokens.find((t) => t.skill === 'feed.put');
+    await host.stop();
+
+    // the node is away: the revoke (a contact deleted) answers at once, and the debt is on the person's own record
+    const t0 = Date.now();
+    expect(await call('revokeCompanionGrant', { to: bot.pubKey })).toMatchObject({ ok: true, outcome: 'pending', pending: 1 });
+    expect(Date.now() - t0, 'it did not wait on the node').toBeLessThan(3_000);
+    const owed = async () => pendingRevokesOf({ properties: (await web.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {} });
+    expect(await owed()).toEqual([{ node, key: bot.pubKey }]);
+    // a retry while it is still away keeps it owed
+    await web.agent.retryPendingCompanionRevokes();
+    expect(await owed()).toEqual([{ node, key: bot.pubKey }]);
+
+    // the node comes back; the next time it answers, what it is owed lands
+    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, management: true, feeds: true });
+    expect(host.agent.address).toBe(node);
+    const tries = [];
+    const back = await until(async () => { const r = await call('companionGrantList', { node }); tries.push(r?.outcome); return r?.ok ? r : null; }, { timeout: 60_000, step: 500 });
+    expect(back, `the node answers again (${tries.join(',')})`).toBeTruthy();
+    expect(await until(async () => ((await owed()).length === 0 ? true : null), { timeout: 20_000, step: 200 }), 'the owed revoke landed').toBe(true);
+    // the node's own gate now refuses that token
+    await expect(host.agent.policyEngine.checkInbound({ peerPubKey: bot.pubKey, skillId: 'feed.put', token: put, agentPubKey: node })).rejects.toThrow(/revoked/i);
+    expect(await call('companionGrantList', { node })).toMatchObject({ ok: true, grants: [] });
+  }, 120_000);
 });

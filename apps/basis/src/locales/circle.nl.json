@@ -6949,7 +6949,11 @@
     "granted": "Toegang gegeven aan",
     "may": "mag: {{what}}",
     "revoke": "intrekken",
-    "revoked": "Ingetrokken. Wat het hier nog probeert, weigert de companion."
+    "revoked": "Ingetrokken. Wat het hier nog probeert, weigert de companion.",
+    "pending": {
+      "text": "Intrekken onderweg bij {{count}} companion(s)",
+      "doc": "My data → Mijn agents: revokes of a deleted contact that did not reach a node yet (it was away); told when it answers again."
+    }
   },
   "wizard": {
     "recovery": {

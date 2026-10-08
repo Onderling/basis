@@ -38,6 +38,8 @@ export function renderCircleMyData(container, {
   // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
   // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
   companions = [],
+  // "intrekken onderweg bij n companion(s)" while a deleted contact's revokes have not reached every node; null = none
+  companionsPending = null,
   onOpenCompanionGrant = null,
   onGrantCompanion = null,
   // Who the node granted, as lines under it: `onLoadCompanionGrants(node)` → `{ok, rows: [{to, label, may}]}` or
@@ -266,6 +268,13 @@ export function renderCircleMyData(container, {
   // linked bot) and the ticks. The node mints the tokens; nothing here decides what a family is.
   if (typeof onOpenCompanionGrant === 'function' && typeof onGrantCompanion === 'function' && Array.isArray(companions) && companions.length) {
     const sec = section(tr('circle.companionGrant.nodes'));
+    if (companionsPending) {
+      const p = document.createElement('p');
+      p.className = 'cc-mydata__companion-pending';
+      p.style.cssText = 'font-size:.9em;opacity:.8;margin:.2rem 0;';
+      p.textContent = companionsPending;
+      sec.appendChild(p);
+    }
     for (const c of companions) {
       const row = document.createElement('div');
       row.className = 'cc-mydata__companion';

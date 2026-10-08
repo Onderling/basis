@@ -33,4 +33,17 @@ describe('deleteContact — what the person granted that contact ends with it', 
     expect(calls).toContain(`household.revokeCompanionGrant:${JSON.stringify({ to: 'K'.repeat(43) })}`);
     expect(calls.findIndex((c) => c.startsWith('stoop.setContactHidden'))).toBeLessThan(calls.findIndex((c) => c.startsWith('household.revokeCompanionGrant')));
   });
+
+  it('the delete never waits on the revokes: a node that does not answer does not hold it up', async () => {
+    let asked = 0;
+    const callSkill = async (app, op) => {
+      if (op === 'listContacts') return { contacts: [{ webid: BOT, peerAddr: BOT }] };
+      if (op === 'revokeCompanionGrant') { asked += 1; return new Promise(() => {}); }   // never answers
+      return { ok: true };
+    };
+    const r = await Promise.race([deleteContact({ callSkill, contactWebid: BOT }), new Promise((res) => { setTimeout(() => res('waited'), 500); })]);
+    expect(r).toMatchObject({ ok: true });
+    await new Promise((res) => { setTimeout(res, 0); });
+    expect(asked, 'the revoke was fired').toBe(1);
+  });
 });

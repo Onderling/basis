@@ -164,3 +164,18 @@ describe('the lines under a node: who may do what there', () => {
     expect(companionRevokeText({ ok: false, outcome: 'unreachable' }, t)).toBe('weg');
   });
 });
+
+describe('revokes still on their way', () => {
+  it('"onderweg bij n": the number of nodes still owed one; nothing owed, no line', async () => {
+    const { pendingRevokeLine } = await import('../../src/v2/companionGrant.js');
+    const { setOwnedNode, addPendingRevokes, clearPendingRevoke } = await import('@onderling/agent-registry');
+    const t = (k, o) => `${k}:${o?.count}`;
+    const A = 'A'.repeat(43); const B = 'B'.repeat(43); const BOT = 'K'.repeat(43); const BOT2 = 'L'.repeat(43);
+    let p = setOwnedNode(setOwnedNode({}, { address: A, claimedAt: 'x' }), { address: B, claimedAt: 'x' });
+    expect(pendingRevokeLine({ properties: p }, t)).toBeNull();
+    p = addPendingRevokes(p, [BOT, BOT2]);
+    expect(pendingRevokeLine({ properties: p }, t)).toBe('circle.companionGrant.pending:2');
+    p = clearPendingRevoke(clearPendingRevoke(p, A, BOT), A, BOT2);
+    expect(pendingRevokeLine({ properties: p }, t)).toBe('circle.companionGrant.pending:1');
+  });
+});

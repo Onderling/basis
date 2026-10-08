@@ -10,8 +10,9 @@
  *   2. this side LEAVES the pair circle — a `leave` on its membership lane: the route and its keys stop, the other
  *      side's roster loses you, and the person's other devices follow the leave (siblings-follow, v0.1.18);
  *   3. what the person GRANTED that contact on a node of theirs (a bot putting agenda files on their companion) ends:
- *      every key the contact is reached at is revoked on every node the person owns — best-effort, a node away keeps
- *      it until the person revokes it there (My data);
+ *      every key the contact is reached at is revoked on every node the person owns — fired, never waited on: the
+ *      revoke is owed on the node's record first and told in the background, so a node that is away hears it when it
+ *      is back (`revokeCompanionGrant`);
  *   4. the thread stays on disk; nothing is erased.
  *
  * If they write again, the pair roster brings the circle back — the SAME circle, re-joined — and the row returns
@@ -34,7 +35,8 @@ export async function deleteContact({ agent, callSkill = null, contactWebid, pai
   if ((!agent && typeof callSkill !== 'function') || typeof contactWebid !== 'string' || !contactWebid) return { ok: false, left: false, error: 'missing-args' };
   const hid = await call('stoop', 'setContactHidden', { webid: contactWebid, hidden: true, deleted: true }).catch((e) => ({ error: e?.message ?? String(e) }));
   if (hid?.error) return { ok: false, left: false, error: hid.error };
-  await revokeGrantsOf(call, contactWebid);
+  // fired, never waited on: the app keeps what a node away is owed and tells it when it is back
+  revokeGrantsOf(call, contactWebid).catch(() => {});
   let left = false;
   if (pairCircleId) {
     const r = await leaveCircleLocally({ agent, callSkill: call, circleId: pairCircleId, unregister });

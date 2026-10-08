@@ -18,7 +18,11 @@ RUN corepack enable && corepack prepare pnpm@10.33.4 --activate
 WORKDIR /app
 COPY . .
 
+# Focused install, then the second half of installing in this tree (as the assistant image does): relink-workspace
+# replaces the COPIES a `file:` dependency leaves (core copied without its own deps — `@onderling/params` not found,
+# so the image could not start) with links, and materialises the transitive workspace links. See CLAUDE.md.
 RUN pnpm install --filter "@onderling-app/companion-node..." \
+ && node scripts/relink-workspace.mjs \
  && pnpm store prune || true
 
 ENV NODE_ENV=production

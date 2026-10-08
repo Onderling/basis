@@ -6,7 +6,7 @@
  * registry rather than copied out of it.
  */
 import { describe, it, expect } from 'vitest';
-import { ENTRY_KINDS, LANE } from '@onderling/item-store';
+import { ENTRY_KINDS, LANE, SUBJECT, bindingOf } from '@onderling/item-store';
 import { CIRCLE_KINDS, applyTemplate, markAxisTouched } from '../../src/v2/circleTemplates.js';
 import {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
@@ -15,11 +15,14 @@ import {
 } from '../../src/v2/conversationKinds.js';
 
 describe('the defaults are derived, not copied', () => {
-  it('the permissive default is exactly the human lane', () => {
+  it('the permissive default is exactly the human lane a circle carries', () => {
     // Copying the list would mean a human kind added to the registry later is silently missing from every
-    // conversation — the drift the one-registry work exists to prevent.
-    const human = Object.entries(ENTRY_KINDS).filter(([, s]) => s.lane === LANE.HUMAN).map(([k]) => k);
+    // conversation — the drift the one-registry work exists to prevent. A kind about one person (their own thread
+    // with an assistant) is in no circle, so it is no circle's default.
+    const human = Object.entries(ENTRY_KINDS).filter(([k, s]) => s.lane === LANE.HUMAN && !bindingOf(k).subject.includes(SUBJECT.PERSON)).map(([k]) => k);
     expect(defaultConversationKinds().sort()).toEqual(human.sort());
+    expect(defaultConversationKinds()).toContain('chat-message');
+    expect(defaultConversationKinds()).not.toContain('assistant-turn');
   });
 
   it('technical kinds are off by default, and offerings are on', () => {
@@ -34,6 +37,7 @@ describe('the defaults are derived, not copied', () => {
     expect(available).toHaveLength(Object.keys(ENTRY_KINDS).length);
     expect(available.find((a) => a.kind === 'governance')).toMatchObject({ defaultOn: false });
     expect(available.find((a) => a.kind === 'chat-message')).toMatchObject({ defaultOn: true });
+    expect(available.find((a) => a.kind === 'assistant-turn')).toMatchObject({ defaultOn: false });
   });
 });
 
@@ -173,6 +177,8 @@ describe('conversationKindsRows — the admin control’s model (decision 3’s 
     // J-L1 exists to prevent. `availableConversationKinds()` returns those kinds; this control filters.
     const kinds = conversationKindsRows({ templateKind: 'household' }).map((r) => r.kind);
     expect(kinds).not.toContain('governance');
+    // nor a person's own thread with an assistant: no circle carries it, so its checkbox would do nothing either
+    expect(kinds).not.toContain('assistant-turn');
     for (const k of kinds) expect(ENTRY_KINDS[k].lane).toBe(LANE.HUMAN);
   });
 

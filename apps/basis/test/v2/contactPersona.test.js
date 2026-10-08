@@ -35,7 +35,7 @@ describe('backfillContactPersonas — an explicit one-time write, and it is CHEC
   it('writes `default` onto rows that predate the field, and proves it by the pair id', async () => {
     // Not a guess: a contact made before this shipped holds the DEFAULT identity's card, so its pair circle
     // is `pairCircleIdFor(default.webid, them)`. That is a fact the backfill can verify, and it does.
-    const rows = [{ contactId: THEM, pairCircleId: pairCircleIdFor(ME, THEM) }];
+    const rows = [{ webid: THEM, pairCircleId: pairCircleIdFor(ME, THEM) }];
     const written = [];
     const r = await backfillContactPersonas({
       rows, selfWebid: ME, setPersona: async (id, persona) => { written.push([id, persona]); },
@@ -47,7 +47,7 @@ describe('backfillContactPersonas — an explicit one-time write, and it is CHEC
   it('does NOT write onto a row whose pair id does not match the default identity — it reports it', async () => {
     // If the pair id is not the default's, the premise is false for that row and writing `default` onto it
     // would record something untrue. Say so instead; that is the whole point of checking rather than assuming.
-    const rows = [{ contactId: THEM, pairCircleId: 'kp-deadbeefdeadbeefdeadbeef' }];
+    const rows = [{ webid: THEM, pairCircleId: 'kp-deadbeefdeadbeefdeadbeef' }];
     const written = [];
     const r = await backfillContactPersonas({ rows, selfWebid: ME, setPersona: async (...a) => { written.push(a); } });
     expect(written, 'nothing written for a row that cannot be proved').toEqual([]);
@@ -56,8 +56,8 @@ describe('backfillContactPersonas — an explicit one-time write, and it is CHEC
 
   it('leaves a row that already has a persona alone, and one with no pair circle yet', async () => {
     const rows = [
-      { contactId: 'a', persona: 'buurt', pairCircleId: pairCircleIdFor(ME, 'a') },
-      { contactId: 'b' },                                    // card-only: no pair circle exists yet
+      { webid: 'a', persona: 'buurt', pairCircleId: pairCircleIdFor(ME, 'a') },
+      { webid: 'b' },                                    // card-only: no pair circle exists yet
     ];
     const written = [];
     const r = await backfillContactPersonas({ rows, selfWebid: ME, setPersona: async (...a) => { written.push(a); } });
@@ -66,8 +66,8 @@ describe('backfillContactPersonas — an explicit one-time write, and it is CHEC
   });
 
   it('is idempotent — a second run writes nothing', async () => {
-    const rows = [{ contactId: THEM, pairCircleId: pairCircleIdFor(ME, THEM) }];
-    const write = async (id, persona) => { rows.find((x) => x.contactId === id).persona = persona; };
+    const rows = [{ webid: THEM, pairCircleId: pairCircleIdFor(ME, THEM) }];
+    const write = async (id, persona) => { rows.find((x) => x.webid === id).persona = persona; };
     await backfillContactPersonas({ rows, selfWebid: ME, setPersona: write });
     const second = [];
     await backfillContactPersonas({ rows, selfWebid: ME, setPersona: async (...a) => { second.push(a); } });

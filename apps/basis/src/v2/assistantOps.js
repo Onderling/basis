@@ -126,6 +126,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-link-confirm') return linkConfirmOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-inapp') return inAppOp(caller ?? ctx?.threadId, args?.answer ?? args?._match, ctx);
       if (op === 'assistant-unlink') return unlinkOp(caller ?? ctx?.threadId, ctx);
+      if (op === 'assistant-forget') return forgetOp(caller ?? ctx?.threadId, ctx);
       if (op === 'assistant-circle') return circleOp(caller ?? ctx?.threadId, args?.spec ?? args?._match, ctx);
       if (op === 'assistant-circles') return circlesOp(caller ?? ctx?.threadId);
       // the export key's set and unlock exist for a screen alone: they run only as the yes to a screen's request
@@ -949,6 +950,18 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const r = await link.unlink(person, { isPrivate: await fromPrivateDoor(person, ctx) });
     if (r.ok) return { ok: true, message: tp('circle.bot.unlink_done') };
     return { ok: false, error: { code: r.reason, message: tp(r.reason === 'not-private' ? 'circle.bot.link_not_private' : 'circle.bot.unlink_nothing') } };
+  }
+
+  /**
+   * `/vergeet` — the person's own thread emptied, now: every turn of it on this device (the log's purge, scoped to their
+   * thread). From their private door only. What the turns did stays — it is the household's, in its stores.
+   */
+  async function forgetOp(person, ctx) {
+    if (!person || typeof threads?.memory?.forget !== 'function') return { ok: false, error: 'unwired' };
+    const tp = personT(person);
+    if (!(await fromPrivateDoor(person, ctx))) return { ok: false, error: { code: 'not-private', message: tp('circle.bot.forget_not_private') } };
+    const count = threads.memory.forget(person);
+    return { ok: true, message: tp('circle.bot.forget_done', { count }) };
   }
 
   /**

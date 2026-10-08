@@ -3,10 +3,12 @@
  *
  * A door that is not a circle (the box's Telegram chat) had its memory in a Map inside the engine and its pending
  * ask in a Map inside the runner, so a restart forgot every conversation and every half-answered question. Now:
- *   - the TURNS are `chat-message` entries on the device log (the conversation's record, the kind that exists),
- *     carrying the thread id and `scope: 'self'` and no circle: nothing that re-sends a circle's chat picks them up,
- *     and on the box the log is sealed at rest. Memory is a PROJECTION over them — the last turns of one thread —
- *     the same shape web's circle memory reads from its rows.
+ *   - the TURNS are `assistant-turn` entries on the device log, carrying the thread id and no circle: nothing that
+ *     re-sends a circle's chat picks them up, and on the box the log is sealed at rest. They are NOT the record: what a
+ *     turn did (a list line, an appointment, a setting) is a store row and stays; the words are plumbing to it — the
+ *     chat retention class, so they age out on the device's chat window through the log's own compactor. Memory is a
+ *     PROJECTION over them — the last turns of one thread inside that window — the same shape web's circle memory
+ *     reads from its rows. A person empties their own thread with `/vergeet` (`forget`), the log's own purge, scoped.
  *   - the thread's SETTINGS — its memory mode, its language, the ask it is waiting on — are one `chat-thread` row
  *     per thread, in a store the host hands in (sealed on the box).
  * A thread is one person's: the door keys it by the person it admitted (their contact id), so what one person said
@@ -23,6 +25,9 @@ import { isQuietHours } from './botSettings.js';
 import { addUsage as addCounts, emptyUsage, monthOf } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 import { ASSISTANT_MEMORY_TURNS } from './assistantEngine.js';
+
+/** The entry kind a turn is written as (the dictionary's row: `@onderling/item-store` entryKinds). */
+export const ASSISTANT_TURN_KIND = 'assistant-turn';
 
 export const MEMORY_MODES = Object.freeze(['off', 'short', 'long']);
 export const DEFAULT_MEMORY_MODE = 'short';
@@ -252,8 +257,8 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
         seq += 1;
         eventLog.append({
           id: `bot-turn:${ts.toString(36)}:${seq}:${Math.random().toString(36).slice(2, 8)}`,
-          type: 'chat-message', app: 'basis', ts, actor: voice === 'you' ? threadId : 'bot',
-          payload: { kind: 'chat-message', scope: 'self', threadId, who: voice, text: words },
+          type: ASSISTANT_TURN_KIND, app: 'basis', ts, actor: voice === 'you' ? threadId : 'bot',
+          payload: { kind: ASSISTANT_TURN_KIND, threadId, who: voice, text: words },
         });
       },
       recent(threadId) {
@@ -261,11 +266,19 @@ export function createBotThreads({ eventLog, store = memoryThreadStore(), memory
         const out = [];
         for (const e of eventLog.query({})) {   // most recent first
           const p = e?.payload;
-          if (e?.type !== 'chat-message' || p?.threadId !== threadId || typeof p.text !== 'string') continue;
+          if (e?.type !== ASSISTANT_TURN_KIND || p?.threadId !== threadId || typeof p.text !== 'string') continue;
           out.push(`${p.who}: ${p.text}`);
           if (out.length >= memoryTurns) break;
         }
         return out.reverse();
+      },
+      /**
+       * Forget one person's thread: every turn of it on this device, now (`/vergeet`). The log's own purge, scoped to the
+       * thread — no one else's turns, no circle's lines. Returns how many turns went.
+       */
+      forget(threadId) {
+        if (!threadId || typeof eventLog.purgeConversation !== 'function') return 0;
+        return eventLog.purgeConversation({ olderThanMs: 0, threadId });
       },
     },
   };

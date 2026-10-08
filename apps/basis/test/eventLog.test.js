@@ -341,6 +341,26 @@ describe('EventLog — per-kind retention', () => {
     expect(ids).toContain('b1');
   });
 
+  it('purgeConversation scoped to one person\'s thread with an assistant: their turns go, nobody else\'s, no circle\'s', () => {
+    const log = new EventLog({ now: () => 1000 });
+    const turn = (id, threadId, ts = 0) => ev({ id, ts, app: 'basis', type: 'assistant-turn', payload: { kind: 'assistant-turn', threadId, who: 'you', text: id } });
+    log.append(turn('ann-1', 'telegram:1'));
+    log.append(turn('ann-2', 'telegram:1', 1000));   // written this very moment: "everything until now" includes it
+    log.append(turn('bo-1', 'telegram:2'));
+    // a circle's chat line that happens to carry the same thread id is the circle's record, not the person's thread
+    log.append(ev({ id: 'circle-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'c1', payload: { threadId: 'telegram:1', text: 'in de kring' } }));
+    log.append(ev({ id: 'gov', ts: 0, app: 'system', type: 'governance', payload: { event: 'propose', threadId: 'telegram:1' } }));
+    expect(log.purgeConversation({ olderThanMs: 0, threadId: 'telegram:1' })).toBe(2);
+    expect(log.query().map((e) => e.id).sort()).toEqual(['bo-1', 'circle-msg', 'gov']);
+  });
+
+  it('the person\'s purge in "Mijn gegevens" reaches their turns with an assistant as well as their chat', () => {
+    const log = new EventLog({ now: () => 1000 });
+    log.append(ev({ id: 'turn', ts: 0, app: 'basis', type: 'assistant-turn', payload: { threadId: 'telegram:1', text: 'x' } }));
+    log.append(ev({ id: 'msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'c1', payload: {} }));
+    expect(log.purgeConversation({ olderThanMs: 100 })).toBe(2);
+  });
+
   it('forgetCircle drops EVERY entry of one circle — record kinds too — and leaves the rest', () => {
     const log = new EventLog({ now: () => 1000 });
     log.append(ev({ id: 'a-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cA', payload: {} }));

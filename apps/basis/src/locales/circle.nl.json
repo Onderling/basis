@@ -2301,6 +2301,14 @@
     "autoReplyAnonNoEnd": {
       "text": "Deze persoon is niet bereikbaar.",
       "doc": "Anon + no-end."
+    },
+    "on": {
+      "text": "🌙 Vakantiestand aan. Je krijgt geen meldingen, en je vaardigheden staan op niet beschikbaar.",
+      "doc": "Confirmation of /holiday-mode on."
+    },
+    "off": {
+      "text": "🌅 Vakantiestand uit. Meldingen en het koppelen op vaardigheden lopen weer.",
+      "doc": "Confirmation of /holiday-mode off."
     }
   },
   "viewAs": {
@@ -3261,6 +3269,18 @@
         "text": "Volledig",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
+    },
+    "on": {
+      "text": "🔓 Je laat je naam zien aan {{peer}}. Dat werkt van twee kanten: de ander moet het ook aanzetten.",
+      "doc": "Confirmation of /reveal on."
+    },
+    "off": {
+      "text": "🔒 Je laat je naam niet meer zien aan {{peer}}.",
+      "doc": "Confirmation of /reveal off."
+    },
+    "someone": {
+      "text": "(iemand)",
+      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {
@@ -3522,6 +3542,26 @@
       "responsibility": {
         "text": "Verantwoordelijkheid",
         "doc": "α.1c — rules block short field label."
+      },
+      "access": {
+        "text": "Toegang",
+        "doc": "Rules summary label (/group-rules): who may get in."
+      },
+      "leave_policy": {
+        "text": "Vertrekbeleid",
+        "doc": "Rules summary label (/group-rules): what leaving means."
+      },
+      "conflict_policy": {
+        "text": "Conflictoplossing",
+        "doc": "Rules summary label (/group-rules): how disagreements are settled."
+      },
+      "tags": {
+        "text": "Labels",
+        "doc": "Rules summary label (/group-rules): the circle's tags."
+      },
+      "extra_admins": {
+        "text": "Extra beheerders",
+        "doc": "Rules summary label (/group-rules): admins beyond the founder."
       }
     },
     "conflict": {
@@ -3529,6 +3569,18 @@
         "text": "Twee van jullie hebben de regels bewerkt",
         "doc": "γ.4 — modal heading when an incoming rules doc diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
       }
+    },
+    "none": {
+      "text": "Deze kring heeft nog geen regels.",
+      "doc": "/group-rules for a circle without rules."
+    },
+    "defaults_apply": {
+      "text": "(geen eigen regels; de standaard geldt)",
+      "doc": "/group-rules for a circle whose rules document has no fields filled in."
+    },
+    "none_set": {
+      "text": "(geen regels)",
+      "doc": "/group-rules when the rules document says nothing at all."
     }
   },
   "create": {
@@ -4079,6 +4131,8 @@
     "memory_off": "Ik onthoud dit gesprek niet meer: elk bericht staat nu op zichzelf. Wat je op een lijst zet, blijft staan.",
     "memory_short": "Ik onthoud de laatste paar berichten van dit gesprek.",
     "memory_long": "Ik onthoud de laatste berichten van dit gesprek, en later ook wat ik over het huishouden weet.",
+    "forget_done": "Vergeten: ik heb niets meer van ons gesprek ({{count}} berichten weg). Wat je op een lijst of in de agenda zette, blijft staan.",
+    "forget_not_private": "Zeg /vergeet in je eigen chat met mij, niet hier. Er is niets vergeten.",
     "lang_set": "Ik antwoord je voortaan in: {{lang}}.",
     "lang_auto": "Ik antwoord je weer in de taal waarin je schrijft.",
     "welcome": "Hoi! Ik ben de assistent van dit huishouden. Typ /help om te zien wat ik kan.",
@@ -4732,6 +4786,7 @@
           "assistant-inapp": "het huishouden ook in je eigen app (na /koppel, als de beheerder het aanzette)",
           "assistant-link-confirm": "de code van je Basis-app kiezen",
           "assistant-unlink": "je Basis-app ontkoppelen",
+          "assistant-forget": "ons gesprek nu vergeten (wat je op een lijst zette, blijft)",
           "assistant-circle": "de bot in een kring zetten (of eruit: /kring los <naam>)",
           "assistant-circles": "de kringen waar de bot in zit",
           "remindMe": "een eigen herinnering voor één afspraak of klusje",
@@ -4823,6 +4878,10 @@
     "not_yours": {
       "text": "Dat mag jij hier niet doen.",
       "doc": "Said when the capability matrix refuses this member. Deliberately short and not apologetic: it is a statement about what this circle grants, not about the person. It does NOT say who could do it — that would name people to somebody who has just been refused."
+    },
+    "no_agent": {
+      "text": "Geen agent gevonden die past bij \"{{agent}}\".",
+      "doc": "Asking to see an agent (viewAgent) by a name or id that fits none."
     }
   },
   "nearby": {
@@ -5121,6 +5180,26 @@
         "text": "Toevoegen",
         "doc": "Add sheet — confirm the add."
       }
+    },
+    "added_named": {
+      "text": "✓ Contact toegevoegd: {{name}}",
+      "doc": "Confirmation of /add-contact."
+    },
+    "trust_updated": {
+      "text": "✓ Vertrouwen bijgewerkt voor {{name}}: {{level}}",
+      "doc": "Confirmation of /contact-trust; {{level}} is the new trust level, or that it was cleared."
+    },
+    "trust_cleared": {
+      "text": "(gewist)",
+      "doc": "The trust level in the /contact-trust confirmation when it was cleared."
+    },
+    "share_title": {
+      "text": "Deel je contactkaart",
+      "doc": "Heading of the record /share-my-contact returns."
+    },
+    "share_hint": {
+      "text": "Kopieer de tekst hierboven en plak die in een QR-maker. De ander scant hem en voegt je toe met /add-contact, met het vertrouwen dat jij voorstelt.",
+      "doc": "Hint in the /share-my-contact record."
     }
   },
   "pairedDevices": {
@@ -5291,6 +5370,30 @@
     "attach_fetching": {
       "text": "Volledige afbeelding ophalen…",
       "doc": "S5 — recipient is fetching full bytes."
+    },
+    "posted_text": {
+      "text": "✓ Geplaatst: {{text}}",
+      "doc": "The agent's confirmation after a post is placed (/post): the post's words."
+    },
+    "untitled": {
+      "text": "(bericht)",
+      "doc": "Stands in for the words of a post that had none, in the /post confirmation."
+    },
+    "brief_one": {
+      "text": "1 vraag in de kring",
+      "doc": "The morning brief's noticeboard slot (/brief): how many posts are open."
+    },
+    "brief_other": {
+      "text": "{{count}} vragen in de kring",
+      "doc": "The morning brief's noticeboard slot (/brief): how many posts are open."
+    },
+    "brief": {
+      "text": "{{count}} vragen in de kring",
+      "doc": "The morning brief's noticeboard slot (/brief): how many posts are open."
+    },
+    "profile_title": {
+      "text": "Je profiel op het prikbord",
+      "doc": "Heading of the record /stoop-profile returns."
     }
   },
   "profile": {
@@ -7739,6 +7842,10 @@
       "edited": {
         "text": "✓ Aangepast: {{title}}{{note}}",
         "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "added": {
+        "text": "✓ Taak toegevoegd: {{title}}",
+        "doc": "The agent's confirmation after a task is added (/addtask, the composer's + menu): the task's words."
       }
     },
     "already_claimed": {
@@ -7772,6 +7879,288 @@
     "given": {
       "text": "Toegewezen.",
       "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "blocked_one": {
+      "text": "🔒 Nog niet af te ronden: 1 deeltaak staat nog open ({{deps}}). Rond die eerst af.",
+      "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
+    },
+    "blocked_other": {
+      "text": "🔒 Nog niet af te ronden: {{count}} deeltaken staan nog open ({{deps}}). Rond die eerst af.",
+      "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
+    },
+    "blocked": {
+      "text": "🔒 Nog niet af te ronden: {{count}} deeltaken staan nog open ({{deps}}). Rond die eerst af.",
+      "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
+    },
+    "blocked_label_one": {
+      "text": "{{title}} 🔒 wacht op 1 deeltaak",
+      "doc": "A row in a task list (/mytasks) for a task that cannot be completed yet because sub-tasks are open."
+    },
+    "blocked_label_other": {
+      "text": "{{title}} 🔒 wacht op {{count}} deeltaken",
+      "doc": "A row in a task list (/mytasks) for a task that cannot be completed yet because sub-tasks are open."
+    },
+    "blocked_label": {
+      "text": "{{title}} 🔒 wacht op {{count}} deeltaken",
+      "doc": "A row in a task list (/mytasks) for a task that cannot be completed yet because sub-tasks are open."
+    },
+    "brief_one": {
+      "text": "1 open taak",
+      "doc": "The morning brief's tasks slot (/brief): how many of your tasks are open."
+    },
+    "brief_other": {
+      "text": "{{count}} open taken",
+      "doc": "The morning brief's tasks slot (/brief): how many of your tasks are open."
+    },
+    "brief": {
+      "text": "{{count}} open taken",
+      "doc": "The morning brief's tasks slot (/brief): how many of your tasks are open."
+    },
+    "invite": {
+      "title": {
+        "text": "Uitnodiging voor de kring",
+        "doc": "Heading of the record the agent returns for /invite (a QR code and the link beside it)."
+      },
+      "minted": {
+        "text": "🎟️ Uitnodiging gemaakt, één keer te gebruiken. Laat de ander de QR-code scannen of de link plakken bij /redeem-invite.",
+        "doc": "Shown under the invite record after /invite."
+      },
+      "no_expiry": {
+        "text": "(verloopt niet)",
+        "doc": "The invite record's expiry field when the invite has no end date."
+      },
+      "joined": {
+        "text": "✓ Je bent lid van de kring. Zichtbare leden: {{members}}. /mytasks toont de taken van de kring.",
+        "doc": "Confirmation after /redeem-invite succeeded; {{members}} is a number, or ? when unknown."
+      },
+      "bad_url": {
+        "text": "Deze uitnodigingslink kon ik niet lezen: {{error}}",
+        "doc": "/redeem-invite with a pasted link that is not a readable invite; {{error}} is the technical reason."
+      },
+      "bad_json": {
+        "text": "Deze uitnodiging kon ik niet lezen: {{error}}",
+        "doc": "/redeem-invite with pasted invite text that is not readable; {{error}} is the technical reason."
+      }
+    },
+    "availability": {
+      "title_week": {
+        "text": "Beschikbaarheid — {{week}}",
+        "doc": "Heading of the week grid /availability returns; {{week}} is the week label."
+      },
+      "this_week": {
+        "text": "(deze week)",
+        "doc": "Week label in /availability when the week has no name."
+      },
+      "disabled": {
+        "text": "Beschikbaarheid staat in deze kring nog niet aan. Vraag een beheerder om het aan te zetten; daarna zet je je eigen week aan met /availability-opt-in on.",
+        "doc": "/availability in a circle where the availability feature is off."
+      },
+      "cycle_hint": {
+        "text": "Klik op een vak om te wisselen: onbekend → vrij → krap → niet beschikbaar → onbekend.",
+        "doc": "Hint under the /availability week grid, for someone who has opted in."
+      },
+      "not_opted_in": {
+        "text": "Je doet nog niet mee. Zet het aan met /availability-opt-in on.",
+        "doc": "Hint under the /availability week grid, for someone who has not opted in."
+      },
+      "day": {
+        "0": {
+          "text": "ma",
+          "doc": "Short weekday name in the /set-availability confirmation (Monday)."
+        },
+        "1": {
+          "text": "di",
+          "doc": "Short weekday name in the /set-availability confirmation (Tuesday)."
+        },
+        "2": {
+          "text": "wo",
+          "doc": "Short weekday name in the /set-availability confirmation (Wednesday)."
+        },
+        "3": {
+          "text": "do",
+          "doc": "Short weekday name in the /set-availability confirmation (Thursday)."
+        },
+        "4": {
+          "text": "vr",
+          "doc": "Short weekday name in the /set-availability confirmation (Friday)."
+        },
+        "5": {
+          "text": "za",
+          "doc": "Short weekday name in the /set-availability confirmation (Saturday)."
+        },
+        "6": {
+          "text": "zo",
+          "doc": "Short weekday name in the /set-availability confirmation (Sunday)."
+        }
+      },
+      "half": {
+        "AM": {
+          "text": "ochtend",
+          "doc": "Half of a day in the /set-availability confirmation."
+        },
+        "PM": {
+          "text": "middag",
+          "doc": "Half of a day in the /set-availability confirmation."
+        }
+      },
+      "state": {
+        "open": {
+          "text": "vrij",
+          "doc": "An availability state in the /set-availability confirmation: free to help."
+        },
+        "tight": {
+          "text": "krap",
+          "doc": "An availability state in the /set-availability confirmation: possible, but busy."
+        },
+        "unavailable": {
+          "text": "niet beschikbaar",
+          "doc": "An availability state in the /set-availability confirmation: not available."
+        },
+        "unknown": {
+          "text": "onbekend",
+          "doc": "An availability state in the /set-availability confirmation: not said."
+        }
+      },
+      "opted_in": {
+        "text": "✓ Je doet mee. Je kring ziet je beschikbaarheid.",
+        "doc": "Confirmation of /availability-opt-in on."
+      },
+      "opted_out": {
+        "text": "✓ Je doet niet meer mee. De coördinator ziet je als \"onbekend\", net als iedereen die niet meedoet.",
+        "doc": "Confirmation of /availability-opt-in off."
+      }
+    },
+    "schedule": {
+      "none": {
+        "text": "Geen taken om in te plannen binnen je vooruitblik (vergroot die met --lookahead-days).",
+        "doc": "/suggest-schedule found nothing to plan."
+      },
+      "found_one": {
+        "text": "1 taak met voorstellen (venster van {{days}} dagen). Klik op een tijdvak om het in te plannen.",
+        "doc": "Above the slot list /suggest-schedule returns."
+      },
+      "found_other": {
+        "text": "{{count}} taken met voorstellen (venster van {{days}} dagen). Klik op een tijdvak om het in te plannen.",
+        "doc": "Above the slot list /suggest-schedule returns."
+      },
+      "found": {
+        "text": "{{count}} taken met voorstellen (venster van {{days}} dagen). Klik op een tijdvak om het in te plannen.",
+        "doc": "Above the slot list /suggest-schedule returns."
+      },
+      "scheduled": {
+        "text": "📅 \"{{title}}\" ingepland op {{when}}.",
+        "doc": "Confirmation after a suggested slot was picked (/accept-schedule)."
+      },
+      "no_time": {
+        "text": "(geen tijd)",
+        "doc": "In the /accept-schedule confirmation when the task came back without a time."
+      }
+    },
+    "circles": {
+      "none": {
+        "text": "Je zit nog in geen enkele kring. Maak er een met /circle-new.",
+        "doc": "/circles when this person is in no circle."
+      },
+      "pending_row": {
+        "text": "{{name}} ({{kind}}) — wacht nog (herlaad om te activeren)",
+        "doc": "A /circles row for a circle made since the app started, not active until a reload."
+      },
+      "stat_open": {
+        "text": "{{n}} open",
+        "doc": "Part of a /circles row: open tasks in that circle."
+      },
+      "stat_overdue": {
+        "text": "{{n}} te laat",
+        "doc": "Part of a /circles row: overdue tasks in that circle."
+      },
+      "stat_mine": {
+        "text": "{{n}} van mij",
+        "doc": "Part of a /circles row: tasks of mine in that circle."
+      },
+      "stat_awaiting": {
+        "text": "{{n}} wacht op goedkeuring",
+        "doc": "Part of a /circles row: tasks waiting for approval in that circle."
+      },
+      "pending": {
+        "text": "{{n}} wachtend (herlaad om te activeren)",
+        "doc": "In the /circles summary: circles made since the app started, not active until a reload."
+      },
+      "summary": {
+        "text": "Kringen: {{n}}{{pending}} · Totaal: {{open}} open, {{overdue}} te laat, {{mine}} van mij, {{awaiting}} wacht op goedkeuring",
+        "doc": "The summary line above the /circles list; {{pending}} is empty or \" + N pending\"."
+      }
+    },
+    "config": {
+      "title": {
+        "text": "Kringinstellingen",
+        "doc": "Heading of the record /circle-info returns."
+      },
+      "not_found": {
+        "text": "Geen instellingen gevonden voor deze kring.",
+        "doc": "/circle-info for a circle this device has no settings for."
+      },
+      "members_hint": {
+        "text": "Gebruik /circle-members voor de ledenlijst.",
+        "doc": "Hint in the /circle-info record."
+      },
+      "members_none": {
+        "text": "Geen kringinstellingen gevonden — probeer eerst /circle-info.",
+        "doc": "/circle-members when the circle has no settings to read the members from."
+      },
+      "members_count_one": {
+        "text": "1 lid in {{circle}}",
+        "doc": "Above the /circle-members list."
+      },
+      "members_count_other": {
+        "text": "{{count}} leden in {{circle}}",
+        "doc": "Above the /circle-members list."
+      },
+      "members_count": {
+        "text": "{{count}} leden in {{circle}}",
+        "doc": "Above the /circle-members list."
+      }
+    },
+    "state": {
+      "paused": {
+        "text": "⏸️ Kring gepauzeerd. Er komen geen nieuwe taken bij; bestaande taken kun je afmaken.",
+        "doc": "Confirmation of /pause-circle."
+      },
+      "not_paused": {
+        "text": "✓ De kring staat niet op pauze.",
+        "doc": "/pause-circle or /unpause-circle answered that the circle is not paused."
+      },
+      "still_paused": {
+        "text": "✓ De kring staat op pauze.",
+        "doc": "/unpause-circle answered that the circle is still paused."
+      },
+      "resumed": {
+        "text": "▶️ Kring hervat. Je kunt weer taken toevoegen.",
+        "doc": "Confirmation of /unpause-circle."
+      },
+      "archived": {
+        "text": "📦 Kring gearchiveerd. Alles blijft te lezen; terugdraaien kan met /unarchive-circle.",
+        "doc": "Confirmation of /archive-circle --confirm=true."
+      },
+      "not_archived": {
+        "text": "✓ De kring is niet gearchiveerd.",
+        "doc": "/archive-circle or /unarchive-circle answered that the circle is not archived."
+      },
+      "still_archived": {
+        "text": "✓ De kring is gearchiveerd.",
+        "doc": "/unarchive-circle answered that the circle is still archived."
+      },
+      "unarchived": {
+        "text": "✓ Kring uit het archief gehaald. Hij is weer actief.",
+        "doc": "Confirmation of /unarchive-circle."
+      },
+      "archive_confirm": {
+        "text": "Archiveren maakt de kring alleen-lezen. Doe het opnieuw met --confirm=true om door te gaan.",
+        "doc": "/archive-circle without the confirm flag: nothing happened yet."
+      },
+      "provisioned": {
+        "text": "✓ Kring \"{{circle}}\" aangemaakt. Hij staat in /circles als \"wacht nog\"; helemaal actief wordt hij pas als meerdere kringen tegelijk kunnen.",
+        "doc": "Confirmation of /circle-new."
+      }
     }
   },
   "refusal": {
@@ -7893,5 +8282,77 @@
     "waiting": "Wachten op de bot…",
     "linked": "Gekoppeld aan {{bot}}. In de chat zegt /ontkoppel het weer op.",
     "close": "Sluiten"
+  },
+  "groups": {
+    "leave_confirm": {
+      "text": "Een kring verlaten kun je niet terugdraaien. Doe het opnieuw met --confirm=true om door te gaan.",
+      "doc": "/leave-group without the confirm flag: nothing happened yet."
+    },
+    "left": {
+      "text": "👋 Je hebt de kring verlaten. Wat op dit apparaat staat blijft; je krijgt geen nieuwe berichten meer uit de kring.",
+      "doc": "Confirmation of /leave-group --confirm=true."
+    },
+    "current_title": {
+      "text": "Je kring",
+      "doc": "Heading of the record /groups returns."
+    },
+    "single_mode": {
+      "text": "één kring",
+      "doc": "The mode field of the /groups record: this device works with one circle."
+    },
+    "current_note": {
+      "text": "Meer kringen tegelijk kan hier nog niet.",
+      "doc": "Note in the /groups record."
+    }
+  },
+  "household": {
+    "ambiguous": {
+      "text": "Meer dan één treffer voor '{{match}}'. Antwoord met het begin van de id:\n{{options}}",
+      "doc": "/done, /remove, /grab or a reassign whose words fit several open items; {{options}} lists them, one per line."
+    },
+    "not_found_task": {
+      "text": "Geen open taak gevonden die past bij '{{match}}'.",
+      "doc": "/grab or a reassign whose words fit no open task."
+    },
+    "not_found_item": {
+      "text": "Geen open item gevonden dat past bij '{{match}}'.",
+      "doc": "/done or /remove whose words fit no open item."
+    },
+    "completed": {
+      "text": "✓ Afgevinkt: {{text}}",
+      "doc": "Confirmation of /done."
+    },
+    "removed": {
+      "text": "✓ Weggehaald: {{text}}",
+      "doc": "Confirmation of /remove."
+    },
+    "claimed": {
+      "text": "✓ Opgepakt: {{text}}",
+      "doc": "Confirmation of /grab."
+    },
+    "reassigned": {
+      "text": "✓ Doorgegeven: {{text}} → {{who}}",
+      "doc": "Confirmation of a reassign; {{who}} is who has it now."
+    },
+    "added_task": {
+      "text": "✓ Taak toegevoegd: {{text}}",
+      "doc": "Confirmation of /task."
+    },
+    "added_to": {
+      "text": "✓ Toegevoegd aan {{list}}: {{text}}",
+      "doc": "Confirmation of /add; {{list}} is the kind of item (shopping, errand, …)."
+    },
+    "brief_one": {
+      "text": "1 open ding in het huishouden",
+      "doc": "The morning brief's household slot (/brief)."
+    },
+    "brief_other": {
+      "text": "{{count}} open dingen in het huishouden",
+      "doc": "The morning brief's household slot (/brief)."
+    },
+    "brief": {
+      "text": "{{count}} open dingen in het huishouden",
+      "doc": "The morning brief's household slot (/brief)."
+    }
   }
 }

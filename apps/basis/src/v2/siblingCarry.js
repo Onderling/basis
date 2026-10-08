@@ -21,9 +21,10 @@
  * sender gate because it is one of the person's proven per-circle addresses on the roster — the same
  * admission every member's address gets.
  *
- * Same shape as the contact-turn fan (`contactTurnFan.js`): `siblings()` is the proven own-device set
- * (`siblingDeviceAddresses`, `grantsRail.js`), `sendToPeer` speaks as this device's address in the circle
- * the sibling shares. The three older fans become callers of this one in a later change, then deletions.
+ * `siblings()` is the proven own-device set (`siblingDeviceAddresses`, `grantsRail.js`), `sendToPeer` speaks as
+ * this device's address in the circle the sibling shares. The three older per-kind fans are callers of this one now
+ * — the contact turns (`contactTurnFan.js`), the grants (`makeGrantsFan`), the known peers (`knownPeersSync.js`) —
+ * each only shaping its payload; their catch-up answers to the one device that asked are a reply, not a fan.
  *
  * The per-silo / per-circle selection (which channels THIS device holds) is the next step: today every
  * device carries and receives everything, which is the policy's default.

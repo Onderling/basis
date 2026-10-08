@@ -2301,6 +2301,14 @@
     "autoReplyAnonNoEnd": {
       "text": "This person is away.",
       "doc": "Anon + no end date."
+    },
+    "on": {
+      "text": "🌙 Holiday mode on. Notifications are held back; your skills show as unavailable.",
+      "doc": "Confirmation of /holiday-mode on."
+    },
+    "off": {
+      "text": "🌅 Holiday mode off. Notifications and skill matching resume.",
+      "doc": "Confirmation of /holiday-mode off."
     }
   },
   "viewAs": {
@@ -3261,6 +3269,18 @@
         "text": "Full",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
+    },
+    "on": {
+      "text": "🔓 Reveal turned on for {{peer}}. It works both ways: they must turn it on too.",
+      "doc": "Confirmation of /reveal on."
+    },
+    "off": {
+      "text": "🔒 Reveal turned off for {{peer}}.",
+      "doc": "Confirmation of /reveal off."
+    },
+    "someone": {
+      "text": "(someone)",
+      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {
@@ -3522,6 +3542,26 @@
       "responsibility": {
         "text": "Responsibility",
         "doc": "α.1c — rules block short field label."
+      },
+      "access": {
+        "text": "Access",
+        "doc": "Rules summary label (/group-rules): who may get in."
+      },
+      "leave_policy": {
+        "text": "Leave policy",
+        "doc": "Rules summary label (/group-rules): what leaving means."
+      },
+      "conflict_policy": {
+        "text": "Conflict resolution",
+        "doc": "Rules summary label (/group-rules): how disagreements are settled."
+      },
+      "tags": {
+        "text": "Tags",
+        "doc": "Rules summary label (/group-rules): the circle's tags."
+      },
+      "extra_admins": {
+        "text": "Extra admins",
+        "doc": "Rules summary label (/group-rules): admins beyond the founder."
       }
     },
     "conflict": {
@@ -3529,6 +3569,18 @@
         "text": "Two of you edited the rules",
         "doc": "γ.4 — modal heading when an incoming rules doc diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
       }
+    },
+    "none": {
+      "text": "No rules have been set for this circle yet.",
+      "doc": "/group-rules for a circle without rules."
+    },
+    "defaults_apply": {
+      "text": "(no rules of its own; the defaults apply)",
+      "doc": "/group-rules for a circle whose rules document has no fields filled in."
+    },
+    "none_set": {
+      "text": "(no rules set)",
+      "doc": "/group-rules when the rules document says nothing at all."
     }
   },
   "create": {
@@ -4079,6 +4131,8 @@
     "memory_off": "I no longer keep this conversation: every message now stands on its own. What you put on a list stays.",
     "memory_short": "I keep the last few messages of this conversation.",
     "memory_long": "I keep the last messages of this conversation, and later also what I know about the household.",
+    "forget_done": "Forgotten: I no longer have any of our conversation ({{count}} messages gone). What you put on a list or in the agenda stays.",
+    "forget_not_private": "Say /vergeet in your own chat with me, not here. Nothing was forgotten.",
     "lang_set": "I will reply to you in: {{lang}}.",
     "lang_auto": "I will reply in the language you write in again.",
     "welcome": "Hi! I'm this household's assistant. Type /help to see what I can do.",
@@ -4732,6 +4786,7 @@
           "assistant-inapp": "the household in your own app too (after /koppel, where the admin switched it on)",
           "assistant-link-confirm": "pick the code your Basis app shows",
           "assistant-unlink": "unlink your Basis app",
+          "assistant-forget": "forget our conversation now (what you put on a list stays)",
           "assistant-circle": "put the bot in a circle (or out: /kring los <name>)",
           "assistant-circles": "the circles the bot is in",
           "remindMe": "your own reminder for one appointment or chore",
@@ -4823,6 +4878,10 @@
     "not_yours": {
       "text": "That is not something you can do here.",
       "doc": "Said when the capability matrix refuses this member. Deliberately short and not apologetic: it is a statement about what this circle grants, not about the person. It does NOT say who could do it — that would name people to somebody who has just been refused."
+    },
+    "no_agent": {
+      "text": "No agent matches \"{{agent}}\".",
+      "doc": "Asking to see an agent (viewAgent) by a name or id that fits none."
     }
   },
   "nearby": {
@@ -5121,6 +5180,26 @@
         "text": "Add",
         "doc": "Add sheet — confirm the add."
       }
+    },
+    "added_named": {
+      "text": "✓ Added contact: {{name}}",
+      "doc": "Confirmation of /add-contact."
+    },
+    "trust_updated": {
+      "text": "✓ Trust level updated for {{name}}: {{level}}",
+      "doc": "Confirmation of /contact-trust; {{level}} is the new trust level, or that it was cleared."
+    },
+    "trust_cleared": {
+      "text": "(cleared)",
+      "doc": "The trust level in the /contact-trust confirmation when it was cleared."
+    },
+    "share_title": {
+      "text": "Share your contact card",
+      "doc": "Heading of the record /share-my-contact returns."
+    },
+    "share_hint": {
+      "text": "Copy the payload above and paste it into any QR generator. The receiver scans it and uses /add-contact to add you with the proposed trust level.",
+      "doc": "Hint in the /share-my-contact record."
     }
   },
   "pairedDevices": {
@@ -5291,6 +5370,30 @@
     "attach_fetching": {
       "text": "Fetching the full image…",
       "doc": "S5 — recipient is fetching full bytes."
+    },
+    "posted_text": {
+      "text": "✓ Posted: {{text}}",
+      "doc": "The agent's confirmation after a post is placed (/post): the post's words."
+    },
+    "untitled": {
+      "text": "(post)",
+      "doc": "Stands in for the words of a post that had none, in the /post confirmation."
+    },
+    "brief_one": {
+      "text": "1 circle request",
+      "doc": "The morning brief's noticeboard slot (/brief): how many posts are open."
+    },
+    "brief_other": {
+      "text": "{{count}} circle requests",
+      "doc": "The morning brief's noticeboard slot (/brief): how many posts are open."
+    },
+    "brief": {
+      "text": "{{count}} circle requests",
+      "doc": "The morning brief's noticeboard slot (/brief): how many posts are open."
+    },
+    "profile_title": {
+      "text": "Your noticeboard profile",
+      "doc": "Heading of the record /stoop-profile returns."
     }
   },
   "profile": {
@@ -7739,6 +7842,10 @@
       "edited": {
         "text": "✓ Edited: {{title}}{{note}}",
         "doc": "A task op's confirmation line (the note: why a task was rejected)."
+      },
+      "added": {
+        "text": "✓ Added task: {{title}}",
+        "doc": "The agent's confirmation after a task is added (/addtask, the composer's + menu): the task's words."
       }
     },
     "already_claimed": {
@@ -7772,6 +7879,288 @@
     "given": {
       "text": "Assigned.",
       "doc": "A household bot's reply when a chore names a person: who may be given one, whether names are visible, and who got it."
+    },
+    "blocked_one": {
+      "text": "🔒 Blocked: 1 open sub-task ({{deps}}). Close it first.",
+      "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
+    },
+    "blocked_other": {
+      "text": "🔒 Blocked: {{count}} open sub-tasks ({{deps}}). Close them first.",
+      "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
+    },
+    "blocked": {
+      "text": "🔒 Blocked: {{count}} open sub-tasks ({{deps}}). Close them first.",
+      "doc": "Completing or approving a task whose sub-tasks are still open is refused; {{deps}} names the first few open sub-tasks."
+    },
+    "blocked_label_one": {
+      "text": "{{title}} 🔒 waiting on 1 sub-task",
+      "doc": "A row in a task list (/mytasks) for a task that cannot be completed yet because sub-tasks are open."
+    },
+    "blocked_label_other": {
+      "text": "{{title}} 🔒 waiting on {{count}} sub-tasks",
+      "doc": "A row in a task list (/mytasks) for a task that cannot be completed yet because sub-tasks are open."
+    },
+    "blocked_label": {
+      "text": "{{title}} 🔒 waiting on {{count}} sub-tasks",
+      "doc": "A row in a task list (/mytasks) for a task that cannot be completed yet because sub-tasks are open."
+    },
+    "brief_one": {
+      "text": "1 open task",
+      "doc": "The morning brief's tasks slot (/brief): how many of your tasks are open."
+    },
+    "brief_other": {
+      "text": "{{count}} open tasks",
+      "doc": "The morning brief's tasks slot (/brief): how many of your tasks are open."
+    },
+    "brief": {
+      "text": "{{count}} open tasks",
+      "doc": "The morning brief's tasks slot (/brief): how many of your tasks are open."
+    },
+    "invite": {
+      "title": {
+        "text": "Circle invite",
+        "doc": "Heading of the record the agent returns for /invite (a QR code and the link beside it)."
+      },
+      "minted": {
+        "text": "🎟️ Single-use invite made. Have the invitee scan the QR code or paste the link into /redeem-invite.",
+        "doc": "Shown under the invite record after /invite."
+      },
+      "no_expiry": {
+        "text": "(no expiry)",
+        "doc": "The invite record's expiry field when the invite has no end date."
+      },
+      "joined": {
+        "text": "✓ Joined the circle. Members visible: {{members}}. /mytasks shows the circle's tasks.",
+        "doc": "Confirmation after /redeem-invite succeeded; {{members}} is a number, or ? when unknown."
+      },
+      "bad_url": {
+        "text": "Couldn't read this invite link: {{error}}",
+        "doc": "/redeem-invite with a pasted link that is not a readable invite; {{error}} is the technical reason."
+      },
+      "bad_json": {
+        "text": "Couldn't read this invite: {{error}}",
+        "doc": "/redeem-invite with pasted invite text that is not readable; {{error}} is the technical reason."
+      }
+    },
+    "availability": {
+      "title_week": {
+        "text": "Availability — {{week}}",
+        "doc": "Heading of the week grid /availability returns; {{week}} is the week label."
+      },
+      "this_week": {
+        "text": "(this week)",
+        "doc": "Week label in /availability when the week has no name."
+      },
+      "disabled": {
+        "text": "Availability isn't turned on for this circle yet. Ask an admin to turn it on, then use /availability-opt-in on to start setting your week.",
+        "doc": "/availability in a circle where the availability feature is off."
+      },
+      "cycle_hint": {
+        "text": "Click a cell to cycle: unknown → open → tight → unavailable → unknown.",
+        "doc": "Hint under the /availability week grid, for someone who has opted in."
+      },
+      "not_opted_in": {
+        "text": "You haven't opted in. Use /availability-opt-in on to start sharing.",
+        "doc": "Hint under the /availability week grid, for someone who has not opted in."
+      },
+      "day": {
+        "0": {
+          "text": "Mon",
+          "doc": "Short weekday name in the /set-availability confirmation (Monday)."
+        },
+        "1": {
+          "text": "Tue",
+          "doc": "Short weekday name in the /set-availability confirmation (Tuesday)."
+        },
+        "2": {
+          "text": "Wed",
+          "doc": "Short weekday name in the /set-availability confirmation (Wednesday)."
+        },
+        "3": {
+          "text": "Thu",
+          "doc": "Short weekday name in the /set-availability confirmation (Thursday)."
+        },
+        "4": {
+          "text": "Fri",
+          "doc": "Short weekday name in the /set-availability confirmation (Friday)."
+        },
+        "5": {
+          "text": "Sat",
+          "doc": "Short weekday name in the /set-availability confirmation (Saturday)."
+        },
+        "6": {
+          "text": "Sun",
+          "doc": "Short weekday name in the /set-availability confirmation (Sunday)."
+        }
+      },
+      "half": {
+        "AM": {
+          "text": "morning",
+          "doc": "Half of a day in the /set-availability confirmation."
+        },
+        "PM": {
+          "text": "afternoon",
+          "doc": "Half of a day in the /set-availability confirmation."
+        }
+      },
+      "state": {
+        "open": {
+          "text": "open",
+          "doc": "An availability state in the /set-availability confirmation: free to help."
+        },
+        "tight": {
+          "text": "tight",
+          "doc": "An availability state in the /set-availability confirmation: possible, but busy."
+        },
+        "unavailable": {
+          "text": "unavailable",
+          "doc": "An availability state in the /set-availability confirmation: not available."
+        },
+        "unknown": {
+          "text": "unknown",
+          "doc": "An availability state in the /set-availability confirmation: not said."
+        }
+      },
+      "opted_in": {
+        "text": "✓ Opted in. Your circle sees your availability.",
+        "doc": "Confirmation of /availability-opt-in on."
+      },
+      "opted_out": {
+        "text": "✓ Opted out. The coordinator sees you as \"unknown\", the same as anyone who has not opted in.",
+        "doc": "Confirmation of /availability-opt-in off."
+      }
+    },
+    "schedule": {
+      "none": {
+        "text": "No schedulable tasks in your lookahead window (set --lookahead-days to expand).",
+        "doc": "/suggest-schedule found nothing to plan."
+      },
+      "found_one": {
+        "text": "1 task with suggestions ({{days}}-day window). Click a slot to schedule it.",
+        "doc": "Above the slot list /suggest-schedule returns."
+      },
+      "found_other": {
+        "text": "{{count}} tasks with suggestions ({{days}}-day window). Click a slot to schedule it.",
+        "doc": "Above the slot list /suggest-schedule returns."
+      },
+      "found": {
+        "text": "{{count}} tasks with suggestions ({{days}}-day window). Click a slot to schedule it.",
+        "doc": "Above the slot list /suggest-schedule returns."
+      },
+      "scheduled": {
+        "text": "📅 Scheduled \"{{title}}\" at {{when}}.",
+        "doc": "Confirmation after a suggested slot was picked (/accept-schedule)."
+      },
+      "no_time": {
+        "text": "(no time)",
+        "doc": "In the /accept-schedule confirmation when the task came back without a time."
+      }
+    },
+    "circles": {
+      "none": {
+        "text": "You're not in any circles yet. Use /circle-new to create one.",
+        "doc": "/circles when this person is in no circle."
+      },
+      "pending_row": {
+        "text": "{{name}} ({{kind}}) — pending (reload to activate)",
+        "doc": "A /circles row for a circle made since the app started, not active until a reload."
+      },
+      "stat_open": {
+        "text": "{{n}} open",
+        "doc": "Part of a /circles row: open tasks in that circle."
+      },
+      "stat_overdue": {
+        "text": "{{n}} overdue",
+        "doc": "Part of a /circles row: overdue tasks in that circle."
+      },
+      "stat_mine": {
+        "text": "{{n}} mine",
+        "doc": "Part of a /circles row: tasks of mine in that circle."
+      },
+      "stat_awaiting": {
+        "text": "{{n}} awaiting approval",
+        "doc": "Part of a /circles row: tasks waiting for approval in that circle."
+      },
+      "pending": {
+        "text": "{{n}} pending (reload to activate)",
+        "doc": "In the /circles summary: circles made since the app started, not active until a reload."
+      },
+      "summary": {
+        "text": "Circles: {{n}}{{pending}} · Total: {{open}} open, {{overdue}} overdue, {{mine}} mine, {{awaiting}} awaiting approval",
+        "doc": "The summary line above the /circles list; {{pending}} is empty or \" + N pending\"."
+      }
+    },
+    "config": {
+      "title": {
+        "text": "Circle settings",
+        "doc": "Heading of the record /circle-info returns."
+      },
+      "not_found": {
+        "text": "No settings found for this circle.",
+        "doc": "/circle-info for a circle this device has no settings for."
+      },
+      "members_hint": {
+        "text": "Use /circle-members for the member list.",
+        "doc": "Hint in the /circle-info record."
+      },
+      "members_none": {
+        "text": "No circle settings found — try /circle-info first.",
+        "doc": "/circle-members when the circle has no settings to read the members from."
+      },
+      "members_count_one": {
+        "text": "1 member in {{circle}}",
+        "doc": "Above the /circle-members list."
+      },
+      "members_count_other": {
+        "text": "{{count}} members in {{circle}}",
+        "doc": "Above the /circle-members list."
+      },
+      "members_count": {
+        "text": "{{count}} members in {{circle}}",
+        "doc": "Above the /circle-members list."
+      }
+    },
+    "state": {
+      "paused": {
+        "text": "⏸️ Circle paused. No new tasks; existing tasks can still be finished.",
+        "doc": "Confirmation of /pause-circle."
+      },
+      "not_paused": {
+        "text": "✓ The circle is not paused.",
+        "doc": "/pause-circle or /unpause-circle answered that the circle is not paused."
+      },
+      "still_paused": {
+        "text": "✓ The circle is paused.",
+        "doc": "/unpause-circle answered that the circle is still paused."
+      },
+      "resumed": {
+        "text": "▶️ Circle resumed. New tasks can be added again.",
+        "doc": "Confirmation of /unpause-circle."
+      },
+      "archived": {
+        "text": "📦 Circle archived. It stays readable; use /unarchive-circle to reverse.",
+        "doc": "Confirmation of /archive-circle --confirm=true."
+      },
+      "not_archived": {
+        "text": "✓ The circle is not archived.",
+        "doc": "/archive-circle or /unarchive-circle answered that the circle is not archived."
+      },
+      "still_archived": {
+        "text": "✓ The circle is archived.",
+        "doc": "/unarchive-circle answered that the circle is still archived."
+      },
+      "unarchived": {
+        "text": "✓ Circle unarchived. Active again.",
+        "doc": "Confirmation of /unarchive-circle."
+      },
+      "archive_confirm": {
+        "text": "Archiving the circle makes it read-only. Re-run with --confirm=true to proceed.",
+        "doc": "/archive-circle without the confirm flag: nothing happened yet."
+      },
+      "provisioned": {
+        "text": "✓ Circle \"{{circle}}\" created. It shows in /circles as \"pending\"; it becomes fully active once more than one circle at a time is supported.",
+        "doc": "Confirmation of /circle-new."
+      }
     }
   },
   "refusal": {
@@ -7893,5 +8282,77 @@
     "waiting": "Waiting for the bot…",
     "linked": "Linked to {{bot}}. In the chat, /ontkoppel undoes it.",
     "close": "Close"
+  },
+  "groups": {
+    "leave_confirm": {
+      "text": "Leaving your circle can't be undone. Re-run with --confirm=true to proceed.",
+      "doc": "/leave-group without the confirm flag: nothing happened yet."
+    },
+    "left": {
+      "text": "👋 Left the circle. What is on this device stays; you no longer receive updates from the circle.",
+      "doc": "Confirmation of /leave-group --confirm=true."
+    },
+    "current_title": {
+      "text": "Your circle",
+      "doc": "Heading of the record /groups returns."
+    },
+    "single_mode": {
+      "text": "single circle",
+      "doc": "The mode field of the /groups record: this device works with one circle."
+    },
+    "current_note": {
+      "text": "More than one circle at a time is not possible here yet.",
+      "doc": "Note in the /groups record."
+    }
+  },
+  "household": {
+    "ambiguous": {
+      "text": "More than one match for '{{match}}'. Reply with the start of the id:\n{{options}}",
+      "doc": "/done, /remove, /grab or a reassign whose words fit several open items; {{options}} lists them, one per line."
+    },
+    "not_found_task": {
+      "text": "Couldn't find an open task matching '{{match}}'.",
+      "doc": "/grab or a reassign whose words fit no open task."
+    },
+    "not_found_item": {
+      "text": "Couldn't find an open item matching '{{match}}'.",
+      "doc": "/done or /remove whose words fit no open item."
+    },
+    "completed": {
+      "text": "✓ Marked complete: {{text}}",
+      "doc": "Confirmation of /done."
+    },
+    "removed": {
+      "text": "✓ Removed: {{text}}",
+      "doc": "Confirmation of /remove."
+    },
+    "claimed": {
+      "text": "✓ Claimed: {{text}}",
+      "doc": "Confirmation of /grab."
+    },
+    "reassigned": {
+      "text": "✓ Reassigned: {{text}} → {{who}}",
+      "doc": "Confirmation of a reassign; {{who}} is who has it now."
+    },
+    "added_task": {
+      "text": "✓ Added task: {{text}}",
+      "doc": "Confirmation of /task."
+    },
+    "added_to": {
+      "text": "✓ Added to {{list}}: {{text}}",
+      "doc": "Confirmation of /add; {{list}} is the kind of item (shopping, errand, …)."
+    },
+    "brief_one": {
+      "text": "1 open household item",
+      "doc": "The morning brief's household slot (/brief)."
+    },
+    "brief_other": {
+      "text": "{{count}} open household items",
+      "doc": "The morning brief's household slot (/brief)."
+    },
+    "brief": {
+      "text": "{{count}} open household items",
+      "doc": "The morning brief's household slot (/brief)."
+    }
   }
 }

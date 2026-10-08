@@ -172,7 +172,7 @@ export function localStorageBackend(storage = globalThis.localStorage) {
   return {
     get: async (key) => {
       try {
-        const s = storage?.getItem(key);
+        const s = await storage?.getItem(key);   // awaited: a sealed or file-backed storage answers async
         if (s == null) return null;
         return { bytes: JSON.parse(s) };
       } catch {
@@ -180,10 +180,10 @@ export function localStorageBackend(storage = globalThis.localStorage) {
       }
     },
     put: async (key, bytes) => {
-      try { storage?.setItem(key, JSON.stringify(bytes)); } catch { /* quota / disabled */ }
+      try { await storage?.setItem(key, JSON.stringify(bytes)); } catch { /* quota / disabled / no key yet */ }
     },
     delete: async (key) => {
-      try { storage?.removeItem(key); } catch { /* ignore */ }
+      try { await storage?.removeItem(key); } catch { /* ignore */ }
     },
     list: async (prefix) => {
       try { return allKeys().filter((k) => k.startsWith(prefix)).sort(); } catch { return []; }

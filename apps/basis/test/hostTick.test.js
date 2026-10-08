@@ -17,6 +17,18 @@ function clock(start = 0) {
 }
 
 describe('the host tick', () => {
+  it('start resolves after the first runs have settled — even when the timer fires its first tick at once', async () => {
+    // a foreground timer (the person's clock) can fire as soon as it is set: that tick must not leave start() resolved
+    // while the job it started is still running (the person's clock test raced on this under CI load, 2026-10-08)
+    const eager = { setInterval: (fn) => { fn(); return 1; }, clearInterval: () => {} };
+    const tick = createHostTick({ timers: eager });
+    let done = false;
+    tick.add('slow', { every: 60_000, run: async () => { await new Promise((r) => { setTimeout(r, 20); }); done = true; } });
+    await tick.start();
+    expect(done, 'the first run had finished when start() resolved').toBe(true);
+    tick.stop();
+  });
+
   it('runs the due jobs in the order they were added, each on its own period', async () => {
     const c = clock();
     const ran = [];

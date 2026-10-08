@@ -26,6 +26,14 @@ describe('the table answers all four questions per kind', () => {
     expect(entryKind('chat-message')).toMatchObject({ lane: LANE.HUMAN, wakes: true });
   });
 
+  it('a person\'s turn with an assistant is chat-class content, not the record: its head is what the turn did', () => {
+    // A turn's words are plumbing to a store row (a list line, an appointment, a setting) — the chat class by its own
+    // definition. The record rule is for people's conversations with each other (`chat-message`).
+    expect(entryKind('assistant-turn')).toMatchObject({ lane: LANE.HUMAN, wakes: false, retain: RETAIN.CHAT, audit: false });
+    expect(bindingOf('assistant-turn')).toEqual({ signs: [SIGNS.LOCAL], subject: [SUBJECT.PERSON], accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE });
+    expect(retentionOf('chat-message')).toBe(RETAIN.RECORD);
+  });
+
   it('conversationKinds is DERIVED, so adding a human kind cannot forget the chat surface', () => {
     const derived = conversationKinds();
     expect(derived).toContain('chat-message');
@@ -61,7 +69,8 @@ describe('the table also answers WHO signs, WHAT it is about, HOW it is accepted
       const b = bindingOf(kind);
       if (!b.signs.includes(SIGNS.LOCAL)) continue;
       expect(b, kind).toMatchObject({ signs: [SIGNS.LOCAL], accepts: ACCEPTS.NONE, syncPolicy: SYNC.NONE });
-      expect(d.subject, kind).toBe(SUBJECT.NONE);
+      // about nothing in particular — or about the one person whose own record it is (never a device, never several)
+      expect([SUBJECT.NONE, SUBJECT.PERSON], kind).toContain(d.subject);
     }
     expect(bindingOf('task').accepts).toBe(ACCEPTS.NONE);   // the derived human line, not the signed statement
   });

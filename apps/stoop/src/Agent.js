@@ -497,7 +497,6 @@ export async function createNeighbourhoodAgent({
     localActor:    offeringMatchOpts.localActor,
     localStableId: id?.stableId ?? null,
     evictionRoster,                  // Phase 35 — drop broadcast-posts from evicted members
-    dataSource:    cache,            // Phase 39 — read/write attachment bytes from the cache
     // Wave B — route 1:1 peer DMs (reveal-request / contact-add / peer chat) through the SAME
     // host-injected hold-forward sender the circle chat fan-out uses, so a DM to a briefly-offline
     // peer is HELD + flushed on reconnect. Absent (standalone stoop / no secure-agent) → the bare

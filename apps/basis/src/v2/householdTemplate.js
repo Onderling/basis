@@ -170,21 +170,33 @@ export function loadListItems({ callSkill }) {
 
 /**
  * One add per thing: "melk en kaas" → melk, kaas; "stokbrood, melk en eieren" → three. Commas split first, then " en " /
- * " and " — except a part that is a known pair ("peper en zout"), which stays one entry.
+ * " and " — except a known pair ("peper en zout"), which is a PHRASE: kept whole wherever it stands in the line
+ * ("zout en peper chips", "chips met zout en peper" stay one; "kaas en zout en peper" → kaas, zout en peper). A pair
+ * matches as whole words only ("zoutjes" is not "zout").
  * @param {string} text
  * @param {readonly string[]} [compounds]
  * @returns {string[]}
  */
 export function splitEntryText(text, compounds = HOUSEHOLD_TEMPLATE.compoundEntries) {
   const whole = String(text ?? '').trim();
-  const known = new Set((compounds ?? []).map((c) => String(c).toLowerCase()));
-  if (!whole || known.has(whole.toLowerCase())) return whole ? [whole] : [];
+  if (!whole) return [];
+  const pairs = (compounds ?? []).map((c) => String(c).trim()).filter(Boolean)
+    .sort((a, b) => b.length - a.length);   // the longest phrase first, so one pair never cuts into another
+  const escape = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const parts = [];
   for (const piece of whole.split(/\s*,\s*/)) {
-    const p = piece.trim();
+    let p = piece.trim();
     if (!p) continue;
-    if (known.has(p.toLowerCase())) { parts.push(p); continue; }
-    parts.push(...p.split(/\s+(?:en|and)\s+/i).map((x) => x.trim()).filter(Boolean));
+    // shield each known pair as one token, split on "en"/"and", then put the pairs back
+    const kept = [];
+    for (const pair of pairs) {
+      p = p.replace(new RegExp(`(^|[^\\p{L}\\p{N}])(${escape(pair)})(?=[^\\p{L}\\p{N}]|$)`, 'giu'), (_, pre, hit) => {
+        kept.push(hit);
+        return `${pre}\u0000${kept.length - 1}\u0000`;
+      });
+    }
+    const restore = (x) => x.replace(/\u0000(\d+)\u0000/g, (_, i) => kept[Number(i)]);
+    parts.push(...p.split(/\s+(?:en|and)\s+/i).map((x) => restore(x.trim())).filter(Boolean));
   }
   return parts.length ? parts : [whole];
 }
@@ -206,7 +218,9 @@ export function expandAdds({ template = HOUSEHOLD_TEMPLATE, t = (k) => k } = {})
     return !l || !l.defaultChild;   // unknown, or plain entries
   };
   return (cmd) => {
-    if (cmd?.opId !== 'addToList' || typeof cmd.args?.text !== 'string') return [cmd];
+    // the add by its bare or its qualified id (`addToList` / `lists.addToList`): a caller that qualifies it is not let past
+    const isAdd = cmd?.opId === 'addToList' || (typeof cmd?.opId === 'string' && cmd.opId.endsWith('.addToList'));
+    if (!isAdd || typeof cmd.args?.text !== 'string') return [cmd];
     if (!holdsThings(cmd.args.list)) return [cmd];
     const parts = splitEntryText(cmd.args.text, template.compoundEntries);
     return parts.length > 1 ? parts.map((text) => ({ ...cmd, args: { ...cmd.args, text } })) : [cmd];

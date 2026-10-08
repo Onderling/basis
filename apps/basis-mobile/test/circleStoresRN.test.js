@@ -5,7 +5,9 @@
 // IO adapters read back what they wrote AND that the on-disk keys match
 // the web convention (so a future pod-sync sees one shape on both
 // surfaces).  A Map-backed mock stands in for AsyncStorage.
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
 import {
   asyncKeyedIo, asyncFixedIo,
   makeCirclePolicyStoreRN, makeMemberOverrideStoreRN, makeAvailabilityStoreRN,
@@ -24,7 +26,9 @@ function mockAsyncStorage() {
 
 describe('M3 circleStoresRN', () => {
   let storage;
-  beforeEach(() => { storage = mockAsyncStorage(); });
+  // the app saves a policy only after boot, when the content key exists (the policy is sealed at rest)
+  beforeEach(() => { storage = mockAsyncStorage(); setShellContentSeal(groupKeyStrategy({ groupKey: 'A'.repeat(43) })); });
+  afterEach(() => setShellContentSeal(null));
 
   it('policy store round-trips an edit under cc.circlePolicy.<id>', async () => {
     const store = makeCirclePolicyStoreRN(storage);

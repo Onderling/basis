@@ -13,7 +13,10 @@
 //
 // The real `createPodWriter` + `discoverPodRoot` are injected as fakes,
 // so this test never touches the network.
-import { describe, it, expect, beforeEach } from 'vitest';
+import { groupKeyStrategy } from '@onderling/pod-client';
+import { setShellContentSeal } from '../../basis/src/v2/localStoreSeal.js';
+const SEAL = groupKeyStrategy({ groupKey: 'A'.repeat(43) });
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   buildCirclePodWriter, makeCirclePolicyStoreRN,
 } from '../src/core/circleStoresRN.js';
@@ -118,7 +121,9 @@ describe('5.4c buildCirclePodWriter', () => {
 
 describe('5.4c makeCirclePolicyStoreRN with getPodWriter thunk', () => {
   let storage;
-  beforeEach(() => { storage = mockAsyncStorage(); });
+  // the app saves a policy only after boot, when the content key exists (the policy is sealed at rest)
+  beforeEach(() => { storage = mockAsyncStorage(); setShellContentSeal(SEAL); });
+  afterEach(() => setShellContentSeal(null));
 
   it('mirrors a pod-shared save to BOTH AsyncStorage AND the pod writer', async () => {
     const writer = fakePodWriter();
@@ -128,7 +133,8 @@ describe('5.4c makeCirclePolicyStoreRN with getPodWriter thunk', () => {
 
     // Local (canonical) write landed under the cc.circlePolicy.<id> key.
     expect([...storage.map.keys()]).toContain('cc.circlePolicy.circle-1');
-    const localValue = JSON.parse(storage.map.get('cc.circlePolicy.circle-1'));
+    // sealed at rest: opened with the device's content key
+    const localValue = JSON.parse(SEAL.open(storage.map.get('cc.circlePolicy.circle-1')));
     expect(localValue.pod).toBe('shared');
     expect(localValue.llmTool).toBe('local');
 

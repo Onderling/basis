@@ -34,9 +34,11 @@ describe('the bot\'s slim map', () => {
     // the screen ops are on the observer's column (a read screen) but slash only: never a tool the model holds
     // and the planned overview is the host runner's: no surface at all, never a tool
     const RUNNER_ONLY = ['sendWeekOverview'];
-    const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp'];
+    // …and emptying one's own thread (`/vergeet`) is typed, never a tool: the model is not handed a delete
+    const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-forget'];
     expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].filter((op) => !SLASH_ONLY.includes(op) && !RUNNER_ONLY.includes(op)).sort());
-    expect(BOT_OP_MAP.member.filter((op) => !RUNNER_ONLY.includes(op))).toEqual(MEMBER);
+    expect(BOT_OP_MAP.member.filter((op) => !RUNNER_ONLY.includes(op) && !SLASH_ONLY.includes(op))).toEqual(MEMBER);
+    expect(BOT_OP_MAP.member, 'a member may empty their own thread').toContain('assistant-forget');
     expect(BOT_OP_MAP.member, 'the runner may send a member their overview').toContain('sendWeekOverview');
   });
 

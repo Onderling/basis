@@ -102,6 +102,7 @@ export const WELCOME_LEAVES = Object.freeze({
   rsvpTentative: "a reply to an appointment, offered on the appointment itself",
   cancelEvent: "part of the agenda; /help has it",
   "assistant-memory": "a personal setting: /instellingen lists it",
+  "assistant-forget": "an act on one's own thread, not a setting: /help lists it",
   "assistant-language": "a personal setting: /instellingen lists it",
   "assistant-menu": "the settings menu itself, named in the reminders line",
   "assistant-view": "a personal setting: /instellingen lists it",

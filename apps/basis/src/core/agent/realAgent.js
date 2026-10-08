@@ -4076,6 +4076,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * owner's own skills are `private`: self only, whatever tier anyone holds); any other op a door reaches is an
    * ordinary one (`authenticated`: an admitted member). A stranger (no record) is `public`. Fails closed: no gate,
    * no door call.
+   * @param {string} opId  the op the call reaches, qualified with its app (`tasks.listOpen`); a bare id counts only
+   *   when one app declares it (two: ambiguous, refused)
    * @returns {Promise<string|null>} the refusal's code, or null when the caller may go on
    */
   // The door's checks at the waist — tier · the door's map · the role — declared once (`botRungs.js`), asked in order,
@@ -4336,7 +4338,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
-      const refusal = await doorRefusal(opId, ctx.caller);
+      // the op the call reaches — its app and its op: household's `listOpen` is not the chores', whatever a menu shows
+      const refusal = await doorRefusal(`${appOrigin}.${opId}`, ctx.caller);
       if (refusal) return { ok: false, error: refusalText(refusal, typeof opts.t === 'function' ? opts.t : null), refusal };
       // ...and runs in the door's circle: a circle named in the args (a typed `--circleId=`, a model's pick, a
       // screen's data) is not followed — the person's role and the token do not look at the circle, so it is pinned

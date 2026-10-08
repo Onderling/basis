@@ -36,10 +36,11 @@ describe('the bot\'s slim map', () => {
     const RUNNER_ONLY = ['sendWeekOverview'];
     // …and emptying one's own thread (`/vergeet`) is typed, never a tool: the model is not handed a delete
     const SLASH_ONLY = ['assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-forget'];
-    expect(tools('observer')).toEqual([...BOT_OP_MAP.observer].filter((op) => !SLASH_ONLY.includes(op) && !RUNNER_ONLY.includes(op)).sort());
-    expect(BOT_OP_MAP.member.filter((op) => !RUNNER_ONLY.includes(op) && !SLASH_ONLY.includes(op))).toEqual(MEMBER);
-    expect(BOT_OP_MAP.member, 'a member may empty their own thread').toContain('assistant-forget');
-    expect(BOT_OP_MAP.member, 'the runner may send a member their overview').toContain('sendWeekOverview');
+    const bare = (ids) => ids.map((q) => q.slice(q.indexOf('.') + 1));
+    expect(tools('observer')).toEqual(bare(BOT_OP_MAP.observer).filter((op) => !SLASH_ONLY.includes(op) && !RUNNER_ONLY.includes(op)).sort());
+    expect(bare(BOT_OP_MAP.member).filter((op) => !RUNNER_ONLY.includes(op) && !SLASH_ONLY.includes(op))).toEqual(MEMBER);
+    expect(BOT_OP_MAP.member, 'a member may empty their own thread').toContain('assistant.assistant-forget');
+    expect(BOT_OP_MAP.member, 'the runner may send a member their overview').toContain('assistant.sendWeekOverview');
   });
 
   it('a member\'s command menu (their /help) holds no admin command; the admin\'s does', () => {
@@ -95,7 +96,7 @@ describe('the bot\'s slim map', () => {
 
   it('a member\'s model is told which tools are the admin\'s, so "maak een lijst" gets "the admin does that"', () => {
     const [line] = roleHintsFor('member');
-    for (const op of BOT_OP_MAP.admin) expect(line).toContain(op);
+    for (const q of BOT_OP_MAP.admin) expect(line).toContain(q.slice(q.indexOf('.') + 1));
     expect(roleHintsFor('admin')).toEqual([]);
     // a coordinator or an observer is not the admin: told which tools are the admin's too
     expect(roleHintsFor('coordinator').length).toBe(1);

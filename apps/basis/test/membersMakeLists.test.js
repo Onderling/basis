@@ -8,8 +8,8 @@ import { botOpLevel, botRoleAllows, BOT_OP_MAP } from '../src/v2/botOpMap.js';
 describe('making a list', () => {
   it('a member\'s op; an observer still only reads', () => {
     expect(botOpLevel('createList')).toBe('authenticated');
-    expect(BOT_OP_MAP.member).toContain('createList');
-    expect(BOT_OP_MAP.admin).not.toContain('createList');
+    expect(BOT_OP_MAP.member).toContain('lists.createList');
+    expect(BOT_OP_MAP.admin).not.toContain('lists.createList');
     expect(botRoleAllows('member', 'createList')).toBe(true);
     expect(botRoleAllows('observer', 'createList')).toBe(false);
   });

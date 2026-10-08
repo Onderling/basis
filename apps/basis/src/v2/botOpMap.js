@@ -8,15 +8,73 @@
  * "ik doe de lamp" is claimTask on a Klusjes child; "wat moet ik nog doen" is listMine.
  *
  * The map is the ONE declaration three things read: the box's catalogue (nothing else is composed), each thread's
- * tools (a member's column, or member + admin), and the host gate (an op's level; an op off the map is refused).
+ * tools (a member's column, or member + admin), and the host gate (an op's level; an op off the map is refused). It names
+ * each op with its app (`tasks.listOpen`), and the gate decides on the op a call reaches: a menu leaving household's
+ * `listOpen` out is a convention a different client walks past; the map is where it binds.
  * The tasks app's other ops (circles, availability, schedules, inboxes, subtask proposals) and household's item and
  * chore ops never reach the bot — the circle management is the basis door's, and household is a template now.
  */
 
-/** Per role, the ops a thread offers. The admin's column is ADDED to the member's. */
 import { STANDARD_ROLE_TABLE } from '@onderling-app/tasks';
-export const BOT_OP_MAP = Object.freeze({
-  member: Object.freeze([
+import { allManifests, DOOR_MANIFESTS } from './manifestSources.js';
+import { HOUSEHOLD_TEMPLATE } from './householdTemplate.js';
+
+/**
+ * The apps a household bot offers ops of: its template's plugins and the door's own. Household itself is the template,
+ * not one of them.
+ */
+export const BOT_APPS = Object.freeze([...HOUSEHOLD_TEMPLATE.apps, ...DOOR_MANIFESTS.map((m) => m.app)]);
+
+/** Which apps declare each op id, over every manifest the app runs. */
+const DECLARERS = (() => {
+  const by = new Map();
+  for (const m of allManifests()) {
+    for (const op of m.operations ?? []) {
+      const apps = by.get(op.id) ?? [];
+      if (!apps.includes(m.app)) apps.push(m.app);
+      by.set(op.id, apps);
+    }
+  }
+  return by;
+})();
+
+/**
+ * The op a door call names, qualified with its app (`app.op`, the codebase's qualified form): the gate decides on this,
+ * never on the bare id — household's `listOpen` and the chores' are two ops.
+ *   · `tasks.listOpen` is itself; a collision-prefixed op (`tasks.tasks/listOpen`, `tasks/listOpen`) is its app's op
+ *     when the prefix names that app;
+ *   · a bare id is the op of the ONE app that declares it — or null when two apps do (ambiguous: refused, never
+ *     resolved to one of them) or none does.
+ * @param {string} opId
+ * @returns {string|null}
+ */
+export function qualifyOp(opId) {
+  const s = String(opId ?? '');
+  const dot = s.indexOf('.');
+  if (dot > 0) {
+    const app = s.slice(0, dot);
+    const op = s.slice(dot + 1);
+    const m = /^([a-z-]+)\/(.+)$/.exec(op);
+    if (!m) return s;
+    return m[1] === app ? `${app}.${m[2]}` : null;
+  }
+  const m = /^([a-z-]+)\/(.+)$/.exec(s);
+  if (m) return `${m[1]}.${m[2]}`;
+  const apps = DECLARERS.get(s) ?? [];
+  return apps.length === 1 ? `${apps[0]}.${s}` : null;
+}
+
+/** An op's own id, without its app (what the model's tools and the menus call it). */
+const bareOf = (qualified) => String(qualified ?? '').slice(String(qualified ?? '').indexOf('.') + 1);
+
+/**
+ * Per role, the ops a thread offers, by each op's own id. The admin's column is ADDED to the member's. Each id is
+ * qualified with the ONE bot app that declares it (`BOT_OP_MAP`), read from the manifests — never typed beside them, so
+ * an op that moves app moves here too, and an id two bot apps declare is left off (`BOT_OP_MAP_UNRESOLVED`, kept empty
+ * by `doorGateQualifiedOps.test.js`).
+ */
+const COLUMNS = {
+  member: [
     // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
     'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
     // the reminders everyone gets for an entry: whoever may edit it may set them
@@ -33,11 +91,25 @@ export const BOT_OP_MAP = Object.freeze({
     'assistant-people',
     // what the bot will send them this week (their own; an admin also the household's rules)
     'assistant-planned',
-  ]),
-  admin: Object.freeze(['reassignTask', 'removeTask', 'editTask']),
+  ],
+  admin: ['reassignTask', 'removeTask', 'editTask'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: Object.freeze(['listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned']),
-});
+  observer: ['listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
+};
+
+/** The bot app that declares this op id, when exactly one does. */
+const botAppOf = (id) => {
+  const apps = (DECLARERS.get(id) ?? []).filter((a) => BOT_APPS.includes(a));
+  return apps.length === 1 ? apps[0] : null;
+};
+
+/** Per role, the ops a thread offers, qualified (`lists.addToList`, `tasks.listOpen`, `assistant.assistant-memory`). */
+export const BOT_OP_MAP = Object.freeze(Object.fromEntries(Object.entries(COLUMNS).map(([role, ids]) => [
+  role, Object.freeze(ids.filter(botAppOf).map((id) => `${botAppOf(id)}.${id}`)),
+])));
+
+/** Column entries no single bot app declares — off the map (fail closed); a test keeps this empty. */
+export const BOT_OP_MAP_UNRESOLVED = Object.freeze(Object.values(COLUMNS).flat().filter((id) => !botAppOf(id)));
 
 const MEMBER = new Set(BOT_OP_MAP.member);
 const ADMIN = new Set(BOT_OP_MAP.admin);
@@ -50,20 +122,21 @@ const COORDINATOR_EXTRA = new Set([
   ...(STANDARD_ROLE_TABLE.coordinator?.reassign ? ['reassignTask'] : []),
   ...(STANDARD_ROLE_TABLE.coordinator?.editBody === 'any' ? ['editTask'] : []),
   ...(STANDARD_ROLE_TABLE.coordinator?.remove ? ['removeTask'] : []),
-]);
+].filter(botAppOf).map((id) => `${botAppOf(id)}.${id}`));
 
 /**
- * An op's level on the bot's door: `authenticated` (a member's), `trusted` (the admin's), or null — not on the map,
- * refused. The door's own admin ops declare their level themselves (`visibility` on the assistant manifest).
- * @param {string} opId
+ * An op's level on the bot's door: `authenticated` (a member's), `by-role` (the admin's data column), or null — not on
+ * the map, refused. The door's own admin ops declare their level themselves (`visibility` on the assistant manifest).
+ * @param {string} opId  qualified (`tasks.listOpen`); a bare id counts only when one app declares it
  * @returns {'authenticated'|'by-role'|null}  `by-role`: any admitted person passes the tier, the role decides
  */
 export function botOpLevel(opId) {
-  const id = String(opId ?? '').replace(/^[a-z-]+\//, '');   // a collision-prefixed id (`tasks/listOpen`) is its op
-  if (MEMBER.has(id)) return 'authenticated';
+  const q = qualifyOp(opId);
+  if (!q) return null;
+  if (MEMBER.has(q)) return 'authenticated';
   // the admin's data column: its ROLE decides (`botRoleAllows`, under the bot's roles preset); without a role rule the
   // door holds it to the admin (fail closed)
-  if (ADMIN.has(id)) return 'by-role';
+  if (ADMIN.has(q)) return 'by-role';
   return null;
 }
 
@@ -73,16 +146,17 @@ const OBSERVER = new Set(BOT_OP_MAP.observer);
  * Does this role reach this op, beyond its tier? Only an observer is narrowed (to the reads); the host gate asks it at
  * the waist, so an observer is refused an add however it is asked for — not only never shown the tool.
  * @param {string|null} role
- * @param {string} opId
+ * @param {string} opId  qualified (`tasks.reassignTask`); a bare id two apps declare reaches no one
  * @param {'standard'|'flat'} [preset]  the bot's `assistant.roles`
  */
 export function botRoleAllows(role, opId, preset = 'standard') {
-  const id = String(opId ?? '').replace(/^[a-z-]+\//, '');
-  if (role === 'observer') return OBSERVER.has(id);
-  if (!ADMIN.has(id) || role == null || role === 'admin') return true;
+  const q = qualifyOp(opId);
+  if (!q) return false;
+  if (role === 'observer') return OBSERVER.has(q);
+  if (!ADMIN.has(q) || role == null || role === 'admin') return true;
   // the admin's data column: everyone's but an observer's under `flat`; a coordinator's own share under `standard`
   if (preset === 'flat' && (role === 'member' || role === 'coordinator')) return true;
-  return role === 'coordinator' && COORDINATOR_EXTRA.has(id);
+  return role === 'coordinator' && COORDINATOR_EXTRA.has(q);
 }
 
 /** Is this catalogue entry on the map at all (any role)? */
@@ -106,19 +180,19 @@ const NOT_ON_A_BOT = new Set(['assistant-apps']);
  */
 export function botOffers(appOrigin, op, role, preset = 'standard') {
   const id = op?.id;
+  const q = `${appOrigin}.${id}`;
   // the door's own ops gate themselves at their declared level; an observer is narrowed to its column there too, and
   // the admin's own (`trusted`) are not offered to anyone else — their /help does not list what they cannot do
   if (appOrigin === 'assistant') {
     if (NOT_ON_A_BOT.has(id)) return false;
-    if (role === 'observer') return botRoleAllows(role, id);
+    if (role === 'observer') return botRoleAllows(role, q);
     return op?.visibility !== 'trusted' || role == null || role === 'admin';
   }
-  // household is the bot's TEMPLATE now, not an app it offers: none of its own ops (its item types, its chore copy) is on
-  // the map — `listOpen` there is the chores' read (tasks), never household's of the same name
-  if (appOrigin === 'household') return false;
-  if (!botOpLevel(id)) return false;
+  // the map names each op with its app, so household's ops (the bot's template, not an app it offers) are off it by
+  // construction: `household.listOpen` is not the chores' `tasks.listOpen`
+  if (!botOpLevel(q)) return false;
   // one rule for what a role reaches — the same the host gate asks
-  return botRoleAllows(role, id, preset);
+  return botRoleAllows(role, q, preset);
 }
 
 export function scopeCatalogueToRole(catalogue, role, preset = 'standard') {
@@ -170,7 +244,7 @@ function narrowMenu(menu, opsById) {
  */
 export function roleHintsFor(role, t = null, preset = 'standard') {
   if (role == null || role === 'admin') return [];
-  const notMine = BOT_OP_MAP.admin.filter((id) => !botRoleAllows(role, id, preset));
+  const notMine = BOT_OP_MAP.admin.filter((q) => !botRoleAllows(role, q, preset)).map(bareOf);
   if (!notMine.length) return [];
   // With the door's translator the model is handed the refusal itself, so the words are the locale's, not its own.
   const say = typeof t === 'function'

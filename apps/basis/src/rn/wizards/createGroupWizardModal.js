@@ -19,7 +19,7 @@ import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
   KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
   initialState, isValidSlug, labelOf,
-  buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
+  buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl, withinMs, POLICY_WRITE_BOUND_MS,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
   CIRCLE_KINDS, setKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
@@ -86,13 +86,8 @@ export default function CreateGroupWizardModal({
     setState(next);
     const { result, state: after } = await finalSubmit({ state: next, callSkill, shareRelease: shareFounderRelease });
     setState({ ...after, successResult: result ?? null });
-    // N1+E8 — persist the chosen policy (features incl. neighbourhood chat-off,
-    // reveal/pod/llm/agents/consensus) so the new circle opens with the
-    // right surfaces.  Best-effort; creation already succeeded.
-    if (result && typeof persistPolicy === 'function') {
-      try { await persistPolicy(result.groupId, policyPatchFromState(after)); }
-      catch { /* policy write is best-effort */ }
-    }
+    // The invite goes out FIRST — the circle exists, and sharing it is the next thing the founder does. Everything
+    // after it is bookkeeping the wizard must not wait on unbounded (walk 2026-10-09: ~3 min of "Creating circle…").
     if (result && typeof onDispatched === 'function') {
       // 2026-05-27 (Bundle I).  Surface the invite URL + a scannable QR
       // so the admin can share the circle right away — the web wizard's
@@ -131,6 +126,14 @@ export default function CreateGroupWizardModal({
           ...enriched,
         });
       } catch {}
+    }
+    // N1+E8 — persist the chosen policy (features incl. neighbourhood chat-off,
+    // reveal/pod/llm/agents/consensus) so the new circle opens with the
+    // right surfaces.  Best-effort; creation already succeeded. Bounded: it is a
+    // local write, and a stuck one must not hold the wizard open.
+    if (result && typeof persistPolicy === 'function') {
+      try { await withinMs(persistPolicy(result.groupId, policyPatchFromState(after)), POLICY_WRITE_BOUND_MS); }
+      catch (err) { console.warn(`[create] the circle's policy was not written: ${err?.message ?? err}`); }
     }
     if (result) onClose?.();
   }, [state, callSkill, onDispatched, onClose, persistPolicy, shareFounderRelease]);

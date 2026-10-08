@@ -9,6 +9,7 @@
  */
 import { CIRCLE_STORAGE_POSTURE_NAMES, DEFAULT_CIRCLE_STORAGE_POSTURE } from '@onderling/pod-routing';
 import { deriveCircleId } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 
 // 5.5a — Step 3 captures the structured v2 rules doc instead of a
@@ -33,6 +34,12 @@ export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 import { loadPersonas } from './joinGroupState.js';
 import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
 export { loadPersonas };
+
+// How long the founder's release may take after the create has answered — it runs after the wizard, never in it.
+// Parameter register (#36), device-scoped, internal.
+const RELEASE_TIMEOUT_MS = param({ key: 'createWizard.releaseTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
+// The circle's policy is a LOCAL write after the create; bounded so a stuck store cannot hold the wizard open.
+export const POLICY_WRITE_BOUND_MS = param({ key: 'createWizard.policyWriteBoundMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
 
 /* ─── Policy catalogues ───────────────────────────────────────── */
 
@@ -486,8 +493,13 @@ export function encodeInviteUri(payload) {
  * On success: caller can post-process the result (the original web
  * wizard adds adminPeerAddr + rules into the result before stashing as
  * successResult; mobile may do the same in its own wrapper).
+ *
+ * It returns on the CREATE's answer. The founder's release runs after, bounded by `releaseTimeoutMs`, and its
+ * outcome is `released` (a Promise<boolean>, also written to `result.releaseShared` when it settles) — never part
+ * of the wizard's wait: a release to an unreachable agent once held "Creating circle…" for minutes over a circle
+ * that already existed (walk, 2026-10-09).
  */
-export async function finalSubmit({ state, callSkill, shareRelease = null }) {
+export async function finalSubmit({ state, callSkill, shareRelease = null, releaseTimeoutMs = RELEASE_TIMEOUT_MS }) {
   state.submitting  = true;
   state.submitError = null;
   try {
@@ -509,14 +521,27 @@ export async function finalSubmit({ state, callSkill, shareRelease = null }) {
     // the next Mij share carries it. No seam (the programmatic creates: the help circle, the pair circles) or
     // "start minimally" means nothing is released, exactly as before this step existed.
     result.releaseShared = false;
+    let released = Promise.resolve(false);
     if (typeof shareRelease === 'function' && typeof state.persona === 'string' && state.persona) {
-      try { await shareRelease(result.groupId, state.persona); result.releaseShared = true; }
-      catch { result.releaseShared = false; }
+      const persona = state.persona;
+      released = withinMs(Promise.resolve().then(() => shareRelease(result.groupId, persona)), releaseTimeoutMs)
+        .then(() => { result.releaseShared = true; return true; })
+        .catch((err) => {
+          if (typeof console !== 'undefined') console.warn(`[create] the founder's release did not land (the next Mij share carries it): ${err?.message ?? err}`);
+          return false;
+        });
     }
-    return { result, state };
+    return { result, state, released };
   } catch (err) {
     state.submitError = err?.message ?? String(err);
     state.submitting  = false;
-    return { state };
+    return { state, released: Promise.resolve(false) };
   }
+}
+
+/** Settle `p`, or reject once `ms` have passed — whichever comes first. The wizards' bound on post-create work. */
+export function withinMs(p, ms) {
+  let timer = null;
+  const bound = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`no answer within ${ms} ms`)), ms); });
+  return Promise.race([p, bound]).finally(() => clearTimeout(timer));
 }

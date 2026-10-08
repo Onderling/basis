@@ -31,7 +31,8 @@ describe('the create wizard founds a circle AS a persona', () => {
 
   it('pushes the chosen persona\'s release onto the new circle, after the create succeeded', async () => {
     const shareRelease = vi.fn(async () => ({ ok: true }));
-    const { result } = await finalSubmit({ state: ready('buurt'), callSkill: okCall, shareRelease });
+    const { result, released } = await finalSubmit({ state: ready('buurt'), callSkill: okCall, shareRelease });
+    expect(await released).toBe(true);
     expect(shareRelease).toHaveBeenCalledWith('c-1', 'buurt');
     expect(result.releaseShared).toBe(true);
   });
@@ -45,8 +46,9 @@ describe('the create wizard founds a circle AS a persona', () => {
 
   it('a release that fails does not undo the circle — it is said, and the next Mij share retries', async () => {
     const shareRelease = vi.fn(async () => { throw new Error('offline'); });
-    const { result, state } = await finalSubmit({ state: ready('default'), callSkill: okCall, shareRelease });
+    const { result, state, released } = await finalSubmit({ state: ready('default'), callSkill: okCall, shareRelease });
     expect(result.groupId).toBe('c-1');
+    expect(await released).toBe(false);
     expect(result.releaseShared).toBe(false);
     expect(state.submitError).toBeNull();
   });
@@ -83,3 +85,21 @@ describe('withPersonas — the picker\'s list, and a choice that must name one o
     expect(withPersonas({ ...initialState(), persona: 'gone' }, personas).persona).toBe('default');
   });
 });
+
+/**
+ * The wizard ends on the CREATE's answer (walk 2026-10-09: "Creating circle…" sat ~3 min with every button off — the
+ * circle existed after 0.2 s, and the founder's release to an unreachable agent ran inside the wizard's wait, 30 s per
+ * timeout). The release runs after, bounded; its outcome is `released`, never the wizard's wait.
+ */
+describe('the release never holds the wizard', () => {
+  it('a release that never answers: finalSubmit returns at once, `released` settles false at its bound', async () => {
+    const shareRelease = vi.fn(() => new Promise(() => {}));   // a dead agent
+    const t0 = Date.now();
+    const { result, released } = await finalSubmit({ state: ready('default'), callSkill: okCall, shareRelease, releaseTimeoutMs: 50 });
+    expect(Date.now() - t0).toBeLessThan(40);
+    expect(result.groupId).toBe('c-1');
+    expect(await released).toBe(false);
+    expect(result.releaseShared).toBe(false);
+  });
+});
+

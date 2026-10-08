@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { circleReplyText } from '../../src/v2/circleReply.js';
+import { runDispatch } from '../../src/dispatch.js';
 
 const t = (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k);
 
@@ -34,5 +35,25 @@ describe('circleReplyText', () => {
     // list·note → the items live under result.items; bodies are enumerated
     const list = { payload: { ok: true, via: 'generic', atom: 'list', result: { items: [{ type: 'note', body: 'stamps' }, { type: 'note', body: 'milk' }] } } };
     expect(circleReplyText(list, { verb: 'list', t })).toBe('• stamps\n• milk');
+  });
+});
+
+describe('circleReplyText — the household families read as on the bot', () => {
+  // the reply as the waist hands it to the web and mobile circle composer (`runDispatch`), with the op that ran
+  const ran = (opId, payload) => runDispatch({ kind: 'ready', opId, appOrigin: 'lists', args: {} }, async () => payload);
+
+  it('an add to a list names the list and the thing — not "Klaar."', async () => {
+    const reply = await ran('addToList', { ok: true, itemId: 'i1', kind: 'list-item', entry: 'melk', list: 'Boodschappen', message: 'x' });
+    expect(circleReplyText(reply, { verb: 'add', t })).toBe('circle.lists.added:{"text":"melk","name":"Boodschappen"}');
+  });
+
+  it('a claimed chore says it is taken, with its day — not "✓ label"', async () => {
+    const reply = await ran('claimTask', { ok: true, message: 'x', itemId: 'c1', task: { id: 'c1', text: 'lamp vervangen', assignees: ['me'] } });
+    expect(circleReplyText(reply, { verb: 'claim', t })).toBe('circle.reply.chore_claimed:{"title":"lamp vervangen","when":""}');
+  });
+
+  it('an op the bot does not reach keeps the bubble it had', async () => {
+    const reply = await ran('someOtherOp', { title: 'X' });
+    expect(circleReplyText(reply, { verb: 'claim', t })).toBe('circle.bot.ok:{"label":"X"}');
   });
 });

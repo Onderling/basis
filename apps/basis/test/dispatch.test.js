@@ -28,6 +28,8 @@ describe('runDispatch — happy path', () => {
       payload:  { ok: true, itemId: 'chore-42' },
       shape:    'text',
       threadId: 't-1',
+      // the op that answered: a painter words the answer by it (`replyLine`)
+      opId:     'markComplete',
     });
     expect(reply.error).toBeUndefined();
   });

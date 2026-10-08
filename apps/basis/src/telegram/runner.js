@@ -27,6 +27,7 @@ import { renderReply }     from '../renderer.js';
 import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
 import { householdListType, coerceListArgs } from '../v2/circleGate.js';
+import { replyFact, replyLines } from '../v2/replyLine.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -84,10 +85,19 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return lang ? (k, p) => t(k, p, lang) : t;
   };
   const note = (chatId, patch) => { const t0 = turns.get(chatId); if (t0) Object.assign(t0, patch); };
-  const say = (chatId, text, buttons) => {
+  const speak = (chatId, text, buttons) => {
     const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });
     return bridge.sendReply({ chatId, text, ...(buttons?.length ? { buttons } : {}) });
   };
+  // A turn's op lines that fold (three adds to one list, two ticks) wait for the turn to end, and are said as one line;
+  // anything else the turn says goes after them, so the order stays the turn's.
+  const say = async (chatId, text, buttons) => { await sayLines(chatId); return speak(chatId, text, buttons); };
+  async function sayLines(chatId) {
+    const t0 = turns.get(chatId);
+    if (!t0?.lines?.length) return;
+    const facts = t0.lines.splice(0);
+    for (const line of replyLines(facts, { t: tc(chatId) })) await speak(chatId, line);
+  }
 
   /** Paint a RenderedReply as bridge messages. */
   /**
@@ -159,7 +169,12 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
     // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
     if (tryRule && (reply?.error?.reason === 'not-found' || (reply?.ok === false && reply?.code === 'not-found'))) { note(chatId, { fellBack: ready.opId }); return { notFound: true }; }
-    await paint(chatId, renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() }));
+    const rendered = renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() });
+    // An op of the families a person reads one line for (`replyLine`): that line, the same for the gate's pick and the
+    // model's. A line that folds waits for the rest of its turn.
+    const fact = !reply?.error && rendered.kind === 'text' ? replyFact(reply?.payload, { opId: ready.opId, args: ready.args }) : null;
+    if (fact?.fold && turns.has(chatId)) { (turns.get(chatId).lines ??= []).push(fact); return; }
+    await paint(chatId, fact ? { ...rendered, text: replyLines([fact], { t: tc(chatId) })[0] ?? rendered.text } : rendered);
   }
 
   /** `/help` (and the `help` op): the commands this bot answers to, with their hints — from the catalogue as scoped to
@@ -341,6 +356,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       note(chatId, { error: err?.message ?? String(err) });
       await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) }));
     } finally {
+      // the turn's folded lines, said before the turn is remembered
+      try { await sayLines(chatId); } catch { /* a reply that cannot be sent is the bridge's to report */ }
       const rec = turns.get(chatId); turns.delete(chatId);
       if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', text);
       // An op's result is the SYSTEM speaking; only a model reply is the assistant's own words.

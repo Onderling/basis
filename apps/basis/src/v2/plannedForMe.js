@@ -7,6 +7,7 @@
  * In time order, each line saying where it comes from. One circle that does not answer empties nothing. It reads; it
  * stores nothing and asks no one. Reminders are not here: who reminds (a bot, a companion) is theirs to say.
  */
+import { whenWords } from './whenWords.js';
 import { acrossCircles } from './acrossCircles.js';
 import { ITEM_MANIFESTS } from './userScreenBlocks.js';
 
@@ -66,12 +67,9 @@ export async function plannedForMe({ callSkill, me, horizonDays = 7, now = Date.
  */
 export function plannedLines(items, { t, tz, lang = 'nl' }) {
   const locale = lang === 'en' ? 'en-GB' : 'nl-NL';
-  const tzOpt = tz ? { timeZone: tz } : {};
-  const hhmm = (when) => new Intl.DateTimeFormat('en-GB', { ...tzOpt, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(when));
-  const day = (when) => new Intl.DateTimeFormat(locale, { ...tzOpt, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(when));
   return (items ?? []).map((i) => {
-    const timed = i.kind === 'event' || hhmm(i.when) !== '00:00';
-    const when = timed ? `${day(i.when)} ${hhmm(i.when)}` : day(i.when);
+    // an appointment always with its time; a chore with its time when it has one
+    const when = whenWords(i.when, { locale, tz, dayOnly: i.kind === 'event' ? false : 'auto' });
     const line = t(i.kind === 'chore' ? 'circle.profile.planned_chore' : 'circle.profile.planned_event', { when, title: i.title });
     return i.circleName ? `${line}${t('circle.profile.planned_where', { circle: i.circleName })}` : line;
   });

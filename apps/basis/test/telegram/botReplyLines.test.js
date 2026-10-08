@@ -45,6 +45,8 @@ describe('the household bot says one line per op family', () => {
       ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
     });
     await ensureHouseholdLists({ callSkill: (a, o, x) => agent.callSkill(a, o, x), t });
+    // one of the household's people, whom a chore can be given to by name
+    await agent.callSkill('stoop', 'addContact', { webid: 'telegram:77', channel: 'telegram', role: 'member', displayName: 'Bob' });
     const catalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps() });
     const doorCall = withAssistantOps({
       callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), t, refusal: agent.doorRefusal, threads: { langOf: () => null },
@@ -104,6 +106,16 @@ describe('the household bot says one line per op family', () => {
 
   it('a line taken off a list names the list and the thing', async () => {
     expect(await say('haal eieren van de lijst')).toEqual(['Van Boodschappen gehaald: eieren.']);
+  });
+
+  it('a slash flag\'s value is every word up to the next flag: /list-edit --text oude kaas is "oude kaas"', async () => {
+    await say('zet jonge kaas op de boodschappen');
+    await say('/list-edit --item jonge kaas --text oude kaas');
+    const read = await agent.callSkill('lists', 'listEntries', { list: 'Boodschappen' });
+    const words = (read?.items ?? read?.entries ?? []).map((e) => e?.text ?? e?.label);
+    expect(words, JSON.stringify(read).slice(0, 400)).toContain('oude kaas');
+    expect(words).not.toContain('oude');
+    expect(words).not.toContain('jonge kaas');
   });
 
   it('chores: who holds it and its day, in one line — never "✓ Opgepakt: …"', async () => {

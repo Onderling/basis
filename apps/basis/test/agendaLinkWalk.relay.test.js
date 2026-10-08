@@ -2,23 +2,23 @@
  * A PERSON'S AGENDA AS A LINK, walked on real processes: the household's box (the runner, against a Bot API of our own)
  * and the household's companion (its own boot, as the tablet will run it: no port of its own), over one relay that
  * serves the links by forwarding them to the companion. The box holds the companion as a CONTACT — its card, which
- * says where its links are served (seeded here; its owner's app hands it over with the grant). Then: the switch is off
- * → no link; on → `/agenda-link` sends a link privately, AT THE RELAY, naming the companion; fetching it gives the
- * agenda with the appointment; a new appointment re-renders it; asking again turns the old link dark; `/revoke` turns
- * a person's link dark; and before any of it, the relay's route answers 404.
- *
- * RED on its own until the bot holds the companion's GRANT: the companion's `feed.put` takes its owner's devices (or,
- * with the grant, the bot's token) — the bot holds neither yet, so the first `/agenda-link` cannot put the file.
+ * says where its links are served (seeded here). The companion's OWNER (a person's real agent) claims it with the line
+ * it prints and, from their app, GRANTS the box its agenda files: the companion mints one token per op to the box's key
+ * and sends them over the relay; the box keeps them and presents one on every put. Then: the switch is off → no link;
+ * on → `/agenda-link` sends a link privately, AT THE RELAY, naming the companion; fetching it gives the agenda with the
+ * appointment; a new appointment re-renders it; asking again turns the old link dark; `/revoke` turns a person's link
+ * dark; and before any of it, the relay's route answers 404.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fakeBotApi } from './support/fakeBotApi.js';
 import { startJourneyRelay } from './support/testRelay.js';
-import { until } from './support/pairRealAgents.js';
+import { loadCompanionGrantPicker } from '../src/v2/companionGrant.js';
+import { until, bootRealAgentNode, connectNodesOverRelay, teardown } from './support/pairRealAgents.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const COMPANION = fileURLToPath(new URL('../../companion-node/src/boot.js', import.meta.url));
@@ -73,8 +73,30 @@ describe('the agenda link, on a real box and a real companion', () => {
       ONDERLING_RELAY_URL: relay.url, TG_BOT_TOKEN: '123:fake', TG_ADMIN_UID: ADMIN, ONDERLING_TELEGRAM_API_ROOT: api.root,
       ONDERLING_SEEDED_CONTACT_CARD: companionCard,
     });
-    await box.waitFor(/address\s+(\S{20,})/);
+    const boxAddress = (await box.waitFor(/address\s+(\S{20,})/))[1];
     const log = box.log;
+    /** The box's walk log, as entries. */
+    const walked = () => readdirSync(boxDir).filter((f) => /^walk-log-.*\.jsonl$/.test(f))
+      .flatMap((f) => readFileSync(path.join(boxDir, f), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return {}; } }));
+
+    // 2 · the companion's owner, in their own app: claims it with the line it printed, adds the box as a contact by the
+    // card it prints, and grants it the agenda files from the picker — the box's row there is its address, the key it
+    // calls the companion with
+    const owner = await bootRealAgentNode('web', {});
+    cleanup.push(() => teardown([owner]));
+    await connectNodesOverRelay([owner], { relayUrl: relay.url });
+    const claimLine = (await comp.waitFor(/Claim:\s+(\S+@\S+)/))[1];
+    expect(await owner.agent.callSkill('household', 'claimCompanion', { claim: claimLine })).toMatchObject({ ok: true });
+    const boxCard = (await box.waitFor(/(onderling-contact:\/\/\S+)/))[1];
+    expect((await owner.agent.callSkill('stoop', 'addContactFromQr', { payload: boxCard }))?.error).toBeUndefined();
+    const picker = await loadCompanionGrantPicker({ callSkill: owner.agent.callSkill, node: companionAddress, t: (k) => k });
+    expect(picker, JSON.stringify(picker)).toMatchObject({ ok: true, choices: [{ id: 'agenda-files' }] });
+    const target = picker.targets.find((x) => x.key === boxAddress);
+    expect(target, `the box among the picker's rows: ${JSON.stringify(picker.targets)}`).toBeTruthy();
+    const granted = await owner.agent.callSkill('household', 'grantCompanion', { node: companionAddress, to: target.key, families: ['agenda-files'] });
+    expect(granted, JSON.stringify(granted)).toMatchObject({ ok: true, ops: ['feed.drop', 'feed.put'] });
+    const kept = await until(async () => walked().find((e) => e.kind === 'companion-grant') ?? null, { timeout: 30_000, step: 250 });
+    expect(kept, `the box kept the grant\n${log().slice(-1500)}`).toMatchObject({ ok: true, ops: ['feed.drop', 'feed.put'] });
 
     await ask(api, ADMIN, '/start', () => true, { log });
     await ask(api, ADMIN, 'tandarts morgen om 10 uur', (m) => /tandarts/i.test(m.text), { log });
@@ -122,6 +144,8 @@ describe('the agenda link, on a real box and a real companion', () => {
     const [, id, k] = /\/feed\/[^/]+\/([^.]+)\.([^.]+)\.ics/.exec(link2);
     expect(comp.log()).not.toContain(id);
     expect(comp.log()).not.toContain(k);
+    // every put and drop went with the grant's token: the companion refused none of the box's calls
+    expect(walked().filter((e) => e.kind === 'companion-call'), 'a call the companion refused').toEqual([]);
     await box.stop(); await comp.stop();
   }, 300_000);
 });

@@ -21,6 +21,7 @@
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
 import { createIdentityLinkView } from '../../src/v2/identityLinkView.js';
+import { loadCompanionGrantPicker, companionGrantText } from '../../src/v2/companionGrant.js';
 import { IDENTITY_LINK_SUBTYPE } from '../../src/v2/identityLink.js';
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
@@ -326,7 +327,7 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '../../src/v2/paramsManifest.js';
 import { CONNECTION_MANIFESTS } from '../../src/v2/connectionManifests.js';
 import { householdManifest } from '../../../household/manifest.js';
-import { deviceDelegationsOf } from '@onderling/agent-registry';
+import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 // per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
@@ -4473,7 +4474,7 @@ function ensurePagePanel() {
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
-  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = [];
+  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = [];
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
@@ -4584,6 +4585,14 @@ async function showMyData() {
     });
   };
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
+    // rows come from the node itself and the shared projection; the grant is one op through the waist.
+    companions,
+    onOpenCompanionGrant: (node) => loadCompanionGrantPicker({
+      callSkill: rawCallSkill, node, t,
+      linkedBots: createIdentityLinkView({ link: '', personKey: null, signOffer: null, storage: window.localStorage }).linkedTo(),
+    }),
+    onGrantCompanion: async (args) => companionGrantText(await rawCallSkill('household', 'grantCompanion', args).catch(() => null), t),
     // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
     // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
     // every write goes through the waist.
@@ -4684,6 +4693,9 @@ async function showMyData() {
   // tombstones shown struck — the revoke door acts on the live ones.
   devices = Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
     .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true }));
+  // the nodes this person claimed (their own list; each node keeps its owner itself)
+  companions = Object.values(ownedNodesOf({ properties: profProps?.properties ?? {} }))
+    .map((n) => ({ node: n.address, short: n.label || `${n.address.slice(0, 8)}…` }));
   dataLocation = loc ?? {};
   podStatus = status ?? {};
   // Prefer the real Solid session over the (aspirational) stoop op — read through the waist, so the

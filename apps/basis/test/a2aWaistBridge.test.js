@@ -105,4 +105,16 @@ describe('the A2A bridge — a peer invokes a declared op through the waist', ()
       'a peer holding a grant could make the person the owner of a node of its choosing',
     ).rejects.toMatchObject({ code: 'POLICY_NEVER' });
   }, 120_000);
+
+  it("granting what the person's node lets another agent do is refused even holding a token for it", async () => {
+    const { A, owner, caller } = await ownerAndCaller();
+    await A.sa.trust?.setTier?.(owner.identity.pubKey, 'trusted');
+    for (const op of ['household.grantCompanion', 'household.companionGrantChoices']) {
+      const token = await grantFor(A, caller, op);
+      await expect(
+        owner.policyEngine.checkInbound({ peerPubKey: caller.pubKey, skillId: op, token }),
+        `${op}: a peer holding a grant could have the person's device sign for their node`,
+      ).rejects.toMatchObject({ code: 'POLICY_NEVER' });
+    }
+  }, 120_000);
 });

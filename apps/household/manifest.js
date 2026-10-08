@@ -68,6 +68,8 @@ export const householdManifest = {
     'enroll-device': 'write',
     'revoke-device': 'write',
     'claim-companion': 'write',
+    'list-companion-grants': 'read',
+    'grant-companion': 'write',
     'reveal-owner-phrase': 'write',
     'restore-owner-phrase': 'write',
     'replace-device': 'write',
@@ -341,6 +343,30 @@ export const householdManifest = {
       // every device of theirs manages it and a revoked one does not. Reached through the claim-companion flow.
       params: [
         { name: 'claim', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'companionGrantChoices', group: 'device',
+      verb: 'list-companion-grants',
+      // What a node the person owns can let another agent do there: its op FAMILIES, asked of the node itself (a
+      // statement signed by this device). The tick list of the grant on My data is made of these.
+      params: [
+        { name: 'node', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'grantCompanion', group: 'device',
+      verb: 'grant-companion',
+      writes: { scope: 'person' },   // nothing on this device: the person's node keeps the grant, the agent its tokens
+      // Let another agent (a household bot) do a family of a node's ops: signed by THIS device for the node the person
+      // owns (`grants.mint`); the node mints one token per op to that agent's key and delivers them over the relay.
+      // Owner-only and unreachable from chat, like every grant of authority.
+      params: [
+        { name: 'node', kind: 'string', required: true },
+        { name: 'to',   kind: 'string', required: true },
+        { name: 'families', kind: 'object', required: true, schema: { type: 'array', items: { type: 'string' } } },
       ],
       surfaces: {},
     },

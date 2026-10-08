@@ -17,14 +17,23 @@ const HTTP = /^https?:\/\/[^\s]+$/;
  * @param {Array<{webid?: string, peerAddr?: string, serves?: string, hidden?: boolean}>} contacts
  */
 export function feedCompanionOf(contacts) {
-  const rows = Array.isArray(contacts) ? contacts : [];
-  for (let i = rows.length - 1; i >= 0; i -= 1) {
-    const c = rows[i];
+  const all = companionsOf(contacts);
+  return all.length ? all[all.length - 1] : null;
+}
+
+/**
+ * Every companion among these contact rows, in the order they were added: a row whose card says where it serves and
+ * whose address is a node's (and that the person has not hidden). `[{ node, base }]`.
+ * @param {Array<{webid?: string, peerAddr?: string, serves?: string, hidden?: boolean}>} contacts
+ */
+export function companionsOf(contacts) {
+  const out = [];
+  for (const c of (Array.isArray(contacts) ? contacts : [])) {
     if (!c || c.hidden === true || typeof c.serves !== 'string' || !HTTP.test(c.serves)) continue;
     const node = [c.peerAddr, c.webid].find((a) => typeof a === 'string' && LINK_NODE.test(a));
-    if (node) return { node, base: c.serves.replace(/\/+$/, '') };
+    if (node) out.push({ node, base: c.serves.replace(/\/+$/, '') });
   }
-  return null;
+  return out;
 }
 
 /**
@@ -32,8 +41,17 @@ export function feedCompanionOf(contacts) {
  * @param {{ callSkill: (app: string, op: string, args: object) => Promise<any> }} a
  */
 export async function loadFeedCompanion({ callSkill }) {
+  const all = await loadCompanions({ callSkill });
+  return all.length ? all[all.length - 1] : null;
+}
+
+/**
+ * Every companion the bot holds as a contact, read through the waist (`[]` when there is none, or the book is down).
+ * @param {{ callSkill: (app: string, op: string, args: object) => Promise<any> }} a
+ */
+export async function loadCompanions({ callSkill }) {
   try {
     const r = await callSkill('stoop', 'listContacts', {});
-    return feedCompanionOf(Array.isArray(r?.contacts) ? r.contacts : (Array.isArray(r?.items) ? r.items : []));
-  } catch { return null; }
+    return companionsOf(Array.isArray(r?.contacts) ? r.contacts : (Array.isArray(r?.items) ? r.items : []));
+  } catch { return []; }
 }

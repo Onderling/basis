@@ -103,6 +103,7 @@ import { welcomeLines, basicModeLines } from '../src/v2/botWelcome.js';
 import { exportFromHost, importHousehold } from '../src/v2/householdExport.js';
 import { createBotFeeds } from '../src/v2/botFeeds.js';
 import { loadFeedCompanion } from '../src/v2/feedCompanion.js';
+import { createCompanionGrants, COMPANION_GRANT_SUBTYPE } from '../src/v2/companionGrant.js';
 import { seedContactCard } from '../src/v2/seededContact.js';
 import { DataPart, Parts } from '@onderling/core';
 import { createExportShelf, EXPORT_KEY_FILE, UNLOCKED_KEY_FILE, unlockedSecret } from '../src/v2/householdExportShelf.js';
@@ -160,6 +161,8 @@ const relayUrl = (process.env.ONDERLING_RELAY_URL ?? '').trim();
 const appUrl   = (process.env.BASIS_APP_URL ?? '').trim();
 // A screen's offer (`/scherm`) arrives on the peer router, which is up before the door that answers it exists.
 const screenOffer = { handle: null };
+// …and so does a companion's grant (its owner let this bot put agenda files there), before the bot keeps grants.
+const companionGrantDoor = { accept: null };
 
 /** The vault key: the environment if set, else one generated once beside the vault — the machine that
  *  runs unattended holds it, which is the same trust as the disk the vault itself is on. */
@@ -662,6 +665,8 @@ if (relayUrl) {
       [SCREEN_OFFER_SUBTYPE]: (from, payload) => screenOffer.handle?.(from, payload),
       // a screen waiting for its grant says it is there: nothing to do — its message alone releases what was held for it
       [SCREEN_WAITING_SUBTYPE]: () => {},
+      // a companion's owner granted this bot ops there: the companion sends the tokens; kept only from a companion contact
+      [COMPANION_GRANT_SUBTYPE]: (from, payload) => companionGrantDoor.accept?.(from, payload),
       'chat-message': makeHandleThreadedChat({
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
@@ -960,7 +965,30 @@ if (tgToken || inboxDoor.bridge) {
   // A person's agenda as a link (`/agenda-link`): the household's companion serves each person's sealed file, through
   // the relay. WHICH companion and where its links are served comes from the contact the bot holds (its card), read
   // each time — no companion among its contacts, no link; off in the household until the admin switches it on.
-  const companionCall = async (node, skill, data) => Parts.data(await agent.sa.peer.invoke(node, skill, [DataPart(data)])) ?? null;
+  // What it may do THERE is the grant the companion's owner gave it from their app: one token per op, delivered over the
+  // relay, kept per companion (`companionGrant.js`, sealed on disk) and presented on every call — the companion's gate
+  // checks it, revocation first. The key it calls with is the tokens' subject.
+  const companionGrants = isFunctionProfile ? createCompanionGrants({
+    vault: new VaultNodeFs(path.join(dataDir, 'companion-grants.json'), vaultPassphrase()),
+    self: () => agent.identity?.chat?.pubKey ?? null,
+    callSkill,
+  }) : null;
+  if (companionGrants) {
+    companionGrantDoor.accept = async (from, payload) => {
+      const r = await companionGrants.accept(from, payload).catch(() => ({ ok: false, reason: 'error' }));
+      walkLog({ kind: 'companion-grant', from: String(from).slice(0, 12), ok: r.ok, ...(r.ok ? { ops: r.ops } : { reason: r.reason }) });
+    };
+  }
+  const companionCall = async (node, skill, data) => {
+    const token = await companionGrants?.tokenFor(node, skill).catch(() => null) ?? null;
+    try {
+      return Parts.data(await agent.sa.peer.invoke(node, skill, [DataPart(data)], token ? { token } : {})) ?? null;
+    } catch (err) {
+      // a refusal: where the bot will drop the grant it presented and tell its admin once (the revoke, its own step)
+      walkLog({ kind: 'companion-call', op: skill, ok: false, presented: !!token, error: String(err?.message ?? err).slice(0, 120) });
+      throw err;
+    }
+  };
   const feeds = isFunctionProfile ? createBotFeeds({
     threads,
     events: async () => (await agent.reminderSources())?.events ?? [],

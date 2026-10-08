@@ -124,7 +124,8 @@ import {
   ROSTER_SEED_SUBTYPES, buildRosterSeedRequest, makeRosterSeedServer, makeRosterSeedReceiver,
 } from '../../v2/rosterSeed.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
-import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
+import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';
+import { COMPANION_GRANT_OUTCOMES } from '../../v2/companionGrant.js';   // the words a grant to a node's agent ends on   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -2937,6 +2938,40 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch (err) { console.warn('[claimCompanion] the node is yours, but this device could not write it down:', err?.message ?? err); }
     return [DataPart({ ok: true, outcome: 'ok', node: claim.node })];
   }, { visibility: 'private' });   // makes this person a node's owner: owner-only
+
+  /* ─── What a node the person owns lets ANOTHER agent do there (a household bot putting agenda files) ──────────────
+   * Granted by FAMILY, never by op: the node names its families and maps each to its ops itself; it mints one token per
+   * op to the agent's key and delivers them over the relay. Both ops sign a statement with THIS device's delegation key
+   * — only for a node the person's own list says they own — and are never delegable (renderA2A's withhold list). */
+  const ownedNode = async (node) => {
+    if (typeof node !== 'string' || !node) return false;
+    try { return Object.prototype.hasOwnProperty.call(ownedNodesOf(await agentsRegistryRef?.lookup?.('default')), node); } catch { return false; }
+  };
+  /** Ask a node the person owns `op`, signed by this device: `{res}` or `{outcome}` naming why it was not asked/answered. */
+  const askOwnedNode = async (node, op, args) => {
+    if (!(await ownedNode(node))) return { outcome: 'not-owned' };
+    const data = await signedForNode(node, op, args);
+    if (!data) return { outcome: 'no-device-key' };
+    const res = await invokeNode(node, op, data);
+    return res ? { res } : { outcome: 'unreachable' };
+  };
+  hostAgent.register('companionGrantChoices', async ({ parts }) => {
+    const { node } = parts?.[0]?.data ?? {};
+    const { res, outcome } = await askOwnedNode(node, 'grants.families', {});
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true || !Array.isArray(res.families)) return [DataPart({ ok: false, outcome: res.error === 'stale' ? 'stale' : 'forbidden' })];
+    return [DataPart({ ok: true, outcome: 'ok', families: res.families.filter((f) => typeof f === 'string') })];
+  }, { visibility: 'private' });   // signs for the person's node: owner-only
+  hostAgent.register('grantCompanion', async ({ parts }) => {
+    const { node, to, families } = parts?.[0]?.data ?? {};
+    if (typeof to !== 'string' || !to || !Array.isArray(families) || families.length === 0) return [DataPart({ ok: false, outcome: 'bad-args' })];
+    const { res, outcome } = await askOwnedNode(node, 'grants.mint', { to, families });
+    if (!res) return [DataPart({ ok: false, outcome })];
+    if (res.ok !== true) {
+      return [DataPart({ ok: false, outcome: COMPANION_GRANT_OUTCOMES.includes(res.error) ? res.error : 'forbidden' })];
+    }
+    return [DataPart({ ok: true, outcome: 'ok', ops: res.ops ?? [], delivery: res.delivery ?? null })];
+  }, { visibility: 'private' });   // hands another agent standing authority on the person's node: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
    * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),

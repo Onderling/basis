@@ -501,6 +501,10 @@
     "text": "← circles",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "membercard_close": {
+    "text": "Close",
+    "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
+  },
   "detail_empty": {
     "text": "Nothing here yet.",
     "doc": "Empty state inside a circle detail view."

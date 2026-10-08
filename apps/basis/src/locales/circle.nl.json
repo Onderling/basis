@@ -501,6 +501,10 @@
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "membercard_close": {
+    "text": "Sluiten",
+    "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
+  },
   "detail_empty": {
     "text": "Nog niks hier.",
     "doc": "Empty state inside a circle detail view."

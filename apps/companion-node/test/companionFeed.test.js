@@ -4,7 +4,7 @@
  * The owner (a household bot) puts a file sealed to a key only the link carries; the companion keeps the ciphertext
  * under the hash of the link's id and nothing else; `GET /feed/<id>.<k>.ics` opens it with the key from the path. A
  * non-owner's put is refused; an unknown id, a wrong key and a dropped file are ONE identical 404; nothing at rest
- * holds the agenda, the id or the key; Caddy keeps no log of the path.
+ * holds the agenda, the id or the key; Caddy keeps no log of the path. A put takes a token the owner granted.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Agent, AgentIdentity, Parts, Bootstrap } from '@onderling/core';
 import { ownerDevice } from './support/ownerDevice.js';
+import { grantAgendaFiles } from './support/grantAgendaFiles.js';
 import { randomKey, sealForLink } from '@onderling/blob-gateway';
 import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
@@ -84,12 +85,12 @@ describe('the feed shelf', () => {
 });
 
 describe('the companion serves the owner\'s agenda files', () => {
-  it('the owner puts, the link opens it; a non-owner is refused; every miss is one identical 404', async () => {
-    // the owner's device signs each put (a node composed already claimed by that person's root)
+  it('the granted bot puts, the link opens it; an agent without the grant is refused; every miss is one identical 404', async () => {
+    // the owner's device grants the bot (a node composed already claimed by that person's root)
     const root = Bootstrap.create().bootstrap;
-    const ownersDevice = ownerDevice(root, 'household-bot');
+    const ownersDevice = ownerDevice(root, 'phone');
     const host = await startCompanionNode({
-      identityVault: new VaultMemory(), gate: false,
+      identityVault: new VaultMemory(),
       management: true, claimedOwner: { root: ownersDevice.delegation.by }, manageHttp: true,
       feeds: true, feedBucket: makeDevBlobBucket(),
     });
@@ -104,16 +105,16 @@ describe('the companion serves the owner\'s agenda files', () => {
     expect(none.status).toBe(404);
     expect(none.body).toBe(nowhere.body);
 
-    // a non-owner's put is refused, and leaves nothing
+    // a put without the grant is refused, and leaves nothing
     const stranger = await device(host);
-    const refused = Parts.data(await stranger.invoke(host.agent.address, 'feed.put', { id, envelope: sealed(k) }));
-    expect(refused).toEqual({ ok: false, error: 'forbidden' });
+    await expect(stranger.invoke(host.agent.address, 'feed.put', { id, envelope: sealed(k) })).rejects.toThrow(/token/i);
     expect(await host.feeds.open(id, k)).toBeNull();
 
-    // the owner's put; the link opens it
+    // the granted bot's put; the link opens it
     const bot = await device(host);
+    const tokens = await grantAgendaFiles(host, ownersDevice, bot);
     const put = { id, envelope: sealed(k) };
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', { ...put, auth: ownersDevice.auth(host.agent.address, 'feed.put', put) }))).toEqual({ ok: true });
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', put, { token: tokens.put }))).toEqual({ ok: true });
     const hit = await get(`/feed/${id}.${k}.ics`);
     expect(hit.status).toBe(200);
     expect(hit.type).toMatch(/^text\/calendar/);
@@ -128,10 +129,10 @@ describe('the companion serves the owner\'s agenda files', () => {
       expect(r.body, miss).toBe(nowhere.body);
     }
 
-    // a non-owner cannot drop it; the owner can, and the link is dark
-    expect(Parts.data(await stranger.invoke(host.agent.address, 'feed.drop', { id }))).toEqual({ ok: false, error: 'forbidden' });
+    // an agent without the grant cannot drop it; the bot can, and the link is dark
+    await expect(stranger.invoke(host.agent.address, 'feed.drop', { id })).rejects.toThrow(/token/i);
     expect((await get(`/feed/${id}.${k}.ics`)).status).toBe(200);
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.drop', { id, auth: ownersDevice.auth(host.agent.address, 'feed.drop', { id }) }))).toEqual({ ok: true });
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.drop', { id }, { token: tokens.drop }))).toEqual({ ok: true });
     expect((await get(`/feed/${id}.${k}.ics`)).body).toBe(nowhere.body);
   }, 30_000);
 });

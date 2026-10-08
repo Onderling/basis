@@ -2,7 +2,7 @@
  * A person's agenda link, served THROUGH THE RELAY by a companion that has no public port — over a REAL relay (its
  * HTTP server, its seat) and a REAL companion (`startCompanionNode`, gate on).
  *
- * The owner's device puts a sealed file; the link is built from the companion's CARD (its address and where it
+ * The bot the owner granted puts a sealed file; the link is built from the companion's CARD (its address and where it
  * serves); a calendar app's GET at the relay opens it; the companion away → the relay's one 404; the relay's log names
  * nothing of the link. And `feed.serve` is the ONE public op on the companion: a stranger reaches it, and every other
  * op the companion registers refuses that same stranger.
@@ -15,6 +15,7 @@ import { startRelay } from '@onderling/relay';
 import { randomKey, sealForLink, feedLinkPath } from '@onderling/blob-gateway';
 import { decodeContactCard } from '../../stoop/src/lib/contactCard.js';
 import { ownerDevice } from './support/ownerDevice.js';
+import { grantAgendaFiles } from './support/grantAgendaFiles.js';
 import { startCompanionNode, FEED_SERVE_OP } from '../src/index.js';
 import { makeDevBlobBucket } from '../src/mediaEdge.js';
 
@@ -37,7 +38,7 @@ async function companionOnRelay(extra = {}) {
   const relay = await startRelay({ port: 0, host: '127.0.0.1', log: true, feeds: { missFloorMs: 0 } });
   cleanups.push(() => relay.stop());
   const relayUrl = `ws://127.0.0.1:${relay.port}`;
-  const owners = ownerDevice(Bootstrap.create().bootstrap, 'household-bot');
+  const owners = ownerDevice(Bootstrap.create().bootstrap, 'phone');
   const host = await startCompanionNode({
     relayUrl, identityVault: new VaultMemory(),
     management: true, claimedOwner: { root: owners.delegation.by },
@@ -60,11 +61,12 @@ describe('the companion\'s links, through the relay', () => {
     expect(card.relays).toEqual([relayUrl]);
     expect(card.serves).toBe(`http://127.0.0.1:${relay.port}`);
 
-    // the owner's device puts a person's file
+    // the granted bot puts a person's file
     const id = randomKey(); const k = randomKey();
     const bot = await stranger(relayUrl, host.agent.address);
+    const tokens = await grantAgendaFiles(host, owners, bot);
     const put = { id, envelope: sealForLink(ICS, k) };
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', { ...put, auth: owners.auth(host.agent.address, 'feed.put', put) }))).toEqual({ ok: true });
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', put, { token: tokens.put }))).toEqual({ ok: true });
 
     capturing = true;
     const link = `${card.serves}${feedLinkPath({ node: card.peerAddr, id, k })}`;
@@ -113,7 +115,8 @@ describe('feed.serve is the ONE public op on the companion', () => {
     const id = randomKey(); const k = randomKey();
     const put = { id, envelope: sealForLink(ICS, k) };
     const bot = await stranger(relayUrl, host.agent.address);
-    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', { ...put, auth: owners.auth(host.agent.address, 'feed.put', put) }))).toEqual({ ok: true });
+    const tokens = await grantAgendaFiles(host, owners, bot);
+    expect(Parts.data(await bot.invoke(host.agent.address, 'feed.put', put, { token: tokens.put }))).toEqual({ ok: true });
 
     const someone = await stranger(relayUrl, host.agent.address);
     // the link's halves open the file; every failure is the one miss

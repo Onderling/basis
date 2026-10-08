@@ -80,6 +80,7 @@ import { makeMemoryRegistryPod }       from './registryPod.js';
 import { buildDevMediaEdge }           from './mediaEdge.js';
 import { createOwnerClaim, ownerFile, CLAIM_TTL_MS } from './ownerClaim.js';
 import { companionCard }               from './card.js';
+import { createNodeGrants, GRANT_FAMILIES } from './grants.js';
 
 const IDENTITY_FILE = 'host-identity.json';
 
@@ -250,6 +251,8 @@ export async function startCompanionNode(opts = {}) {
     publicUrl,
   } = opts;
   const bootAt = Date.now();
+  // the agenda files are put by an agent the owner granted, its token checked by the gate: no gate, no feeds
+  if (feeds && !gate) throw new Error('companion-node: feeds need the gate (a put is allowed by a token the gate verifies)');
 
   // ── 1. Host identity — persisted so the pubKey is stable across restarts ──
   const vault = identityVault
@@ -544,8 +547,8 @@ export async function startCompanionNode(opts = {}) {
   let trustRegistry = null;
   let tokenRegistry = null;
   let policyEngine  = null;
+  const permVault = permissionsVault ?? vault;     // multi-key store; reuse identity vault by default
   if (gate) {
-    const permVault = permissionsVault ?? vault;   // multi-key store; reuse identity vault by default
     trustRegistry   = new TrustRegistry(permVault);
     tokenRegistry   = new TokenRegistry(permVault);
 
@@ -733,6 +736,18 @@ export async function startCompanionNode(opts = {}) {
       return { ok: true, tenants: tenants() };
     });
 
+    // `grants.mint` — OWNER-GATED: let another agent (a household bot) do a FAMILY of this node's ops — one token per
+    // op, issuer this node, subject that agent, no wildcard (`grants.js`); delivered to the agent over the relay.
+    const nodeGrants = tokenRegistry ? createNodeGrants({ identity, agent, tokenRegistry, vault: permVault }) : null;
+    managed('grants.mint', async (ctx) => {
+      if (!nodeGrants) return { ok: false, error: 'gate-off' };
+      const { args } = argsOf(ctx);
+      return nodeGrants.mint({ to: args.to, families: args.families });
+    });
+
+    // `grants.families` — OWNER-GATED: the families the owner's app offers to tick, as this node names them.
+    managed('grants.families', async () => ({ ok: true, families: Object.keys(GRANT_FAMILIES) }));
+
     // `grant.revoke` — OWNER-GATED live per-token revocation (the R2 seam J-companion
     // proved). The management UI's "revoke" button drives this.
     managed('grant.revoke', async (ctx) => {
@@ -744,7 +759,8 @@ export async function startCompanionNode(opts = {}) {
     });
 
     // ── a person's agenda as a link (the owner's files, blind at rest: `feedShelf.js`) ─────────────
-    // `feed.put` / `feed.drop` — OWNER-GATED, refused before the body is read; the node never logs an id.
+    // `feed.put` / `feed.drop` — a TOKEN for exactly that op, minted here (`grants.mint`): the gate refuses the call
+    // before the body is read — no token, another op's token, another node's, a revoked one. The node never logs an id.
     // `feed.serve` — the link itself, asked by the relay a calendar app fetched it from: THE ONE PUBLIC OP on this node.
     // No token, no admission, no statement: `k` is the capability (whoever holds the link reads the agenda — exactly
     // what this node's own `/feed` route has always taken it to be). Every failure is one identical miss.
@@ -752,14 +768,14 @@ export async function startCompanionNode(opts = {}) {
       const { createFeedShelf } = await import('./feedShelf.js');
       const { makeFileBlobBucket } = await import('./mediaEdge.js');
       feedShelf = createFeedShelf({ bucket: feedBucket ?? makeFileBlobBucket(join(resolveConfigDir(configDir), 'feeds')) });
-      managed('feed.put', async (ctx) => {
+      agent.register('feed.put', async (ctx) => {
         const { id, envelope } = Parts.data(ctx?.parts) ?? {};
         return feedShelf.put(id, envelope);
-      });
-      managed('feed.drop', async (ctx) => {
+      }, { policy: 'requires-token' });
+      agent.register('feed.drop', async (ctx) => {
         const { id } = Parts.data(ctx?.parts) ?? {};
         return feedShelf.drop(id);
-      });
+      }, { policy: 'requires-token' });
       agent.register(FEED_SERVE_OP, async (ctx) => {
         try {
           const { id, k } = Parts.data(ctx?.parts) ?? {};

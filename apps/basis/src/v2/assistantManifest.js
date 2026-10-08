@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'forget-conversation': 'write', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'forget-conversation': 'write', greet: 'read', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'agenda-link': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },
@@ -68,6 +68,15 @@ export const assistantManifest = {
       id:     'sendWeekOverview',
       verb:   'send-week-overview',
       params: [{ name: 'occurrence', kind: 'string', required: false }],
+      surfaces: {},
+    },
+    {
+      // a greeting and nothing else ("hoi", "goedemorgen", "hello"): the bot's greeting line, in the person's language (or
+      // the greeting's own, `lang`). No surface: the deterministic gate takes it (`circleGate.js`), so a greeting never
+      // reaches the model — it is not a tool, and nothing to type.
+      id:     'assistant-hello',
+      verb:   'greet',
+      params: [{ name: 'lang', kind: 'string', required: false }],
       surfaces: {},
     },
     {

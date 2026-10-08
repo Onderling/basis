@@ -1,4 +1,21 @@
 {
+  "assistant.hello": {
+    "doc": "A greeting and nothing else (\"hi\", \"good morning\"): the bot says its greeting line, without the model.",
+    "patterns": [
+      "(hi|hii|hello|hullo|hey|good morning|good afternoon|good evening) (there|all|everyone)?"
+    ],
+    "examples": [
+      "hi",
+      "Hello!",
+      "hullo",
+      "good morning",
+      "hi there"
+    ],
+    "not": [
+      "hi, add milk to the shopping list",
+      "hello who does the lamp"
+    ]
+  },
   "lists.addToList.named": {
     "doc": "Put one or more things on a list the household names (\"melk en kaas\" are two).",
     "patterns": [

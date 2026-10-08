@@ -26,6 +26,7 @@ import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
+import { THREAD_LANGS } from './botThreads.js';
 
 /** How many entries of one part the week overview shows before it says how many more there are. */
 export const WEEK_OVERVIEW_MAX_ITEMS = param({ key: 'assistant.weekOverviewMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 });
@@ -169,6 +170,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       const tp = personT(threadId);
       // a switch asked without its value: how it stands now, with a button per value (as `/instellingen` paints it)
       if (PERSON_SETTINGS[op] && !(args?.mode ?? args?.lang ?? args?.hours ?? args?.rules ?? args?._match)) return oneSettingOp(threadId, op);
+      // a greeting: the greeting line, in the person's fixed language, else the greeting's own, else the door's
+      if (op === 'assistant-hello') {
+        const lang = threads?.langOf?.(threadId) ?? (THREAD_LANGS.includes(args?.lang) ? args.lang : null);
+        // `greeting`: a door that has just said its welcome this turn does not say it again
+        return { ok: true, greeting: true, message: lang ? t('circle.bot.welcome', {}, lang) : t('circle.bot.welcome') };
+      }
       if (op === 'assistant-memory') {
         const mode = args?.mode ?? args?._match;
         threads.setMode(threadId, mode);

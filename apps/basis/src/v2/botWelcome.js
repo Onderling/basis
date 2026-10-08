@@ -85,6 +85,7 @@ export const WELCOME_LEAVES = Object.freeze({
   entryReminders: "asked in words ('herinner iedereen ook de avond ervoor aan de tandarts'); the reminders line says when reminders come",
   remindMe: "asked in words ('herinner me een uur van tevoren aan de tandarts'); the reminders line says how to change your own",
   sendWeekOverview: "not typed: the host's runner sends it to whoever switched the overview on (said on the overview line)",
+  'assistant-hello': "not typed: the gate answers a greeting (\"hoi\") with the welcome's own first line",
   announceChange: "not typed: the host's runner calls it, as the household, when an appointment or a chore changes (the people it concerns hear it)",
   listLists: "part of the lists line: reading a list is said there",
   listEntries: "part of the lists line: reading a list is said there",

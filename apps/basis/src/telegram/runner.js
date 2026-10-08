@@ -167,6 +167,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
     try { reply = await runDispatch(ready, callFor(chatId)); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
+    // a greeting answered in the turn that already said the welcome (a first contact's "hoi"): said once, not twice
+    if (reply?.payload?.greeting === true && turns.get(chatId)?.welcomed) { note(chatId, { welcomedOnce: true }); return; }
     // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
     if (tryRule && (reply?.error?.reason === 'not-found' || (reply?.ok === false && reply?.code === 'not-found'))) { note(chatId, { fellBack: ready.opId }); return { notFound: true }; }
     const rendered = renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() });
@@ -400,6 +402,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     }
     await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
+    note(chatId, { welcomed: true });
   }
 
   /**

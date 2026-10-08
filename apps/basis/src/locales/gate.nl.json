@@ -1,4 +1,21 @@
 {
+  "assistant.hello": {
+    "doc": "A greeting and nothing else (\"hoi\", \"goedemorgen\"): the bot says its greeting line, without the model.",
+    "patterns": [
+      "(hoi|hoii|hallo|hee|hey|hii|goedemorgen|goedemiddag|goedenavond) (allemaal|daar)?"
+    ],
+    "examples": [
+      "hoi",
+      "Hallo!",
+      "goedemorgen",
+      "hoi allemaal"
+    ],
+    "not": [
+      "hoi, zet melk op de boodschappen",
+      "hallo wie doet de lamp",
+      "goedemorgen, wat staat er vandaag"
+    ]
+  },
   "lists.addToList.named": {
     "doc": "Put one or more things on a list the household names (\"melk en kaas\" are two).",
     "patterns": [

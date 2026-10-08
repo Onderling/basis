@@ -11,7 +11,9 @@
  * one line, the nearest kind of notice.
  */
 import { wallClockInTz } from '@onderling/notifier';
+import { parseReminderRule } from '@onderling/item-types';
 import { reminderOccurrences, householdRules, EVENING_BEFORE_UNTIL, REMINDER_MOMENTS, remindedFor } from './reminderOccurrences.js';
+import { HOUSEHOLD_RULES_DEFAULT } from './botSettings.js';
 
 // The moments and who an appointment is for are the engine's; read here, and by the bot's older readers, from it.
 export { EVENING_BEFORE_UNTIL, REMINDER_MOMENTS, remindedFor };
@@ -24,9 +26,31 @@ export { EVENING_BEFORE_UNTIL, REMINDER_MOMENTS, remindedFor };
 export function reminderPromptLines() {
   return [
     `REMINDERS — you (this bot) send them yourself, and only these: everything of the day — chores due today AND today's appointments — is said that morning at ${REMINDER_MOMENTS.morning}; an appointment early the next morning (before ${EVENING_BEFORE_UNTIL}) is also reminded the evening before at ${REMINDER_MOMENTS.evening}; anything with a time is reminded again shortly before it starts (the household's lead time, set by the admin in /huishouden; not when it was made just before), an appointment goes to everyone in the household unless it names people (then those, its maker and who comes); a chore to whoever holds it; a Sunday overview at 18:00 for whoever switched it on (/overzicht aan). You send nothing in a person's quiet hours: their own (/stil 23:00-08:00) or else the household's (the admin's /huishouden shows them). Asked whether you send reminders: say yes, and when.`,
-    'Each person sets their own reminders (the assistant-reminders tool; /herinneringen): on or off, or WHEN for everything — rules in words: "60" (minutes before), "ochtend" (the morning), "avond" (the evening before), "7:30" (a time on its day), "ook …" to add to the usual ones instead of replacing them, "huis" to follow the household again. For ONE appointment or chore, their own: the remindMe tool (item = words of its title, rules in the same words). For everyone an item is for: the reminders argument of addEvent or editEntry. Only those kinds exist — never promise another (no "every hour", nothing that repeats); say plainly what you set.',
+    'Each person sets their own reminders (the assistant-reminders tool; /herinneringen): on or off, or WHEN for everything — rules in words: "60" (minutes before), "ochtend" (the morning), "avond" (the evening before), "7:30" (a time on its day), "ook …" to add to the usual ones instead of replacing them, "huis" to follow the household again. For ONE existing appointment or chore, their own: the remindMe tool (item = words of its title, rules in the same words). There is no own reminder at a bare time ("remind me in 10 minutes", "remind me at 8 to call mum") without an appointment or chore it is about: say so plainly, and offer to put it in the agenda or on a list instead. For everyone an item is for: the reminders argument of addEvent or editEntry. For EVERYONE in the household at a time, with words of their own ("herinner iedereen om 19:45: eten"): remindMe with who: everyone, item = what to say, rules = the time ("19:45", "over 10 minuten"). Only those kinds exist — never promise another (no "every hour", nothing that repeats); say plainly what you set.',
     'When an appointment is made, moved or cancelled, or a chore is given to someone, you tell the others it concerns yourself, at once (never the one who did it; in their quiet hours it waits for their next message) — so do not promise to pass it on, and do not say they will not hear of it.',
   ];
+}
+
+/**
+ * When the bot reminds, in ONE line for a person (the welcome and `/help` say the same): the household's rules as they
+ * stand, each with the moment the tick really uses — the morning moment (everything of that day), the evening before
+ * (only an appointment before `EVENING_BEFORE_UNTIL` the next morning), the minutes before anything with a time, a fixed
+ * time on the day — and that `/herinneringen` changes it for them. Read from the rules and the tick's constants, never
+ * typed beside them.
+ * @param {{rules?: string[], t: (key: string, vars?: object) => string}} a
+ * @returns {string}
+ */
+export function reminderRuleLine({ rules = HOUSEHOLD_RULES_DEFAULT, t }) {
+  const parts = [];
+  for (const r of rules ?? []) {
+    const p = parseReminderRule(r);
+    if (!p) continue;
+    if (p.kind === 'morning') parts.push(t('circle.bot.reminder_rule_morning', { time: REMINDER_MOMENTS.morning }));
+    else if (p.kind === 'evening-before') parts.push(t('circle.bot.reminder_rule_evening', { time: REMINDER_MOMENTS.evening, until: EVENING_BEFORE_UNTIL }));
+    else if (p.kind === 'before') parts.push(t('circle.bot.reminder_rule_before', { n: p.minutes }));
+    else if (p.kind === 'at') parts.push(t('circle.bot.reminder_rule_at', { time: p.time }));
+  }
+  return parts.length ? t('circle.bot.reminder_rule', { rules: parts.join(', ') }) : t('circle.bot.reminder_rule_none');
 }
 
 /** Quiet hours, on the household's clock: nothing is said inside them. */

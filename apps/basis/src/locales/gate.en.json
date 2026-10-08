@@ -1,4 +1,37 @@
 {
+  "assistant.hello": {
+    "doc": "A greeting and nothing else (\"hi\", \"good morning\"): the bot says its greeting line, without the model.",
+    "patterns": [
+      "(hi|hii|hello|hullo|hey|good morning|good afternoon|good evening) (there|all|everyone)?"
+    ],
+    "examples": [
+      "hi",
+      "Hello!",
+      "hullo",
+      "good morning",
+      "hi there"
+    ],
+    "not": [
+      "hi, add milk to the shopping list",
+      "hello who does the lamp"
+    ]
+  },
+  "assistant.remindMe.everyone": {
+    "doc": "A reminder for everyone in the household at a time: \"remind everyone at 19:45: dinner\" (the words after the colon are what is said).",
+    "patterns": [
+      "remind everyone {time}: {text}",
+      "remind everyone {time} (to|that|about) {text}"
+    ],
+    "examples": [
+      "remind everyone at 19:45: dinner",
+      "Remind everyone at 7 pm: dinner",
+      "remind everyone at 19:30 to take the bins out"
+    ],
+    "not": [
+      "remind me at 19:45 about the dentist",
+      "remind everyone about the dentist"
+    ]
+  },
   "lists.addToList.named": {
     "doc": "Put one or more things on a list the household names (\"melk en kaas\" are two).",
     "patterns": [

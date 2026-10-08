@@ -28,6 +28,7 @@ import { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldF
 import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine.js';
 import { householdListType, coerceListArgs } from '../v2/circleGate.js';
 import { replyFact, replyLines, isReadFamily } from '../v2/replyLine.js';
+import { createLastReads } from '../v2/lastRead.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -79,6 +80,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
 
   /** The turn under way (one per chat at a time) — the walk log's record in the making. */
   const turns = new Map();
+  /** What each thread just read, handed to the model for the one turn after it (never for a thread that keeps no memory). */
+  const lastReads = createLastReads({ keeps: (id) => threads?.modeOf?.(id) !== 'off' });
   /** The translator for this chat's person: their fixed `/taal` language, else the bot's own. */
   const tc = (chatId) => {
     const lang = threads?.langOf?.(turns.get(chatId)?.thread ?? threadFor(chatId)) ?? null;
@@ -119,6 +122,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const onMap = (b) => !offered || offered.has(String(b?.callbackData ?? '').split(':')[0]);
     if (rendered.kind === 'list') {
       const items = Array.isArray(rendered.items) ? rendered.items : [];
+      // the list read, for the model's next turn ("en nu?" is about it)
+      lastReads.saw(turns.get(chatId)?.thread ?? threadFor(chatId), { title: rendered.title ?? null, lines: items.map((it) => it?.label) });
       // A read of a named list says which list, always — one list or five in a turn.
       const head = rendered.title ? [`${rendered.title}:`] : [];
       if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n')); return; }
@@ -167,6 +172,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
     try { reply = await runDispatch(ready, callFor(chatId)); }
     catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
+    // a greeting answered in the turn that already said the welcome (a first contact's "hoi"): said once, not twice
+    if (reply?.payload?.greeting === true && turns.get(chatId)?.welcomed) { note(chatId, { welcomedOnce: true }); return; }
     // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
     if (tryRule && (reply?.error?.reason === 'not-found' || (reply?.ok === false && reply?.code === 'not-found'))) { note(chatId, { fellBack: ready.opId }); return { notFound: true }; }
     const rendered = renderReply(reply, { t: tc(chatId), appOrigin: ready.appOrigin, manifestsByOrigin: manifestsOf() });
@@ -300,7 +307,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     ...(threads ? { memory: threads.memory, threadLang: (id) => threads.langOf(id) } : {}),
     ...(promptLines ? { promptLines } : {}),
     ...(Array.isArray(gateRules) ? { gateRules } : {}),
-    ...(typeof hintsFor === 'function' ? { threadHints: hintsFor } : {}),
+    // a thread's own lines for the model: its role's (the door's), and the list it read the turn before
+    threadHints: (threadId) => [...(typeof hintsFor === 'function' ? (hintsFor(threadId) ?? []) : []), ...lastReads.hintsFor(threadId)],
     ...(typeof expand === 'function' ? { expand } : {}),
     // Each person sees their own tools (a household bot: a member's, or an admin's): the thread is the person.
     ...(typeof roleFor === 'function' && typeof scopeToRole === 'function'
@@ -361,6 +369,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       // the turn's folded lines, said before the turn is remembered
       try { await sayLines(chatId); } catch { /* a reply that cannot be sent is the bridge's to report */ }
       const rec = turns.get(chatId); turns.delete(chatId);
+      // a read lives one turn past the turn that made it
+      lastReads.turnEnded(threadId);
       if (rec && !/^(__confirm:|[A-Za-z][\w-]*:)/.test(text)) engine.remember(threadId, 'you', text);
       // An op's result is the SYSTEM speaking; only a model reply is the assistant's own words.
       const voice = rec?.opId || rec?.route === 'help' ? 'system' : 'assistant';
@@ -400,6 +410,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     }
     await say(chatId, [welcome, ...derived, ...(disclosure ? [disclosure] : [])].join('\n'));
     threads.markGreeted(threadId);
+    note(chatId, { welcomed: true });
   }
 
   /**

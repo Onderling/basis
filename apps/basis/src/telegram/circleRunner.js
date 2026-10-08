@@ -68,7 +68,8 @@ export async function composeCircleRunner({ circleId, bridge, roleOf, agentCall,
     scopeToRole: scopeCatalogueToRole,
     hintsFor: (threadId) => roleHintsFor(roleOf(threadId), t),
     ...(typeof expand === 'function' ? { expand } : {}),
-    gateRules: listsGateRules(lang, lists),
+    // a circle has no door ops, so no greeting op: a greeting there stays the model's
+    gateRules: listsGateRules(lang, lists, { greeting: false }),
   });
   return { ...runner, lists: lists.map((l) => l.name) };
 }

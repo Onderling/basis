@@ -13,7 +13,7 @@ export const basisManifest = {
   app:        'basis',
   // The network hosts this app's code reaches: the sign-in issuers it offers as presets (reached when
   // the person picks one). The person's own pod and relay are endpoints they configure, not fixed hosts.
-  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org', 'relay.onderling.org'],   // the public relay a person's device dials by default
+  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org'],
   itemTypes:  ['chat-thread', 'chat-message'],
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).

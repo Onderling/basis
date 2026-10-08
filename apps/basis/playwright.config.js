@@ -141,8 +141,6 @@ export default defineConfig({
      * NB: only applied when Playwright STARTS the server; a reused pre-existing server keeps its env. */
     env: {
       VITE_CIRCLE_LLM_BASEURL: 'http://127.0.0.1:9999',
-      // Hermetic: no default relay under test — a no-relay project has none, and nothing dials the production relay.
-      VITE_CIRCLE_RELAY_DEFAULT: '',
       /* Belt to the per-client seed: when the relay setup is armed, boot the dev server with the relay
        * as its build-time default too (ignored by a reused server — the per-client cc.relayUrl wins). */
       ...(RELAY_URL ? { VITE_CIRCLE_RELAY_URL: RELAY_URL } : {}),
@@ -154,6 +152,6 @@ export default defineConfig({
     url: NO_RELAY_BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
-    env: { VITE_CIRCLE_LLM_BASEURL: 'http://127.0.0.1:9999', VITE_CIRCLE_RELAY_DEFAULT: '' },
+    env: { VITE_CIRCLE_LLM_BASEURL: 'http://127.0.0.1:9999' },
   }],
 });

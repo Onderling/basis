@@ -33,6 +33,9 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // Device ceremonies: adding or cutting off a device is the custody boundary itself.
   'household.enrollDevice',
   'household.revokeDevice',
+  // Ownership of a node: claiming a companion makes the person's root its owner — a peer must not be able to make
+  // someone the owner of a node of the peer's choosing (2026-10-09).
+  'household.claimCompanion',
   // Authority over authority: a connection that could grant connections is a connection that owns you.
   'household.grantSurface',
   'household.revokeSurface',

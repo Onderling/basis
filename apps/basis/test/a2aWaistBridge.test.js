@@ -93,4 +93,16 @@ describe('the A2A bridge — a peer invokes a declared op through the waist', ()
       'a recovery phrase was delegable to a peer holding a grant',
     ).rejects.toMatchObject({ code: 'POLICY_NEVER' });
   }, 120_000);
+
+  it('claiming a node for the person is refused even holding a token for it — ownership is not delegable', async () => {
+    const { A, owner, caller } = await ownerAndCaller();
+    const token = await grantFor(A, caller, 'household.claimCompanion');
+    await A.sa.trust?.setTier?.(owner.identity.pubKey, 'trusted');
+    await expect(
+      owner.policyEngine.checkInbound({
+        peerPubKey: caller.pubKey, skillId: 'household.claimCompanion', token,
+      }),
+      'a peer holding a grant could make the person the owner of a node of its choosing',
+    ).rejects.toMatchObject({ code: 'POLICY_NEVER' });
+  }, 120_000);
 });

@@ -13,6 +13,7 @@
 
 import { BASE_PROPERTIES, BASE_REQUIRED, NAMESPACE } from '../baseSchema.js';
 
+/** The `inbox-item` JSON schema: work waiting on a person's decision, discriminated by `kind`. */
 export const INBOX_ITEM_SCHEMA = {
   iri:         `${NAMESPACE}InboxItem`,
   description: 'A request or proposal awaiting one person\'s approval.',

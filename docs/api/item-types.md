@@ -121,7 +121,7 @@ Project namespace for type IRIs.
 
 **Kind:** constant · **Import:** `CANONICAL_TYPES` from `'@onderling/item-types'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The canonical item types every store knows, by name → JSON schema.
 
 ### `LISTS_TYPES`
 
@@ -144,7 +144,7 @@ names the set so each surface can decide it out loud instead of guessing per typ
 registerCanonicalTypes(registry)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Register every canonical type (with its legacy aliases) on a type registry.
 
 ## `src/embedsSchema.js`
 
@@ -211,7 +211,7 @@ stoop's forward map and this reverse are pinned to each other by a round-trip te
 
 **Kind:** constant · **Import:** `SYSTEM_STOOP_TYPES` from `'@onderling/item-types'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Item types the noticeboard holds that are system documents (rules, membership), never posts.
 
 ### `isNoticeboardPost`
 
@@ -263,7 +263,7 @@ The four kinds.
 parseReminderRule(s)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Parse a reminder rule string; null when it is not one of the four kinds (or a `before` longer than a week).
 
 **Parameters**
 
@@ -279,7 +279,7 @@ _No JSDoc block in the source (recorded gap — see the coverage table)._
 isReminderRule(s)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Is `s` a valid reminder rule?
 
 ### `TIME_ANCHORS`
 
@@ -379,7 +379,7 @@ The keyless row, as the type declares it — the fixture every reader of the boo
 
 **Kind:** constant · **Import:** `INBOX_ITEM_SCHEMA` from `'@onderling/item-types'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The `inbox-item` JSON schema: work waiting on a person's decision, discriminated by `kind`.
 
 ### `INBOX_KIND`
 

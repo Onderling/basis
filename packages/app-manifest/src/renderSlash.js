@@ -1,3 +1,5 @@
+import { gateVerbsOf, gateDropTrailingOf } from './gateVerbs.js';
+
 /**
  * Render the deterministic, generic slash-grammar matcher.
  *
@@ -27,8 +29,6 @@
  *
  * @param {import('./schema.js').Manifest} manifest
  */
-import { gateVerbsOf, gateDropTrailingOf } from './gateVerbs.js';
-
 export function renderSlash(manifest, opts = {}) {
   // Per-locale TRAILING-verb support (opt-in via opts, used by renderGate for the circle bot): an op
   // whose `match.trailing` names an intent ALSO matches that intent's verbs at the END of the text

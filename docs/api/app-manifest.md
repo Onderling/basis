@@ -352,7 +352,8 @@ bespoke behaviour or free CRUD — "declare a noun, get CRUD". `generic` is the 
 createFlowRunner({ callSkill, saveInstance, genId, isSecretKind, flowById, ops } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The flow runner: starts and steps flow instances through the waist, asks for declared params the bindings
+left open, and persists each instance without its secrets.
 
 **Parameters**
 
@@ -621,7 +622,8 @@ Ops that may never be reached by an external caller, whatever token it presents.
 renderA2A(manifestOrList, args, opts = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Project manifests into A2A skill definitions for peers — the never-delegable ops withheld, each call run as the
+verified caller when `ctxFor` says so.
 
 **Parameters**
 
@@ -744,7 +746,7 @@ Defined as `matchesAppliesTo` in the source module.
 matchesAppliesTo(appliesTo, item)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Does an op's `appliesTo` (type, incl. the `'*'` wildcard, and kind) match this item? No `appliesTo` matches all.
 
 ## `src/renderCoverage.js`
 
@@ -796,7 +798,8 @@ Render the matrix as a scannable markdown table (grouped by app).
 renderFlow(flow, instance, { ops } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Project a flow and its instance into a surface-neutral view: progress per step, the form a step waits on, and
+which actions are open.
 
 **Parameters**
 
@@ -840,7 +843,35 @@ FIRST command.
 renderSlash(manifest, opts = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Render the deterministic, generic slash-grammar matcher.
+
+`parse(text)` returns the same shape household's `regexParse` does:
+    null                                  (no match — caller falls back)
+  | { skillId, args }
+  | Array<{ skillId, args }>              (multi-item, when an op opts
+                                           into splitItems)
+
+Drop-in for the byte-equivalence gate.
+
+Driven by:
+  - manifest.slashGrammar              (addressedPrefixes, specials,
+                                         typeAliases, defaultType)
+  - per-op surfaces.slash.match        (body, splitItems, onEmpty; the verbs from the app's
+                                         gate words — `gateVerbs.js`)
+
+Pure.  Deterministic.  Verbs / operations tried in declaration order;
+first match wins.  Patterns compiled once per `renderSlash` call so
+`parse` stays cheap.
+
+Per PLAN flag #13 (F-SP1-b, locked 2026-05-19): the grammar spec is
+rich enough to encode household's regexParse — EN/NL aliases, multiword
+verb phrases ('voeg toe'), special forms ('what do we need'), item
+splitting on `,`/` and `/` en ` with quote handling, peel-type +
+default-type fallback, trailing-punct strip, addressed-prefix strip.
+
+**Parameters**
+
+- `manifest` `import('./schema.js').Manifest`
 
 ## `src/renderWeb.js`
 

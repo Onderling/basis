@@ -22,16 +22,16 @@ Recorded gaps are allowlisted in `scripts/api-doc-gaps.json`; new undocumented e
 | --- | --- | ---: | ---: | ---: | --- |
 | `@onderling/sdk` | [sdk.md](sdk.md) | 414 | 414 | 100% | — |
 | `@onderling/core` | [core.md](core.md) | 290 | 290 | 100% | — |
-| `@onderling/transports` | [transports.md](transports.md) | 22 | 21 | 95% | `b64Decode` |
-| `@onderling/vault` | [vault.md](vault.md) | 20 | 15 | 75% | `RootKeyStoreWebCrypto`, `VaultEncrypted`, `assertSeed`, `seedFromString`, `seedToString` |
+| `@onderling/transports` | [transports.md](transports.md) | 22 | 22 | 100% | — |
+| `@onderling/vault` | [vault.md](vault.md) | 20 | 20 | 100% | — |
 | `@onderling/pod-client` | [pod-client.md](pod-client.md) | 116 | 116 | 100% | — |
 | `@onderling/redaction` | [redaction.md](redaction.md) | 8 | 8 | 100% | — |
 | `@onderling/pseudo-pod` | [pseudo-pod.md](pseudo-pod.md) | 9 | 9 | 100% | — |
-| `@onderling/item-types` | [item-types.md](item-types.md) | 35 | 29 | 83% | `CANONICAL_TYPES`, `INBOX_ITEM_SCHEMA`, `SYSTEM_STOOP_TYPES`, `isReminderRule`, `parseReminderRule`, `registerCanonicalTypes` |
-| `@onderling/item-store` | [item-store.md](item-store.md) | 136 | 134 | 99% | `CLAIM_FIELDS`, `deliveryForResolution` |
-| `@onderling/app-manifest` | [app-manifest.md](app-manifest.md) | 69 | 64 | 93% | `chatMatchesAppliesTo`, `createFlowRunner`, `renderA2A`, `renderFlow`, `renderSlash` |
+| `@onderling/item-types` | [item-types.md](item-types.md) | 35 | 35 | 100% | — |
+| `@onderling/item-store` | [item-store.md](item-store.md) | 136 | 136 | 100% | — |
+| `@onderling/app-manifest` | [app-manifest.md](app-manifest.md) | 69 | 69 | 100% | — |
 | `@onderling/app-scaffold` | [app-scaffold.md](app-scaffold.md) | 4 | 4 | 100% | — |
 | `@onderling/attribute-charter` | [attribute-charter.md](attribute-charter.md) | 20 | 20 | 100% | — |
-| `@onderling/logger` | [logger.md](logger.md) | 8 | 7 | 88% | `REDACTED` |
+| `@onderling/logger` | [logger.md](logger.md) | 8 | 8 | 100% | — |
 | `@onderling/oidc-session` | [oidc-session.md](oidc-session.md) | 10 | 10 | 100% | — |
 | `@onderling/agent-registry` | [agent-registry.md](agent-registry.md) | 150 | 150 | 100% | — |

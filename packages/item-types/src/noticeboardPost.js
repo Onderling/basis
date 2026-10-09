@@ -58,6 +58,7 @@ export function noticeboardIntentOf(item) {
   return 'ask';
 }
 
+/** Item types the noticeboard holds that are system documents (rules, membership), never posts. */
 export const SYSTEM_STOOP_TYPES = new Set([
   'group-rules', 'membership-code', 'membership-redemption', 'circle-chat-message',
 ]);

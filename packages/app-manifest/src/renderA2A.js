@@ -56,6 +56,8 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
 ]));
 
 /**
+ * Project manifests into A2A skill definitions for peers — the never-delegable ops withheld, each call run as the
+ * verified caller when `ctxFor` says so.
  * @param {import('./schema.js').Manifest|import('./schema.js').Manifest[]} manifestOrList
  * @param {object} args
  * @param {(appOrigin:string, opId:string, args:object)=>Promise<any>} args.callSkill — the waist

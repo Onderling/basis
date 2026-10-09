@@ -15,6 +15,7 @@ export function b64Encode(bytes) {
   return btoa(bin);
 }
 
+/** Standard base64 → bytes (the inverse of `b64Encode`). */
 export function b64Decode(str) {
   const bin = atob(str);
   const out = new Uint8Array(bin.length);

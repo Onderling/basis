@@ -342,7 +342,9 @@ Decide which side to keep when an inbound item meets the local copy.
 
 **Kind:** constant · **Import:** `CLAIM_FIELDS` from `'@onderling/item-store'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The claim cluster the verbs maintain — the ONE list of what "the claim" is. Exported so the declaration
+layer (`resolutionPolicy.js`) declares exactly these fields as the `claim`-policy channel, rather than
+keeping a second copy of the cluster.
 
 ### `reconcileClaim`
 
@@ -1534,7 +1536,9 @@ The delivery-reliability tiers — a policy IMPLIES a transport guarantee, so th
 deliveryForResolution(resolution)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The delivery tier a resolution policy implies. DERIVED from the policy (a projection), not a second table
+to keep in sync: pick the policy and the transport guarantee follows. `deliveryOf(...)` is this over
+`resolutionOf(...)`. An unknown policy gets best-effort.
 
 ### `DEFAULT_RESOLUTION`
 

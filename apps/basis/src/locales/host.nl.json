@@ -381,7 +381,7 @@
       "doc": "Substrate error or unknown payload."
     },
     "scan_unknown": {
-      "text": "QR-code niet herkend. Verwacht: onderling-contact:// of onderling-invite:// URL.",
+      "text": "Deze code kent Basis niet — verwacht een contactkaart, een uitnodiging, een apparaat- of koppelcode, of de claimregel van een companion.",
       "doc": "classifyQrPayload returned kind:'unknown'."
     }
   },

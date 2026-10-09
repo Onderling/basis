@@ -1680,7 +1680,7 @@ export default function CircleLauncherScreen({
     setJoinScanOpen(false);
     const target = SCAN_TARGETS[res?.kind];
     const paint = target ? SCAN_PAINTERS[target.id] : undefined;
-    if (!target || paint === undefined) { Alert.alert(t('circle.profile.scan'), t('chat.scan_unknown')); return; }
+    if (!target || paint === undefined) { Alert.alert(t('circle.profile.scan'), t('scan_qr.scan_unknown')); return; }
     if (paint === null) { Alert.alert(t('circle.profile.scan'), t('circle.scan.pair_held')); return; }
     paint(target.needs(res.payload), res);
   };
@@ -1688,7 +1688,13 @@ export default function CircleLauncherScreen({
   // the one scanner above — one door with `/scan-qr`.
   const onMeAction = (id) => {
     if (id === 'share-contact') { setView('shareContact'); return; }
-    if (id === 'scan') { Promise.resolve(bundle?.callSkill?.('basis', 'scanQr', {})).catch(() => setJoinScanOpen(true)); }
+    if (id === 'scan') {
+      // ONE door: the op opens the scanner through its seam. If it refuses, say so — opening the scanner anyway would be
+      // a second door to the same act.
+      Promise.resolve(bundle?.callSkill?.('basis', 'scanQr', {}))
+        .then((r) => { if (r?.ok === false || r?.error) Alert.alert(t('circle.profile.scan'), String(r?.error?.message ?? r?.error ?? '')); })
+        .catch((err) => Alert.alert(t('circle.profile.scan'), String(err?.message ?? err)));
+    }
   };
 
   // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate). Carries the same fields a

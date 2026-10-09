@@ -28,6 +28,10 @@ import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { compileGateWords, GATE_WORDS } from './gateWords.js';
 import { compilePhrase } from './gatePhrases.js';
+import { encodeGenericOpId } from '@onderling/app-manifest';
+
+/** The household note's generic ops (its people-written noun's own verbs). */
+const NOTE_OP = Object.freeze({ add: encodeGenericOpId('household', 'add', 'note'), list: encodeGenericOpId('household', 'list', 'note'), remove: encodeGenericOpId('household', 'remove', 'note') });
 
 /**
  * Token-gate rules for the circle bot, projected from the circle apps' manifests.
@@ -129,6 +133,18 @@ const GATE_RULES = [
   { id: 'tasks.listMine.who', name: 'tasks:listMine(who)', build: (m) => {
     const who = String(m.person ?? '').replace(/[.!?]+$/, '');
     return who && !NOT_A_PERSON.has(who.toLowerCase()) ? { opId: 'listMine', args: { who } } : null;
+  } },
+  // the household's notes, in people's own words — household's people-written `note` noun, its generic verbs: "onthoud
+  // dat …" / "weetje: …" writes one (never the model: it has no tool for it), "welke weetjes zijn er" reads them,
+  // "vergeet het weetje over …" takes one away (its maker or an admin; the dispatch finds it by its words)
+  { id: 'household.add:note.remember', name: 'household:add-note(remember)', build: (m) => {
+    const text = String(m.text ?? '').replace(/[.!]+$/, '').trim();
+    return text ? { opId: NOTE_OP.add, args: { body: text }, appOrigin: 'household' } : null;
+  } },
+  { id: 'household.list:note.ask', name: 'household:list-note(ask)', build: () => ({ opId: NOTE_OP.list, args: {}, appOrigin: 'household' }) },
+  { id: 'household.remove:note.forget', name: 'household:remove-note(forget)', build: (m) => {
+    const id = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
+    return id ? { opId: NOTE_OP.remove, args: { id }, appOrigin: 'household' } : null;
   } },
   { id: 'lists.addToList.named', name: 'lists:addToList(named-list)', build: (m, _t, { listFor }) => {
     const list = listFor(m.list);

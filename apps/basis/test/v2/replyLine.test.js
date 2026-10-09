@@ -142,7 +142,7 @@ describe('replyLines — one line per family in a turn', () => {
 
 describe('the families cover what the bot reaches', () => {
   it('every op on the bot\'s map that acts has a family; the reads are painted as lists', () => {
-    const reads = new Set(['listLists', 'listEntries', 'shopVisit', 'listMine', 'listEvents', 'weekOverview', 'sendWeekOverview']);
+    const reads = new Set(['listLists', 'listEntries', '__generic__:household:list:note', 'shopVisit', 'listMine', 'listEvents', 'weekOverview', 'sendWeekOverview']);
     // the people reads are worded too (who does it · whose · a day)
     expect(isReadFamily('listOpen') && isReadFamily('listMine') && isReadFamily('weekOverview')).toBe(true);
     expect(isReadFamily('addToList')).toBe(false);

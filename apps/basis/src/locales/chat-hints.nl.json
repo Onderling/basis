@@ -39,6 +39,10 @@
     "registerName": {
       "text": "Zet je naam in het huishouden.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "__generic__:household:list:note": {
+      "text": "Laat de weetjes van het huishouden zien: wat mensen hebben opgeschreven zodat iedereen het weet. Citeer een weetje; verander er nooit een.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "lists": {

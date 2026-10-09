@@ -16,6 +16,7 @@
  */
 
 import { STANDARD_ROLE_TABLE } from '@onderling-app/tasks';
+import { encodeGenericOpId, isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 import { allManifests, DOOR_MANIFESTS } from './manifestSources.js';
 import { HOUSEHOLD_TEMPLATE } from './householdTemplate.js';
 
@@ -24,6 +25,9 @@ import { HOUSEHOLD_TEMPLATE } from './householdTemplate.js';
  * not one of them.
  */
 export const BOT_APPS = Object.freeze([...HOUSEHOLD_TEMPLATE.apps, ...DOOR_MANIFESTS.map((m) => m.app)]);
+
+/** The household note's generic ops (its noun's own verbs): what people write down for everyone to know. */
+export const NOTE_OPS = Object.freeze(['add', 'list', 'remove'].map((atom) => encodeGenericOpId('household', atom, 'note')));
 
 /** Which apps declare each op id, over every manifest the app runs. */
 const DECLARERS = (() => {
@@ -60,6 +64,8 @@ export function qualifyOp(opId) {
   }
   const m = /^([a-z-]+)\/(.+)$/.exec(s);
   if (m) return `${m[1]}.${m[2]}`;
+  // a generic op ("declare a noun → get CRUD free") names its own app in its id
+  if (isGenericOpId(s)) { const g = decodeGenericOpId(s); return g?.app ? `${g.app}.${s}` : null; }
   const apps = DECLARERS.get(s) ?? [];
   return apps.length === 1 ? `${apps[0]}.${s}` : null;
 }
@@ -89,16 +95,21 @@ const COLUMNS = {
     'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'sayReminder', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
     // who is in the household (names as the household allows): anyone in it may ask
     'assistant-people',
+    // the household's notes (weetjes), written by people — household's note noun, its generic ops (the noun is people-
+    // written: the model reads, never writes; removing is the maker's or an admin's, the op refuses anyone else)
+    ...NOTE_OPS,
     // what the bot will send them this week (their own; an admin also the household's rules)
     'assistant-planned',
   ],
   admin: ['reassignTask', 'removeTask', 'editTask'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: ['listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
+  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
 };
 
 /** The bot app that declares this op id, when exactly one does. */
 const botAppOf = (id) => {
+  // a generic op names its app in its id; the columns list exactly which ones the bot offers (household's note, only)
+  if (isGenericOpId(id)) return decodeGenericOpId(id)?.app ?? null;
   const apps = (DECLARERS.get(id) ?? []).filter((a) => BOT_APPS.includes(a));
   return apps.length === 1 ? apps[0] : null;
 };

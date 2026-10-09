@@ -97,7 +97,21 @@ pre_update_export() {   # pre_update_export <outgoing sha>
   exported=1
   role_names | grep -qx assistant || return 0
   local cmd; cmd="$(compose_cmd)"
-  if ! eval "$cmd ps --status running --services" 2>/dev/null | grep -qx assistant; then
+  local running=0
+  eval "$cmd ps --status running --services" 2>/dev/null | grep -qx assistant && running=1
+  # Only a household bot (ONDERLING_PROFILE_KIND=function) holds a household and answers an export request; a person's
+  # own device has none to export (its circles live on the person's other devices too), so asking it only ever timed
+  # out — and held every release. Its own environment says which it is, running or not.
+  local kind
+  if [ "$running" = 1 ]; then
+    kind="$(eval "$cmd exec -T assistant printenv ONDERLING_PROFILE_KIND" 2>/dev/null | tr -d '\r\n')"
+  else
+    kind="$(eval "$cmd run --rm --no-deps -T --entrypoint printenv assistant ONDERLING_PROFILE_KIND" 2>/dev/null | tr -d '\r\n')"
+  fi
+  if [ "$kind" != function ]; then
+    log "the assistant is not a household bot (${kind:-personal}) — no export to take; going ahead"; return 0
+  fi
+  if [ "$running" != 1 ]; then
     # read its volume without starting it: an export file on its shelf from the last day
     if [ -n "$(eval "$cmd run --rm --no-deps -T --entrypoint sh assistant -c \"find /data/assistant/exports -maxdepth 1 -name '*.json' -mmin -1440 2>/dev/null | head -1\"" 2>/dev/null)" ]; then
       log "assistant not running — its shelf holds an export younger than a day; going ahead"; return 0

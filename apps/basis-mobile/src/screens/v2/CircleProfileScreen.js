@@ -11,13 +11,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, lang } from '../../core/localisation.js';
+import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
+import { basisManifest } from '../../../../basis/src/index.js';
 import { useTheme } from './themeContext.js';
 import { plannedForMe, plannedLines } from '../../../../basis/src/v2/plannedForMe.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 import { mijOverviewBlocks, MIJ_OVERVIEW_TITLE_KEY } from '../../../../basis/src/v2/mijOverview.js';
 import CircleScreenView from './CircleScreenView.js';
 
-export default function CircleProfileScreen({ callSkill, personClock = null, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onShareContact }) {
+export default function CircleProfileScreen({ callSkill, personClock = null, onAvailability, onMyData, onSharedWithMe, onOpenMij, onAdvanced, onBlocked, onMeAction }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -98,6 +100,19 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
     <View style={styles.wrap}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID="circle-profile">
       <Text style={styles.title}>{t('circle.profile.title')}</Text>
+
+      {/* The Me actions — painted from the manifest's declaration (`meActions` → `meActionsMobile`), never listed here:
+          Share my card, Scan. One prop carries the choice back, like the tab bar's `onSelect`. */}
+      {typeof onMeAction === 'function' ? (
+        <View style={styles.meActions}>
+          {meActionsMobile(basisManifest).map((a, i) => (
+            <Pressable key={a.id} style={[i === 0 ? styles.primary : styles.secondary, styles.meAction]} onPress={() => onMeAction(a.id)}
+              accessibilityRole="button" testID={`profile-${a.id}`}>
+              <Text style={i === 0 ? styles.primaryText : styles.secondaryText}>{t(a.labelKey)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <Section title={t('circle.profile.identity')}>
         <Field label={t('circle.profile.handle')} value={handle} onChangeText={setHandle} editable={profileLoaded} testID="profile-handle" />
@@ -196,10 +211,6 @@ export default function CircleProfileScreen({ callSkill, personClock = null, onA
         )}
       </Section>
 
-      {/* Share my contact (web parity with circleProfile.js, 2026-09-19): the QR, the code, the link. */}
-      {typeof onShareContact === 'function' && (
-        <Pressable style={styles.secondary} onPress={onShareContact} testID="profile-share-contact"><Text style={styles.secondaryText}>{t('circle.profile.share_contact')}</Text></Pressable>
-      )}
       {typeof onAvailability === 'function' && (
         <Pressable style={styles.secondary} onPress={onAvailability} testID="profile-availability"><Text style={styles.secondaryText}>{t('circle.profile.availability')}</Text></Pressable>
       )}
@@ -256,6 +267,8 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   primary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, justifyContent: 'center', alignSelf: 'flex-start' },
   primaryDisabled: { opacity: 0.4 },
   inputWaiting: { opacity: 0.5 },
+  meActions: { flexDirection: 'row', gap: 10 },
+  meAction: { flex: 1, alignItems: 'center', alignSelf: 'auto' },
   primaryText: { fontSize: 14, fontWeight: '600', color: theme.color.white },
   secondary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent, alignSelf: 'flex-start' },
   secondaryText: { fontSize: 14, fontWeight: '600', color: theme.color.accent },

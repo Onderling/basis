@@ -509,6 +509,16 @@
     "text": "Your default persona",
     "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
   },
+  "scan": {
+    "pair_held": {
+      "text": "This is a pairing code. Pairing from Scan is not here yet — open the circle → Circle settings → Paired devices and add it there.",
+      "doc": "Me → Scan read a pairing code: pairing from Scan waits for a picker-capable form (its own row); say where it can be done today, never drop the code."
+    },
+    "paste_placeholder": {
+      "text": "Paste a code, a link or a claim line",
+      "doc": "Me → Scan on web (no camera): the paste prompt."
+    }
+  },
   "membercard_close": {
     "text": "Close",
     "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
@@ -5667,8 +5677,12 @@
       "text": "development build",
       "doc": "What the version line says for a build with no tag (a dev server)."
     },
-    "share_contact": {
-      "text": "Share my contact →",
+    "scan": {
+        "text": "Scan",
+        "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+      },
+      "share_contact": {
+      "text": "Share my card",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     },
     "overview_title": {

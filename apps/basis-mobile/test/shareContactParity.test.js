@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { basisManifest } from '../../basis/src/index.js';
 const here = (p) => resolve(__dirname, p);
 const read = (p) => readFileSync(here(p), 'utf8');
 
@@ -16,6 +17,8 @@ describe('share my contact — parity', () => {
   const webProfile   = read('../../basis/web/v2/circleProfile.js');
   const mobileScreen = read('../src/screens/v2/ShareMyContactScreen.js');
   const mobileProfile = read('../src/screens/v2/CircleProfileScreen.js');
+  const en = JSON.parse(read('../../basis/src/locales/circle.en.json'));
+  const nl = JSON.parse(read('../../basis/src/locales/circle.nl.json'));
   const mobileClassifier = read('../../basis/src/v2/scanRoute.js');   // the list moved to the shared router (2026-10-09)
 
   it('both shells resolve the panel through the shared loader — neither builds the link or asks stoop itself', () => {
@@ -36,7 +39,13 @@ describe('share my contact — parity', () => {
     expect(mobileClassifier).toMatch(/contactCardFromLink\(/);
   });
   it('Mij offers it on both shells under the same key; both panels speak the same keys', () => {
-    for (const src of [webProfile, mobileProfile]) expect(src).toMatch(/circle\.profile\.share_contact/);
+    // Both Me screens paint the DECLARED row (manifest `meActions`), so they agree by construction; what is pinned is
+    // the agreement — both read the projection, and the row's key resolves in both languages.
+    expect(webProfile).toMatch(/meActionsFor\(basisManifest\)/);
+    expect(mobileProfile).toMatch(/meActionsMobile\(basisManifest\)/);
+    const row = basisManifest.meActions.find((a) => a.id === 'share-contact');
+    expect(row?.labelKey).toBe('circle.profile.share_contact');
+    for (const loc of [en, nl]) expect(row.labelKey.split('.').slice(1).reduce((o, k) => o?.[k], loc)?.text, 'resolves').toBeTruthy();
     for (const key of ['title', 'hint', 'code_label', 'link_label', 'error']) {
       for (const src of [webPanel, mobileScreen]) expect(src, key).toMatch(new RegExp(`circle\\.shareContact\\.${key}`));
     }

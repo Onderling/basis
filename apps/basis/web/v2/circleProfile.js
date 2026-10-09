@@ -19,6 +19,8 @@
  * hardcoded tr('circle.profile.title'). Pure selector lives in shared src.
  */
 import { pageLabel } from '../../src/v2/pageProjection.js';
+import { meActionsFor } from '../../src/v2/meActionProjection.js';
+import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { MIJ_OVERVIEW_TITLE_KEY } from '../../src/v2/mijOverview.js';
 import { renderCircleScreen } from './circleScreen.js';
@@ -60,9 +62,9 @@ export function renderCircleProfile(container, {
   // last line of Mij, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's
   // build looked like a laptop that receives nothing).
   version,
-  // Share my contact (2026-09-19) — the panel with this person's contact as a QR, a code and a link, so
-  // someone can be handed it without a circle. Absent ⇒ omitted, like its peers.
-  onShareContact,
+  // The Me actions (Share my card · Scan) — DECLARED in the manifest (`meActions`), painted here from the projection;
+  // this one callback carries the chosen id back (like the tab bar's handlers). Absent ⇒ none painted.
+  onMeAction,
   // D / consumer-switch — the projected PAGE surface for the `me` op
   // (renderWeb(manifest).pages[] entry, selected via pageForOp). When present,
   // the header label is derived from `page.labelKey` via t, making this
@@ -83,6 +85,14 @@ export function renderCircleProfile(container, {
   // tr('circle.profile.title') when no projected page is passed.
   heading.textContent = pageLabel(profilePage, tr, tr('circle.profile.title'));
   container.appendChild(heading);
+
+  // ── the Me actions, from the declaration (Share my card · Scan) ──
+  if (typeof onMeAction === 'function') {
+    const row = document.createElement('div');
+    row.className = 'cc-profile__me-actions';
+    for (const a of meActionsFor(basisManifest)) row.appendChild(button(tr(a.labelKey), `cc-profile__${a.id}`, () => onMeAction(a.id)));
+    container.appendChild(row);
+  }
 
   // ── identity (handle + display name) ────────────────────────────────────
   const idSection = section(tr('circle.profile.identity'));
@@ -206,9 +216,6 @@ export function renderCircleProfile(container, {
   container.appendChild(locSection);
 
   // ── availability + my-data links ──────────────────────────────────────────
-  if (typeof onShareContact === 'function') {
-    container.appendChild(button(tr('circle.profile.share_contact'), 'cc-profile__share-contact', onShareContact));
-  }
   if (typeof onAvailability === 'function') {
     const avail = button(tr('circle.profile.availability'), 'cc-profile__availability', onAvailability);
     container.appendChild(avail);

@@ -142,6 +142,24 @@ manifest classifies it in its `domainVerbs` map (see `verbKind`).
 
 How a manifest classifies each of its domain verbs: `domainVerbs` is a map `{ verb: 'read' | 'write' }`.
 
+### `NOUN_WRITERS`
+
+**Kind:** constant · **Import:** `NOUN_WRITERS` from `'@onderling/app-manifest'`
+
+Who writes a noun's items, when a manifest says so (`nouns[noun].writtenBy`). `people` — PEOPLE write them, never the
+model: the noun's generic WRITE atoms carry no chat surface (no model tool), and an item is changed or removed only by
+the one who made it or an admin. (A household's notes: what people want everyone to know, in their own words.)
+
+### `isPeopleWritten`
+
+**Kind:** function · **Import:** `isPeopleWritten` from `'@onderling/app-manifest'`
+
+```js
+isPeopleWritten(manifest, noun)
+```
+
+Is this noun's content written by people only (`nouns[noun].writtenBy: 'people'`)?
+
 ### `verbKind`
 
 **Kind:** function · **Import:** `verbKind` from `'@onderling/app-manifest'`
@@ -464,6 +482,52 @@ A cap not in the matrix (domain verb / not gated) → `'show'`. Pure; surfaces m
 
 **Returns:** `'show'|'grey'|'hide'|'limit'`
 
+## `src/gateVerbs.js`
+
+### `gateVerbsOf`
+
+**Kind:** function · **Import:** `gateVerbsOf` from `'@onderling/app-manifest'`
+
+```js
+gateVerbsOf(manifest, op, locale = null)
+```
+
+gateVerbs — the words an op's deterministic match starts with, per language.
+
+A manifest declares THAT an op has gate words, and how the rest of the line is read (`surfaces.slash.match`:
+`body`, `arg`, …). The words themselves are data the app ships beside its manifest, one file per language
+(`gate.<lang>.json`, keyed by `<app>.<op>`, each entry with `doc`, `verbs`, `examples`, `not`), carried on the
+manifest as `gateWords: { <lang>: entries }` — so a translator reaches them, a received manifest brings them, and
+the words guard runs each entry's own examples. A verb is a phrase ("zet afspraak"), split on spaces. The trailing
+connector words a match drops ("tandarts MET Bert" → "tandarts") are words too: the manifest says THAT the match
+drops them (`dropTrailing: true`), the entry which (`dropTrailing: ["with"]`), per language.
+
+With a locale the manifest has words for, only that language's verbs match; without one (or one it has no words
+for), every language's do, in the order the files were given. An op whose app has not moved its words yet keeps
+`match.verbs` on the manifest.
+
+**Parameters**
+
+- `manifest` `object`
+- `op` `object`
+- `[locale]` `string|null`
+
+**Returns:** `Array<string[]>` — each verb as its words
+
+### `gateDropTrailingOf`
+
+**Kind:** function · **Import:** `gateDropTrailingOf` from `'@onderling/app-manifest'`
+
+```js
+gateDropTrailingOf(manifest, op, locale = null)
+```
+
+The connector words this op's match drops from the end of its body, for a locale (same rule as the verbs: the
+locale's, or every language's without one), or null when the match drops none. An app that has not moved yet keeps
+the list on the manifest.
+
+**Returns:** `string[]|null`
+
 ## `src/genericOp.js`
 
 ### `encodeGenericOpId`
@@ -567,6 +631,8 @@ _No JSDoc block in the source (recorded gap — see the coverage table)._
 - `[opts]` `object`
 - `[opts.isNeverDelegable]` `(opId:string)=>boolean` — override the withhold predicate (tests)
 - `[opts.readArgs]` `(parts:any)=>object` — how to read args off the inbound Parts
+- `[opts.ctxFor]` `(handlerCtx:object, op:{appOrigin:string, opId:string})=>Promise<object|null>|object|null` — who a peer's call runs AS: the waist's ctx, from the verified call (its token's `actingAs`). Returning nothing refuses the call before the op (`not-bound`), and only the op's declared params pass. Absent → no ctx and the args as sent, as before (a person's own agent: its screen IS the owner).
+- `[opts.never]` `Iterable<string>` — the shell's own withheld ops (`app.opId`), besides the kernel's
 
 **Returns:** `Array<{id:string, handler:Function, visibility:string, policy:string, description:string}>` — Skill definitions, ready for `SkillRegistry.register`. NOT registered here — this is a projector, and deciding WHICH agent exposes them is the composing app's call, not the manifest's.
 
@@ -774,34 +840,7 @@ FIRST command.
 renderSlash(manifest, opts = {})
 ```
 
-Render the deterministic, generic slash-grammar matcher.
-
-`parse(text)` returns the same shape household's `regexParse` does:
-    null                                  (no match — caller falls back)
-  | { skillId, args }
-  | Array<{ skillId, args }>              (multi-item, when an op opts
-                                           into splitItems)
-
-Drop-in for the byte-equivalence gate.
-
-Driven by:
-  - manifest.slashGrammar              (addressedPrefixes, specials,
-                                         typeAliases, defaultType)
-  - per-op surfaces.slash.match        (verbs, body, splitItems, onEmpty)
-
-Pure.  Deterministic.  Verbs / operations tried in declaration order;
-first match wins.  Patterns compiled once per `renderSlash` call so
-`parse` stays cheap.
-
-Per PLAN flag #13 (F-SP1-b, locked 2026-05-19): the grammar spec is
-rich enough to encode household's regexParse — EN/NL aliases, multiword
-verb phrases ('voeg toe'), special forms ('what do we need'), item
-splitting on `,`/` and `/` en ` with quote handling, peel-type +
-default-type fallback, trailing-punct strip, addressed-prefix strip.
-
-**Parameters**
-
-- `manifest` `import('./schema.js').Manifest`
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ## `src/renderWeb.js`
 

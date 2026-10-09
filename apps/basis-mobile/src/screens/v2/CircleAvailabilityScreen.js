@@ -13,12 +13,14 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 
 export default function CircleAvailabilityScreen({ store, onBack }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [working, setWorking] = useState(null);
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
       {onBack ? (
         <View style={styles.bar}>
           <Pressable onPress={onBack} accessibilityRole="button" testID="circle-availability-back">
-            <Text style={styles.back}>{t('circle.back')}</Text>
+            <Text style={styles.back}>{t('circle.back_me')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -72,6 +74,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
             value={h.until || ''}
             onChangeText={(v) => setHoliday({ until: v || null })}
             placeholder="YYYY-MM-DD"
+            placeholderTextColor={theme.color.inkSoft}
             autoCapitalize="none"
             autoCorrect={false}
             testID="holiday-until"
@@ -90,6 +93,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
             value={q.from || ''}
             onChangeText={(v) => setQuiet({ from: v })}
             placeholder="HH:MM"
+            placeholderTextColor={theme.color.inkSoft}
             autoCapitalize="none"
             autoCorrect={false}
             testID="quiet-from"
@@ -102,6 +106,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
             value={q.to || ''}
             onChangeText={(v) => setQuiet({ to: v })}
             placeholder="HH:MM"
+            placeholderTextColor={theme.color.inkSoft}
             autoCapitalize="none"
             autoCorrect={false}
             testID="quiet-to"
@@ -120,8 +125,8 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  page:     { flex: 1, paddingHorizontal: 16, paddingTop: 12, backgroundColor: theme.color.paper },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  page:     { flex: 1, paddingHorizontal: 16, paddingTop: 12 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   bar:      { flexDirection: 'row', alignItems: 'center', minHeight: 22 },
   back:     { fontSize: 13, color: theme.color.inkSoft },
   title:    { fontSize: 24, fontWeight: '600', fontFamily: theme.font.serif, color: theme.color.ink, marginVertical: 10 },
@@ -130,7 +135,7 @@ const makeStyles = (theme) => StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },
   rowLabel: { fontSize: 14, color: theme.color.ink, flexShrink: 1, paddingRight: 8 },
-  input:    { width: 130, padding: 9, borderWidth: 1, borderColor: theme.color.accent, borderRadius: 8, backgroundColor: theme.color.white, fontSize: 14, textAlign: 'center' },
+  input:    { width: 130, padding: 9, borderWidth: 1, borderColor: theme.color.accent, borderRadius: 8, backgroundColor: theme.color.white, color: theme.color.ink, fontSize: 14, textAlign: 'center' },
   muted:    { color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 10 },
   save:     { marginTop: 8, marginBottom: 12, padding: 13, borderRadius: 8, backgroundColor: theme.color.accent, alignItems: 'center' },
   saveText: { color: theme.color.white, fontSize: 15, fontWeight: '700' },

@@ -40,6 +40,7 @@ import { DEFAULT_INTERPRET_SYSTEM } from './interpretCommand.js';
 import { detectLang } from './assistantLanguage.js';
 import { chatHintFor } from './chatHints.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { encodeGenericOpId } from '@onderling/app-manifest';
 
 export const ASSISTANT_MEMORY_TURNS = 6;
 /** How much the model may vary: low and fixed, so the same line picks the same tool. No `tool_choice`. */
@@ -293,11 +294,14 @@ export function interpretHintsFor(text) {
  * @param {{ callSkill: Function }} a
  */
 export function loadAssistantItems({ callSkill }) {
-  return async () => {
+  const read = async (op, type) => {
     try {
-      const r = await callSkill('household', 'listOpen', {});
+      const r = await callSkill('household', op, {});
       const items = Array.isArray(r?.items) ? r.items : [];
-      return items.map((it) => ({ id: String(it.id ?? ''), type: it.type ?? 'item', text: String(it.text ?? it.label ?? '') })).filter((it) => it.text);
+      return items.map((it) => ({ id: String(it.id ?? ''), type: it.type ?? type, text: String(it.text ?? it.label ?? '') })).filter((it) => it.text);
     } catch { return []; }
   };
+  // the open list items, and the household's notes (weetjes: what its people wrote down for everyone to know) — the
+  // model reads a note it is given here; it has no tool to write or change one
+  return async () => [...await read('listOpen', 'item'), ...await read(encodeGenericOpId('household', 'list', 'note'), 'note')];
 }

@@ -22,8 +22,8 @@ import { decodeContactCard } from '../src/v2/contactCardLink.js';
 
 const dir = process.env.WALK_DIR;
 const botAddr = process.env.BOT_ADDR;
-const relayUrl = process.env.RELAY_URL || 'wss://relay.onderling.org';
-if (!dir || !botAddr) { console.error('walk: set WALK_DIR and BOT_ADDR'); process.exit(2); }
+const relayUrl = process.env.RELAY_URL;      // the relay to walk over — an argument, never a default
+if (!dir || !botAddr || !relayUrl) { console.error('walk: set WALK_DIR, BOT_ADDR and RELAY_URL'); process.exit(2); }
 const lines = String(process.env.WALK_LINES ?? '').split('|').map((s) => s.trim()).filter(Boolean);
 const settleMs = Number(process.env.WALK_SETTLE_MS || 6000);
 const firstMs = Number(process.env.WALK_TIMEOUT_MS || 120_000);

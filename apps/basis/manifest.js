@@ -613,7 +613,7 @@ export const basisManifest = {
         {
           id: 'relay-endpoint', kind: 'text', scope: 'device',
           opId: 'set-relay', arg: 'url',
-          labelKey: 'circle.settings.relayEndpoint', hintKey: 'circle.settings.relayEndpoint_hint',
+          labelKey: 'circle.settings.relayEndpoint', hintKey: 'circle.mydata.relay_hint',
           enabledWhen: 'always',
         },
         // Wake nudges — device-scoped, OFF by default (silence-by-default). Enabling registers this

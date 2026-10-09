@@ -18,17 +18,19 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
   KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
-  initialState, isValidSlug, labelOf,
-  buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
+  initialState, labelOf,
+  buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl, withinMs, POLICY_WRITE_BOUND_MS,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
   CIRCLE_KINDS, setKind, setSize, setStoragePolicy, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
   // The persona the circle is founded as (web parity).
-  loadPersonas, withPersonas, founderPersonaName,
+  loadPersonas, withPersonas, founderPersonaName, personaLabel,
   // The circle's id comes from its founder (web parity, L126).
   resolveFounderKey, newFounderCircleId,
+  // The founder's handle, asked only when their profile has none (the join wizard's field and checks).
+  loadFounderHandle, identityComplete,
 } from '../../core/wizards/createGroupState.js';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
@@ -38,7 +40,7 @@ import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 
 import {
-  Steps, Body, Field, Textarea, RadioGroup, Checkbox,
+  Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField,
   Actions, ErrorBanner, Submitting, ReviewList, Warn,
 } from './_kit.js';
 import { wizardPalette } from './_palette.js';
@@ -78,6 +80,12 @@ export default function CreateGroupWizardModal({
     }).catch(() => {});
     return () => { active = false; };
   }, [callSkill]);   // not `getMyPeerAddr`: the shells pass an inline arrow, new on every render — read once is the point
+  // Does the founder need a handle? Read once on open; a founder without one reached every member as `peer-xxxxxx`.
+  useEffect(() => {
+    let active = true;
+    loadFounderHandle({ callSkill }).then((r) => { if (active) setState((s) => ({ ...s, ...r })); }).catch(() => {});
+    return () => { active = false; };
+  }, [callSkill]);
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
   const updateName = useCallback((name) => setState((s) => ({ ...s, name })), []);
 
@@ -86,13 +94,8 @@ export default function CreateGroupWizardModal({
     setState(next);
     const { result, state: after } = await finalSubmit({ state: next, callSkill, shareRelease: shareFounderRelease });
     setState({ ...after, successResult: result ?? null });
-    // N1+E8 — persist the chosen policy (features incl. neighbourhood chat-off,
-    // reveal/pod/llm/agents/consensus) so the new circle opens with the
-    // right surfaces.  Best-effort; creation already succeeded.
-    if (result && typeof persistPolicy === 'function') {
-      try { await persistPolicy(result.groupId, policyPatchFromState(after)); }
-      catch { /* policy write is best-effort */ }
-    }
+    // The invite goes out FIRST — the circle exists, and sharing it is the next thing the founder does. Everything
+    // after it is bookkeeping the wizard must not wait on unbounded (walk 2026-10-09: ~3 min of "Creating circle…").
     if (result && typeof onDispatched === 'function') {
       // 2026-05-27 (Bundle I).  Surface the invite URL + a scannable QR
       // so the admin can share the circle right away — the web wizard's
@@ -132,10 +135,20 @@ export default function CreateGroupWizardModal({
         });
       } catch {}
     }
+    // N1+E8 — persist the chosen policy (features incl. neighbourhood chat-off,
+    // reveal/pod/llm/agents/consensus) so the new circle opens with the
+    // right surfaces.  Best-effort; creation already succeeded. Bounded: it is a
+    // local write, and a stuck one must not hold the wizard open.
+    if (result && typeof persistPolicy === 'function') {
+      try { await withinMs(persistPolicy(result.groupId, policyPatchFromState(after)), POLICY_WRITE_BOUND_MS); }
+      // The bound stops the WAIT, not the write: a write still running finishes in the background (walked 2026-10-09: >3 s
+      // on an emulator, and the circle opened with its template's tabs). Only a write that FAILED leaves the policy unset.
+      catch (err) { console.warn(`[create] the circle's policy write is still running or failed: ${err?.message ?? err}`); }
+    }
     if (result) onClose?.();
   }, [state, callSkill, onDispatched, onClose, persistPolicy, shareFounderRelease]);
 
-  const canAdvance1 = state.name.trim().length > 0 && isValidSlug(state.groupId);
+  const canAdvance1 = identityComplete(state);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -189,6 +202,17 @@ export default function CreateGroupWizardModal({
                   onChangeText={updateName}
                   placeholder="e.g. Onze Circle"
                 />
+                {state.needsHandle ? (
+                  <HandleField
+                    t={t}
+                    value={state.handle}
+                    onChange={(v) => setState((s) => ({ ...s, handle: v }))}
+                    suggestions={state.handleSuggestions}
+                    // Under the circle's own name, "Name" read twice: here it is the person's name IN the circle.
+                    label={t('circle.wizard.create.your_name')}
+                    hint={t('circle.join.wizard.handle.intro')}
+                  />
+                ) : null}
                 {state.personas.length > 0 && (
                   <>
                     <RadioGroup
@@ -199,7 +223,7 @@ export default function CreateGroupWizardModal({
                         { id: '', label: t('circle.wizard.create.persona.minimal') },
                         ...state.personas.map((p) => ({
                           id: p.id,
-                          label: p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
+                          label: personaLabel(p, t),
                         })),
                       ]}
                     />
@@ -403,9 +427,8 @@ export default function CreateGroupWizardModal({
                 <Body title={t('circle.wizard.create.step_review')} intro={t('circle.wizard.create.step_review_intro')}>
                   <ReviewList items={[
                     { label: 'Name',        value: state.name },
-                    { label: 'Circle id',    value: state.groupId, monospace: true },
                     { label: t('circle.wizard.create.review_persona'),
-                      value: founderPersonaName(state) ?? t('circle.wizard.create.review_persona_minimal') },
+                      value: founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal') },
                     ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
                     ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
                     ...(rules.additionalAdmins ? [{ label: 'Extra admins', value: rules.additionalAdmins.join(', ') }] : []),

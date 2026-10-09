@@ -92,6 +92,33 @@ export function Field({ label, value, onChangeText, placeholder, monospace, hint
   );
 }
 
+/**
+ * A person's handle in a circle — the ONE field both wizards ask it with: joining (the handle you show there) and
+ * creating (the founder's, when their profile has none). Its words, its monospace, and its suggestions row (shown only
+ * when there is something to suggest) live here, so the two cannot drift.
+ */
+export function HandleField({ t, value, onChange, suggestions = [], label = null, hint = null }) {
+  const styles = makeStyles(useWizardPalette());
+  return (
+    <>
+      <Field
+        label={label ?? t('circle.join.wizard.handle.label')}
+        value={value}
+        onChangeText={onChange}
+        placeholder={t('circle.join.wizard.handle.placeholder')}
+        monospace
+        hint={hint}
+      />
+      {suggestions.length ? (
+        <>
+          <Text style={styles.fieldLabel}>{t('circle.join.wizard.handle.suggestions')}</Text>
+          <Chips items={suggestions} onPress={onChange} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export function Textarea({ label, value, onChangeText, placeholder, rows = 4 }) {
   const styles = makeStyles(useWizardPalette());
   return (

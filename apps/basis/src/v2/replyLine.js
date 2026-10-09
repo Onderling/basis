@@ -54,6 +54,9 @@ export const REPLY_FAMILY = Object.freeze({
   restoreList: 'list',
   editEntry: 'list',
   entryReminders: 'list',
+  // a household note written or taken away: in the op's own words ("Onthouden: …", "Vergeten: …")
+  '__generic__:household:add:note': 'list',
+  '__generic__:household:remove:note': 'list',
   // the people reads
   listOpen: 'who',
   listMine: 'mine',
@@ -112,7 +115,8 @@ export function replyFact(result, { opId, args = {} } = {}) {
       const key = id === 'addEvent' ? (result.duplicate ? 'circle.calendar.already_there' : 'circle.calendar.added')
         : id === 'cancelEvent' ? 'circle.calendar.cancelled'
           : `circle.calendar.rsvp_${RSVP[id]}`;
-      return { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: false } };
+      // a day without a time (local midnight — the whole day) is said without a time, as a chore's day is
+      return { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: 'auto' } };
     }
     default:
       return own;

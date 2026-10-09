@@ -19,7 +19,7 @@
 // Accuracy is the requirement; this generator is driven by the real exported surface.
 //
 // Run:  node scripts/api-appendix.mjs          (regenerates docs/api/ deterministically)
-// Used by:  scripts/api-fitness.mjs            (no-diff + coverage guard; `npm run api-fitness`)
+// Used by:  scripts/lint-api-docs.mjs          (no-diff + coverage guard, in `npm run guards`; `npm run api-fitness`)
 //
 // Note: importing @onderling/item-types prints one ajv strict-mode warning line — harmless.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';

@@ -497,9 +497,21 @@
     "text": "Kringen laden…",
     "doc": "Shown while circles are being fetched."
   },
+  "back_me": {
+    "text": "← Mij",
+    "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
+  },
   "back": {
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
+  },
+  "persona_default_name": {
+    "text": "Je standaardpersona",
+    "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
+  },
+  "membercard_close": {
+    "text": "Sluiten",
+    "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
   },
   "detail_empty": {
     "text": "Nog niks hier.",
@@ -1750,10 +1762,6 @@
       "text": "Relay-server",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
-    "relayEndpoint_hint": {
-      "text": "Voeg een WebSocket-relay toe (ws:// of wss://). Laat leeg voor de standaard.",
-      "doc": "Phase 4 §9 — relay endpoint hint."
-    },
     "relayEndpoint_placeholder": {
       "text": "wss://relay.voorbeeld.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
@@ -1765,6 +1773,26 @@
     "relayEndpoint_clear": {
       "text": "Wissen",
       "doc": "Phase 4 §9 — relay endpoint clear button."
+    },
+    "relayAsk_title": {
+      "text": "Welke relay gebruik je?",
+      "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
+    },
+    "relayAsk_body": {
+      "text": "Je kreeg hem van wie je uitnodigde, of van degene die je agent draait. Zonder relay bereiken je apparaten en contacten elkaar alleen rechtstreeks.",
+      "doc": "The relay question — the body: where a person gets a relay, and what happens without one."
+    },
+    "relayAsk_save": {
+      "text": "Bewaren",
+      "doc": "The relay question — saves the relay (through the relay setting)."
+    },
+    "relayAsk_later": {
+      "text": "Later",
+      "doc": "The relay question — not now; asked again at the next app start."
+    },
+    "relayAsk_invalid": {
+      "text": "Dat is geen relay-adres — het begint met wss:// of ws://.",
+      "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
       "text": "Privéchat tussen leden",
@@ -3446,7 +3474,7 @@
         "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
       },
       "agents": {
-        "text": "Agents",
+        "text": "Bots",
         "doc": "P1.7 — author chip: only what the agents said."
       }
     }
@@ -3767,6 +3795,14 @@
     "not_there": {
       "text": "\"{{item}}\" staat op geen lijst.",
       "doc": "A household bot's reply when a person names a chore or entry that is not there."
+    },
+    "already_done": {
+      "text": "\"{{text}}\" is al afgevinkt.",
+      "doc": "A tap on a line someone already ticked (a button on an older list message): says so by the line's words, never its id."
+    },
+    "line_gone": {
+      "text": "Die regel staat niet meer op een lijst.",
+      "doc": "A tap on a line that was taken off since the list message was sent (a stale button): never shows the id."
     },
     "which_one": {
       "text": "Welke bedoel je: {{options}}?",
@@ -4145,6 +4181,10 @@
     "apps_none_left": "Er moet minstens één app aan blijven.",
     "status": "Apps: {{apps}}\nModel: {{model}}\nDeur: {{door}}\nGesprekken in het logboek: {{turns}}\nStandaard geheugen: {{memory}}\nToegelaten mensen: {{users}}",
     "users_none": "Nog niemand toegelaten.",
+    "admission_relink": {
+      "text": "Koppel opnieuw: typ /start <code> in de app (de code geeft de beheerder, zoals altijd).",
+      "doc": "Told once to a person admitted at the bot's inbox before their app signed its turns: they re-link with a fresh code."
+    },
     "admission_needs_code": {
       "text": "Om met deze assistent te praten heb je een code nodig van de beheerder. Stuur dan: /start <code>",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
@@ -4362,11 +4402,11 @@
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_morning": {
-      "text": "'s ochtends (08:00)",
+      "text": "'s ochtends ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_evening": {
-      "text": "de avond ervoor (19:00)",
+      "text": "de avond ervoor ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_before": {
@@ -4892,6 +4932,11 @@
           "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
           "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
+        },
+        "household": {
+          "__generic__:household:add:note": "een weetje voor iedereen opschrijven (of zeg: onthoud dat de vuilnis dinsdag buiten gaat)",
+          "__generic__:household:list:note": "de weetjes van het huishouden (of zeg: welke weetjes zijn er)",
+          "__generic__:household:remove:note": "een weetje weghalen — je eigen, of als beheerder (of zeg: vergeet het weetje over de wifi)"
         }
       }
     },
@@ -4973,6 +5018,14 @@
     "day_unread": {
       "text": "Welke dag bedoel je met '{{day}}'? Zeg bijvoorbeeld 'zaterdag' of 'morgen'.",
       "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    },
+    "welcome_notes": {
+      "text": "Weetjes voor iedereen: \"onthoud dat de wifi-code op de koelkast staat\"; \"welke weetjes zijn er\" laat ze zien, en ik gebruik ze als je iets vraagt.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_notes_read": {
+      "text": "\"Welke weetjes zijn er\" laat zien wat het huishouden heeft opgeschreven.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     }
   },
   "op": {
@@ -5775,7 +5828,7 @@
       "doc": "Mobile relay save confirmation (applies on next app open; mobile has no live reconnect yet)."
     },
     "relay_hint": {
-      "text": "Wijs dit naar een bereikbare relay om zonder server tussen apparaten te synchroniseren (bijv. ws://192.168.1.20:8787). Laat leeg voor de standaard.",
+      "text": "Je kreeg hem van wie je uitnodigde, of van wie je agent draait. Leeg laten: geen relay, dan alleen rechtstreekse verbindingen.",
       "doc": "Relay setting help text."
     },
     "privacy": {
@@ -7293,6 +7346,10 @@
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
+      "your_name": {
+        "text": "Jouw naam in deze kring",
+        "doc": "The founder's handle field in the create wizard, asked when their profile has none — directly under the circle's own name field, so it names whose name it is."
+      },
       "review_persona": {
         "text": "Gestart als",
         "doc": "Create wizard, review — the founding persona's row."
@@ -7908,6 +7965,10 @@
       "text": "Nog niets.",
       "doc": "Telegram runner: a list reply with no items."
     },
+    "refresh": {
+      "text": "Ververs",
+      "doc": "The button under a list message in a chat: sends the list again, read fresh (a list message goes stale once someone ticks a line elsewhere)."
+    },
     "list_shopping": {
       "text": "boodschappen",
       "doc": "Telegram runner: the \"shopping\" household list as a button label when the assistant asks which list."
@@ -7955,10 +8016,6 @@
     "error": {
       "text": "Je contact kon nu niet worden gemaakt.",
       "doc": "When getContactShareQr fails (no identity yet)."
-    },
-    "back": {
-      "text": "← Mij",
-      "doc": "Back to the Mij screen."
     },
     "opened_added": {
       "text": "{{name}} is toegevoegd aan je contacten.",
@@ -8428,7 +8485,8 @@
       "assistant-role": "Rol",
       "assistant-revoke": "Eruit",
       "removeFromList": "Weg",
-      "entryReminders": "Herinneringen"
+      "entryReminders": "Herinneringen",
+      "__generic__:household:remove:note": "Weg"
     },
     "household": "Het huishouden",
     "people": "Wie er in huis zijn",
@@ -8628,6 +8686,32 @@
     "day_none": {
       "text": "Op {{when}} staat er niets.",
       "doc": "One day's read: no appointments and no chores that day."
+    }
+  },
+  "notes": {
+    "need_text": {
+      "text": "Wat moet ik onthouden? Bijvoorbeeld: onthoud dat de vuilnis dinsdag buiten gaat.",
+      "doc": "A note added with no words."
+    },
+    "added": {
+      "text": "Onthouden: {{text}}",
+      "doc": "A note was added (a weetje: something the household wants known)."
+    },
+    "title": {
+      "text": "Weetjes",
+      "doc": "The heading above the household's notes."
+    },
+    "not_there": {
+      "text": "Dat weetje ken ik niet{{item}}.",
+      "doc": "Removing a note that is not there; item is \" (words)\" or empty."
+    },
+    "not_yours": {
+      "text": "\"{{text}}\" heeft iemand anders opgeschreven — dat mag alleen die persoon of een beheerder weghalen.",
+      "doc": "A member tried to remove a note they did not write."
+    },
+    "removed": {
+      "text": "Vergeten: {{text}}",
+      "doc": "A note was removed."
     }
   }
 }

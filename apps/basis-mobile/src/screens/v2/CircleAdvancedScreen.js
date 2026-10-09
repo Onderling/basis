@@ -8,14 +8,16 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { advancedOpRows, advancedParamRows } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import OpPageModal from './OpPageModal.js';
 
-export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill }) {
+export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill, onBack = null }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const ops = useMemo(() => advancedOpRows({ manifests: Object.values(manifestsByOrigin) }), [manifestsByOrigin]);
   const [params, setParams] = useState([]);
   const [drafts, setDrafts] = useState({});
@@ -55,6 +57,11 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
 
   return (
     <ScrollView testID="circle-advanced-screen" style={styles.screen} contentContainerStyle={styles.wrap}>
+      {onBack ? (
+        <Pressable onPress={onBack} accessibilityRole="button" testID="circle-advanced-back">
+          <Text style={styles.back}>{t('circle.back_me')}</Text>
+        </Pressable>
+      ) : null}
       <Text style={styles.title}>{t('circle.advanced.title')}</Text>
 
       <Text style={styles.section}>{t('circle.advanced.params_title')}</Text>
@@ -127,12 +134,13 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
+const makeStyles = (theme, insets) => StyleSheet.create({
   // The screen paints its OWN ground. Every colour here came from the theme except this one, which was
   // simply absent — so on a dark device the themed (light) ink landed on the platform's default white
   // and the whole tab read as washed out beside an otherwise black app. A screen that themes its text
   // and not its background is not half-themed; it is unreadable in exactly one mode.
-  screen:   { flex: 1, backgroundColor: theme.color.paper },
+  screen:   { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
+  back:     { fontSize: 15, color: theme.color.accent, marginBottom: 10 },
   wrap:     { padding: 16, paddingBottom: 48, backgroundColor: theme.color.paper },
   title:    { fontSize: 20, fontWeight: '700', color: theme.color.ink, marginBottom: 12 },
   section:  { fontSize: 14, fontWeight: '700', color: theme.color.ink, marginTop: 18, marginBottom: 4 },

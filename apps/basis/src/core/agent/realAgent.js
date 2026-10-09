@@ -59,6 +59,7 @@ import {
 import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
+import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
 import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
 
@@ -261,7 +262,7 @@ import { botDoorChecks } from '../../v2/botRungs.js';                           
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
-import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
+import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 
 // Deterministic seed for the real household store.  Three open items across
@@ -2919,6 +2920,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     return auth ? { ...args, auth } : null;
   };
   /** Is this address a household bot the person's identity is linked to (`/koppel`) — a contact row marked so? */
+  /** Typing `/start <code>` to a bot: the admission by its card's code. */
+  const ADMISSION_TURN = /^\/start(?:@\S+)?\s+\S+$/;
+  /** Whether a contact's card says it is a bot (display only — the admission still has to be the person's own act). */
+  const claimsBot = async (address) => {
+    if (typeof address !== 'string' || !address) return false;
+    try { return (await rawContacts()).some((c) => c?.bot === true && (c.webid === address || c.peerAddr === address) && !c.hidden); } catch { return false; }
+  };
   const isLinkedBot = async (address) => {
     if (typeof address !== 'string' || !address) return false;
     try { return linkedBotsOf(await rawContacts()).includes(address); } catch { return false; }
@@ -3485,6 +3493,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     return { reopened };
   }
   await reopenMemberCircles();
+  // Every circle this device is in belongs on the restore list. A create writes its record after answering; one
+  // that did not land (an agents store that was down) is written here, at the next boot. Not awaited: boot does
+  // not wait on it, and each write is bounded.
+  healRestoreList({
+    circleIds: async () => circleIdsFrom(await rawStoop('listMyCircles', {}))
+      .filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId),
+    memberships: () => readSelfCircleMemberships(),
+    addressFor: circleAddressFor,
+    write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address }),
+    log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
+  }).catch(() => { /* the next boot tries again */ });
 
   // Pre-seed the demo circle with 4 starter tasks — the demo + journey
   // fixtures expect /mytasks to show these out of the box.  DEMO-ONLY: a real
@@ -4647,10 +4666,45 @@ export async function createRealHouseholdAgent(opts = {}) {
       // household is the only app with a capability entry today; `by`/`circleId` are sourced
       // exactly like the bespoke household path below (chatId.pubKey actor · resolved circle).
       if (g?.app === 'household' && householdService) {
-        return householdService.callCapability(g.atom, g.noun, args ?? {}, {
+        const capCtx = {
           circleId: resolveCircleId(args),
-          by:       chatId?.pubKey,
-        });
+          // made by the PERSON at the door (as chores and appointments are, `actorOf`), never by the device: a note on a
+          // household bot was "made by the bot" for everyone, and whose it was could not be judged
+          by:       actorOf(ctx) ?? chatId?.pubKey,
+        };
+        // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
+        // the maker's or an admin's — anyone else is refused, and nothing changes.
+        if (isPeopleWritten(householdManifest, g.noun) && ['get', 'update', 'remove'].includes(g.atom)) {
+          const listed = await householdService.callCapability('list', g.noun, {}, capCtx);
+          const items = (listed?.result?.items ?? listed?.items ?? []).filter((i) => i && i.type === g.noun);
+          const ref = String(args?.id ?? '').trim();
+          const wordsOf = (i) => String(i.body ?? i.text ?? i.title ?? '');
+          let item = items.find((i) => i.id === ref) ?? null;
+          if (!item && ref) {
+            const { entry, among } = matchEntry(items, ref, wordsOf);
+            if (!entry && among?.length) return { ok: false, error: agentT('circle.lists.which_one', { options: choicesOf(among, wordsOf) }) };
+            item = entry ?? null;
+          }
+          if (!item) return { ok: false, code: 'not-found', error: agentT('circle.notes.not_there', { item: ref ? ` (${ref})` : '' }) };
+          if (g.atom !== 'get' && item.createdBy !== capCtx.by && doorRoles.get(actorOf(ctx)) !== 'admin') {
+            return { ok: false, code: 'forbidden', error: agentT('circle.notes.not_yours', { text: wordsOf(item) }) };
+          }
+          args = { ...(args ?? {}), id: item.id, _words: wordsOf(item) };
+        }
+        const done = await householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx);
+        // A people-written noun answers in words a door can say: what was written or taken away, and the list as a list.
+        if (isPeopleWritten(householdManifest, g.noun) && done?.ok !== false) {
+          const inner = done?.result ?? done;
+          const words = (i) => String(i?.body ?? i?.text ?? i?.title ?? '');
+          // the generic answer stays whole (`via`, `atom`, `result`); the words ride beside it
+          if (g.atom === 'add') return { ...done, itemId: inner?.item?.id ?? null, entry: words(inner?.item), message: agentT('circle.notes.added', { text: words(inner?.item) }) };
+          if (g.atom === 'remove') return { ...done, entry: args?._words ?? '', message: agentT('circle.notes.removed', { text: args?._words ?? '' }) };
+          if (g.atom === 'list') {
+            const items = (inner?.items ?? []).filter((i) => i && i.type === g.noun && words(i).trim());
+            return { ...done, title: agentT('circle.notes.title'), items: items.map((i) => ({ id: i.id, label: words(i), text: words(i), type: g.noun })) };
+          }
+        }
+        return done;
       }
       // An app with no generic handler → a structured error, mirroring how callSkill
       // surfaces skill errors (never throw for this boundary case).
@@ -5079,6 +5133,9 @@ export async function createRealHouseholdAgent(opts = {}) {
           for (const u of wanted) if (on.includes(u) && !relays.includes(u)) relays.push(u);
           if (relays.length) realArgs = { ...realArgs, relays };
         }
+        // a FUNCTION profile (a household bot) says so on its card — for display and the add-flow's words only; what a
+        // person's app signs to is decided by their own admission, never by this claim
+        try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -5217,14 +5274,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         const circleId = out?.groupId ?? realArgs.groupId;
         const address = realArgs.circleAddress ?? null;
         if (circleId && address) {
-          try {
-            // No handle: a founder has none yet (they never redeemed an invite), and restore does not
-            // need one — the circle id and this device's address are what re-open a circle. A handle
-            // the person chooses later merges into the same record through the ordinary setter.
-            await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address });
-          } catch (err) {
-            if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list: ${err?.message ?? err}`);
-          }
+          // No handle: a founder has none yet (they never redeemed an invite), and restore does not
+          // need one — the circle id and this device's address are what re-open a circle. A handle
+          // the person chooses later merges into the same record through the ordinary setter.
+          //
+          // NOT awaited: the create answers first. Inside the create's wait, an agents store that did not
+          // answer held "Creating circle…" for minutes over a circle that already existed (walk, 2026-10-09).
+          // A write that fails here is not lost — `healRestoreList` puts the circle on the list at the next boot.
+          Promise.resolve().then(() => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address }))
+            .catch((err) => {
+              if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list yet (the next boot retries): ${err?.message ?? err}`);
+            });
         }
       }
       return out;
@@ -6533,9 +6593,18 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @param {string} peerAddr
      * @param {{text: string, messageId: string}} turn
      */
-    linkedTurnAuth: async (peerAddr, { text, messageId } = {}) => (
-      (await isLinkedBot(peerAddr)) ? deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId }) : null
-    ),
+    linkedTurnAuth: async (peerAddr, { text, messageId } = {}) => {
+      const statement = () => deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId });
+      // an agent this person admitted themselves WITH (linked, or admitted by its card's code): every turn is signed
+      if (await isLinkedBot(peerAddr)) return statement();
+      // the admission itself: the person typed `/start <code>` to a contact whose card says it is a bot — their own act,
+      // the one turn to a not-yet-admitted contact that carries a statement; this device then waits for the bot's word
+      if (ADMISSION_TURN.test(String(text ?? '').trim()) && await claimsBot(peerAddr)) {
+        identityLinks.expectAdmission(peerAddr);
+        return statement();
+      }
+      return null;
+    },
     /** The person's identity links: the offer's view, the bot's statement → a contact row (every shell spreads `handlers`). */
     identityLinks,
     /** Whether this install is an ENROLLED device (a delegation under the owner root) — read by a

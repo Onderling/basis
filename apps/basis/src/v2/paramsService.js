@@ -41,6 +41,13 @@ import { REMINDER_RULES_KEY, REMINDER_RULES_PARAM } from './reminderWords.js';
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
  * each entry is `{ key, scope, kind:'user', default }` with the default sourced from the declaration site.
  */
+/**
+ * The developer switch: the Advanced screen (raw parameter keys and values — a developer tool) is shown only when this is
+ * on, in every build (the dev client is a person's daily app, so a build flag decides nothing). Off by default; set
+ * through the ordinary set-param path until the register-projected settings surface exists.
+ */
+export const DEVELOPER_PARAM_KEY = 'app.developer';
+
 export const BASIS_USER_PARAMS = [
   { key: 'nearby.ask.defaultTtlMs', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: ASK_DEFAULT_TTL_MS },
   // The windowed-class retention default — INTERNAL since the cleanup redesign (the conversation is the
@@ -91,6 +98,7 @@ export const BASIS_USER_PARAMS = [
   { key: 'display.theme',                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_THEME_PREF },
   { key: 'app.lang',                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
   { key: 'relay.url',                           scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
+  { key: DEVELOPER_PARAM_KEY,                   scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: false },
   // Which apps a door's assistant may act in when the door is not a circle (the box's Telegram chat). Set by the
   // owner, read at the door's boot; the model never sets it.
   { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },

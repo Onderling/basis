@@ -79,7 +79,7 @@ circle policy. The register never persists; it declares + routes.
 
 ```js
 class CircleItemStore
-new CircleItemStore({ dataSource, rootContainer, registry, resolution } = {})
+new CircleItemStore({ dataSource, rootContainer, registry, resolution, originOf } = {})
 ```
 
 Generic, per-circle, type-indexed item store over an injected `core.DataSource`: typed
@@ -124,12 +124,12 @@ The durable DM turn item type (parity with wireChat's persisted chat item).
 **Kind:** function · **Import:** `createAddressedDeliver` from `'@onderling/item-store'`
 
 ```js
-createAddressedDeliver({ send, toWire, toItem, itemStore = null, localActor = null, localStableId = null, seenNonces = new Set(), } = {})
+createAddressedDeliver({ send, toWire, toItem, itemStore = null, localActor = null, localStableId = null, seenNonces = new Set(), blobStore = null, } = {})
 ```
 
 Build the one addressed-send core shared by the 1:1 DM paths: send an Envelope
 to ONE peer via the injected `send`, then (optionally) persist + dedup the
-turn. Returns `{ deliver, persistInbound, seenNonces }`. Transport-agnostic —
+turn. Returns `{ deliver, persistInbound, persistOutbound, seenNonces }`. Transport-agnostic —
 the send and the wire/item projections are injected, so item-store imports no
 transport and each caller keeps its exact wire shape + subtype.
 
@@ -400,7 +400,7 @@ chatEnvelopeFromStoreItem(item, { groupId = null, lenient = false } = {})
 
 `fromItem` — project a durable itemStore `circle-chat-message` item onto the
 WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
-consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, media? }`.
+consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, card? }`.
 
 This replaces the two hand-maintained reshapers that read a stored item's
 `source` and re-emit the envelope — `stoop getMessagesSince`'s `.map(...)`
@@ -421,14 +421,14 @@ than as two silently-drifting copies:
 - `item` `{id?:string, text?:string, source?:object}`
 - `[opts]` `{groupId?:string|null, lenient?:boolean}`
 
-**Returns:** `{subtype:string, circleId:string, msgId:string, ts:number, text:string, fromActor:(string|null), media?:object} | null`
+**Returns:** `{subtype:string, circleId:string, msgId:string, ts:number, text:string, fromActor:(string|null), card?:object} | null`
 
 ### `toEventLogItem`
 
 **Kind:** function · **Import:** `toEventLogItem` from `'@onderling/item-store'`
 
 ```js
-toEventLogItem({ msgId, ts, circleId, actor, text, senderDisplay, buttons, scope, embeds, media, review, provenance, consent, })
+toEventLogItem({ msgId, ts, circleId, actor, text, senderDisplay, buttons, scope, embeds, card, review, provenance, consent, })
 ```
 
 `toItem` (render item) — project the canonical fields onto the in-memory
@@ -439,7 +439,7 @@ hand-copies:
     the LOCAL-ONLY presentation fields (buttons/scope/embeds/review/
     provenance/consent) and NO `senderDisplay`;
   - the received append (`basis chatMessageInbox`) — passes `senderDisplay`
-    + an already-guarded `media`;
+    + an already-guarded `card`;
   - the rehydrate legacy append (`basis circleChatRehydrate`) — passes only
     `senderDisplay`.
 
@@ -462,7 +462,7 @@ byte-identical to before. `senderDisplay` sits right after `kind`
 - `[a.buttons]` `Array`
 - `[a.scope]` `string`
 - `[a.embeds]` `Array`
-- `[a.media]` `object`
+- `[a.card]` `object`
 - `[a.review]` `object`
 - `[a.provenance]` `(string|object)`
 - `[a.consent]` `*`
@@ -485,20 +485,20 @@ presentation fields are carried back verbatim; `senderDisplay` is dropped
 **Kind:** function · **Import:** `toWireEnvelope` from `'@onderling/item-store'`
 
 ```js
-toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, media })
+toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, card })
 ```
 
 `toWire` — project the canonical fields onto the peer fan-out WIRE
 envelope that `stoop broadcastCircleMessage` sends over the reliable
 transport:
-  `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
+  `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
 
-The media wire-allowlist (`kring-host mediaForCircleWire`) runs UPSTREAM
+The card wire-allowlist (`kring-host cardForCircleWire`) runs UPSTREAM
 inside `broadcastCircleFanOut` before the pointer reaches this projection,
-so `media` here is already the whitelisted, circle-safe shape (sender-local
+so `card` here is already the whitelisted, circle-safe shape (sender-local
 fields such as `stored` / device paths already dropped). This projector
 only re-emits it; it never re-admits a raw embed. Absent → byte-identical
-to the pre-media wire shape (legacy receivers ignore an unknown field
+to the pre-card wire shape (legacy receivers ignore an unknown field
 either way).
 
 **Parameters**
@@ -510,14 +510,14 @@ either way).
 - `a.text` `string`
 - `a.fromActor` `(string|null)`
 - `a.fromWebid` `(string|null)`
-- `[a.media]` `object` — already wire-whitelisted
+- `[a.card]` `object` — already wire-whitelisted
 
 ### `toWireRefEnvelope`
 
 **Kind:** function · **Import:** `toWireRefEnvelope` from `'@onderling/item-store'`
 
 ```js
-toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, media, subtype })
+toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, card, subtype })
 ```
 
 `toWire` (REF variant) — the pod-signal projection of the canonical
@@ -531,7 +531,7 @@ receiving it inline.
 
 It is the byte-for-byte sibling of `toWireEnvelope` with `text` replaced by
 `ref`: same `{ type, subtype, circleId, msgId, ts, fromActor, fromWebid,
-media? }` frame, no `text` field. `ref` is an opaque string (a pod row
+card? }` frame, no `text` field. `ref` is an opaque string (a pod row
 pointer); this projector neither interprets nor resolves it.
 
 NOTE (honest degrade): the live send path degrades pod-signal to a
@@ -548,7 +548,7 @@ live path. It plugs in at the stoop `broadcastToCircle` pod seam.
 - `a.ref` `string` — opaque pod-row pointer (replaces the body)
 - `a.fromActor` `(string|null)`
 - `a.fromWebid` `(string|null)`
-- `[a.media]` `object` — already wire-whitelisted (unchanged from toWireEnvelope)
+- `[a.card]` `object` — already wire-whitelisted (unchanged from toWireEnvelope)
 
 ### `fromWireRefEnvelope`
 
@@ -567,7 +567,7 @@ ref-shaped wire envelope (missing `ref`).
 
 - `env` `object`
 
-**Returns:** `{circleId:string, msgId:string, ts:number, ref:string, fromActor:(string|null), fromWebid:(string|null), media?:object} | null`
+**Returns:** `{circleId:string, msgId:string, ts:number, ref:string, fromActor:(string|null), fromWebid:(string|null), card?:object} | null`
 
 ### `isRefEnvelope`
 
@@ -626,7 +626,7 @@ back to last-received-wins so pre-metadata peers still ingest. See `causalMerge.
 **Kind:** function · **Import:** `createCircleStores` from `'@onderling/item-store'`
 
 ```js
-createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor } = {})
+createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor, originOf } = {})
 ```
 
 Lazy per-circle registry of `CircleItemStore`s over ONE shared `dataSource`: `getStore(circleId)`
@@ -718,7 +718,7 @@ K0-deferred natural-verb context resolution made dispatchable.
 **Parameters**
 
 - `args` `object`
-- `args.container` `{type:string}` — the active container item
+- `args.container` `{type:string, defaultChild?:string}` — the active container item (its own default child, if any)
 - `args.acceptsFor` `(containerType:string)=>Array` — from `buildAcceptsPolicy`
 - `[args.body]` `string` — the "add X" text
 
@@ -1024,6 +1024,30 @@ Which surface an entry belongs to. `human` shows in a conversation; `system` is 
 
 Retention classes. Durations are a per-user setting; these are the buckets they apply to.
 
+### `SIGNS`
+
+**Kind:** constant · **Import:** `SIGNS` from `'@onderling/item-store'`
+
+Which key must have signed an entry of this kind. `local` = this device's own unsigned record, never carried.
+
+### `SUBJECT`
+
+**Kind:** constant · **Import:** `SUBJECT` from `'@onderling/item-store'`
+
+What an entry of this kind is ABOUT — the axis a revocation or eviction acts on.
+
+### `ACCEPTS`
+
+**Kind:** constant · **Import:** `ACCEPTS` from `'@onderling/item-store'`
+
+The named verifier a receiver folds the kind with. `none` = never accepted from a peer.
+
+### `SYNC`
+
+**Kind:** constant · **Import:** `SYNC` from `'@onderling/item-store'`
+
+Whether a person's own devices carry the kind to each other, and how.
+
 ### `ENTRY_KINDS`
 
 **Kind:** constant · **Import:** `ENTRY_KINDS` from `'@onderling/item-store'`
@@ -1031,11 +1055,33 @@ Retention classes. Durations are a per-user setting; these are the buckets they 
 The table. A kind absent from it is treated as `system / never wakes / short / not auditable` — the
 conservative reading, so an unregistered kind cannot wake a phone or masquerade as conversation.
 
+### `VIEWER_FACING_SYSTEM_KINDS`
+
+**Kind:** constant · **Import:** `VIEWER_FACING_SYSTEM_KINDS` from `'@onderling/item-store'`
+
+System-lane kinds a CONVERSATION still renders when an entry concerns the viewer — silent on the wire
+(`wakes: false` stands), shown to the one person it is about. "Silent" had been read as "invisible",
+and so a removed member was told nothing while every device held the signed statement that said so
+(2026-08-29). The conversation projection derives the line from the entry; nothing is appended.
+
 ### `UNKNOWN_KIND`
 
 **Kind:** constant · **Import:** `UNKNOWN_KIND` from `'@onderling/item-store'`
 
 The conservative default for an unregistered kind — never wakes, never reads as conversation.
+
+### `bindingOf`
+
+**Kind:** function · **Import:** `bindingOf` from `'@onderling/item-store'`
+
+```js
+bindingOf(kind)
+```
+
+The binding columns of a kind, with the two that may name several levels normalised to arrays: a
+membership statement is signed per circle, except a revocation, which the root signs in a ceremony.
+
+**Returns:** `{ signs: string[], subject: string[], accepts: string, syncPolicy: string }`
 
 ### `entryKind`
 
@@ -2157,8 +2203,8 @@ Maintains the `assignee = assignees[0]` mirror + `claimedAt`.
 **Parameters**
 
 - `store` `import('./CircleItemStore.js').CircleItemStore`
-- `id` `string`
-- `ctx` `object` — see module doc (`actor` required; `rolePolicy`, `expectedEtag`, `emit` optional).
+- `id` `string` — ON BEHALF OF someone: `ctx.onBehalfOf` names the person the claim is for when the key with authority (`ctx.actor`) acts for them — a host serving several people through one key. The GATE reads `ctx.actor`; the co-owner set, the "already a co-owner" test and the confirmed claimant read the person. Who may vouch is the caller's rule, not this layer's.
+- `ctx` `object` — see module doc (`actor` required; `onBehalfOf`, `rolePolicy`, `expectedEtag`, `emit` optional).
 
 **Returns:** `Promise<object | {error:'already-claimed', current: object|null}>`
 

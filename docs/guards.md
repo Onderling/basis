@@ -7,11 +7,12 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 48
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 50
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
 | `alpha-surface` | — | a hidden surface cannot creep back into a shell by accident |
+| `api-docs` | — | the API-appendix drift guard (source JSDoc ↔ docs/api/), in the `npm run guards` aggregate |
 | `architecture-reality` | — | docs/architecture.md describes what RUNS. It carries no plans, no considerations, no history of who |
 | `asked-frits` | — | the open-questions table matches the `? Needs Frits` markers it projects |
 | `box-runner` | — | the box runner (deploy/box) stays a working thing, not a script that rotted |
@@ -40,6 +41,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
+| `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
 | `plans-structure` | — | the private plans/ folder keeps the shape it was sorted into (2026-09-25) |
 | `rails-named-verifier` | — | every signed rail is constructed with a NAMED binding verifier, and the name agrees |

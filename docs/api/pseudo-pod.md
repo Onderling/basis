@@ -109,6 +109,37 @@ option for the chosen mode is missing or invalid. Per-option detail: the `@param
 
 **Returns:** `object` — the pseudo-pod instance: `read` / `write` / `delete` / `list` / `subscribe` / `writeFromPeer` / `flush` / `mode` / `setMode` / `fetchResourceSkill` / `on` / `off` / `drainWriteThroughQueue` / `listWriteThroughPending` / `writeThroughPendingCount`, plus introspection getters (`deviceId`, `backend`, `currentMode`, …).
 
+## `src/SealingBackend.js`
+
+### `createSealingBackend`
+
+**Kind:** function · **Import:** `createSealingBackend` from `'@onderling/pseudo-pod'`
+
+```js
+createSealingBackend({ backend, getStrategy, onWarn = null } = {})
+```
+
+Wrap a StorageBackend so everything written through it is sealed.
+
+The wrapper is a TRANSPARENT proxy: it changes exactly one thing, the `bytes` a record carries, and
+forwards every other argument, every returned field and every other method (`subscribe`, `listDirty`,
+`delete`, …) untouched. That matters more than it sounds — the etag and the Lamport `_v` are how the
+replication ring resolves a conflict, and a wrapper that swallowed them would turn "sealed at rest"
+into "sync quietly stops converging".
+
+The strategy is resolved LAZILY and cached, because the stores are built before the agent that holds
+the key: the web shell constructs its search index at module scope, long before anyone has typed a
+phrase. put/get are already async, so the first call is the natural moment to ask for the key.
+
+**Parameters**
+
+- `a` `object`
+- `a.backend` `object` — the real store underneath
+- `a.getStrategy` `() => ({seal:Function, open:Function}|null|Promise<{seal:Function, open:Function}|null>)` — resolves this device's content-seal strategy, or null while none is available (no identity yet).
+- `[a.onWarn]` `(msg: string, err?: unknown) => void` — where an unopenable value is reported.
+
+**Returns:** `object` — the same port, sealed
+
 ## `src/syncEngineAdapter.js`
 
 ### `createSyncEnginePodClient`

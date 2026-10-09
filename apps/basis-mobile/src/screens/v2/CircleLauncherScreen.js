@@ -167,6 +167,7 @@ import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
+import { useRelayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
@@ -292,6 +293,7 @@ import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
+import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -520,6 +522,9 @@ export default function CircleLauncherScreen({
   // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
   // `launcherListPaint`).
   const [launcherSettled, setLauncherSettled] = useState(false);
+  // The developer switch (`app.developer`, a register param, off by default in every build): the Advanced screen — raw
+  // parameter keys and values, a developer tool — is offered only when it is on. Read each time Me opens.
+  const [developerOn, setDeveloperOn] = useState(false);
   const [selected, setSelected] = useState(null);
   // The OPEN circle, readable from a closure that outlives a render — the mounted waist ops need "which
   // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
@@ -635,6 +640,11 @@ export default function CircleLauncherScreen({
     }
     return null;
   }, [bundle, loadCircleTransport]);
+  // The relay question (there is no default relay): asked by an invite when this device knows none, saved through
+  // the same set-relay path the settings use.
+  const { askRelayIfNone, relayQuestionModal } = useRelayQuestion(
+    useCallback((url) => onCircleControl('set-relay', { url }), [onCircleControl]),
+  );
   // the contact (bot/peer) whose DM thread is open under the Contacten tab.
   const [contactThread, setContactThread] = useState(null);
   // WHAT IS NEW IN CONTACTEN (2026-09-21, web parity): the seen-marks on this device (AsyncStorage), the unread map
@@ -1274,6 +1284,15 @@ export default function CircleLauncherScreen({
     } catch { setShareContacts([]); }
   }, [bundle]);
 
+  useEffect(() => {
+    if (view !== 'profile' || typeof bundle?.callSkill !== 'function') return undefined;
+    let alive = true;
+    bundle.callSkill('params', 'get-param', { key: DEVELOPER_PARAM_KEY })
+      .then((r) => { if (alive) setDeveloperOn(r?.value === true); })
+      .catch(() => { if (alive) setDeveloperOn(false); });
+    return () => { alive = false; };
+  }, [view, bundle]);
+
   // The first load WITH the agent bundle is the answer: stoop's store is loaded inside the agent's boot, which the
   // bundle awaits — instrumented on a phone (2026-10-08): the store loaded, then the first load with the bundle listed
   // the circle at once. (A comment here used to say the store hydrated "a beat after" the bundle and retried boot on a
@@ -1629,6 +1648,7 @@ export default function CircleLauncherScreen({
   const shareNknAddress = bundle?.agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false;
 
   const openCircleInvite = useCallback(async (circleId) => {
+    await askRelayIfNone();   // an invite without a relay gives the person joining none either
     let r;
     try {
       let pol = {};
@@ -1656,7 +1676,7 @@ export default function CircleLauncherScreen({
       });
     } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(r || {}) });
-  }, [bundle, policyStore, shareNknAddress]);
+  }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
 
   if (view === 'screens') {
     // α.3 — Screens primary tab.  Two sub-modes: 'picker' (CRUD list)
@@ -1706,7 +1726,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -1736,7 +1756,7 @@ export default function CircleLauncherScreen({
   if (view === 'advanced') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} />
+        <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
   }
@@ -1770,6 +1790,7 @@ export default function CircleLauncherScreen({
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAvailabilityScreen
           store={availabilityStore}
+          onBack={() => setView('profile')}
           onHop={() => setView('hop')}
         />
       </WithTabBar>
@@ -2038,8 +2059,58 @@ export default function CircleLauncherScreen({
       />
     );
   }
+  // OBJ-2 — the invite QR for a circle (admin shows it; another device scans). ONE element, painted where the person IS:
+  // the list AND the open circle. It lived only in the list's return, so Invite from a circle's ⋯ set `inviteFor` and
+  // painted nothing until `← circles` (walked 2026-10-09: 22 s of nothing, then the QR the moment the list came back).
+  const inviteModal = (
+        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
+          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
+            <Pressable style={styles.inviteCard} onPress={() => {}}>
+              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
+              {inviteFor?.uri ? (
+                <>
+                  <QrCodeView value={inviteFor.uri} size={200} />
+                  <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
+                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
+                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
+                    <Text style={styles.inviteHint}>
+                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
+                    </Text>
+                  ) : null}
+                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
+                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="invite-announce-nearby"
+                    onPress={async () => {
+                      const res = await bundle?.nearbyRoom?.announceInvite?.({
+                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
+                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
+                      }) ?? { ok: false, reason: 'nobody-nearby' };
+                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
+                    }}
+                  >
+                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
+                  </Pressable>
+                  {inviteFor.announced ? (
+                    <Text style={styles.inviteHint} testID="invite-announce-result">
+                      {inviteFor.announced.ok
+                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
+                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+  );
+
   if (selected) {
     return (
+      <>
       <CircleDetail
         circle={selected}
         deliveryStateMap={deliveryStateMap}
@@ -2146,6 +2217,9 @@ export default function CircleLauncherScreen({
         onLists={() => setView('lists')}
         onShare={() => { loadShareContacts(); setView('share'); }}
       />
+      {relayQuestionModal}
+      {inviteModal}
+      </>
     );
   }
 
@@ -2293,53 +2367,14 @@ export default function CircleLauncherScreen({
               const gid = r?.groupId ?? null;
               if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
               load();
+              // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
+              // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
+              if (gid) openCircleInvite(gid).catch(() => {});
             }}
           />
         ) : null}
-        {/* OBJ-2 — invite QR for a circle (admin shows it; another device scans). */}
-        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
-          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
-            <Pressable style={styles.inviteCard} onPress={() => {}}>
-              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
-              {inviteFor?.uri ? (
-                <>
-                  <QrCodeView value={inviteFor.uri} size={200} />
-                  <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
-                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
-                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
-                    <Text style={styles.inviteHint}>
-                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
-                    </Text>
-                  ) : null}
-                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
-                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
-                  <Pressable
-                    accessibilityRole="button"
-                    testID="invite-announce-nearby"
-                    onPress={async () => {
-                      const res = await bundle?.nearbyRoom?.announceInvite?.({
-                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
-                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
-                      }) ?? { ok: false, reason: 'nobody-nearby' };
-                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
-                    }}
-                  >
-                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
-                  </Pressable>
-                  {inviteFor.announced ? (
-                    <Text style={styles.inviteHint} testID="invite-announce-result">
-                      {inviteFor.announced.ok
-                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
-                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
+        {relayQuestionModal}
+        {inviteModal}
         {/* β.5 — per-tile context menu, rendered as a transparent modal
             so a tap outside the sheet dismisses it.  The four actions
             mirror web: pin (toggle), mute (toggle), settings, leave. */}
@@ -5699,7 +5734,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   // P1.7 — the conversation filter strip. Quiet by default; the strip warms when a filter is active so
   // a narrowed conversation never reads as a missing one (web parity).
   filterStrip:      { paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, gap: 4 },
-  filterStripActive:{ backgroundColor: theme.color.surface2 ?? theme.color.card, borderRadius: theme.radius.sm },
+  filterStripActive:{ backgroundColor: theme.color.paper2, borderRadius: theme.radius.sm },
   filterRow:        { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   filterChip:       { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },
   filterChipOn:     { backgroundColor: theme.color.card, borderColor: theme.color.ink },
@@ -5810,8 +5845,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   ownProfileTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 4 },
   // Nearby visibility banner (step E). The alert variant is for the ONE case that matters: the device is
   // announcing itself after being asked not to, so it must not look like the ordinary states.
-  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.surfaceSoft ?? theme.color.surface, borderWidth: 1, borderColor: theme.color.line },
-  nearbyBannerAlert: { borderColor: theme.color.warn ?? theme.color.ink, borderWidth: 2 },
+  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.paper2, borderWidth: 1, borderColor: theme.color.line },
+  nearbyBannerAlert: { borderColor: theme.color.danger, borderWidth: 2 },
   nearbyBannerTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 2 },
   nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   nearbyAsks:        { marginTop: 12, paddingHorizontal: 2 },

@@ -88,7 +88,21 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return lang ? (k, p) => t(k, p, lang) : t;
   };
   const note = (chatId, patch) => { const t0 = turns.get(chatId); if (t0) Object.assign(t0, patch); };
+  // The quick replies the bot's LAST message to a chat offered (a button whose tap is a slash line): the next line the
+  // person TYPES that is exactly one of their labels is that tap — a person who types "Zoals altijd" under the button
+  // that says it means the button (a household's chat, 2026-10-08: the line went to the model instead). One line only.
+  const quickOffer = new Map();
+  const labelKey = (s) => String(s ?? '').toLowerCase().replace(/[\p{P}\p{S}]/gu, '').replace(/\s+/g, ' ').trim();
+  const spendQuickOffer = (chatId, text) => {
+    const offer = quickOffer.get(chatId);
+    quickOffer.delete(chatId);
+    if (!offer || String(text).startsWith('/')) return null;
+    const said = labelKey(text);
+    return said ? (offer.find((b) => labelKey(b.label) === said)?.id ?? null) : null;
+  };
   const speak = (chatId, text, buttons) => {
+    const slashButtons = (buttons ?? []).filter((b) => typeof b?.id === 'string' && b.id.startsWith('/') && b.label);
+    if (slashButtons.length) quickOffer.set(chatId, slashButtons); else quickOffer.delete(chatId);
     const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });
     return bridge.sendReply({ chatId, text, ...(buttons?.length ? { buttons } : {}) });
   };
@@ -126,7 +140,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       lastReads.saw(turns.get(chatId)?.thread ?? threadFor(chatId), { title: rendered.title ?? null, lines: items.map((it) => it?.label) });
       // A read of a named list says which list, always — one list or five in a turn.
       const head = rendered.title ? [`${rendered.title}:`] : [];
-      if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n')); return; }
+      // "Ververs": the same read again, as a new message — a list message goes stale the moment someone ticks a line
+      // elsewhere (asked for by a household member). A quick reply: the read's own slash line, decided by the gate like
+      // a typed one. Telegram carries a button's data in 64 bytes; a list whose name does not fit simply has none.
+      const refreshLine = rendered.title && (!offered || offered.has('listEntries')) ? `/list-entries ${rendered.title}` : null;
+      const refresh = refreshLine && new TextEncoder().encode(refreshLine).length <= 64
+        ? [{ id: refreshLine, label: tc(chatId)('circle.telegram.refresh') }] : [];
+      if (!items.length) { await say(chatId, [...head, rendered.text ?? tc(chatId)('circle.telegram.empty_list')].join('\n'), refresh.length ? refresh : undefined); return; }
       const lines = [...head, ...items.map((it, i) => `${i + 1}. ${it.label}`)];
       const buttons = [];
       // A button names the ITEM, not its row number ("Done: melk", not "Done 1") — read from a phone, the
@@ -136,7 +156,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
         const short = name.length > 18 ? `${name.slice(0, 17)}…` : name;
         for (const b of (it.buttons ?? []).filter(onMap)) buttons.push({ id: b.callbackData, label: items.length > 1 ? `${b.label}: ${short || i + 1}` : b.label });
       });
-      await say(chatId, lines.join('\n'), buttons);
+      await say(chatId, lines.join('\n'), [...buttons, ...refresh]);
       return;
     }
     const text = rendered.text ?? (rendered.error ? rendered.error.message : '');
@@ -510,7 +530,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       if (r && typeof r === 'object' && r.refused) {
         // A door that tells a stranger once (the bot's inbox): "you need a code" the first time, kept on their row, then
         // silence. A message that carried a code is told why it failed, every time: that is a new question.
-        if (msg?.refuseOnce && threads && r.id && r.refused === 'needs-code') {
+        if (msg?.refuseOnce && threads && r.id && (r.refused === 'needs-code' || r.refused === 'relink')) {
           if (threads.refused(r.id)) return;
           threads.markRefused(r.id);
         }
@@ -528,8 +548,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // A person who writes can be written to again: a kept refusal (the bot could not start a chat with them) is cleared.
     if (caller && threads && typeof threads.clearUnreachable === 'function') threads.clearUnreachable(caller);
     // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
-    // memory, in a group chat too; without admission, the chat's.
-    await engine.ask(caller ?? threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
+    // memory, in a group chat too; without admission, the chat's. A typed button label goes on as the button's line.
+    const tapped = spendQuickOffer(chatId, text);
+    await engine.ask(caller ?? threadFor(chatId), tapped ?? text, { chatId, ...(caller ? { caller } : {}) });
   }
 
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when

@@ -347,6 +347,19 @@ export async function loadPersonas({ callSkill } = {}) {
 }
 
 /**
+ * How a persona reads in a picker or on Review — ONE answer for both wizards on both shells. The default persona is
+ * marked as the default; when it has no name of its own (its list entry falls back to its id, `default`), it reads as
+ * the person's default persona in their language — a persona id never meets a person.
+ * @param {{id: string, name?: string}} p
+ * @param {(key: string, vars?: object) => string} t
+ */
+export function personaLabel(p, t) {
+  const own = typeof p?.name === 'string' && p.name && p.name !== p.id ? p.name : null;
+  if (p?.id !== 'default') return own ?? String(p?.id ?? '');
+  return own ? t('circle.join.wizard.persona.default_suffix', { name: own }) : t('circle.persona_default_name');
+}
+
+/**
  * Record the joiner's persona choice. `null` (the protective default) means
  * "join minimally — disclose no background"; a profile id means "join AS this
  * persona, sharing what it discloses in THIS circle" (finalSubmit computes the

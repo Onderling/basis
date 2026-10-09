@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createRelayPrefStore, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
@@ -46,6 +47,7 @@ import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
+import { useRelayQuestion } from './RelayQuestionModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
@@ -59,6 +61,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
+  const insets = useSafeAreaInsets();   // clear the status bar: the back link and the title sat under it
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [themePref, setThemePref] = useThemePref();
   // Section / KV close over the render-time `styles` so they recolour with the theme.
@@ -155,6 +158,12 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       setRelayNote(t('circle.mydata.relay_saved_reload', { url: saved || t('circle.mydata.relay_off') }));
     } catch (e) { setRelayNote(t('circle.mydata.relay_error', { msg: e?.message ?? '' })); }
   }, [callSkill, relayStore, relayInput, onSetRelay]);
+  // The relay question (there is no default relay): an add-device offer asks when this device knows none, and the
+  // answer goes through the same one set-relay implementation as the field above.
+  const { askRelayIfNone, relayQuestionModal } = useRelayQuestion(useCallback(
+    (url) => (typeof onSetRelay === 'function' ? onSetRelay({ url }) : relayStore.set(url)),
+    [onSetRelay, relayStore],
+  ));
 
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.
@@ -330,7 +339,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const usage = Object.entries(metrics || {});
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-mydata">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }]} testID="circle-mydata">
       <View style={styles.header}>
         {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
         <Text style={styles.title}>{t('circle.mydata.title')}</Text>
@@ -950,7 +959,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           }}
         />
       )}
-      <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
+      <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
+      {relayQuestionModal}
       <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
       <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
         placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
@@ -1004,10 +1014,11 @@ const makeStyles = (theme) => StyleSheet.create({
   retentionChoiceTextOn:{ color: theme.color.ink, fontWeight: '600' },
   relayEdit: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   relayInput: { flex: 1, fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
-  relaySave: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.terracotta },
-  relaySaveText: { fontSize: 14, fontWeight: '600', color: theme.color.white },
+  // the theme's primary button (ink on light, light on dark): `terracotta` was the retired linen theme's and has no value now
+  relaySave: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.accent },
+  relaySaveText: { fontSize: 14, fontWeight: '600', color: theme.color.accentContrast },
   relayNote: { marginTop: 6, fontSize: 12, color: theme.color.ink },
-  relayHint: { marginTop: 4, fontSize: 12, color: theme.color.inkMuted ?? theme.color.ink },
+  relayHint: { marginTop: 4, fontSize: 12, color: theme.color.inkSoft },
   signin: { marginTop: 10, gap: 8 },
   signinInput: { fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   signinErr: { fontSize: 12, color: '#b3261e' },

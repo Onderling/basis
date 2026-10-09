@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
 import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { addBoxCard } from './support/addBoxCard.js';
 
 // the box's walk log (each turn's route), beside its data
 const walkLog = (dir) => [dir, path.join(dir, 'walks')].flatMap((d) => { try { return readdirSync(d).filter((f) => f.startsWith('walk-log-')).map((f) => path.join(d, f)); } catch { return []; } })
@@ -59,12 +60,14 @@ describe('chores on the real box', () => {
   });
 
   it('Ann adds a chore; Bert claims it by its words, it is his, he completes it', async () => {
-    await sendAs(ann)('hallo', { admission: /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1] });
+    await addBoxCard(ann, out);
+    await sendAs(ann)(`/start ${/\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1]}`);
     expect(await until(async () => ((await saidTo(ann)()).length ? true : null), { timeout: 30_000, step: 400 })).toBe(true);
     await ask(ann, '/cohort 3 7');
     const invite = await ask(ann, '/invite', /\/start \S+/);
     expect(invite, `no invite:\n${out.slice(-1200)}`).toBeTruthy();
-    await sendAs(bert)('hallo', { admission: /\/start (\S+)/.exec(invite)[1] });
+    await addBoxCard(bert, out);
+    await sendAs(bert)(`/start ${/\/start (\S+)/.exec(invite)[1]}`);
     expect(await until(async () => ((await saidTo(bert)()).length ? true : null), { timeout: 30_000, step: 400 }), `Bert not admitted:\n${out.slice(-1200)}`).toBe(true);
 
     const added = await ask(ann, '/add-to-list --list Klusjes --text ramen-lappen');

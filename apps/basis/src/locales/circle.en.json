@@ -497,9 +497,21 @@
     "text": "Loading circles…",
     "doc": "Shown while circles are being fetched."
   },
+  "back_me": {
+    "text": "← Me",
+    "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
+  },
   "back": {
     "text": "← circles",
     "doc": "Back link from a circle detail view to the launcher."
+  },
+  "persona_default_name": {
+    "text": "Your default persona",
+    "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
+  },
+  "membercard_close": {
+    "text": "Close",
+    "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
   },
   "detail_empty": {
     "text": "Nothing here yet.",
@@ -1750,10 +1762,6 @@
       "text": "Relay server",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
-    "relayEndpoint_hint": {
-      "text": "Add a WebSocket relay (ws:// or wss://). Leave blank to use the default.",
-      "doc": "Phase 4 §9 — relay endpoint hint."
-    },
     "relayEndpoint_placeholder": {
       "text": "wss://relay.example.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
@@ -1765,6 +1773,26 @@
     "relayEndpoint_clear": {
       "text": "Clear",
       "doc": "Phase 4 §9 — relay endpoint clear button."
+    },
+    "relayAsk_title": {
+      "text": "Which relay do you use?",
+      "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
+    },
+    "relayAsk_body": {
+      "text": "You got it from whoever invited you, or from whoever runs your agent. Without one, your devices and contacts reach each other only directly.",
+      "doc": "The relay question — the body: where a person gets a relay, and what happens without one."
+    },
+    "relayAsk_save": {
+      "text": "Save",
+      "doc": "The relay question — saves the relay (through the relay setting)."
+    },
+    "relayAsk_later": {
+      "text": "Later",
+      "doc": "The relay question — not now; asked again at the next app start."
+    },
+    "relayAsk_invalid": {
+      "text": "That is not a relay address — it starts with wss:// or ws://.",
+      "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
       "text": "Private member-to-member chat",
@@ -3768,6 +3796,14 @@
       "text": "\"{{item}}\" is on no list.",
       "doc": "A household bot's reply when a person names a chore or entry that is not there."
     },
+    "already_done": {
+      "text": "\"{{text}}\" is already ticked off.",
+      "doc": "A tap on a line someone already ticked (a button on an older list message): says so by the line's words, never its id."
+    },
+    "line_gone": {
+      "text": "That line is no longer on a list.",
+      "doc": "A tap on a line that was taken off since the list message was sent (a stale button): never shows the id."
+    },
     "which_one": {
       "text": "Which one do you mean: {{options}}?",
       "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
@@ -4145,6 +4181,10 @@
     "apps_none_left": "At least one app has to stay on.",
     "status": "Apps: {{apps}}\nModel: {{model}}\nDoor: {{door}}\nConversations in the log: {{turns}}\nDefault memory: {{memory}}\nPeople admitted: {{users}}",
     "users_none": "Nobody admitted yet.",
+    "admission_relink": {
+      "text": "Link again: type /start <code> in the app (the admin gives the code, as always).",
+      "doc": "Told once to a person admitted at the bot's inbox before their app signed its turns: they re-link with a fresh code."
+    },
     "admission_needs_code": {
       "text": "To talk to this assistant you need a code from its administrator. Then send: /start <code>",
       "doc": "Said to a person at the bot's door (Telegram) when they may not start talking to it yet; never names their chat id."
@@ -4362,11 +4402,11 @@
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_morning": {
-      "text": "in the morning (08:00)",
+      "text": "in the morning ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_evening": {
-      "text": "the evening before (19:00)",
+      "text": "the evening before ({{time}})",
       "doc": "A person's own reminders (their layer on the thread row) and the rules' words: /herinneringen with rules, remindMe for one item."
     },
     "rule_before": {
@@ -4892,6 +4932,11 @@
           "remindMe": "a reminder of your own: at a time (\"in 10 minutes: …\"), for an appointment or chore, or one for everyone",
           "assistant-planned": "what I will send you this week (reminders, the week overview)",
           "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)"
+        },
+        "household": {
+          "__generic__:household:add:note": "write a note for everyone (or say: remember that the bins go out on Tuesday)",
+          "__generic__:household:list:note": "the household's notes (or say: what notes are there)",
+          "__generic__:household:remove:note": "take a note away — your own, or as an admin (or say: forget the note about the wifi)"
         }
       }
     },
@@ -4973,6 +5018,14 @@
     "day_unread": {
       "text": "Which day do you mean by '{{day}}'? Say for example 'Saturday' or 'tomorrow'.",
       "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    },
+    "welcome_notes": {
+      "text": "Notes for everyone: \"remember that the wifi code is on the fridge\"; \"what notes are there\" shows them, and I use them when you ask something.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_notes_read": {
+      "text": "\"What notes are there\" shows what the household wrote down.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     }
   },
   "op": {
@@ -5775,7 +5828,7 @@
       "doc": "Mobile relay save confirmation (applies on next app open; mobile has no live reconnect yet)."
     },
     "relay_hint": {
-      "text": "Point this at a reachable relay to sync across devices with no server (e.g. ws://192.168.1.20:8787). Leave blank to use the built-in default.",
+      "text": "You got it from whoever invited you, or from whoever runs your agent. Leave it blank for none: then only direct connections.",
       "doc": "Relay setting help text."
     },
     "privacy": {
@@ -7293,6 +7346,10 @@
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
+      "your_name": {
+        "text": "Your name in this circle",
+        "doc": "The founder's handle field in the create wizard, asked when their profile has none — directly under the circle's own name field, so it names whose name it is."
+      },
       "review_persona": {
         "text": "Started as",
         "doc": "Create wizard, review — the founding persona's row."
@@ -7908,6 +7965,10 @@
       "text": "Nothing here yet.",
       "doc": "Telegram runner: a list reply with no items."
     },
+    "refresh": {
+      "text": "Refresh",
+      "doc": "The button under a list message in a chat: sends the list again, read fresh (a list message goes stale once someone ticks a line elsewhere)."
+    },
     "list_shopping": {
       "text": "shopping",
       "doc": "Telegram runner: the \"shopping\" household list as a button label when the assistant asks which list."
@@ -7955,10 +8016,6 @@
     "error": {
       "text": "Your contact could not be made right now.",
       "doc": "When getContactShareQr fails (no identity yet)."
-    },
-    "back": {
-      "text": "← Me",
-      "doc": "Back to the Mij screen."
     },
     "opened_added": {
       "text": "{{name}} was added to your contacts.",
@@ -8428,7 +8485,8 @@
       "assistant-role": "Role",
       "assistant-revoke": "Remove",
       "removeFromList": "Remove",
-      "entryReminders": "Reminders"
+      "entryReminders": "Reminders",
+      "__generic__:household:remove:note": "Remove"
     },
     "household": "The household",
     "people": "Who is in the household",
@@ -8628,6 +8686,32 @@
     "day_none": {
       "text": "Nothing on {{when}}.",
       "doc": "One day's read: no appointments and no chores that day."
+    }
+  },
+  "notes": {
+    "need_text": {
+      "text": "What should I remember? For example: remember that the bins go out on Tuesday.",
+      "doc": "A note added with no words."
+    },
+    "added": {
+      "text": "Noted: {{text}}",
+      "doc": "A note was added (a weetje: something the household wants known)."
+    },
+    "title": {
+      "text": "Notes",
+      "doc": "The heading above the household's notes."
+    },
+    "not_there": {
+      "text": "I don't have that note{{item}}.",
+      "doc": "Removing a note that is not there; item is \" (words)\" or empty."
+    },
+    "not_yours": {
+      "text": "\"{{text}}\" was written by someone else — only they or an admin may remove it.",
+      "doc": "A member tried to remove a note they did not write."
+    },
+    "removed": {
+      "text": "Forgotten: {{text}}",
+      "doc": "A note was removed."
     }
   }
 }

@@ -1,4 +1,5 @@
-// api-fitness — the API-appendix drift guard (source JSDoc ↔ docs/api/).
+// lint-api-docs — the API-appendix drift guard (source JSDoc ↔ docs/api/), in the `npm run guards` aggregate.
+// (It ran only by hand as `api-fitness` until 2026-10-09 — outside the aggregate, so ten packages' docs/api went stale.)
 //
 // Two checks, both driven by scripts/api-appendix.mjs (the generator — single source of logic):
 //
@@ -9,7 +10,7 @@
 //      on disk. Edit the source JSDoc and run `node scripts/api-appendix.mjs`, never the .md.
 //
 // README↔code existence is readme-fitness's job — not duplicated here.
-// Run:  node scripts/api-fitness.mjs        (exit 1 on any failure)
+// Run:  node scripts/lint-api-docs.mjs   (or `npm run api-fitness`; exit 1 on any failure)
 // Note: importing @onderling/item-types prints one ajv strict-mode warning line — harmless.
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';

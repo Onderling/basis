@@ -9,6 +9,7 @@
  */
 import { QUIET_HOURS, reminderRuleLine } from './botReminders.js';
 import { HOUSEHOLD_RULES_DEFAULT } from './botSettings.js';
+import { NOTE_OPS } from './botOpMap.js';
 
 /**
  * @param {object} a
@@ -37,6 +38,9 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
   if (has('makeChore')) lines.push(t('circle.bot.welcome_make_chore'));
   if (has('shopVisit')) lines.push(t('circle.bot.welcome_shop'));
   if (has('weekOverview')) lines.push(t('circle.bot.welcome_week'));
+  // the household's notes (weetjes): what people write down for everyone to know — the bot reads them, never writes one
+  if (has(NOTE_OPS[0])) lines.push(t('circle.bot.welcome_notes'));
+  else if (has(NOTE_OPS[1])) lines.push(t('circle.bot.welcome_notes_read'));
   if (has('assistant-people')) lines.push(t('circle.bot.welcome_people'));
   if (has('assistant-screen')) lines.push(t('circle.bot.welcome_screen'));
   if (has('assistant-link')) lines.push(t(has('assistant-inapp') && settings.inApp === 'on' ? 'circle.bot.welcome_link_inapp' : 'circle.bot.welcome_link'));
@@ -64,6 +68,9 @@ export function welcomeLines({ ops, lists = [], role = null, settings = {}, t })
  * line here, or a reason here — never forgotten (Frits 2026-10-06: "the welcome must be updated each time").
  */
 export const WELCOME_SAYS = Object.freeze({
+  [NOTE_OPS[0]]: 'welcome_notes',
+  [NOTE_OPS[1]]: 'welcome_notes · welcome_notes_read (an observer reads them)',
+  [NOTE_OPS[2]]: 'welcome_notes',
   addToList: "welcome_lists",
   createList: "welcome_own_lists",
   removeList: "welcome_own_lists",

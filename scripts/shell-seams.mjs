@@ -49,6 +49,9 @@ export const SEAMS = Object.freeze([
   // its memory, so every boot forgot the decline and offered again — one more bubble in the circle's conversation
   // per app start (found 2026-10-08 on a phone). The box makes no offer: a hosted bot has no person to ask.
   { id: 'fallback-offer-memory', pattern: /fallbackOfferStateIo\(/, shells: ['web', 'mobile'], why: 'a declined fallback offer stays declined for its cooldown, not until the next app start' },
+  // There is no default relay: a person's device that knows none ASKS at the first action that needs one (an invite).
+  // The box is left out on purpose — it has no person to ask; its relay is its operator's argument.
+  { id: 'relay-question', pattern: /await askRelayIfNone\(\)/, shells: ['web', 'mobile'], why: 'a device with no relay asks for one before it makes an invite that would carry none' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).

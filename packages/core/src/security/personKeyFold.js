@@ -1,7 +1,7 @@
 /**
  * personKeyFold — a person's CURRENT signing key, per circle, as a fold of `person-key` spine statements.
  *
- * The person level signs with a ROTATING key (the design: plans/NOTE-binding-levels.md §10 — never the static
+ * The person level signs with a ROTATING key (the binding-levels design, Frits 2026-09-15 — never the static
  * profile key). A rotation happens in a ceremony and reaches each circle the person is in as one `person-key`
  * statement on that circle's membership lane: `{ kind: 'person-key', subject: <the member>, payload: { version,
  * pubKey, reveal } }`, authored by whichever of the person's devices ran the ceremony. It binds by ROOT REVEAL
@@ -24,7 +24,7 @@
  *   · Junk (no version, no key) is skipped, never thrown on.
  *
  * Read by `deriveRoster` (the roster row's `personKey`) today; the sender authorizer and DM sealing read the
- * row in the steps that follow (§10.7). Nothing writes the statement yet — the ceremony does, in the next step.
+ * row in the steps that follow. Nothing writes the statement yet — the ceremony does, in the next step.
  */
 
 export const PERSON_KEY_KIND = 'person-key';

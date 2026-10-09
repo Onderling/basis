@@ -195,6 +195,7 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
+import { routeScan } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
 // client-side image-attachment encoder (Canvas resize + thumbnail → the
 // inbound shape stoop.postRequest expects).
 import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
@@ -213,6 +214,8 @@ import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
+import { renderHostFrame } from './hostFrameBar.js';
+import { hostFrameOf } from '../../src/v2/hostFrame.js';
 import { renderPersonCard } from './personCard.js';
 import { createPersonClock, webAppState } from '../../src/v2/personClock.js';
 import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.js';
@@ -768,7 +771,7 @@ import { DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
 import { buildCircleEmbedProviders } from '../../src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../src/v2/embedPicker.js';
 import { quickCreateCircle } from '../../src/v2/circleCreate.js';
-import { setActiveCircle, getActiveCircle } from '../../src/v2/activeCircle.js';
+import { setActiveCircle, getActiveCircle, subscribeActiveCircle } from '../../src/v2/activeCircle.js';
 import { normalizeCircleMembers, recipientSealKeyFromMembers } from '@onderling/kring-host/circleMembers';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
@@ -780,7 +783,7 @@ import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControl
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
 // agent-add admin approval store.
 import { createAgentRequestStore } from '../../src/v2/agentRequest.js';
-import { buildTilePreviews, bumpSeenAt } from '../../src/v2/circleTilePreviews.js';
+import { buildTilePreviews, bumpSeenAt, seenOnLeave } from '../../src/v2/circleTilePreviews.js';
 import { makeAfterClaimHook } from '../../src/v2/claimRouter.js';
 import { mergeAvailability } from '../../src/v2/memberAvailability.js';
 import { createAvailabilityStore, localStorageAvailabilityIo, podAvailabilityIo, tieredAvailabilityIo } from '../../src/v2/memberAvailability.js';
@@ -886,7 +889,9 @@ function mountBasisOpsOnAgent(agent) {
       await tryConnectPeerTransport(_peerAgent, _peerRouter, { awaitRelayReady: true });
       return { address: _peerAgent.peer?.address ?? '' };
     },
-    // No camera in the browser: `scanQr` says so in its own words rather than being absent.
+    // No camera in the browser: `scanQr`'s seam is the PASTE prompt (the declared exception, web-mobile-exceptions:36) —
+    // so `/scan-qr` and Me → Scan are one door here too, and what is pasted goes through the route table.
+    openQrScanner: () => { const v = (globalThis.prompt?.(t('circle.scan.paste_placeholder')) || '').trim(); if (v) takeScannedText(v); },
   }));
 }
 
@@ -1497,6 +1502,8 @@ const CIRCLE_RELAY_ENV     = import.meta.env?.VITE_CIRCLE_RELAY_URL ?? null;
 // The contact the app ships with (the alpha's feedback path: Frits himself, as a person in Contacten).
 // A build-time card beside the app-native relay; absent ⇒ no seeded contact (seededContact.js).
 const SEEDED_CONTACT_CARD  = import.meta.env?.VITE_SEEDED_CONTACT_CARD ?? null;
+// The site a hosted build belongs to — two build values; absent ⇒ no line at the top (hostFrame.js).
+const HOST_FRAME = hostFrameOf({ returnTo: import.meta.env?.VITE_HOST_RETURN_TO, label: import.meta.env?.VITE_HOST_RETURN_LABEL });
 const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
 // The two delivery settings, and the per-message state map they govern the display of.
 const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
@@ -3457,6 +3464,16 @@ function writeSeenAt(map) {
   try { window.localStorage.setItem(SEEN_AT_KEY, JSON.stringify(map)); }
   catch { /* quota / disabled */ }
 }
+// …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
+subscribeActiveCircle(seenOnLeave((id) => writeSeenAt(bumpSeenAt(readSeenAt(), id))));
+// Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as —
+// refreshed when the agent is up and on every launcher visit (`ownAddresses`, the one source the Contacts filter reads).
+let unreadMyRefs = ['me'];
+function refreshUnreadMyRefs() {
+  Promise.resolve(_peerAgent?.ownAddresses?.()).then((a) => {
+    if (Array.isArray(a)) unreadMyRefs = ['me', ...a.filter((x) => typeof x === 'string' && x)];
+  }).catch(() => { /* the last known set still serves */ });
+}
 
 // Chat ↔ Screen pill: per-circle preference persists in
 // localStorage so the user lands back in whichever mode they last used
@@ -3555,6 +3572,7 @@ function paintLauncher() {
     events:  eventLog.query({ excludeMuted: true }),
     circles: circlesCache,
     seenAt:  readSeenAt(),
+    myRefs:  unreadMyRefs,
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
@@ -3581,6 +3599,7 @@ function paintLauncher() {
 
 function showLauncher() {
   setActiveCircle(null);
+  refreshUnreadMyRefs();
   try { sessionStorage.removeItem('cc.activeCircle'); } catch { /* ignore */ }
   // β.1 — Stream/Availability/Hop/Nearby/My-things buttons are gone from the launcher; those surfaces
   // are reachable via the Screens + Mij tabs. The `show*` functions stay defined below.
@@ -4272,7 +4291,11 @@ async function showMij() {
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
     version: APP_VERSION,
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
-    onShareContact: showShareMyContact,
+    // The Me actions are DECLARED (manifest `meActions`); this is what each id does here.
+    onMeAction: (id) => {
+      if (id === 'share-contact') { showShareMyContact(); return; }
+      if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
+    },
   });
   rerender();
   load();
@@ -4776,6 +4799,34 @@ function mountMyDataWizard(renderWizard, extra = {}) {
 // OBJ-2 — Join a circle (no pod). Paste an invite (the QR's onderling-invite:// payload) and mount the SHARED
 // join wizard through the same overlay adapter; the joiner-side peer-redeem sender carries the no-pod
 // handshake. On success we feed the new roster (so items sync) and refresh the launcher. Pure reuse.
+/**
+ * THE PER-ID PAINTER MAP (web) — the one shell-side piece of the scan route: `routeScan` names a DECLARED target
+ * (`SCAN_TARGETS`), this map names who paints it here today (PR 2's generic flow painter shrinks it to one). Every
+ * declared id has an entry; pairing is HELD on purpose (its pick-list needs a picker-capable form on both shells — its
+ * own row), and says so instead of dropping the code.
+ */
+const SCAN_PAINTERS = {
+  'add-contact': async (needs) => {
+    const added = await addContactWithSheet(needs.payload).catch(() => ({ error: true }));
+    if (added === null) return;   // closed the sheet: nothing added
+    if (!added?.contact || added?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }
+    showContacts();
+  },
+  joinGroup:         (needs, text) => showJoinCircle(String(text).trim()),   // the whole text: the app's own link carries its relay
+  'enroll-device':   (needs) => showEnrollDeviceFlow({ needs }),
+  'claim-companion': (needs) => showClaimCompanionFlow({ needs }),
+  pairCirclePeer:    null,   // HELD (pick-list row) — said, not dropped
+};
+
+/** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter. */
+async function takeScannedText(text) {
+  const r = routeScan(text);
+  const paint = r.target ? SCAN_PAINTERS[r.target.id] : undefined;
+  if (paint === undefined) { globalThis.alert?.(t('scan_qr.scan_unknown')); return; }
+  if (paint === null) { globalThis.alert?.(t('circle.scan.pair_held')); return; }
+  await paint(r.needs, text);
+}
+
 async function showJoinCircle(inviteArg) {
   let invite = (typeof inviteArg === 'string' && inviteArg.trim())
     ? inviteArg.trim()
@@ -4783,7 +4834,14 @@ async function showJoinCircle(inviteArg) {
   if (!invite) return;
   // tolerate a full deep-link (https://…/?join=<invite>&relay=…): pull the invite out of it
   if (/^https?:\/\//i.test(invite)) {
-    try { const j = new URL(invite).searchParams.get('join'); if (j) invite = j; } catch { /* keep as-is */ }
+    let relay = null;
+    try { const u = new URL(invite); const j = u.searchParams.get('join'); relay = u.searchParams.get('relay'); if (j) invite = j; } catch { /* keep as-is */ }
+    // …and the relay the app's own link names, BESIDE this device's own (as the `?join=&relay=` landing and mobile's
+    // scan do): a relay-only admin is reachable only there.
+    if (relay) {
+      try { getConnectionPoints().addManually(relay); } catch { /* the list is a convenience */ }
+      try { await dialRelayUrl(relay); } catch { /* best-effort */ }
+    }
   }
   // decode once up front to learn the admin's transport addresses and seed the
   // app PeerGraph BEFORE the wizard runs its peer redeem. The router then
@@ -5155,7 +5213,7 @@ function _restoreOverlay() {
   return { wrap, card, close: () => wrap.remove() };
 }
 
-function showEnrollDeviceFlow() {
+function showEnrollDeviceFlow({ needs = null } = {}) {
   // ADD-A-DEVICE (the enroll ceremony, as its declared flow): the phrase is typed on THIS — the
   // NEW — device. One pause (the secret-kind phrase + an optional device label), then the
   // ceremony op restores the owner root + writes this install's delegation; the reload lets boot
@@ -5275,8 +5333,11 @@ function showEnrollDeviceFlow() {
         offerErr.style.display = 'none';
         const pasted = offerInput.value.trim();
         if (pasted) {
-          const stashed = await stashEnrollOffer(window.localStorage, pasted).catch(() => ({ ok: false }));
-          if (!stashed.ok) { offerErr.style.display = 'block'; return; }
+          // The pasted offer is the FLOW's `offer` need — its first step keeps it (the declared stashEnrollOffer), one
+          // path for the act. A code that does not parse ends there: said, not dropped.
+          const at = await runner.start(FLOW, { needs: { offer: pasted } }).catch(() => null);
+          if (!at || at.steps?.stash?.outcome === 'bad-offer' || at.awaiting?.step !== 'ceremony') { offerErr.style.display = 'block'; return; }
+          inst = at;
         }
         runner.resume(FLOW, inst, { input: values }).then((r) => { inst = r; paint(); }).catch(() => close());
       });
@@ -5336,7 +5397,7 @@ function showEnrollDeviceFlow() {
     }
   };
 
-  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => close());
+  runner.start(FLOW, { needs: needs ?? {} }).then((r) => { inst = r; paint(); }).catch(() => close());
 }
 
 function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
@@ -5347,13 +5408,13 @@ function showReplaceDeviceFlow({ onClosed } = {}) {
   return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
 /** Claim a companion node: paste the line it printed; this device signs the claim. */
-function showClaimCompanionFlow({ onClosed } = {}) {
+function showClaimCompanionFlow({ onClosed, needs = null } = {}) {
   return showDeviceCeremonyFlow({
-    flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed,
+    flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed, needs,
     inputName: 'claim', placeholderKey: 'circle.companionClaim.placeholder', rows: 2,
   });
 }
-function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3 } = {}) {
+function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3, needs = null } = {}) {
   // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
   // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
   // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
@@ -5423,7 +5484,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     }
   };
 
-  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => done());
+  runner.start(FLOW, { needs: needs ?? {} }).then((r) => { inst = r; paint(); }).catch(() => done());
 }
 
 function showRestoreFinishFlow() {
@@ -8216,6 +8277,8 @@ async function boot() {
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
+  // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
+  renderHostFrame(document.body, { frame: HOST_FRAME, t });
   renderCircleLauncher(rootEl, { loading: true, t });
 
   // register the web-push service worker (root-scoped /sw.js). Best-effort:
@@ -8809,6 +8872,7 @@ async function boot() {
         },
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
+      refreshUnreadMyRefs();
       // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
       // the shell bridges it into stoop's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({

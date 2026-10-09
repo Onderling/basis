@@ -47,16 +47,16 @@ export const DELIVERY = Object.freeze({
   RELIABLE:      'reliable',       // spine   — a lost membership/key event leaves a lingering divergence
 });
 
-/**
- * The delivery tier a resolution policy implies. DERIVED from the policy (a projection), not a second table
- * to keep in sync — §5's "declared together" made concrete: pick the policy and the transport guarantee
- * follows. `deliveryOf(...)` is this over `resolutionOf(...)`.
- */
 const DELIVERY_FOR = Object.freeze({
   [RESOLUTION.CONTENT]: DELIVERY.BEST_EFFORT,
   [RESOLUTION.CLAIM]:   DELIVERY.AT_LEAST_ONCE,
   [RESOLUTION.SPINE]:   DELIVERY.RELIABLE,
 });
+/**
+ * The delivery tier a resolution policy implies. DERIVED from the policy (a projection), not a second table
+ * to keep in sync: pick the policy and the transport guarantee follows. `deliveryOf(...)` is this over
+ * `resolutionOf(...)`. An unknown policy gets best-effort.
+ */
 export function deliveryForResolution(resolution) {
   return DELIVERY_FOR[resolution] ?? DELIVERY.BEST_EFFORT;
 }

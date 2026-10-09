@@ -56,22 +56,6 @@ import {
 import { generateGroupKey, sealWithGroupKey, sealingPublicKeyFromNetworkKey } from './envelope.js';
 
 /**
- * Build a canonical-share controller for a single sealed resource. Pure orchestration — pod I/O is injected
- * exactly as `createControlAgent` injects it:
- *
- * @param {object} a
- * @param {{ grant: Function, revoke: Function }} a.sharing   the ACP surface (client.sharing) — grant/revoke
- *        already enforce the SHARING_GRANT_NOOP / SHARING_REVOKE_NOOP contract (a no-op throws).
- * @param {{ read: () => any, write: (res:any) => any }} a.keyStore  reads/writes the item's group-key
- *        resource on the pod (e.g. `/.keys/<item>-vN.json`).
- * @param {{ publicKey: string, privateKey: string }} a.controllerKey  the origin-side granter's keypair. It
- *        is always a recipient of the key resource, so it can unwrap-to-re-wrap on every grant/rotate.
- * @param {string} [a.resourceUri]  the canonical item's pod resource URI (the ACP target). May instead be
- *        supplied per-call, or derived via `resourceUriFor(ref)`.
- * @param {(ref:object)=>(string|null)} [a.resourceUriFor]  maps a shared-ref → the canonical resource URI.
- * @param {string} [a.mode='read']  the ACP mode granted/revoked (canonical sharing is read-only by design).
- */
-/**
  * One promise-chain per KEY STORE, so every controller writing the same group-key resource in this process
  * takes the grant critical section in turn. A chain is enough: each call waits for the previous to settle
  * before it reads, so no two grants compute from the same stale base. Errors are contained, so one failed
@@ -92,6 +76,22 @@ function _serializerFor(keyStore) {
 // Parameter register (#36) — bounded optimistic-concurrency grant retries (scope:device, kind:internal).
 const MAX_GRANT_ATTEMPTS = param({ key: 'podClient.grantAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 
+/**
+ * Build a canonical-share controller for a single sealed resource. Pure orchestration — pod I/O is injected
+ * exactly as `createControlAgent` injects it:
+ *
+ * @param {object} a
+ * @param {{ grant: Function, revoke: Function }} a.sharing   the ACP surface (client.sharing) — grant/revoke
+ *        already enforce the SHARING_GRANT_NOOP / SHARING_REVOKE_NOOP contract (a no-op throws).
+ * @param {{ read: () => any, write: (res:any) => any }} a.keyStore  reads/writes the item's group-key
+ *        resource on the pod (e.g. `/.keys/<item>-vN.json`).
+ * @param {{ publicKey: string, privateKey: string }} a.controllerKey  the origin-side granter's keypair. It
+ *        is always a recipient of the key resource, so it can unwrap-to-re-wrap on every grant/rotate.
+ * @param {string} [a.resourceUri]  the canonical item's pod resource URI (the ACP target). May instead be
+ *        supplied per-call, or derived via `resourceUriFor(ref)`.
+ * @param {(ref:object)=>(string|null)} [a.resourceUriFor]  maps a shared-ref → the canonical resource URI.
+ * @param {string} [a.mode='read']  the ACP mode granted/revoked (canonical sharing is read-only by design).
+ */
 export function createCanonicalShare({ sharing, keyStore, controllerKey, resourceUri, resourceUriFor, mode = 'read' } = {}) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.revoke !== 'function') {
     throw new Error('createCanonicalShare: sharing with grant/revoke required');

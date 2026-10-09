@@ -111,6 +111,12 @@ export function firstDeviceIdFor(root) {
   return `first-${hex}`;
 }
 
+/**
+ * A short fingerprint of an owner root's public key: the first 16 hex characters of its SHA-256. Compares a
+ * delegation record's signer with a known root without carrying the whole key.
+ * @param {string} pubKeyB64  the root's 32-byte Ed25519 public key, base64
+ * @returns {string|null}  null when the key is not 32 bytes or does not decode
+ */
 export function ownerRootFingerprint(pubKeyB64) {
   try {
     const key = b64decode(pubKeyB64);

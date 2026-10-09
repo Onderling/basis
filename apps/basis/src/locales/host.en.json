@@ -381,7 +381,7 @@
       "doc": "Substrate returned error or classifier saw an unknown payload."
     },
     "scan_unknown": {
-      "text": "Unrecognised QR code. Expected a onderling-contact:// or onderling-invite:// URL.",
+      "text": "This code is not one Basis knows — a contact card, an invite, an add-device or pairing code, or a companion's claim line.",
       "doc": "classifyQrPayload returned kind:'unknown'."
     }
   },

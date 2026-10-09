@@ -277,6 +277,7 @@ export function itemRowButtons(manifest, item) {
   return out;
 }
 
+/** Does an op's `appliesTo` (type, incl. the `'*'` wildcard, and kind) match this item? No `appliesTo` matches all. */
 export function matchesAppliesTo(appliesTo, item) {
   if (!appliesTo) return true;
   if (!item || typeof item !== 'object') return false;

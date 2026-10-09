@@ -22,6 +22,7 @@ const STORE      = 'keys';
 const K_WRAP     = 'wrap-key';
 const K_SEED     = 'sealed-seed';
 
+/** The browser's root-key store: the seed in IndexedDB, AES-GCM-sealed under a non-extractable WebCrypto key (see the file header). */
 export class RootKeyStoreWebCrypto extends RootKeyStore {
   #db = null;
 

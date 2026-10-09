@@ -1471,7 +1471,14 @@ the first device is special; a device enrolled by a ceremony carries a random id
 ownerRootFingerprint(pubKeyB64)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+A short fingerprint of an owner root's public key: the first 16 hex characters of its SHA-256. Compares a
+delegation record's signer with a known root without carrying the whole key.
+
+**Parameters**
+
+- `pubKeyB64` `string` — the root's 32-byte Ed25519 public key, base64
+
+**Returns:** `string|null` — null when the key is not 32 bytes or does not decode
 
 ### `verifyDeviceDelegation`
 
@@ -2159,7 +2166,9 @@ class RoleGrantManager
 new RoleGrantManager({ identity, groupManager, agentId, store = null } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Grants a role to a member and materializes its bundle's capability tokens,
+tracking the issued token ids so revoking the role invalidates them through
+the PolicyEngine revocation hook.
 
 **Methods:** `ready()` · `isRevoked()` · `materializedTokenIds()` · `grant()` · `revoke()`
 
@@ -3263,7 +3272,7 @@ the fork-proof verifier/detectors), plus the domain-independent helpers, as one 
 
 **Kind:** constant · **Import:** `ADDRESS_REVOKE_KIND` from `'@onderling/core'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The ceremony kind that revokes one of a person's addresses — bound by the owner root's reveal, like a person-key statement.
 
 ### `CEREMONY_KINDS`
 
@@ -3279,7 +3288,7 @@ The kinds whose statements bind by root reveal.
 isCeremonyKind(kind)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Is this statement kind a ceremony kind (bound by a root reveal rather than the author's per-circle key)?
 
 ### `ceremonyRevealFacts`
 
@@ -3347,7 +3356,7 @@ On success, `res.body.subject` is the evicted member.
 
 **Kind:** constant · **Import:** `EVICTION_STMT_VERSION` from `'@onderling/core'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The eviction statement's wire version — eviction rides the spine body version; kept for call sites that pin it.
 
 ## `src/security/helloGates.js`
 
@@ -3442,7 +3451,8 @@ independent implementation knows the exact shape without our source (docs/conven
 
 **Kind:** constant · **Import:** `DEFAULT_ORIGIN_WINDOW_MS` from `'@onderling/core'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Default clock-skew window for verifyOrigin's timestamp check: ±10 minutes. A parameter (device scope, internal —
+a security bound, immutable by construction; mirrors security.replayWindowMs).
 
 ### `signOrigin`
 
@@ -3554,7 +3564,9 @@ Whether a body is a well-formed person-key statement about its own author.
 foldPersonKeys(statements)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Fold verified spine statements into each member's current person key: the higher version wins; at one version a
+root-revealed person-key statement outranks a key carried by a join or create; then the smaller hash, so every
+replica settles on the same key.
 
 **Parameters**
 
@@ -4784,7 +4796,8 @@ radio in their pocket said otherwise.
 
 **Kind:** constant · **Import:** `MAX_ENVELOPE_BYTES` from `'@onderling/core'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The default ceiling for one envelope on the peer wire, in bytes (256 KiB). A parameter (device scope, internal — a
+defensive protocol cap).
 
 ### `EnvelopeTooLargeError`
 
@@ -4838,7 +4851,24 @@ Serialised byte length of an envelope, or null when it cannot be measured.
 createMeshSurface({ onDegraded = null } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The mesh SURFACE — the discoverability control and the nearby peer source, as one object an app can
+hold from boot, over a set of transports that may land later.
+
+Why one thing: the control and the peer source both take a lazy `transports()` thunk so they can exist
+before any transport does (a phone builds mDNS seconds into boot). Until 2026-08-30 the mobile shell
+created its own pair over its own thunk and threw away the pair `buildMeshTransports` made over the
+real transports — two controls for one radio, and the one the screen held was the one nobody re-asked
+when the transport arrived ("unavailable" for as long as the tab stayed open). The web shell used the
+builder's. So: the app creates the surface, hands it to the builder, and the builder fills it in
+(`setTransports`) — which settles the control (re-applies what a screen asked meanwhile) and rebinds
+the peer source. One object, both shells, no duplicate.
+
+**Parameters**
+
+- `[opts]` `object`
+- `[opts.onDegraded]` `(report: object) => void` — forwarded to the control
+
+**Returns:** `{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void> }`
 
 ## `src/transport/nearbyPeers.js`
 
@@ -4850,7 +4880,8 @@ _No JSDoc block in the source (recorded gap — see the coverage table)._
 createNearbyPeerSource({ transports, now = () => Date.now() } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The nearby peer source over every discovering transport: one row per address, updated (not appended) by a
+second sighting, each row keeping the sources it was seen on.
 
 **Parameters**
 

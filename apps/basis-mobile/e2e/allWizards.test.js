@@ -13,7 +13,8 @@
 
 const { gotoChat } = require('./support/nav.js');
 
-describe('Bundle F P2 — all-wizard launch smoke (via slash)', () => {
+// SKIPPED (Detox survey 2026-10-09): this spec drives the classic CHAT SHELL through `gotoChat()` — the launcher's "← chat" affordance (`circle-to-chat`) was removed, so that surface is unreachable for a person (CircleLauncherScreen.js: "no chat shell to navigate to"). On development @ ed1a25ddc every test here timed out in `gotoChat` waiting for `chat-header-status`. Not an app bug. Port what is still worth pinning to the circle composer before un-skipping.
+describe.skip('Bundle F P2 — all-wizard launch smoke (via slash)', () => {
   beforeAll(async () => {
     await device.launchApp({ newInstance: true });
     await device.disableSynchronization();

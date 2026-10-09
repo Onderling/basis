@@ -60,6 +60,9 @@ function candidateOf(s) {
 }
 
 /**
+ * Fold verified spine statements into each member's current person key: the higher version wins; at one version a
+ * root-revealed person-key statement outranks a key carried by a join or create; then the smaller hash, so every
+ * replica settles on the same key.
  * @param {Array<object>} statements  verified spine bodies, authors resolved to member refs
  * @returns {Map<string, { version: number, pubKey: string, hash: string|null }>}  member ref → current key
  */

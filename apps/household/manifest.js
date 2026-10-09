@@ -68,6 +68,8 @@ export const householdManifest = {
     'enroll-device': 'write',
     'revoke-device': 'write',
     'claim-companion': 'write',
+    'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
+    'pair-peer': 'write',            // adds a peer to a circle's item sync
     'list-companion-grants': 'read',
     'grant-companion': 'write',
     'read-companion-grants': 'read',
@@ -339,6 +341,31 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'pairCirclePeer', group: 'device',
+      verb: 'pair-peer',
+      writes: { scope: 'circle' },   // the peer joins this circle's item sync, both ways (a __pairReq asks it back)
+      // Pair a device or agent into one of the person's circles: the code another device shows (`onderling-pair://…`, or
+      // a bare address). The circle is PICKED from the person's own circles — the form paints the pick-list from the
+      // param's pickerSource, skipped when there is only one. Reached from Me → Scan.
+      params: [
+        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'stoop' } },
+        { name: 'addr',   kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'stashEnrollOffer', group: 'device',
+      verb: 'stash-enroll-offer',
+      writes: { scope: 'device' },   // this device's own storage: the offer waits there for the add-device ceremony
+      // An add-device OFFER read off another device of the person's (its QR, its link, or pasted): kept on THIS device
+      // so the ceremony that follows bootstraps the circles it names. Public data, never authority — the ceremony asks
+      // for the recovery phrase. The first step of the enroll-device flow; absent offer → 'no-offer', nothing written.
+      params: [
+        { name: 'offer', kind: 'string', required: false },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'claimCompanion', group: 'device',
       verb: 'claim-companion',
       writes: { scope: 'device' },   // the person's own list of the nodes they own; the node records its owner itself
@@ -589,7 +616,13 @@ export const householdManifest = {
         { name: 'deviceId',       kind: 'string',  from: '$steps.ceremony.deviceId' },
         { name: 'reloadRequired', kind: 'boolean', from: '$steps.ceremony.reloadRequired' },
       ],
+      // An add-device offer handed in (Me → Scan, a link, a paste) — optional: the phrase-only path has none.
+      needs: [{ name: 'offer', kind: 'string', required: false }],
       steps: [
+        // An offer handed in (Me → Scan read another device's add-device code) is kept first; without one the flow
+        // goes straight to the phrase, as it always has.
+        { id: 'stash', op: 'stashEnrollOffer', bind: { offer: { from: '$flow.needs.offer', optional: true } },
+          next: { stashed: 'ceremony', 'no-offer': 'ceremony', 'bad-offer': null } },
         { id: 'ceremony', op: 'enrollDevice', labelKey: 'circle.enroll.ceremony' },
       ],
     },
@@ -657,8 +690,11 @@ export const householdManifest = {
       produces: [
         { name: 'node', kind: 'string', from: '$steps.ceremony.node' },
       ],
+      // The claim line handed in (Me → Scan read it) — optional: without it the flow asks for it, as before.
+      needs: [{ name: 'claim', kind: 'string', required: false }],
       steps: [
-        { id: 'ceremony', op: 'claimCompanion', labelKey: 'circle.companionClaim.ceremony' },
+        { id: 'ceremony', op: 'claimCompanion', labelKey: 'circle.companionClaim.ceremony',
+          bind: { claim: { from: '$flow.needs.claim', optional: true } } },
       ],
     },
     {

@@ -90,7 +90,7 @@ when the user asks to see it — one secret, two encodings, each kept where it b
 assertSeed(seed, who)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Throw unless `seed` is a 32-byte Uint8Array; `who` names the caller in the message.
 
 ### `seedToString`
 
@@ -100,7 +100,7 @@ _No JSDoc block in the source (recorded gap — see the coverage table)._
 seedToString(seed)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+A seed as unpadded base64url text.
 
 ### `seedFromString`
 
@@ -110,7 +110,7 @@ _No JSDoc block in the source (recorded gap — see the coverage table)._
 seedFromString(s)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Unpadded base64url text back to seed bytes (the inverse of `seedToString`).
 
 ### `RootKeyStoreMemory`
 
@@ -159,7 +159,7 @@ class RootKeyStoreWebCrypto extends RootKeyStore
 new RootKeyStoreWebCrypto()
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The browser's root-key store: the seed in IndexedDB, AES-GCM-sealed under a non-extractable WebCrypto key (see the file header).
 
 **Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
 
@@ -213,7 +213,7 @@ class VaultEncrypted extends Vault
 new VaultEncrypted({ backing, key } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+A Vault decorator that encrypts every value at rest (secretbox, `enc1:` format) over any backing vault; reads are strict.
 
 **Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
 

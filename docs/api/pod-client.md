@@ -670,7 +670,18 @@ returning the same `{ seal, open }` shape:
 createCanonicalShare({ sharing, keyStore, controllerKey, resourceUri, resourceUriFor, mode = 'read' } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Build a canonical-share controller for a single sealed resource. Pure orchestration — pod I/O is injected
+exactly as `createControlAgent` injects it:
+
+**Parameters**
+
+- `a` `object`
+- `a.sharing` `{ grant: Function, revoke: Function }` — the ACP surface (client.sharing) — grant/revoke already enforce the SHARING_GRANT_NOOP / SHARING_REVOKE_NOOP contract (a no-op throws).
+- `a.keyStore` `{ read: () => any, write: (res:any) => any }` — reads/writes the item's group-key resource on the pod (e.g. `/.keys/<item>-vN.json`).
+- `a.controllerKey` `{ publicKey: string, privateKey: string }` — the origin-side granter's keypair. It is always a recipient of the key resource, so it can unwrap-to-re-wrap on every grant/rotate.
+- `[a.resourceUri]` `string` — the canonical item's pod resource URI (the ACP target). May instead be supplied per-call, or derived via `resourceUriFor(ref)`.
+- `[a.resourceUriFor]` `(ref:object)=>(string|null)` — maps a shared-ref → the canonical resource URI.
+- `[a.mode='read']` `string` — the ACP mode granted/revoked (canonical sharing is read-only by design).
 
 ## `src/sealing/controlAgent.js`
 
@@ -979,7 +990,13 @@ The log `kind` a key-event carries, so it is distinguishable from other membersh
 keyIdOf(groupKey)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The name of a group key: a domain-separated hash of it, so two keys minted for the same version can be told apart.
+
+**Parameters**
+
+- `groupKey` `string`
+
+**Returns:** `string|null` — null for an empty or non-string key
 
 ### `MAX_KEYS_PER_VERSION`
 
@@ -1019,7 +1036,13 @@ every device drops the same ones.
 buildKeyEvent({ groupId, version = 1, groupKey, recipients } = {})
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Build a key-event row for the log: the group key wrapped to each recipient at a version, named by its `keyId`.
+
+**Parameters**
+
+- `o` `{ groupId?: string, version?: number, groupKey: string, recipients: string[] }`
+
+**Returns:** `{ kind: string, groupId: string|null, version: number, keyId: string|null, members: any, recipients: any, sealed: any }`
 
 ### `establishKeyEvent`
 
@@ -1316,7 +1339,7 @@ holder never has to know the two-step shape.
 
 **Kind:** constant · **Import:** `SCOPED_SEAL_SCHEMES` from `'@onderling/pod-client'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The seal schemes whose audience a grant may extend: pairwise and per-resource CEK — never the group key.
 
 ### `assertScopedScheme`
 

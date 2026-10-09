@@ -32,6 +32,7 @@ export class RootKeyStore {
 
 export const ROOT_SEED_LEN = 32;
 
+/** Throw unless `seed` is a 32-byte Uint8Array; `who` names the caller in the message. */
 export function assertSeed(seed, who) {
   if (!(seed instanceof Uint8Array) || seed.length !== ROOT_SEED_LEN) {
     throw new Error(`${who}: seed must be a ${ROOT_SEED_LEN}-byte Uint8Array`);
@@ -39,11 +40,13 @@ export function assertSeed(seed, who) {
 }
 
 // b64url helpers (btoa/atob exist in Node 16+, browsers, and the Expo runtime).
+/** A seed as unpadded base64url text. */
 export function seedToString(seed) {
   let bin = '';
   for (let i = 0; i < seed.length; i++) bin += String.fromCharCode(seed[i]);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+/** Unpadded base64url text back to seed bytes (the inverse of `seedToString`). */
 export function seedFromString(s) {
   const bin = atob(String(s).replace(/-/g, '+').replace(/_/g, '/'));
   const u8 = new Uint8Array(bin.length);

@@ -21,6 +21,8 @@
  */
 
 /**
+ * Project a flow and its instance into a surface-neutral view: progress per step, the form a step waits on, and
+ * which actions are open.
  * @param {import('./flows.js').Flow} flow
  * @param {object|null} instance   a flowRunner instance (null = not started)
  * @param {object} [ctx]

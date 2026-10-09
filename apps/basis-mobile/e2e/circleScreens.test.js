@@ -25,35 +25,30 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(60_000);
   });
 
-  it('opens Availability from the launcher, toggles holiday, Saves back to the launcher', async () => {
+  // Availability is a screen UNDER Me now (Me → "Availability →"); its Save and its "← Me" return to Me
+  // (Detox survey 2026-10-09: the spec still expected the Me tab to open Availability and Save to land on the launcher).
+  async function openAvailability() {
     await element(by.id('circle-tab-mij')).tap();
-    await waitFor(element(by.id('circle-availability')))
-      .toBeVisible()
-      .withTimeout(10_000);
+    await waitFor(element(by.id('circle-profile'))).toBeVisible().withTimeout(10_000);
+    await waitFor(element(by.id('profile-availability'))).toBeVisible()
+      .whileElement(by.id('circle-profile')).scroll(400, 'down');
+    await element(by.id('profile-availability')).tap();
+    // The loading state carries the same `circle-availability` id — wait for the loaded form (its holiday switch).
+    await waitFor(element(by.id('holiday-active'))).toBeVisible().withTimeout(15_000);
+  }
 
-    // Toggle holiday mode (RN Switch) + save.
+  it('opens Availability from Me, toggles holiday, Saves back to Me', async () => {
+    await openAvailability();
     await element(by.id('holiday-active')).tap();
     await element(by.id('circle-availability-save')).tap();
-
-    // Save returns to the launcher.
-    await waitFor(element(by.id('circle-launcher')))
-      .toBeVisible()
-      .withTimeout(10_000);
+    await waitFor(element(by.id('circle-profile'))).toBeVisible().withTimeout(10_000);
   });
 
   it('the Circles tab returns from Availability to the launcher', async () => {
-    await element(by.id('circle-tab-mij')).tap();
-    await waitFor(element(by.id('circle-availability')))
-      .toBeVisible()
-      .withTimeout(10_000);
-    // No back arrow on a tab screen — the Circles tab is the way back.
+    await openAvailability();
     await element(by.id('circle-tab-circles')).tap();
     await waitFor(element(by.id('circle-launcher')))
       .toBeVisible()
       .withTimeout(10_000);
   });
-
-  // (Batch 5) the cross-circle Stream spec is GONE with the view it tapped: `circle-tab-stroom` left
-  // the tab bar long ago, so this spec could only fail — a must-fail spec in the suite teaches people
-  // to ignore red. The LOG the Stream projected is untouched; its surfaces are the circle tabs above.
 });

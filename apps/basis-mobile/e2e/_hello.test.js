@@ -7,7 +7,9 @@
 
 describe('Detox sanity', () => {
   beforeAll(async () => {
-    await device.launchApp({ newInstance: true });
+    // Synchronization off at LAUNCH too, like every other spec: the app's network timers never let RN idle, so a
+    // synchronized launch hung the hook for its full 180 s (Detox survey 2026-10-09).
+    await device.launchApp({ newInstance: true, launchArgs: { detoxEnableSynchronization: 0 } });
     // Disable synchronization AFTER launch (the bridge has to exist
     // before this call can route through).  Our app has perpetual
     // background work (NknTransport reconnect loop, periodic

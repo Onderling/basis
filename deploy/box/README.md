@@ -33,7 +33,9 @@ certificate; asks the relay URL, the bot token, your chat id and the Privatemode
 
 Roles share a box freely: `ROLES` in `box.conf` is a list, and the `platform` profile is exactly relay +
 pod + companion + caddy + backup on one machine. Adding a role to a running box is an edit, not an install:
-add `role@repo` to `ROLES`, put its `.env` keys in place, run `FORCE=1 update.sh` — the role is built, the
+add `role@repo` to `ROLES`, put its `.env` keys in place, run the updater as the box's user, the way its timer
+does — `sudo -u onderling env BOX_DIR=/opt/onderling FORCE=1 bash /opt/onderling/repos/basis/deploy/box/update.sh`
+(as root, git refuses the repo it does not own and the update keeps the old release) — the role is built, the
 stack comes up, the health gate runs, `state.json` records it. **Two boxes on one machine is not a thing**:
 a box is one directory, one compose project (`onderling`) and one timer, and a second one would collide on
 all three.

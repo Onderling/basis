@@ -78,14 +78,14 @@ export async function materializeBundle({ identity, agentId, memberPubKey, group
   return tokens;
 }
 
+/** Vault key holding the serialized revocation set + materialized index. */
+const STORE_KEY = 'role-grants';
+
 /**
  * Grants a role to a member and materializes its bundle's capability tokens,
  * tracking the issued token ids so revoking the role invalidates them through
  * the PolicyEngine revocation hook.
  */
-/** Vault key holding the serialized revocation set + materialized index. */
-const STORE_KEY = 'role-grants';
-
 export class RoleGrantManager {
   #identity;
   #groupManager;

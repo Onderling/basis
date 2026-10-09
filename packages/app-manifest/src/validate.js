@@ -316,6 +316,20 @@ export function validateManifest(manifest, opts = {}) {
     }
   }
 
+  // Nav-chrome (Me) — `manifest.meActions` declares the ordered actions at the top of the person's own page (Me):
+  // "Share my card" and "Scan" (2026-10-09). The SAME NavItem shape and helper as `tabs`, so both shells paint them
+  // from the declaration, never from a screen file's list. Forward-additive: absent → no Me actions.
+  if (manifest.meActions !== undefined) {
+    if (!Array.isArray(manifest.meActions)) {
+      errors.push({ path: '/meActions', message: 'meActions must be an array if present' });
+    } else {
+      const meIds = new Set();
+      manifest.meActions.forEach((item, i) => {
+        validateNavItem(item, `/meActions/${i}`, manifest, errors, meIds, strict);
+      });
+    }
+  }
+
   // Nav-chrome (D / Surface 2) — `manifest.actions` declares the ordered
   // DETAIL ACTION BAR: the per-detail nav buttons to sibling screens (the
   // circle detail bar's back/settings/viewAs/advisor/skills/files/rules/…).
@@ -1196,6 +1210,18 @@ function validateView(v, path, manifest, errors, idSet, strict = false) {
 /** The roles a nav item may be reserved for (`item.role`). */
 export const NAV_ROLES = Object.freeze(['admin']);
 
+/** The op a nav `to` names (its id or slash command starts with it, compared without case or punctuation), or null. */
+function navShadowsOp(to, manifest) {
+  const norm = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const want = norm(to);
+  if (!want) return null;
+  for (const op of manifest?.operations ?? []) {
+    const names = [op?.id, op?.surfaces?.slash?.command].filter((v) => typeof v === 'string' && v);
+    if (names.some((n) => norm(n).startsWith(want))) return op.id;
+  }
+  return null;
+}
+
 function validateNavItem(item, path, manifest, errors, idSet, strict = false) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     errors.push({ path, message: 'nav item must be an object' });
@@ -1246,6 +1272,18 @@ function validateNavItem(item, path, manifest, errors, idSet, strict = false) {
   if (target.kind === 'nav') {
     if (typeof target.to !== 'string' || target.to === '') {
       errors.push({ path: `${path}/target/to`, message: "nav item.target.to must be a non-empty string when kind === 'nav'" });
+    } else if (strict) {
+      // A nav target is only for a VIEW no op backs. A button, a tab and a slash command for the same ACT target the
+      // same op — that is what makes them one door. A nav `to` that names an op (its id or its slash command, compared
+      // without case or dashes: `scan` vs `scanQr` / `/scan-qr`) is a second, private route to that act.
+      const shadowed = navShadowsOp(target.to, manifest);
+      if (shadowed) {
+        errors.push({
+          path:    `${path}/target/to`,
+          message: `nav target "${target.to}" names an act that op "${shadowed}" performs — an op performs this; target the op`,
+          code:    'nav-shadows-op',
+        });
+      }
     }
   } else if (target.kind === 'op') {
     if (typeof target.opId !== 'string' || target.opId === '') {

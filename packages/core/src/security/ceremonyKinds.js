@@ -10,11 +10,13 @@
  */
 import { personKeyFacts, PERSON_KEY_KIND } from './personKeyFold.js';
 
+/** The ceremony kind that revokes one of a person's addresses — bound by the owner root's reveal, like a person-key statement. */
 export const ADDRESS_REVOKE_KIND = 'address-revoke';
 
 /** The kinds whose statements bind by root reveal. */
 export const CEREMONY_KINDS = Object.freeze(new Set([ADDRESS_REVOKE_KIND, PERSON_KEY_KIND]));
 
+/** Is this statement kind a ceremony kind (bound by a root reveal rather than the author's per-circle key)? */
 export const isCeremonyKind = (kind) => CEREMONY_KINDS.has(kind);
 
 /**

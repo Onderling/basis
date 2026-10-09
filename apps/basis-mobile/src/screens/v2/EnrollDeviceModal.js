@@ -8,11 +8,9 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet, Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
-import { stashEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { useTheme } from './themeContext.js';
 import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
@@ -20,7 +18,7 @@ import { t } from '../../core/localisation.js';
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
-export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeOffer = null }) {
+export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeOffer = null, needs = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
@@ -37,7 +35,8 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
     const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => callSkill('household', opId, args) });
     runnerRef.current = runner;
     let alive = true;
-    runner.start(FLOW, {})
+    // `needs` (an offer handed in — Me → Scan read another device's code) start the flow: its first step keeps the offer.
+    runner.start(FLOW, { needs: needs ?? {} })
       .then((r) => { if (alive) { setInst(r); setDrafts({}); } })
       .catch(() => { if (alive) onClose?.(); });
     return () => { alive = false; runnerRef.current = null; };
@@ -54,11 +53,15 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
     // use it, and a silent drop would strand the new device unreachable. Empty = fine.
     setOfferInvalid(false);
     const pasted = offerDraft.trim();
+    let at = inst;
     if (pasted) {
-      const stashed = await stashEnrollOffer(AsyncStorage, pasted).catch(() => ({ ok: false }));
-      if (!stashed.ok) { setOfferInvalid(true); return; }
+      // The pasted offer is the FLOW's `offer` need — its first step keeps it (`stashEnrollOffer`, declared), so there is
+      // one path for the act, not a stash beside the flow. A code that does not parse ends there: said, not dropped.
+      at = await runner.start(FLOW, { needs: { offer: pasted } }).catch(() => null);
+      if (!at || at.steps?.stash?.outcome === 'bad-offer' || at.awaiting?.step !== 'ceremony') { setOfferInvalid(true); return; }
+      setInst(at);
     }
-    runner.resume(FLOW, inst, { input: drafts })
+    runner.resume(FLOW, at, { input: drafts })
       .then((r) => setInst(r))
       .catch(() => { setInst(null); onClose?.(); });
   };

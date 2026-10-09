@@ -42,7 +42,7 @@ import {
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
-  buildTilePreviews, bumpSeenAt,
+  buildTilePreviews, bumpSeenAt, seenOnLeave, subscribeActiveCircle,
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
@@ -167,6 +167,10 @@ import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
+import EnrollDeviceModal from './EnrollDeviceModal.js';
+import RevokeDeviceModal from './RevokeDeviceModal.js';
+import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
+import { SCAN_TARGETS } from '../../../../basis/src/v2/scanRoute.js';
 import { useRelayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
@@ -712,6 +716,12 @@ export default function CircleLauncherScreen({
   // OBJ-2 — join a circle: scan an invite QR → run the shared join wizard. Invite modal: show this
   // circle's membership QR. Both reuse the classic membership core; nothing new below the surface.
   const [joinScanOpen, setJoinScanOpen] = useState(false);
+  // What a scan opened that is a FLOW with its own painter here (enrol · claim): its declared id + the needs it starts with.
+  const [scanTask, setScanTask] = useState(null);
+  // The "what will they see of you" sheet — the painter of the add-contact flow's needs (persona + reveal), asked first.
+  const contactLens = useContactLensSheet({
+    callSkill: bundle?.callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
+  });
   const [joinArgs, setJoinArgs] = useState(null);     // {invite} → JoinGroupWizardModal runs
   const [inviteFor, setInviteFor] = useState(null);   // {circleId, uri, error} → invite-QR modal
   // selected circle's policy (loaded when `selected` changes); used
@@ -735,11 +745,29 @@ export default function CircleLauncherScreen({
     })();
     return () => { alive = false; };
   }, []);
+  // The circle you LEAVE is seen up to that moment (the shared rule, web alike) — every way out (← circles, a tab, Nearby)
+  // goes through the active-circle signal, so one subscription covers them all.
+  useEffect(() => subscribeActiveCircle(seenOnLeave((id) => {
+    setSeenAt((prev) => {
+      const next = bumpSeenAt(prev, id);
+      AsyncStorage.setItem('cc.circleSeenAt', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  })), []);
+  // Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as.
+  const [unreadMyRefs, setUnreadMyRefs] = useState(['me']);
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve(bundle?.agent?.ownAddresses?.()).then((a) => {
+      if (alive && Array.isArray(a)) setUnreadMyRefs(['me', ...a.filter((x) => typeof x === 'string' && x)]);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [bundle, circles]);
   // Recompute the previews map whenever events / circles / seenAt change.
   useEffect(() => {
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
-    setPreviews(buildTilePreviews({ events, circles, seenAt }));
-  }, [eventLog, circles, seenAt]);
+    setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs }));
+  }, [eventLog, circles, seenAt, unreadMyRefs]);
   // per-circle voorstellen badge. Populated lazily after
   // circles load; refresh after a settings save (CircleSettingsScreen
   // calls back through onPoll once it persists a new proposal).
@@ -1637,6 +1665,38 @@ export default function CircleLauncherScreen({
     }
     setJoinArgs({ invite: parsed.inviteUri });
   }, [bundle]);
+  // THE PER-ID PAINTER MAP — the one shell-side piece of the scan route: the route table names a DECLARED target
+  // (`SCAN_TARGETS`), this map names who paints it here today (PR 2's generic flow painter shrinks it to one). Every
+  // declared id has an entry; pairing is HELD on purpose (its pick-list needs a picker-capable form on both shells —
+  // its own row), and says so instead of dropping the code.
+  const SCAN_PAINTERS = {
+    'add-contact':     (needs) => { contactLens.addWithSheet(needs.payload).catch(() => {}); },
+    joinGroup:         (needs, res) => onJoinScan({ kind: 'invite', payload: res.payload }),
+    'enroll-device':   (needs) => setScanTask({ id: 'enroll-device', needs }),
+    'claim-companion': (needs) => setScanTask({ id: 'claim-companion', needs }),
+    pairCirclePeer:    null,   // HELD (pick-list row) — said, not dropped
+  };
+  const onScan = (res) => {
+    setJoinScanOpen(false);
+    const target = SCAN_TARGETS[res?.kind];
+    const paint = target ? SCAN_PAINTERS[target.id] : undefined;
+    if (!target || paint === undefined) { Alert.alert(t('circle.profile.scan'), t('scan_qr.scan_unknown')); return; }
+    if (paint === null) { Alert.alert(t('circle.profile.scan'), t('circle.scan.pair_held')); return; }
+    paint(target.needs(res.payload), res);
+  };
+  // The Me actions (declared in the manifest): share opens the existing view; scan runs the `scanQr` op, whose seam is
+  // the one scanner above — one door with `/scan-qr`.
+  const onMeAction = (id) => {
+    if (id === 'share-contact') { setView('shareContact'); return; }
+    if (id === 'scan') {
+      // ONE door: the op opens the scanner through its seam. If it refuses, say so — opening the scanner anyway would be
+      // a second door to the same act.
+      Promise.resolve(bundle?.callSkill?.('basis', 'scanQr', {}))
+        .then((r) => { if (r?.ok === false || r?.error) Alert.alert(t('circle.profile.scan'), String(r?.error?.message ?? r?.error ?? '')); })
+        .catch((err) => Alert.alert(t('circle.profile.scan'), String(err?.message ?? err)));
+    }
+  };
+
   // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate). Carries the same fields a
   // web-built invite does (invariant 2): the freedom template (join-time consent), the pod disclosure +
   // its url (J-NP3, rule 1), the admin's NKN address (B2) and the RELAY endpoint (the invite-carries-
@@ -1678,6 +1738,59 @@ export default function CircleLauncherScreen({
     setInviteFor({ circleId, ...(r || {}) });
   }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
 
+  // ONE mount for everything a scan or the Join button opens, painted beside whichever view is up (the Mij view returns
+  // early, so a modal living in one branch's return never shows in another). The scanner is the `scanQr` op's seam
+  // (`openQrScanner` above); its result goes through the route table (`scanRoute.js`) to the painter for the declared
+  // target (`SCAN_PAINTERS`).
+  const scanOverlays = (
+    <>
+      <QrScannerModal visible={joinScanOpen} onClose={() => setJoinScanOpen(false)} onResult={onScan} t={t} />
+      {contactLens.sheet}
+      <EnrollDeviceModal visible={scanTask?.id === 'enroll-device'} callSkill={bundle?.callSkill} needs={scanTask?.needs ?? null}
+        onClose={() => setScanTask(null)} />
+      <RevokeDeviceModal visible={scanTask?.id === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+        placeholderKey="circle.companionClaim.placeholder" callSkill={bundle?.callSkill} needs={scanTask?.needs ?? null}
+        onClose={() => setScanTask(null)} />
+      {/* Mount only once we have the invite — the wizard decodes it in its useState initializer (runs
+          once on mount), so an always-mounted modal would cache a "no invite" error. */}
+      {joinArgs ? (
+        <JoinGroupWizardModal
+          visible
+          args={joinArgs}
+          callSkill={bundle?.callSkill}
+          sendPeerRedeem={bundle?.sendPeerRedeem}
+          t={t}
+          // The join sheet is the first surface a new person meets; it was hardcoded light and arrived
+          // as a white sheet in a dark app (S3, 2026-07-30). The theme lives here, in the shell.
+          theme={theme}
+          circles={circles}
+          circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
+          signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}
+          // J-CP1 — be on the circle's endpoint BEFORE the redeem. The invite names it; without this
+          // the redeem goes out over whatever transport this device happens to have, and a relay-only
+          // admin never hears it.
+          dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
+          activeEndpointUrl={() => bundle?.relayUrls?.() ?? bundle?.activeRelayUrl?.() ?? null}
+          // Post-join reachability (G13) — the same seam the chat-shell host passes, so a join is
+          // equally complete from either surface. This screen already bound the roster keys in
+          // `onDispatched`; what it never did was RE-REGISTER this device's per-circle address, so the
+          // circle just joined was missing from the relay until the next circles load.
+          onJoined={bundle?.onCircleJoined}
+          onClose={() => setJoinArgs(null)}
+          onDispatched={(r) => {
+            setJoinArgs(null);
+            const gid = r?.groupId ?? r?.joinedGroupId ?? null;
+            if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
+            // (The joined circle's connection point is recorded by the bundle's `onCircleJoined`, before presence
+            // and the pull — web parity by construction.)
+            load();
+          }}
+        />
+      ) : null}
+    </>
+  );
+
+  const page = (() => {
   if (view === 'screens') {
     // α.3 — Screens primary tab.  Two sub-modes: 'picker' (CRUD list)
     // and 'view' (render the active screen's materialized blocks).
@@ -1726,7 +1839,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onOpenMij={() => setMyPersona('default')} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2306,44 +2419,6 @@ export default function CircleLauncherScreen({
             ) : null}
           </ScrollView>
         )}
-        {/* OBJ-2 — scan an invite QR, then run the shared join wizard (no-pod redeem via the bundle's sender). */}
-        <QrScannerModal visible={joinScanOpen} onClose={() => setJoinScanOpen(false)} onResult={onJoinScan} t={t} />
-        {/* Mount only once we have the invite — the wizard decodes it in its useState initializer (runs
-            once on mount), so an always-mounted modal would cache a "no invite" error. */}
-        {joinArgs ? (
-          <JoinGroupWizardModal
-            visible
-            args={joinArgs}
-            callSkill={bundle?.callSkill}
-            sendPeerRedeem={bundle?.sendPeerRedeem}
-            t={t}
-            // The join sheet is the first surface a new person meets; it was hardcoded light and arrived
-            // as a white sheet in a dark app (S3, 2026-07-30). The theme lives here, in the shell.
-            theme={theme}
-            circles={circles}
-            circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
-            signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}
-            // J-CP1 — be on the circle's endpoint BEFORE the redeem. The invite names it; without this
-            // the redeem goes out over whatever transport this device happens to have, and a relay-only
-            // admin never hears it.
-            dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
-            activeEndpointUrl={() => bundle?.relayUrls?.() ?? bundle?.activeRelayUrl?.() ?? null}
-            // Post-join reachability (G13) — the same seam the chat-shell host passes, so a join is
-            // equally complete from either surface. This screen already bound the roster keys in
-            // `onDispatched`; what it never did was RE-REGISTER this device's per-circle address, so the
-            // circle just joined was missing from the relay until the next circles load.
-            onJoined={bundle?.onCircleJoined}
-            onClose={() => setJoinArgs(null)}
-            onDispatched={(r) => {
-              setJoinArgs(null);
-              const gid = r?.groupId ?? r?.joinedGroupId ?? null;
-              if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
-              // (The joined circle's connection point is recorded by the bundle's `onCircleJoined`, before presence
-              // and the pull — web parity by construction.)
-              load();
-            }}
-          />
-        ) : null}
         {/* Starting a circle opens the RICH 5-step wizard (identity · governance · rules · offerings · tech
             → review) — web parity (2026-07-26). It used to render a bare inline name row, so the wizard we
             built was reachable only through the onboarding handoff and every governance/rules/offerings
@@ -2452,6 +2527,13 @@ export default function CircleLauncherScreen({
         </Modal>
       </View>
     </WithTabBar>
+  );
+  })();
+  return (
+    <>
+      {page}
+      {scanOverlays}
+    </>
   );
 }
 

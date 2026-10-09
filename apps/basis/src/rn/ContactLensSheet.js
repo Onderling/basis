@@ -15,6 +15,7 @@ import {
   contactAddSheetModel, addContactAs, contactLensModel, changeContactLens,
 } from '../v2/contactLens.js';
 import { DEFAULT_PERSONA } from '../v2/contactPersona.js';
+import { personaLabel } from '../core/wizards/joinGroupState.js';   // the one persona label (wizards + this sheet)
 
 /** The sheet itself: persona + level, prefilled, the honest hint, cancel / confirm. */
 export function ContactLensSheet({ visible, mode = 'change', model, t, theme, onSubmit, onCancel }) {
@@ -41,7 +42,7 @@ export function ContactLensSheet({ visible, mode = 'change', model, t, theme, on
                 onChange={setPersona}
                 options={personas.map((x) => ({
                   id: x.id,
-                  label: x.id === DEFAULT_PERSONA ? t('circle.join.wizard.persona.default_suffix', { name: x.name }) : x.name,
+                  label: personaLabel(x, t),
                 }))}
               />
               <RadioGroup

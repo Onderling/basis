@@ -16,15 +16,17 @@
  *              event matched a renderable shape (host falls back to the
  *              member-count meta).
  *   ts       = ms-epoch of the most-recent matched event (0 when none).
- *   unread   = number of events for this circle whose `ts > seenAt[id]`
- *              (default 0 → "everything counts as unread the first time").
+ *   unread   = number of events for this circle whose `ts > seenAt[id]` AND that
+ *              `countsAsUnread` — what OTHERS said on the human lane
+ *              (default seenAt 0 → "all of that is unread the first time").
  *
  * Note the host owns the seenAt store — on the launcher we never touch
- * it; opening a circle bumps it to Date.now() (`bumpSeenAt(id)`).  Pure
+ * it; opening a circle AND leaving it bump it to Date.now() (`bumpSeenAt(id)`),
+ * so what happened while you were inside is not "new" when you get back.  Pure
  * helpers stay testable with a Map-backed snapshot.
  */
 import { eventCircleId } from './circleStream.js';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { param, PARAM_SCOPE, PARAM_KIND, entryKind, LANE } from '@onderling/item-store';
 
 // Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
 const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
@@ -36,9 +38,10 @@ const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_
  * @param {object[]} [opts.events=[]]   LoggedEvent[] (any order; we sort)
  * @param {object[]} [opts.circles=[]]  normalised circles ({ id, ... })
  * @param {Object<string,number>} [opts.seenAt={}]  { [circleId]: epochMs }
+ * @param {string[]} [opts.myRefs=[]]  this person's refs — their own lines are never unread
  * @returns {Object<string, {subtitle: string|null, ts: number, unread: number}>}
  */
-export function buildTilePreviews({ events = [], circles = [], seenAt = {} } = {}) {
+export function buildTilePreviews({ events = [], circles = [], seenAt = {}, myRefs = [] } = {}) {
   const known = new Set((circles || []).map((c) => c?.id).filter(Boolean));
   const out = {};
   // Seed entries for every known circle so the host can drive layout
@@ -60,12 +63,34 @@ export function buildTilePreviews({ events = [], circles = [], seenAt = {} } = {
       if (sub) entry.subtitle = sub;
       entry.ts = typeof event.ts === 'number' ? event.ts : 0;
     }
-    // Unread: count every event newer than the host-supplied seenAt.
+    // Unread: what someone ELSE said, newer than the host-supplied seenAt.
     const seen = typeof seenAt[cid] === 'number' ? seenAt[cid] : 0;
-    if ((event.ts ?? 0) > seen) entry.unread += 1;
+    if ((event.ts ?? 0) > seen && countsAsUnread(event, { myRefs })) entry.unread += 1;
   }
 
   return out;
+}
+
+/**
+ * Does this event count toward a circle's unread badge? The rule: news is ANOTHER PERSON's line on the human lane.
+ *   - The HUMAN lane only — the entry-kinds dictionary decides, so a system kind (roster, rules, a join, an unlisted
+ *     type) never counts.
+ *   - Not mine: not one of `myRefs` (the shells pass 'me' and every address this person's devices speak as, so a
+ *     second device of the same person is mine too).
+ *   - Not my own device talking to me: a 'bot' line scoped to me alone (the wizard's lines, the fallback offer).
+ * A circle you just made used to greet you with "6 unread": your own setup and your own sends.
+ * One decision, read by the web launcher and the mobile one alike.
+ *
+ * @param {object} event   a LoggedEvent
+ * @param {{myRefs?: string[]}} [o]
+ * @returns {boolean}
+ */
+export function countsAsUnread(event, { myRefs = [] } = {}) {
+  if (!event || typeof event !== 'object') return false;
+  if (entryKind(event.type).lane !== LANE.HUMAN) return false;
+  const actor = event.actor ?? event.payload?.actor ?? null;
+  if (actor === 'bot' && event.payload?.scope === 'self') return false;
+  return !(actor && myRefs.includes(actor));
 }
 
 /**
@@ -111,3 +136,22 @@ export function bumpSeenAt(seenAt, circleId, now = Date.now()) {
   if (!circleId) return seenAt || {};
   return { ...(seenAt || {}), [circleId]: now };
 }
+
+/**
+ * The circle a person LEAVES is seen up to that moment — what happened while they were inside it (their own sends, a
+ * join they watched) is not news when they get back to the launcher. A subscriber for the shared active-circle signal
+ * (`subscribeActiveCircle`): it remembers the open circle and calls `onLeave(id)` when that changes to anything else.
+ * Both shells hand it their own seenAt write.
+ *
+ * @param {(circleId: string) => void} onLeave
+ * @returns {(current: string|null) => void}
+ */
+export function seenOnLeave(onLeave) {
+  let open = null;
+  return (current) => {
+    const next = current || null;
+    if (open && open !== next) { try { onLeave(open); } catch { /* a failed write must not break the signal */ } }
+    open = next;
+  };
+}
+

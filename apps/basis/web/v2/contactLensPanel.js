@@ -7,6 +7,7 @@
  * The hint is the honest sentence: a different VIEW of the same person, never a second identity (ledger L123).
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { personaLabel } from '../../src/core/wizards/joinGroupState.js';   // the one persona label (wizards + this panel)
 
 /**
  * @param {object} o
@@ -69,7 +70,7 @@ export function renderContactLensPanel({ container, doc = document, t, onClose, 
   const personas = model.personas?.length ? model.personas : [{ id: 'default', name: 'default' }];
   field('circle.contacts.lens.persona', 'cc-lens__persona', personas.map((p) => ({
     id: p.id,
-    label: p.id === 'default' ? tr('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
+    label: personaLabel(p, tr),
   })), choice.persona, (v) => { choice.persona = v; });
   field('circle.contacts.lens.level', 'cc-lens__level', (model.presets ?? []).map((p) => ({
     id: p, label: tr(`circle.reveal.preset.${p}`),

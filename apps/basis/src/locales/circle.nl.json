@@ -509,6 +509,16 @@
     "text": "Je standaardpersona",
     "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
   },
+  "scan": {
+    "pair_held": {
+      "text": "Dit is een koppelcode. Koppelen vanuit Scan kan nog niet — open de kring → Kring-instellingen → Gekoppelde apparaten en voeg hem daar toe.",
+      "doc": "Me → Scan read a pairing code: pairing from Scan waits for a picker-capable form (its own row); say where it can be done today, never drop the code."
+    },
+    "paste_placeholder": {
+      "text": "Plak een code, een link of een claimregel",
+      "doc": "Me → Scan on web (no camera): the paste prompt."
+    }
+  },
   "membercard_close": {
     "text": "Sluiten",
     "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
@@ -5667,8 +5677,12 @@
       "text": "ontwikkelversie",
       "doc": "What the version line says for a build with no tag (a dev server)."
     },
-    "share_contact": {
-      "text": "Mijn contact delen →",
+    "scan": {
+        "text": "Scan",
+        "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+      },
+      "share_contact": {
+      "text": "Deel mijn kaart",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     },
     "overview_title": {
@@ -7986,6 +8000,12 @@
       "doc": "Telegram runner: the \"schedule\" household list as a button label when the assistant asks which list."
     }
   },
+  "hostFrame": {
+    "back": {
+      "text": "← terug naar {{site}}",
+      "doc": "The one line at the top of a HOSTED web build, linking back to the site that hosts it (a build value; a self-built shell has no line). site = the site's name from the build, or its host."
+    }
+  },
   "update": {
     "available": {
       "text": "Er is een nieuwere versie van Basis ({{tag}}).",
@@ -7998,7 +8018,7 @@
   },
   "shareContact": {
     "title": {
-      "text": "Mijn contact delen",
+      "text": "Deel mijn kaart",
       "doc": "Heading of the share panel under Mij."
     },
     "hint": {

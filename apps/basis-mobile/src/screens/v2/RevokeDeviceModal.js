@@ -20,7 +20,7 @@ const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
  * device (the restore wizard's "this is my phone now"); `flowId: 'claim-companion'` makes the person the owner of a
  * companion node (`inputName: 'claim'`, the line the node prints). `keyPrefix` picks the copy.
  */
-export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke', inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder' }) {
+export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke', inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', needs = null }) {
   const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -33,7 +33,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
     const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => callSkill('household', opId, args) });
     runnerRef.current = runner;
     let alive = true;
-    runner.start(FLOW, {})
+    runner.start(FLOW, { needs: needs ?? {} })
       .then((r) => { if (alive) { setInst(r); setPhrase(''); } })
       .catch(() => { if (alive) onClose?.(); });
     return () => { alive = false; runnerRef.current = null; };
@@ -90,7 +90,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
                       const runner = runnerRef.current;
                       if (!runner) return finish();
                       setPhrase('');
-                      runner.start(FLOW, {}).then((r) => setInst(r)).catch(() => finish());
+                      runner.start(FLOW, { needs: needs ?? {} }).then((r) => setInst(r)).catch(() => finish());
                     }}
                   >
                     <Text style={styles.buttonText}>{t('circle.enroll.retry')}</Text>

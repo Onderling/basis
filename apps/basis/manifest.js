@@ -866,6 +866,19 @@ export const basisManifest = {
   ],
 
   /**
+   * Me — the two things a person does with someone in the room, at the top of their own page (2026-10-09): show their
+   * card, or take someone else's code. Declared HERE so both shells paint them from the declaration (`meActions` →
+   * renderWeb → `meActionsFor`), never because a screen file lists them.
+   *   share-card — the existing Share-my-contact view (the QR, the code, the link).
+   *   scan       — ONE scanner (web: the paste prompt), routed by what it reads (`scanRoute.js`: each kind to its
+   *                declared op or flow).
+   */
+  meActions: [
+    { id: 'share-card', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
+    { id: 'scan',       labelKey: 'circle.profile.scan',          target: { kind: 'nav', to: 'scan' } },
+  ],
+
+  /**
    * Nav-chrome (D / Surface 2) — the circle DETAIL ACTION BAR + the live circle
    * ⋯ overflow menu.  These sibling-screen buttons WERE hand-written and had
    * DIVERGED across THREE places: web detail bar (`circleDetail.js`

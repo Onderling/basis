@@ -2969,6 +2969,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     const told = await Promise.all(nodes.map((node) => invokeNode(node, 'manage.revokeDevice', { revocation })));
     return told.filter((r) => r?.ok === true).length;
   }
+  // The enroll-device flow's first step: an add-device offer handed in (Me → Scan, a link, a paste) is kept on this
+  // device for the ceremony that follows. No offer → 'no-offer' (the phrase-only path), an unreadable one → 'bad-offer'.
+  hostAgent.register('stashEnrollOffer', async ({ parts }) => {
+    const offer = parts?.[0]?.data?.offer;
+    if (typeof offer !== 'string' || !offer.trim()) return [DataPart({ ok: true, outcome: 'no-offer' })];
+    if (!opts.enrollOfferStorage) return [DataPart({ ok: false, outcome: 'bad-offer', error: 'no-storage' })];
+    try {
+      const r = await stashEnrollOffer(opts.enrollOfferStorage, offer.trim());
+      return [DataPart(r?.ok ? { ok: true, outcome: 'stashed' } : { ok: false, outcome: 'bad-offer' })];
+    } catch (err) { return [DataPart({ ok: false, outcome: 'bad-offer', error: err?.message ?? String(err) })]; }
+  });
+
   hostAgent.register('claimCompanion', async ({ parts }) => {
     const claim = parseCompanionClaim(parts?.[0]?.data?.claim);
     if (!claim) return [DataPart({ ok: false, outcome: 'bad-claim' })];

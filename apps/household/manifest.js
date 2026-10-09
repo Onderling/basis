@@ -339,6 +339,18 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'stashEnrollOffer', group: 'device',
+      verb: 'stash-enroll-offer',
+      writes: { scope: 'device' },   // this device's own storage: the offer waits there for the add-device ceremony
+      // An add-device OFFER read off another device of the person's (its QR, its link, or pasted): kept on THIS device
+      // so the ceremony that follows bootstraps the circles it names. Public data, never authority — the ceremony asks
+      // for the recovery phrase. The first step of the enroll-device flow; absent offer → 'no-offer', nothing written.
+      params: [
+        { name: 'offer', kind: 'string', required: false },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'claimCompanion', group: 'device',
       verb: 'claim-companion',
       writes: { scope: 'device' },   // the person's own list of the nodes they own; the node records its owner itself
@@ -589,7 +601,13 @@ export const householdManifest = {
         { name: 'deviceId',       kind: 'string',  from: '$steps.ceremony.deviceId' },
         { name: 'reloadRequired', kind: 'boolean', from: '$steps.ceremony.reloadRequired' },
       ],
+      // An add-device offer handed in (Me → Scan, a link, a paste) — optional: the phrase-only path has none.
+      needs: [{ name: 'offer', kind: 'string', required: false }],
       steps: [
+        // An offer handed in (Me → Scan read another device's add-device code) is kept first; without one the flow
+        // goes straight to the phrase, as it always has.
+        { id: 'stash', op: 'stashEnrollOffer', bind: { offer: { from: '$flow.needs.offer', optional: true } },
+          next: { stashed: 'ceremony', 'no-offer': 'ceremony', 'bad-offer': null } },
         { id: 'ceremony', op: 'enrollDevice', labelKey: 'circle.enroll.ceremony' },
       ],
     },

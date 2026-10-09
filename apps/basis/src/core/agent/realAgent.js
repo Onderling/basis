@@ -221,6 +221,7 @@ import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
 import { stashEnrollOffer } from '../../v2/enrollOffer.js';
+import { parsePairUri } from '../qrSchemes.js';   // the pairing code's one reader (the declared pairCirclePeer op)
 import { bindCircleAddressKeysFor } from '../../v2/householdRosterPairing.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
@@ -2971,6 +2972,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
   // The enroll-device flow's first step: an add-device offer handed in (Me → Scan, a link, a paste) is kept on this
   // device for the ceremony that follows. No offer → 'no-offer' (the phrase-only path), an unreadable one → 'bad-offer'.
+  // OBJ-2 mutual pairing — add the peer AND ask it to add us back (a __pairReq carrying our address + the circle), so
+  // a single scan makes the no-pod sync bidirectional. No echo → no loop. ONE body: the bundle's `pairWithPeer` and the
+  // declared `pairCirclePeer` op (Me → Scan read a pairing code; the circle picked from `listMyCircles`) both run it.
+  async function pairCirclePeer(circleId, pubKey) {
+    if (pubKey === undefined) { pubKey = circleId; circleId = resolveCircleId({}); }
+    const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
+    const mirror = await ensureCircleMirror(id);
+    const fresh = isNewCirclePeer(id, pubKey);
+    await mirror.addPeer(pubKey); await persistCirclePeers(id);
+    try { await sa.peer.sendTo(pubKey, { __pairReq: { addr: chatId.pubKey, circleId: id } }); } catch { /* best-effort */ }
+    if (fresh) republishCircleItemsToNewPeer(id).catch(() => {});
+    return mirror.listPeers?.() ?? [];
+  }
+  hostAgent.register('pairCirclePeer', async ({ parts }) => {
+    const d = parts?.[0]?.data ?? {};
+    const addr = parsePairUri(String(d.addr ?? '').trim())?.addr ?? null;
+    if (!addr || typeof d.circle !== 'string' || !d.circle) return [DataPart({ ok: false, outcome: 'bad-code' })];
+    try { await pairCirclePeer(d.circle, addr); return [DataPart({ ok: true, outcome: 'paired', circle: d.circle })]; }
+    catch (err) { return [DataPart({ ok: false, outcome: 'failed', error: err?.message ?? String(err) })]; }
+  });
+
   hostAgent.register('stashEnrollOffer', async ({ parts }) => {
     const offer = parts?.[0]?.data?.offer;
     if (typeof offer !== 'string' || !offer.trim()) return [DataPart({ ok: true, outcome: 'no-offer' })];
@@ -6696,16 +6718,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     // OBJ-2 mutual pairing — add the peer AND ask it to add us back (a __pairReq carrying our address +
     // the circle), so a single scan makes the no-pod sync bidirectional. No echo → no loop.
-    pairWithPeer:        async (circleId, pubKey) => {
-      if (pubKey === undefined) { pubKey = circleId; circleId = resolveCircleId({}); }
-      const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
-      const mirror = await ensureCircleMirror(id);
-      const fresh = isNewCirclePeer(id, pubKey);
-      await mirror.addPeer(pubKey); await persistCirclePeers(id);
-      try { await sa.peer.sendTo(pubKey, { __pairReq: { addr: chatId.pubKey, circleId: id } }); } catch { /* best-effort */ }
-      if (fresh) republishCircleItemsToNewPeer(id).catch(() => {});
-      return mirror.listPeers?.() ?? [];
-    },
+    pairWithPeer:        (circleId, pubKey) => pairCirclePeer(circleId, pubKey),
     listHouseholdPeers:  (circleId) => circleMirrors.get((typeof circleId === 'string' && circleId) ? circleId : 'household')?.listPeers?.() ?? [],
     // This device's shareable household address (the pubKey peers route to — matches
     // relay.address; the OTHER device pastes this into its "paired devices" screen).

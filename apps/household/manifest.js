@@ -68,6 +68,8 @@ export const householdManifest = {
     'enroll-device': 'write',
     'revoke-device': 'write',
     'claim-companion': 'write',
+    'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
+    'pair-peer': 'write',            // adds a peer to a circle's item sync
     'list-companion-grants': 'read',
     'grant-companion': 'write',
     'read-companion-grants': 'read',
@@ -336,6 +338,19 @@ export const householdManifest = {
         { name: 'deviceId', kind: 'string', required: true },
       ],
       // CEREMONY-ONLY, like enrollDevice: reached through the revoke-device flow.
+      surfaces: {},
+    },
+    {
+      id:   'pairCirclePeer', group: 'device',
+      verb: 'pair-peer',
+      writes: { scope: 'circle' },   // the peer joins this circle's item sync, both ways (a __pairReq asks it back)
+      // Pair a device or agent into one of the person's circles: the code another device shows (`onderling-pair://…`, or
+      // a bare address). The circle is PICKED from the person's own circles — the form paints the pick-list from the
+      // param's pickerSource, skipped when there is only one. Reached from Me → Scan.
+      params: [
+        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'stoop' } },
+        { name: 'addr',   kind: 'string', required: true },
+      ],
       surfaces: {},
     },
     {
@@ -675,8 +690,11 @@ export const householdManifest = {
       produces: [
         { name: 'node', kind: 'string', from: '$steps.ceremony.node' },
       ],
+      // The claim line handed in (Me → Scan read it) — optional: without it the flow asks for it, as before.
+      needs: [{ name: 'claim', kind: 'string', required: false }],
       steps: [
-        { id: 'ceremony', op: 'claimCompanion', labelKey: 'circle.companionClaim.ceremony' },
+        { id: 'ceremony', op: 'claimCompanion', labelKey: 'circle.companionClaim.ceremony',
+          bind: { claim: { from: '$flow.needs.claim', optional: true } } },
       ],
     },
     {

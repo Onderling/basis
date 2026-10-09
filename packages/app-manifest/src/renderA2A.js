@@ -37,6 +37,7 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // someone the owner of a node of the peer's choosing (2026-10-09).
   'household.claimCompanion',
   'household.stashEnrollOffer',
+  'household.pairCirclePeer',
   // …and what that node lets another agent do there: granting it, or reading its choices, has THIS device sign a
   // statement for the person's node — a peer must not get the person's device to sign for it.
   'household.grantCompanion',

@@ -16,7 +16,7 @@ describe('share my contact — parity', () => {
   const webProfile   = read('../../basis/web/v2/circleProfile.js');
   const mobileScreen = read('../src/screens/v2/ShareMyContactScreen.js');
   const mobileProfile = read('../src/screens/v2/CircleProfileScreen.js');
-  const mobileClassifier = read('../src/core/qrClassifiers.js');
+  const mobileClassifier = read('../../basis/src/v2/scanRoute.js');   // the list moved to the shared router (2026-10-09)
 
   it('both shells resolve the panel through the shared loader — neither builds the link or asks stoop itself', () => {
     for (const src of [webHost, mobileScreen]) expect(src).toMatch(/loadShareMyContact\(/);

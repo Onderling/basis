@@ -29,11 +29,12 @@ import { encode as b64encode }  from '../crypto/b64.js';
  * `signOrigin` writes it; `verifyOrigin` rejects any other version.
  */
 export const ORIGIN_SIG_VERSION      = 'onderling/origin.v1';
-/** Default clock-skew window for verifyOrigin's timestamp check: ±10 minutes. */
 import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 
-// Parameter register (#36) — origin-signature freshness window (scope:device, kind:INTERNAL — a security
-// bound, immutable by construction; mirrors security.replayWindowMs).
+/**
+ * Default clock-skew window for verifyOrigin's timestamp check: ±10 minutes. A parameter (device scope, internal —
+ * a security bound, immutable by construction; mirrors security.replayWindowMs).
+ */
 export const DEFAULT_ORIGIN_WINDOW_MS = param({ key: 'originSignature.windowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60_000 });  // ±10 min, matches SecurityLayer
 
 /**

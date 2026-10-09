@@ -1,34 +1,6 @@
 {
   "//": "Recorded JSDoc gaps — public exports allowed to lack a JSDoc block, per package. lint-api-docs fails on any undocumented public export NOT listed here; shrink this list, never grow it casually. The entries below were found on 2026-10-09 when the check joined the guards (it had run only by hand); burning them down is a ledger row.",
   "gaps": {
-    "sdk": [
-      "ADDRESS_REVOKE_KIND",
-      "DEFAULT_ORIGIN_WINDOW_MS",
-      "EVICTION_STMT_VERSION",
-      "MAX_ENVELOPE_BYTES",
-      "RoleGrantManager",
-      "SCOPED_SEAL_SCHEMES",
-      "buildKeyEvent",
-      "createCanonicalShare",
-      "createMeshSurface",
-      "createNearbyPeerSource",
-      "foldPersonKeys",
-      "isCeremonyKind",
-      "keyIdOf",
-      "ownerRootFingerprint"
-    ],
-    "core": [
-      "ADDRESS_REVOKE_KIND",
-      "DEFAULT_ORIGIN_WINDOW_MS",
-      "EVICTION_STMT_VERSION",
-      "MAX_ENVELOPE_BYTES",
-      "RoleGrantManager",
-      "createMeshSurface",
-      "createNearbyPeerSource",
-      "foldPersonKeys",
-      "isCeremonyKind",
-      "ownerRootFingerprint"
-    ],
     "transports": [
       "b64Decode"
     ],
@@ -38,12 +10,6 @@
       "assertSeed",
       "seedFromString",
       "seedToString"
-    ],
-    "pod-client": [
-      "SCOPED_SEAL_SCHEMES",
-      "buildKeyEvent",
-      "createCanonicalShare",
-      "keyIdOf"
     ],
     "item-types": [
       "CANONICAL_TYPES",

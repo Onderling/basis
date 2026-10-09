@@ -18,6 +18,8 @@
  */
 
 /**
+ * The nearby peer source over every discovering transport: one row per address, updated (not appended) by a
+ * second sighting, each row keeping the sources it was seen on.
  * @param {object} deps
  * @param {() => Record<string, object|null>} deps.transports  named transports; re-read on subscribe
  * @param {() => number} [deps.now]

@@ -1,3 +1,6 @@
+import { createDiscoverabilityControl } from './discoverability.js';
+import { createNearbyPeerSource } from './nearbyPeers.js';
+
 /**
  * The mesh SURFACE — the discoverability control and the nearby peer source, as one object an app can
  * hold from boot, over a set of transports that may land later.
@@ -15,9 +18,6 @@
  * @param {(report: object) => void} [opts.onDegraded]  forwarded to the control
  * @returns {{ discoverability, nearbyPeers, transports: () => object, setTransports: (next: object) => Promise<void> }}
  */
-import { createDiscoverabilityControl } from './discoverability.js';
-import { createNearbyPeerSource } from './nearbyPeers.js';
-
 export function createMeshSurface({ onDegraded = null } = {}) {
   let current = {};
   const transports = () => current;

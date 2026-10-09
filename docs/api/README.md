@@ -20,11 +20,11 @@ Recorded gaps are allowlisted in `scripts/api-doc-gaps.json`; new undocumented e
 
 | Package | Reference | Public exports | Documented | Coverage | Recorded gaps |
 | --- | --- | ---: | ---: | ---: | --- |
-| `@onderling/sdk` | [sdk.md](sdk.md) | 414 | 400 | 97% | `ADDRESS_REVOKE_KIND`, `DEFAULT_ORIGIN_WINDOW_MS`, `EVICTION_STMT_VERSION`, `MAX_ENVELOPE_BYTES`, `RoleGrantManager`, `SCOPED_SEAL_SCHEMES` … (14 total) |
-| `@onderling/core` | [core.md](core.md) | 290 | 280 | 97% | `ADDRESS_REVOKE_KIND`, `DEFAULT_ORIGIN_WINDOW_MS`, `EVICTION_STMT_VERSION`, `MAX_ENVELOPE_BYTES`, `RoleGrantManager`, `createMeshSurface` … (10 total) |
+| `@onderling/sdk` | [sdk.md](sdk.md) | 414 | 414 | 100% | — |
+| `@onderling/core` | [core.md](core.md) | 290 | 290 | 100% | — |
 | `@onderling/transports` | [transports.md](transports.md) | 22 | 21 | 95% | `b64Decode` |
 | `@onderling/vault` | [vault.md](vault.md) | 20 | 15 | 75% | `RootKeyStoreWebCrypto`, `VaultEncrypted`, `assertSeed`, `seedFromString`, `seedToString` |
-| `@onderling/pod-client` | [pod-client.md](pod-client.md) | 116 | 112 | 97% | `SCOPED_SEAL_SCHEMES`, `buildKeyEvent`, `createCanonicalShare`, `keyIdOf` |
+| `@onderling/pod-client` | [pod-client.md](pod-client.md) | 116 | 116 | 100% | — |
 | `@onderling/redaction` | [redaction.md](redaction.md) | 8 | 8 | 100% | — |
 | `@onderling/pseudo-pod` | [pseudo-pod.md](pseudo-pod.md) | 9 | 9 | 100% | — |
 | `@onderling/item-types` | [item-types.md](item-types.md) | 35 | 29 | 83% | `CANONICAL_TYPES`, `INBOX_ITEM_SCHEMA`, `SYSTEM_STOOP_TYPES`, `isReminderRule`, `parseReminderRule`, `registerCanonicalTypes` |

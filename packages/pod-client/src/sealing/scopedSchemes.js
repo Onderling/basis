@@ -15,6 +15,7 @@
  */
 import { SEAL_SCHEMES } from '../sealing/sealResolver.js';
 
+/** The seal schemes whose audience a grant may extend: pairwise and per-resource CEK — never the group key. */
 export const SCOPED_SEAL_SCHEMES = Object.freeze([SEAL_SCHEMES.PAIRWISE, SEAL_SCHEMES.PER_RESOURCE_CEK]);
 
 /**

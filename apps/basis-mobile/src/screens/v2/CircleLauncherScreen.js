@@ -2059,6 +2059,55 @@ export default function CircleLauncherScreen({
       />
     );
   }
+  // OBJ-2 — the invite QR for a circle (admin shows it; another device scans). ONE element, painted where the person IS:
+  // the list AND the open circle. It lived only in the list's return, so Invite from a circle's ⋯ set `inviteFor` and
+  // painted nothing until `← circles` (walked 2026-10-09: 22 s of nothing, then the QR the moment the list came back).
+  const inviteModal = (
+        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
+          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
+            <Pressable style={styles.inviteCard} onPress={() => {}}>
+              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
+              {inviteFor?.uri ? (
+                <>
+                  <QrCodeView value={inviteFor.uri} size={200} />
+                  <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
+                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
+                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
+                    <Text style={styles.inviteHint}>
+                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
+                    </Text>
+                  ) : null}
+                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
+                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="invite-announce-nearby"
+                    onPress={async () => {
+                      const res = await bundle?.nearbyRoom?.announceInvite?.({
+                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
+                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
+                      }) ?? { ok: false, reason: 'nobody-nearby' };
+                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
+                    }}
+                  >
+                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
+                  </Pressable>
+                  {inviteFor.announced ? (
+                    <Text style={styles.inviteHint} testID="invite-announce-result">
+                      {inviteFor.announced.ok
+                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
+                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+  );
+
   if (selected) {
     return (
       <>
@@ -2169,6 +2218,7 @@ export default function CircleLauncherScreen({
         onShare={() => { loadShareContacts(); setView('share'); }}
       />
       {relayQuestionModal}
+      {inviteModal}
       </>
     );
   }
@@ -2321,50 +2371,7 @@ export default function CircleLauncherScreen({
           />
         ) : null}
         {relayQuestionModal}
-        {/* OBJ-2 — invite QR for a circle (admin shows it; another device scans). */}
-        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
-          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
-            <Pressable style={styles.inviteCard} onPress={() => {}}>
-              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
-              {inviteFor?.uri ? (
-                <>
-                  <QrCodeView value={inviteFor.uri} size={200} />
-                  <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
-                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
-                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
-                    <Text style={styles.inviteHint}>
-                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
-                    </Text>
-                  ) : null}
-                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
-                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
-                  <Pressable
-                    accessibilityRole="button"
-                    testID="invite-announce-nearby"
-                    onPress={async () => {
-                      const res = await bundle?.nearbyRoom?.announceInvite?.({
-                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
-                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
-                      }) ?? { ok: false, reason: 'nobody-nearby' };
-                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
-                    }}
-                  >
-                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
-                  </Pressable>
-                  {inviteFor.announced ? (
-                    <Text style={styles.inviteHint} testID="invite-announce-result">
-                      {inviteFor.announced.ok
-                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
-                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
+        {inviteModal}
         {/* β.5 — per-tile context menu, rendered as a transparent modal
             so a tap outside the sheet dismisses it.  The four actions
             mirror web: pin (toggle), mute (toggle), settings, leave. */}

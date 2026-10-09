@@ -4604,6 +4604,8 @@ export function buildSkills({
         // (basis's realAgent) passes args.peerAddr; the stoop
         // substrate doesn't have its own NKN identity.
         ...(typeof a.peerAddr === 'string' && a.peerAddr ? { peerAddr: a.peerAddr } : {}),
+        // A household bot's card says it is one — for display and the add-flow's words only, never for trust
+        ...(a.bot === true ? { bot: true } : {}),
         // Where this person can be FOUND — the relay(s) the caller chose to put on the card (basis
         // hands in the primary by default and any extra the person ticked). A message to a contact
         // rides these before any kring's relay; two people who share no kring have no other route.
@@ -4655,6 +4657,8 @@ export function buildSkills({
         // A node's card says where its agenda links are served (a household's companion): kept, so a bot builds the link
         // from the contact it holds.
         ...(typeof card.serves === 'string' && /^https?:\/\//.test(card.serves) ? { serves: card.serves } : {}),
+        // a card that says it is a bot (display only — what a person's app signs to is decided by their own admission)
+        ...(card.bot === true ? { bot: true } : {}),
         // WHICH PERSONA this contact was added through — what they see of you (the release their pair roster
         // will carry). Chosen in the add flow with the default prefilled; absent when the caller did not ask,
         // and then left ABSENT rather than defaulted, so a row that was never chosen for is distinguishable

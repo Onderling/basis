@@ -7,7 +7,7 @@
  * every step what each device must SHOW. Run against the real relay when the point is "real shells,
  * real wire" (2026-09-14, after every catch-up between members started going over the real wire):
  *
- *   PEER_TEST_RELAY=wss://relay.onderling.org npx playwright test --project=relay walk-drie
+ *   PEER_TEST_RELAY=wss://<relay-domain> npx playwright test --project=relay walk-drie
  *
  * Every step logs a verdict and takes a screenshot per device into the test's output dir — the
  * screenshots are what Frits reviews with his own eyes; this spec asserts what a script can see.

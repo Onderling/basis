@@ -24,6 +24,7 @@ import { DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { createSecureAgent } from '@onderling/secure-agent';
 import { createScreenView, screenAddressFor } from '../src/v2/screenView.js';
+import { addBoxCard } from './support/addBoxCard.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const cardFrom = (stdout) => { const m = /onderling-contact:\/\/([A-Za-z0-9_-]+)/.exec(stdout); return m ? decodeCardBody(m[1]) : null; };
@@ -74,7 +75,8 @@ describe('a person connects a screen to the bot over the relay', () => {
     expect(card?.peerAddr, 'the runner printed no card').toBeTruthy();
     const send = (text, extra = {}) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
     const code = /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)?.[1];
-    await send('hallo', { admission: code });
+    await addBoxCard(ann, out);
+    await send(`/start ${code}`);
     expect(await until(async () => ((await botSaid(ann)).length >= 1 ? true : null), { timeout: 30_000, step: 500 }), `not admitted:\n${out.slice(-1200)}`).toBe(true);
 
     await send('/scherm link');   // Ann is the admin: the link on request

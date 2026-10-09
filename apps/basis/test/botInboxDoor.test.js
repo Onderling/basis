@@ -20,19 +20,31 @@ import { createBotUsers, createDoorAdmit } from '../src/v2/botUsers.js';
 import { createBotAdmission } from '../src/v2/botAdmission.js';
 import { createInboxDoor } from '../src/v2/inboxDoor.js';
 import { multiplexBridges } from '../src/v2/doorBridges.js';
+import { createIdentityLink, createLinkTombstones } from '../src/v2/botIdentityLink.js';
+import { linkedPerson } from './support/linkedPerson.js';
 
 const t = (k, p) => (p && typeof p === 'object' && Object.keys(p).length ? `${k}:${JSON.stringify(p)}` : k);
 function memStore() { const m = new Map(); return { get: async (id) => m.get(id) ?? null, put: async (row) => { m.set(row.id, row); return row; }, list: async () => [...m.values()] }; }
 function memVault() { const m = new Map(); return { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); } }; }
 
 const ANN = 'https://ann.example/profile#me';
+const BOT = 'BOT-ADDRESS';
+let seq = 0;
+/** A turn from a person's own app, signed by one of their devices (what `/start <code>` and every later turn carry). */
+const signed = (person, text) => { seq += 1; const messageId = `s-${seq}`; return [person.webid, text, { messageId, auth: person.turn('phone', BOT, { text, messageId }) }]; };
 const BO = 'https://bo.example/profile#me';
 
 function box() { return { users: memStore(), admission: memStore(), vault: memVault(), threads: memoryThreadStore() }; }
 
 async function boot(state, kind) {
   const sent = [];
-  const door = await createInboxDoor({ profileKind: async () => kind, sendTurn: async (turn) => { sent.push(turn); } });
+  // the door checks a turn's device statement as the box does (the identity link's verifyTurn)
+  const link = createIdentityLink({
+    users: createBotUsers({ store: state.users, adminUid: '1' }), botAddress: () => BOT, tombstones: createLinkTombstones({ vault: memVault() }),
+    ask: async () => ({ ok: true }), sendPrivately: async () => ({ ok: true }), tellApp: async () => {},
+    listGrants: async () => [], revokeView: async () => true, where: () => ({}),
+  });
+  const door = await createInboxDoor({ profileKind: async () => kind, sendTurn: async (turn) => { sent.push(turn); }, linkedRootOf: (turn) => link.verifyTurn(turn) });
   const telegram = new InMemoryBridge({ id: 'telegram' });
   const agent = createMockHouseholdAgent();
   const users = createBotUsers({ store: state.users, adminUid: '1' });
@@ -69,17 +81,18 @@ describe('the bot\'s inbox door', () => {
     const d = await boot(state, 'function');
     await d.admission.openCohort({ ceiling: 3, days: 1 });
     const code = await d.admission.code();
-    const first = await d.write(ANN, 'hallo', { admission: code });
+    const ann = await linkedPerson();
+    const first = await d.write(...signed(ann, `/start ${code}`));
     // the inbox has no slash commands: its welcome says what to do, not "typ /help"
     expect(first.replies.join('\n')).toContain('circle.bot.welcome_talk');
     // a person who writes can be written to again: a kept "cannot reach" is cleared
-    d.threads.markUnreachable(ANN, 'no-private-chat');
-    await d.write(ANN, 'nog iets');
-    expect(d.threads.unreachableOf(ANN)).toBeNull();
+    d.threads.markUnreachable(ann.webid, 'no-private-chat');
+    await d.write(...signed(ann, 'nog iets'));
+    expect(d.threads.unreachableOf(ann.webid)).toBeNull();
     // the reply goes to the PERSON (their id), whatever address the message came from
-    expect(first.to).toEqual([ANN]);
-    expect((await d.users.list()).some((u) => u.id === ANN && u.channel === 'web')).toBe(true);
-    const later = await d.write(ANN, '/help');
+    expect(first.to).toEqual([ann.webid]);
+    expect((await d.users.list()).some((u) => u.id === ann.webid && u.channel === 'web' && u.linkedRoot === ann.root)).toBe(true);
+    const later = await d.write(...signed(ann, '/help'));
     expect(later.replies.join('\n')).toContain('circle.bot.help_memory');
     // the same engine still answers Telegram
     expect(await d.tg('1', '/help')).toContain('circle.bot.help_memory');

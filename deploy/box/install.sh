@@ -55,7 +55,7 @@ case "$PROFILE" in
   *) echo "profile '$PROFILE' is not built yet — only 'relay' is (plans/PLAN-vps-runner.md §6)"; exit 2 ;;
 esac
 if [ "$PROFILE" = personal ]; then
-  ask COMPANION_RELAY_URL "The shared relay to dial (wss://relay.onderling.org)" "wss://relay.onderling.org"
+  ask COMPANION_RELAY_URL "The shared relay to dial (wss://<relay-domain>)"
   ask TG_BOT_TOKEN "Telegram bot token for your assistant"
   ask TG_ALLOWED_CHAT_IDS "Your Telegram chat id(s), comma-separated (empty = open door)" ""
   ask PRIVATEMODE_API_KEY "Privatemode API key (the assistant's confidential LLM route)"

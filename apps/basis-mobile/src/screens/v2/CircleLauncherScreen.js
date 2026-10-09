@@ -2367,6 +2367,9 @@ export default function CircleLauncherScreen({
               const gid = r?.groupId ?? null;
               if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
               load();
+              // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
+              // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
+              if (gid) openCircleInvite(gid).catch(() => {});
             }}
           />
         ) : null}

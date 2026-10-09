@@ -50,6 +50,9 @@ export {
   // A manifest's classification of its domain verbs (`domainVerbs: { verb: 'read' | 'write' }`).
   DOMAIN_VERB_KINDS,
   verbKind,
+  // Who writes a noun's items (`nouns[noun].writtenBy`): people only — no model tool, maker-or-admin to change.
+  NOUN_WRITERS,
+  isPeopleWritten,
 } from './atoms.js';
 
 // B · (ruling) — read helpers over manifest.settings (the wizard/form layer).

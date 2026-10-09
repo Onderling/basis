@@ -505,6 +505,10 @@
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "persona_default_name": {
+    "text": "Je standaardpersona",
+    "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
+  },
   "membercard_close": {
     "text": "Sluiten",
     "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
@@ -4928,6 +4932,11 @@
           "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
           "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
+        },
+        "household": {
+          "__generic__:household:add:note": "een weetje voor iedereen opschrijven (of zeg: onthoud dat de vuilnis dinsdag buiten gaat)",
+          "__generic__:household:list:note": "de weetjes van het huishouden (of zeg: welke weetjes zijn er)",
+          "__generic__:household:remove:note": "een weetje weghalen — je eigen, of als beheerder (of zeg: vergeet het weetje over de wifi)"
         }
       }
     },
@@ -5009,6 +5018,14 @@
     "day_unread": {
       "text": "Welke dag bedoel je met '{{day}}'? Zeg bijvoorbeeld 'zaterdag' of 'morgen'.",
       "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    },
+    "welcome_notes": {
+      "text": "Weetjes voor iedereen: \"onthoud dat de wifi-code op de koelkast staat\"; \"welke weetjes zijn er\" laat ze zien, en ik gebruik ze als je iets vraagt.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_notes_read": {
+      "text": "\"Welke weetjes zijn er\" laat zien wat het huishouden heeft opgeschreven.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     }
   },
   "op": {
@@ -7329,6 +7346,10 @@
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
+      "your_name": {
+        "text": "Jouw naam in deze kring",
+        "doc": "The founder's handle field in the create wizard, asked when their profile has none — directly under the circle's own name field, so it names whose name it is."
+      },
       "review_persona": {
         "text": "Gestart als",
         "doc": "Create wizard, review — the founding persona's row."
@@ -8464,7 +8485,8 @@
       "assistant-role": "Rol",
       "assistant-revoke": "Eruit",
       "removeFromList": "Weg",
-      "entryReminders": "Herinneringen"
+      "entryReminders": "Herinneringen",
+      "__generic__:household:remove:note": "Weg"
     },
     "household": "Het huishouden",
     "people": "Wie er in huis zijn",
@@ -8664,6 +8686,32 @@
     "day_none": {
       "text": "Op {{when}} staat er niets.",
       "doc": "One day's read: no appointments and no chores that day."
+    }
+  },
+  "notes": {
+    "need_text": {
+      "text": "Wat moet ik onthouden? Bijvoorbeeld: onthoud dat de vuilnis dinsdag buiten gaat.",
+      "doc": "A note added with no words."
+    },
+    "added": {
+      "text": "Onthouden: {{text}}",
+      "doc": "A note was added (a weetje: something the household wants known)."
+    },
+    "title": {
+      "text": "Weetjes",
+      "doc": "The heading above the household's notes."
+    },
+    "not_there": {
+      "text": "Dat weetje ken ik niet{{item}}.",
+      "doc": "Removing a note that is not there; item is \" (words)\" or empty."
+    },
+    "not_yours": {
+      "text": "\"{{text}}\" heeft iemand anders opgeschreven — dat mag alleen die persoon of een beheerder weghalen.",
+      "doc": "A member tried to remove a note they did not write."
+    },
+    "removed": {
+      "text": "Vergeten: {{text}}",
+      "doc": "A note was removed."
     }
   }
 }

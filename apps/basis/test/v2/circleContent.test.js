@@ -12,7 +12,7 @@ const callSkill = async (op, args) => {
   }
   if (op === 'getMyTasks') return { tasks: [{ taskId: 't1', title: 'Sweep', circleId: args.circleId }] };
   if (op === 'getFeed') return null;
-  if (op === 'listNotes') return { notes: [{ noteId: 'n1', name: 'A note' }] }; // no circle hint
+  if (op === '__generic__:household:list:note') return { notes: [{ noteId: 'n1', name: 'A note' }] }; // no circle hint
   return null;
 };
 

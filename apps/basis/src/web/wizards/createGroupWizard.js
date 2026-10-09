@@ -32,7 +32,7 @@ import {
   ROLE_TEMPLATE_IDS, toggleRole,
   setStoragePolicy,
   // The persona the circle is founded as — the list, and the choice kept honest against it.
-  loadPersonas, withPersonas, founderPersonaName,
+  loadPersonas, withPersonas, founderPersonaName, personaLabel, loadFounderHandle, identityComplete,
   // The circle's id comes from its founder — one helper, both wizards and the quick create.
   resolveFounderKey, newFounderCircleId,
 } from '../../core/wizards/createGroupState.js';
@@ -46,6 +46,7 @@ import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { localCirclePolicyStore } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';
 import { t } from '../../localisation.js';
+import { mkHandleField } from './_wizardKit.js';   // the one handle field the join and create wizards share
 
 /**
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
@@ -98,6 +99,11 @@ export function renderCreateGroupWizard(opts) {
 
   // Which persona founds the circle: the join wizard's list, read once at mount. Until it lands the picker is
   // not painted and the default stays chosen — the same value the picker would show preselected.
+  // Does the founder need a handle? Read once at mount, like the personas.
+  loadFounderHandle({ callSkill }).then((r) => {
+    Object.assign(state, r);
+    if (r.needsHandle && state.step === 1 && !state.successResult) rerender();
+  }).catch(() => {});
   loadPersonas({ callSkill }).then((personas) => {
     Object.assign(state, withPersonas(state, personas));
     if (state.step === 1 && !state.successResult) rerender();
@@ -188,8 +194,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   // rerendering the panel (which would lose focus).  We grab a
   // direct reference to the groupId input after it's appended +
   // mutate its .value on each keystroke.
-  const refreshNextBtn = () => refreshActionsLocal(container, () =>
-    !!state.name.trim() && isValidSlug(state.groupId));
+  const refreshNextBtn = () => refreshActionsLocal(container, () => identityComplete(state));
 
   // THE ID IS NOT A FIELD ANY MORE — and it is not derived from the name.
   //
@@ -215,6 +220,18 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
     },
     { placeholder: 'e.g. Circle Westend' });
 
+  // The founder's handle, asked only when their profile has none — the join wizard's field (a founder without one
+  // reached every member as `peer-xxxxxx`).
+  if (state.needsHandle) {
+    mkHandleField(wrap, doc, {
+      t, value: state.handle, suggestions: state.handleSuggestions,
+      // Under the circle's own name, "Name" read twice: here it is the person's name IN the circle.
+      label: t('circle.wizard.create.your_name'), hint: t('circle.join.wizard.handle.intro'),
+      onInput: (v) => { state.handle = v; refreshNextBtn(); },
+      onPick: (v) => { state.handle = v; rerender(); },
+    });
+  }
+
   appendFounderPersona(wrap, doc, state);
 
   appendField(wrap, doc, t('circle.wizard.create.purpose'), 'purpose',
@@ -228,7 +245,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   renderActions(container, doc, [
     { label: 'Cancel', onClick: onCancel, kind: 'secondary' },
     { label: 'Next →', onClick: onNext, kind: 'primary',
-      disabled: !state.name.trim() || !isValidSlug(state.groupId),
+      disabled: !identityComplete(state),
       validate: 'identityOk' },
   ]);
 }
@@ -253,7 +270,7 @@ function appendFounderPersona(wrap, doc, state) {
   for (const p of state.personas) {
     const opt = doc.createElement('option');
     opt.value = p.id;
-    opt.textContent = p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name;
+    opt.textContent = personaLabel(p, t);
     select.appendChild(opt);
   }
   select.value = state.persona ?? '';
@@ -450,8 +467,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   const dl = doc.createElement('dl');
   dl.className = 'cc-wizard-review';
   appendReview(dl, doc, t('circle.wizard.create.review_name'),           state.name);
-  appendReview(dl, doc, t('circle.wizard.create.review_id'),       state.groupId);
-  appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state) ?? t('circle.wizard.create.review_persona_minimal'));
+  appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal'));
   if (state.purpose) appendReview(dl, doc, t('circle.wizard.create.purpose'), state.purpose);
   if (state.tags)    appendReview(dl, doc, t('circle.wizard.create.review_tags'), state.tags);
   if (state.additionalAdmins) appendReview(dl, doc, t('circle.wizard.create.review_admins'), state.additionalAdmins);

@@ -18,11 +18,12 @@ import {
   finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, applyPersonaHandle, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
+  personaLabel,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
 import {
-  Steps, Body, Field, Checkbox, Chips, RadioGroup, Actions, ErrorBanner, Submitting,
+  Steps, Body, Field, Checkbox, HandleField, RadioGroup, Actions, ErrorBanner, Submitting,
   WizardTheme, wizardPalette,
 } from './_kit.js';
 
@@ -206,26 +207,14 @@ export default function JoinGroupWizardModal({
                 title={t('circle.join.wizard.handle.title')}
                 intro={t('circle.join.wizard.handle.intro')}
               >
-                <Field
-                  label={t('circle.join.wizard.handle.label')}
+                {/* The one handle field both wizards share (_kit.js). Suggestions show only when there is something to
+                    suggest — a heading over an empty row was its own small lie (S3, 2026-07-30). */}
+                <HandleField
+                  t={t}
                   value={state.handle}
-                  onChangeText={(v) => setState((s) => ({ ...s, handle: v }))}
-                  placeholder={t('circle.join.wizard.handle.placeholder')}
-                  monospace
+                  onChange={(v) => setState((s) => ({ ...s, handle: v }))}
+                  suggestions={suggestions}
                 />
-                {/* Only when there is something to suggest. The shell has no display name to work from
-                    yet (see `suggestions` above), so this row used to render a heading over an empty chip
-                    and two bare suffixes — `-29`, `.2026` — that were not valid handles and changed on
-                    every render (S3, 2026-07-30). A heading with nothing under it is its own small lie. */}
-                {suggestions.length ? (
-                  <>
-                    <Text style={styles.subLabel}>{t('circle.join.wizard.handle.suggestions')}</Text>
-                    <Chips
-                      items={suggestions}
-                      onPress={(v) => setState((s) => ({ ...s, handle: v }))}
-                    />
-                  </>
-                ) : null}
                 {/* Property layer — join-with-persona. Pick a persona whose
                     per-circle disclosure applies here, or join minimally (the
                     protective default: share no background). Nothing is shared
@@ -249,7 +238,7 @@ export default function JoinGroupWizardModal({
                       { id: '', label: t('circle.join.wizard.persona.minimal') },
                       ...state.personas.map((p) => ({
                         id: p.id,
-                        label: p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
+                        label: personaLabel(p, t),
                       })),
                     ]}
                   />

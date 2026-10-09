@@ -20,19 +20,18 @@
  *     dedicated feed substrate (separate from bulletin posts) can
  *     wire it without a contract change.
  *   - getMyTasks → tasks-v0.listOpen (5.3b, via TASKS_OP_ALIAS).
- *   - listNotes — ASPIRATIONAL.  No app exposes a `listNotes` skill
- *     today (no notes substrate in basis).  The resolver returns
- *     null for every origin, so this contributes nothing — a future
- *     substrate-authoring slice can wire it without changing this
- *     contract.
+ *   - the circle's notes → household's `note` noun, its generic list op
+ *     (people-written: what the circle's people wrote down for everyone to
+ *     know; the noun's CRUD comes free from its manifest declaration).
  */
 import { isInCircle } from './circleScope.js';
+import { encodeGenericOpId } from '@onderling/app-manifest';
 
 const DEFAULT_SOURCES = [
   { op: 'getBulletin', kind: 'post', pick: (r) => r?.posts ?? r?.bulletin ?? r?.items },
   { op: 'getFeed',     kind: 'post', pick: (r) => r?.feed ?? r?.items },
   { op: 'getMyTasks',  kind: 'task', pick: (r) => r?.tasks ?? r?.items },
-  { op: 'listNotes',   kind: 'note', pick: (r) => r?.notes ?? r?.items },
+  { op: encodeGenericOpId('household', 'list', 'note'), kind: 'note', pick: (r) => r?.notes ?? r?.items },
 ];
 
 export function normalizeContentItem(raw = {}, kind = null) {

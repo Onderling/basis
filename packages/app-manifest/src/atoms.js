@@ -169,6 +169,18 @@ export const DOMAIN_VERB_KINDS = Object.freeze(['read', 'write']);
  * @param {string} [verb]
  * @returns {'read'|'write'|null}
  */
+/**
+ * Who writes a noun's items, when a manifest says so (`nouns[noun].writtenBy`). `people` — PEOPLE write them, never the
+ * model: the noun's generic WRITE atoms carry no chat surface (no model tool), and an item is changed or removed only by
+ * the one who made it or an admin. (A household's notes: what people want everyone to know, in their own words.)
+ */
+export const NOUN_WRITERS = Object.freeze(['people']);
+
+/** Is this noun's content written by people only (`nouns[noun].writtenBy: 'people'`)? */
+export function isPeopleWritten(manifest, noun) {
+  return manifest?.nouns?.[noun]?.writtenBy === 'people';
+}
+
 export function verbKind(manifest, verb) {
   if (typeof verb !== 'string' || verb === '') return 'write';
   if (isAtom(verb)) return isWritingVerb(verb) ? 'write' : 'read';

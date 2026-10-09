@@ -22,13 +22,16 @@ import { createDoorCatalogue } from '../src/telegram/assistantCatalogue.js';
 import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { allManifests, catalogueManifests, DOOR_MANIFESTS } from '../src/v2/manifestSources.js';
 import { householdManifest } from '../../household/manifest.js';
+import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, p) => NAMES[k] ?? (p ? `${k} ${JSON.stringify(p)}` : k);
 const PEOPLE = { member: 'telegram:111', coordinator: 'telegram:222', observer: 'telegram:333', admin: 'telegram:999' };
 
 /** Which apps declare an op id, over every manifest the app runs. */
-const declarers = (id) => allManifests().filter((m) => (m.operations ?? []).some((o) => o.id === id)).map((m) => m.app);
+// a generic op ("declare a noun → get CRUD free") is declared by its app's noun carrying that atom
+const declaresGeneric = (m, id) => { const g = isGenericOpId(id) ? decodeGenericOpId(id) : null; return Boolean(g && g.app === m.app && (m.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)); };
+const declarers = (id) => allManifests().filter((m) => (m.operations ?? []).some((o) => o.id === id) || declaresGeneric(m, id)).map((m) => m.app);
 const assistantLevel = (id) => DOOR_MANIFESTS[0].operations.find((o) => o.id === id)?.visibility ?? 'authenticated';
 const visibilityOf = (qualified) => (qualified.startsWith('assistant.') ? assistantLevel(qualified.slice('assistant.'.length)) : undefined);
 
@@ -39,7 +42,8 @@ describe('the columns name each op with its app', () => {
       for (const q of ids) {
         const [app, op, ...rest] = q.split('.');
         expect(rest, `${column}: ${q}`).toEqual([]);
-        expect(allManifests().find((m) => m.app === app)?.operations?.some((o) => o.id === op), `${column}: ${q} is declared by ${app}`).toBe(true);
+        const m = allManifests().find((x) => x.app === app);
+        expect(Boolean(m?.operations?.some((o) => o.id === op) || declaresGeneric(m, op)), `${column}: ${q} is declared by ${app}`).toBe(true);
       }
     }
     // the chores' open read is on the member's column — as the tasks app's, never household's or stoop's

@@ -54,6 +54,9 @@ export const REPLY_FAMILY = Object.freeze({
   restoreList: 'list',
   editEntry: 'list',
   entryReminders: 'list',
+  // a household note written or taken away: in the op's own words ("Onthouden: …", "Vergeten: …")
+  '__generic__:household:add:note': 'list',
+  '__generic__:household:remove:note': 'list',
   // the people reads
   listOpen: 'who',
   listMine: 'mine',

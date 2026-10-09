@@ -4928,6 +4928,11 @@
           "remindMe": "a reminder of your own: at a time (\"in 10 minutes: …\"), for an appointment or chore, or one for everyone",
           "assistant-planned": "what I will send you this week (reminders, the week overview)",
           "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)"
+        },
+        "household": {
+          "__generic__:household:add:note": "write a note for everyone (or say: remember that the bins go out on Tuesday)",
+          "__generic__:household:list:note": "the household's notes (or say: what notes are there)",
+          "__generic__:household:remove:note": "take a note away — your own, or as an admin (or say: forget the note about the wifi)"
         }
       }
     },
@@ -5009,6 +5014,14 @@
     "day_unread": {
       "text": "Which day do you mean by '{{day}}'? Say for example 'Saturday' or 'tomorrow'.",
       "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    },
+    "welcome_notes": {
+      "text": "Notes for everyone: \"remember that the wifi code is on the fridge\"; \"what notes are there\" shows them, and I use them when you ask something.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_notes_read": {
+      "text": "\"What notes are there\" shows what the household wrote down.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     }
   },
   "op": {
@@ -8464,7 +8477,8 @@
       "assistant-role": "Role",
       "assistant-revoke": "Remove",
       "removeFromList": "Remove",
-      "entryReminders": "Reminders"
+      "entryReminders": "Reminders",
+      "__generic__:household:remove:note": "Remove"
     },
     "household": "The household",
     "people": "Who is in the household",
@@ -8664,6 +8678,32 @@
     "day_none": {
       "text": "Nothing on {{when}}.",
       "doc": "One day's read: no appointments and no chores that day."
+    }
+  },
+  "notes": {
+    "need_text": {
+      "text": "What should I remember? For example: remember that the bins go out on Tuesday.",
+      "doc": "A note added with no words."
+    },
+    "added": {
+      "text": "Noted: {{text}}",
+      "doc": "A note was added (a weetje: something the household wants known)."
+    },
+    "title": {
+      "text": "Notes",
+      "doc": "The heading above the household's notes."
+    },
+    "not_there": {
+      "text": "I don't have that note{{item}}.",
+      "doc": "Removing a note that is not there; item is \" (words)\" or empty."
+    },
+    "not_yours": {
+      "text": "\"{{text}}\" was written by someone else — only they or an admin may remove it.",
+      "doc": "A member tried to remove a note they did not write."
+    },
+    "removed": {
+      "text": "Forgotten: {{text}}",
+      "doc": "A note was removed."
     }
   }
 }

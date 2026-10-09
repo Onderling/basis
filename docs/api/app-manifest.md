@@ -142,6 +142,24 @@ manifest classifies it in its `domainVerbs` map (see `verbKind`).
 
 How a manifest classifies each of its domain verbs: `domainVerbs` is a map `{ verb: 'read' | 'write' }`.
 
+### `NOUN_WRITERS`
+
+**Kind:** constant · **Import:** `NOUN_WRITERS` from `'@onderling/app-manifest'`
+
+Who writes a noun's items, when a manifest says so (`nouns[noun].writtenBy`). `people` — PEOPLE write them, never the
+model: the noun's generic WRITE atoms carry no chat surface (no model tool), and an item is changed or removed only by
+the one who made it or an admin. (A household's notes: what people want everyone to know, in their own words.)
+
+### `isPeopleWritten`
+
+**Kind:** function · **Import:** `isPeopleWritten` from `'@onderling/app-manifest'`
+
+```js
+isPeopleWritten(manifest, noun)
+```
+
+Is this noun's content written by people only (`nouns[noun].writtenBy: 'people'`)?
+
 ### `verbKind`
 
 **Kind:** function · **Import:** `verbKind` from `'@onderling/app-manifest'`
@@ -150,19 +168,7 @@ How a manifest classifies each of its domain verbs: `domainVerbs` is a map `{ ve
 verbKind(manifest, verb)
 ```
 
-Does an op's verb read or write, in this manifest?
-  • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
-  • a domain verb — the manifest's `domainVerbs` map says;
-  • no verb at all — `'write'`: nothing says it only reads;
-  • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
-    read: the default is the safe one, so a new verb cannot slip past as a silent read.
-
-**Parameters**
-
-- `manifest` `object`
-- `[verb]` `string`
-
-**Returns:** `'read'|'write'|null`
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ### `WRITE_SCOPES`
 

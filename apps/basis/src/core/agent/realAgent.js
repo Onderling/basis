@@ -4656,7 +4656,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (g?.app === 'household' && householdService) {
         return householdService.callCapability(g.atom, g.noun, args ?? {}, {
           circleId: resolveCircleId(args),
-          by:       chatId?.pubKey,
+          // made by the PERSON at the door (as chores and appointments are, `actorOf`), never by the device: a note on a
+          // household bot was "made by the bot" for everyone, and whose it was could not be judged
+          by:       actorOf(ctx) ?? chatId?.pubKey,
         });
       }
       // An app with no generic handler → a structured error, mirroring how callSkill

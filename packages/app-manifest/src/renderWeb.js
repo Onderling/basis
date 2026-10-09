@@ -59,6 +59,8 @@
  *                                         manifest declares no tabs, so tab-less
  *                                         manifests keep the {app, sections,
  *                                         globals} shape.  See "Nav-chrome" below.
+ * @property {NavItem[]} [meActions]       NAV-CHROME (Me) — the ordered actions on the person's own page
+ *                                         (`manifest.meActions`, declaration order; the tab NavItem shape).
  * @property {NavItem[]} [actions]         NAV-CHROME (D / Surface 2) — the ordered
  *                                         DETAIL ACTION BAR (per-detail buttons to
  *                                         sibling screens), one per
@@ -595,6 +597,16 @@ export function renderWeb(manifest) {
     }
   }
 
+  // (f) Nav-chrome Me actions — the ordered actions on the person's own page (Me): projected verbatim from
+  //     `manifest.meActions` with the tab NavItem shape. Kept OUT of the return object when empty.
+  const meActions = [];
+  if (Array.isArray(manifest.meActions)) {
+    for (const item of manifest.meActions) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      meActions.push(buildTab(item));
+    }
+  }
+
   const nav = {
     app: typeof manifest.app === 'string' ? manifest.app : '',
     sections,
@@ -603,6 +615,7 @@ export function renderWeb(manifest) {
   if (pages.length > 0) nav.pages = pages;
   if (tabs.length > 0) nav.tabs = tabs;
   if (actions.length > 0) nav.actions = actions;
+  if (meActions.length > 0) nav.meActions = meActions;
   return nav;
 }
 

@@ -91,13 +91,14 @@ function momentOf(parsed, layer, item, tz, eveningBeforeUntil) {
   const anchor = item.anchor;
   const aw = wallClockInTz(anchor, tz);
   const day = dayOf(aw);
-  const dayOnly = item.kind === 'chore' && aw.hour === 0 && aw.minute === 0;
+  // a day without a time — a chore due on a day, an all-day appointment — is local midnight: the morning is its moment
+  const dayOnly = aw.hour === 0 && aw.minute === 0;
   const endOfDay = atLocal(shiftDay(day, 1), '00:00', tz);
   const made = ms(item.createdAt);
   switch (parsed.kind) {
     case 'morning': {
       const at = atLocal(day, REMINDER_MOMENTS.morning, tz);
-      if (item.kind === 'event') {
+      if (item.kind === 'event' && !dayOnly) {
         // one made after the morning's moment is not that morning's news (its reminder is shortly before)
         if (Number.isFinite(made) && made >= at) return null;
         return { at, windowEnd: anchor, day: ymd(aw), slot: `${ymd(aw)}:morning` };
@@ -105,7 +106,8 @@ function momentOf(parsed, layer, item, tz, eveningBeforeUntil) {
       return { at, windowEnd: endOfDay, day: ymd(aw), slot: `${ymd(aw)}:morning` };
     }
     case 'evening-before': {
-      if (layer === 'household' && (item.kind !== 'event' || hhmm(aw) >= eveningBeforeUntil)) return null;
+      // the household's is for an appointment early the next morning — not a chore, not a whole day (its morning says it)
+      if (layer === 'household' && (item.kind !== 'event' || dayOnly || hhmm(aw) >= eveningBeforeUntil)) return null;
       const eve = shiftDay(day, -1);
       const at = atLocal(eve, REMINDER_MOMENTS.evening, tz);
       return { at, windowEnd: Math.min(anchor, atLocal(day, '00:00', tz)), day: ymd(eve), slot: `${ymd(eve)}:evening` };

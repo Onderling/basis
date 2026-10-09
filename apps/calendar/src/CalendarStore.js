@@ -341,8 +341,13 @@ export function buildEvent(args = {}, { actorDefault = 'webid:local-demo-user' }
     if (!title) throw new Error('CalendarStore.addEvent: title required');
     // v0.7.-followup (3rd pass): accept `when` (canonical 2026-05-23+)
     // OR `startsAt` (legacy alias).  Same for `until` / `endsAt`.
-    const startsAt = parseDateInput(args.when ?? args.startsAt);
+    const said = args.when ?? args.startsAt;
+    let startsAt = parseDateInput(said);
     if (!startsAt) throw new Error('CalendarStore.addEvent: when (or startsAt) required (ISO-8601)');
+    // A day without a time ("vrijdag", "2026-11-08") is the whole day: local midnight to the next — the same convention
+    // as a chore due on a day, so replies, reminders and the feed read it the one way.
+    const allDay = !hasTimeOfDay(said);
+    if (allDay) { const d = new Date(startsAt); d.setHours(0, 0, 0, 0); startsAt = d.toISOString(); }
     // v0.7.-followup: duration as a string ('1h' / '30m' / '2h30m').
     // CalendarStore now also accepts an explicit until/endsAt + a
     // duration override.  Default: 1 hour.
@@ -352,6 +357,9 @@ export function buildEvent(args = {}, { actorDefault = 'webid:local-demo-user' }
       if (ms != null) {
         endsAt = new Date(new Date(startsAt).getTime() + ms).toISOString();
       }
+    }
+    if (!endsAt && allDay) {
+      const d = new Date(startsAt); d.setDate(d.getDate() + 1); endsAt = d.toISOString();
     }
     if (!endsAt) {
       endsAt = new Date(new Date(startsAt).getTime() + 3_600_000).toISOString();

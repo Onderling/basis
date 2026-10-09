@@ -41,6 +41,9 @@ const holdersOf = (c) => {
   return { holders: ids, ...(c.dueAt ? { dueAt: c.dueAt } : {}) };
 };
 
+// An item id (a ULID) — what a button carries; a person never types one.
+const ID_SHAPED = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
 export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', passed = null, completeChore = null, now = Date.now } = {}) {
   // What a list may hold beyond its own entries and tasks: appointments (the calendar's `accepts` line).
   const svc = makeCircleLists({ storeFor, manifests: [calendarManifest] });
@@ -84,6 +87,20 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
     ? t('circle.lists.mean_this', { item: among[0].text ?? '' })
     : t('circle.lists.which_one', { options: choicesOf(among, (c) => c.text) }));
   /**
+   * Why a named line is not open, in words. A button on an older list message names its line by ID, and someone else
+   * may have ticked it (or taken it off) since: the reply says what happened to the LINE, by its words — never the id.
+   * Words that name nothing are answered with the words the person typed.
+   */
+  const notOpen = async (circleId, item) => {
+    let stored = null;
+    try { stored = await svc.storeFor(circleId).get(item); } catch { stored = null; }
+    if (stored?.completedAt) return t('circle.lists.already_done', { text: stored.text ?? '' });
+    if (stored) return t('circle.lists.not_there', { item: stored.text ?? '' });
+    if (ID_SHAPED.test(item)) return t('circle.lists.line_gone');
+    return t('circle.lists.not_there', { item });
+  };
+
+  /**
    * The entry a call names, and the list that holds it — or the refusal. A person names the ENTRY ("verander melk in
    * halfvolle melk"); a list, when given, only tells two entries on different lists apart.
    */
@@ -95,13 +112,13 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
     const ref = String(args?.list ?? '').trim();
     if (!ref) {
       const { entry, among, target } = await findAnyEntry(circleId, item);
-      if (!entry) return among.length ? { error: which(among) } : { error: t('circle.lists.not_there', { item }), notFound: true };
+      if (!entry) return among.length ? { error: which(among) } : { error: await notOpen(circleId, item), notFound: true };
       return { circleId, target, entry };
     }
     const target = await findList(circleId, ref);
     if (!target) return { error: t('circle.lists.no_such_list', { name: ref }) };
     const { entry, among } = await findEntry(circleId, target.id, item);
-    if (!entry) return among.length ? { error: which(among) } : { error: t('circle.lists.no_such_entry', { item, name: target.text ?? ref }), notFound: true };
+    if (!entry) return among.length ? { error: which(among) } : { error: ID_SHAPED.test(item) ? await notOpen(circleId, item) : t('circle.lists.no_such_entry', { item, name: target.text ?? ref }), notFound: true };
     return { circleId, target, entry };
   };
 

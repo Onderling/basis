@@ -292,6 +292,7 @@ import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
+import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
 
 // B (circle bot) — host LLM route for NL→command in the circle. Mirrors web's VITE_CIRCLE_LLM_BASEURL.
 // Unset → no provider → the LLM branch
@@ -520,6 +521,9 @@ export default function CircleLauncherScreen({
   // Whether the list has had a real answer: "No circles yet." is said only then, never in "not known yet" (see
   // `launcherListPaint`).
   const [launcherSettled, setLauncherSettled] = useState(false);
+  // The developer switch (`app.developer`, a register param, off by default in every build): the Advanced screen — raw
+  // parameter keys and values, a developer tool — is offered only when it is on. Read each time Me opens.
+  const [developerOn, setDeveloperOn] = useState(false);
   const [selected, setSelected] = useState(null);
   // The OPEN circle, readable from a closure that outlives a render — the mounted waist ops need "which
   // circle am I in" at CALL time, and an effect that mounts once would otherwise hold whichever circle
@@ -1274,6 +1278,15 @@ export default function CircleLauncherScreen({
     } catch { setShareContacts([]); }
   }, [bundle]);
 
+  useEffect(() => {
+    if (view !== 'profile' || typeof bundle?.callSkill !== 'function') return undefined;
+    let alive = true;
+    bundle.callSkill('params', 'get-param', { key: DEVELOPER_PARAM_KEY })
+      .then((r) => { if (alive) setDeveloperOn(r?.value === true); })
+      .catch(() => { if (alive) setDeveloperOn(false); });
+    return () => { alive = false; };
+  }, [view, bundle]);
+
   // The first load WITH the agent bundle is the answer: stoop's store is loaded inside the agent's boot, which the
   // bundle awaits — instrumented on a phone (2026-10-08): the store loaded, then the first load with the bundle listed
   // the circle at once. (A comment here used to say the store hydrated "a beat after" the bundle and retried boot on a
@@ -1706,7 +1719,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onOpenMij={() => setMyPersona('default')} onShareContact={() => setView('shareContact')} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -1736,7 +1749,7 @@ export default function CircleLauncherScreen({
   if (view === 'advanced') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} />
+        <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
   }
@@ -1770,6 +1783,7 @@ export default function CircleLauncherScreen({
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAvailabilityScreen
           store={availabilityStore}
+          onBack={() => setView('profile')}
           onHop={() => setView('hop')}
         />
       </WithTabBar>

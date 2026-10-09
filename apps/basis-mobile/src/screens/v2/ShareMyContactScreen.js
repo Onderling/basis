@@ -12,6 +12,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Share, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { loadShareMyContact, CONTACT_QR } from '../../../../basis/src/v2/contactCardLink.js';
 import { t } from '../../core/localisation.js';
@@ -21,7 +22,8 @@ export const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_APP_URL || null;
 
 export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_APP_URL }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [state, setState] = useState({ loading: true, payload: null, link: null, qr: null });
   // A tap enlarges the QR to the screen's width, for a camera across the table; a second tap brings it back.
   const [large, setLarge] = useState(false);
@@ -45,7 +47,7 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="share-my-contact-screen">
       <Pressable onPress={onBack} accessibilityRole="button" testID="share-contact-back">
-        <Text style={styles.back}>{t('circle.shareContact.back')}</Text>
+        <Text style={styles.back}>{t('circle.back_me')}</Text>
       </Pressable>
       <Text style={styles.title}>{t('circle.shareContact.title')}</Text>
       {state.loading ? (
@@ -77,8 +79,8 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  wrap:       { flex: 1, backgroundColor: theme.color.paper },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  wrap:       { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
   content:    { padding: 16, paddingBottom: 48 },
   back:       { fontSize: 15, color: theme.color.accent, marginBottom: 10 },
   title:      { fontSize: 20, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },

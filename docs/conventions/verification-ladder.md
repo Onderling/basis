@@ -52,6 +52,11 @@ an agent session cannot and should not.
 - **A change to the box or the deploy files** (`deploy/`, a role, the Dockerfile): rung 2 is a throwaway
   profile against the real box (the rehearsal script's shape: enrol, walk, wipe) — the box's health gate
   is the last net, not the first.
+- **A change to an admission or gate path** (the bot's inbox door, `botUsers`, the gates, `checkInbound`, the identity
+  link): rung 2 is the `*-box` browser specs (`test-browser/*-box.spec.js`, about six minutes for all of them), run
+  locally before the merge and named in the PR. The browser tail does not run on pull requests, so a door that starts
+  refusing what these specs send shows only after the merge — on 2026-10-09 an unsigned-admission refusal left eight of
+  them red on the trunk for half a day and stopped a release.
 - **Never** run the whole browser suite locally (an hour) — that is what the tail is for, after the merge.
   Run the spec you need.
 - **A merge does not wait for the tail.** A red tail on `development` is a red trunk: it blocks the next

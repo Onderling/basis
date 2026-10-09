@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
 import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { addBoxCard } from '../test/support/addBoxCard.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
@@ -47,7 +48,8 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
       await ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
       return until(async () => (await annSaid()).slice(from).join('\n') || null, { timeout: 30_000, step: 400 });
     };
-    await annAsk('hallo', { admission: /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1] });
+    await addBoxCard(ann, out);   // the box is a contact whose card says it is a bot: the app signs its /start
+    await annAsk(`/start ${/\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1]}`);
     expect(await annAsk('zet melk op de boodschappen')).toContain('melk');
     expect(await annAsk('/huishouden app on')).toBeTruthy();
     await annAsk('/cohort 3 7');
@@ -72,7 +74,7 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
       }
       return null;
     }, { text, extra, bot: card.peerAddr });
-    expect(await bertAsk('hallo', { admission: code }), `Bert not admitted:\n${out.slice(-1200)}`).toBeTruthy();
+    expect(await bertAsk(`/start ${code}`), `Bert not admitted:\n${out.slice(-1200)}`).toBeTruthy();
     const yes = await bertAsk('/inapp ja');
     const invite = /onderling-invite:\/\/\S+/.exec(yes ?? '')?.[0];
     expect(invite, `no invite; the bot said: ${yes}`).toBeTruthy();

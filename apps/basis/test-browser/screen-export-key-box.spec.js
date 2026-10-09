@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
 import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { addBoxCard } from '../test/support/addBoxCard.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
@@ -44,7 +45,8 @@ test('the export key from the screen: set and unlocked after a yes in her chat; 
     const said = async () => (await ann.contactThreadChannel.rehydrateAll()).filter((x) => x.origin === 'bot').map((x) => x.text);
     const send = (text, extra = {}) => ann.contactThreadChannel.sendTurn({ peerAddr: card.peerAddr, threadId: card.peerAddr, text, ...extra }).sent;
     const next = async (from, re) => until(async () => (await said()).slice(from).find((x) => re.test(x)) ?? null, { timeout: 30_000, step: 500 });
-    await send('hallo', { admission: /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1] });
+    await addBoxCard(ann, out);   // the box is a contact whose card says it is a bot: the app signs its /start
+    await send(`/start ${/\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1]}`);
     expect(await until(async () => ((await said()).length ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
     await send('/scherm link');
     const linkLine = await next(0, /#scherm=/);

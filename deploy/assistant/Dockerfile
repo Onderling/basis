@@ -21,7 +21,7 @@ COPY . .
 # — e.g. app-manifest → item-types — is otherwise unresolvable at runtime). See CLAUDE.md.
 RUN pnpm install --filter "@onderling-app/basis..." \
  && node scripts/relink-workspace.mjs \
- && pnpm store prune || true
+ && (pnpm store prune || true)
 
 ENV NODE_ENV=production
 RUN mkdir -p /data/assistant

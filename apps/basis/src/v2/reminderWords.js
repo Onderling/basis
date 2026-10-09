@@ -10,6 +10,7 @@
  */
 import { parseReminderRule } from '@onderling/item-types';
 import { REMINDER_RULES_KEY, HOUSEHOLD_RULES_DEFAULT, REMINDER_RULES_PARAM } from './botSettings.js';
+import { REMINDER_MOMENTS } from './reminderOccurrences.js';
 
 // the household's list is one of the household's settings; kept with them, read here
 export { REMINDER_RULES_KEY, HOUSEHOLD_RULES_DEFAULT, REMINDER_RULES_PARAM };
@@ -70,8 +71,8 @@ export function describeRules(rules, tp) {
   return rules.map((r) => {
     const p = parseReminderRule(r);
     if (!p) return r;
-    if (p.kind === 'morning') return tp('circle.bot.rule_morning');
-    if (p.kind === 'evening-before') return tp('circle.bot.rule_evening');
+    if (p.kind === 'morning') return tp('circle.bot.rule_morning', { time: REMINDER_MOMENTS.morning });
+    if (p.kind === 'evening-before') return tp('circle.bot.rule_evening', { time: REMINDER_MOMENTS.evening });
     if (p.kind === 'before') return tp('circle.bot.rule_before', { n: p.minutes });
     return tp('circle.bot.rule_at', { time: p.time });
   }).join(', ');

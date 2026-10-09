@@ -17,7 +17,7 @@ the same compose file and can be added later with one command — step 9 shows h
 
 | | value | used for |
 |---|---|---|
-| `RELAY_DOMAIN` | **`relay.onderling.org`** (suggested) | what clients connect to: `wss://relay.onderling.org` |
+| `RELAY_DOMAIN` | **`<relay-domain>`** (e.g. `relay.<your-domain>`) | what clients connect to: `wss://<relay-domain>` |
 | `POD_DOMAIN` | **`pod.onderling.org`** (suggested) | the Solid pod later — **create its DNS record now anyway**, see step 1 |
 
 Write down your VPS's **public IPv4** from the TransIP control panel (*VPS → your VPS → the
@@ -42,7 +42,7 @@ certificate now, so adding the pod later needs **no DNS work and no certificate 
 Give it a minute, then check from your laptop — this must print your VPS IP before you go on:
 
 ```bash
-dig +short relay.onderling.org
+dig +short <relay-domain>
 dig +short pod.onderling.org
 ```
 
@@ -146,7 +146,7 @@ nano .env
 Set exactly these three (leave the optional blocks commented out for now):
 
 ```ini
-RELAY_DOMAIN=relay.onderling.org
+RELAY_DOMAIN=<relay-domain>
 POD_DOMAIN=pod.onderling.org
 ACME_EMAIL=fritsderoos@gmail.com
 ```
@@ -189,7 +189,7 @@ docker compose -f docker-compose.yml -f docker-compose.tls.yml logs caddy | grep
 **a. From the VPS — the relay answers over TLS:**
 
 ```bash
-curl -s https://relay.onderling.org/
+curl -s https://<relay-domain>/
 ```
 
 > Expected exactly: `@onderling/relay — WebSocket endpoint only`
@@ -200,7 +200,7 @@ two-party delivery, offline hold-and-flush, and fan-out):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.tls.yml exec relay \
   sh -lc 'cp /app/deploy/smoke/smoke.mjs /app/packages/relay/_smoke.mjs \
-          && node /app/packages/relay/_smoke.mjs wss://relay.onderling.org'
+          && node /app/packages/relay/_smoke.mjs wss://<relay-domain>'
 ```
 
 > Expected: `=== 8/8 checks passed ===`
@@ -213,7 +213,7 @@ your server:
 
 ```bash
 cd ~/expotest/canopy-mono/packages/relay
-node ../../deploy/smoke/smoke.mjs wss://relay.onderling.org
+node ../../deploy/smoke/smoke.mjs wss://<relay-domain>
 ```
 
 **d. From your laptop — the FULL journey acceptance run** (the strongest check there is: the same
@@ -222,7 +222,7 @@ relay you just deployed, instead of an in-process one):
 
 ```bash
 cd ~/expotest/canopy-mono/apps/basis
-ONDERLING_RELAY_URL=wss://relay.onderling.org npx vitest run relay
+ONDERLING_RELAY_URL=wss://<relay-domain> npx vitest run relay
 ```
 
 > Expected: **15 files / 57 tests passed**. If exactly `chatRealReceive.relay.repro` and/or
@@ -235,8 +235,8 @@ If all four pass, the relay is live, correct, and the apps can use it.
 
 ## 8. Point the apps at it
 
-- Web/mobile transport: `RelayTransport({ relayUrl: 'wss://relay.onderling.org' })`
-- Media edge (only once you enable R2): `https://relay.onderling.org/blob-gate`
+- Web/mobile transport: `RelayTransport({ relayUrl: 'wss://<relay-domain>' })`
+- Media edge (only once you enable R2): `https://<relay-domain>/blob-gate`
 
 ---
 
@@ -259,13 +259,13 @@ docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Caddy logs `no such host` / ACME challenge fails | DNS not live yet, or points elsewhere | `dig +short relay.onderling.org` must print `<VPS_IP>`; wait for TTL, then `docker compose … restart caddy` |
+| Caddy logs `no such host` / ACME challenge fails | DNS not live yet, or points elsewhere | `dig +short <relay-domain>` must print `<VPS_IP>`; wait for TTL, then `docker compose … restart caddy` |
 | ACME times out; port 80 unreachable | firewall | `ufw status` → allow 80/tcp + 443/tcp; check the TransIP control-panel firewall too |
 | `curl https://…` hangs, `curl http://…` works | 443 blocked but 80 open | same as above — open 443 |
 | Relay container restarts in a loop | check the reason, don't guess | `docker compose … logs relay \| tail -30` |
 | Smoke: `register timeout` | you're running an **old** relay image or an old smoke script | `git pull` on the VPS, then re-run step 6 (the handshake is challenge-first; both sides must be current) |
 | Smoke: `Cannot find package 'ws'` | script run from a directory with no `node_modules` | use the exact command in 7b (it copies the script next to the relay's own `node_modules`) |
-| Everything fine, but a phone on mobile data can't connect | app still pointing at the old/local relay | step 8 — the client URL must be `wss://relay.onderling.org` |
+| Everything fine, but a phone on mobile data can't connect | app still pointing at the old/local relay | step 8 — the client URL must be `wss://<relay-domain>` |
 
 **Rate-limit caution:** Let's Encrypt allows ~5 certificates per domain per week. If you find
 yourself re-issuing repeatedly while debugging, uncomment the `acme_ca` staging line in

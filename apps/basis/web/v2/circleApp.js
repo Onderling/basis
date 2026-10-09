@@ -768,7 +768,7 @@ import { DEFAULT_CIRCLE_RAG_MIN_SCORE } from '../../src/v2/circleRetriever.js';
 import { buildCircleEmbedProviders } from '../../src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../src/v2/embedPicker.js';
 import { quickCreateCircle } from '../../src/v2/circleCreate.js';
-import { setActiveCircle, getActiveCircle } from '../../src/v2/activeCircle.js';
+import { setActiveCircle, getActiveCircle, subscribeActiveCircle } from '../../src/v2/activeCircle.js';
 import { normalizeCircleMembers, recipientSealKeyFromMembers } from '@onderling/kring-host/circleMembers';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
@@ -780,7 +780,7 @@ import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControl
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
 // agent-add admin approval store.
 import { createAgentRequestStore } from '../../src/v2/agentRequest.js';
-import { buildTilePreviews, bumpSeenAt } from '../../src/v2/circleTilePreviews.js';
+import { buildTilePreviews, bumpSeenAt, seenOnLeave } from '../../src/v2/circleTilePreviews.js';
 import { makeAfterClaimHook } from '../../src/v2/claimRouter.js';
 import { mergeAvailability } from '../../src/v2/memberAvailability.js';
 import { createAvailabilityStore, localStorageAvailabilityIo, podAvailabilityIo, tieredAvailabilityIo } from '../../src/v2/memberAvailability.js';
@@ -3457,6 +3457,16 @@ function writeSeenAt(map) {
   try { window.localStorage.setItem(SEEN_AT_KEY, JSON.stringify(map)); }
   catch { /* quota / disabled */ }
 }
+// …and on LEAVING a circle too: what happened while you were inside is not news on the launcher (one rule, both shells).
+subscribeActiveCircle(seenOnLeave((id) => writeSeenAt(bumpSeenAt(readSeenAt(), id))));
+// Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as —
+// refreshed when the agent is up and on every launcher visit (`ownAddresses`, the one source the Contacts filter reads).
+let unreadMyRefs = ['me'];
+function refreshUnreadMyRefs() {
+  Promise.resolve(_peerAgent?.ownAddresses?.()).then((a) => {
+    if (Array.isArray(a)) unreadMyRefs = ['me', ...a.filter((x) => typeof x === 'string' && x)];
+  }).catch(() => { /* the last known set still serves */ });
+}
 
 // Chat ↔ Screen pill: per-circle preference persists in
 // localStorage so the user lands back in whichever mode they last used
@@ -3555,6 +3565,7 @@ function paintLauncher() {
     events:  eventLog.query({ excludeMuted: true }),
     circles: circlesCache,
     seenAt:  readSeenAt(),
+    myRefs:  unreadMyRefs,
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
@@ -3581,6 +3592,7 @@ function paintLauncher() {
 
 function showLauncher() {
   setActiveCircle(null);
+  refreshUnreadMyRefs();
   try { sessionStorage.removeItem('cc.activeCircle'); } catch { /* ignore */ }
   // β.1 — Stream/Availability/Hop/Nearby/My-things buttons are gone from the launcher; those surfaces
   // are reachable via the Screens + Mij tabs. The `show*` functions stay defined below.
@@ -8809,6 +8821,7 @@ async function boot() {
         },
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
+      refreshUnreadMyRefs();
       // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
       // the shell bridges it into stoop's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({

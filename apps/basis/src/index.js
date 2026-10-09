@@ -227,7 +227,7 @@ export {
   localStorageScreenBlocksCacheIo,
 } from './v2/screenBlocksCacheStorage.js';
 // per-circle activity preview + unread count for launcher tiles.
-export { buildTilePreviews, renderSubtitle, bumpSeenAt } from './v2/circleTilePreviews.js';
+export { buildTilePreviews, renderSubtitle, bumpSeenAt, countsAsUnread, seenOnLeave } from './v2/circleTilePreviews.js';
 // claim router: mirror claimed tasks into the personal circle
 // when the per-circle override has flowThrough.tasksToPersonal.
 export { routeClaim, makeAfterClaimHook } from './v2/claimRouter.js';

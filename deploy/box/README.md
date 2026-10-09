@@ -115,7 +115,9 @@ nothing secret on it. Anything interactive (freeze, force an update) stays a com
    the running assistant writes `exports/pre-update-<when>-<sha>.json` on its shelf, the last three kept beside the
    nightly ones). If that fails, the update is **held**: nothing is checked out, the log and the alert say so. An
    assistant that is not running cannot be asked: the update goes ahead only when its shelf already holds an export
-   younger than a day (read from its volume without starting it); otherwise it is held too.
+   younger than a day (read from its volume without starting it); otherwise it is held too. **Only a household bot**
+   (`ONDERLING_PROFILE_KIND=function`, read by name from the assistant's own environment) holds a household: a person's
+   own device has none to export and is not asked — the update goes ahead and the log says so.
 4. New sha → check it out (detached), `compose build` the roles of that repo **whose `<role>.paths` the
    release actually touched**, then `compose up -d`. This is what keeps a docs-only release from
    recreating the public relay container — which drops its in-memory hold-and-forward queue and

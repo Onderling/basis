@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createRelayPrefStore, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
@@ -60,6 +61,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
+  const insets = useSafeAreaInsets();   // clear the status bar: the back link and the title sat under it
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [themePref, setThemePref] = useThemePref();
   // Section / KV close over the render-time `styles` so they recolour with the theme.
@@ -337,7 +339,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const usage = Object.entries(metrics || {});
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-mydata">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }]} testID="circle-mydata">
       <View style={styles.header}>
         {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
         <Text style={styles.title}>{t('circle.mydata.title')}</Text>
@@ -1012,10 +1014,11 @@ const makeStyles = (theme) => StyleSheet.create({
   retentionChoiceTextOn:{ color: theme.color.ink, fontWeight: '600' },
   relayEdit: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   relayInput: { flex: 1, fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
-  relaySave: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.terracotta },
-  relaySaveText: { fontSize: 14, fontWeight: '600', color: theme.color.white },
+  // the theme's primary button (ink on light, light on dark): `terracotta` was the retired linen theme's and has no value now
+  relaySave: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.accent },
+  relaySaveText: { fontSize: 14, fontWeight: '600', color: theme.color.accentContrast },
   relayNote: { marginTop: 6, fontSize: 12, color: theme.color.ink },
-  relayHint: { marginTop: 4, fontSize: 12, color: theme.color.inkMuted ?? theme.color.ink },
+  relayHint: { marginTop: 4, fontSize: 12, color: theme.color.inkSoft },
   signin: { marginTop: 10, gap: 8 },
   signinInput: { fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   signinErr: { fontSize: 12, color: '#b3261e' },

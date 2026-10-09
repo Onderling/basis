@@ -5724,7 +5724,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   // P1.7 — the conversation filter strip. Quiet by default; the strip warms when a filter is active so
   // a narrowed conversation never reads as a missing one (web parity).
   filterStrip:      { paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, gap: 4 },
-  filterStripActive:{ backgroundColor: theme.color.surface2 ?? theme.color.card, borderRadius: theme.radius.sm },
+  filterStripActive:{ backgroundColor: theme.color.paper2, borderRadius: theme.radius.sm },
   filterRow:        { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   filterChip:       { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },
   filterChipOn:     { backgroundColor: theme.color.card, borderColor: theme.color.ink },
@@ -5835,8 +5835,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   ownProfileTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 4 },
   // Nearby visibility banner (step E). The alert variant is for the ONE case that matters: the device is
   // announcing itself after being asked not to, so it must not look like the ordinary states.
-  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.surfaceSoft ?? theme.color.surface, borderWidth: 1, borderColor: theme.color.line },
-  nearbyBannerAlert: { borderColor: theme.color.warn ?? theme.color.ink, borderWidth: 2 },
+  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.paper2, borderWidth: 1, borderColor: theme.color.line },
+  nearbyBannerAlert: { borderColor: theme.color.danger, borderWidth: 2 },
   nearbyBannerTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 2 },
   nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   nearbyAsks:        { marginTop: 12, paddingHorizontal: 2 },

@@ -8059,7 +8059,7 @@ async function showSettings(id) {
     onControl: async (opId, args) => {
       if (opId === 'set-relay') {
         const r = await applyRelayUrl(args?.clear ? '' : String(args?.url ?? ''));
-        if (!r?.ok) storageNote = t('circle.settings.relayEndpoint_hint');
+        if (!r?.ok) storageNote = t('circle.mydata.relay_hint');
       } else if (opId === 'transport-mode') {
         applyTransportMode(args?.mode);
       }

@@ -1758,10 +1758,6 @@
       "text": "Relay-server",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
-    "relayEndpoint_hint": {
-      "text": "Voeg een WebSocket-relay toe (ws:// of wss://). Laat leeg voor geen — dan alleen rechtstreekse verbindingen.",
-      "doc": "Phase 4 §9 — relay endpoint hint."
-    },
     "relayEndpoint_placeholder": {
       "text": "wss://relay.voorbeeld.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
@@ -5815,7 +5811,7 @@
       "doc": "Mobile relay save confirmation (applies on next app open; mobile has no live reconnect yet)."
     },
     "relay_hint": {
-      "text": "Wijs dit naar een bereikbare relay om zonder server tussen apparaten te synchroniseren (bijv. ws://192.168.1.20:8787). Laat leeg voor geen relay.",
+      "text": "Je kreeg hem van wie je uitnodigde, of van wie je agent draait. Leeg laten: geen relay, dan alleen rechtstreekse verbindingen.",
       "doc": "Relay setting help text."
     },
     "privacy": {

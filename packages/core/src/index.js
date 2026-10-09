@@ -199,7 +199,7 @@ export { encode as b64encode,
 export { Task }                                           from './protocol/Task.js';
 export { ping }                                           from './protocol/ping.js';
 export { sendMessage, handleMessage }                     from './protocol/messaging.js';
-export { sendHello, handleHello }                         from './protocol/hello.js';
+export { sendHello, handleHello, forgetHello }            from './protocol/hello.js';
 export { requestSkills, handleSkillDiscovery }            from './protocol/skillDiscovery.js';
 export { invokeAgentSkill, handleTaskRequest, handleTaskOneWay } from './protocol/taskExchange.js';
 export { subscribe, unsubscribe, publish, handlePubSub, setSubscribeAuthorizer, dropSubscriber }

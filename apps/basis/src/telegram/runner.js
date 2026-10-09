@@ -88,7 +88,21 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return lang ? (k, p) => t(k, p, lang) : t;
   };
   const note = (chatId, patch) => { const t0 = turns.get(chatId); if (t0) Object.assign(t0, patch); };
+  // The quick replies the bot's LAST message to a chat offered (a button whose tap is a slash line): the next line the
+  // person TYPES that is exactly one of their labels is that tap — a person who types "Zoals altijd" under the button
+  // that says it means the button (a household's chat, 2026-10-08: the line went to the model instead). One line only.
+  const quickOffer = new Map();
+  const labelKey = (s) => String(s ?? '').toLowerCase().replace(/[\p{P}\p{S}]/gu, '').replace(/\s+/g, ' ').trim();
+  const spendQuickOffer = (chatId, text) => {
+    const offer = quickOffer.get(chatId);
+    quickOffer.delete(chatId);
+    if (!offer || String(text).startsWith('/')) return null;
+    const said = labelKey(text);
+    return said ? (offer.find((b) => labelKey(b.label) === said)?.id ?? null) : null;
+  };
   const speak = (chatId, text, buttons) => {
+    const slashButtons = (buttons ?? []).filter((b) => typeof b?.id === 'string' && b.id.startsWith('/') && b.label);
+    if (slashButtons.length) quickOffer.set(chatId, slashButtons); else quickOffer.delete(chatId);
     const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });
     return bridge.sendReply({ chatId, text, ...(buttons?.length ? { buttons } : {}) });
   };
@@ -534,8 +548,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // A person who writes can be written to again: a kept refusal (the bot could not start a chat with them) is cleared.
     if (caller && threads && typeof threads.clearUnreachable === 'function') threads.clearUnreachable(caller);
     // The thread is the PERSON's when the door admits people (their contact id), so what one said is never another's
-    // memory, in a group chat too; without admission, the chat's.
-    await engine.ask(caller ?? threadFor(chatId), text, { chatId, ...(caller ? { caller } : {}) });
+    // memory, in a group chat too; without admission, the chat's. A typed button label goes on as the button's line.
+    const tapped = spendQuickOffer(chatId, text);
+    await engine.ask(caller ?? threadFor(chatId), tapped ?? text, { chatId, ...(caller ? { caller } : {}) });
   }
 
   // The bridge is let go as soon as the line is in its lane: a long-polling bridge fetches the next updates only when

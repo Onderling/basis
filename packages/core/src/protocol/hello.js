@@ -30,9 +30,35 @@ import { _snapshot } from '../skills/capabilities.js';
  * @param {string}  peerAddress
  * @param {number}  [timeout=15000]
  */
+/**
+ * The peers that hold OUR key in this process — they answered our hello, or we answered theirs. In memory only, so
+ * empty at every start: a hello is about THEM knowing US, and knowing THEIR key (which a peer record restores across
+ * a restart) says nothing about that. On phones the host agent's security layer is new at every start while the chat
+ * agent kept the host's key; skipping the hello on "we know their key" left the host refusing every call as an unknown
+ * sender, in silence (2026-10-09).
+ * @type {WeakMap<object, Set<string>>}
+ */
+const acknowledged = new WeakMap();
+const ackSet = (agent) => { let s = acknowledged.get(agent); if (!s) { s = new Set(); acknowledged.set(agent, s); } return s; };
+
+/** They may not hold our key any more (a call to them timed out: they may have restarted) — hello again next time. */
+export function forgetHello(agent, peerAddress) {
+  acknowledged.get(agent)?.delete(peerAddress);
+}
+
 export async function sendHello(agent, peerAddress, timeout = 15_000) {
-  // If already registered, nothing to do.
-  if (agent.security.getPeerKey(peerAddress)) return;
+  // They acknowledged our key in this process AND we hold theirs: nothing to do. (Without their key — forgotten since —
+  // the hello is how we learn it again; an acknowledgement that lands after a forget must not stand in for it.)
+  if (ackSet(agent).has(peerAddress) && agent.security.getPeerKey(peerAddress)) return;
+  // We already know THEIR key: tell them ours, without waiting — their answer marks them (`handleHello`), and a peer
+  // that is away costs nothing here (the send that follows is sealed to the key we hold, as before).
+  if (agent.security.getPeerKey(peerAddress)) {
+    try {
+      const t = await agent.transportFor(peerAddress);
+      await t.sendHello(peerAddress, { pubKey: agent.pubKey, label: agent.label ?? null, ack: false, capabilities: _selfCapabilities(agent) });
+    } catch { /* best-effort: the key we hold still seals what follows */ }
+    return;
+  }
 
   let timer   = null;
   let handler = null;
@@ -65,6 +91,7 @@ export async function sendHello(agent, peerAddress, timeout = 15_000) {
       capabilities: _selfCapabilities(agent),
     });
     await waitForPeer;
+    ackSet(agent).add(peerAddress);
   } catch (err) {
     clearTimeout(timer);
     if (handler) agent.off('peer', handler);
@@ -140,6 +167,9 @@ export async function handleHello(agent, envelope) {
     }).catch(() => { /* non-fatal */ });
   }
 
+  // An ack answers our hello: they hold our key now. (An initial HI is answered below with ours.)
+  if (ack) ackSet(agent).add(envelope._from);
+
   // SecurityLayer already registered sender.pubKey when it processed the HI.
   // We emit 'peer' so sendHello() above and application code know about it.
   agent.emit('peer', {
@@ -161,7 +191,7 @@ export async function handleHello(agent, envelope) {
       label:        agent.label ?? null,
       ack:          true,
       capabilities: _selfCapabilities(agent),
-    }, { re: envelope._id ?? null }).catch(err => agent.emit('error', err));
+    }, { re: envelope._id ?? null }).then(() => { ackSet(agent).add(envelope._from); }).catch(err => agent.emit('error', err));
   }
 }
 

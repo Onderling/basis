@@ -56,6 +56,7 @@ import {
   firstContactRateGate,
   invokeAgentSkill,
   Parts,
+  forgetHello,
 } from '@onderling/core';
 import {
   NknTransport,
@@ -2404,7 +2405,7 @@ export async function createSecureAgent(opts = {}) {
       // No answer at all: the peer may have RESTARTED and forgotten our key (a node keeps its peers' keys in memory),
       // so everything we send it is dropped unread — and since we already said hello, we never would again. Forget
       // that we did: the next call announces us once more, and a peer that is back answers it.
-      if (/Timeout waiting for reply/i.test(String(result.error ?? ''))) helloedPeers.delete(helloKey(addr, null));
+      if (/Timeout waiting for reply/i.test(String(result.error ?? ''))) { helloedPeers.delete(helloKey(addr, null)); forgetHello(agent, addr); }
       throw new Error(result.error ?? `Skill "${skillId}" failed`);
     }
     return result.parts;

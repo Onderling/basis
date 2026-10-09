@@ -168,7 +168,19 @@ Is this noun's content written by people only (`nouns[noun].writtenBy: 'people'`
 verbKind(manifest, verb)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Does an op's verb read or write, in this manifest?
+  • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
+  • a domain verb — the manifest's `domainVerbs` map says;
+  • no verb at all — `'write'`: nothing says it only reads;
+  • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
+    read: the default is the safe one, so a new verb cannot slip past as a silent read.
+
+**Parameters**
+
+- `manifest` `object`
+- `[verb]` `string`
+
+**Returns:** `'read'|'write'|null`
 
 ### `WRITE_SCOPES`
 

@@ -29,7 +29,7 @@ Recorded gaps are allowlisted in `scripts/api-doc-gaps.json`; new undocumented e
 | `@onderling/pseudo-pod` | [pseudo-pod.md](pseudo-pod.md) | 9 | 9 | 100% | — |
 | `@onderling/item-types` | [item-types.md](item-types.md) | 35 | 29 | 83% | `CANONICAL_TYPES`, `INBOX_ITEM_SCHEMA`, `SYSTEM_STOOP_TYPES`, `isReminderRule`, `parseReminderRule`, `registerCanonicalTypes` |
 | `@onderling/item-store` | [item-store.md](item-store.md) | 136 | 134 | 99% | `CLAIM_FIELDS`, `deliveryForResolution` |
-| `@onderling/app-manifest` | [app-manifest.md](app-manifest.md) | 67 | 62 | 93% | `chatMatchesAppliesTo`, `createFlowRunner`, `renderA2A`, `renderFlow`, `renderSlash` |
+| `@onderling/app-manifest` | [app-manifest.md](app-manifest.md) | 69 | 64 | 93% | `chatMatchesAppliesTo`, `createFlowRunner`, `renderA2A`, `renderFlow`, `renderSlash` |
 | `@onderling/app-scaffold` | [app-scaffold.md](app-scaffold.md) | 4 | 4 | 100% | — |
 | `@onderling/attribute-charter` | [attribute-charter.md](attribute-charter.md) | 20 | 20 | 100% | — |
 | `@onderling/logger` | [logger.md](logger.md) | 8 | 7 | 88% | `REDACTED` |

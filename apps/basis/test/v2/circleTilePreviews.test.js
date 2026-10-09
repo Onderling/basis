@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  buildTilePreviews, renderSubtitle, bumpSeenAt, countsAsUnread,
+  buildTilePreviews, renderSubtitle, bumpSeenAt, countsAsUnread, seenOnLeave,
 } from '../../src/v2/circleTilePreviews.js';
 
 // A conversation line by default — only the human lane counts as unread (see the last describe).
@@ -177,3 +177,16 @@ describe('buildTilePreviews — unread is what OTHERS said', () => {
     expect(countsAsUnread({ type: 'roster-updated', actor: 'bea-pub' }, { myRefs: [ME] })).toBe(false);
   });
 });
+
+describe('seenOnLeave — the circle you leave is seen', () => {
+  it('leaving a circle marks it; opening one does not; switching marks the one left', () => {
+    const left = [];
+    const sub = seenOnLeave((id) => left.push(id));
+    sub('club');            // open
+    sub(null);              // leave → seen
+    sub('club'); sub('buurt');   // switch → the one left
+    sub('buurt');           // no change
+    expect(left).toEqual(['club', 'club']);
+  });
+});
+

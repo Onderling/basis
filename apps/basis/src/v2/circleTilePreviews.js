@@ -136,3 +136,22 @@ export function bumpSeenAt(seenAt, circleId, now = Date.now()) {
   if (!circleId) return seenAt || {};
   return { ...(seenAt || {}), [circleId]: now };
 }
+
+/**
+ * The circle a person LEAVES is seen up to that moment — what happened while they were inside it (their own sends, a
+ * join they watched) is not news when they get back to the launcher. A subscriber for the shared active-circle signal
+ * (`subscribeActiveCircle`): it remembers the open circle and calls `onLeave(id)` when that changes to anything else.
+ * Both shells hand it their own seenAt write.
+ *
+ * @param {(circleId: string) => void} onLeave
+ * @returns {(current: string|null) => void}
+ */
+export function seenOnLeave(onLeave) {
+  let open = null;
+  return (current) => {
+    const next = current || null;
+    if (open && open !== next) { try { onLeave(open); } catch { /* a failed write must not break the signal */ } }
+    open = next;
+  };
+}
+

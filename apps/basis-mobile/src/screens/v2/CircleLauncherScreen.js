@@ -42,7 +42,7 @@ import {
   // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
-  buildTilePreviews, bumpSeenAt,
+  buildTilePreviews, bumpSeenAt, seenOnLeave, subscribeActiveCircle,
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
@@ -735,11 +735,29 @@ export default function CircleLauncherScreen({
     })();
     return () => { alive = false; };
   }, []);
+  // The circle you LEAVE is seen up to that moment (the shared rule, web alike) — every way out (← circles, a tab, Nearby)
+  // goes through the active-circle signal, so one subscription covers them all.
+  useEffect(() => subscribeActiveCircle(seenOnLeave((id) => {
+    setSeenAt((prev) => {
+      const next = bumpSeenAt(prev, id);
+      AsyncStorage.setItem('cc.circleSeenAt', JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  })), []);
+  // Whose lines are MINE for the unread count: 'me' (local stamps) and every address this person's devices speak as.
+  const [unreadMyRefs, setUnreadMyRefs] = useState(['me']);
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve(bundle?.agent?.ownAddresses?.()).then((a) => {
+      if (alive && Array.isArray(a)) setUnreadMyRefs(['me', ...a.filter((x) => typeof x === 'string' && x)]);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [bundle, circles]);
   // Recompute the previews map whenever events / circles / seenAt change.
   useEffect(() => {
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
-    setPreviews(buildTilePreviews({ events, circles, seenAt }));
-  }, [eventLog, circles, seenAt]);
+    setPreviews(buildTilePreviews({ events, circles, seenAt, myRefs: unreadMyRefs }));
+  }, [eventLog, circles, seenAt, unreadMyRefs]);
   // per-circle voorstellen badge. Populated lazily after
   // circles load; refresh after a settings save (CircleSettingsScreen
   // calls back through onPoll once it persists a new proposal).

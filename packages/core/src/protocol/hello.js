@@ -21,16 +21,6 @@
 import { _snapshot } from '../skills/capabilities.js';
 
 /**
- * Send a hello announcement and wait until we hear back.
- *
- * If the peer is already registered (pubKey known), this is a no-op
- * and resolves immediately.
- *
- * @param {import('../Agent.js').Agent} agent
- * @param {string}  peerAddress
- * @param {number}  [timeout=15000]
- */
-/**
  * The peers that hold OUR key in this process — they answered our hello, or we answered theirs. In memory only, so
  * empty at every start: a hello is about THEM knowing US, and knowing THEIR key (which a peer record restores across
  * a restart) says nothing about that. On phones the host agent's security layer is new at every start while the chat
@@ -46,6 +36,17 @@ export function forgetHello(agent, peerAddress) {
   acknowledged.get(agent)?.delete(peerAddress);
 }
 
+/**
+ * Send a hello announcement and wait until we hear back.
+ *
+ * A no-op when the peer acknowledged our key in THIS process and we hold
+ * theirs. When we already hold their key, our HI is sent without waiting
+ * (their answer marks them); otherwise we wait for their answer.
+ *
+ * @param {import('../Agent.js').Agent} agent
+ * @param {string}  peerAddress
+ * @param {number}  [timeout=15000]
+ */
 export async function sendHello(agent, peerAddress, timeout = 15_000) {
   // They acknowledged our key in this process AND we hold theirs: nothing to do. (Without their key — forgotten since —
   // the hello is how we learn it again; an acknowledgement that lands after a forget must not stand in for it.)

@@ -159,17 +159,6 @@ export function isWritingVerb(verb) {
 export const DOMAIN_VERB_KINDS = Object.freeze(['read', 'write']);
 
 /**
- * Does an op's verb read or write, in this manifest?
- *   • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
- *   • a domain verb — the manifest's `domainVerbs` map says;
- *   • no verb at all — `'write'`: nothing says it only reads;
- *   • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
- *     read: the default is the safe one, so a new verb cannot slip past as a silent read.
- * @param {object} manifest
- * @param {string} [verb]
- * @returns {'read'|'write'|null}
- */
-/**
  * Who writes a noun's items, when a manifest says so (`nouns[noun].writtenBy`). `people` — PEOPLE write them, never the
  * model: the noun's generic WRITE atoms carry no chat surface (no model tool), and an item is changed or removed only by
  * the one who made it or an admin. (A household's notes: what people want everyone to know, in their own words.)
@@ -181,6 +170,17 @@ export function isPeopleWritten(manifest, noun) {
   return manifest?.nouns?.[noun]?.writtenBy === 'people';
 }
 
+/**
+ * Does an op's verb read or write, in this manifest?
+ *   • an atom — the catalogue says (`READ_ATOMS` read, every other atom writes);
+ *   • a domain verb — the manifest's `domainVerbs` map says;
+ *   • no verb at all — `'write'`: nothing says it only reads;
+ *   • `null` — a domain verb the manifest has not classified. Callers treat that as an error, never as a
+ *     read: the default is the safe one, so a new verb cannot slip past as a silent read.
+ * @param {object} manifest
+ * @param {string} [verb]
+ * @returns {'read'|'write'|null}
+ */
 export function verbKind(manifest, verb) {
   if (typeof verb !== 'string' || verb === '') return 'write';
   if (isAtom(verb)) return isWritingVerb(verb) ? 'write' : 'read';

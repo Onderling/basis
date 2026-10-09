@@ -15,6 +15,13 @@ README: [`packages/agent-registry/README.md`](../../packages/agent-registry/READ
 
 ## `src/AgentRegistry.js`
 
+### `PROFILE_KINDS`
+
+**Kind:** constant · **Import:** `PROFILE_KINDS` from `'@onderling/agent-registry'`
+
+Whose a profile is: a PERSON's, or a FUNCTION's (a household bot on its own node — "a hosted function is a profile
+whose runners are its devices"). The bot's inbox door follows it; absent means a person.
+
 ### `createAgentRegistry`
 
 **Kind:** function · **Import:** `createAgentRegistry` from `'@onderling/agent-registry'`
@@ -206,8 +213,18 @@ The ref is a reference, never inline secret bytes; posture (optional) is one of 
 isCircleMembershipRecord(v)
 ```
 
-True iff `v` is a well-formed per-circle membership record. `handle` + `address` are required (who
-you are in the circle + where you are reachable); `proof`, `relays`, and `key` are optional facets.
+True iff `v` is a well-formed per-circle membership record. `address` is required — it is where you
+are reachable, and the only field a restore actually needs to re-open a circle. `handle`, `proof`,
+`relays` and `key` are optional facets.
+
+The handle used to be required too, and that quietly excluded the one person who most needs this
+record: a FOUNDER never redeems an invite, so they never choose a handle, so their own circle was
+refused a membership entry — and a restored device re-opened everything they had joined and nothing
+they had started. Measured 2026-09-10 from one paired circle: the creator's recovery file carried
+0 circles, the joiner's carried 1. The requirement encoded an assumption that only joiners exist.
+
+Readers were already null-tolerant (`memberships[id]?.handle ?? null`), and a handle chosen later
+merges onto the same record through the ordinary setter.
 
 **Parameters**
 
@@ -270,6 +287,18 @@ its memberships from the default profile unless it declares its own). Mirrors dr
 - `getProfile` `(id:string)=>({properties?:object}|null|undefined)`
 - `profileId` `string`
 - `[opts]` `{ defaultProfileId?: string|null }`
+
+### `removeCircleMembership`
+
+**Kind:** function · **Import:** `removeCircleMembership` from `'@onderling/agent-registry'`
+
+```js
+removeCircleMembership(properties, circleId)
+```
+
+A circle the person LEFT (or was removed from) comes off the profile — with the record still there a restored
+device re-opened a circle the person had left (found 2026-09-22 while making a leave follow the siblings).
+A circle not on the record is a no-op; the other records stay.
 
 ### `setCircleMembership`
 
@@ -425,41 +454,6 @@ from the owner root: root → profile seed → per-circle address. A distinct ke
 
 The canonical property key holding the `{ [deviceId]: record }` map.
 
-### `GRANTS_FLOOR_KEY`
-
-**Kind:** constant · **Import:** `GRANTS_FLOOR_KEY` from `'@onderling/agent-registry'`
-
-The GRANTS-FLOOR marker (its own property key, beside the map — a marker in the map would read
-as a malformed device record to every map consumer). The grants lane's device-set trust base
-accepts statements signed by the shared PROFILE key — "the floor" — because a person's first,
-un-enrolled device has no other key. The floor is also the one signature a revoked-but-stolen
-device still holds (the key cannot be tombstoned without re-keying the person). So THE FIRST
-DEVICE-REVOKE CEREMONY CLOSES IT: the ceremony proves the phrase and self-enrolls the running
-device into delegation custody, so at that moment every legitimate device signs with a
-revocable delegation key — and this marker tells every verifier the shared signature no longer
-counts. Closed is forever (deny-wins; there is no reopen — a later device joins by enrollment,
-which needs no floor).
-
-### `grantsFloorClosedOf`
-
-**Kind:** function · **Import:** `grantsFloorClosedOf` from `'@onderling/agent-registry'`
-
-```js
-grantsFloorClosedOf(entry)
-```
-
-Is the profile's grants floor closed? (Absent/malformed → open — the pre-ceremony default.)
-
-### `closeGrantsFloor`
-
-**Kind:** function · **Import:** `closeGrantsFloor` from `'@onderling/agent-registry'`
-
-```js
-closeGrantsFloor(properties, { closedAt = null } = {})
-```
-
-Close the floor on a properties map (idempotent). Returns a NEW frozen map.
-
 ### `isDeviceDelegationRecord`
 
 **Kind:** function · **Import:** `isDeviceDelegationRecord` from `'@onderling/agent-registry'`
@@ -495,6 +489,22 @@ deviceDelegationsOf(entry)
 ```
 
 Read the OWN `{ [deviceId]: record }` map straight off one registry entry (no inherit chain).
+
+### `profileHasOtherDevices`
+
+**Kind:** function · **Import:** `profileHasOtherDevices` from `'@onderling/agent-registry'`
+
+```js
+profileHasOtherDevices(entry, deviceId)
+```
+
+Does this profile have a live device other than `deviceId`? A profile with a phone and a laptop behind it is a
+person's — the rule that keeps a person's profile from ever being named a function's (a bot's).
+
+**Parameters**
+
+- `entry` `object` — the profile's registry entry
+- `deviceId` `string|null` — this node's own device id
 
 ### `deviceDelegationOf`
 
@@ -1585,6 +1595,79 @@ derivation; no match → `{ categoryId: null }`, which reveals nothing).
 
 - `[key='offering']` `string`
 - `[opts]` `{taxonomy?:object}` — override taxonomy (tests / future per-app overlays)
+
+## `src/ownedNodes.js`
+
+### `OWNED_NODES_KEY`
+
+**Kind:** constant · **Import:** `OWNED_NODES_KEY` from `'@onderling/agent-registry'`
+
+The canonical property key holding the `{ [address]: record }` map.
+
+### `isOwnedNodeRecord`
+
+**Kind:** function · **Import:** `isOwnedNodeRecord` from `'@onderling/agent-registry'`
+
+```js
+isOwnedNodeRecord(v)
+```
+
+A well-formed record: the node's address and when it was claimed; a `label` the person may give it.
+
+### `ownedNodesOf`
+
+**Kind:** function · **Import:** `ownedNodesOf` from `'@onderling/agent-registry'`
+
+```js
+ownedNodesOf(entry)
+```
+
+Read the OWN `{ [address]: record }` map off one registry entry (no inherit chain).
+
+### `setOwnedNode`
+
+**Kind:** function · **Import:** `setOwnedNode` from `'@onderling/agent-registry'`
+
+```js
+setOwnedNode(properties, record)
+```
+
+Upsert one claimed node as an OWN property. Returns a NEW properties map (other nodes preserved).
+
+**Parameters**
+
+- `properties` `object`
+- `record` `{address: string, claimedAt: string, label?: string}`
+
+### `addPendingRevokes`
+
+**Kind:** function · **Import:** `addPendingRevokes` from `'@onderling/agent-registry'`
+
+```js
+addPendingRevokes(properties, keys)
+```
+
+Owe `keys` a revoke on EVERY node the person owns. Returns a NEW properties map.
+
+### `clearPendingRevoke`
+
+**Kind:** function · **Import:** `clearPendingRevoke` from `'@onderling/agent-registry'`
+
+```js
+clearPendingRevoke(properties, node, key)
+```
+
+The node was told: `key` is no longer owed there. Returns a NEW properties map.
+
+### `pendingRevokesOf`
+
+**Kind:** function · **Import:** `pendingRevokesOf` from `'@onderling/agent-registry'`
+
+```js
+pendingRevokesOf(entry)
+```
+
+Every revoke still owed, as `[{node, key}]`.
 
 ## `src/profileProperties.js`
 

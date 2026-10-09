@@ -20,6 +20,13 @@ import { withCAS } from './concurrency.js';
 import { normalizeExposure } from './skillExposure.js';
 
 /**
+ * Whose a profile is: a PERSON's, or a FUNCTION's (a household bot on its own node — "a hosted function is a profile
+ * whose runners are its devices"). The bot's inbox door follows it; absent means a person.
+ */
+// whose a profile is: the member kinds a roster row can say (one list, the kernel's)
+export const PROFILE_KINDS = MEMBER_KINDS;
+
+/**
  * Build the live agent-registry handle over an injected pseudo-pod: etag-CAS reads/writes of the
  * registry resource with retry, plus optional per-write snapshots via a `versionStore`. Returns
  * `{register, lookup, revoke, purge, updateCapabilities, updateExposure, applyGrant, revokeGrant, list, reload,
@@ -40,13 +47,6 @@ import { normalizeExposure } from './skillExposure.js';
  *                                          every write snapshots the resource (best-effort).
  * @param {() => string} [opts.now]
  */
-/**
- * Whose a profile is: a PERSON's, or a FUNCTION's (a household bot on its own node — "a hosted function is a profile
- * whose runners are its devices"). The bot's inbox door follows it; absent means a person.
- */
-// whose a profile is: the member kinds a roster row can say (one list, the kernel's)
-export const PROFILE_KINDS = MEMBER_KINDS;
-
 export function createAgentRegistry({
   pseudoPod,
   anchorPodUri,

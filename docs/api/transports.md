@@ -7,6 +7,56 @@ Concrete network transports (NknTransport, MqttTransport, RelayTransport, Rendez
 
 README: [`packages/transports/README.md`](../../packages/transports/README.md) · Index: [docs/api/README.md](README.md)
 
+**Entry points**
+
+- `'@onderling/transports'`
+- `'@onderling/transports/mdns'`
+- `'@onderling/transports/mdns-node'`
+- `'@onderling/transports/mdns-dnssd'`
+- `'@onderling/transports/utils/base64'`
+
+## `src/MdnsTransport.js`
+
+### `SERVICE_TYPE`
+
+**Kind:** constant · **Import:** `SERVICE_TYPE` from `'@onderling/transports/mdns'`
+
+The DNS-SD service type every Onderling device advertises and browses for. Part of the wire contract.
+
+### `MdnsTransport`
+
+**Kind:** class · **Import:** `MdnsTransport` from `'@onderling/transports/mdns'`
+
+```js
+class MdnsTransport extends Transport
+new MdnsTransport({ identity, hostname = null, native = null, emitter = null })
+```
+
+What a backend must provide. Named here so a second one has a checklist rather than an archaeology
+exercise:
+
+  native.start(serviceType, serviceName, pubKey) -> Promise<port>    // advertise AND browse
+  native.startAdvertising(serviceType, serviceName, pubKey) -> Promise<port>
+  native.startDiscovery(serviceType)  -> Promise
+  native.stopAdvertising()            -> Promise
+  native.stopDiscovery()              -> Promise
+  native.stop()                       -> Promise
+  native.connect(host, port)          -> Promise<connectionId>
+  native.send(connectionId, base64)   -> Promise
+  native.close?.(connectionId)        -> Promise                     // optional
+
+  emitter.addListener(name, fn) -> { remove() }
+    'MdnsServiceDiscovered'  { host, port, pubKey }
+    'MdnsClientConnected'    { connectionId }
+    'MdnsDataReceived'       { connectionId, data }   // STANDARD base64, not base64url
+    'MdnsClientDisconnected' { connectionId }
+    'MdnsError'              { message }
+
+A backend with `start` but no `startAdvertising`/`startDiscovery` is honoured as far as it goes and says
+so — see `_applyDiscoverability`.
+
+**Methods:** `connect()` · `supportsSplit()` · `_applyDiscoverability()` · `_reannounce()` · `disconnect()` · `connectedPeers()` · `_hasPeer()` · `lastActivityAt()` · `canReach()` · `isStale()` · `forgetPeer()` · `_put()`
+
 ## `src/MqttTransport.js`
 
 ### `MqttTransport`
@@ -158,7 +208,7 @@ backoff (capped at 30s) until `disconnect()`. Also supports the relay's opt-in p
 protocol (`registerPushToken`/`unregisterPushToken`). Uses `ws` in Node.js and falls back to
 `globalThis.WebSocket` in browsers.
 
-**Methods:** `_bindAddress()` · `_unbindAddress()` · `canReach()` · `connect()` · `disconnect()` · `_put()` · `registerPushToken()` · `unregisterPushToken()` · `forgetPeer()`
+**Methods:** `addAddress()` · `_bindAddress()` · `setPrimaryDevice()` · `_unbindAddress()` · `canReach()` · `connect()` · `disconnect()` · `_put()` · `registerPushToken()` · `unregisterPushToken()` · `forgetPeer()`
 
 ## `src/RendezvousTransport.js`
 
@@ -178,6 +228,89 @@ React Native need an injected `rtcLib` polyfill. Use `RendezvousTransport.isSupp
 guard instantiation where WebRTC globals may be missing.
 
 **Methods:** `connect()` · `disconnect()` · `connectToPeer()` · `hasOpenChannelTo()` · `canReach()` · `_put()`
+
+## `src/mdnsDnsSdDiscovery.js`
+
+### `dnsSdType`
+
+**Kind:** function · **Import:** `dnsSdType` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+dnsSdType(serviceType)
+```
+
+Strip the leading underscore our constant carries, because the library adds its own.
+Exported for the test that pins this against `SERVICE_TYPE`.
+
+### `createDnsSdDiscovery`
+
+**Kind:** function · **Import:** `createDnsSdDiscovery` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+createDnsSdDiscovery({ bonjour = null } = {})
+```
+
+Build the DNS-SD seam.
+
+**Parameters**
+
+- `[opts]` `object`
+- `[opts.bonjour]` `object` — inject an instance (tests); otherwise one is created lazily and shared
+
+**Returns:** `{advertise:Function, browse:Function, destroy:Function}`
+
+## `src/mdnsNodeBackend.js`
+
+### `createFrameReader`
+
+**Kind:** function · **Import:** `createFrameReader` from `'@onderling/transports/mdns-node'`
+
+```js
+createFrameReader(onFrame)
+```
+
+Read side of the length-prefixed stream. Returns a `push(chunk)` that yields whole frames.
+Kept separate from the socket so it can be tested against adversarial chunkings directly.
+
+### `frameEncode`
+
+**Kind:** function · **Import:** `frameEncode` from `'@onderling/transports/mdns-node'`
+
+```js
+frameEncode(bytes)
+```
+
+Write side: one frame, length-prefixed.
+
+### `createLoopbackDiscovery`
+
+**Kind:** function · **Import:** `createLoopbackDiscovery` from `'@onderling/transports/mdns-node'`
+
+```js
+createLoopbackDiscovery()
+```
+
+A discovery seam for tests and single-host runs: every backend built from the same registry finds every
+other one, over REAL sockets on localhost. It replaces multicast, not TCP — so framing, the tiebreaker,
+the hello handshake and the peer maps are all genuinely exercised.
+
+### `createMdnsNodeBackend`
+
+**Kind:** function · **Import:** `createMdnsNodeBackend` from `'@onderling/transports/mdns-node'`
+
+```js
+createMdnsNodeBackend({ discovery, host = undefined } = {})
+```
+
+Build the Node backend.
+
+**Parameters**
+
+- `deps` `object`
+- `deps.discovery` `{advertise:Function, browse:Function}` — the DNS-SD seam (see the header)
+- `[deps.host]` `string` — interface to bind (default: all)
+
+**Returns:** `{native: object, emitter: object}` — pass straight into `new MdnsTransport({...})`
 
 ## `src/nknSenderBinding.js`
 
@@ -238,3 +371,33 @@ The shared rule, asked with nkn's port.
 - `envelope` `object` — the parsed envelope
 
 **Returns:** `{ok: boolean, reason: string, claimed: string|null, authenticated: string|null}`
+
+## `src/utils/base64.js`
+
+### `b64Encode`
+
+**Kind:** function · **Import:** `b64Encode` from `'@onderling/transports/utils/base64'`
+
+```js
+b64Encode(bytes)
+```
+
+Standard base64 (btoa/atob, WITH padding) — the encoding used at the mDNS/BLE NATIVE BOUNDARY.
+
+⚠ NOT interchangeable with `@onderling/core`'s `crypto/b64.js`, which is base64URL without padding.
+The Kotlin side decodes standard base64, so swapping the two silently breaks the wire — a frame that
+decodes to garbage rather than an error. Keep them separate on purpose.
+
+Lives here rather than in the React Native package because the mDNS transport's routing layer is
+platform-neutral and a Node backend needs the same encoding; `@onderling/react-native`'s
+`utils/base64.js` re-exports these so BleTransport keeps one source.
+
+### `b64Decode`
+
+**Kind:** function · **Import:** `b64Decode` from `'@onderling/transports/utils/base64'`
+
+```js
+b64Decode(str)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._

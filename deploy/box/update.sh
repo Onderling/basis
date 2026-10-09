@@ -102,12 +102,18 @@ pre_update_export() {   # pre_update_export <outgoing sha>
   # Only a household bot (ONDERLING_PROFILE_KIND=function) holds a household and answers an export request; a person's
   # own device has none to export (its circles live on the person's other devices too), so asking it only ever timed
   # out — and held every release. Its own environment says which it is, running or not.
-  local kind
+  # The read never fails open: a failed exec (a docker hiccup, a container mid-restart) is NOT "no kind" — it holds,
+  # as before. Only a read that SUCCEEDED and says something other than `function` lets the update go ahead.
+  local kind rc
   if [ "$running" = 1 ]; then
-    kind="$(eval "$cmd exec -T assistant printenv ONDERLING_PROFILE_KIND" 2>/dev/null | tr -d '\r\n')"
+    kind="$(eval "$cmd exec -T assistant printenv ONDERLING_PROFILE_KIND" 2>/dev/null)"; rc=$?
   else
-    kind="$(eval "$cmd run --rm --no-deps -T --entrypoint printenv assistant ONDERLING_PROFILE_KIND" 2>/dev/null | tr -d '\r\n')"
+    kind="$(eval "$cmd run --rm --no-deps -T --entrypoint printenv assistant ONDERLING_PROFILE_KIND" 2>/dev/null)"; rc=$?
   fi
+  if [ "$rc" != 0 ]; then
+    HOLD_REASON="could not read the assistant's kind"; return 1
+  fi
+  kind="$(printf '%s' "$kind" | tr -d '\r\n')"
   if [ "$kind" != function ]; then
     log "the assistant is not a household bot (${kind:-personal}) — no export to take; going ahead"; return 0
   fi

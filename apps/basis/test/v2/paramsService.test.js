@@ -54,8 +54,9 @@ describe('the set-param op — the kind gate (decision D)', () => {
     // `assistant.apps`: which apps a non-circle door's assistant (the box's Telegram chat) may act in;
     // `assistant.memoryDefault`: how much of a person's thread the household bot keeps, until they choose;
     // `assistant.assignPolicy`: whether a household bot's roles decide who may give a chore to someone else.
+    // `app.developer`: the developer switch — the Advanced screen (raw param keys) is shown only when it is on.
     expect(params.map((p) => p.key).sort()).toEqual([
-      'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.calendarFeed', 'assistant.cancelPolicy', 'assistant.householdInApp', 'assistant.memoryDefault', 'assistant.monthlyTokenLimit', 'assistant.names', 'assistant.passedItems', 'assistant.passedKeepDays', 'assistant.quietHours', 'assistant.reminderRules', 'assistant.reminders', 'assistant.roles', 'assistant.usageVisible', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
+      'app.developer', 'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.calendarFeed', 'assistant.cancelPolicy', 'assistant.householdInApp', 'assistant.memoryDefault', 'assistant.monthlyTokenLimit', 'assistant.names', 'assistant.passedItems', 'assistant.passedKeepDays', 'assistant.quietHours', 'assistant.reminderRules', 'assistant.reminders', 'assistant.roles', 'assistant.usageVisible', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
       'privacy.shareNknAddress', 'relay.url', 'surface.pref',

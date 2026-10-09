@@ -37,8 +37,10 @@ describe('share my contact — parity', () => {
   });
   it('Mij offers it on both shells under the same key; both panels speak the same keys', () => {
     for (const src of [webProfile, mobileProfile]) expect(src).toMatch(/circle\.profile\.share_contact/);
-    for (const key of ['title', 'hint', 'code_label', 'link_label', 'error', 'back']) {
+    for (const key of ['title', 'hint', 'code_label', 'link_label', 'error']) {
       for (const src of [webPanel, mobileScreen]) expect(src, key).toMatch(new RegExp(`circle\\.shareContact\\.${key}`));
     }
+    // …and both go back with the one key every screen under Me uses
+    for (const src of [webPanel, mobileScreen]) expect(src).toMatch(/circle\.back_me/);
   });
 });

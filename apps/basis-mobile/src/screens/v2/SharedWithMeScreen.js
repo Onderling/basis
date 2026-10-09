@@ -9,6 +9,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import { buildSharedWithMe, openSharedCopy } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
@@ -20,7 +21,8 @@ export default function SharedWithMeScreen({
   onOpened,
 }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar: a back link under it cannot be tapped
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [openedId, setOpenedId] = useState(null);
 
   // The ONE shared selector — identical projection web uses.
@@ -39,7 +41,7 @@ export default function SharedWithMeScreen({
     <View style={styles.page} testID="shared-with-me">
       <View style={styles.bar}>
         <Pressable onPress={onBack} accessibilityRole="button" testID="shared-with-me-back">
-          <Text style={styles.back}>{t('circle.back')}</Text>
+          <Text style={styles.back}>{t('circle.back_me')}</Text>
         </Pressable>
       </View>
       <Text style={styles.title}>{t('circle.sharedWithMe.title')}</Text>
@@ -69,8 +71,8 @@ export default function SharedWithMeScreen({
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
-  page:    { flex: 1, backgroundColor: theme.color.paper, padding: 12 },
+const makeStyles = (theme, insets) => StyleSheet.create({
+  page:    { flex: 1, backgroundColor: theme.color.paper, padding: 12, paddingTop: 12 + (insets?.top ?? 0) },
   bar:     { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   back:    { color: theme.color.accent, fontSize: 16 },
   title:   { color: theme.color.ink, fontSize: 20, fontWeight: '600', marginBottom: 12 },

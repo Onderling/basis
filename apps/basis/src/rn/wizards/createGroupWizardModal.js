@@ -141,7 +141,9 @@ export default function CreateGroupWizardModal({
     // local write, and a stuck one must not hold the wizard open.
     if (result && typeof persistPolicy === 'function') {
       try { await withinMs(persistPolicy(result.groupId, policyPatchFromState(after)), POLICY_WRITE_BOUND_MS); }
-      catch (err) { console.warn(`[create] the circle's policy was not written: ${err?.message ?? err}`); }
+      // The bound stops the WAIT, not the write: a write still running finishes in the background (walked 2026-10-09: >3 s
+      // on an emulator, and the circle opened with its template's tabs). Only a write that FAILED leaves the policy unset.
+      catch (err) { console.warn(`[create] the circle's policy write is still running or failed: ${err?.message ?? err}`); }
     }
     if (result) onClose?.();
   }, [state, callSkill, onDispatched, onClose, persistPolicy, shareFounderRelease]);

@@ -57,6 +57,11 @@ an agent session cannot and should not.
   locally before the merge and named in the PR. The browser tail does not run on pull requests, so a door that starts
   refusing what these specs send shows only after the merge — on 2026-10-09 an unsigned-admission refusal left eight of
   them red on the trunk for half a day and stopped a release.
+- **A change to a wizard step or a flow the browser helpers drive** (a step added, reordered or given a required field
+  — the create and join wizards, which `createCircleViaWizard` and the peer harness walk through): rung 2 is the browser
+  specs that drive that wizard (for create: `journeys.spec.js` pairing and `walk-persona-contacts.spec.js`), run
+  locally and named in the PR. Same reason as above: the same day a required "your name" field on the create
+  wizard's first step left every shard red, because the shared helper stopped on a Next that never enabled.
 - **Never** run the whole browser suite locally (an hour) — that is what the tail is for, after the merge.
   Run the spec you need.
 - **A merge does not wait for the tail.** A red tail on `development` is a red trunk: it blocks the next

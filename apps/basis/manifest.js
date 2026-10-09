@@ -855,6 +855,9 @@ export const basisManifest = {
    * Ids + locale keys preserved EXACTLY (screens/circles/contacten/mij ·
    * circle.tab.*), so behaviour is unchanged.
    */
+  // THE RULE for every nav-chrome row (tabs · actions · meActions): `nav` is for a VIEW no op backs (a screen, a list,
+  // back); an act an op performs targets the OP — never a nav row with the same meaning. That is what makes a button, a
+  // slash command and a chat line one door (strict validation refuses a nav `to` that names an op: `nav-shadows-op`).
   tabs: [
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
     { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
@@ -863,6 +866,20 @@ export const basisManifest = {
     { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },
     { id: 'contacten', labelKey: 'circle.tab.contacten', target: { kind: 'nav', to: 'contacten' } },
     { id: 'mij',       labelKey: 'circle.tab.mij',       target: { kind: 'op',  opId: 'me' } },
+  ],
+
+  /**
+   * Me — the two things a person does with someone in the room, at the top of their own page (2026-10-09): show their
+   * card, or take someone else's code. Declared HERE so both shells paint them from the declaration (`meActions` →
+   * renderWeb → `meActionsFor`), never because a screen file lists them.
+   *   share-contact — the existing Share-my-contact view (the QR, the code, the link).
+   *   scan          — the scanQr op: ONE scanner (web: the paste prompt), routed by what it reads (`scanRoute.js`: each
+   *                   kind to its declared op or flow).
+   */
+  meActions: [
+    { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
+    // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
+    { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
   ],
 
   /**

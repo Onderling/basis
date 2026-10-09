@@ -36,7 +36,7 @@ export default function QrScannerModal({ visible, onClose, onResult, t }) {
 
   const dispatch = useCallback((res) => {
     if (res.kind === 'unknown') {
-      setHint(t('chat.scan_unknown'));
+      setHint(t('scan_qr.scan_unknown'));
       return;
     }
     setScanLock(true);
@@ -127,7 +127,7 @@ function PasteToggle({ visible, value, onChange, onShow, onSubmit, t }) {
     <View style={styles.pasteBlock}>
       <TextInput
         value={value} onChangeText={onChange}
-        multiline placeholder={t('chat.scan_paste_placeholder')}
+        multiline placeholder={t('circle.scan.paste_placeholder')}
         style={styles.pasteInput}
         autoCapitalize="none" autoCorrect={false}
         accessibilityLabel="scan-paste-input"

@@ -195,6 +195,7 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
+import { routeScan } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
 // client-side image-attachment encoder (Canvas resize + thumbnail → the
 // inbound shape stoop.postRequest expects).
 import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
@@ -888,7 +889,9 @@ function mountBasisOpsOnAgent(agent) {
       await tryConnectPeerTransport(_peerAgent, _peerRouter, { awaitRelayReady: true });
       return { address: _peerAgent.peer?.address ?? '' };
     },
-    // No camera in the browser: `scanQr` says so in its own words rather than being absent.
+    // No camera in the browser: `scanQr`'s seam is the PASTE prompt (the declared exception, web-mobile-exceptions:36) —
+    // so `/scan-qr` and Me → Scan are one door here too, and what is pasted goes through the route table.
+    openQrScanner: () => { const v = (globalThis.prompt?.(t('circle.scan.paste_placeholder')) || '').trim(); if (v) takeScannedText(v); },
   }));
 }
 
@@ -4288,7 +4291,11 @@ async function showMij() {
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
     version: APP_VERSION,
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
-    onShareContact: showShareMyContact,
+    // The Me actions are DECLARED (manifest `meActions`); this is what each id does here.
+    onMeAction: (id) => {
+      if (id === 'share-contact') { showShareMyContact(); return; }
+      if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
+    },
   });
   rerender();
   load();
@@ -4792,6 +4799,34 @@ function mountMyDataWizard(renderWizard, extra = {}) {
 // OBJ-2 — Join a circle (no pod). Paste an invite (the QR's onderling-invite:// payload) and mount the SHARED
 // join wizard through the same overlay adapter; the joiner-side peer-redeem sender carries the no-pod
 // handshake. On success we feed the new roster (so items sync) and refresh the launcher. Pure reuse.
+/**
+ * THE PER-ID PAINTER MAP (web) — the one shell-side piece of the scan route: `routeScan` names a DECLARED target
+ * (`SCAN_TARGETS`), this map names who paints it here today (PR 2's generic flow painter shrinks it to one). Every
+ * declared id has an entry; pairing is HELD on purpose (its pick-list needs a picker-capable form on both shells — its
+ * own row), and says so instead of dropping the code.
+ */
+const SCAN_PAINTERS = {
+  'add-contact': async (needs) => {
+    const added = await addContactWithSheet(needs.payload).catch(() => ({ error: true }));
+    if (added === null) return;   // closed the sheet: nothing added
+    if (!added?.contact || added?.error) { globalThis.alert?.(t('circle.contacts.add_failed')); return; }
+    showContacts();
+  },
+  joinGroup:         (needs, text) => showJoinCircle(String(text).trim()),   // the whole text: the app's own link carries its relay
+  'enroll-device':   (needs) => showEnrollDeviceFlow({ needs }),
+  'claim-companion': (needs) => showClaimCompanionFlow({ needs }),
+  pairCirclePeer:    null,   // HELD (pick-list row) — said, not dropped
+};
+
+/** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter. */
+async function takeScannedText(text) {
+  const r = routeScan(text);
+  const paint = r.target ? SCAN_PAINTERS[r.target.id] : undefined;
+  if (paint === undefined) { globalThis.alert?.(t('scan_qr.scan_unknown')); return; }
+  if (paint === null) { globalThis.alert?.(t('circle.scan.pair_held')); return; }
+  await paint(r.needs, text);
+}
+
 async function showJoinCircle(inviteArg) {
   let invite = (typeof inviteArg === 'string' && inviteArg.trim())
     ? inviteArg.trim()
@@ -4799,7 +4834,14 @@ async function showJoinCircle(inviteArg) {
   if (!invite) return;
   // tolerate a full deep-link (https://…/?join=<invite>&relay=…): pull the invite out of it
   if (/^https?:\/\//i.test(invite)) {
-    try { const j = new URL(invite).searchParams.get('join'); if (j) invite = j; } catch { /* keep as-is */ }
+    let relay = null;
+    try { const u = new URL(invite); const j = u.searchParams.get('join'); relay = u.searchParams.get('relay'); if (j) invite = j; } catch { /* keep as-is */ }
+    // …and the relay the app's own link names, BESIDE this device's own (as the `?join=&relay=` landing and mobile's
+    // scan do): a relay-only admin is reachable only there.
+    if (relay) {
+      try { getConnectionPoints().addManually(relay); } catch { /* the list is a convenience */ }
+      try { await dialRelayUrl(relay); } catch { /* best-effort */ }
+    }
   }
   // decode once up front to learn the admin's transport addresses and seed the
   // app PeerGraph BEFORE the wizard runs its peer redeem. The router then
@@ -5171,7 +5213,7 @@ function _restoreOverlay() {
   return { wrap, card, close: () => wrap.remove() };
 }
 
-function showEnrollDeviceFlow() {
+function showEnrollDeviceFlow({ needs = null } = {}) {
   // ADD-A-DEVICE (the enroll ceremony, as its declared flow): the phrase is typed on THIS — the
   // NEW — device. One pause (the secret-kind phrase + an optional device label), then the
   // ceremony op restores the owner root + writes this install's delegation; the reload lets boot
@@ -5291,8 +5333,11 @@ function showEnrollDeviceFlow() {
         offerErr.style.display = 'none';
         const pasted = offerInput.value.trim();
         if (pasted) {
-          const stashed = await stashEnrollOffer(window.localStorage, pasted).catch(() => ({ ok: false }));
-          if (!stashed.ok) { offerErr.style.display = 'block'; return; }
+          // The pasted offer is the FLOW's `offer` need — its first step keeps it (the declared stashEnrollOffer), one
+          // path for the act. A code that does not parse ends there: said, not dropped.
+          const at = await runner.start(FLOW, { needs: { offer: pasted } }).catch(() => null);
+          if (!at || at.steps?.stash?.outcome === 'bad-offer' || at.awaiting?.step !== 'ceremony') { offerErr.style.display = 'block'; return; }
+          inst = at;
         }
         runner.resume(FLOW, inst, { input: values }).then((r) => { inst = r; paint(); }).catch(() => close());
       });
@@ -5352,7 +5397,7 @@ function showEnrollDeviceFlow() {
     }
   };
 
-  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => close());
+  runner.start(FLOW, { needs: needs ?? {} }).then((r) => { inst = r; paint(); }).catch(() => close());
 }
 
 function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
@@ -5363,13 +5408,13 @@ function showReplaceDeviceFlow({ onClosed } = {}) {
   return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
 /** Claim a companion node: paste the line it printed; this device signs the claim. */
-function showClaimCompanionFlow({ onClosed } = {}) {
+function showClaimCompanionFlow({ onClosed, needs = null } = {}) {
   return showDeviceCeremonyFlow({
-    flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed,
+    flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed, needs,
     inputName: 'claim', placeholderKey: 'circle.companionClaim.placeholder', rows: 2,
   });
 }
-function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3 } = {}) {
+function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3, needs = null } = {}) {
   // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
   // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
   // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
@@ -5439,7 +5484,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     }
   };
 
-  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => done());
+  runner.start(FLOW, { needs: needs ?? {} }).then((r) => { inst = r; paint(); }).catch(() => done());
 }
 
 function showRestoreFinishFlow() {

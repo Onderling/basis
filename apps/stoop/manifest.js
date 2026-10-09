@@ -1523,7 +1523,7 @@ export const stoopManifest = {
       id:   'addContactFromQr', verb: 'add',
       writes: { scope: 'person' },
       params: [
-        { name: 'payload', kind: 'object', required: true },
+        { name: 'payload', kind: 'string', required: true },   // the card as scanned or pasted (`onderling-contact://…`): every caller passes a string; the skill refuses anything else
         // Which of your personas this contact is added through — what they see of you. Optional: absent
         // means "not recorded", which is a different thing from "the default", and nothing may read it as one.
         { name: 'persona', kind: 'string', required: false },
@@ -2152,6 +2152,29 @@ export const stoopManifest = {
    * this manifest's operations — so the declaration cannot drift from the machine it describes.
    */
   flows: [
+    {
+      // ADD A PERSON from their card (Me → Scan, a link, a paste): the "what will they see of you" sheet FIRST — the
+      // person's own disclosure act, never skipped (L125) — then addContactFromQr. The sheet is the painter of this
+      // flow's needs (persona + reveal level are REQUIRED here, though optional on the op for its other callers), so a
+      // shell cannot run the add without asking.
+      id:    'add-contact',
+      kind:  'ceremony',
+      labelKey: 'circle.contacts.add_sheet.title',
+      needs: [
+        { name: 'payload',      kind: 'string', required: true },
+        { name: 'persona',      kind: 'string', required: true },
+        { name: 'revealPreset', kind: 'enum',   of: ['handle', 'profile', 'full'], required: true },
+      ],
+      effects:  [{ kind: 'write', target: 'contacts' }],
+      produces: [{ name: 'contact', kind: 'object', from: '$steps.add.contact' }],
+      steps: [
+        { id: 'add', op: 'addContactFromQr', bind: {
+          payload:      { from: '$flow.needs.payload' },
+          persona:      { from: '$flow.needs.persona' },
+          revealPreset: { from: '$flow.needs.revealPreset' },
+        } },
+      ],
+    },
     {
       id:    'joinGroup',
       kind:  'wizard',

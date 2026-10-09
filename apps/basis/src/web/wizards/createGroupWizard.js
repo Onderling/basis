@@ -32,7 +32,7 @@ import {
   ROLE_TEMPLATE_IDS, toggleRole,
   setStoragePolicy,
   // The persona the circle is founded as — the list, and the choice kept honest against it.
-  loadPersonas, withPersonas, founderPersonaName, loadFounderHandle, identityComplete,
+  loadPersonas, withPersonas, founderPersonaName, personaLabel, loadFounderHandle, identityComplete,
   // The circle's id comes from its founder — one helper, both wizards and the quick create.
   resolveFounderKey, newFounderCircleId,
 } from '../../core/wizards/createGroupState.js';
@@ -225,6 +225,8 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   if (state.needsHandle) {
     mkHandleField(wrap, doc, {
       t, value: state.handle, suggestions: state.handleSuggestions,
+      // Under the circle's own name, "Name" read twice: here it is the person's name IN the circle.
+      label: t('circle.wizard.create.your_name'), hint: t('circle.join.wizard.handle.intro'),
       onInput: (v) => { state.handle = v; refreshNextBtn(); },
       onPick: (v) => { state.handle = v; rerender(); },
     });
@@ -268,7 +270,7 @@ function appendFounderPersona(wrap, doc, state) {
   for (const p of state.personas) {
     const opt = doc.createElement('option');
     opt.value = p.id;
-    opt.textContent = p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name;
+    opt.textContent = personaLabel(p, t);
     select.appendChild(opt);
   }
   select.value = state.persona ?? '';

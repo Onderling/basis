@@ -26,7 +26,7 @@ import {
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
   // The persona the circle is founded as (web parity).
-  loadPersonas, withPersonas, founderPersonaName,
+  loadPersonas, withPersonas, founderPersonaName, personaLabel,
   // The circle's id comes from its founder (web parity, L126).
   resolveFounderKey, newFounderCircleId,
   // The founder's handle, asked only when their profile has none (the join wizard's field and checks).
@@ -206,6 +206,9 @@ export default function CreateGroupWizardModal({
                     value={state.handle}
                     onChange={(v) => setState((s) => ({ ...s, handle: v }))}
                     suggestions={state.handleSuggestions}
+                    // Under the circle's own name, "Name" read twice: here it is the person's name IN the circle.
+                    label={t('circle.wizard.create.your_name')}
+                    hint={t('circle.join.wizard.handle.intro')}
                   />
                 ) : null}
                 {state.personas.length > 0 && (
@@ -218,7 +221,7 @@ export default function CreateGroupWizardModal({
                         { id: '', label: t('circle.wizard.create.persona.minimal') },
                         ...state.personas.map((p) => ({
                           id: p.id,
-                          label: p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
+                          label: personaLabel(p, t),
                         })),
                       ]}
                     />

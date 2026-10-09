@@ -52,7 +52,7 @@ import {
   prepareJoinIdentity,
   setLinkChoice,
   setJoinReveal,
-  REVEAL_PRESETS, isJoinDirty } from '../../core/wizards/joinGroupState.js';
+  REVEAL_PRESETS, isJoinDirty, personaLabel } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
 import { mkHandleField } from './_wizardKit.js';   // the one handle field the join and create wizards share
@@ -422,7 +422,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     for (const p of state.personas) {
       const opt = doc.createElement('option');
       opt.value = p.id;
-      opt.textContent = p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name;
+      opt.textContent = personaLabel(p, t);
       select.appendChild(opt);
     }
     select.value = state.persona ?? '';

@@ -18,6 +18,7 @@ import {
   finalSubmit, joinSubmitLabelKey, loadPersonas, setPersona, applyPersonaHandle, isJoinDirty,
   prepareJoinIdentity, setLinkChoice,
   setJoinReveal, REVEAL_PRESETS,
+  personaLabel,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
@@ -237,7 +238,7 @@ export default function JoinGroupWizardModal({
                       { id: '', label: t('circle.join.wizard.persona.minimal') },
                       ...state.personas.map((p) => ({
                         id: p.id,
-                        label: p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
+                        label: personaLabel(p, t),
                       })),
                     ]}
                   />

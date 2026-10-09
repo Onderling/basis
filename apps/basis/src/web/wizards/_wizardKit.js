@@ -196,15 +196,27 @@ export function mkSubmitting(body, doc, flag, text = 'Submitting…') {
  * creating (the founder's, when their profile has none). The input keeps focus while typing (`onInput`, no rerender);
  * a suggestion chip sets the value (`onPick`, the caller rerenders).
  */
-export function mkHandleField(body, doc, { t, value = '', suggestions = [], onInput, onPick }) {
+export function mkHandleField(body, doc, { t, value = '', suggestions = [], onInput, onPick, label = null, hint = null }) {
+  if (label) {
+    const l = doc.createElement('div');
+    l.className = 'cc-wizard-field-label';
+    l.textContent = label;
+    body.appendChild(l);
+  }
   const input = doc.createElement('input');
   input.type = 'text';
   input.className = 'cc-wizard-handle-input';
   input.value = value;
   input.placeholder = t('circle.join.wizard.handle.placeholder');
-  input.setAttribute('aria-label', t('circle.join.wizard.handle.label'));
+  input.setAttribute('aria-label', label ?? t('circle.join.wizard.handle.label'));
   input.addEventListener('input', () => onInput?.(input.value.trim()));
   body.appendChild(input);
+  if (hint) {
+    const h = doc.createElement('div');
+    h.className = 'cc-wizard-field-hint';
+    h.textContent = hint;
+    body.appendChild(h);
+  }
   if (!suggestions.length) return input;
   const row = doc.createElement('div');
   row.className = 'cc-wizard-suggestions';

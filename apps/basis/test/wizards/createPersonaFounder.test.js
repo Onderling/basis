@@ -130,3 +130,27 @@ describe('Review speaks in names, not ids', () => {
     expect(read('../../src/rn/wizards/createGroupWizardModal.js')).not.toMatch(/label: 'Circle id'/);
   });
 });
+
+describe('personaLabel — one persona label for both wizards on both shells', () => {
+  const t = (k, v) => ({ 'circle.persona_default_name': 'Your default persona', 'circle.join.wizard.persona.default_suffix': `${v?.name} (default persona)` }[k] ?? k);
+  it('the default persona without a name of its own never shows its id', async () => {
+    const { personaLabel } = await import('../../src/core/wizards/joinGroupState.js');
+    expect(personaLabel({ id: 'default', name: 'default' }, t)).toBe('Your default persona');
+    expect(personaLabel({ id: 'default' }, t)).toBe('Your default persona');
+  });
+  it('a named default is marked as the default; any other persona is its name', async () => {
+    const { personaLabel } = await import('../../src/core/wizards/joinGroupState.js');
+    expect(personaLabel({ id: 'default', name: 'Frits' }, t)).toBe('Frits (default persona)');
+    expect(personaLabel({ id: 'buurt', name: 'Buurtmens' }, t)).toBe('Buurtmens');
+  });
+  it('all four pickers use it — no picker builds the label by hand', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    for (const rel of ['../../src/rn/wizards/createGroupWizardModal.js', '../../src/rn/wizards/joinGroupWizardModal.js',
+      '../../src/web/wizards/createGroupWizard.js', '../../src/web/wizards/joinGroupWizard.js']) {
+      const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+      expect(src, rel).toMatch(/personaLabel\(p, t\)/);
+      expect(src, rel).not.toMatch(/default_suffix', \{ name: p\.name \}/);
+    }
+  });
+});

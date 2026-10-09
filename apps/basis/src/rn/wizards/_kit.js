@@ -97,16 +97,17 @@ export function Field({ label, value, onChangeText, placeholder, monospace, hint
  * creating (the founder's, when their profile has none). Its words, its monospace, and its suggestions row (shown only
  * when there is something to suggest) live here, so the two cannot drift.
  */
-export function HandleField({ t, value, onChange, suggestions = [] }) {
+export function HandleField({ t, value, onChange, suggestions = [], label = null, hint = null }) {
   const styles = makeStyles(useWizardPalette());
   return (
     <>
       <Field
-        label={t('circle.join.wizard.handle.label')}
+        label={label ?? t('circle.join.wizard.handle.label')}
         value={value}
         onChangeText={onChange}
         placeholder={t('circle.join.wizard.handle.placeholder')}
         monospace
+        hint={hint}
       />
       {suggestions.length ? (
         <>

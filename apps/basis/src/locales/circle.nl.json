@@ -7333,6 +7333,10 @@
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
       },
+      "your_name": {
+        "text": "Jouw naam in deze kring",
+        "doc": "The founder's handle field in the create wizard, asked when their profile has none — directly under the circle's own name field, so it names whose name it is."
+      },
       "review_persona": {
         "text": "Gestart als",
         "doc": "Create wizard, review — the founding persona's row."

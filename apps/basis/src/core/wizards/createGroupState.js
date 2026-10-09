@@ -31,9 +31,9 @@ import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling'
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 // The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
-import { loadPersonas, loadPriorHandles, handleSuggestions, isValidHandle } from './joinGroupState.js';
+import { loadPersonas, loadPriorHandles, handleSuggestions, isValidHandle, personaLabel } from './joinGroupState.js';
 import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-export { loadPersonas, isValidHandle };
+export { loadPersonas, isValidHandle, personaLabel };
 
 // How long the founder's release may take after the create has answered — it runs after the wizard, never in it.
 // Parameter register (#36), device-scoped, internal.
@@ -395,11 +395,10 @@ export function identityComplete(state) {
 
 export function founderPersonaName(state, t = null) {
   if (!state?.persona) return null;
-  const name = (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? null;
-  // The default persona has no name of its own (its list entry falls back to its id): it reads as the person's
-  // default persona, in their language — a persona id never meets a person.
-  if ((!name || name === state.persona) && state.persona === DEFAULT_PERSONA && typeof t === 'function') return t('circle.persona_default_name');
-  return name ?? state.persona;
+  const p = (state.personas ?? []).find((x) => x.id === state.persona) ?? { id: state.persona };
+  // The one persona label both wizards use (`personaLabel`) — a persona id never meets a person.
+  if (typeof t === 'function') return personaLabel(p, t);
+  return p.name ?? state.persona;
 }
 
 /* ─── Rules object + submit ────────────────────────────────── */

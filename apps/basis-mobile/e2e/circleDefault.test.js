@@ -26,7 +26,8 @@ describe('circle launcher is the default screen (M2)', () => {
       .withTimeout(60_000);
   });
 
-  it('"← chat" reveals the chat shell; "Circles" returns to the launcher', async () => {
+  // SKIPPED (Detox survey 2026-10-09): the "← chat" affordance (`circle-to-chat`) was removed — no chat shell to reveal.
+  it.skip('"← chat" reveals the chat shell; "Circles" returns to the launcher', async () => {
     // gotoChat taps "← chat" then waits for the chat boot status — which
     // only appears if the always-mounted chat shell actually booted.
     await gotoChat();

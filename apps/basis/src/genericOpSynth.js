@@ -77,7 +77,11 @@ export function synthesizeGenericOps(manifest) {
         slash: { command: `/${atom}-${noun}`, match },
         // LLM-facing tool description (like DEFAULT_INTERPRET_SYSTEM — internal, not shown to the member). A noun PEOPLE
         // write (`writtenBy: 'people'`) gives the model no tool to write it: its writing atoms carry no chat surface.
-        ...(isPeopleWritten(manifest, noun) && isWritingVerb(atom) ? {} : { chat: { hint: `${atom} a ${noun}` } }),
+        ...(isPeopleWritten(manifest, noun) && isWritingVerb(atom) ? {} : { chat: {
+          hint: `${atom} a ${noun}`,
+          // a people-written noun's list comes back as the noun's lines in words (the door paints it as a list)
+          ...(atom === 'list' && isPeopleWritten(manifest, noun) ? { reply: 'list' } : {}),
+        } }),
       },
     });
   }

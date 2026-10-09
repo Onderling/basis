@@ -34,6 +34,8 @@ describe('a generic write at a door', () => {
     const add = encodeGenericOpId('household', 'add', 'note');
     const made = await agent.callSkill('household', add, { body: 'de vuilnis gaat dinsdag buiten' }, { caller: ANN });
     expect(made?.ok, JSON.stringify(made)).toBe(true);
-    expect(made.result.item.createdBy, 'the person who wrote it').toBe(ANN);
+    // the item as stored (a people-written noun's add answers in words; `get` hands back the item itself)
+    const got = await agent.callSkill('household', encodeGenericOpId('household', 'get', 'note'), { id: made.itemId });   // read as the box's owner (get is no door op)
+    expect((got?.result ?? got)?.item?.createdBy, `the person who wrote it (${JSON.stringify(got)})`).toBe(ANN);
   }, 60_000);
 });

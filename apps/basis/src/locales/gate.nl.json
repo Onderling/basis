@@ -384,5 +384,56 @@
       "done",
       "finished"
     ]
+  },
+  "household.add:note.remember": {
+    "doc": "A note for the household, in the person's own words (\"onthoud dat de vuilnis dinsdag buiten gaat\", \"weetje: …\"): what people want everyone (and the bot) to know.",
+    "patterns": [
+      "onthoud dat {text}",
+      "onthoud: {text}",
+      "weetje: {text}"
+    ],
+    "examples": [
+      "onthoud dat de vuilnis dinsdag buiten gaat",
+      "Onthoud: de wifi-code staat op de koelkast",
+      "weetje: Bob is vegetariër"
+    ],
+    "not": [
+      "onthoud je dat nog",
+      "zet melk op de boodschappen",
+      "vergeet het weetje over de wifi"
+    ]
+  },
+  "household.list:note.ask": {
+    "doc": "The household's notes, read out (\"welke weetjes zijn er\").",
+    "patterns": [
+      "welke weetjes (zijn er|heb je|ken je)",
+      "(laat|geef) (de|alle)? weetjes (zien)?",
+      "weetjes"
+    ],
+    "examples": [
+      "welke weetjes zijn er",
+      "laat de weetjes zien",
+      "weetjes"
+    ],
+    "not": [
+      "weetje: de vuilnis gaat dinsdag",
+      "wat staat er op de boodschappen"
+    ]
+  },
+  "household.remove:note.forget": {
+    "doc": "Take a note away by words from it (\"vergeet het weetje over de wifi\"); only its maker or an admin may.",
+    "patterns": [
+      "vergeet het weetje (over)? {text}",
+      "haal het weetje (over)? {text} weg"
+    ],
+    "examples": [
+      "vergeet het weetje over de wifi",
+      "haal het weetje over de vuilnis weg"
+    ],
+    "not": [
+      "vergeet het",
+      "vergeet alles",
+      "haal melk van de boodschappen"
+    ]
   }
 }

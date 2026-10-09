@@ -363,5 +363,47 @@
       "completed",
       "finished"
     ]
+  },
+  "household.add:note.remember": {
+    "doc": "A note for the household, in the person's own words (\"remember that the bins go out on Tuesday\"): what people want everyone (and the bot) to know.",
+    "patterns": [
+      "remember that {text}",
+      "remember: {text}"
+    ],
+    "examples": [
+      "remember that the bins go out on Tuesday",
+      "Remember: the wifi code is on the fridge"
+    ],
+    "not": [
+      "do you remember that",
+      "add milk to the shopping"
+    ]
+  },
+  "household.list:note.ask": {
+    "doc": "The household's notes, read out (\"what notes are there\").",
+    "patterns": [
+      "what notes (are there|do you have)",
+      "(show|list) (the|all)? notes"
+    ],
+    "examples": [
+      "what notes are there",
+      "show the notes"
+    ],
+    "not": [
+      "what is on the shopping list"
+    ]
+  },
+  "household.remove:note.forget": {
+    "doc": "Take a note away by words from it (\"forget the note about the wifi\"); only its maker or an admin may.",
+    "patterns": [
+      "forget the note (about)? {text}"
+    ],
+    "examples": [
+      "forget the note about the wifi"
+    ],
+    "not": [
+      "forget it",
+      "forget everything"
+    ]
   }
 }

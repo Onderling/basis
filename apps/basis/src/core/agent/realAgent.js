@@ -4677,9 +4677,22 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (g.atom !== 'get' && item.createdBy !== capCtx.by && doorRoles.get(actorOf(ctx)) !== 'admin') {
             return { ok: false, code: 'forbidden', error: agentT('circle.notes.not_yours', { text: wordsOf(item) }) };
           }
-          args = { ...(args ?? {}), id: item.id };
+          args = { ...(args ?? {}), id: item.id, _words: wordsOf(item) };
         }
-        return householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx);
+        const done = await householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx);
+        // A people-written noun answers in words a door can say: what was written or taken away, and the list as a list.
+        if (isPeopleWritten(householdManifest, g.noun) && done?.ok !== false) {
+          const inner = done?.result ?? done;
+          const words = (i) => String(i?.body ?? i?.text ?? i?.title ?? '');
+          // the generic answer stays whole (`via`, `atom`, `result`); the words ride beside it
+          if (g.atom === 'add') return { ...done, itemId: inner?.item?.id ?? null, entry: words(inner?.item), message: agentT('circle.notes.added', { text: words(inner?.item) }) };
+          if (g.atom === 'remove') return { ...done, entry: args?._words ?? '', message: agentT('circle.notes.removed', { text: args?._words ?? '' }) };
+          if (g.atom === 'list') {
+            const items = (inner?.items ?? []).filter((i) => i && i.type === g.noun && words(i).trim());
+            return { ...done, title: agentT('circle.notes.title'), items: items.map((i) => ({ id: i.id, label: words(i), text: words(i), type: g.noun })) };
+          }
+        }
+        return done;
       }
       // An app with no generic handler → a structured error, mirroring how callSkill
       // surfaces skill errors (never throw for this boundary case).

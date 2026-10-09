@@ -62,7 +62,7 @@ describe('the household\'s notes through a bot\'s door', () => {
     const as = (caller) => (atom, args) => agent.callSkill('household', op(atom), args, { caller });
     expect((await as(ANN)('add', { body: 'de wifi-code staat op de koelkast' })).ok).toBe(true);
     expect((await as(BOB)('add', { body: 'Bob is vegetariër' })).ok).toBe(true);
-    const bodies = async () => ((await as(BOB)('list', {}))?.result?.items ?? []).map((i) => i.body).sort();
+    const bodies = async () => ((await as(BOB)('list', {}))?.items ?? []).map((i) => i.label).sort();
     expect(await bodies()).toEqual(['Bob is vegetariër', 'de wifi-code staat op de koelkast']);
     const refused = await as(BOB)('remove', { id: 'wifi-code' });
     expect(refused).toMatchObject({ ok: false, code: 'forbidden' });

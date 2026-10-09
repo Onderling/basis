@@ -11,6 +11,7 @@
 
 import { renderA2A } from '@onderling/app-manifest';
 import { scopeCatalogueToRole } from './botOpMap.js';
+import { synthesizeGenericOps } from '../genericOpSynth.js';
 
 /** The bot's ops a screen never reaches, whatever token it holds: restoring an export, or pairing more screens. */
 export const BOT_SCREEN_NEVER = Object.freeze([
@@ -117,7 +118,10 @@ export function screenActsAs(users, { activeEntry } = {}) {
  */
 export function exposeDoorToScreens({ agent, catalogue, manifests, doorCall, users }) {
   const mapped = new Set([...screenColumnFor(catalogue, 'admin'), ...screenColumnFor(catalogue, 'member'), ...screenColumnFor(catalogue, 'observer'), ...BOT_SCREEN_NEVER]);
-  const defs = renderA2A(manifests, { callSkill: doorCall }, {
+  // the generic ops a noun's declaration brings ("declare a noun → get CRUD free") are ops of the manifest too: the same
+  // synthesis the catalogue merges, so a screen reaches a mapped generic op (household's notes) like any other
+  const withGeneric = manifests.map((m) => ({ ...m, operations: [...(m.operations ?? []), ...synthesizeGenericOps(m)] }));
+  const defs = renderA2A(withGeneric, { callSkill: doorCall }, {
     ctxFor: screenActsAs(users, { activeEntry: (id) => agent.surfaceTokenEntry(id) }), never: BOT_SCREEN_NEVER,
   }).filter((d) => mapped.has(d.id));
   return agent.exposeToPeers(defs);

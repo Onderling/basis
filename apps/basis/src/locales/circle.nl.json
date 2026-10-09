@@ -4912,6 +4912,11 @@
           "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
           "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
+        },
+        "household": {
+          "__generic__:household:add:note": "een weetje voor iedereen opschrijven (of zeg: onthoud dat de vuilnis dinsdag buiten gaat)",
+          "__generic__:household:list:note": "de weetjes van het huishouden (of zeg: welke weetjes zijn er)",
+          "__generic__:household:remove:note": "een weetje weghalen — je eigen, of als beheerder (of zeg: vergeet het weetje over de wifi)"
         }
       }
     },
@@ -4993,6 +4998,14 @@
     "day_unread": {
       "text": "Welke dag bedoel je met '{{day}}'? Zeg bijvoorbeeld 'zaterdag' of 'morgen'.",
       "doc": "The one-day overview (\"wie is er zaterdag\", /week zaterdag) could not read the day the person gave."
+    },
+    "welcome_notes": {
+      "text": "Weetjes voor iedereen: \"onthoud dat de wifi-code op de koelkast staat\"; \"welke weetjes zijn er\" laat ze zien, en ik gebruik ze als je iets vraagt.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
+    },
+    "welcome_notes_read": {
+      "text": "\"Welke weetjes zijn er\" laat zien wat het huishouden heeft opgeschreven.",
+      "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     }
   },
   "op": {
@@ -8448,7 +8461,8 @@
       "assistant-role": "Rol",
       "assistant-revoke": "Eruit",
       "removeFromList": "Weg",
-      "entryReminders": "Herinneringen"
+      "entryReminders": "Herinneringen",
+      "__generic__:household:remove:note": "Weg"
     },
     "household": "Het huishouden",
     "people": "Wie er in huis zijn",

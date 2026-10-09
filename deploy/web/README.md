@@ -35,7 +35,9 @@ defaults live — the repo deliberately holds none. The one that matters today i
 page is on a working transport without touching a setting (they can still change it in the app). The
 second is `VITE_SEEDED_CONTACT_CARD`: the contact the build ships with — the maker's own card, printed with
 `/share-my-contact` on any device of that account — so a fresh install has someone to write to (the
-alpha's feedback path). Both are in `example.env`. Publishing to a second host is a second file.
+alpha's feedback path). The third pair is `VITE_HOST_RETURN_TO` / `VITE_HOST_RETURN_LABEL`: the site the
+build belongs to, which gets one line at the top of the page linking back to it; without them there is no
+line. All are in `example.env`. Publishing to a second host is a second file.
 
 ## A derived app
 

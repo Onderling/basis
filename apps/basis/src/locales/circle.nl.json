@@ -7986,6 +7986,12 @@
       "doc": "Telegram runner: the \"schedule\" household list as a button label when the assistant asks which list."
     }
   },
+  "hostFrame": {
+    "back": {
+      "text": "← terug naar {{site}}",
+      "doc": "The one line at the top of a HOSTED web build, linking back to the site that hosts it (a build value; a self-built shell has no line). site = the site's name from the build, or its host."
+    }
+  },
   "update": {
     "available": {
       "text": "Er is een nieuwere versie van Basis ({{tag}}).",

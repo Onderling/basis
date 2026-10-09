@@ -213,6 +213,8 @@ import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
+import { renderHostFrame } from './hostFrameBar.js';
+import { hostFrameOf } from '../../src/v2/hostFrame.js';
 import { renderPersonCard } from './personCard.js';
 import { createPersonClock, webAppState } from '../../src/v2/personClock.js';
 import { personWeekOn, switchPersonWeek } from '../../src/v2/personWeekOverview.js';
@@ -1497,6 +1499,8 @@ const CIRCLE_RELAY_ENV     = import.meta.env?.VITE_CIRCLE_RELAY_URL ?? null;
 // The contact the app ships with (the alpha's feedback path: Frits himself, as a person in Contacten).
 // A build-time card beside the app-native relay; absent ⇒ no seeded contact (seededContact.js).
 const SEEDED_CONTACT_CARD  = import.meta.env?.VITE_SEEDED_CONTACT_CARD ?? null;
+// The site a hosted build belongs to — two build values; absent ⇒ no line at the top (hostFrame.js).
+const HOST_FRAME = hostFrameOf({ returnTo: import.meta.env?.VITE_HOST_RETURN_TO, label: import.meta.env?.VITE_HOST_RETURN_LABEL });
 const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
 // The two delivery settings, and the per-message state map they govern the display of.
 const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
@@ -8228,6 +8232,8 @@ async function boot() {
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
+  // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
+  renderHostFrame(document.body, { frame: HOST_FRAME, t });
   renderCircleLauncher(rootEl, { loading: true, t });
 
   // register the web-push service worker (root-scoped /sw.js). Best-effort:

@@ -47,6 +47,7 @@ function unb64u(s) {
 const te = new TextEncoder();
 const td = new TextDecoder();
 
+/** A Vault decorator that encrypts every value at rest (secretbox, `enc1:` format) over any backing vault; reads are strict. */
 export class VaultEncrypted extends Vault {
   #backing;
   #key;

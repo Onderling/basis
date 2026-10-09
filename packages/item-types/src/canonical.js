@@ -60,6 +60,7 @@ const BOARD_SCHEMA = Object.freeze({
   type: 'object', properties: { type: { const: 'board' }, text: { type: 'string', minLength: 1 } }, required: ['type', 'text'],
 });
 
+/** The canonical item types every store knows, by name → JSON schema. */
 export const CANONICAL_TYPES = Object.freeze({
   'task':               TASK_SCHEMA,
   'note':               NOTE_SCHEMA,
@@ -136,6 +137,7 @@ export const LEGACY_ALIASES = Object.freeze({
  */
 export const LISTS_TYPES = Object.freeze(['list', 'list-item', 'board']);
 
+/** Register every canonical type (with its legacy aliases) on a type registry. */
 export function registerCanonicalTypes(registry) {
   for (const [name, schema] of Object.entries(CANONICAL_TYPES)) {
     const aliases = LEGACY_ALIASES[name];

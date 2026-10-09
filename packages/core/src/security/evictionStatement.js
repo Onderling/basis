@@ -35,5 +35,5 @@ export function verifyEviction(statement, opts = {}) {
   return verifySpine(statement, { ...opts, expectedKind: EVICTION_KIND });
 }
 
-// Back-reference for call sites that pin the wire version; eviction rides the spine body version.
+/** The eviction statement's wire version — eviction rides the spine body version; kept for call sites that pin it. */
 export const EVICTION_STMT_VERSION = SPINE_STMT_VERSION;

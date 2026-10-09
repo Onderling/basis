@@ -400,4 +400,4 @@ platform-neutral and a Node backend needs the same encoding; `@onderling/react-n
 b64Decode(str)
 ```
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+Standard base64 → bytes (the inverse of `b64Encode`).

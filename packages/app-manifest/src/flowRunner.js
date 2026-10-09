@@ -55,6 +55,8 @@ function resolvePath(path, { flow, instance, transient }) {
 const isSecretDefault = (k) => k === 'secret';
 
 /**
+ * The flow runner: starts and steps flow instances through the waist, asks for declared params the bindings
+ * left open, and persists each instance without its secrets.
  * @param {object} deps
  * @param {(opId: string, args: object) => Promise<any>} deps.callSkill  bound to the owning app
  * @param {(instance: object) => Promise<void>|void} [deps.saveInstance] persistence seam —

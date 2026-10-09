@@ -26,6 +26,7 @@ const AT = /^at:([01]\d|2[0-3]):([0-5]\d)$/;
 const MAX_BEFORE_MINUTES = 7 * 24 * 60;
 
 /**
+ * Parse a reminder rule string; null when it is not one of the four kinds (or a `before` longer than a week).
  * @param {unknown} s
  * @returns {{kind: 'morning'|'evening-before'|'before'|'at', rule: string, minutes?: number, time?: string}|null}
  */
@@ -39,6 +40,7 @@ export function parseReminderRule(s) {
   return null;
 }
 
+/** Is `s` a valid reminder rule? */
 export const isReminderRule = (s) => parseReminderRule(s) !== null;
 
 /** Type → the field that is its moment. */

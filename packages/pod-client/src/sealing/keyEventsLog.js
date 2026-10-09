@@ -57,6 +57,12 @@ export const KEY_EVENT_KIND = 'group-key-event';
  * wraps as being of the same thing — which is exactly what it is for.
  */
 const KEY_ID_DOMAIN = new TextEncoder().encode('onderling/group-key-id/v1');
+
+/**
+ * The name of a group key: a domain-separated hash of it, so two keys minted for the same version can be told apart.
+ * @param {string} groupKey
+ * @returns {string|null}  null for an empty or non-string key
+ */
 export function keyIdOf(groupKey) {
   if (typeof groupKey !== 'string' || !groupKey) return null;
   const body = new TextEncoder().encode(groupKey);
@@ -118,6 +124,11 @@ export function collapseKeyEvents(events) {
   return out.sort((a, b) => a.version - b.version);
 }
 
+/**
+ * Build a key-event row for the log: the group key wrapped to each recipient at a version, named by its `keyId`.
+ * @param {{ groupId?: string, version?: number, groupKey: string, recipients: string[] }} o
+ * @returns {{ kind: string, groupId: string|null, version: number, keyId: string|null, members: any, recipients: any, sealed: any }}
+ */
 export function buildKeyEvent({ groupId, version = 1, groupKey, recipients } = {}) {
   const res = buildGroupKeyResource({ version, groupKey, recipients });
   return {

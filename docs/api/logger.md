@@ -11,7 +11,7 @@ README: [`packages/logger/README.md`](../../packages/logger/README.md) · Index:
 
 **Kind:** constant · **Import:** `REDACTED` from `'@onderling/logger'`
 
-_No JSDoc block in the source (recorded gap — see the coverage table)._
+The marker that stands in for an identifier-shaped value in a log field (see looksLikeIdentifier).
 
 ### `log`
 

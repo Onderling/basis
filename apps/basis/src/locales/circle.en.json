@@ -3772,6 +3772,14 @@
       "text": "\"{{item}}\" is on no list.",
       "doc": "A household bot's reply when a person names a chore or entry that is not there."
     },
+    "already_done": {
+      "text": "\"{{text}}\" is already ticked off.",
+      "doc": "A tap on a line someone already ticked (a button on an older list message): says so by the line's words, never its id."
+    },
+    "line_gone": {
+      "text": "That line is no longer on a list.",
+      "doc": "A tap on a line that was taken off since the list message was sent (a stale button): never shows the id."
+    },
     "which_one": {
       "text": "Which one do you mean: {{options}}?",
       "doc": "A household bot's question when a person's words fit several entries, chores or appointments (the choices, quoted)."
@@ -7915,6 +7923,10 @@
     "empty_list": {
       "text": "Nothing here yet.",
       "doc": "Telegram runner: a list reply with no items."
+    },
+    "refresh": {
+      "text": "Refresh",
+      "doc": "The button under a list message in a chat: sends the list again, read fresh (a list message goes stale once someone ticks a line elsewhere)."
     },
     "list_shopping": {
       "text": "shopping",

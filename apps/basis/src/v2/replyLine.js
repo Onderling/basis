@@ -112,7 +112,8 @@ export function replyFact(result, { opId, args = {} } = {}) {
       const key = id === 'addEvent' ? (result.duplicate ? 'circle.calendar.already_there' : 'circle.calendar.added')
         : id === 'cancelEvent' ? 'circle.calendar.cancelled'
           : `circle.calendar.rsvp_${RSVP[id]}`;
-      return { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: false } };
+      // a day without a time (local midnight — the whole day) is said without a time, as a chore's day is
+      return { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: 'auto' } };
     }
     default:
       return own;

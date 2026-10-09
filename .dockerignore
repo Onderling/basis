@@ -29,6 +29,9 @@ session-notes
 test-results
 test-results/**
 playwright-report
+# a browser run's output anywhere in the tree (apps/basis/test-results): not image content, and it changes every run
+**/test-results
+**/playwright-report
 .vercel
 **/*.log
 

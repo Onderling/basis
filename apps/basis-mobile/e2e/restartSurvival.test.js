@@ -18,7 +18,8 @@
 
 const { gotoChat } = require('./support/nav.js');
 
-describe('restart survival', () => {
+// SKIPPED (Detox survey 2026-10-09): this spec drives the classic CHAT SHELL through `gotoChat()` — the launcher's "← chat" affordance (`circle-to-chat`) was removed, so that surface is unreachable for a person (CircleLauncherScreen.js: "no chat shell to navigate to"). On development @ ed1a25ddc every test here timed out in `gotoChat` waiting for `chat-header-status`. Not an app bug. Port what is still worth pinning to the circle composer before un-skipping.
+describe.skip('restart survival', () => {
   it('relaunching the app lands on the same "Agents ready" screen', async () => {
     // First boot.  M2 — the circle launcher is the default screen, so
     // reveal the chat shell to assert on its boot status.  Disable sync

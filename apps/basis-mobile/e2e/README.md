@@ -37,6 +37,19 @@ npm run detox:test:attached
 | `slashRoundtrip.test.js` | #253 step 2 — /mine + list bubble with button |
 | `restartSurvival.test.js` | #249 vault + cache persistence on relaunch |
 
+## State of the suite (Detox survey, 2026-10-09, development @ ed1a25ddc, release APK, headless emulator)
+
+| Spec | State | Why |
+|---|---|---|
+| `walkFixes20261008` | ✅ 3/3 | the week's walk fixes |
+| `_hello` | ✅ | launch now with synchronization off, like the rest (a synchronized launch hung 180 s) |
+| `circleDefault` | ✅ 1, ⏭ 1 | the launcher is the default; the "← chat" test is skipped (affordance removed) |
+| `circleScreens` | ✅ 2/2 | rewritten: Availability lives under Me, its Save returns to Me |
+| `coldBoot` `logsPanel` `restartSurvival` `allWizards` `disputeWizard` `threadDrawer` `stateMorph` `multiThreadIsolation` `slashRoundtrip` | ⏭ skipped | they drive the classic CHAT SHELL via `gotoChat()`; the launcher's `circle-to-chat` is gone, so that surface is unreachable for a person. Port what is worth pinning to the circle composer before un-skipping. |
+
+Run: `npx detox test --configuration android.emu.release --reuse -- --no-watchman` (Watchman on this box fails
+"non-recoverable" now and then; Jest's own crawler is fine). Build with `:app:` tasks only (see the gotchas doc).
+
 ## What's NOT covered (D-2+, tracked in #224 Phase B)
 
 - State-morphing assertion (tap → row vanishes from origin bubble)

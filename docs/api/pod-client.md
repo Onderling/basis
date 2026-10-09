@@ -971,6 +971,46 @@ history entry with no retained `recipients` (legacy resources) is left untouched
 
 The log `kind` a key-event carries, so it is distinguishable from other membership-log entries.
 
+### `keyIdOf`
+
+**Kind:** function · **Import:** `keyIdOf` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+keyIdOf(groupKey)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `MAX_KEYS_PER_VERSION`
+
+**Kind:** constant · **Import:** `MAX_KEYS_PER_VERSION` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+The most a version may carry. Two honest admins colliding is TWO keys; three is a partition healing; more is
+a client minting keys to grow every member's chain, which is the one place this whole concern meets an
+adversary. Over the cap the extra events are refused — deny-wins, the same shape as a handle collision.
+
+### `collapseKeyEvents`
+
+**Kind:** function · **Import:** `collapseKeyEvents` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
+
+```js
+collapseKeyEvents(events)
+```
+
+Collapse a list of key-events for one circle into the events that must be kept.
+
+TWO rules, not one, because "same version" covers two different situations:
+
+  · **the same key, wrapped again** — a v1 re-sealed to one more recipient as the roster grows. One must
+    win, and it must be the wrap that reaches MORE people: a superset always serves everyone the subset
+    served, while "last read" can drop the wrap that added the newcomer on a device that read the two in the
+    other order. Ties break on the lower `sealed`, so every device picks the same one.
+  · **two different keys** — two admins rotating at once. Both are kept. The reader trials the whole chain
+    (`openAcrossKeyChain`), so content sealed under either opens; discarding one would lose it silently.
+
+Beyond `MAX_KEYS_PER_VERSION` distinct keys at one version, the extra ones are dropped in a stable order so
+every device drops the same ones.
+
 ### `buildKeyEvent`
 
 **Kind:** function · **Import:** `buildKeyEvent` from `'@onderling/pod-client'`, `'@onderling/pod-client/sealing'`
@@ -979,18 +1019,7 @@ The log `kind` a key-event carries, so it is distinguishable from other membersh
 buildKeyEvent({ groupId, version = 1, groupKey, recipients } = {})
 ```
 
-Build ONE key-event: the `version` group key wrapped multi-recipient to `recipients` (sealing public keys).
-Reuses `buildGroupKeyResource` for the wrap, then tags it as a log entry. Pure.
-
-**Parameters**
-
-- `o` `object`
-- `[o.groupId]` `string` — the circle the event belongs to (routes the fold).
-- `[o.version=1]` `number` — the key version this event establishes.
-- `o.groupKey` `string` — the group key (b64url) this event distributes.
-- `o.recipients` `string[]` — the then-current members' sealing PUBLIC keys.
-
-**Returns:** `{kind:string, groupId:string|null, version:number, members:number, recipients:string[], sealed:string}`
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ### `establishKeyEvent`
 

@@ -121,13 +121,20 @@ Project namespace for type IRIs.
 
 **Kind:** constant · **Import:** `CANONICAL_TYPES` from `'@onderling/item-types'`
 
-Map of canonical name → schema. Useful for `Object.entries(...)`
-iteration when building a fresh registry.
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
-Vocabulary refresh 2026-05-12: `offer` + `request` + `claim`
-replace the legacy `supply-offer` / `demand-offer` / `lend-request`
-trio. Old names persist as **aliases** (see `LEGACY_ALIASES` below)
-so already-written data + apps in transition keep validating.
+### `LISTS_TYPES`
+
+**Kind:** constant · **Import:** `LISTS_TYPES` from `'@onderling/item-types'`
+
+The composable lists' nouns, named once.
+
+They live in the circle's one store like everything else — a list entry and a task are siblings there,
+and that is the point of one store. What they are NOT is tasks: a listing that computes task status
+over "everything in the store" must skip them, or a shopping list and its entries show up among the
+chores. That is what happened the day lists moved onto the circle's own store, and it is a PROJECTION
+question, not a storage one — which types a given surface shows is that surface's decision, and this
+names the set so each surface can decide it out loud instead of guessing per type.
 
 ### `registerCanonicalTypes`
 
@@ -137,12 +144,7 @@ so already-written data + apps in transition keep validating.
 registerCanonicalTypes(registry)
 ```
 
-Register every canonical type on the supplied registry, including
-the legacy-name aliases.
-
-**Parameters**
-
-- `registry` `ReturnType<typeof import('./registry.js').createRegistry>`
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ## `src/embedsSchema.js`
 
@@ -171,17 +173,45 @@ unknown-type fallback.
 
 ## `src/noticeboardPost.js`
 
+### `NOTICEBOARD_POST_TYPES`
+
+**Kind:** constant · **Import:** `NOTICEBOARD_POST_TYPES` from `'@onderling/item-types'`
+
+The canonical types a noticeboard post can be — what the board shows and what the circle carries as a post.
+
+### `NOTICEBOARD_INTENTS`
+
+**Kind:** constant · **Import:** `NOTICEBOARD_INTENTS` from `'@onderling/item-types'`
+
+The BOARD's own vocabulary: the three words a person picks between when posting, and the three the
+badge on a post can say. Distinct from the canonical `{type, kind}` a post is STORED as — stoop
+translates one into the other on the way in (`STOOP_TYPE_MAPPING`), and `noticeboardIntentOf`
+translates back on the way out.
+
+It lives here, with the other board vocabulary, because both shells need it and neither may import
+an app. Each shell used to carry its own copy of the list AND its own copy of the reverse mapping.
+
+### `noticeboardIntentOf`
+
+**Kind:** function · **Import:** `noticeboardIntentOf` from `'@onderling/item-types'`
+
+```js
+noticeboardIntentOf(item)
+```
+
+Which intent a stored post shows as — always one of `NOTICEBOARD_INTENTS`, never a raw stored value.
+
+The shells' copies read `item.intent ?? item.kind ?? …`, so a post stored the canonical way handed
+the badge its KIND — and `borrow` is a kind, not an intent, so the board printed the untranslated
+locale key `CIRCLE.NOTICEBOARD.INTENT.BORROW` at every asker (walked on a phone, both shells).
+The two vocabularies are not interchangeable and this is the one place that converts between them;
+stoop's forward map and this reverse are pinned to each other by a round-trip test.
+
 ### `SYSTEM_STOOP_TYPES`
 
 **Kind:** constant · **Import:** `SYSTEM_STOOP_TYPES` from `'@onderling/item-types'`
 
-Stoop item types that are NOT user-facing noticeboard posts — the membership lifecycle + rules
-documents, and the circle chat lines.
-
-`circle-chat-message` earns its place here for the same reason the others do, but the symptom was
-louder: every line typed in a circle's Conversation also appeared on the Noticeboard — with a
-"Withdraw" action when it was yours — and, because a chat item carries its circle as
-`source.circleId` (a hint the circle-scope reader does not read), on EVERY circle's Noticeboard.
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ### `isNoticeboardPost`
 
@@ -192,6 +222,16 @@ isNoticeboardPost(item)
 ```
 
 True when `item` is a real noticeboard post (an ask/offer), not a system item.
+
+### `isNoticeboardPostType`
+
+**Kind:** function · **Import:** `isNoticeboardPostType` from `'@onderling/item-types'`
+
+```js
+isNoticeboardPostType(item)
+```
+
+Is this row a noticeboard POST (a canonical post type, not a system row)? Stricter than `isNoticeboardPost`, which only excludes system rows.
 
 ## `src/registry.js`
 
@@ -206,6 +246,132 @@ createRegistry()
 Create an independent registry instance. Most callers use the
 default canonical one (via the top-level `validate` etc.); apps
 that want a fresh registry for tests can call this.
+
+## `src/reminderRules.js`
+
+### `REMINDER_RULE_KINDS`
+
+**Kind:** constant · **Import:** `REMINDER_RULE_KINDS` from `'@onderling/item-types'`
+
+The four kinds.
+
+### `parseReminderRule`
+
+**Kind:** function · **Import:** `parseReminderRule` from `'@onderling/item-types'`
+
+```js
+parseReminderRule(s)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Parameters**
+
+- `s` `unknown`
+
+**Returns:** `{kind: 'morning'|'evening-before'|'before'|'at', rule: string, minutes?: number, time?: string}|null`
+
+### `isReminderRule`
+
+**Kind:** function · **Import:** `isReminderRule` from `'@onderling/item-types'`
+
+```js
+isReminderRule(s)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `TIME_ANCHORS`
+
+**Kind:** constant · **Import:** `TIME_ANCHORS` from `'@onderling/item-types'`
+
+Type → the field that is its moment.
+
+### `timeAnchorOf`
+
+**Kind:** function · **Import:** `timeAnchorOf` from `'@onderling/item-types'`
+
+```js
+timeAnchorOf(type)
+```
+
+The field that is this type's moment, or null when the type has none.
+
+### `ITEM_REMINDERS_SCHEMA`
+
+**Kind:** constant · **Import:** `ITEM_REMINDERS_SCHEMA` from `'@onderling/item-types'`
+
+The field an item with a moment carries for ITS reminders: the household's statement about the item (synced like any
+content field), set by whoever may edit the item. `replace` stands instead of the layers below it; `add` keeps them.
+A person's own reminders for an item are theirs and never live on the item.
+
+## `src/types/contact.js`
+
+### `CHANNELS`
+
+**Kind:** constant · **Import:** `CHANNELS` from `'@onderling/item-types'`
+
+The doors a person can be admitted by — the closed set, defined here and nowhere else. A hosting bot's user
+registry imports it; the contact row's `channel` is one of these.
+
+### `isChannel`
+
+**Kind:** function · **Import:** `isChannel` from `'@onderling/item-types'`
+
+```js
+isChannel(v)
+```
+
+@param {unknown} v @returns {boolean} whether `v` is one of `CHANNELS`
+
+### `channelOfWebid`
+
+**Kind:** function · **Import:** `channelOfWebid` from `'@onderling/item-types'`
+
+```js
+channelOfWebid(webid)
+```
+
+The door a door-shaped id names (`telegram:4242` → `telegram`), or null for any other id — a key, a WebID URL, a
+prefix outside `CHANNELS`, or a door with no uid behind it.
+
+**Parameters**
+
+- `webid` `unknown`
+
+**Returns:** `string|null`
+
+### `isKeylessContact`
+
+**Kind:** function · **Import:** `isKeylessContact` from `'@onderling/item-types'`
+
+```js
+isKeylessContact(row)
+```
+
+Whether a contact row is the keyless row: it names a door (a `channel`, or a door-shaped webid) and carries no key
+it can be sealed to or reached at — no `pubKey`, no person key, no peer address. Such a row cannot found a pair
+circle or receive a sealed share; readers that need a key refuse it. A row that names no door is never keyless by
+this test, key fields or not: in the mesh binding a contact's webid IS its key (a row added by webid alone).
+Pass `{ webid }` to ask about an id the book does not hold.
+
+**Parameters**
+
+- `row` `object|null|undefined`
+
+**Returns:** `boolean`
+
+### `KEYLESS_REFUSAL`
+
+**Kind:** constant · **Import:** `KEYLESS_REFUSAL` from `'@onderling/item-types'`
+
+The reason a reader that needs a key gives for a keyless row.
+
+### `KEYLESS_CONTACT_EXAMPLE`
+
+**Kind:** constant · **Import:** `KEYLESS_CONTACT_EXAMPLE` from `'@onderling/item-types'`
+
+The keyless row, as the type declares it — the fixture every reader of the book runs over.
 
 ## `src/types/inbox-item.js`
 

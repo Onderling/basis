@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
 import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { addBoxCard } from '../test/support/addBoxCard.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
@@ -48,7 +49,8 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     const next = async (said, from, re) => until(async () => (await said()).slice(from).find((x) => re.test(x)) ?? null, { timeout: 30_000, step: 500 });
 
     // Ann, the first, is the admin; she opens a cohort and makes Bert a code
-    await annSend('hallo', { admission: /\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1] });
+    await addBoxCard(ann, out);   // the box is a contact whose card says it is a bot: the app signs its /start
+    await annSend(`/start ${/\/start ([0-9a-f]{16}-[0-9a-f]{12})/.exec(out)[1]}`);
     expect(await until(async () => ((await annSaid()).length ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
     let seen = (await annSaid()).length;
     await annSend('/cohort 3 7');
@@ -60,7 +62,8 @@ test('a member\'s screen: the household\'s ops, no admin section, an add that la
     const code = /\/start (\S+)/.exec(invite)[1];
 
     // Bert comes in on that code: a member
-    await bertSend('hallo', { admission: code });
+    await addBoxCard(bert, out);
+    await bertSend(`/start ${code}`);
     expect(await until(async () => ((await bertSaid()).length ? true : null), { timeout: 30_000, step: 500 }), `Bert not admitted:\n${out.slice(-1200)}`).toBe(true);
     seen = (await bertSaid()).length;
     await bertSend('/scherm');   // a member gets the link

@@ -47,8 +47,9 @@ export function forgetHello(agent, peerAddress) {
 }
 
 export async function sendHello(agent, peerAddress, timeout = 15_000) {
-  // They acknowledged our key in this process: nothing to do.
-  if (ackSet(agent).has(peerAddress)) return;
+  // They acknowledged our key in this process AND we hold theirs: nothing to do. (Without their key — forgotten since —
+  // the hello is how we learn it again; an acknowledgement that lands after a forget must not stand in for it.)
+  if (ackSet(agent).has(peerAddress) && agent.security.getPeerKey(peerAddress)) return;
   // We already know THEIR key: tell them ours, without waiting — their answer marks them (`handleHello`), and a peer
   // that is away costs nothing here (the send that follows is sealed to the key we hold, as before).
   if (agent.security.getPeerKey(peerAddress)) {

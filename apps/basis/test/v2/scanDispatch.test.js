@@ -43,6 +43,13 @@ describe('every declared scan target has a painter in each shell', () => {
     expect(m).toMatch(/const scanOverlays = \(\n\s*<>\n\s*<QrScannerModal visible=\{joinScanOpen\}[^\n]*onResult=\{onScan\}/);
     expect(m).toMatch(/\{page\}\n\s*\{scanOverlays\}/);
   });
+  it("the scanner itself speaks the shared words: one 'unknown' key and one paste placeholder on both shells", () => {
+    const scanner = read('../../../basis-mobile/src/rn/QrScannerModal.js');
+    expect(scanner).toMatch(/t\('scan_qr\.scan_unknown'\)/);
+    expect(scanner).toMatch(/t\('circle\.scan\.paste_placeholder'\)/);
+    expect(scanner).not.toMatch(/chat\.scan_unknown/);
+    expect(SHELLS.web).toMatch(/t\('scan_qr\.scan_unknown'\)/);
+  });
   it("web: scanQr's seam is the paste prompt, through the route table", () => {
     expect(SHELLS.web).toMatch(/openQrScanner: \(\) => \{[^\n]*takeScannedText\(v\)/);
     expect(SHELLS.web).toMatch(/const r = routeScan\(text\);/);

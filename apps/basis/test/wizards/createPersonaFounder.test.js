@@ -143,13 +143,14 @@ describe('personaLabel — one persona label for both wizards on both shells', (
     expect(personaLabel({ id: 'default', name: 'Frits' }, t)).toBe('Frits (default persona)');
     expect(personaLabel({ id: 'buurt', name: 'Buurtmens' }, t)).toBe('Buurtmens');
   });
-  it('all four pickers use it — no picker builds the label by hand', async () => {
+  it('every persona picker uses it (the four wizards + both lens sheets) — none builds the label by hand', async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
     for (const rel of ['../../src/rn/wizards/createGroupWizardModal.js', '../../src/rn/wizards/joinGroupWizardModal.js',
-      '../../src/web/wizards/createGroupWizard.js', '../../src/web/wizards/joinGroupWizard.js']) {
+      '../../src/web/wizards/createGroupWizard.js', '../../src/web/wizards/joinGroupWizard.js',
+      '../../src/rn/ContactLensSheet.js', '../../web/v2/contactLensPanel.js']) {
       const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
-      expect(src, rel).toMatch(/personaLabel\(p, t\)/);
+      expect(src, rel).toMatch(/personaLabel\((p|x), (t|tr)\)/);
       expect(src, rel).not.toMatch(/default_suffix', \{ name: p\.name \}/);
     }
   });

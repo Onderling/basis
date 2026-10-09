@@ -23,7 +23,7 @@ COPY . .
 # so the image could not start) with links, and materialises the transitive workspace links. See CLAUDE.md.
 RUN pnpm install --filter "@onderling-app/companion-node..." \
  && node scripts/relink-workspace.mjs \
- && pnpm store prune || true
+ && (pnpm store prune || true)
 
 ENV NODE_ENV=production
 # Persistent identity vault (host keypair). Mount a volume here so the host's

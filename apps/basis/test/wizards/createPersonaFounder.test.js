@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  initialState, finalSubmit, withPersonas,
+  initialState, finalSubmit, withPersonas, founderPersonaName,
 } from '../../src/core/wizards/createGroupState.js';
 
 const created = { groupId: 'c-1', code: 'X', expiresAt: 1 };
@@ -103,3 +103,30 @@ describe('the release never holds the wizard', () => {
   });
 });
 
+
+/**
+ * Review read "Circle id 7c10225e229fcaab18b0c01d" and "Started as: default" (walk 2026-10-09) — an identifier and a
+ * persona id, neither of which ever meets a person. The id row is gone from both wizards; the default persona, which
+ * has no name of its own, reads as the person's default persona in their language.
+ */
+describe('Review speaks in names, not ids', () => {
+  const t = (k) => ({ 'circle.persona_default_name': 'Your default persona' }[k] ?? k);
+  it('the default persona without a name of its own is "Your default persona"', () => {
+    const s = initialState();
+    s.personas = [{ id: 'default', name: 'default' }];
+    expect(founderPersonaName(s, t)).toBe('Your default persona');
+    s.personas = [];
+    expect(founderPersonaName(s, t)).toBe('Your default persona');
+  });
+  it('a named persona keeps its name', () => {
+    const s = initialState(); s.persona = 'buurt'; s.personas = [{ id: 'buurt', name: 'Buurtmens' }];
+    expect(founderPersonaName(s, t)).toBe('Buurtmens');
+  });
+  it('neither wizard shows the circle id on Review', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+    expect(read('../../src/web/wizards/createGroupWizard.js')).not.toMatch(/review_id'\),\s*state\.groupId/);
+    expect(read('../../src/rn/wizards/createGroupWizardModal.js')).not.toMatch(/label: 'Circle id'/);
+  });
+});

@@ -450,8 +450,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   const dl = doc.createElement('dl');
   dl.className = 'cc-wizard-review';
   appendReview(dl, doc, t('circle.wizard.create.review_name'),           state.name);
-  appendReview(dl, doc, t('circle.wizard.create.review_id'),       state.groupId);
-  appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state) ?? t('circle.wizard.create.review_persona_minimal'));
+  appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal'));
   if (state.purpose) appendReview(dl, doc, t('circle.wizard.create.purpose'), state.purpose);
   if (state.tags)    appendReview(dl, doc, t('circle.wizard.create.review_tags'), state.tags);
   if (state.additionalAdmins) appendReview(dl, doc, t('circle.wizard.create.review_admins'), state.additionalAdmins);

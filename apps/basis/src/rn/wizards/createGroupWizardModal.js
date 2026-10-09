@@ -406,9 +406,8 @@ export default function CreateGroupWizardModal({
                 <Body title={t('circle.wizard.create.step_review')} intro={t('circle.wizard.create.step_review_intro')}>
                   <ReviewList items={[
                     { label: 'Name',        value: state.name },
-                    { label: 'Circle id',    value: state.groupId, monospace: true },
                     { label: t('circle.wizard.create.review_persona'),
-                      value: founderPersonaName(state) ?? t('circle.wizard.create.review_persona_minimal') },
+                      value: founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal') },
                     ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
                     ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
                     ...(rules.additionalAdmins ? [{ label: 'Extra admins', value: rules.additionalAdmins.join(', ') }] : []),

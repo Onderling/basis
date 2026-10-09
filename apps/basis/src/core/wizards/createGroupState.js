@@ -368,9 +368,13 @@ export function withPersonas(state, personas) {
 }
 
 /** The founding persona's name as the review shows it; `null` when the founder starts minimally. */
-export function founderPersonaName(state) {
+export function founderPersonaName(state, t = null) {
   if (!state?.persona) return null;
-  return (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? state.persona;
+  const name = (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? null;
+  // The default persona has no name of its own (its list entry falls back to its id): it reads as the person's
+  // default persona, in their language — a persona id never meets a person.
+  if ((!name || name === state.persona) && state.persona === DEFAULT_PERSONA && typeof t === 'function') return t('circle.persona_default_name');
+  return name ?? state.persona;
 }
 
 /* ─── Rules object + submit ────────────────────────────────── */

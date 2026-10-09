@@ -1,0 +1,13 @@
+# The step-0 walk's ONLY additions to the box's real role files (deploy/roles/assistant.yml + companion.yml):
+#  - host networking: the relay is a local process on this machine, and every party (the box, the companion, the
+#    browser) must name it the SAME way (ws://127.0.0.1:<port>) — as on a real box, where all of them name the one
+#    public relay. On a compose network the containers would know it by another name than the app does.
+#  - the Telegram Bot API root: a fake one the walk runs (the runner reads ONDERLING_TELEGRAM_API_ROOT; the role
+#    file does not pass it, because a real box talks to Telegram).
+services:
+  assistant:
+    network_mode: host
+    environment:
+      ONDERLING_TELEGRAM_API_ROOT: "${STEP0_TELEGRAM_API_ROOT:?the walk's fake Bot API}"
+  companion:
+    network_mode: host

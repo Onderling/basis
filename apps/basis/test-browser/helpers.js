@@ -33,11 +33,12 @@ export function circleSlug(name) {
  * Only the two REQUIRED fields are filled (Name, Circle id); every other step is accepted as it comes, so
  * this helper keeps working when a step gains a field and fails loudly if a step gains a required one.
  */
-export async function createCircleViaWizard(page, name) {
+export async function createCircleViaWizard(page, name, { handle = 'founder' } = {}) {
   await page.locator('.circle-launcher__new').click();
   await page.waitForTimeout(3500);
   const inputs = page.locator('.cc-wizard-input:visible');
   await inputs.nth(0).fill(name);
+  await fillFounderHandle(page, handle);
   // The id is NOT typed any more. It used to be `circleSlug(name)` filled into the wizard's second
   // field — which meant this helper MANUFACTURED the very collision the L49 walk went on to report:
   // two peers "independently" naming a circle the same thing shared an id because the harness had
@@ -59,6 +60,16 @@ export async function createCircleViaWizard(page, name) {
   const done = page.locator('button:visible').filter({ hasText: /^(done|klaar)$/i });
   if (await done.count()) { await done.first().click(); await page.waitForTimeout(1500); }
   return name;      // the id is the product's to derive; a caller matches on what a PERSON sees
+}
+
+/**
+ * The create wizard asks the founder's own name on its first step when their profile has none — and a fresh
+ * browser profile has none, so without this the first step's Next stays off and every walk that creates a
+ * circle stops there. Filled only when the field is shown; a profile that already has a handle is not asked.
+ */
+export async function fillFounderHandle(page, handle = 'founder') {
+  const field = page.locator('.cc-wizard-handle-input:visible');
+  if (await field.count()) { await field.first().fill(handle); await page.waitForTimeout(300); }
 }
 
 /** Boot the v2 app and open a circle chat composer for OUR circle, creating it if needed.

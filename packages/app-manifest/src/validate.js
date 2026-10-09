@@ -12,7 +12,7 @@
  */
 
 import { list as listCanonicalTypes, metadata as registryTypeMetadata } from '@onderling/item-types';
-import { isAtom, canonicalAtom, DOMAIN_VERB_KINDS } from './atoms.js';
+import { isAtom, canonicalAtom, DOMAIN_VERB_KINDS, NOUN_WRITERS } from './atoms.js';
 
 /**
  * L4 ≡ B — registry recognition. True when the shared `@onderling/item-types`
@@ -266,6 +266,9 @@ export function validateManifest(manifest, opts = {}) {
         if (!Array.isArray(decl.atoms)) {
           errors.push({ path: `${np}/atoms`, message: 'nouns[noun].atoms must be an array' });
           continue;
+        }
+        if (decl.writtenBy !== undefined && !NOUN_WRITERS.includes(decl.writtenBy)) {
+          errors.push({ path: `${np}/writtenBy`, message: `writtenBy must be one of ${NOUN_WRITERS.join(', ')} (got "${decl.writtenBy}")`, code: 'unknown-writer' });
         }
         decl.atoms.forEach((a, i) => {
           const ap = `${np}/atoms/${i}`;

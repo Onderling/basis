@@ -8649,5 +8649,31 @@
       "text": "Nothing on {{when}}.",
       "doc": "One day's read: no appointments and no chores that day."
     }
+  },
+  "notes": {
+    "need_text": {
+      "text": "What should I remember? For example: remember that the bins go out on Tuesday.",
+      "doc": "A note added with no words."
+    },
+    "added": {
+      "text": "Noted: {{text}}",
+      "doc": "A note was added (a weetje: something the household wants known)."
+    },
+    "title": {
+      "text": "Notes",
+      "doc": "The heading above the household's notes."
+    },
+    "not_there": {
+      "text": "I don't have that note{{item}}.",
+      "doc": "Removing a note that is not there; item is \" (words)\" or empty."
+    },
+    "not_yours": {
+      "text": "\"{{text}}\" was written by someone else — only they or an admin may remove it.",
+      "doc": "A member tried to remove a note they did not write."
+    },
+    "removed": {
+      "text": "Forgotten: {{text}}",
+      "doc": "A note was removed."
+    }
   }
 }

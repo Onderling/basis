@@ -8649,5 +8649,31 @@
       "text": "Op {{when}} staat er niets.",
       "doc": "One day's read: no appointments and no chores that day."
     }
+  },
+  "notes": {
+    "need_text": {
+      "text": "Wat moet ik onthouden? Bijvoorbeeld: onthoud dat de vuilnis dinsdag buiten gaat.",
+      "doc": "A note added with no words."
+    },
+    "added": {
+      "text": "Onthouden: {{text}}",
+      "doc": "A note was added (a weetje: something the household wants known)."
+    },
+    "title": {
+      "text": "Weetjes",
+      "doc": "The heading above the household's notes."
+    },
+    "not_there": {
+      "text": "Dat weetje ken ik niet{{item}}.",
+      "doc": "Removing a note that is not there; item is \" (words)\" or empty."
+    },
+    "not_yours": {
+      "text": "\"{{text}}\" heeft iemand anders opgeschreven — dat mag alleen die persoon of een beheerder weghalen.",
+      "doc": "A member tried to remove a note they did not write."
+    },
+    "removed": {
+      "text": "Vergeten: {{text}}",
+      "doc": "A note was removed."
+    }
   }
 }

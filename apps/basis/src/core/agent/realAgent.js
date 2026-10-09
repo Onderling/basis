@@ -261,7 +261,7 @@ import { botDoorChecks } from '../../v2/botRungs.js';                           
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
-import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
+import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 
 // Deterministic seed for the real household store.  Three open items across
@@ -4654,12 +4654,32 @@ export async function createRealHouseholdAgent(opts = {}) {
       // household is the only app with a capability entry today; `by`/`circleId` are sourced
       // exactly like the bespoke household path below (chatId.pubKey actor · resolved circle).
       if (g?.app === 'household' && householdService) {
-        return householdService.callCapability(g.atom, g.noun, args ?? {}, {
+        const capCtx = {
           circleId: resolveCircleId(args),
           // made by the PERSON at the door (as chores and appointments are, `actorOf`), never by the device: a note on a
           // household bot was "made by the bot" for everyone, and whose it was could not be judged
           by:       actorOf(ctx) ?? chatId?.pubKey,
-        });
+        };
+        // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
+        // the maker's or an admin's — anyone else is refused, and nothing changes.
+        if (isPeopleWritten(householdManifest, g.noun) && ['get', 'update', 'remove'].includes(g.atom)) {
+          const listed = await householdService.callCapability('list', g.noun, {}, capCtx);
+          const items = (listed?.result?.items ?? listed?.items ?? []).filter((i) => i && i.type === g.noun);
+          const ref = String(args?.id ?? '').trim();
+          const wordsOf = (i) => String(i.body ?? i.text ?? i.title ?? '');
+          let item = items.find((i) => i.id === ref) ?? null;
+          if (!item && ref) {
+            const { entry, among } = matchEntry(items, ref, wordsOf);
+            if (!entry && among?.length) return { ok: false, error: agentT('circle.lists.which_one', { options: choicesOf(among, wordsOf) }) };
+            item = entry ?? null;
+          }
+          if (!item) return { ok: false, code: 'not-found', error: agentT('circle.notes.not_there', { item: ref ? ` (${ref})` : '' }) };
+          if (g.atom !== 'get' && item.createdBy !== capCtx.by && doorRoles.get(actorOf(ctx)) !== 'admin') {
+            return { ok: false, code: 'forbidden', error: agentT('circle.notes.not_yours', { text: wordsOf(item) }) };
+          }
+          args = { ...(args ?? {}), id: item.id };
+        }
+        return householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx);
       }
       // An app with no generic handler → a structured error, mirroring how callSkill
       // surfaces skill errors (never throw for this boundary case).

@@ -101,17 +101,29 @@ export function buildIcsForEvents({
   return cal.toString();
 }
 
+const _isLocalMidnight = (iso) => { const d = new Date(iso); return !Number.isNaN(d.getTime()) && d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0; };
+/** The household's convention for a day without a time: start and end at local midnight, the end after the start. */
+const _isWholeDay = (e) => typeof e.endsAt === 'string' && _isLocalMidnight(e.startsAt) && _isLocalMidnight(e.endsAt)
+  && new Date(e.endsAt).getTime() > new Date(e.startsAt).getTime();
+const _localDate = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
 function _buildEventVevent(e, now) {
   const ve = new ICAL.Component('vevent');
   ve.updatePropertyWithValue('uid', e.id);
   ve.updatePropertyWithValue('summary', String(e.title ?? e.id).slice(0, 80));
   ve.updatePropertyWithValue('description', e.body ?? '');
   if (e.location) ve.updatePropertyWithValue('location', e.location);
-  ve.updatePropertyWithValue('dtstart', ICAL.Time.fromString(_toIcalDateTime(e.startsAt)));
-  const end = e.endsAt
-    ? _toIcalDateTime(e.endsAt)
-    : _toIcalDateTime(new Date(new Date(e.startsAt).getTime() + 3_600_000).toISOString());
-  ve.updatePropertyWithValue('dtend', ICAL.Time.fromString(end));
+  if (_isWholeDay(e)) {
+    // a whole day (local midnight to a later local midnight — a day said without a time): a DATE, not a midnight time
+    ve.updatePropertyWithValue('dtstart', ICAL.Time.fromDateString(_localDate(e.startsAt)));
+    ve.updatePropertyWithValue('dtend', ICAL.Time.fromDateString(_localDate(e.endsAt)));
+  } else {
+    ve.updatePropertyWithValue('dtstart', ICAL.Time.fromString(_toIcalDateTime(e.startsAt)));
+    const end = e.endsAt
+      ? _toIcalDateTime(e.endsAt)
+      : _toIcalDateTime(new Date(new Date(e.startsAt).getTime() + 3_600_000).toISOString());
+    ve.updatePropertyWithValue('dtend', ICAL.Time.fromString(end));
+  }
   ve.updatePropertyWithValue('dtstamp', ICAL.Time.fromString(_toIcalDateTime(new Date(now).toISOString())));
   if (e.state === 'cancelled') ve.updatePropertyWithValue('status', 'CANCELLED');
   if (e.organiser) ve.updatePropertyWithValue('organizer', `mailto:${e.organiser}`);

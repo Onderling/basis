@@ -505,6 +505,10 @@
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "persona_default_name": {
+    "text": "Je standaardpersona",
+    "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
+  },
   "membercard_close": {
     "text": "Sluiten",
     "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
@@ -7341,6 +7345,10 @@
           "text": "Alleen wat deze persona in deze kring deelt, zien de mensen die meedoen — niets wat je niet zelf hebt ingesteld. Later aanpassen kan bij Mij → persona's.",
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
+      },
+      "your_name": {
+        "text": "Jouw naam in deze kring",
+        "doc": "The founder's handle field in the create wizard, asked when their profile has none — directly under the circle's own name field, so it names whose name it is."
       },
       "review_persona": {
         "text": "Gestart als",

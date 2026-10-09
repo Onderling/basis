@@ -9,6 +9,7 @@
  */
 import { CIRCLE_STORAGE_POSTURE_NAMES, DEFAULT_CIRCLE_STORAGE_POSTURE } from '@onderling/pod-routing';
 import { deriveCircleId } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 
 // 5.5a — Step 3 captures the structured v2 rules doc instead of a
@@ -30,9 +31,15 @@ import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling'
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 // The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
-import { loadPersonas } from './joinGroupState.js';
+import { loadPersonas, loadPriorHandles, handleSuggestions, isValidHandle, personaLabel } from './joinGroupState.js';
 import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-export { loadPersonas };
+export { loadPersonas, isValidHandle, personaLabel };
+
+// How long the founder's release may take after the create has answered — it runs after the wizard, never in it.
+// Parameter register (#36), device-scoped, internal.
+const RELEASE_TIMEOUT_MS = param({ key: 'createWizard.releaseTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
+// The circle's policy is a LOCAL write after the create; bounded so a stuck store cannot hold the wizard open.
+export const POLICY_WRITE_BOUND_MS = param({ key: 'createWizard.policyWriteBoundMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3_000 });
 
 /* ─── Policy catalogues ───────────────────────────────────────── */
 
@@ -258,6 +265,11 @@ export function initialState() {
     step: 1,                          // 1..5
     // Step 1 — identity & purpose
     name:                  '',
+    // The FOUNDER's handle — asked only when their profile has none (`loadFounderHandle`): a founder without one
+    // reached every member as `peer-xxxxxx` (walk, 2026-10-08). The join wizard's field, validation and suggestions.
+    needsHandle:           false,
+    handle:                '',
+    handleSuggestions:     [],
     groupId:               '',
     purpose:               '',
     tags:                  '',
@@ -361,9 +373,32 @@ export function withPersonas(state, personas) {
 }
 
 /** The founding persona's name as the review shows it; `null` when the founder starts minimally. */
-export function founderPersonaName(state) {
+/**
+ * Does the founder still need a handle? Only when their profile has none — then the identity step asks for one, with the
+ * join wizard's suggestions (their own prior handles first). Pure state out; an unreadable profile asks nothing.
+ * @returns {Promise<{needsHandle: boolean, handleSuggestions: string[]}>}
+ */
+export async function loadFounderHandle({ callSkill } = {}) {
+  if (typeof callSkill !== 'function') return { needsHandle: false, handleSuggestions: [] };
+  let entry = null;
+  try { entry = (await callSkill('stoop', 'getMyProfile', {}))?.entry ?? null; } catch { return { needsHandle: false, handleSuggestions: [] }; }
+  if (!entry || (typeof entry.handle === 'string' && entry.handle.trim())) return { needsHandle: false, handleSuggestions: [] };
+  const prior = await loadPriorHandles({ callSkill });
+  return { needsHandle: true, handleSuggestions: handleSuggestions(prior, entry.displayName ?? '') };
+}
+
+/** Can the identity step be left? A name, a valid id, and — when the founder needs one — a valid handle. */
+export function identityComplete(state) {
+  if (!state?.name?.trim() || !isValidSlug(state.groupId)) return false;
+  return !state.needsHandle || isValidHandle(String(state.handle ?? '').trim());
+}
+
+export function founderPersonaName(state, t = null) {
   if (!state?.persona) return null;
-  return (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? state.persona;
+  const p = (state.personas ?? []).find((x) => x.id === state.persona) ?? { id: state.persona };
+  // The one persona label both wizards use (`personaLabel`) — a persona id never meets a person.
+  if (typeof t === 'function') return personaLabel(p, t);
+  return p.name ?? state.persona;
 }
 
 /* ─── Rules object + submit ────────────────────────────────── */
@@ -486,8 +521,13 @@ export function encodeInviteUri(payload) {
  * On success: caller can post-process the result (the original web
  * wizard adds adminPeerAddr + rules into the result before stashing as
  * successResult; mobile may do the same in its own wrapper).
+ *
+ * It returns on the CREATE's answer. The founder's release runs after, bounded by `releaseTimeoutMs`, and its
+ * outcome is `released` (a Promise<boolean>, also written to `result.releaseShared` when it settles) — never part
+ * of the wizard's wait: a release to an unreachable agent once held "Creating circle…" for minutes over a circle
+ * that already existed (walk, 2026-10-09).
  */
-export async function finalSubmit({ state, callSkill, shareRelease = null }) {
+export async function finalSubmit({ state, callSkill, shareRelease = null, releaseTimeoutMs = RELEASE_TIMEOUT_MS }) {
   state.submitting  = true;
   state.submitError = null;
   try {
@@ -509,14 +549,39 @@ export async function finalSubmit({ state, callSkill, shareRelease = null }) {
     // the next Mij share carries it. No seam (the programmatic creates: the help circle, the pair circles) or
     // "start minimally" means nothing is released, exactly as before this step existed.
     result.releaseShared = false;
+    let released = Promise.resolve(false);
     if (typeof shareRelease === 'function' && typeof state.persona === 'string' && state.persona) {
-      try { await shareRelease(result.groupId, state.persona); result.releaseShared = true; }
-      catch { result.releaseShared = false; }
+      const persona = state.persona;
+      released = withinMs(Promise.resolve().then(() => shareRelease(result.groupId, persona)), releaseTimeoutMs)
+        .then(() => { result.releaseShared = true; return true; })
+        .catch((err) => {
+          if (typeof console !== 'undefined') console.warn(`[create] the founder's release did not land (the next Mij share carries it): ${err?.message ?? err}`);
+          return false;
+        });
     }
-    return { result, state };
+    // The founder's handle, when the identity step asked for one: set on their profile, which tells every roster
+    // they are on — this new circle included. After the create, bounded; `named` is its outcome.
+    let named = Promise.resolve(false);
+    const handle = String(state.handle ?? '').trim();
+    if (state.needsHandle && isValidHandle(handle)) {
+      named = withinMs(Promise.resolve().then(() => callSkill('stoop', 'setMyHandle', { handle })), releaseTimeoutMs)
+        .then((r) => !r?.error)
+        .catch((err) => {
+          if (typeof console !== 'undefined') console.warn(`[create] the founder's handle was not set (Me → handle sets it): ${err?.message ?? err}`);
+          return false;
+        });
+    }
+    return { result, state, released, named };
   } catch (err) {
     state.submitError = err?.message ?? String(err);
     state.submitting  = false;
-    return { state };
+    return { state, released: Promise.resolve(false), named: Promise.resolve(false) };
   }
+}
+
+/** Settle `p`, or reject once `ms` have passed — whichever comes first. The wizards' bound on post-create work. */
+export function withinMs(p, ms) {
+  let timer = null;
+  const bound = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`no answer within ${ms} ms`)), ms); });
+  return Promise.race([p, bound]).finally(() => clearTimeout(timer));
 }

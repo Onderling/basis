@@ -505,6 +505,10 @@
     "text": "← circles",
     "doc": "Back link from a circle detail view to the launcher."
   },
+  "persona_default_name": {
+    "text": "Your default persona",
+    "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
+  },
   "membercard_close": {
     "text": "Close",
     "doc": "Closes the member card (a sheet over the Members tab) — you stay where you were, so it does not say where it goes."
@@ -7341,6 +7345,10 @@
           "text": "Only what this persona discloses in this circle is shared with the people who join — nothing you have not set. Adjust later under Me → personas.",
           "doc": "Create wizard — what founding as a persona shares. Says 'discloses', never 'is': one identity runs, the persona is a lens (ledger L123)."
         }
+      },
+      "your_name": {
+        "text": "Your name in this circle",
+        "doc": "The founder's handle field in the create wizard, asked when their profile has none — directly under the circle's own name field, so it names whose name it is."
       },
       "review_persona": {
         "text": "Started as",

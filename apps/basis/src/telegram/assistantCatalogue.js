@@ -39,12 +39,17 @@ export function composeAssistantCatalogue({ apps, householdManifest, slim = fals
   // The door's own ops (the person's memory mode, their language) come whatever the app list says: they are about
   // the conversation, not an app.
   const doorOwn = withoutDoorOps ? [] : DOOR_MANIFESTS;
-  const inScope = [...ordered.filter((m) => list.includes(m.app)), ...doorOwn];
+  // A household bot (`slim`) takes household's NOTE ops only — its people-written noun's generic verbs, named on the
+  // bot's map — never household's item or list reads: its manifest comes in with no ops of its own, and the map scope
+  // below keeps just the generic ops it names.
+  const notesOnly = slim && !list.includes('household')
+    ? all.filter((m) => m.app === 'household').map((m) => ({ ...m, operations: [] })) : [];
+  const inScope = [...ordered.filter((m) => list.includes(m.app)), ...notesOnly, ...doorOwn];
   // A household bot (`slim`) narrows each app to the bot's map BEFORE the merge: a command is prefixed only when two
   // ops the bot offers share it, never for an op it drops (the tasks app's own `/invite` beside the door's).
   const merged = (slim ? inScope.map((m) => ({ ...m, operations: (m.operations ?? []).filter((op) => botOffers(m.app, op, null)) })) : inScope)
     .map((manifest) => ({ manifest }));
-  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...doorOwn.map((m) => m.app)]);
+  const scoped = scopeCatalogueToApps(mergeManifests(merged), [...list, ...notesOnly.map((m) => m.app), ...doorOwn.map((m) => m.app)]);
   // A household bot (`slim`): exactly the bot's map (`botOpMap.js`) — nothing else of the apps is composed.
   const catalogue = slim ? scopeCatalogueToRole(scoped, null) : scoped;
   const manifestsByOrigin = Object.fromEntries(inScope.map((m) => [m.app, m]));

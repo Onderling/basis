@@ -1523,7 +1523,7 @@ export const stoopManifest = {
       id:   'addContactFromQr', verb: 'add',
       writes: { scope: 'person' },
       params: [
-        { name: 'payload', kind: 'object', required: true },
+        { name: 'payload', kind: 'string', required: true },   // the card as scanned or pasted (`onderling-contact://…`): every caller passes a string; the skill refuses anything else
         // Which of your personas this contact is added through — what they see of you. Optional: absent
         // means "not recorded", which is a different thing from "the default", and nothing may read it as one.
         { name: 'persona', kind: 'string', required: false },
@@ -2161,7 +2161,7 @@ export const stoopManifest = {
       kind:  'ceremony',
       labelKey: 'circle.contacts.add_sheet.title',
       needs: [
-        { name: 'payload',      kind: 'object', required: true },
+        { name: 'payload',      kind: 'string', required: true },
         { name: 'persona',      kind: 'string', required: true },
         { name: 'revealPreset', kind: 'enum',   of: ['handle', 'profile', 'full'], required: true },
       ],

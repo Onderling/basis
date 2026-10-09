@@ -869,13 +869,14 @@ export const basisManifest = {
    * Me — the two things a person does with someone in the room, at the top of their own page (2026-10-09): show their
    * card, or take someone else's code. Declared HERE so both shells paint them from the declaration (`meActions` →
    * renderWeb → `meActionsFor`), never because a screen file lists them.
-   *   share-card — the existing Share-my-contact view (the QR, the code, the link).
-   *   scan       — ONE scanner (web: the paste prompt), routed by what it reads (`scanRoute.js`: each kind to its
-   *                declared op or flow).
+   *   share-contact — the existing Share-my-contact view (the QR, the code, the link).
+   *   scan          — the scanQr op: ONE scanner (web: the paste prompt), routed by what it reads (`scanRoute.js`: each
+   *                   kind to its declared op or flow).
    */
   meActions: [
-    { id: 'share-card', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
-    { id: 'scan',       labelKey: 'circle.profile.scan',          target: { kind: 'nav', to: 'scan' } },
+    { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
+    // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
+    { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
   ],
 
   /**

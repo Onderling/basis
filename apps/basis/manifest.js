@@ -855,6 +855,9 @@ export const basisManifest = {
    * Ids + locale keys preserved EXACTLY (screens/circles/contacten/mij ·
    * circle.tab.*), so behaviour is unchanged.
    */
+  // THE RULE for every nav-chrome row (tabs · actions · meActions): `nav` is for a VIEW no op backs (a screen, a list,
+  // back); an act an op performs targets the OP — never a nav row with the same meaning. That is what makes a button, a
+  // slash command and a chat line one door (strict validation refuses a nav `to` that names an op: `nav-shadows-op`).
   tabs: [
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
     { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },

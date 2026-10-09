@@ -78,7 +78,8 @@ does NOT come back — this has cost multiple sessions.
    recur. (`circle.*` locale is now one shared source `apps/basis/src/locales/`; do the same for the rest.)
 4. **The manifest is the source of truth for surfaces.** Add an op/surface to `manifest.js`, never a
    per-shell switch statement. After any manifest change, regenerate + commit the coverage snapshot
-   (`npm run coverage` in `apps/basis` → `docs/surface-coverage.md`).
+   (`npm run coverage` in `apps/basis` → `docs/surface-coverage.md`). A GUI button, a tab and a slash command for the
+   same act target the same op; a nav target is only for a view that no op backs.
 5. **Three-layer dependency invariant:** `apps/` → `packages/{substrates}` → `packages/core` (the **kernel** —
    a lean set of ports + kernel logic). Concrete adapters live *outside* the kernel (`@onderling/transports`,
    `@onderling/pod-client`, `@onderling/vault`); nothing in the kernel depends *up* on an adapter. The dev-facing

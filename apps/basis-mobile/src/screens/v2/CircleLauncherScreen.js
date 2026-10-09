@@ -167,6 +167,7 @@ import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
+import { useRelayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
 // `callSkill('basis', …)` into an agent that had never heard of the app. Same table, mounted where the
@@ -639,6 +640,11 @@ export default function CircleLauncherScreen({
     }
     return null;
   }, [bundle, loadCircleTransport]);
+  // The relay question (there is no default relay): asked by an invite when this device knows none, saved through
+  // the same set-relay path the settings use.
+  const { askRelayIfNone, relayQuestionModal } = useRelayQuestion(
+    useCallback((url) => onCircleControl('set-relay', { url }), [onCircleControl]),
+  );
   // the contact (bot/peer) whose DM thread is open under the Contacten tab.
   const [contactThread, setContactThread] = useState(null);
   // WHAT IS NEW IN CONTACTEN (2026-09-21, web parity): the seen-marks on this device (AsyncStorage), the unread map
@@ -1642,6 +1648,7 @@ export default function CircleLauncherScreen({
   const shareNknAddress = bundle?.agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false;
 
   const openCircleInvite = useCallback(async (circleId) => {
+    await askRelayIfNone();   // an invite without a relay gives the person joining none either
     let r;
     try {
       let pol = {};
@@ -1669,7 +1676,7 @@ export default function CircleLauncherScreen({
       });
     } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(r || {}) });
-  }, [bundle, policyStore, shareNknAddress]);
+  }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
 
   if (view === 'screens') {
     // α.3 — Screens primary tab.  Two sub-modes: 'picker' (CRUD list)
@@ -2054,6 +2061,7 @@ export default function CircleLauncherScreen({
   }
   if (selected) {
     return (
+      <>
       <CircleDetail
         circle={selected}
         deliveryStateMap={deliveryStateMap}
@@ -2160,6 +2168,8 @@ export default function CircleLauncherScreen({
         onLists={() => setView('lists')}
         onShare={() => { loadShareContacts(); setView('share'); }}
       />
+      {relayQuestionModal}
+      </>
     );
   }
 
@@ -2310,6 +2320,7 @@ export default function CircleLauncherScreen({
             }}
           />
         ) : null}
+        {relayQuestionModal}
         {/* OBJ-2 — invite QR for a circle (admin shows it; another device scans). */}
         <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
           <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
@@ -5713,7 +5724,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   // P1.7 — the conversation filter strip. Quiet by default; the strip warms when a filter is active so
   // a narrowed conversation never reads as a missing one (web parity).
   filterStrip:      { paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, gap: 4 },
-  filterStripActive:{ backgroundColor: theme.color.surface2 ?? theme.color.card, borderRadius: theme.radius.sm },
+  filterStripActive:{ backgroundColor: theme.color.paper2, borderRadius: theme.radius.sm },
   filterRow:        { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   filterChip:       { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },
   filterChipOn:     { backgroundColor: theme.color.card, borderColor: theme.color.ink },
@@ -5824,8 +5835,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   ownProfileTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 4 },
   // Nearby visibility banner (step E). The alert variant is for the ONE case that matters: the device is
   // announcing itself after being asked not to, so it must not look like the ordinary states.
-  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.surfaceSoft ?? theme.color.surface, borderWidth: 1, borderColor: theme.color.line },
-  nearbyBannerAlert: { borderColor: theme.color.warn ?? theme.color.ink, borderWidth: 2 },
+  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.paper2, borderWidth: 1, borderColor: theme.color.line },
+  nearbyBannerAlert: { borderColor: theme.color.danger, borderWidth: 2 },
   nearbyBannerTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 2 },
   nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   nearbyAsks:        { marginTop: 12, paddingHorizontal: 2 },

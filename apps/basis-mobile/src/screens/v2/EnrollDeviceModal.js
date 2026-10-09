@@ -14,12 +14,13 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
 import { stashEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { useTheme } from './themeContext.js';
+import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
-export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
+export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeOffer = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
@@ -61,8 +62,12 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
       .then((r) => setInst(r))
       .catch(() => { setInst(null); onClose?.(); });
   };
-  const showOffer = () => {
-    Promise.resolve(callSkill('household', 'buildEnrollOffer', {}))
+  const showOffer = async () => {
+    // The new device finds this one over the relay the offer names (web parity — circleApp passes its live relay;
+    // this passed none, so a phone's offer carried no relay at all). With none known, the relay question asks first.
+    try { await beforeOffer?.(); } catch { /* the question is a convenience; the offer still shows */ }
+    const relayUrl = await currentRelayUrl();
+    Promise.resolve(callSkill('household', 'buildEnrollOffer', relayUrl ? { relayUrl } : {}))
       .then((r) => setOfferView(r?.ok && r.uri ? { uri: r.uri } : { error: true }))
       .catch(() => setOfferView({ error: true }));
   };

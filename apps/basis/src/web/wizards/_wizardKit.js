@@ -190,3 +190,33 @@ export function mkSubmitting(body, doc, flag, text = 'Submitting…') {
   s.textContent = text;
   body.appendChild(s);
 }
+
+/**
+ * A person's handle in a circle — the ONE field both wizards ask it with: joining (the handle you show there) and
+ * creating (the founder's, when their profile has none). The input keeps focus while typing (`onInput`, no rerender);
+ * a suggestion chip sets the value (`onPick`, the caller rerenders).
+ */
+export function mkHandleField(body, doc, { t, value = '', suggestions = [], onInput, onPick }) {
+  const input = doc.createElement('input');
+  input.type = 'text';
+  input.className = 'cc-wizard-handle-input';
+  input.value = value;
+  input.placeholder = t('circle.join.wizard.handle.placeholder');
+  input.setAttribute('aria-label', t('circle.join.wizard.handle.label'));
+  input.addEventListener('input', () => onInput?.(input.value.trim()));
+  body.appendChild(input);
+  if (!suggestions.length) return input;
+  const row = doc.createElement('div');
+  row.className = 'cc-wizard-suggestions';
+  for (const s of suggestions) {
+    const chip = doc.createElement('button');
+    chip.type = 'button';
+    chip.className = 'cc-wizard-suggestion';
+    chip.textContent = s;
+    chip.addEventListener('click', () => onPick?.(s));
+    row.appendChild(chip);
+  }
+  body.appendChild(row);
+  return input;
+}
+

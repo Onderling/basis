@@ -31,9 +31,9 @@ import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling'
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 // The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
-import { loadPersonas } from './joinGroupState.js';
+import { loadPersonas, loadPriorHandles, handleSuggestions, isValidHandle } from './joinGroupState.js';
 import { DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-export { loadPersonas };
+export { loadPersonas, isValidHandle };
 
 // How long the founder's release may take after the create has answered — it runs after the wizard, never in it.
 // Parameter register (#36), device-scoped, internal.
@@ -265,6 +265,11 @@ export function initialState() {
     step: 1,                          // 1..5
     // Step 1 — identity & purpose
     name:                  '',
+    // The FOUNDER's handle — asked only when their profile has none (`loadFounderHandle`): a founder without one
+    // reached every member as `peer-xxxxxx` (walk, 2026-10-08). The join wizard's field, validation and suggestions.
+    needsHandle:           false,
+    handle:                '',
+    handleSuggestions:     [],
     groupId:               '',
     purpose:               '',
     tags:                  '',
@@ -368,6 +373,26 @@ export function withPersonas(state, personas) {
 }
 
 /** The founding persona's name as the review shows it; `null` when the founder starts minimally. */
+/**
+ * Does the founder still need a handle? Only when their profile has none — then the identity step asks for one, with the
+ * join wizard's suggestions (their own prior handles first). Pure state out; an unreadable profile asks nothing.
+ * @returns {Promise<{needsHandle: boolean, handleSuggestions: string[]}>}
+ */
+export async function loadFounderHandle({ callSkill } = {}) {
+  if (typeof callSkill !== 'function') return { needsHandle: false, handleSuggestions: [] };
+  let entry = null;
+  try { entry = (await callSkill('stoop', 'getMyProfile', {}))?.entry ?? null; } catch { return { needsHandle: false, handleSuggestions: [] }; }
+  if (!entry || (typeof entry.handle === 'string' && entry.handle.trim())) return { needsHandle: false, handleSuggestions: [] };
+  const prior = await loadPriorHandles({ callSkill });
+  return { needsHandle: true, handleSuggestions: handleSuggestions(prior, entry.displayName ?? '') };
+}
+
+/** Can the identity step be left? A name, a valid id, and — when the founder needs one — a valid handle. */
+export function identityComplete(state) {
+  if (!state?.name?.trim() || !isValidSlug(state.groupId)) return false;
+  return !state.needsHandle || isValidHandle(String(state.handle ?? '').trim());
+}
+
 export function founderPersonaName(state, t = null) {
   if (!state?.persona) return null;
   const name = (state.personas ?? []).find((p) => p.id === state.persona)?.name ?? null;
@@ -535,11 +560,23 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
           return false;
         });
     }
-    return { result, state, released };
+    // The founder's handle, when the identity step asked for one: set on their profile, which tells every roster
+    // they are on — this new circle included. After the create, bounded; `named` is its outcome.
+    let named = Promise.resolve(false);
+    const handle = String(state.handle ?? '').trim();
+    if (state.needsHandle && isValidHandle(handle)) {
+      named = withinMs(Promise.resolve().then(() => callSkill('stoop', 'setMyHandle', { handle })), releaseTimeoutMs)
+        .then((r) => !r?.error)
+        .catch((err) => {
+          if (typeof console !== 'undefined') console.warn(`[create] the founder's handle was not set (Me → handle sets it): ${err?.message ?? err}`);
+          return false;
+        });
+    }
+    return { result, state, released, named };
   } catch (err) {
     state.submitError = err?.message ?? String(err);
     state.submitting  = false;
-    return { state, released: Promise.resolve(false) };
+    return { state, released: Promise.resolve(false), named: Promise.resolve(false) };
   }
 }
 

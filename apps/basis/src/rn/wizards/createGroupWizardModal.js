@@ -18,7 +18,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
   KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
-  initialState, isValidSlug, labelOf,
+  initialState, labelOf,
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl, withinMs, POLICY_WRITE_BOUND_MS,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
@@ -29,6 +29,8 @@ import {
   loadPersonas, withPersonas, founderPersonaName,
   // The circle's id comes from its founder (web parity, L126).
   resolveFounderKey, newFounderCircleId,
+  // The founder's handle, asked only when their profile has none (the join wizard's field and checks).
+  loadFounderHandle, identityComplete,
 } from '../../core/wizards/createGroupState.js';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
@@ -38,7 +40,7 @@ import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 
 import {
-  Steps, Body, Field, Textarea, RadioGroup, Checkbox,
+  Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField,
   Actions, ErrorBanner, Submitting, ReviewList, Warn,
 } from './_kit.js';
 import { wizardPalette } from './_palette.js';
@@ -78,6 +80,12 @@ export default function CreateGroupWizardModal({
     }).catch(() => {});
     return () => { active = false; };
   }, [callSkill]);   // not `getMyPeerAddr`: the shells pass an inline arrow, new on every render — read once is the point
+  // Does the founder need a handle? Read once on open; a founder without one reached every member as `peer-xxxxxx`.
+  useEffect(() => {
+    let active = true;
+    loadFounderHandle({ callSkill }).then((r) => { if (active) setState((s) => ({ ...s, ...r })); }).catch(() => {});
+    return () => { active = false; };
+  }, [callSkill]);
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
   const updateName = useCallback((name) => setState((s) => ({ ...s, name })), []);
 
@@ -138,7 +146,7 @@ export default function CreateGroupWizardModal({
     if (result) onClose?.();
   }, [state, callSkill, onDispatched, onClose, persistPolicy, shareFounderRelease]);
 
-  const canAdvance1 = state.name.trim().length > 0 && isValidSlug(state.groupId);
+  const canAdvance1 = identityComplete(state);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -192,6 +200,14 @@ export default function CreateGroupWizardModal({
                   onChangeText={updateName}
                   placeholder="e.g. Onze Circle"
                 />
+                {state.needsHandle ? (
+                  <HandleField
+                    t={t}
+                    value={state.handle}
+                    onChange={(v) => setState((s) => ({ ...s, handle: v }))}
+                    suggestions={state.handleSuggestions}
+                  />
+                ) : null}
                 {state.personas.length > 0 && (
                   <>
                     <RadioGroup

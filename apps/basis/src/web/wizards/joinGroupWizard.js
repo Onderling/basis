@@ -55,6 +55,7 @@ import {
   REVEAL_PRESETS, isJoinDirty } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
+import { mkHandleField } from './_wizardKit.js';   // the one handle field the join and create wizards share
 
 /**
  * Wizard renderer for /join-group.  Wired via openPagePanel's
@@ -355,34 +356,16 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
   blurb.textContent = t('circle.join.wizard.handle.intro');
   wrap.appendChild(blurb);
 
-  const input = doc.createElement('input');
-  input.type = 'text';
-  input.className = 'cc-wizard-handle-input';
-  input.value = state.handle;
-  input.placeholder = t('circle.join.wizard.handle.placeholder');
-  input.addEventListener('input', () => {
-    state.handle = input.value.trim();
-    // Don't re-render on every keystroke to preserve focus + caret;
-    // only refresh the submit button's disabled state.
-    const submitBtn = container.querySelector('.cc-wizard-submit');
-    if (submitBtn) submitBtn.disabled = !isValidHandle(state.handle) || state.submitting;
+  // The one handle field both wizards share (_wizardKit.js). Typing keeps focus — only the submit button's state refreshes.
+  mkHandleField(wrap, doc, {
+    t, value: state.handle, suggestions: HANDLE_SUGGESTIONS(),
+    onInput: (v) => {
+      state.handle = v;
+      const submitBtn = container.querySelector('.cc-wizard-submit');
+      if (submitBtn) submitBtn.disabled = !isValidHandle(state.handle) || state.submitting;
+    },
+    onPick: (v) => { state.handle = v; rerender(); },
   });
-  wrap.appendChild(input);
-
-  const suggestions = doc.createElement('div');
-  suggestions.className = 'cc-wizard-suggestions';
-  for (const s of HANDLE_SUGGESTIONS()) {
-    const chip = doc.createElement('button');
-    chip.type = 'button';
-    chip.className = 'cc-wizard-suggestion';
-    chip.textContent = s;
-    chip.addEventListener('click', () => {
-      state.handle = s;
-      rerender();
-    });
-    suggestions.appendChild(chip);
-  }
-  wrap.appendChild(suggestions);
 
   // #4 — SENSITIVE: continue as an existing self? Default is a FRESH, unlinkable key (same
   // name in two circles = coincidence). Choosing an existing self presents THAT circle's key

@@ -32,7 +32,8 @@ import { _snapshot } from '../skills/capabilities.js';
  */
 export async function sendHello(agent, peerAddress, timeout = 15_000) {
   // If already registered, nothing to do.
-  if (agent.security.getPeerKey(peerAddress)) return;
+  if (agent.security.getPeerKey(peerAddress)) { console.info(`[L249] sendHello SKIPPED ${String(agent.address).slice(0, 12)} → ${String(peerAddress).slice(0, 12)}: peer key already known`); return; }
+  console.info(`[L249] sendHello SENDING ${String(agent.address).slice(0, 12)} → ${String(peerAddress).slice(0, 12)}`);
 
   let timer   = null;
   let handler = null;

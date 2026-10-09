@@ -720,6 +720,7 @@ export class SecurityLayer {
         this.#peers.set(env._from, senderKey);
         this.#noteEstablished(env._id, env._from);
       } else {
+        console.info(`[L249] UNKNOWN_SENDER on layer ${String(this.#identity?.pubKey ?? '').slice(0, 12)}: from ${String(env._from).slice(0, 12)} _p=${env._p}`);
         throw new SecurityError(
           SEC.UNKNOWN_SENDER,
           `No pubKey registered for sender "${env._from}" — await HI handshake first`,

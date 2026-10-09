@@ -29,7 +29,7 @@ import { defineSkill }        from './skills/defineSkill.js';
 import { StateManager }       from './state/StateManager.js';
 import { Parts }              from './Parts.js';
 import { P }                  from './Envelope.js';
-import { sendHello, handleHello }                    from './protocol/hello.js';
+import { sendHello, handleHello, forgetHello }       from './protocol/hello.js';
 import { handleMessage }                             from './protocol/messaging.js';
 import { handleKeyRotationOW, KeyRotation, migratePeerGraph } from './protocol/keyRotation.js';
 import { AgentIdentity }                              from './identity/AgentIdentity.js';
@@ -266,6 +266,7 @@ export class Agent extends Emitter {
    */
   async forget(pubKeyOrAddress) {
     this.#security.unregisterPeer(pubKeyOrAddress);
+    forgetHello(this, pubKeyOrAddress);   // a forgotten peer is greeted again: the next hello is sent
     if (this.#peers) await this.#peers.remove(pubKeyOrAddress).catch(() => {});
     for (const t of this.#transports.values()) {
       try { t.forgetPeer?.(pubKeyOrAddress); } catch {}

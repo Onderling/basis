@@ -177,7 +177,7 @@ function Chip({ label, onPress, accent, testID }) {
 }
 
 const makeStyles = (theme) => StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: theme.color.bg },
+  wrap: { flex: 1, backgroundColor: theme.color.paper },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   back: { fontSize: 16, color: theme.color.accent, fontWeight: '600' },
   body: { paddingHorizontal: 16, paddingBottom: 32, gap: 8 },

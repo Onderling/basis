@@ -473,6 +473,49 @@ export function bootRelayUrls({ stored = null, list = [] } = {}) {
 }
 
 /**
+ * The relay this device knows, from what it holds right now: the saved setting, else the build/boot argument, else a
+ * relay a circle recorded — `bootRelayUrl`'s order. Null when it knows none (there is no default relay).
+ *
+ * @param {{ saved?: string|null, arg?: string|null, list?: Array<object> }} known
+ * @returns {string|null}
+ */
+export function knownRelayUrl({ saved = null, arg = null, list = [] } = {}) {
+  const given = [saved, arg].find((v) => typeof v === 'string' && v.trim()) ?? null;
+  return bootRelayUrl({ stored: given, list });
+}
+
+/**
+ * The relay question — asked only when this device knows NO relay at all.
+ *
+ * There is no default relay: a relay is a setting the person makes, an invite or enroll offer carries one, or the
+ * build/boot hands one in as an argument. A device with none of those can still reach what is near it (NKN), so the
+ * question is not asked at launch; a shell asks it at the first action that NEEDS a relay — making an invite, which
+ * would otherwise carry none, so the person joining would get none either. "Later" is an answer for this session:
+ * the question waits for the next app start, it does not come back on every tap.
+ *
+ * `read()` returns what the device knows right now — `{ saved, arg, list }`: the saved setting, the build/boot
+ * argument, and the connection points a circle recorded (`store.list()`). Sync or async. The answer is saved through
+ * the existing relay setting (`set-relay`), so no second store holds it.
+ *
+ * @param {object} deps
+ * @param {() => ({ saved?: string|null, arg?: string|null, list?: Array<object> } | Promise<object>)} deps.read
+ * @returns {{ check: () => Promise<{ ask: boolean }>, later: () => void }}
+ */
+export function createRelayQuestion({ read } = {}) {
+  let deferred = false;
+  return {
+    async check() {
+      if (deferred) return { ask: false };
+      let known = null;
+      try { known = knownRelayUrl((await read?.()) ?? {}); } catch { known = null; }
+      return { ask: !known };
+    },
+    /** "Later": not again this session. */
+    later() { deferred = true; },
+  };
+}
+
+/**
  * Rule 1, applied EARLIER — the endpoint a joiner must be on **before** the redeem, or `null`.
  *
  * `recordJoinedCirclePoints` above runs from the join callback, which needs a circle id, which only

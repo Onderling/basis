@@ -1758,10 +1758,6 @@
       "text": "Relay-server",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
-    "relayEndpoint_hint": {
-      "text": "Voeg een WebSocket-relay toe (ws:// of wss://). Laat leeg voor de standaard.",
-      "doc": "Phase 4 §9 — relay endpoint hint."
-    },
     "relayEndpoint_placeholder": {
       "text": "wss://relay.voorbeeld.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
@@ -1773,6 +1769,26 @@
     "relayEndpoint_clear": {
       "text": "Wissen",
       "doc": "Phase 4 §9 — relay endpoint clear button."
+    },
+    "relayAsk_title": {
+      "text": "Welke relay gebruik je?",
+      "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
+    },
+    "relayAsk_body": {
+      "text": "Je kreeg hem van wie je uitnodigde, of van degene die je agent draait. Zonder relay bereiken je apparaten en contacten elkaar alleen rechtstreeks.",
+      "doc": "The relay question — the body: where a person gets a relay, and what happens without one."
+    },
+    "relayAsk_save": {
+      "text": "Bewaren",
+      "doc": "The relay question — saves the relay (through the relay setting)."
+    },
+    "relayAsk_later": {
+      "text": "Later",
+      "doc": "The relay question — not now; asked again at the next app start."
+    },
+    "relayAsk_invalid": {
+      "text": "Dat is geen relay-adres — het begint met wss:// of ws://.",
+      "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
       "text": "Privéchat tussen leden",
@@ -5808,7 +5824,7 @@
       "doc": "Mobile relay save confirmation (applies on next app open; mobile has no live reconnect yet)."
     },
     "relay_hint": {
-      "text": "Wijs dit naar een bereikbare relay om zonder server tussen apparaten te synchroniseren (bijv. ws://192.168.1.20:8787). Laat leeg voor de standaard.",
+      "text": "Je kreeg hem van wie je uitnodigde, of van wie je agent draait. Leeg laten: geen relay, dan alleen rechtstreekse verbindingen.",
       "doc": "Relay setting help text."
     },
     "privacy": {

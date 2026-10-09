@@ -1758,10 +1758,6 @@
       "text": "Relay server",
       "doc": "Phase 4 §9 — relay endpoint control label (dispatches /set-relay)."
     },
-    "relayEndpoint_hint": {
-      "text": "Add a WebSocket relay (ws:// or wss://). Leave blank to use the default.",
-      "doc": "Phase 4 §9 — relay endpoint hint."
-    },
     "relayEndpoint_placeholder": {
       "text": "wss://relay.example.org",
       "doc": "Phase 4 §9 — relay endpoint input placeholder."
@@ -1773,6 +1769,26 @@
     "relayEndpoint_clear": {
       "text": "Clear",
       "doc": "Phase 4 §9 — relay endpoint clear button."
+    },
+    "relayAsk_title": {
+      "text": "Which relay do you use?",
+      "doc": "The relay question — asked at the first action that needs a relay when the device knows none (there is no default relay)."
+    },
+    "relayAsk_body": {
+      "text": "You got it from whoever invited you, or from whoever runs your agent. Without one, your devices and contacts reach each other only directly.",
+      "doc": "The relay question — the body: where a person gets a relay, and what happens without one."
+    },
+    "relayAsk_save": {
+      "text": "Save",
+      "doc": "The relay question — saves the relay (through the relay setting)."
+    },
+    "relayAsk_later": {
+      "text": "Later",
+      "doc": "The relay question — not now; asked again at the next app start."
+    },
+    "relayAsk_invalid": {
+      "text": "That is not a relay address — it starts with wss:// or ws://.",
+      "doc": "The relay question — the typed value is not a ws:// or wss:// URL."
     },
     "privateDm": {
       "text": "Private member-to-member chat",
@@ -5808,7 +5824,7 @@
       "doc": "Mobile relay save confirmation (applies on next app open; mobile has no live reconnect yet)."
     },
     "relay_hint": {
-      "text": "Point this at a reachable relay to sync across devices with no server (e.g. ws://192.168.1.20:8787). Leave blank to use the built-in default.",
+      "text": "You got it from whoever invited you, or from whoever runs your agent. Leave it blank for none: then only direct connections.",
       "doc": "Relay setting help text."
     },
     "privacy": {

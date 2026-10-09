@@ -779,3 +779,20 @@ Found writing `apps/basis-mobile/e2e/walkFixes20261008.test.js`; each cost a run
   tap Add, and tap again while it is still up.
 - **Verify by logcat, not by guessing**: `adb logcat -d -s ReactNativeJS | grep -E "\[link\]|addContactFromQr"` shows
   whether the link drained and whether the add ran.
+
+## Building a mobile APK to verify a fix: three traps (2026-10-09)
+
+Each one produced an APK that did not carry the code it was built to test.
+
+- **Build only the app's test APK**: `./gradlew :app:assembleRelease :app:assembleAndroidTest -DtestBuildType=release`
+  (what `.detoxrc.js` runs). A bare `assembleAndroidTest` also builds every library module's tests and dies on
+  `:expo-dev-client:mergeDebugAndroidTestJavaResource` (6 × `META-INF/LICENSE.md`). The app already picks one; the
+  libraries do not, and need not.
+- **`git checkout -B <branch> <new sha>` while ON that branch keeps your files**: the branch moves, the old contents
+  stay as staged changes, and every build after it is the OLD code. In a throwaway worktree use
+  `git reset --hard origin/<branch>`, then check `git status` is clean before building.
+- **A change only in `packages/**` may not reach the bundle**: compare the bundle's md5
+  (`app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle`) with the previous build's. Identical
+  bundles from two different commits mean the build did not see the change. The release bundle is Hermes bytecode:
+  search it with `LC_ALL=C grep -a`.
+

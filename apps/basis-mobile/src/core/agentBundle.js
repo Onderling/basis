@@ -628,6 +628,12 @@ export async function bootAgentBundle(opts = {}) {
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
         alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+        // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+        relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+        alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
+      // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+      relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+      alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
         circlesForPoint,
         // The relay this device connects to IS the deployment default — unmapped circles land here alone.
         defaultRelayUrl: relayUrl,

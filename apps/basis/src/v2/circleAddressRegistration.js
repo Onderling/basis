@@ -120,10 +120,38 @@ export async function registerCircleAddresses({
  *   absent ⇒ the primary entry's url
  * @returns {Promise<Array<{relayUrl: string} & Awaited<ReturnType<typeof registerCircleAddresses>>>>}
  */
-export async function registerCircleAddressesOnRelays({ relays = [], defaultRelayUrl = null, ...rest } = {}) {
+export async function registerCircleAddressesOnRelays({ relays = [], defaultRelayUrl = null, relaysOf = null, alsoAddressesOf = null, ...rest } = {}) {
   const list = Array.isArray(relays) ? relays.filter((r) => r && typeof r.url === 'string' && r.url) : [];
   const fallback = defaultRelayUrl ?? list.find((r) => r.primary)?.url ?? list[0]?.url ?? null;
   const out = [];
+  // EACH SELF ON ITS OWN SOCKETS (a device that is several people): `relaysOf(circleId)` names the sockets of the self
+  // that circle belongs to — a persona's circle registers only on the persona's sockets, so the relay never sees one
+  // socket holding two selves' addresses. Absent → every circle on `relays`, as always.
+  if (typeof relaysOf === 'function') {
+    const { circleIds = [], alsoAddresses = [], ...restNoIds } = rest;
+    const groups = new Map();   // socket-set key → { relays, circleIds }
+    for (const cid of circleIds) {
+      let own = null;
+      try { own = relaysOf(cid); } catch { own = null; }
+      const rs = Array.isArray(own) ? own.filter((r) => r && typeof r.url === 'string' && r.url) : null;
+      const key = rs ? rs.map((r) => `${r.url}@${r.identity ?? ''}`).join('|') : '';
+      if (!groups.has(key)) groups.set(key, { relays: rs ?? list, circleIds: [], selfDefault: !rs });
+      groups.get(key).circleIds.push(cid);
+    }
+    if (!groups.has('')) groups.set('', { relays: list, circleIds: [], selfDefault: true });   // the default's person address
+    for (const g of groups.values()) {
+      // the person address beside the circles: the default's on the default's sockets, a persona's on its own
+      let also = g.selfDefault ? alsoAddresses : [];
+      if (!g.selfDefault && typeof alsoAddressesOf === 'function' && g.circleIds.length) {
+        try { also = alsoAddressesOf(g.circleIds[0]) ?? []; } catch { also = []; }
+      }
+      for (const r of g.relays) {
+        const result = await registerCircleAddresses({ ...restNoIds, circleIds: g.circleIds, alsoAddresses: also, transport: r.port, relayUrl: r.url, defaultRelayUrl: fallback });
+        out.push({ relayUrl: r.url, ...(r.identity ? { identity: r.identity } : {}), ...result });
+      }
+    }
+    return out;
+  }
   for (const r of list) {
     const result = await registerCircleAddresses({ ...rest, transport: r.port, relayUrl: r.url, defaultRelayUrl: fallback });
     out.push({ relayUrl: r.url, ...result });
@@ -148,9 +176,11 @@ export async function unregisterCircleAddresses({ transport, circleIds = [], cir
 }
 
 /** The leave half over every relay the device is on (2026-09-08): a left circle's address goes off each. */
-export async function unregisterCircleAddressesOnRelays({ relays = [], ...rest } = {}) {
+export async function unregisterCircleAddressesOnRelays({ relays = [], relaysOf = null, ...rest } = {}) {
   const out = [];
-  for (const r of (Array.isArray(relays) ? relays : [])) {
+  // a persona's circle comes off the persona's own sockets (where it was registered), never the default's
+  const own = typeof relaysOf === 'function' && (rest.circleIds ?? []).length === 1 ? (() => { try { return relaysOf(rest.circleIds[0]); } catch { return null; } })() : null;
+  for (const r of (Array.isArray(own) ? own : (Array.isArray(relays) ? relays : []))) {
     if (!r?.port) continue;
     out.push({ relayUrl: r.url, ...(await unregisterCircleAddresses({ ...rest, transport: r.port })) });
   }

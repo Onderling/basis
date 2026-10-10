@@ -1195,6 +1195,12 @@ export async function createSecureAgent(opts = {}) {
   const SPECULATIVE_RELAY_TIMEOUT_MS = 700;
 
   const extraTransports = new Map();
+  // A PERSONA'S OWN SOCKETS (2026-10-10): a second identity of the person dials its relays on sockets of its own, keyed
+  // by (identity, url) and kept OUT of the shared router and the relay sweep — so the default identity's routes are
+  // exactly what they were, and a persona's traffic can only ever leave on a socket that is the persona's.
+  const personaTransports = new Map();   // `${url}@${pubKey}` → { url, identity, tx }
+  // Which identity of ours owns a self address (a persona's chat key, its per-circle aliases). Absent → the default.
+  const selfOwners = new Map();
 
   // (T2/T5.1 — `routing` is created above and shared with the core Agent; in transportMode:'both'
   // `sendToPeer` asks it for the BEST reachable route per peer. Transports register via
@@ -1736,10 +1742,11 @@ export async function createSecureAgent(opts = {}) {
   // unscoped sends through the shared strategy instead of the pinned relay).
   const RELAY_NAME_PREFIX = 'relay:';
   const relayNameFor = (url) => `${RELAY_NAME_PREFIX}${url}`;
-  function relayEntry(url, tx, primary) {
+  function relayEntry(url, tx, primary, socketIdentity = identity) {
     return {
       url,
       primary,
+      identity: socketIdentity?.pubKey ?? null,
       get connected() { return tx?.connected === true; },
       // The alias half of the transport port, per relay — what the host's per-circle address registration
       // needs, scoped to the circles that ride THIS relay (the relay-diversity rule lives in the caller).
@@ -1754,8 +1761,9 @@ export async function createSecureAgent(opts = {}) {
   function hasRelay(url) {
     return (!!relayTransport && relayState.url === url) || extraTransports.has(relayNameFor(url));
   }
-  async function addRelay(url, { awaitReady = false } = {}) {
+  async function addRelay(url, { awaitReady = false, identity: socketIdentity = null } = {}) {
     if (typeof url !== 'string' || !url) throw new Error('relays.add: url required');
+    if (socketIdentity && socketIdentity.pubKey !== identity.pubKey) return addPersonaRelay(url, socketIdentity, { awaitReady });
     if (relayTransport && relayState.url === url) {
       if (awaitReady) await waitForSocket(relayTransport, relayReadyTimeoutMs);
       return relayEntry(url, relayTransport, true);
@@ -1780,6 +1788,27 @@ export async function createSecureAgent(opts = {}) {
     if (awaitReady) await waitForSocket(tx, relayReadyTimeoutMs);
     return relayEntry(url, tx, false);
   }
+  /** A persona's own socket on `url`: its identity is the socket's, it receives into this agent, it never joins the router. */
+  async function addPersonaRelay(url, socketIdentity, { awaitReady = false } = {}) {
+    const key = `${url}@${socketIdentity.pubKey}`;
+    const have = personaTransports.get(key);
+    if (have) {
+      if (awaitReady) await waitForSocket(have.tx, relayReadyTimeoutMs);
+      return relayEntry(url, have.tx, false, socketIdentity);
+    }
+    const tx = new RelayTransport({
+      identity: socketIdentity,
+      relayUrl: url,
+      primaryDevice: () => false,
+      onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
+    });
+    makeReceiveHandler(tx);                 // inbound for the persona lands in this one agent
+    await tx.connect();
+    personaTransports.set(key, { url, identity: socketIdentity, tx });
+    if (auditAutoLog) audit('relay.add.persona', url);
+    if (awaitReady) await waitForSocket(tx, relayReadyTimeoutMs);
+    return relayEntry(url, tx, false, socketIdentity);
+  }
   async function removeRelay(url) {
     if (relayTransport && relayState.url === url) { await disconnectRelay(); return; }
     await removeSecureTransport(relayNameFor(url));
@@ -1803,7 +1832,11 @@ export async function createSecureAgent(opts = {}) {
     return out.filter(({ transport }) => (typeof transport?.canReach !== 'function' || transport.canReach() !== false));
   }
 
-  function listRelays() {
+  function listRelays({ identity: who = null } = {}) {
+    // a persona's sockets, when asked for one; the default's otherwise (every existing caller)
+    if (who && who !== identity.pubKey) {
+      return [...personaTransports.values()].filter((e) => e.identity.pubKey === who).map((e) => relayEntry(e.url, e.tx, false, e.identity));
+    }
     const out = [];
     if (relayTransport) out.push(relayEntry(relayState.url, relayTransport, true));
     for (const [name, tx] of extraTransports) {
@@ -2009,6 +2042,9 @@ export async function createSecureAgent(opts = {}) {
    * to a fresh peer races the handshake.
    */
   async function sendToPeer(addr, payload, opts = {}) {
+    // A send that speaks as a PERSONA's address leaves on that persona's own sockets — never the default's routes.
+    const owner = (typeof opts?.sendAs === 'string' && selfOwners.get(opts.sendAs)) || null;
+    if (owner) return sendAsPersona(addr, payload, opts, owner);
     // Delivery guarantee — hold-forward. When the caller opts in, a peer we
     // can't reach right now enqueues locally and returns "held" instead of
     // erroring; a later presence signal flushes it. Two triggers:
@@ -2129,6 +2165,32 @@ export async function createSecureAgent(opts = {}) {
    * @param {*}      payload
    * @param {object} [opts]  — `firstSendTimeoutMs`, `failoverBudget`
    */
+  /**
+   * Send as a persona: over each of its own sockets that the scope allows, in turn, until one delivers. No socket at all
+   * is a TYPED refusal the agent can say ({reason: 'persona-no-connection'}) — never a send on another identity's
+   * socket, which would show the relay that the two are one device (the very link a persona exists to prevent).
+   */
+  async function sendAsPersona(addr, payload, opts, owner) {
+    if (await isPeerMuted(addr)) throw new Error(`secure-agent: peer "${addr}" is muted; sendTo refused`);
+    const points = Array.isArray(opts?.scope?.points) && opts.scope.points.length ? new Set(opts.scope.points) : null;
+    const sockets = [...personaTransports.entries()]
+      .filter(([, e]) => e.identity.pubKey === owner && (!points || points.has(e.url)));
+    const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+    if (!sockets.length) return { held: false, delivered: false, msgId, reason: 'persona-no-connection', persona: owner };
+    let last = null;
+    for (const [key, e] of sockets) {
+      try {
+        const r = await _sendOverRoute(addr, payload, { name: key, transport: e.tx, address: addr }, opts);
+        if (r?.delivered !== false) return { held: false, delivered: true, msgId, result: r };
+        last = { held: false, delivered: false, msgId, reason: r?.reason ?? 'not-delivered', persona: owner };
+      } catch (err) {
+        if (isApplicationError(err)) throw err;
+        last = { held: false, delivered: false, msgId, reason: 'persona-unreachable', persona: owner, error: err?.message ?? String(err) };
+      }
+    }
+    return last;
+  }
+
   async function _sendWithFailover(addr, payload, opts = {}) {
     // refuse to send to a muted peer (alias-aware) up front.
     // This is an APPLICATION decision, never a transport failure: no
@@ -2528,6 +2590,8 @@ export async function createSecureAgent(opts = {}) {
   async function shutdown() {
     for (const [, tx] of extraTransports) { try { await tx.disconnect?.(); } catch { /* defensive */ } }
     extraTransports.clear();
+    for (const [, e] of personaTransports) { try { await e.tx.disconnect?.(); } catch { /* defensive */ } }
+    personaTransports.clear();
     try { await relayTransport?.disconnect?.(); } catch { /* defensive */ }
     try { await peerTransport?.disconnect?.(); } catch { /* defensive */ }
     try { await agent.stop?.(); } catch { /* defensive */ }
@@ -2604,13 +2668,16 @@ export async function createSecureAgent(opts = {}) {
      * @param {object} identity  the AgentIdentity behind it
      * @returns {boolean}
      */
-    registerSelfIdentity(address, identity) {
+    registerSelfIdentity(address, selfIdentity, { owner = null } = {}) {
       if (typeof agent.security?.addSelfIdentity !== 'function') return false;
-      return agent.security.addSelfIdentity(address, identity);
+      // `owner`: the persona this address belongs to (its chat key). Absent → the default identity, as before.
+      if (owner && owner !== identity.pubKey) selfOwners.set(address, owner); else selfOwners.delete(address);
+      return agent.security.addSelfIdentity(address, selfIdentity);
     },
 
     /** Stop speaking as the identity at `address` — the circle was left. Idempotent. */
     forgetSelfIdentity(address) {
+      selfOwners.delete(address);
       if (typeof agent.security?.removeSelfIdentity !== 'function') return false;
       return agent.security.removeSelfIdentity(address);
     },

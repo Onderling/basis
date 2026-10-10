@@ -1416,13 +1416,34 @@ export async function createRealHouseholdAgent(opts = {}) {
     const TRUSTED_AGENT_OPS = new Set(['createProfile', 'grantAgent', 'revokeAgent', 'revokeGrant', 'purgeAgent', 'installAgent', 'restoreDataVersion']);
     // identity step 4 — the createProfile collaborator: derive a new profile from THIS user's owner
     // root + register it. Owner-root-backed (kept out of the dependency-free cores).
+    // EVERY PERSONA THE REGISTRY HOLDS RUNS (root custody: each derives from the resident root). One device internal id,
+    // shown per persona as its own wire id. A delegated device runs only the personas a ceremony handed it (later).
+    const runPersona = async (id) => {
+      if (!ownerRoot || id === 'default' || personas.has(id)) return personas.get(id) ?? null;
+      try {
+        const rt = await createPersonaRuntime({ profileId: id, ownerRoot, chatVault, internalDeviceId: persona.internalDeviceId });
+        personas.set(id, rt);
+        return rt;
+      } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
+    };
+    if (ownerRoot) {
+      try {
+        for (const entry of (await agentsRegistry.list?.()) ?? []) {
+          if (entry?.role === 'profile' && typeof entry.agentId === 'string' && /^p-[0-9a-f]{12}$/.test(entry.agentId)) await runPersona(entry.agentId);
+        }
+      } catch (err) { console.warn(`[persona] the registry's personas could not be read: ${err?.message ?? err}`); }
+    }
     const agentsProfiles = {
       // Creating a NAMED profile derives its key from the root — under delegation custody that is
       // a CEREMONY act (the phrase must be typed), so the door refuses honestly instead of a raw
       // "ownerRoot required" throw. The ceremony-side profile creation lands with the profiles arc.
-      create: ({ profileId, name, properties }) => (ownerRoot
-        ? registryCreateProfile({ registry: agentsRegistry, ownerRoot, profileId, name, properties })
-        : Promise.resolve({ ok: false, reason: 'ceremony-required' })),
+      create: async ({ profileId, name, properties }) => {
+        if (!ownerRoot) return { ok: false, reason: 'ceremony-required' };
+        const made = await registryCreateProfile({ registry: agentsRegistry, ownerRoot, profileId, name, properties });
+        // the persona RUNS from here: its own chat identity, device id, delegation and per-circle keys (personaRuntime.js)
+        await runPersona(made.profileId);
+        return made;
+      },
       // Property layer — set/read a coarse property on a profile (curate once, reuse across apps). setProperty
       // merges (setOwn) then re-registers the FULL existing entry (register replaces), preserving key/role/grants.
       setProperty: async ({ profileId, key, value }) => {

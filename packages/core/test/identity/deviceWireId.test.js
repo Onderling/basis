@@ -1,38 +1,37 @@
-// The id a device shows on the wire is per persona and keyed by a device SECRET. The device keeps one internal id (its
-// keys derive from it, so no address changes); old records already showed that internal id, so a wire id computable
-// from it would reopen the very link the persona closes.
+// The id a device shows on the wire is per persona, keyed by the persona's own SEED: the internal id never appears,
+// two personas' records of one device are unrelated, and an old record plus a persona id give nothing without that
+// persona's seed. The device seed derives from the wire id, so revocation works from the record plus the phrase alone.
 import { describe, it, expect } from 'vitest';
-import { hkdf } from '@noble/hashes/hkdf.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { mintDeviceSalt, wireDeviceId } from '../../src/identity/deviceDelegation.js';
+import { Bootstrap } from '../../src/identity/Bootstrap.js';
+import { wireDeviceId, deriveDeviceSeed } from '../../src/identity/deviceDelegation.js';
 import { mintProfileId } from '../../src/identity/profileIds.js';
 
 describe('wireDeviceId', () => {
-  it('is per persona, stable for one device, and shaped d-<32 hex>', () => {
-    const salt = mintDeviceSalt();
-    const a = mintProfileId();
-    expect(salt).toBeInstanceOf(Uint8Array);
-    expect(salt.length).toBe(32);
-    expect(wireDeviceId(salt, 'default')).toMatch(/^d-[0-9a-f]{32}$/);
-    expect(wireDeviceId(salt, a)).toBe(wireDeviceId(salt, a));
-    expect(wireDeviceId(salt, 'default')).not.toBe(wireDeviceId(salt, a));
+  const root = Bootstrap.create().bootstrap;
+  const persona = mintProfileId();
+  const seedOf = (id) => root.deriveAgentSeed(id);
+  const internal = 'c7e1f0a2-5b9d-4e3a-8f61-2d4c9b7a1e05';
+
+  it('is stable for one device and persona, per persona, and shaped d-<32 hex>', () => {
+    expect(wireDeviceId(seedOf('default'), internal)).toMatch(/^d-[0-9a-f]{32}$/);
+    expect(wireDeviceId(seedOf(persona), internal)).toBe(wireDeviceId(seedOf(persona), internal));
+    expect(wireDeviceId(seedOf('default'), internal)).not.toBe(wireDeviceId(seedOf(persona), internal));
+    expect(wireDeviceId(seedOf('default'), internal)).not.toContain(internal);
   });
 
-  it('cannot be computed from an old record: the internal id and the persona id are not enough', () => {
-    const internalId = 'c7e1f0a2-5b9d-4e3a-8f61-2d4c9b7a1e05';   // what an old record showed
-    const persona = mintProfileId();                               // what the persona's own record shows
-    const salt = mintDeviceSalt();
-    const wire = wireDeviceId(salt, persona);
-    expect(wire).not.toContain(internalId);
-    // the obvious recomputations from what an observer holds do not land on it
-    const fromInternal = (ikm) => `d-${Buffer.from(hkdf(sha256, new TextEncoder().encode(ikm), new Uint8Array(0), new TextEncoder().encode(persona), 16)).toString('hex')}`;
-    expect(wire).not.toBe(fromInternal(internalId));
-    // the salt is what decides: another device's salt, same persona → another id
-    expect(wireDeviceId(mintDeviceSalt(), persona)).not.toBe(wire);
+  it('needs the persona\'s seed: another root\'s seed for the same persona id and device gives another id', () => {
+    const other = Bootstrap.create().bootstrap;
+    expect(wireDeviceId(other.deriveAgentSeed(persona), internal)).not.toBe(wireDeviceId(seedOf(persona), internal));
   });
 
-  it('refuses a salt that is not 32 bytes, and a profile id that is not one', () => {
-    expect(() => wireDeviceId(new Uint8Array(16), 'default')).toThrow(/salt/);
-    expect(() => wireDeviceId(mintDeviceSalt(), 'first-device')).toThrow(/reserved/);
+  it('the device seed derives from the wire id: the phrase + the record\'s id reproduce it anywhere', () => {
+    const wire = wireDeviceId(seedOf('default'), internal);
+    expect(deriveDeviceSeed(seedOf('default'), wire)).toEqual(deriveDeviceSeed(seedOf('default'), wire));
+    expect(deriveDeviceSeed(seedOf('default'), wire)).not.toEqual(deriveDeviceSeed(seedOf('default'), internal));
+  });
+
+  it('refuses a seed that is not 32 bytes and an empty id', () => {
+    expect(() => wireDeviceId(new Uint8Array(16), internal)).toThrow(/seed/);
+    expect(() => wireDeviceId(seedOf('default'), '')).toThrow(/id/);
   });
 });

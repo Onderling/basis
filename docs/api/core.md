@@ -1406,36 +1406,24 @@ revocation ceremony reason about an absent device's keys without the device).
 
 **Returns:** `Uint8Array` — 32-byte seed.
 
-### `mintDeviceSalt`
-
-**Kind:** function · **Import:** `mintDeviceSalt` from `'@onderling/core'`
-
-```js
-mintDeviceSalt()
-```
-
-A device's secret for its wire ids: 32 random bytes, minted once per device, kept sealed in the person's own registry
-entry beside the internal id. It never leaves the person's devices; it only makes the wire id.
-
-**Returns:** `Uint8Array`
-
 ### `wireDeviceId`
 
 **Kind:** function · **Import:** `wireDeviceId` from `'@onderling/core'`
 
 ```js
-wireDeviceId(deviceSalt, profileId)
+wireDeviceId(profileSeed, internalId)
 ```
 
 The id a device shows ON THE WIRE for one persona — in its delegation record, and so in every device statement
-that carries it. Per persona and keyed by the device's secret salt: two personas on one device show two unrelated
-ids, and an old record's internal id plus a persona id are not enough to compute either. The internal id still keys
-the device's seed (`deriveDeviceSeed`), so no address changes.
+that carries it — and the id its device seed derives from (`deriveDeviceSeed(profileSeed, wireDeviceId(...))`).
+Keyed by the persona's own SEED, which the phrase rebuilds: the internal id never appears, two personas' records of
+one device are unrelated, an old record plus a persona id give nothing without that persona's seed, and a
+revocation works from the record alone plus the phrase (the seed derives from the id the record names).
 
 **Parameters**
 
-- `deviceSalt` `Uint8Array` — the device's 32-byte secret (`mintDeviceSalt`).
-- `profileId` `string` — a persona id.
+- `profileSeed` `Uint8Array` — the persona's 32-byte seed (`Bootstrap.deriveAgentSeed(profileId)`).
+- `internalId` `string` — the device's own id (random at enrolment; root-derived for the first device).
 
 **Returns:** `string` — `d-<32 hex>`
 

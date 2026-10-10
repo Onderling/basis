@@ -42,7 +42,7 @@ export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircle
 // owner root → profile seed → DEVICE seed → per-circle seed; each device presents distinct addresses.
 export {
   deriveDeviceSeed, deviceDelegationPubKey, deviceDelegationMessage,
-  signDeviceDelegation, verifyDeviceDelegation, ownerRootFingerprint, firstDeviceIdFor, mintDeviceSalt, wireDeviceId,
+  signDeviceDelegation, verifyDeviceDelegation, ownerRootFingerprint, firstDeviceIdFor, wireDeviceId,
   deviceRevocationMessage, signDeviceRevocation, verifyDeviceRevocation,
 } from './identity/deviceDelegation.js';
 // A persona's id is a stable label, never its name (the HKDF label every key of the persona derives from).

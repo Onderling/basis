@@ -29,7 +29,7 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { Bootstrap, deriveDeviceSeed, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
+import { Bootstrap, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
 import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
@@ -116,7 +116,10 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
   try {
     // Every phrase ceremony ENROLLS (a restore is enrollment as this profile's next device); the
     // delegation seed is deterministic from (phrase, profileId, deviceId).
-    const deviceId = newDeviceId();
+    // The id the device shows is its persona-keyed WIRE id; the seed derives from it, so the phrase + the record's id
+    // reproduce the seed anywhere (a revocation needs nothing else). The internal id stays in the sealed blob.
+    const internalId = newDeviceId();
+    const deviceId = wireDeviceId(root.deriveAgentSeed(DEFAULT_PROFILE), internalId);
     const delegationSeed = deriveDeviceSeed(root.deriveAgentSeed(DEFAULT_PROFILE), deviceId);
     const delegationCustody = !!markerVault;
 
@@ -147,7 +150,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
 
     // 3. The delegation blob (the label carrier + the enrolled-boot signal for root-custody
     //    installs; under delegation custody the key door + marker are the boot authority).
-    const blob = { seed: _b64url(delegationSeed), deviceId };
+    const blob = { seed: _b64url(delegationSeed), deviceId, internalId };
     if (typeof enrollDevice?.label === 'string' && enrollDevice.label) blob.label = enrollDevice.label;
     // The ROOT-SIGNED delegation record, pre-signed HERE (the one moment the root exists) and
     // carried in the blob — the boot's registry self-heal registers it without ever needing the

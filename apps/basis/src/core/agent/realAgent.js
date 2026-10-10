@@ -29,7 +29,7 @@ import {
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, rootPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
@@ -717,9 +717,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The key the commitment and every reveal name is the default persona's AUTHORITY, never the root: the root's own
   // public key on the wire would link every persona of the person. Under delegation custody it rides the device's own
   // record (`by` — the authority signed it).
-  const rootPubKeyB64 = ownerRoot ? rootPubKeyB64Of(ownerRoot.deriveProfileAuthority('default')) : (enrolledDevice?.record?.by ?? null);
-  if (!rootPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
-  const ceremonyCommitmentFor = (circleId) => (rootPubKeyB64 ? ceremonyCommitment(rootPubKeyB64, circleId) : null);
+  const authorityPubKeyB64 = ownerRoot ? authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority('default')) : (enrolledDevice?.record?.by ?? null);
+  if (!authorityPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
+  const ceremonyCommitmentFor = (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null);
   const signCeremonyCommitment = (circleId, address, commitment) =>
     signCeremonyCommitmentFromSeed(deriveCircleSeed(deviceDerivationSeed, circleId), { circleId, circleAddress: address, commitment });
 
@@ -1867,7 +1867,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     selfPubKey: chatId.pubKey,
     // siblings bind by the AUTHORITY that signed their records — the root's fingerprint stays on this device (it seals
     // the vaults) and never meets a record
-    rootFingerprint: rootPubKeyB64 ? ownerRootFingerprint(rootPubKeyB64) : null,
+    authorityFingerprint: authorityPubKeyB64 ? ownerRootFingerprint(authorityPubKeyB64) : null,
     // The registry supplies the deny-wins tombstone + the no-record fallback. Late-bound via the
     // outer ref (null until the agents block runs) and best-effort: a degraded registry means the
     // carried record alone binds.
@@ -2047,7 +2047,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     selfPubKey: chatId.pubKey,
     // My own commitment per circle, from the root's PUBLIC key every device of mine holds — no roster read.
-    ownCommitmentFor: (circleId) => (rootPubKeyB64 ? ceremonyCommitment(rootPubKeyB64, circleId) : null),
+    ownCommitmentFor: (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null),
     onLanded: ({ version }) => console.info(`[person-key] version ${version} arrived from one of my devices`),
     onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
   });

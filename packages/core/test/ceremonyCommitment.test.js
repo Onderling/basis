@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Bootstrap } from '../src/identity/Bootstrap.js';
 import {
-  ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal,
+  ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
 } from '../src/identity/ceremonyCommitment.js';
 import { deriveCircleSeed, deriveCircleAddress } from '../src/identity/circleAddress.js';
@@ -9,7 +9,7 @@ import { circleAddressAnnouncement, verifyCircleAddressAnnouncement, ownCircleAd
 import { signCircleLinkFromSeed } from '../src/identity/circleLink.js';
 
 const root = Bootstrap.create().bootstrap;
-const pub = rootPubKeyB64Of(root.secret);
+const pub = authorityPubKeyB64Of(root.secret);
 
 describe('the ceremony commitment — who may retire a device address', () => {
   it('is per circle, deterministic, and does not correlate circles', () => {
@@ -24,7 +24,7 @@ describe('the ceremony commitment — who may retire a device address', () => {
     expect(verifyCeremonyReveal(reveal, { ...facts, commitment })).toBe(true);
     expect(verifyCeremonyReveal(reveal, { ...facts, subject: 'addr-2', commitment })).toBe(false);
     expect(verifyCeremonyReveal(reveal, { ...facts, circleId: 'b', commitment: ceremonyCommitment(pub, 'b') })).toBe(false);
-    expect(verifyCeremonyReveal(reveal, { ...facts, commitment: ceremonyCommitment(rootPubKeyB64Of(Bootstrap.create().bootstrap.secret), 'a') })).toBe(false);
+    expect(verifyCeremonyReveal(reveal, { ...facts, commitment: ceremonyCommitment(authorityPubKeyB64Of(Bootstrap.create().bootstrap.secret), 'a') })).toBe(false);
     expect(verifyCeremonyReveal(null, { ...facts, commitment })).toBe(false);
     expect(verifyCeremonyReveal(reveal, { ...facts, commitment: null })).toBe(false);
   });

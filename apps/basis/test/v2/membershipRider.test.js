@@ -174,10 +174,10 @@ describe('the membership rider — statements on the device log, roster folds th
 
   it('THE CEREMONY BINDING: address-revoke binds ONLY by a root reveal against the row\'s commitment', async () => {
     const { membershipBindingVerifier } = await import('../../src/v2/membershipRail.js');
-    const { Bootstrap, ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal } = await import('@onderling/core');
+    const { Bootstrap, ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal } = await import('@onderling/core');
     const root = Bootstrap.create().bootstrap;
     const other = Bootstrap.create().bootstrap;
-    const commitment = ceremonyCommitment(rootPubKeyB64Of(root.secret), 'g1');
+    const commitment = ceremonyCommitment(authorityPubKeyB64Of(root.secret), 'g1');
     const row = {
       webid: 'webid:bea', circleAddress: 'dev-2-addr', ceremonyCommitment: commitment,
       circleAddresses: ['dev-2-addr', 'join-addr', 'dev-3-addr'],

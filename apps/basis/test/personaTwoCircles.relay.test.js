@@ -115,6 +115,9 @@ describe('two personas of one device, seen by a co-member of both circles', () =
     // Cor's rail verifies it against Cor's own roster for Y (signature + the key↔ref binding) and keeps it. Handed
     // over directly: the wire crossing of a persona's circle traffic needs its per-circle address registered on the
     // persona's OWN relay socket, which is the next step's relay registration per persona (a row).
+    // TEMPORARY SCAFFOLD — the next step's definition of done: remove this hand-over; the same walk passes with the
+    // statement crossing the relay (the persona's per-circle address on the persona's own socket, no circle send as a
+    // chat key), landing in Cor's rail on its own.
     const landed = await cor.chatRail.ingest(Y, res.statement);
     expect(landed?.ok, JSON.stringify(landed)).toBe(true);
     expect(cor.chatRail.storedStatements(Y).some((st) => st?.body?.payload?.authorRef === B.chatId.pubKey)).toBe(true);

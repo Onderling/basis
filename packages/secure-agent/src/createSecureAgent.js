@@ -1809,7 +1809,17 @@ export async function createSecureAgent(opts = {}) {
     if (awaitReady) await waitForSocket(tx, relayReadyTimeoutMs);
     return relayEntry(url, tx, false, socketIdentity);
   }
-  async function removeRelay(url) {
+  async function removeRelay(url, { identity: who = null } = {}) {
+    // a persona's own socket on `url` — closed and forgotten; the default's sockets are not touched
+    if (who && who !== identity.pubKey) {
+      const key = `${url}@${who}`;
+      const have = personaTransports.get(key);
+      if (!have) return;
+      personaTransports.delete(key);
+      try { await have.tx.disconnect?.(); } catch { /* defensive */ }
+      if (auditAutoLog) audit('relay.remove.persona', url);
+      return;
+    }
     if (relayTransport && relayState.url === url) { await disconnectRelay(); return; }
     await removeSecureTransport(relayNameFor(url));
   }

@@ -96,4 +96,26 @@ describe('once a persona exists, every identity of ours names its owner', () => 
       expect(anna.registerSelfIdentity(other.pubKey, other, { owner: anna.identity.pubKey })).toBe(true);
     } finally { await anna.shutdown(); }
   });
+
+  it('relays.remove(url, { identity }) closes only that persona\'s socket; a send as it is then the typed refusal', async () => {
+    const R = await startRelay({ port: 0, log: false });
+    const url = `ws://127.0.0.1:${R.port}`;
+    const anna = await agent();
+    const bram = await agent();
+    const persona = await AgentIdentity.generate(new VaultMemory());
+    try {
+      await anna.relay.connect({ relayUrl: url, awaitReady: true });
+      await bram.relay.connect({ relayUrl: url, awaitReady: true });
+      anna.setTransportMode('relay'); bram.setTransportMode('relay');
+      await anna.relays.add(url, { identity: persona, awaitReady: true });
+      anna.registerSelfIdentity(persona.pubKey, persona, { owner: persona.pubKey });
+      await anna.relays.remove(url, { identity: persona.pubKey });
+      expect(anna.relays.list({ identity: persona.pubKey })).toEqual([]);
+      expect(anna.relays.list().map((r) => r.url), 'the default keeps its socket').toEqual([url]);
+      const r = await anna.peer.sendTo(bram.identity.pubKey, { subtype: 'note', text: 'x' }, { ...FAST, sendAs: persona.pubKey });
+      expect(r).toMatchObject({ delivered: false, held: false, reason: 'persona-no-connection' });
+    } finally {
+      await anna.shutdown(); await bram.shutdown(); await R.close?.();
+    }
+  }, 30_000);
 });

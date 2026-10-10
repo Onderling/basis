@@ -2883,6 +2883,12 @@ function CircleDetail({
     deliveryTick; // read tick so memoised consumers re-evaluate on bumps
     return deliveryStateMapRef.current.get(msgId);
   }, [deliveryTick]);
+  // why a failed send failed, when known — the chip's words (the shared `deliveryPresentation` picks them)
+  const deliveryReasonFor = useCallback((msgId) => {
+    // eslint-disable-next-line no-unused-expressions
+    deliveryTick;
+    return deliveryStateMapRef.current.reasonOf?.(msgId) ?? null;
+  }, [deliveryTick]);
   const [composerText, setComposerText] = useState('');
   // The "+" — mobile had no attach affordance at all, so a phone could not put a photo or an
   // appointment in a conversation by any route. Same projected entries as web, narrowed the same way.
@@ -4392,6 +4398,7 @@ function CircleDetail({
         ) : (
           renderBubblesWithDayDividers(rows, t, {
             deliveryStateFor,
+            deliveryReasonFor,
             localActor: 'me',
             onRetryDelivery,
             onBubbleButton,
@@ -4758,6 +4765,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
     && row?.actor === localActor
     && (row?.type === 'chat-message' || row?.event?.type === 'chat-message');
   const deliveryState = isLocalChat ? deliveryStateFor(row.id) : null;
+  const deliveryReason = isLocalChat && typeof deliveryOpts?.deliveryReasonFor === 'function' ? deliveryOpts.deliveryReasonFor(row.id) : null;
   // Bulletin restyle (web parity) — my own chat messages align right on --me-bg
   // (no border); everyone else's + the bot's stay left on --bot-bg + --bot-line.
   // Same gate the delivery icon uses: a locally-authored chat-message.
@@ -4908,7 +4916,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
           (`maybe-received` / `reached-device` / `stored` would have rendered as silence here). Retryable
           states are a Pressable; the rest a static Text with role=text. */}
       {(() => {
-        const p = deliveryPresentation(deliveryState);
+        const p = deliveryPresentation(deliveryState, { reason: deliveryReason });
         if (!p) return null;
         const label = t(p.labelKey);
         const line = `${p.glyph} ${label}`;

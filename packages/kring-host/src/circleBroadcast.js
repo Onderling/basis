@@ -147,9 +147,23 @@ export function classifyFanOut(r) {
   return 'undeliverable';                         // all permanent
 }
 
+/**
+ * WHY a fan-out failed, when every failing recipient failed for the same reason (e.g. `persona-no-connection`: the
+ * circle's persona has no socket of its own to send on) — rides beside the state so the bubble can say it. Null when the
+ * reasons differ, when nothing failed per recipient, or when the whole op failed.
+ * @returns {string|null}
+ */
+export function fanOutReason(r) {
+  if (r?.error) return null;
+  const errors = Array.isArray(r?.errors) ? r.errors : [];
+  if (errors.length === 0) return null;
+  const first = errors[0]?.reason;
+  return typeof first === 'string' && first && errors.every((e) => e?.reason === first) ? first : null;
+}
+
 export function broadcastCircleFanOut({ rawCallSkill, circleId, msgId, text, ts, card, deliveryStateMap, onChange, signStatement = null }) {
   if (typeof rawCallSkill !== 'function') return Promise.resolve();
-  const mark = (state) => { deliveryStateMap.set(msgId, state); onChange?.(); };
+  const mark = (state, reason = null) => { deliveryStateMap.set(msgId, state, reason ? { reason } : undefined); onChange?.(); };
   mark('pending');
   return Promise.resolve()
     // The chat lane: the fan carries a SIGNED statement, always — `signStatement(circleId, msgId)` is
@@ -169,7 +183,7 @@ export function broadcastCircleFanOut({ rawCallSkill, circleId, msgId, text, ts,
     .then((r) => {
       const state = classifyFanOut(r);
       if (state !== 'maybe-received') console.info('[circle-chat] fan-out', state, '—', r?.error ?? r?.errors);
-      mark(state);
+      mark(state, fanOutReason(r));
     })
     .catch((err) => { console.warn('[circle-chat] fan-out failed:', err?.message ?? err); mark('failed'); });
 }

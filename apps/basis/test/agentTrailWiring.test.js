@@ -13,12 +13,17 @@ import { VaultMemory } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { EventLog } from '../src/eventLog.js';
 import { agentTrailRows } from '../src/v2/circleStream.js';
+import { createMemoryBackend } from '@onderling/pseudo-pod';
 
 const boot = (deviceLog) => createRealHouseholdAgent({
   seedHousehold: false,
   ownerRootVault: new VaultMemory(),
   chatVault: new VaultMemory(),
   deviceLog,
+});
+// a persona needs the profile registry across the boot (as every shell has one)
+const bootWithRegistry = (deviceLog) => createRealHouseholdAgent({
+  seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), deviceLog, registryBackend: createMemoryBackend(),
 });
 
 describe('trail emitters at the waist', () => {
@@ -66,4 +71,15 @@ describe('trail emitters at the waist', () => {
     // …and the owner lens stays empty without an explicit actor (never fall open).
     expect(agentTrailRows({ events: deviceLog.query(), circles: [] })).toHaveLength(0);
   });
+
+  it('a persona of the owner is the owner too: its in-process exercise lands no agent-action', async () => {
+    const deviceLog = new EventLog({ initial: [], muted: [] });
+    const a = await bootWithRegistry(deviceLog);
+    const { id } = await a.callSkill('agents', 'createProfile', { name: 'Buurt' });
+    const B = a.persona(id);
+    a.sa.agent.trailSink({ actor: B.chatId.pubKey, op: 'whoAmI', via: 'peer', outcome: 'ok' });
+    expect(deviceLog.query().filter((e) => e.type === 'agent-action')).toHaveLength(0);
+    a.sa.agent.trailSink({ actor: 'agent-key-xyz', op: 'whoAmI', via: 'peer', outcome: 'ok' });
+    expect(deviceLog.query().filter((e) => e.type === 'agent-action')).toHaveLength(1);
+  }, 60_000);
 });

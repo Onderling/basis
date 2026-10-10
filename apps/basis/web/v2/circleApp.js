@@ -6980,6 +6980,7 @@ function showCircle(id, circle, policy) {
       // without us having to pass a fresh snapshot through every prop.
       // Locally-sent bubbles read this to decide which icon to render.
       deliveryStateFor: (msgId) => deliveryStateMap.get(msgId),
+      deliveryReasonFor: (msgId) => deliveryStateMap.reasonOf(msgId),
       localActor: LOCAL_ACTOR,
       // δ.2 — retry on the failed icon tap.  Re-fires the SAME msgId
       // (idempotent receiver-side dedup).  Looks up the original text
@@ -7267,6 +7268,7 @@ function showCircle(id, circle, policy) {
     // container, the translator and the retry handler all live in this scope.
     paintDelivery: (msgId, state) => paintDeliveryChip(rootEl, msgId, state, {
       tr: t,
+      reason: deliveryStateMap.reasonOf(msgId),
       onRetryDelivery: (retryId) => {
         const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
         const text = evt?.payload?.text;

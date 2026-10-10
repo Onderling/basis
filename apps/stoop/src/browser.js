@@ -93,6 +93,7 @@ export async function createBrowserStoopAgent({
   // The rules-update rider: a rules-doc edit also fans a signed statement on the governance lane
   // (absent → store-local only, the pre-propagation behaviour).
   rulesUpdateEmit,
+  selfWebidFor = null,
   mutedSet,
   // This device's content-seal strategy: the member map (the contact book, every roster row, the name a
   // person shows) and the posts persist under it. Absent → the persisted copy is written in the clear,
@@ -134,6 +135,7 @@ export async function createBrowserStoopAgent({
     currentPersonKey,      // the person key announced on a join/create (absent → none announced)
     mutedSet,              // the SHELL's block set — this app reads it, never writes it
     rulesUpdateEmit,       // the rules-update rider's governance-lane emitter (absent → store-local only)
+    selfWebidFor,          // who this device is per circle (its persona) — absent → the default throughout
     contentSeal,           // the persisted store is sealed under this device's content key
   });
 

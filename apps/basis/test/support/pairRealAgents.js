@@ -648,12 +648,30 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
     // Decision 4 — the per-circle SIGNING identity, exactly as both shells install it, and BEFORE
     // the transport check: it is needed to open inbound circle traffic even where no alias is bound.
     await n.agent?.installCircleIdentities?.(ids);
+    // Each self on its own sockets, as the shells register (`relaysOf`): a persona's circles go on the persona's
+    // relay sockets with its own person address; the rest on the node's one transport, as before.
+    const own = new Map();   // persona socket port → circle ids
+    const rest = [];
+    for (const cid of ids) {
+      const rs = n.agent?.relaysFor?.(cid) ?? null;
+      if (Array.isArray(rs) && rs.length) for (const r of rs) { if (!own.has(r.port)) own.set(r.port, { url: r.url, ids: [] }); own.get(r.port).ids.push(cid); }
+      else rest.push(cid);
+    }
+    for (const [port, g] of own) {
+      if (!port?.supportsAliases) continue;
+      await registerCircleAddresses({
+        transport: port, relayUrl: g.url, circleIds: g.ids,
+        circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
+        circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
+        alsoAddresses: n.agent?.ownAddressBindingsFor?.(g.ids[0]) ?? [],
+      });
+    }
     const transport = n._busTransport ?? n.agent?.relay ?? null;
     if (!transport?.supportsAliases) continue;
     await registerCircleAddresses({
       transport,
       relayUrl: 'internal://bus',          // single-transport world: everything rides the one socket
-      circleIds: ids,
+      circleIds: rest,
       circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: n.agent?.ownAddressBindings?.() ?? [],   // the person address, as the shells register it

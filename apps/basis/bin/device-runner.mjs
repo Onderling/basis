@@ -628,7 +628,7 @@ if (relayUrl) {
   // …and leaves one: the leave statement, the members' keys unbound, the authorize snapshot dropped, the address off the relay
   circleSeams.leave = (circleId) => leaveCircleLocally({
     agent, callSkill, circleId,
-    unregister: () => unregisterCircleAddressesOnRelays({ relays: agent.relays?.list?.() ?? [], circleIds: [circleId], circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null }),
+    unregister: () => unregisterCircleAddressesOnRelays({ relays: agent.relays?.list?.() ?? [], relaysOf: (cid) => agent.relaysFor?.(cid) ?? null, circleIds: [circleId], circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null }),
   });
   // Still in it? Not when this device left it, and not when the circle's folded roster no longer carries this device's
   // per-circle address (an eviction the membership lane folded). A read that fails is not a removal.
@@ -708,6 +708,9 @@ if (relayUrl) {
       circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+      relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+      alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
       circlesForPoint,
       defaultRelayUrl: relayUrl,
       onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),

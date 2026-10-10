@@ -3012,6 +3012,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** WHO this device is in a circle: the circle's persona's webid, the address it sends AS (null for the default), its person key. */
   /** The ref this device signs as in a circle: its persona there, else the default — what every lane names as author. */
   const circleSelfRef = (circleId) => circleSelf(circleId).webid ?? chatId.pubKey;
+  /** The relay sockets a circle's self speaks on: a persona's own (null for the default — the shells' default list). */
+  const relaysFor = (circleId) => {
+    const as = circleSelf(circleId).sendAs;
+    return as ? (sa.relays?.list?.({ identity: as }) ?? []) : null;
+  };
+  /** The person address a circle's self registers beside its circle addresses: a persona's own person key. */
+  const ownAddressBindingsFor = (circleId) => {
+    const p = personaOf(circleId);
+    if (p === persona) return ownAddressBindings();
+    const id = p.personIdentity; const seed = p.personKey?.seed;
+    return id?.pubKey && seed ? [{ address: id.pubKey, sign: (message) => signWithPersonKey(seed, new TextEncoder().encode(message)) }] : [];
+  };
   const circleSelf = (circleId) => {
     const p = personaOf(circleId);
     const isDefault = p === persona;
@@ -7004,6 +7016,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     personAddress,
     /** `[{ address, sign }]` for a shell's relay alias registration: the person address beside the per-circle ones. */
     ownAddressBindings,
+    // each self on its own sockets: the shells' circle-address registration asks per circle (`relaysOf` / `alsoAddressesOf`)
+    relaysFor,
+    ownAddressBindingsFor,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
 

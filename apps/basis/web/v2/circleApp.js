@@ -5916,7 +5916,7 @@ async function openAboutMePanel(personaId) {
         await draw();
       },
       onCreatePersona: async (name) => {
-        try { await rawCallSkill('agents', 'createProfile', { id: name }); } catch { /* */ }
+        try { await rawCallSkill('agents', 'createProfile', { name }); } catch { /* */ }
         await draw();
       },
       onToggleDisclosure: async (contextId, key, enabled, forPersonaId) => {

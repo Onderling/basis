@@ -40,10 +40,12 @@ import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
  *   chatId: object|null, personKey: object|null, personIdentity: object|null,
  * }>}
  */
-export async function createPersonaRuntime({ profileId = 'default', ownerRoot = null, custody, custodySeed = null, chatVault } = {}) {
-  if (profileId !== 'default') {
-    throw new Error(`createPersonaRuntime: only the default persona runs on the wire today (got "${profileId}")`);
-  }
+export async function createPersonaRuntime({ profileId = 'default', ownerRoot = null, custody, custodySeed = null, chatVault, internalDeviceId = null } = {}) {
+  const isDefault = profileId === 'default';
+  // A persona other than the default derives everything from the root, so it runs only where the root is resident; a
+  // delegated device is handed a persona at a ceremony (enrol/restore), never derives one.
+  if (!isDefault && !ownerRoot) throw new Error(`createPersonaRuntime: persona "${profileId}" needs the owner root on this device (ceremony-required)`);
+  if (!isDefault) custody = { mode: 'root' };
   // The persona's slots in the device's chat vault (personaVault.js): its chat seed, person key and delegation blob.
   const vault = personaVault(chatVault, profileId);
   // The persona's seed — the source of its chat identity, its device seed, its person key. Root custody only.
@@ -81,6 +83,8 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   // keys. The chat identity (the member's webid) stays PROFILE-derived on every device: the member is one.
   let deviceDerivationSeed = custodySeed ?? profileSeed;
   let enrolledDevice = custody?.mode === 'delegation' ? { deviceId: custody.deviceId } : null;
+  // the device's own internal id, the same for every persona it runs (each shows its own wire id of it)
+  let deviceInternalId = internalDeviceId;
   try {
     let blob = await vault.get(DEVICE_DELEGATION_VAULT_KEY);
     if (typeof blob === 'string') { try { blob = JSON.parse(blob); } catch { blob = null; } }
@@ -108,6 +112,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
               await vault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
             } catch (err) { console.warn(`[realAgent] could not re-sign this device's delegation by its authority: ${err?.message ?? err}`); }
           }
+          deviceInternalId = typeof blob.internalId === 'string' ? blob.internalId : blob.deviceId;   // pre-wire-id blobs: the id WAS internal
           enrolledDevice = {
             deviceId: blob.deviceId, selfMinted: blob.selfMinted === true,
             ...(blob.label ? { label: blob.label } : {}),
@@ -126,12 +131,13 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     try {
       // the internal id is root-derived, so a later device holding the phrase can re-derive this one; the id it SHOWS is
       // the persona-keyed wire id, and the seed derives from that (the phrase + the record's id reproduce it anywhere)
-      const internalId = firstDeviceIdFor(ownerRoot);
+      const internalId = internalDeviceId ?? firstDeviceIdFor(ownerRoot);
       const deviceId = wireDeviceId(profileSeed, internalId);
       const seed = deriveDeviceSeed(profileSeed, deviceId);
       const record = signDeviceDelegation(ownerRoot.deriveProfileAuthority(profileId), { profileId, deviceId, pubKey: deviceDelegationPubKey(seed) });
       await vault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, internalId, record, selfMinted: true }));
       deviceDerivationSeed = seed;
+      deviceInternalId = internalId;
       enrolledDevice = { deviceId, record, selfMinted: true };
     } catch (err) {
       console.warn(`[realAgent] the first device could not mint its delegation — the grants lane will not sign until it does: ${err?.message ?? err}`);
@@ -161,14 +167,17 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   const signCeremonyCommitment = (circleId, address, commitment) =>
     signCeremonyCommitmentFromSeed(deriveCircleSeed(deviceDerivationSeed, circleId), { circleId, circleAddress: address, commitment });
 
+  // The persona's chat identity: the secure agent loads the DEFAULT's from its slot; any other persona's is loaded here.
+  const chatId = isDefault ? null : await AgentIdentity.restore(vault);
+
   return {
-    profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice,
+    profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice, internalDeviceId: deviceInternalId,
     circleIdentityFor, circleAddressFor, circleSealingKeyPairFor,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,
     // The persona's LIVE identities, set by the agent: its chat identity once the secure agent has loaded it from the
     // persona's slot, and its current person key (+ the identity it speaks as), which a rotation replaces.
-    chatId: null,
+    chatId,
     personKey: initialPersonKey,
     personIdentity: null,
   };

@@ -29,10 +29,9 @@ describe('createPersonaRuntime — one persona\'s keys, named once (N = 1)', () 
     expect(p.initialPersonKey?.version).toBe(1);
   });
 
-  it('only the default persona runs today — a second one is refused until it runs on the wire', async () => {
-    const root = Bootstrap.create().bootstrap;
-    await expect(createPersonaRuntime({ profileId: 'p-0123456789ab', ownerRoot: root, custody: { mode: 'root' }, chatVault: new VaultMemory() }))
-      .rejects.toThrow(/default/);
+  it('a persona other than the default needs the owner root on the device — a delegated device cannot derive one', async () => {
+    await expect(createPersonaRuntime({ profileId: 'p-0123456789ab', ownerRoot: null, custody: { mode: 'delegation', deviceId: 'd' }, chatVault: new VaultMemory() }))
+      .rejects.toThrow(/ceremony-required/);
   });
 
   it('the agent runs the default persona through it: what the agent exposes is what the factory derives', async () => {
@@ -52,7 +51,7 @@ describe('createPersonaRuntime — one persona\'s keys, named once (N = 1)', () 
 describe('two personas on one device share nothing on the wire (waits on a second persona running)', () => {
   it.todo('no key, address, pair-circle id, relay socket, wire device id, commitment or sibling set in common');
   it.todo('a co-member of both sees two members with two commitments');
-  it.todo('nothing root-level in either persona\'s records');
+  // 'nothing root-level in either persona\'s records' — real now: personaCreateRunning.test.js
   it.todo('the phrase rebuilds both; the restore picker re-binds only the chosen one');
   it.todo('a revoked device loses every persona it held');
 });

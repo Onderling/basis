@@ -2,7 +2,7 @@
  * The person's own week overview: a row in their own store (Saturday 09:00), switched from Gepland, run by the person's
  * clock while the app is open — a card of their coming week, saying honestly that it shows when the app is open.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { memoryDataSource } from '@onderling/item-store';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { createIntentionBook } from '../src/v2/intentionBook.js';
@@ -12,7 +12,12 @@ import { PERSON_WEEK_OP, personWeekOn, switchPersonWeek, personWeekCard } from '
 const t = (k, v) => (v ? `${k} ${JSON.stringify(v)}` : k);
 
 describe('the person\'s own week overview', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
   it('is switched on and off as one row in their own store, on Saturday morning', async () => {
+    // the row is anchored at its creation time (the store's clock), so the clock is a fixed Thursday: on the real clock
+    // this test went off at 2026-10-10 07:00Z, when the Saturday it asserts became the past
+    vi.useFakeTimers({ now: Date.parse('2026-10-08T09:00:00Z'), toFake: ['Date'] });
     const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), actor: 'me' });
     await book.load();
     expect(personWeekOn(book, 'me')).toBe(false);

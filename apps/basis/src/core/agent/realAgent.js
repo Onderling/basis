@@ -29,7 +29,7 @@ import {
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
-  deriveCircleSeed, ceremonyCommitment, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
+  deriveCircleSeed, ceremonyCommitment, rootPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
 import { readKeyChain, foldKeyEvents, rotateKeyEvent } from '@onderling/pod-client';   // the replace ceremony re-reads and re-keys the group-key chain
 import { keyEventsFromRail, KEY_STATEMENT_BROADCAST } from '../../v2/keyRail.js';
 import { replyLine } from '../../v2/replyLine.js';
@@ -690,7 +690,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       const deviceId = firstDeviceIdFor(ownerRoot);   // root-derived, so a later device holding the phrase can re-derive this one
       const seed = deriveDeviceSeed(defaultProfileSeed, deviceId);
-      const record = signDeviceDelegation(ownerRoot.secret, { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(seed) });
+      const record = signDeviceDelegation(ownerRoot.deriveProfileAuthority('default'), { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(seed) });
       await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, record, selfMinted: true }));
       deviceDerivationSeed = seed;
       enrolledDevice = { deviceId, record, selfMinted: true };
@@ -714,7 +714,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circle — their owner root, at a ceremony. Every device of the person can DECLARE it (the root's public
   // key is public: resident under root custody, carried on the delegation record under delegation custody)
   // and none can USE it. Declared in every announcement, signed with the circle key the address proves.
-  const rootPubKeyB64 = ownerRoot ? b64encode(ownerRoot.derivedPubKey()) : (enrolledDevice?.record?.by ?? null);
+  // The key the commitment and every reveal name is the default persona's AUTHORITY, never the root: the root's own
+  // public key on the wire would link every persona of the person. Under delegation custody it rides the device's own
+  // record (`by` — the authority signed it).
+  const rootPubKeyB64 = ownerRoot ? rootPubKeyB64Of(ownerRoot.deriveProfileAuthority('default')) : (enrolledDevice?.record?.by ?? null);
   if (!rootPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
   const ceremonyCommitmentFor = (circleId) => (rootPubKeyB64 ? ceremonyCommitment(rootPubKeyB64, circleId) : null);
   const signCeremonyCommitment = (circleId, address, commitment) =>
@@ -1659,7 +1662,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           // a root-custody install without one (the pre-cutover interim) mints it here instead.
           let record = enrolledDevice.record ?? null;
           if (!record && ownerRoot) {
-            record = signDeviceDelegation(ownerRoot.secret, {
+            record = signDeviceDelegation(ownerRoot.deriveProfileAuthority('default'), {
               profileId: 'default',
               deviceId:  enrolledDevice.deviceId,
               pubKey:    deviceDelegationPubKey(deviceDerivationSeed),
@@ -1862,7 +1865,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the rule to drift.
   const deviceSetVerifier = deviceSetBindingVerifier({
     selfPubKey: chatId.pubKey,
-    rootFingerprint,
+    // siblings bind by the AUTHORITY that signed their records — the root's fingerprint stays on this device (it seals
+    // the vaults) and never meets a record
+    rootFingerprint: rootPubKeyB64 ? ownerRootFingerprint(rootPubKeyB64) : null,
     // The registry supplies the deny-wins tombstone + the no-record fallback. Late-bound via the
     // outer ref (null until the agents block runs) and best-effort: a degraded registry means the
     // carried record alone binds.
@@ -2537,7 +2542,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Never retire the address this device presents — except at the one moment it is leaving it
       // (the self-enrol migration, which has already introduced the address it moves to).
       if (!address || (!includeOwn && address === circleAddressFor(circleId))) continue;
-      const reveal = signCeremonyReveal(root.secret, { circleId, kind: 'address-revoke', subject: address, authorRef: chatId.pubKey });
+      const reveal = signCeremonyReveal(root.deriveProfileAuthority('default'), { circleId, kind: 'address-revoke', subject: address, authorRef: chatId.pubKey });
       const stmt = await membershipEmit({
         kind: 'address-revoke', circleId, subject: address,
         payload: { by: chatId.pubKey, reveal }, actor: chatId.pubKey,
@@ -2561,7 +2566,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         known[deviceId] = !!rec;
         if (!rec) {
           const revokedSeed = deriveDeviceSeed(root.deriveAgentSeed('default'), deviceId);
-          const minted = signDeviceDelegation(root.secret, { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed) });
+          const minted = signDeviceDelegation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed) });
           props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true });
         } else if (rec.revoked !== true) {
           props = registrySetDeviceDelegation(props, deviceId, { revoked: true });
@@ -2723,7 +2728,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           known = !!rec;
           let props = cur.properties ?? {};
           if (!rec) {
-            const minted = signDeviceDelegation(root.secret, {
+            const minted = signDeviceDelegation(root.deriveProfileAuthority('default'), {
               profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed),
             });
             props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true });
@@ -2766,7 +2771,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // sibling that asks later gets the same proof.
         const reveals = {};
         for (const circleId of circleIds) {
-          reveals[circleId] = signCeremonyReveal(root.secret, {
+          reveals[circleId] = signCeremonyReveal(root.deriveProfileAuthority('default'), {
             circleId, kind: PERSON_KEY_CARRY, subject: chatId.pubKey, authorRef: chatId.pubKey,
             facts: personKeyFacts({ version: nextVersion, pubKey }),
           });
@@ -2784,7 +2789,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (typeof membershipEmit === 'function') {
           for (const circleId of circleIds) {
             try {
-              const reveal = signCeremonyReveal(root.secret, {
+              const reveal = signCeremonyReveal(root.deriveProfileAuthority('default'), {
                 circleId, kind: PERSON_KEY_KIND, subject: chatId.pubKey, authorRef: chatId.pubKey,
                 facts: personKeyFacts({ version: nextVersion, pubKey }),
               });
@@ -2821,7 +2826,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           for (const backing of sealedBackings) {
             await resealVault({ backing, oldKey: atRestKey, newKey });
           }
-          const selfRecord = signDeviceDelegation(root.secret, {
+          const selfRecord = signDeviceDelegation(root.deriveProfileAuthority('default'), {
             profileId: 'default', deviceId: selfDeviceId, pubKey: deviceDelegationPubKey(selfSeed),
           });
           await new VaultEncrypted({ backing: chatVaultBacking, key: newKey }).set(
@@ -2956,7 +2961,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     let bots = [];
     try { bots = linkedBotsOf(await rawContacts()); } catch { bots = []; }
     if (!bots.length) return 0;
-    const revocation = signDeviceRevocation(root.secret, { profileId: 'default', deviceId });
+    const revocation = signDeviceRevocation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId });
     const sent = await Promise.all(bots.map((bot) => Promise.resolve()
       .then(() => secureAgentRef.current?.peer?.sendTo(bot, { subtype: IDENTITY_LINK_REVOKE_SUBTYPE, revocation }, { guarantee: 'hold-forward' }))
       .then(() => true, () => false)));
@@ -2966,7 +2971,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     let nodes = [];
     try { nodes = Object.keys(ownedNodesOf(await agentsRegistryRef?.lookup?.('default'))); } catch { nodes = []; }
     if (!nodes.length) return 0;
-    const revocation = signDeviceRevocation(root.secret, { profileId: 'default', deviceId });
+    const revocation = signDeviceRevocation(root.deriveProfileAuthority('default'), { profileId: 'default', deviceId });
     const told = await Promise.all(nodes.map((node) => invokeNode(node, 'manage.revokeDevice', { revocation })));
     return told.filter((r) => r?.ok === true).length;
   }

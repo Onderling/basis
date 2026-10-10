@@ -48,7 +48,8 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     const bId = (await call(B.page, 'stoop', 'whoAmI'))?.webid;
 
     // ── L122 + L126: the create wizard ─────────────────────────────────────────────────────────────
-    const made = await call(A.page, 'agents', 'createProfile', { id: 'buurt', name: 'Buurt' });
+    const made = await call(A.page, 'agents', 'createProfile', { name: 'Buurt' });
+    const buurt = made?.id;   // a persona's id is minted, never its name
     expect(made?.error ?? made?.ok === false ? String(made?.error ?? made?.reason) : 'ok', 'setup: a second persona').toBe('ok');
     await gotoCircles(A.page);
     const idsOf = async () => ((await call(A.page, 'stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
@@ -57,8 +58,8 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     const picker = A.page.locator('[data-testid="create-founder-persona"]');
     await expect(picker, 'the founding persona is asked').toBeVisible({ timeout: 20_000 });
     expect(await picker.inputValue(), 'the default is preselected').toBe('default');
-    expect(await picker.locator('option').evaluateAll((os) => os.map((o) => o.value)), 'the personas are offered, and starting minimally').toEqual(['', 'default', 'buurt']);
-    await picker.selectOption('buurt');
+    expect(await picker.locator('option').evaluateAll((os) => os.map((o) => o.value)), 'the personas are offered, and starting minimally').toEqual(['', 'default', buurt]);
+    await picker.selectOption(buurt);
     await A.page.locator('.cc-wizard-input').first().fill('Proeftuin');
     await fillFounderHandle(A.page, 'anna');
     for (let i = 0; i < 5; i += 1) { await A.page.locator('.cc-wizard-btn-primary').first().click(); await A.page.waitForTimeout(300); }

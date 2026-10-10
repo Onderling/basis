@@ -9,6 +9,10 @@
 // typed phrase and never resident. A stolen device, enrolled or not, therefore holds nothing that can
 // revoke a sibling, and there is no window between a join and "the next ceremony".
 //
+// "The root" in this file is the PERSONA'S AUTHORITY key (`Bootstrap.deriveProfileAuthority`), derived from the owner
+// root inside the ceremony: the root's own public key never reaches a roster, so two personas of one person in one
+// circle declare two unrelated commitments.
+//
 // The commitment is per circle and pre-image resistant, so two circles cannot correlate a person by it.
 // What a revocation reveals — the root public key — is seen by that circle's members only; someone who
 // sits in two of the person's circles and witnesses a revocation in both can link them. Stated cost.
@@ -32,9 +36,9 @@ export function ceremonyCommitment(rootPubKeyB64, circleId) {
   return hex(sha256(new TextEncoder().encode(`${COMMIT_DOMAIN}|${rootPubKeyB64}|${circleId}`)));
 }
 
-/** The root's pubkey in the encoding every commitment and reveal uses. */
-export function rootPubKeyB64Of(rootSecret) {
-  return b64encode(nacl.sign.keyPair.fromSeed(rootSecret).publicKey);
+/** The signer's pubkey in the encoding every commitment and reveal uses — a persona's authority (`deriveProfileAuthority`). */
+export function rootPubKeyB64Of(authoritySecret) {
+  return b64encode(nacl.sign.keyPair.fromSeed(authoritySecret).publicKey);
 }
 
 /**
@@ -49,13 +53,14 @@ export function ceremonyRevealMessage({ circleId, kind, subject, authorRef, fact
 }
 
 /**
- * Mint the reveal for a ceremony statement. Called where the root is transiently in hand.
+ * Mint the reveal for a ceremony statement. Called where the root is transiently in hand; signed by the persona's
+ * authority derived from it, never by the root itself.
  * @returns {{ rootPubKey: string, sig: string }}
  */
-export function signCeremonyReveal(rootSecret, { circleId, kind, subject, authorRef, facts = null } = {}) {
-  if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) throw new Error('signCeremonyReveal: rootSecret must be a 32-byte Uint8Array');
+export function signCeremonyReveal(authoritySecret, { circleId, kind, subject, authorRef, facts = null } = {}) {
+  if (!(authoritySecret instanceof Uint8Array) || authoritySecret.length !== 32) throw new Error('signCeremonyReveal: authoritySecret must be a 32-byte Uint8Array');
   if (!circleId || !kind || !subject || !authorRef) throw new Error('signCeremonyReveal: circleId, kind, subject and authorRef are required');
-  const kp = nacl.sign.keyPair.fromSeed(rootSecret);
+  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
   const msg = new TextEncoder().encode(ceremonyRevealMessage({ circleId, kind, subject, authorRef, facts }));
   return { rootPubKey: b64encode(kp.publicKey), sig: b64encode(nacl.sign.detached(msg, kp.secretKey)) };
 }

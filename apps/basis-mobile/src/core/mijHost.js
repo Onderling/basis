@@ -41,7 +41,7 @@ export async function addGeneralOffering({ callSkill, defaultId, text, tags }) {
 
 /** Section-2 add-affordance — create a new persona (createProfile). */
 export async function createPersona({ callSkill, name }) {
-  try { await callSkill('agents', 'createProfile', { id: name }); } catch { /* */ }
+  try { await callSkill('agents', 'createProfile', { name }); } catch { /* */ }
 }
 
 /** Section-3 toggle — enable/withdraw one key's disclosure for a circle. */

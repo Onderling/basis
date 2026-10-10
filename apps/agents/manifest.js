@@ -157,10 +157,10 @@ export const agentsManifest = {
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
       params: [
-        // Stable profile id — also the registry agentId + the HKDF label. Never rename.
-        { name: 'id',         kind: 'string', required: true, schema: { minLength: 1 } },
-        // Optional display name.
-        { name: 'name',       kind: 'string' },
+        // The display name a person typed — a property, free to change.
+        { name: 'name',       kind: 'string', schema: { minLength: 1 } },
+        // The stable profile id (also the registry agentId + the HKDF label) — minted when absent; never a name.
+        { name: 'id',         kind: 'string', schema: { minLength: 1 } },
         // Optional own/inherit property map — a JSON string (same convention as installAgent.grants).
         { name: 'properties', kind: 'string' },
       ],

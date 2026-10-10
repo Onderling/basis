@@ -144,7 +144,7 @@ describe('the edit ops — same calls the web host fires (verify the dispatch sh
   it('createPersona / toggleDisclosure mirror createProfile / setProfileDisclosure', async () => {
     const callSkill = vi.fn(async () => ({ ok: true }));
     await createPersona({ callSkill, name: 'werk' });
-    expect(callSkill).toHaveBeenCalledWith('agents', 'createProfile', { id: 'werk' });
+    expect(callSkill).toHaveBeenCalledWith('agents', 'createProfile', { name: 'werk' });
 
     await toggleDisclosure({ callSkill, personaId: 'werk', contextId: 'circle-2', key: 'place', enabled: false });
     expect(callSkill).toHaveBeenCalledWith('agents', 'setProfileDisclosure', { id: 'werk', contextId: 'circle-2', key: 'place', enabled: false });

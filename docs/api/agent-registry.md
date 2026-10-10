@@ -417,13 +417,13 @@ device that actually runs the profile.
 - `a` `object`
 - `a.registry` `object` — a createAgentRegistry handle
 - `a.ownerRoot` `object` — a core Bootstrap (deriveAgentSeed + fingerprint)
-- `a.profileId` `string` — stable per-profile label (also the registry agentId)
+- `[a.profileId]` `string` — the persona's stable id (`'default'` or `p-<12 hex>`; also the registry agentId and the HKDF label). Absent → one is minted. Never a display name: renaming must not re-key.
+- `[a.name]` `string` — the display name — a property, free to change
 - `[a.role]` `string` — default 'profile'
-- `[a.name]` `string`
 - `[a.properties]` `object` — own/inherit property map
 - `[a.agentUri]` `string` — default `profile:<id>`
 
-**Returns:** `Promise<{ entry: object, pubKey: string }>`
+**Returns:** `Promise<{ entry: object, pubKey: string, profileId: string }>`
 
 ### `profilePubKey`
 

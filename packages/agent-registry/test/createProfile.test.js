@@ -1,6 +1,6 @@
 // Identity step 2 — root-derived profile creation: reproducible keys + registry entry.
 import { describe, it, expect } from 'vitest';
-import { Bootstrap } from '@onderling/core';
+import { Bootstrap, mintProfileId } from '@onderling/core';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createAgentRegistry } from '../src/AgentRegistry.js';
 import { createProfile, profilePubKey, profileCircleAddress, own } from '../index.js';
@@ -9,6 +9,9 @@ const mkReg = () => createAgentRegistry({
   pseudoPod: createPseudoPod({ backend: createMemoryBackend(), mode: 'standalone', deviceId: 'd1' }),
   deviceId: 'd1',
 });
+
+// a second persona: its id is minted, never a name
+const WORK = mintProfileId();
 
 describe('createProfile — root-derived profile entries', () => {
   it('is reproducible: same owner root + profileId → same pubKey (recovery on any device)', () => {
@@ -43,9 +46,9 @@ describe('createProfile — root-derived profile entries', () => {
     const reg = mkReg();
     const root = Bootstrap.create().bootstrap;
     await createProfile({ registry: reg, ownerRoot: root, profileId: 'default' });
-    await createProfile({ registry: reg, ownerRoot: root, profileId: 'work' });
+    await createProfile({ registry: reg, ownerRoot: root, profileId: WORK });
     const a = await reg.lookup('default');
-    const b = await reg.lookup('work');
+    const b = await reg.lookup(WORK);
     expect(a.ownerFingerprint).toBe(b.ownerFingerprint);   // same account
     expect(a.pubKey).not.toBe(b.pubKey);                    // distinct per-profile keys
   });
@@ -61,5 +64,24 @@ describe('createProfile — root-derived profile entries', () => {
     expect(a).toBe(profileCircleAddress(root, 'default', 'circle-42'));           // reproducible (recovery)
     expect(a).not.toBe(profileCircleAddress(root, 'default', 'werk-7'));         // unlinkable per circle
     expect(a).not.toBe(profilePubKey(root, 'default'));                          // circle address != profile key
+  });
+});
+
+describe('createProfile — a persona id is minted, the name is a property', () => {
+  it('without an id: mints p-<12 hex>, keys it by the id, keeps the name as the name', async () => {
+    const reg = mkReg();
+    const root = Bootstrap.create().bootstrap;
+    const { profileId, pubKey } = await createProfile({ registry: reg, ownerRoot: root, name: 'Buurt' });
+    expect(profileId).toMatch(/^p-[0-9a-f]{12}$/);
+    expect(pubKey).toBe(profilePubKey(root, profileId));
+    const stored = await reg.lookup(profileId);
+    expect(stored.name).toBe('Buurt');
+    expect(await reg.lookup('Buurt')).toBeFalsy();
+  });
+  it('refuses a name passed as the id, and a label the platform keeps for itself', async () => {
+    const reg = mkReg();
+    const root = Bootstrap.create().bootstrap;
+    await expect(createProfile({ registry: reg, ownerRoot: root, profileId: 'Buurt' })).rejects.toThrow(/not an id/);
+    await expect(createProfile({ registry: reg, ownerRoot: root, profileId: 'first-device' })).rejects.toThrow(/reserved/);
   });
 });

@@ -20,7 +20,7 @@ import {
   b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey,
 } from '@onderling/core';
 import { sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
-import { DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
+import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
 
 /**
  * Build one persona's runtime bundle.
@@ -37,12 +37,15 @@ import { DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
  *   circleSealingKeyPairFor: (circleId: string) => object, authorityPubKeyB64: string|null,
  *   ceremonyCommitmentFor: (circleId: string) => string|null, signCeremonyCommitment: Function,
  *   initialPersonKey: object|null, derivedLinkKeyPub: string|null,
+ *   chatId: object|null, personKey: object|null, personIdentity: object|null,
  * }>}
  */
 export async function createPersonaRuntime({ profileId = 'default', ownerRoot = null, custody, custodySeed = null, chatVault } = {}) {
   if (profileId !== 'default') {
     throw new Error(`createPersonaRuntime: only the default persona runs on the wire today (got "${profileId}")`);
   }
+  // The persona's slots in the device's chat vault (personaVault.js): its chat seed, person key and delegation blob.
+  const vault = personaVault(chatVault, profileId);
   // The persona's seed — the source of its chat identity, its device seed, its person key. Root custody only.
   const profileSeed = ownerRoot ? ownerRoot.deriveAgentSeed(profileId) : null;
 
@@ -53,7 +56,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   const derivedLinkKeyPub = profileSeed ? personKeyPubKeyB64(derivePersonLinkKeySeed(profileSeed)) : null;
   const initialPersonKey = await (async () => {
     try {
-      const stored = await loadPersonKey(chatVault);
+      const stored = await loadPersonKey(vault);
       if (stored) return (stored.linkKeyPub || !derivedLinkKeyPub) ? stored : { ...stored, linkKeyPub: derivedLinkKeyPub };
     } catch { /* re-derive below */ }
     if (profileSeed) return { version: 1, seed: derivePersonKeySeed(profileSeed, 1), linkKeyPub: derivedLinkKeyPub };
@@ -65,10 +68,10 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   // resident) — the identity was persisted at the ceremony, and its absence is a broken vault, not a re-derivable
   // state. Loud, never silently a new person.
   let chatSeedReadable = false;
-  try { chatSeedReadable = (await chatVault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
+  try { chatSeedReadable = (await vault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
   if (!chatSeedReadable) {
     if (!profileSeed) throw new Error('delegation custody: the chat identity vault is unreadable — restore with the recovery phrase');
-    await AgentIdentity.fromSeed(profileSeed, chatVault);
+    await AgentIdentity.fromSeed(profileSeed, vault);
   }
 
   // ── THE DEVICE DERIVATION ROOT ──────────────────────────────────────────────────────────────────────────────
@@ -79,7 +82,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   let deviceDerivationSeed = custodySeed ?? profileSeed;
   let enrolledDevice = custody?.mode === 'delegation' ? { deviceId: custody.deviceId } : null;
   try {
-    let blob = await chatVault.get(DEVICE_DELEGATION_VAULT_KEY);
+    let blob = await vault.get(DEVICE_DELEGATION_VAULT_KEY);
     if (typeof blob === 'string') { try { blob = JSON.parse(blob); } catch { blob = null; } }
     if (blob && typeof blob === 'object' && typeof blob.seed === 'string' && typeof blob.deviceId === 'string') {
       if (custody?.mode === 'delegation') {
@@ -102,7 +105,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
                 profileId: blob.record.profileId ?? profileId, deviceId: blob.deviceId, pubKey: blob.record.pubKey,
               });
               blob.record = blob.record.label ? { ...resigned, label: blob.record.label } : resigned;
-              await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+              await vault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
             } catch (err) { console.warn(`[realAgent] could not re-sign this device's delegation by its authority: ${err?.message ?? err}`); }
           }
           enrolledDevice = {
@@ -127,7 +130,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
       const deviceId = wireDeviceId(profileSeed, internalId);
       const seed = deriveDeviceSeed(profileSeed, deviceId);
       const record = signDeviceDelegation(ownerRoot.deriveProfileAuthority(profileId), { profileId, deviceId, pubKey: deviceDelegationPubKey(seed) });
-      await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, internalId, record, selfMinted: true }));
+      await vault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, internalId, record, selfMinted: true }));
       deviceDerivationSeed = seed;
       enrolledDevice = { deviceId, record, selfMinted: true };
     } catch (err) {
@@ -159,9 +162,14 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     signCeremonyCommitmentFromSeed(deriveCircleSeed(deviceDerivationSeed, circleId), { circleId, circleAddress: address, commitment });
 
   return {
-    profileId, profileSeed, deviceDerivationSeed, enrolledDevice,
+    profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice,
     circleIdentityFor, circleAddressFor, circleSealingKeyPairFor,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,
+    // The persona's LIVE identities, set by the agent: its chat identity once the secure agent has loaded it from the
+    // persona's slot, and its current person key (+ the identity it speaks as), which a rotation replaces.
+    chatId: null,
+    personKey: initialPersonKey,
+    personIdentity: null,
   };
 }

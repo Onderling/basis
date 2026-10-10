@@ -43,6 +43,9 @@ describe('createPersonaRuntime — one persona\'s keys, named once (N = 1)', () 
     expect(id).toBeTruthy();
     expect(agent.ceremonyCommitmentFor(CIRCLE)).toBe(ceremonyCommitment(authorityPubKeyB64Of(root.deriveProfileAuthority('default')), CIRCLE));
     expect(agent.persona?.('default')?.circleAddressFor(CIRCLE)).toBe(agent.circleAddressFor(CIRCLE));
+    // the live identities ride the persona: its chat identity is the agent's webid, its person key the agent's
+    expect(agent.persona('default').chatId.pubKey).toBe(agent.identity.chat.pubKey);
+    expect(agent.persona('default').personKey?.version).toBe(agent.personKey()?.version);
   }, 60_000);
 });
 

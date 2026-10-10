@@ -218,6 +218,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
+import { personaVault } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -564,27 +565,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // commitments name, and its person key's starting point. Named once there; the agent reads it. Only 'default' runs.
   const personas = new Map([['default', await createPersonaRuntime({ profileId: 'default', ownerRoot, custody, custodySeed, chatVault })]]);
   const persona = personas.get('default');
-  let personKey = persona.initialPersonKey;
+  persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
-  const currentPersonKey = () => (personKey ? { version: personKey.version, pubKey: personKeyPubKeyB64(personKey.seed) } : null);
+  const currentPersonKey = () => (persona.personKey ? { version: persona.personKey.version, pubKey: personKeyPubKeyB64(persona.personKey.seed) } : null);
   /** The same, with the link key's public half — what a CARD and a chain reply carry, so a contact can pin it and verify rotations. */
-  const personKeyForContacts = () => (personKey ? { ...currentPersonKey(), ...(personKey.linkKeyPub ? { linkKeyPub: personKey.linkKeyPub } : {}) } : null);
+  const personKeyForContacts = () => (persona.personKey ? { ...currentPersonKey(), ...(persona.personKey.linkKeyPub ? { linkKeyPub: persona.personKey.linkKeyPub } : {}) } : null);
   // THE PERSON KEY ON THE WIRE (binding-levels §10.5 step 4): an identity the secure agent can sign envelopes with
   // (`sendAs`), registered as OURS at the security layer and as an address on the relays. It is what a device
   // speaks as when nothing else of it is known to the other end — the enrolling device's first requests to its
   // sibling, the sibling's parcel back — and what the sender authorizer admits live as our own current key. The
   // static profile key stops being spoken and stops being admitted; a rotation swaps this identity out.
-  let personIdentity = personKey ? await AgentIdentity.fromSeed(personKey.seed, new VaultMemory()) : null;
-  const personAddress = () => personIdentity?.pubKey ?? null;
+  persona.personIdentity = persona.personKey ? await AgentIdentity.fromSeed(persona.personKey.seed, new VaultMemory()) : null;
+  const personAddress = () => persona.personIdentity?.pubKey ?? null;
   /** The relay proof for the person address: the same challenge-signing contract as a per-circle alias. */
-  const personAddressSigner = () => (personKey ? (message) => signWithPersonKey(personKey.seed, new TextEncoder().encode(message)) : null);
+  const personAddressSigner = () => (persona.personKey ? (message) => signWithPersonKey(persona.personKey.seed, new TextEncoder().encode(message)) : null);
   /** `[{ address, sign }]` — what a shell hands its relay alias registration beside the per-circle addresses. */
   const ownAddressBindings = () => (personAddress() ? [{ address: personAddress(), sign: personAddressSigner() }] : []);
   const secureAgentRef = { current: null };   // late-bound: the secure agent is created further down this scope
   const registerPersonIdentity = () => {
     const sa2 = secureAgentRef.current;
-    if (!sa2 || !personIdentity) return;
-    try { sa2.registerSelfIdentity?.(personIdentity.pubKey, personIdentity); } catch { /* the send path falls back to canonical and says so */ }
+    if (!sa2 || !persona.personIdentity) return;
+    try { sa2.registerSelfIdentity?.(persona.personIdentity.pubKey, persona.personIdentity); } catch { /* the send path falls back to canonical and says so */ }
   };
   const registerPersonAddressOnRelays = async () => {
     const sa2 = secureAgentRef.current;
@@ -600,9 +601,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** A new version arrived (a ceremony here, or a hand-over): keep it, and speak as it from now on. */
   const adoptPersonKey = async (k) => {
     const old = personAddress();
-    personKey = k;
-    personIdentity = await AgentIdentity.fromSeed(k.seed, new VaultMemory());
-    if (old && old !== personIdentity.pubKey) { try { secureAgentRef.current?.forgetSelfIdentity?.(old); } catch { /* best-effort */ } }
+    persona.personKey = k;
+    persona.personIdentity = await AgentIdentity.fromSeed(k.seed, new VaultMemory());
+    if (old && old !== persona.personIdentity.pubKey) { try { secureAgentRef.current?.forgetSelfIdentity?.(old); } catch { /* best-effort */ } }
     registerPersonIdentity();
     await registerPersonAddressOnRelays();
   };
@@ -628,7 +629,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Other agents' kernel task requests over the relay (a connected screen calling the door's ops): only where the
     // composition asks — a household bot. A person's agent takes none until its door allows only lane-active tokens.
     ...(opts.acceptPeerSkillCalls ? { acceptPeerSkillCalls: opts.acceptPeerSkillCalls } : {}),
-    vault:               chatVault,
+    vault:               persona.vault,   // the persona's chat seed lives in its slot (personaVault.js)
     primaryDevice:       () => primaryDeviceRef.current?.isMine() === true,
     identityVaultPrefix: 'cc-chat-id:',   // no effect when `vault` is supplied; documents the prefix
     muteListVaultKey:    'cc-mute',
@@ -744,6 +745,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  // the persona's chat identity (its webid): the secure agent loaded it from the persona's slot
+  persona.chatId = chatId;
   // A household bot's circle id is its own, derived from its key (`tasksCircleId` is then a function of it). Its rows
   // from before (under the bare `household` id) move there ONCE, beneath the store: item ids unchanged, nothing fanned;
   // a second boot finds the circle holding rows and moves nothing.
@@ -1928,10 +1931,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const personKeySync = createPersonKeySync({
     siblings: ownDeviceSiblings,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-    current: () => personKey,
+    current: () => persona.personKey,
     store: async (k) => {
-      const landed = await storePersonKey(chatVault, k);
-      if (landed) await adoptPersonKey((await loadPersonKey(chatVault)) ?? k);   // the merged entry: chain + older seeds
+      const landed = await storePersonKey(persona.vault, k);
+      if (landed) await adoptPersonKey((await loadPersonKey(persona.vault)) ?? k);   // the merged entry: chain + older seeds
       return landed;
     },
     selfPubKey: chatId.pubKey,
@@ -1941,9 +1944,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
   });
   /** My chain, for a contact's pull: the current key and the links that vouch for it from any earlier version. */
-  const personKeyChainOf = () => (personKey ? { current: personKeyForContacts(), links: Array.isArray(personKey.links) ? personKey.links : [] } : null);
+  const personKeyChainOf = () => (persona.personKey ? { current: personKeyForContacts(), links: Array.isArray(persona.personKey.links) ? persona.personKey.links : [] } : null);
   /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
-  const personSeedFor = (version) => (personKey?.version === version ? personKey.seed : (personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
+  const personSeedFor = (version) => (persona.personKey?.version === version ? persona.personKey.seed : (persona.personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
   const contactRecords = async () => {
     try { return bookRowsOf(await callSkill('stoop', 'listContacts', {})); } catch { return []; }
   };
@@ -1991,7 +1994,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const sealedWarned = new Set();
   /** The direct-message seal: to the contact's current person key, from mine — or null (unsealed, as before) when either is unknown. */
   /** The one resolution the seal uses: the contact's current key, when I hold a person key of my own to seal from. */
-  const sealTargetFor = async (peerAddr) => (personKey ? await contactPersonKeyOf(peerAddr) : null);
+  const sealTargetFor = async (peerAddr) => (persona.personKey ? await contactPersonKeyOf(peerAddr) : null);
   const contactSeal = {
     /** What a direct message to this contact is sealed to — what the thread header says. */
     statusFor: async (peerAddr) => {
@@ -2001,10 +2004,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     sealFor: async (peerAddr, content) => {
       const to = await sealTargetFor(peerAddr);
       if (!to) {
-        if (personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
+        if (persona.personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
         return null;
       }
-      const { sealed, nonce } = await sealToPersonKey(personKey.seed, to.pubKey, content);
+      const { sealed, nonce } = await sealToPersonKey(persona.personKey.seed, to.pubKey, content);
       return { to, from: currentPersonKey(), sealed, nonce };
     },
     openFor: async (s, fromAddr) => {
@@ -2649,7 +2652,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // its addresses derive deterministically from the seed the ceremony is revoking.
       let personKeyVersion = null;
       try {
-        const nextVersion = (personKey?.version ?? 0) + 1;
+        const nextVersion = (persona.personKey?.version ?? 0) + 1;
         const profileSeedNow = root.deriveAgentSeed('default');
         const nextSeed = derivePersonKeySeed(profileSeedNow, nextVersion);
         const pubKey = personKeyPubKeyB64(nextSeed);
@@ -2669,11 +2672,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         // The chain link: the LINK KEY vouches that n+1 follows n — what a contact who knew n verifies to learn n+1
         // without the root. Never signed with the seed being retired: the revoked device holds that seed and would
         // vouch for a key of its own (the hole of 2026-09-16). Older seeds are kept, so a message sealed to n still opens.
-        const link = personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: personKey.version }) : null;
+        const link = persona.personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: persona.personKey.version }) : null;
         // The seed being retired rides along explicitly: a root-custody device derived v1 at boot and never stored it.
-        const previous = personKey ? [...(personKey.previous ?? []), { version: personKey.version, seed: personKey.seed }] : [];
-        if (await storePersonKey(chatVault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub })) {
-          await adoptPersonKey((await loadPersonKey(chatVault)) ?? { version: nextVersion, seed: nextSeed, reveals, linkKeyPub });
+        const previous = persona.personKey ? [...(persona.personKey.previous ?? []), { version: persona.personKey.version, seed: persona.personKey.seed }] : [];
+        if (await storePersonKey(persona.vault, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub })) {
+          await adoptPersonKey((await loadPersonKey(persona.vault)) ?? { version: nextVersion, seed: nextSeed, reveals, linkKeyPub });
         }
         personKeyVersion = nextVersion;
         if (typeof membershipEmit === 'function') {
@@ -2719,7 +2722,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           const selfRecord = signDeviceDelegation(root.deriveProfileAuthority('default'), {
             profileId: 'default', deviceId: selfDeviceId, pubKey: deviceDelegationPubKey(selfSeed),
           });
-          await new VaultEncrypted({ backing: chatVaultBacking, key: newKey }).set(
+          await personaVault(new VaultEncrypted({ backing: chatVaultBacking, key: newKey }), 'default').set(
             DEVICE_DELEGATION_VAULT_KEY,
             JSON.stringify({ seed: seedToString(selfSeed), deviceId: selfDeviceId, record: selfRecord }),
           );
@@ -5047,7 +5050,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         );
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
         // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
-        if (personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(personKey.links) ? personKey.links : [] };
+        if (persona.personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(persona.personKey.links) ? persona.personKey.links : [] };
         // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
         // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
         // an unlinkability strategy, and a card listing every relay hands its holder a linkage across

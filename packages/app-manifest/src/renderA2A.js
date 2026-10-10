@@ -48,6 +48,10 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'household.grantSurface',
   'household.revokeSurface',
   'household.listSurfaceGrants',
+  // The person's personas: each is an identity of theirs, with its own keys under their root. A peer that could create
+  // one or purge one from the registry would be acting on the person's identity set itself (2026-10-10).
+  'agents.createProfile',
+  'agents.purgeAgent',
   // The pod session (2026-09-01). Signing in navigates a browser to an identity provider and signing out
   // ends the session every other grant is read under — neither is a thing to do TO someone from
   // somewhere else. Withheld here rather than merely omitted from the connection manifest list, because

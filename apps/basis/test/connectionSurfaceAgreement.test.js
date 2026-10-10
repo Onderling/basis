@@ -60,3 +60,18 @@ describe('the connection surface agrees with the connection menu', () => {
     }
   });
 });
+
+describe('a persona is the person\'s own — no connection mints or deletes one', () => {
+  // A persona is an identity of the person (its own keys, derived from their root): a peer that could create one, or
+  // purge one from the registry, would be acting on the person's identity set itself — the custody boundary.
+  it('createProfile and purgeAgent are never delegable: not on the menu, refused at the door', () => {
+    const offered = new Set(connectionOpChoices({ manifests: MANIFESTS }).map((c) => c.opId ?? c.id));
+    const skills = renderA2A(MANIFESTS, { callSkill: async () => ({}) });
+    for (const id of ['agents.createProfile', 'agents.purgeAgent']) {
+      expect(NEVER_DELEGABLE.has(id), `${id} on the withhold list`).toBe(true);
+      expect(offered.has(id), `${id} not on the connection menu`).toBe(false);
+      const skill = skills.find((s) => s.id === id);
+      expect(skill?.policy, `${id} refused at the door`).toBe('never');
+    }
+  });
+});

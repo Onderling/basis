@@ -52,6 +52,10 @@ export const SEAMS = Object.freeze([
   // There is no default relay: a person's device that knows none ASKS at the first action that needs one (an invite).
   // The box is left out on purpose — it has no person to ask; its relay is its operator's argument.
   { id: 'relay-question', pattern: /await askRelayIfNone\(\)/, shells: ['web', 'mobile'], why: 'a device with no relay asks for one before it makes an invite that would carry none' },
+  // JOINING AS A PERSONA: the redeem names WHO joins — the circle's persona (`agent.circleSelf`), so it leaves as that
+  // persona on its own socket and announces its person key. A shell that built the redeem without it would join every
+  // circle as the default, whatever the person picked (2026-10-10).
+  { id: 'redeem-as-circle-self', pattern: /circleSelfFor:\s*\(gid\)\s*=>\s*agent\.circleSelf/, why: 'a circle joined as a persona is joined AS it, from every shell' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).

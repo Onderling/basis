@@ -36,6 +36,8 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // Ownership of a node: claiming a companion makes the person's root its owner — a peer must not be able to make
   // someone the owner of a node of the peer's choosing (2026-10-09).
   'household.claimCompanion',
+  // Which persona a circle is joined as: a peer must not re-file one of the person's circles under another identity.
+  'household.bindCirclePersona',
   'household.stashEnrollOffer',
   'household.pairCirclePeer',
   // …and what that node lets another agent do there: granting it, or reading its choices, has THIS device sign a

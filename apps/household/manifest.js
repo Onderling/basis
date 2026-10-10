@@ -69,6 +69,7 @@ export const householdManifest = {
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
+    'bind-circle-persona': 'write',   // which persona a circle is joined as, on this device
     'pair-peer': 'write',            // adds a peer to a circle's item sync
     'list-companion-grants': 'read',
     'grant-companion': 'write',
@@ -362,6 +363,20 @@ export const householdManifest = {
       // for the recovery phrase. The first step of the enroll-device flow; absent offer → 'no-offer', nothing written.
       params: [
         { name: 'offer', kind: 'string', required: false },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'bindCirclePersona', group: 'device',
+      verb: 'bind-circle-persona',
+      writes: { scope: 'device' },   // this device's own map of which persona a circle is joined as
+      // JOINING AS A PERSONA: before the redeem goes out, the circle is the persona's — its address, its link proof, its
+      // "me" — and the persona is on the circle's relay on a socket of its own. `personaId` null gives the circle back to
+      // the default (a join that did not happen). A persona this device does not run → 'no-such-persona'.
+      params: [
+        { name: 'circleId',  kind: 'string', required: true },
+        { name: 'personaId', kind: 'string', required: false },
+        { name: 'relayUrl',  kind: 'string', required: false },
       ],
       surfaces: {},
     },

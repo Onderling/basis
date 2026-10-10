@@ -591,6 +591,7 @@ if (relayUrl) {
   pairSeams.sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join
+    circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // this device's per-circle address on the redeem path, proven with its own key (source circle == the circle joined)

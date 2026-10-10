@@ -1039,10 +1039,10 @@ The per-circle commitment to an owner root. `rootPubKeyB64` is the root's Ed2551
 **Kind:** function · **Import:** `rootPubKeyB64Of` from `'@onderling/core'`
 
 ```js
-rootPubKeyB64Of(rootSecret)
+rootPubKeyB64Of(authoritySecret)
 ```
 
-The root's pubkey in the encoding every commitment and reveal uses.
+The signer's pubkey in the encoding every commitment and reveal uses — a persona's authority (`deriveProfileAuthority`).
 
 ### `ceremonyRevealMessage`
 
@@ -1062,10 +1062,11 @@ absent for kinds whose subject is the whole fact (address-revoke).
 **Kind:** function · **Import:** `signCeremonyReveal` from `'@onderling/core'`
 
 ```js
-signCeremonyReveal(rootSecret, { circleId, kind, subject, authorRef, facts = null } = {})
+signCeremonyReveal(authoritySecret, { circleId, kind, subject, authorRef, facts = null } = {})
 ```
 
-Mint the reveal for a ceremony statement. Called where the root is transiently in hand.
+Mint the reveal for a ceremony statement. Called where the root is transiently in hand; signed by the persona's
+authority derived from it, never by the root itself.
 
 **Returns:** `{ rootPubKey: string, sig: string }`
 
@@ -1463,7 +1464,7 @@ The canonical statement the owner root signs. Deterministic; binds profile + dev
 **Kind:** function · **Import:** `signDeviceDelegation` from `'@onderling/core'`
 
 ```js
-signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey } = {})
+signDeviceDelegation(authoritySecret, { profileId, deviceId, pubKey } = {})
 ```
 
 Mint the root-signed delegation record for a device. Called at the enrollment ceremony, where
@@ -1471,10 +1472,10 @@ the phrase (and so the root secret) is transiently present.
 
 **Parameters**
 
-- `rootSecret` `Uint8Array` — the owner root's 32-byte secret (Bootstrap#secret).
+- `authoritySecret` `Uint8Array` — the signing persona's 32-byte authority (`Bootstrap.deriveProfileAuthority`) — never the owner root, whose key must not appear on the wire.
 - `a` `{profileId: string, deviceId: string, pubKey: string}` — pubKey = deviceDelegationPubKey(seed).
 
-**Returns:** `{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}` — `by` = the root's derived pubKey (b64), `sig` = base64url Ed25519 over the statement.
+**Returns:** `{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}` — `by` = the authority's pubKey (b64), `sig` = base64url Ed25519 over the statement.
 
 ### `firstDeviceIdFor`
 
@@ -1551,7 +1552,7 @@ The canonical statement the owner root signs to retire a device. Deterministic; 
 **Kind:** function · **Import:** `signDeviceRevocation` from `'@onderling/core'`
 
 ```js
-signDeviceRevocation(rootSecret, { profileId, deviceId } = {})
+signDeviceRevocation(authoritySecret, { profileId, deviceId } = {})
 ```
 
 Mint the root-signed REVOCATION of a device — the tombstone a party outside the person's own devices can check
@@ -1560,7 +1561,7 @@ nothing. Minted at the revoke ceremony, where the phrase (and so the root secret
 
 **Parameters**
 
-- `rootSecret` `Uint8Array`
+- `authoritySecret` `Uint8Array` — the persona's authority (as for `signDeviceDelegation`)
 - `a` `{profileId: string, deviceId: string}`
 
 **Returns:** `{profileId:string, deviceId:string, by:string, sig:string}`

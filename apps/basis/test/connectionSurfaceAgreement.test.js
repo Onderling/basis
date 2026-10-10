@@ -60,3 +60,20 @@ describe('the connection surface agrees with the connection menu', () => {
     }
   });
 });
+
+describe('the person\'s registry is theirs — a connection may see what acts for them, nothing more', () => {
+  // Every registry WRITE changes who the person is, what they disclose, or who acts for them; every raw registry READ
+  // returns their own record, not a release (and getPersonaRelease lets the caller pick the context, so it is a raw
+  // read too). A connection may only see what acts for them and what exists — a view screen of their own shows that.
+  const MAY_OFFER = ['agents.listAgents', 'agents.viewAgent', 'agents.listCatalogue', 'agents.listDataVersions'];
+  it('of the agents ops, the menu offers exactly the four views; every other one is refused at the door', () => {
+    const all = agentsManifest.operations.map((o) => `agents.${o.id}`);
+    const offered = new Set(connectionOpChoices({ manifests: MANIFESTS }).map((c) => c.opId ?? c.id));
+    const skills = renderA2A(MANIFESTS, { callSkill: async () => ({}) });
+    expect(all.filter((id) => offered.has(id)).sort()).toEqual([...MAY_OFFER].sort());
+    for (const id of all.filter((x) => !MAY_OFFER.includes(x))) {
+      expect(NEVER_DELEGABLE.has(id), `${id} on the withhold list`).toBe(true);
+      expect(skills.find((sk) => sk.id === id)?.policy, `${id} refused at the door`).toBe('never');
+    }
+  });
+});

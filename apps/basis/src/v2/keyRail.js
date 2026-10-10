@@ -22,6 +22,7 @@
  * statements are DISCOUNTED — the projected chain simply stays at the last undisputed head, so
  * members keep sealing under it and the contested version is never adopted. Deny-wins, softly.
  */
+import { selfRefIn } from './selfRef.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { addressBindsOnRow } from './membershipRail.js';
 import { KEY_LANE } from './keyManifest.js';
@@ -88,10 +89,11 @@ export function keyBindingVerifier(callSkill, { rotateClassFor = null } = {}) {
 
 /** Build the key rail over the device log. Mirrors `makeMembershipRail`. */
 export function makeKeyRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null, rotateClassFor = null } = {}) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function') return null;
   return makeCircleEntryRail({
     eventLog,
-    signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: myRef }),
+    signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: KEY_LANE,
     declaredKinds: KEY_RAIL_KINDS,
     verifyBinding: verifyBinding ?? keyBindingVerifier(callSkill, { rotateClassFor }),

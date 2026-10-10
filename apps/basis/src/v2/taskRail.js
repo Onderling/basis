@@ -13,6 +13,7 @@
  * This lane replaces the unsigned peer-mirror carry for task items (per-type one-path): the store's publish
  * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
  */
+import { selfRefIn } from './selfRef.js';
 import { isRosterTrailItem } from '@onderling/circles';
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
@@ -64,6 +65,7 @@ export const OWN_TASK_CATCHUP_SUBTYPES = Object.freeze({
  *   `delegation()` the record carried so a sibling verifies the chain without the registry.
  */
 export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, own = null }) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const isOwn = (circleId) => Boolean(own?.scope) && circleId === own.scope;
   const rosterBinding = verifyBinding ?? rosterBindingVerifier(callSkill);
@@ -78,7 +80,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
   };
   const base = makeCircleEntryRail({
     eventLog,
-    signerFor: async (circleId) => (isOwn(circleId) ? ownSigner() : { identity: await circleIdentityFor(circleId), ref: myRef }),
+    signerFor: async (circleId) => (isOwn(circleId) ? ownSigner() : { identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: TASK_LANE,
     declaredKinds: TASK_RAIL_KINDS,
     verifyBinding: (a) => (isOwn(a?.circleId) ? (own.verifyBinding?.(a) ?? false) : rosterBinding(a)),
@@ -137,7 +139,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isRosterTrailItem(it));
     if (uncovered.length === 0) return stored;
     let resolved = null;
-    let ref = myRef;
+    let ref = refIn(circleId);
     try {
       if (isOwn(circleId)) { const s = await ownSigner(); resolved = s?.identity ?? null; ref = s?.ref ?? null; }
       else resolved = await circleIdentityFor(circleId);

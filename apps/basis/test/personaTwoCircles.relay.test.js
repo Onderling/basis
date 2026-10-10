@@ -106,6 +106,20 @@ describe('two personas of one device, seen by a co-member of both circles', () =
     expect((await dev.agent.callSkill('stoop', 'whoAmI', { groupId: X }))?.webid).toBe(dev.agent.identity.chat.pubKey);
   });
 
+  it('what B says in Y names B and verifies at Cor AS B — the lane names the persona beside its circle key', async () => {
+    const ts = Date.now();
+    // the device's own chat rail — the one the shells sign their circle messages with
+    const res = await dev.agent.chatRail.appendMessage(Y, { msgId: 'y-1', ts, text: 'hallo buren' });
+    expect(res?.statement?.body?.payload?.authorRef).toBe(B.chatId.pubKey);
+    expect(JSON.stringify(res.statement).includes(dev.agent.identity.chat.pubKey), 'no byte of A').toBe(false);
+    // Cor's rail verifies it against Cor's own roster for Y (signature + the key↔ref binding) and keeps it. Handed
+    // over directly: the wire crossing of a persona's circle traffic needs its per-circle address registered on the
+    // persona's OWN relay socket, which is the next step's relay registration per persona (a row).
+    const landed = await cor.chatRail.ingest(Y, res.statement);
+    expect(landed?.ok, JSON.stringify(landed)).toBe(true);
+    expect(cor.chatRail.storedStatements(Y).some((st) => st?.body?.payload?.authorRef === B.chatId.pubKey)).toBe(true);
+  }, 60_000);
+
   it('B without a connection of its own: nothing leaves, and the bubble says why (retryable)', async () => {
     await dev.agent.sa.relays.remove(relay.url, { identity: B.chatId.pubKey });
     expect(dev.agent.sa.relays.list({ identity: B.chatId.pubKey })).toEqual([]);

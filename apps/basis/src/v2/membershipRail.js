@@ -8,6 +8,7 @@
  * the pull-all catch-up. `deriveRoster` folds the rail's VERIFIED bodies (author resolved to ref) as the
  * AUTHORITATIVE membership — the wall-clock exit path retires with this rider.
  */
+import { selfRefIn } from './selfRef.js';
 import { verifyCeremonyReveal, isCeremonyKind, ceremonyRevealFacts, PERSON_KEY_KIND } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -150,10 +151,11 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
 }
 
 export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function') return null;
   return makeCircleEntryRail({
     eventLog,
-    signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: myRef }),
+    signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
     verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor }),
@@ -169,9 +171,10 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
  * statement the fold discards; never persist one). Joins/evicts are authority-checked at the fold.
  */
 export function makeMembershipEmitter({ rail, myRef, fan = null }) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (!rail) return null;
   return async function emitSpine({ kind, circleId, subject, payload, actor, signer } = {}) {
-    if (kind === 'leave' && subject !== myRef) return null;
+    if (kind === 'leave' && subject !== refIn(circleId)) return null;
     const res = await rail.append(circleId, { kind, subject, payload, actor, signer });
     if (!res) return null;
     if (typeof fan === 'function') {

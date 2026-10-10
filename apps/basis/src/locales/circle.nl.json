@@ -576,6 +576,10 @@
       "undeliverable": {
         "text": "Kon sommige leden niet bereiken",
         "doc": "δ.2 — permanent fan-out failure (e.g. a member has no published key); shown but NOT retryable (retry can't help)."
+      },
+      "persona_no_connection": {
+        "text": "Niet verstuurd: deze persona heeft geen verbinding met de kring (tik om opnieuw te proberen)",
+        "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."
       }
     },
     "unknown_sender": {

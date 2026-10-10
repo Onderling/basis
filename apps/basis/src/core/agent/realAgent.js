@@ -790,8 +790,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // with `agentTrailRows({actor})` — the agent-detail activity card.
   if (opts.deviceLog) {
     const ownIds = new Set([chatId?.pubKey, hostId?.pubKey].filter(Boolean));
+    // ...and every persona of the owner: a local call made AS one (`actAs`) is the owner's own surface too. Read live —
+    // a persona created after boot is one of the owner's from that moment.
+    const isOwn = (actor) => ownIds.has(actor) || [...personas.values()].some((p) => p?.chatId?.pubKey === actor);
     const trailSink = ({ actor, op, via, outcome }) => {
-      if (!actor || ownIds.has(actor)) return;
+      if (!actor || isOwn(actor)) return;
       const entry = makeAgentTrailEntry({ actor, op, via, outcome });
       if (entry) opts.deviceLog.append(entry);
     };
@@ -2075,8 +2078,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (the stoop agent directly, not the waist), because the waist's add is what fans a row out and a
   // landed row must not fan back.
   const stoopAgentRef = { current: null };   // late-bound: the stoop agent is created further down this scope
+  // WHO this device's own stoop call is: in a persona's circle (the args name it), the persona — `actAs` at the core's
+  // in-process membrane, so the skill's `from` and the trail's actor are it. Anything else: the default, as before.
+  const stoopActAs = (args) => {
+    const c = args?.groupId ?? args?.circleId ?? null;
+    if (typeof c !== 'string' || !c) return {};
+    let as = null;
+    try { as = circleSelf(c).sendAs ?? null; } catch { as = null; }   // (circleSelf is bound further down; early boot reads none)
+    return as ? { actAs: as } : {};
+  };
   const rawStoop = async (opId, args = {}) => {
-    const result = await chatAgent.invoke(stoopAgentRef.current.address, opId, [DataPart(args)]);
+    const result = await chatAgent.invoke(stoopAgentRef.current.address, opId, [DataPart(args)], stoopActAs(args));
     return (Array.isArray(result) ? result[0] : null)?.data ?? null;
   };
   const rawContacts = async () => (await rawStoop('listContacts', {}))?.contacts ?? [];
@@ -2124,16 +2136,31 @@ export async function createRealHouseholdAgent(opts = {}) {
   // a failing circle named and retried on the next save. `sayOnRosters` is the shells' seam too (About me's "share
   // to this circle" says the persona release through it, step two 2026-09-22); `tellMyRostersWhatISay` is the
   // after-write hook's call for the name fields, over every circle I am in (pair circles included).
-  const sayOnRosters = ({ circleIds = [], props = {} } = {}) => {
-    if (typeof membershipEmit !== 'function') return Promise.resolve({ error: 'no-membership-rail', emitted: [], unchanged: [], failed: [] });
-    return emitMemberProps(
-      { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
-      { from: chatId.pubKey, circleIds, props },
-    );
+  // Each circle hears it from the self it knows there: a persona's circle from the persona, never the default.
+  const sayOnRosters = async ({ circleIds = [], props = {} } = {}) => {
+    if (typeof membershipEmit !== 'function') return { error: 'no-membership-rail', emitted: [], unchanged: [], failed: [] };
+    const bySelf = new Map();
+    for (const cid of Array.isArray(circleIds) ? circleIds : []) {
+      const me = circleSelf(cid).webid ?? chatId.pubKey;
+      if (!bySelf.has(me)) bySelf.set(me, []);
+      bySelf.get(me).push(cid);
+    }
+    const out = { ok: true, emitted: [], unchanged: [], failed: [] };
+    for (const [from, ids] of bySelf) {
+      const r = await emitMemberProps(
+        { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
+        { from, circleIds: ids, props },
+      );
+      if (r?.error) return { ...r, emitted: out.emitted, unchanged: out.unchanged, failed: [...out.failed, ...ids] };
+      out.emitted.push(...r.emitted); out.unchanged.push(...r.unchanged); out.failed.push(...r.failed);
+    }
+    return out;
   };
   async function tellMyRostersWhatISay() {
     if (typeof membershipEmit !== 'function') return { error: 'no-membership-rail' };
     const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
+    // the DEFAULT's names over the DEFAULT's circles: `listMyCircles` answers for its caller, and this call is the
+    // default's — a persona's circle is never on it, so never hears them (pinned over a relay: its names are its own)
     const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
     // Names only. The PICTURE does not ride here: it is the persona's `profilePicture` attribute and travels
@@ -3891,7 +3918,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // identity (derived from the profile seed — same on every device of the user, never persisted), and
     // carries the member's ref (webid == the chat pubKey in the basis binding) as the signed authorRef the
     // roster projection verifies. One global key across circles would re-link memberships; this doesn't.
-    circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: chatId.pubKey }),
+    // In a persona's circle both are the persona's: its per-circle key (`circleIdentityFor` routes through `personaOf`)
+    // and its webid as the ref the roster verifies.
+    circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: circleSelf(circleId).webid ?? chatId.pubKey }),
+    // ...and stoop's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
+    // about it arrive AS the persona (`stoopActAs`).
+    selfWebidFor: (circleId) => circleSelf(circleId).webid,
     membershipEmit,
     membershipRead,
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
@@ -4173,7 +4205,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           myCircleIds: () => _listMyKnownCircles(),
           rosterOf: async (circleId) => {
             const reply = await chatAgent.invoke(
-              stoopAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })],
+              stoopAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })], stoopActAs({ groupId: circleId }),
             );
             return reply?.[0]?.data?.members ?? [];
           },
@@ -4205,7 +4237,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         try {
           await ensureCircleSync(circleId);   // the publish valve is wired at open; a post may come first
           const store = householdService.stores.getStore(circleId);
-          await store.put(toCircleStorePost(item, { from: chatId.pubKey }), { by: chatId.pubKey });
+          const me = circleSelf(circleId).webid ?? chatId.pubKey;   // in a persona's circle, the persona posts
+          await store.put(toCircleStorePost(item, { from: me }), { by: me });
           if (typeof console !== 'undefined') console.info(`[realAgent] noticeboard ${item.type} ${item.id} → circle store ${circleId} (the lane carries it)`);
         } catch (err) {
           if (typeof console !== 'undefined') console.warn(`[realAgent] noticeboard → circle store ${circleId} failed:`, err?.message ?? err);
@@ -5218,7 +5251,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       let rawReply = null;   // the stoop reply before shaping — the own-devices fan below reads the contact row
       const runStoop = async () => {
         const parts = [DataPart(realArgs)];
-        const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts);
+        const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts, stoopActAs(realArgs));
         const first  = Array.isArray(result) ? result[0] : null;
         const reply  = first?.data ?? null;
         rawReply = reply;

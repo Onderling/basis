@@ -677,7 +677,12 @@ async function _fanOutViaReliableSend({
         // held (offline → queued for hold-forward) AND delivered both count as sent; a send
         // that explicitly reports neither is the only genuine transient failure — try the member's
         // next proven address before giving up on them.
-        if (r && r.held === false && r.delivered === false) { failure = { webid, reason: 'not-delivered' }; last = { webid, addr, outcome: 'not-delivered' }; continue; }
+        if (r && r.held === false && r.delivered === false) {
+          // the send's own reason when it gave one (`persona-no-connection`: this circle's persona has no socket of
+          // its own) — the bubble says it; else the plain transient failure
+          const why = typeof r.reason === 'string' && r.reason ? r.reason : 'not-delivered';
+          failure = { webid, reason: why }; last = { webid, addr, outcome: why }; continue;
+        }
         sent += 1;
         failure = null;
         last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'delivered' };
@@ -832,7 +837,7 @@ async function listGroupMembersCore(scope, a, ctx) {
       store, members, reveals, projectCircleRoster: project, readCircleExits, isExited,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
-    { a, from: ctx?.from ?? null, localActor, groupId },
+    { a, from: ctx?.from ?? null, localActor: scope.localActorIn ? scope.localActorIn(a?.groupId ?? groupId) : localActor, groupId },
   );
 }
 
@@ -1266,6 +1271,7 @@ export function buildStoopScope(deps = {}) {
   const {
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
+    selfWebidFor = null,
   } = deps;
   // This device's own key paired with the webid it speaks for. Derived HERE so both routes into the
   // scope get it — the roster projection needs it to read back statements this same composition
@@ -1273,8 +1279,16 @@ export function buildStoopScope(deps = {}) {
   const selfSigner = deps.selfSigner ?? ((bundle?.agent?.identity?.pubKey && localActor)
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
+  // THIS DEVICE in a circle: its persona there (host-injected `selfWebidFor`), else `localActor`. The cores' "is
+  // this my own call?" compares against it — `withCircleSelf` hands a persona's circle's own calls the persona's
+  // webid as `from`, so the local/foreign line must be drawn at the same webid or the device's own call reads foreign.
+  const localActorIn = (gid) => {
+    let self = null;
+    try { self = (typeof gid === 'string' && gid && typeof selfWebidFor === 'function') ? selfWebidFor(gid) : null; } catch { self = null; }
+    return (typeof self === 'string' && self) ? self : localActor;
+  };
   return {
-    selfSigner,
+    selfSigner, localActorIn,
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
@@ -1304,6 +1318,9 @@ export function buildSkills({
   controlAgent,
   muted,
   localActor,
+  // WHO this device is per circle, `(circleId) => webid|null` (its persona there) — host-injected; the local/foreign
+  // line in the cores follows it (`localActorIn`). Absent → `localActor` for every circle.
+  selfWebidFor = null,
   groupId: explicitGroupId,
   dataLocationConfig,
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` (principle 5) — host-injected;
@@ -1385,8 +1402,9 @@ export function buildSkills({
   const scope = buildStoopScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfSigner,
+    selfSigner, selfWebidFor,
   });
+  const localActorIn = scope.localActorIn;
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
   // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
   // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
@@ -3018,7 +3036,7 @@ export function buildSkills({
       // and its `_sync` producer, and passes the parsed args + carrier context.
       return recordCircleAddress(
         { store, verifyCircleAddressAnnouncement, simulateSync },
-        { a: dataArgs(parts), from, localActor },
+        { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
       );
     }, {
       description: 'Record a member\'s PROVEN per-circle address for a circle (the receive half of address announcing).',
@@ -3240,7 +3258,7 @@ export function buildSkills({
             store, groupId: gid, memberMapList: [], circleSignerFor, membershipRead, selfSigner,
           }),
         },
-        { a: dataArgs(parts), from, localActor },
+        { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
       );
     }, {
       description: 'List addresses for the calling actor\'s circle peers (fan-out roster).',

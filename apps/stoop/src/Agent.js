@@ -233,6 +233,10 @@ export async function createNeighbourhoodAgent({
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
+  // WHO this device is in a circle, `(circleId) => webid|null` — host-injected (basis: the circle's persona). The
+  // host's own calls about a persona's circle arrive AS it (`invoke(…, { actAs })`); the skills' local/foreign line
+  // follows it (`localActorIn`). Absent → the default throughout.
+  selfWebidFor = null,
   label = 'NeighbourhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
@@ -613,6 +617,7 @@ export async function createNeighbourhoodAgent({
       controlAgent,   // household sealed-pod membership hooks (no-op when absent)
       muted,
       localActor: offeringMatchOpts.localActor,
+      selfWebidFor,   // who this device is per circle — the cores' local/foreign line follows it
       groupId:    offeringMatchOpts.group,
       dataLocationConfig,
       chat,           // Phase 14 — used by sendChatMessage / respondToItem

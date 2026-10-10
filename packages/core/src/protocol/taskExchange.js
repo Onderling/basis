@@ -118,6 +118,12 @@ export function invokeAgentSkill(agent, peerId, skillId, parts, opts = {}) {
         return;
       }
 
+      // `actAs` names one of THIS process's own identities and is read only in-process: on the wire it would be a
+      // claim nobody can check, so a call that cannot run here is refused rather than sent as the agent.
+      if (opts.actAs) {
+        task._transition('failed', { error: 'actAs: in-process only — this call would leave the process' });
+        return;
+      }
       if (!opts.quiet) console.log(`[invokeAgentSkill] ${skillId} → ${peerId.slice(0,12)} via ${t?.constructor?.name}`);
       const rs = await t.request(
         peerId,
@@ -229,6 +235,8 @@ function _fastPathTarget(callerAgent, peerId, skillId, t, opts) {
  */
 async function _runInProcess(callerAgent, targetAgent, task, taskId, skillId, parts, tokenJson, opts) {
   const from    = callerAgent.address;
+  // the persona this local call is made as (one of this process's own identities), or null
+  const actAs   = typeof opts.actAs === 'string' && opts.actAs ? opts.actAs : null;
   const targetT = await targetAgent.transportFor(from);
 
   let cleanup = () => {};
@@ -261,9 +269,9 @@ async function _runInProcess(callerAgent, targetAgent, task, taskId, skillId, pa
   // must behave identically on the fast-path and the wire path.
   const res = await runGatedSkill(targetAgent, {
     skillId, parts, from, token: tokenJson,
-    taskId,
+    taskId, actAs,
     envelope: {
-      _from:   from,
+      _from:   actAs ?? from,
       payload: { type: 'task', taskId, skillId, parts, _token: tokenJson },
     },
     onGatePassed,
@@ -476,6 +484,9 @@ export async function runGatedSkill(agent, {
   skillId, parts = [], from, token = null,
   origin = null, originSig = null, originTs = null,
   taskId = null, envelope = null, onGatePassed = null,
+  // IN-PROCESS ONLY (`_runInProcess` passes it; the wire handler never does): the persona a local call is made as.
+  // The gate below judges the real caller (`from`); the handler's `from`, its origin and the trail's actor are it.
+  actAs = null,
 }) {
   // ── Policy check ───────────────────────────────────────────────────────────
   if (agent.policyEngine) {
@@ -553,6 +564,9 @@ export async function runGatedSkill(agent, {
     // _origin present but no sig → unverified claim; attribute to `from`.
     attributedOrigin = from;
   }
+  // A local call made AS one of this process's personas: one actor field for it, as for a verified origin.
+  const actor = typeof actAs === 'string' && actAs ? actAs : null;
+  if (actor) attributedOrigin = actor;
 
   // Gate passed. Let the wire path stand up its AbortController + TTL now
   // (exact original ordering: after the gate, before the handler).
@@ -582,7 +596,7 @@ export async function runGatedSkill(agent, {
   // sender (`from` = the relay) and the original caller (originFrom).
   const ctx = {
     parts,
-    from,
+    from:           actor ?? from,
     originFrom:     attributedOrigin,
     originVerified: verifiedOrigin,
     relayedBy:      origin ? from : null,

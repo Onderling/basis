@@ -43,8 +43,9 @@ export const GRANTS_CATCHUP_SUBTYPES = Object.freeze({
  *
  * @param {object} a
  * @param {string} a.selfPubKey  the profile's chat pubKey (the one ref this lane admits, and the floor key)
- * @param {string|null} [a.rootFingerprint]  this device's owner-root fingerprint (root custody derives it;
- *   delegation custody carries it on the marker). Absent → carried records cannot bind (floor + registry only).
+ * @param {string|null} [a.authorityFingerprint]  the fingerprint of the persona's AUTHORITY that signs this person's
+ *   delegation records (root custody derives it; delegation custody reads it off its own record's `by`) — never the
+ *   owner root's, which stays on the device. Absent → carried records cannot bind (registry only).
  * @param {(() => Promise<object>|object)|null} [a.lookupDelegations]  the owner's `{[deviceId]: record}`
  *   delegation map (best-effort; the registry). Source of the deny-wins tombstone and the no-record fallback.
  *   THE FLOOR IS GONE (2026-09-16, binding-levels §10.5 step 4): a statement signed with the shared PROFILE key —
@@ -57,7 +58,7 @@ export const GRANTS_CATCHUP_SUBTYPES = Object.freeze({
  *   ceremony that enrolled the second — and My data, which lists the registry, showed no device to
  *   revoke (the box, 2026-09-14). The record proves itself; keeping it is bookkeeping, best-effort.
  */
-export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null, learnDelegation = null } = {}) {
+export function deviceSetBindingVerifier({ selfPubKey, authorityFingerprint = null, lookupDelegations = null, learnDelegation = null } = {}) {
   if (typeof selfPubKey !== 'string' || !selfPubKey) {
     throw new Error('deviceSetBindingVerifier: selfPubKey required');
   }
@@ -76,7 +77,7 @@ export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, l
     const rec = payload?.delegation;
     if (rec && typeof rec === 'object' && rec.pubKey === author && verifyDeviceDelegation(rec)) {
       if (map[rec.deviceId]?.revoked === true) return false;   // deny wins — the tombstone refuses
-      if (rootFingerprint && ownerRootFingerprint(rec.by) === rootFingerprint) {
+      if (authorityFingerprint && ownerRootFingerprint(rec.by) === authorityFingerprint) {
         if (!map[rec.deviceId] && typeof learnDelegation === 'function') {
           try { await learnDelegation(rec); } catch { /* the statement binds either way */ }
         }

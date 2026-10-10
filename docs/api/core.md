@@ -1029,17 +1029,17 @@ malformed or unparseable is `false`, never a throw the caller might treat as "un
 **Kind:** function · **Import:** `ceremonyCommitment` from `'@onderling/core'`
 
 ```js
-ceremonyCommitment(rootPubKeyB64, circleId)
+ceremonyCommitment(authorityPubKeyB64, circleId)
 ```
 
-The per-circle commitment to an owner root. `rootPubKeyB64` is the root's Ed25519 pubkey as b64 (the delegation record's `by`).
+The per-circle commitment to an owner root. `authorityPubKeyB64` is the root's Ed25519 pubkey as b64 (the delegation record's `by`).
 
-### `rootPubKeyB64Of`
+### `authorityPubKeyB64Of`
 
-**Kind:** function · **Import:** `rootPubKeyB64Of` from `'@onderling/core'`
+**Kind:** function · **Import:** `authorityPubKeyB64Of` from `'@onderling/core'`
 
 ```js
-rootPubKeyB64Of(authoritySecret)
+authorityPubKeyB64Of(authoritySecret)
 ```
 
 The signer's pubkey in the encoding every commitment and reveal uses — a persona's authority (`deriveProfileAuthority`).
@@ -1068,7 +1068,7 @@ signCeremonyReveal(authoritySecret, { circleId, kind, subject, authorRef, facts 
 Mint the reveal for a ceremony statement. Called where the root is transiently in hand; signed by the persona's
 authority derived from it, never by the root itself.
 
-**Returns:** `{ rootPubKey: string, sig: string }`
+**Returns:** `{ authorityPubKey: string, sig: string }`
 
 ### `verifyCeremonyReveal`
 

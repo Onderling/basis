@@ -48,6 +48,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `assertProfileId` | function | [`core.md`](core.md#assertprofileid) |
 | `audienceFromHumanInTheLoop` | function | [`core.md`](core.md#audiencefromhumanintheloop) |
 | `authorHead` | function | [`core.md`](core.md#authorhead) |
+| `authorityPubKeyB64Of` | function | [`core.md`](core.md#authoritypubkeyb64of) |
 | `b64decode` | function | [`core.md`](core.md#b64decode) |
 | `b64encode` | function | [`core.md`](core.md#b64encode) |
 | `Bootstrap` | class | [`core.md`](core.md#bootstrap) |
@@ -231,7 +232,6 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `RoleGrantManager` | class | [`core.md`](core.md#rolegrantmanager) |
 | `roleRank` | function | [`core.md`](core.md#rolerank) |
 | `ROLES` | constant | [`core.md`](core.md#roles) |
-| `rootPubKeyB64Of` | function | [`core.md`](core.md#rootpubkeyb64of) |
 | `RoutingStrategy` | class | [`core.md`](core.md#routingstrategy) |
 | `SEALED_VERSION` | constant | [`core.md`](core.md#sealed_version) |
 | `sealToPersonKey` | function | [`core.md`](core.md#sealtopersonkey) |

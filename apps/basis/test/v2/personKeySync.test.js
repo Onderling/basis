@@ -5,10 +5,10 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createPersonKeySync, PERSON_KEY_CARRY, PERSON_KEY_CATCHUP_SUBTYPES } from '../../src/v2/personKeySync.js';
-import { b64encode, Bootstrap, ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, derivePersonKeySeed, personKeyPubKeyB64, personKeyFacts } from '@onderling/core';
+import { b64encode, Bootstrap, ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, derivePersonKeySeed, personKeyPubKeyB64, personKeyFacts } from '@onderling/core';
 
 const root = Bootstrap.create().bootstrap;
-const rootPub = rootPubKeyB64Of(root.secret);
+const rootPub = authorityPubKeyB64Of(root.secret);
 const ME = 'w:anna';
 const profile = root.deriveAgentSeed('default');
 const keyAt = (version, circles = ['k1', 'k2'], secret = root.secret) => {

@@ -188,7 +188,7 @@ export { generateTunnelKey,
          sealTunnelOW,
          openTunnelOW }                from './security/tunnelSeal.js';
 export {
-  ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
+  ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
 } from './identity/ceremonyCommitment.js';   // who may retire a device address: the owner root, at a ceremony
 export { CEREMONY_KINDS, ADDRESS_REVOKE_KIND, isCeremonyKind, ceremonyRevealFacts } from './security/ceremonyKinds.js';   // the kinds only the root may make, and what each reveal covers

@@ -217,6 +217,7 @@ async function restoreOrGenerate(vault) {
 }
 
 import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { createPersonaRuntime } from './personaRuntime.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -558,24 +559,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (added) await historyKeysVault.set(`chain:${circleId}`, JSON.stringify([...byVersion.values()].sort((a, b) => b.version - a.version)));
     return added;
   };
-  // The default profile's seed — the source for both the chat identity AND per-circle addresses
-  // (step 5B/C). Kept so the returned agent can expose circleAddressFor(circleId).
-  const defaultProfileSeed = ownerRoot ? ownerRoot.deriveAgentSeed('default') : null;
-  // THE PERSON KEY (rotating, per profile — identity/personKey.js). A root-custody device re-derives the
-  // current version each boot; an enrolled device was handed it at its ceremony and keeps it sealed. Absent
-  // on an enrolled device from before person keys: it announces no key at joins, and says so once.
-  // The LINK KEY's public half rides with it (personKey.js): root custody derives it; an enrolled device was handed
-  // it at its ceremony. The link SEED exists only inside a ceremony — it is what vouches for a rotation to a contact.
-  const derivedLinkKeyPub = defaultProfileSeed ? personKeyPubKeyB64(derivePersonLinkKeySeed(defaultProfileSeed)) : null;
-  let personKey = await (async () => {
-    try {
-      const stored = await loadPersonKey(chatVault);
-      if (stored) return (stored.linkKeyPub || !derivedLinkKeyPub) ? stored : { ...stored, linkKeyPub: derivedLinkKeyPub };
-    } catch { /* re-derive below */ }
-    if (defaultProfileSeed) return { version: 1, seed: derivePersonKeySeed(defaultProfileSeed, 1), linkKeyPub: derivedLinkKeyPub };
-    console.warn('[realAgent] no person key on this enrolled device — it announces none at joins; a phrase ceremony on it hands it one');
-    return null;
-  })();
+  // THE PERSONA RUNTIME (personaRuntime.js): the keys this device runs for the default persona — its profile seed, the
+  // device seed its per-circle keys derive from, its delegation record, its per-circle identities, the authority its
+  // commitments name, and its person key's starting point. Named once there; the agent reads it. Only 'default' runs.
+  const personas = new Map([['default', await createPersonaRuntime({ profileId: 'default', ownerRoot, custody, custodySeed, chatVault })]]);
+  const persona = personas.get('default');
+  let personKey = persona.initialPersonKey;
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
   const currentPersonKey = () => (personKey ? { version: personKey.version, pubKey: personKeyPubKeyB64(personKey.seed) } : null);
   /** The same, with the link key's public half — what a CARD and a chain reply carry, so a contact can pin it and verify rotations. */
@@ -617,126 +606,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     registerPersonIdentity();
     await registerPersonAddressOnRelays();
   };
-  let chatSeedReadable = false;
-  try { chatSeedReadable = (await chatVault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
-  if (!chatSeedReadable) {
-    // Root custody re-derives the chat identity; delegation custody CANNOT (the root is not
-    // resident) — the identity was persisted at the ceremony, and its absence is a broken vault,
-    // not a re-derivable state. Loud, never silently a new person.
-    if (!defaultProfileSeed) throw new Error('delegation custody: the chat identity vault is unreadable — restore with the recovery phrase');
-    await AgentIdentity.fromSeed(defaultProfileSeed, chatVault);
-  }
 
-  // ── ADD-A-DEVICE: the device derivation root ─────────────────────────────────────────────────
-  // An ENROLLED device (the delegation blob present — written sealed by the enrollment ceremony,
-  // see ownerRootRestore.js) derives its PER-CIRCLE keys from its DELEGATION seed instead of the
-  // profile seed: every device of one person then presents a DISTINCT address per circle (the
-  // roster row's address set), and revoking one device can never touch another device's keys.
-  // An unenrolled install — the first device, every pre-existing install — keeps the profile
-  // seed: nothing re-keys. The chat identity (the member's webid) stays PROFILE-derived on every
-  // device: the member is one; only the circle addresses are per-device.
-  let deviceDerivationSeed = custodySeed ?? defaultProfileSeed;
-  let enrolledDevice = custody.mode === 'delegation' ? { deviceId: custody.deviceId } : null;
-  try {
-    let blob = await chatVault.get(DEVICE_DELEGATION_VAULT_KEY);
-    if (typeof blob === 'string') { try { blob = JSON.parse(blob); } catch { blob = null; } }
-    if (blob && typeof blob === 'object' && typeof blob.seed === 'string' && typeof blob.deviceId === 'string') {
-      if (custody.mode === 'delegation') {
-        // The blob is the LABEL + pre-signed-record carrier here; the key door + marker are the
-        // boot authority.
-        if (enrolledDevice) {
-          if (blob.label) enrolledDevice.label = blob.label;
-          if (blob.record) enrolledDevice.record = blob.record;
-        }
-      } else {
-        // Root custody, enrolled (the pre-cutover interim): the blob supplies the derivation root.
-        const decoded = seedFromString(blob.seed);
-        if (decoded instanceof Uint8Array && decoded.length === 32) {
-          deviceDerivationSeed = decoded;
-          // A record minted before the persona's authority signed names the ROOT as its signer. The root is resident
-          // here, so it is re-signed in place by the authority — same id, same key, so no address moves; the id itself
-          // becomes a wire id at this device's next phrase ceremony (the self-enrol migration mints one).
-          if (ownerRoot && blob.record && blob.record.by !== authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority('default'))) {
-            try {
-              const resigned = signDeviceDelegation(ownerRoot.deriveProfileAuthority('default'), {
-                profileId: blob.record.profileId ?? 'default', deviceId: blob.deviceId, pubKey: blob.record.pubKey,
-              });
-              blob.record = blob.record.label ? { ...resigned, label: blob.record.label } : resigned;
-              await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
-            } catch (err) { console.warn(`[realAgent] could not re-sign this device's delegation by its authority: ${err?.message ?? err}`); }
-          }
-          enrolledDevice = {
-            deviceId: blob.deviceId, selfMinted: blob.selfMinted === true,
-            ...(blob.label ? { label: blob.label } : {}),
-            ...(blob.record ? { record: blob.record } : {}),
-          };
-        }
-      }
-    }
-  } catch { /* unenrolled */ }
-
-  // The per-circle SIGNING identity, one per circle, memoised.
-  //
-  // Derived from `deviceDerivationSeed` — THIS DEVICE'S derivation root, set just above as
-  // `custodySeed ?? defaultProfileSeed`. Read that literally, because the two branches differ in a
-  // way that decides who can tell your devices apart:
-  //   • ENROLLED (custody seed present) → the device seed from the delegation blob, so this device
-  //     presents an honestly DISTINCT address per circle and the roster's address SET gains one
-  //     entry for it. Statements from your phone and your laptop are separable — by address.
-  //   • UNENROLLED first device → the profile's own seed, so device and profile identity collapse.
-  // (The custody CEREMONY key is a third case and is derived from the profile seed explicitly at
-  // its own call site — a stolen device must not be able to mint a revocation.)
-  //
-  // The vault is deliberately EPHEMERAL: nothing here is worth persisting, and a per-circle key
-  // written to storage is one more copy of the thing we are trying not to spread. Re-derived every
-  // boot — and re-derived DIFFERENTLY after a self-enroll cutover, which is why enrollment ends in
-  // a per-circle re-announce that lands the new addresses in every roster's set.
-  const circleIdentities = new Map();   // circleId → Promise<AgentIdentity>
-  // THE FIRST DEVICE ENROLS ITSELF AT FIRST BOOT (2026-09-16, the grants floor's retirement): under root custody
-  // with no delegation blob, mint a device id, derive the device seed from the profile seed, sign the delegation
-  // record with the root (resident here), and keep the blob sealed — exactly what the enrol ceremony writes on a
-  // second device, minus the custody cutover (the root stays resident; the first ceremony still cuts over). From
-  // here every device of a person derives its per-circle addresses from a DEVICE seed and signs the grants lane
-  // with a root-signed delegation; the profile seed derives nothing a peer sees, and the profile key signs nothing.
-  if (ownerRoot && !enrolledDevice && defaultProfileSeed) {
-    try {
-      // the internal id is root-derived, so a later device holding the phrase can re-derive this one; the id it SHOWS is
-      // the persona-keyed wire id, and the seed derives from that (the phrase + the record's id reproduce it anywhere)
-      const internalId = firstDeviceIdFor(ownerRoot);
-      const deviceId = wireDeviceId(defaultProfileSeed, internalId);
-      const seed = deriveDeviceSeed(defaultProfileSeed, deviceId);
-      const record = signDeviceDelegation(ownerRoot.deriveProfileAuthority('default'), { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(seed) });
-      await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, internalId, record, selfMinted: true }));
-      deviceDerivationSeed = seed;
-      enrolledDevice = { deviceId, record, selfMinted: true };
-    } catch (err) {
-      console.warn(`[realAgent] the first device could not mint its delegation — the grants lane will not sign until it does: ${err?.message ?? err}`);
-    }
-  }
-
-  const circleIdentityFor = (circleId) => {
-    if (!circleIdentities.has(circleId)) {
-      circleIdentities.set(circleId, circleIdentity(deviceDerivationSeed, circleId, new VaultMemory()));
-    }
-    return circleIdentities.get(circleId);
-  };
-  const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
-  // ONE sealing key family: this device's per-circle SEALING keypair is the ed2curve image of its per-circle
-  // address key — the same root, so it is phrase-derivable, one per device, and retired with the address.
-  // Every grant in the circle wraps to `sealingPublicKeyFromNetworkKey(address)`; this is the matching half.
-  const circleSealingKeyPairFor = (circleId) => sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(deviceDerivationSeed, circleId)));
-  // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this person's addresses in a
-  // circle — their owner root, at a ceremony. Every device of the person can DECLARE it (the root's public
-  // key is public: resident under root custody, carried on the delegation record under delegation custody)
-  // and none can USE it. Declared in every announcement, signed with the circle key the address proves.
-  // The key the commitment and every reveal name is the default persona's AUTHORITY, never the root: the root's own
-  // public key on the wire would link every persona of the person. Under delegation custody it rides the device's own
-  // record (`by` — the authority signed it).
-  const authorityPubKeyB64 = ownerRoot ? authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority('default')) : (enrolledDevice?.record?.by ?? null);
-  if (!authorityPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
-  const ceremonyCommitmentFor = (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null);
-  const signCeremonyCommitment = (circleId, address, commitment) =>
-    signCeremonyCommitmentFromSeed(deriveCircleSeed(deviceDerivationSeed, circleId), { circleId, circleAddress: address, commitment });
+  const {
+    deviceDerivationSeed, enrolledDevice, circleIdentityFor, circleAddressFor, circleSealingKeyPairFor,
+    authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
+  } = persona;
 
   // A caller's own `policyEngine` opts, pulled out BEFORE the spread so its `isRevoked` can be
   // unioned into this factory's rather than replacing it (see the composition below). `false` is
@@ -7150,8 +7024,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       await hostTrustRegistry.setTier(callerId, tier);
       doorRoles.set(callerId, role);
     },
-    // Who may retire this device's addresses: the owner root, at a ceremony (core ceremonyCommitment.js).
+    // Who may retire this device's addresses: the persona's authority, at a ceremony (core ceremonyCommitment.js).
     ceremonyCommitmentFor, signCeremonyCommitment,
+    /** The persona runtime this device runs for a persona id (personaRuntime.js) — 'default' only today. */
+    persona: (id = 'default') => personas.get(id) ?? null,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
     restorePending: () => restorePendingAtBoot,   // a phrase ceremony ran here and the restore-finish flow has not asked yet

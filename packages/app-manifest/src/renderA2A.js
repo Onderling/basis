@@ -48,10 +48,17 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'household.grantSurface',
   'household.revokeSurface',
   'household.listSurfaceGrants',
-  // The person's personas: each is an identity of theirs, with its own keys under their root. A peer that could create
-  // one or purge one from the registry would be acting on the person's identity set itself (2026-10-10).
-  'agents.createProfile',
-  'agents.purgeAgent',
+  // The person's registry (2026-10-10). Every WRITE changes who they are (a persona — an identity of theirs, with its
+  // own keys under their root), what they disclose, or who acts for them; every raw READ returns their own record, not
+  // a release — getPersonaRelease too, since the caller picks the context. A connection may see what acts for them and
+  // what exists (listAgents · viewAgent · listCatalogue · listDataVersions), nothing more.
+  'agents.createProfile', 'agents.purgeAgent',
+  'agents.setProfileProperty', 'agents.setProfileDriver', 'agents.setProfileCircleMembership',
+  'agents.removeProfileCircleMembership', 'agents.setProfileDisclosure', 'agents.setAgentSkillExposure',
+  'agents.grantAgent', 'agents.grantRole', 'agents.revokeGrant', 'agents.revokeAgent', 'agents.installAgent',
+  'agents.restoreDataVersion',
+  'agents.getProfileProperties', 'agents.getProfileDisclosure', 'agents.getProfileDrivers', 'agents.getPersonaView',
+  'agents.getAgentSkillExposure', 'agents.getPersonaRelease',
   // The pod session (2026-09-01). Signing in navigates a browser to an identity provider and signing out
   // ends the session every other grant is read under — neither is a thing to do TO someone from
   // somewhere else. Withheld here rather than merely omitted from the connection manifest list, because

@@ -46,7 +46,10 @@ export const DEFAULT_PROFILE = 'default';
  */
 /** The unsealed-vault note a phrase ceremony leaves for the next boot (see the restore-finish flow). */
 export const RESTORE_PENDING_KEY = 'restore-pending';
-export const DEVICE_DELEGATION_VAULT_KEY = 'device-delegation-seed';
+// The delegation blob's slot is one of a persona's vault slots (personaVault.js); re-exported for the callers that
+// import it from here.
+export { DEVICE_DELEGATION_VAULT_KEY } from './personaVault.js';
+import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
 
 const _b64url = (bytes) => {
   let s = '';
@@ -135,7 +138,8 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    person" tag across all their devices).
     const atRestKey = delegationCustody ? deriveVaultAtRestKeyFrom(delegationSeed) : root.deriveVaultAtRestKey();
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
-    const sealedChat = new VaultEncrypted({ backing: chatVault, key: atRestKey });
+    // the default persona's slots (its chat seed, person key and delegation blob), as personaVault names them
+    const sealedChat = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), DEFAULT_PROFILE);
     const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
     // 2b. The PERSON KEY (rotating, per profile): the one moment this device has the root, so it is handed
     //     the current version's seed and keeps it sealed. Version 1 until the rotation ceremony exists; a

@@ -753,7 +753,7 @@ Construct via `Bootstrap.create()`, `Bootstrap.fromSeed(bytes)`, or
 `Bootstrap.fromMnemonic(phrase)`.  Direct `new Bootstrap(...)` is
 possible but the static factories validate inputs.
 
-**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
+**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveProfileAuthority()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
 
 ### `deriveVaultAtRestKeyFrom`
 
@@ -1405,6 +1405,39 @@ revocation ceremony reason about an absent device's keys without the device).
 
 **Returns:** `Uint8Array` — 32-byte seed.
 
+### `mintDeviceSalt`
+
+**Kind:** function · **Import:** `mintDeviceSalt` from `'@onderling/core'`
+
+```js
+mintDeviceSalt()
+```
+
+A device's secret for its wire ids: 32 random bytes, minted once per device, kept sealed in the person's own registry
+entry beside the internal id. It never leaves the person's devices; it only makes the wire id.
+
+**Returns:** `Uint8Array`
+
+### `wireDeviceId`
+
+**Kind:** function · **Import:** `wireDeviceId` from `'@onderling/core'`
+
+```js
+wireDeviceId(deviceSalt, profileId)
+```
+
+The id a device shows ON THE WIRE for one persona — in its delegation record, and so in every device statement
+that carries it. Per persona and keyed by the device's secret salt: two personas on one device show two unrelated
+ids, and an old record's internal id plus a persona id are not enough to compute either. The internal id still keys
+the device's seed (`deriveDeviceSeed`), so no address changes.
+
+**Parameters**
+
+- `deviceSalt` `Uint8Array` — the device's 32-byte secret (`mintDeviceSalt`).
+- `profileId` `string` — a persona id.
+
+**Returns:** `string` — `d-<32 hex>`
+
 ### `deviceDelegationPubKey`
 
 **Kind:** function · **Import:** `deviceDelegationPubKey` from `'@onderling/core'`
@@ -1471,14 +1504,18 @@ the first device is special; a device enrolled by a ceremony carries a random id
 ownerRootFingerprint(pubKeyB64)
 ```
 
-A short fingerprint of an owner root's public key: the first 16 hex characters of its SHA-256. Compares a
-delegation record's signer with a known root without carrying the whole key.
+The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
+`Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
+from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
+record to "the same owner as me" without the owner's registry: both custodies hold the root's
+fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
+whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
 
 **Parameters**
 
-- `pubKeyB64` `string` — the root's 32-byte Ed25519 public key, base64
+- `pubKeyB64` `string` — a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
 
-**Returns:** `string|null` — null when the key is not 32 bytes or does not decode
+**Returns:** `string|null` — the 16 hex-character fingerprint, or null.
 
 ### `verifyDeviceDelegation`
 
@@ -1818,6 +1855,50 @@ Write the vault entry — only ever a HIGHER version than what is there (a cerem
 one exception: the SAME version may fill in the link key's public half when the entry has none (an entry from
 before link keys, on a device that then hears it from a sibling). A pub once there is never replaced. Returns
 true when the entry changed.
+
+## `src/identity/profileIds.js`
+
+### `RESERVED_PROFILE_LABELS`
+
+**Kind:** constant · **Import:** `RESERVED_PROFILE_LABELS` from `'@onderling/core'`
+
+Labels the platform already derives other keys from (`first-device` from the owner root; `household-export` on the export's own root) — never a persona's id, so no persona ever shares a key label with them.
+
+### `isReservedProfileLabel`
+
+**Kind:** function · **Import:** `isReservedProfileLabel` from `'@onderling/core'`
+
+```js
+isReservedProfileLabel(label)
+```
+
+Is this label one the root uses for something other than a persona?
+
+### `assertProfileId`
+
+**Kind:** function · **Import:** `assertProfileId` from `'@onderling/core'`
+
+```js
+assertProfileId(id)
+```
+
+Throw unless `id` is a persona id: `'default'` or a minted `p-<12 hex>`, and not a reserved label.
+
+**Parameters**
+
+- `id` `string`
+
+**Returns:** `string` — the id
+
+### `mintProfileId`
+
+**Kind:** function · **Import:** `mintProfileId` from `'@onderling/core'`
+
+```js
+mintProfileId()
+```
+
+Mint a fresh persona id, `p-<12 hex>` (48 random bits: unique within one person's handful of personas).
 
 ## `src/permissions/ActorResolver.js`
 

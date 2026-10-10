@@ -23,6 +23,7 @@
  * msgId remains the join key (receipts, dedup, pod copies) as a field inside the SIGNED payload; the
  * statement hash authenticates, msgId identifies. (Unifying them is a recorded post-retirement candidate.)
  */
+import { selfRefIn } from './selfRef.js';
 import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
 import { entryKindRegistryFromManifests, toEventLogItem, kindWakes } from '@onderling/item-store';
 import { cardForCircleWire } from '@onderling/kring-host/circleBroadcast';
@@ -52,6 +53,7 @@ export const CHAT_CATCHUP_SUBTYPES = Object.freeze({
  * @param {Function} [a.verifyBinding]  override the roster binding verifier (tests)
  */
 export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.append !== 'function') {
     throw new Error('chatRail: an eventLog with query + append is required');
   }
@@ -77,7 +79,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
   async function bindingOk(author, ref, circleId) {
     try {
       const mine = await circleIdentityFor(circleId);
-      if (mine?.pubKey === author) return myRef === ref;
+      if (mine?.pubKey === author) return refIn(circleId) === ref;
     } catch { /* fall through to the foreign resolver */ }
     try { return !!(await bindingOkForeign({ author, ref, circleId })); } catch { return false; }
   }
@@ -99,7 +101,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       ...(typeof text === 'string' ? { text } : {}),
       ...(scope ? { scope } : {}),
       ...(embeds?.length ? { embeds } : {}),
-      authorRef: myRef,
+      authorRef: refIn(circleId),
     };
     const wireCard = cardForCircleWire(card);
     if (wireCard) wire.card = wireCard;
@@ -109,7 +111,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     const statement = signSpine(identity, { kind: 'message', circleId, subject: msgId, payload: wire, parent, deps });
     // The LOCAL render entry keeps the caller's presentation fields (full embed card incl. sender-local
     // bookkeeping, the local actor label) — only the WIRE copy is whitelisted, and it rides the signature.
-    const rendered = toEventLogItem({ msgId, ts: at, circleId, actor: actor ?? myRef, text, scope, card, embeds, buttons });
+    const rendered = toEventLogItem({ msgId, ts: at, circleId, actor: actor ?? refIn(circleId), text, scope, card, embeds, buttons });
     const entry = eventLog.append({ ...rendered, payload: { ...rendered.payload, statement } });
     return { entry, statement };
   }
@@ -134,7 +136,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       ...(typeof p.text === 'string' ? { text: p.text } : {}),
       ...(p.scope ? { scope: p.scope } : {}),
       ...(p.embeds?.length ? { embeds: p.embeds } : {}),
-      authorRef: myRef,
+      authorRef: refIn(circleId),
     };
     const wireCard = cardForCircleWire(p.card);
     if (wireCard) wire.card = wireCard;

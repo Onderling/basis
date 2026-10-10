@@ -624,6 +624,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Which persona an identity of ours belongs to, for the secure agent's routing: its chat key (the default's too, said
   // explicitly — once a second persona exists, an owner-less registration is refused there).
   const ownerFor = (circleId) => personaOf(circleId).chatId?.pubKey ?? null;
+  // WHOSE registry record a circle's membership is: its persona's. A write under another profile would move the circle
+  // (a membership write re-binds it), so every writer that names a circle asks here.
+  const profileIdOf = (circleId) => circlePersonas.get(circleId) ?? 'default';
 
   // A caller's own `policyEngine` opts, pulled out BEFORE the spread so its `isRevoked` can be
   // unioned into this factory's rather than replacing it (see the composition below). `false` is
@@ -1152,7 +1155,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!opts.deviceLog || !chatRail || reFannedCircles.has(circleId)) return;
     reFannedCircles.add(circleId);
     try {
-      for (const owed of owedChatStatements({ eventLog: opts.deviceLog, circleId, myRef: chatId.pubKey })) {
+      for (const owed of owedChatStatements({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) })) {
         callSkill('stoop', 'broadcastCircleChatStatement', {
           groupId: circleId, event: owed.statement, msgId: owed.msgId, ts: owed.ts,
         }).catch(() => { /* best-effort — the next boot, or the member's own catch-up, retries */ });
@@ -1247,6 +1250,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
   // degraded/bare registry simply re-opens nothing rather than throwing at boot.
   let readSelfCircleMemberships = async () => ({});
+  let readAllSelvesCircleMemberships = async () => ({});
   // Siblings follow a circle (composed below, once the sibling set is known): the registry setter — the one seam
   // every "I am in this circle now" passes (the join wizard, the create hook, the enrol consume) — fans a NEW
   // membership to the person's other devices through it.
@@ -1303,6 +1307,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
     // that is where write-on-join records {handle,address} (id:'default').
     readSelfCircleMemberships = async () => circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {});
+    // every SELF's circles — the default's record and each persona's (a circle is on exactly one, its persona's). Only
+    // for what is the PERSON's over all their selves (put away / brought back); the ceremonies and the restore heal
+    // read the default's alone above, so nothing of the default is ever said in a persona's circle.
+    readAllSelvesCircleMemberships = async () => {
+      const out = { ...circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {}) };
+      for (const pid of personas.keys()) {
+        if (pid === 'default') continue;
+        try { Object.assign(out, circleMembershipsOf((await agentsRegistry.lookup(pid)) ?? {})); } catch { /* that persona's record unreadable — its circles absent */ }
+      }
+      return out;
+    };
     agentsRegistryRef = agentsRegistry;
 
 
@@ -2092,6 +2107,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     return (Array.isArray(result) ? result[0] : null)?.data ?? null;
   };
   const rawContacts = async () => (await rawStoop('listContacts', {}))?.contacts ?? [];
+  // Merge every persona's `listMyCircles` into the default's — one list for the person (see the waist's stoop branch).
+  const withPersonaCircles = async (reply, parts) => {
+    const idOf = (c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null));
+    const seen = new Set(reply.circles.map(idOf).filter(Boolean));
+    const circles = [...reply.circles];
+    const left = Array.isArray(reply.left) ? [...reply.left] : reply.left;
+    for (const [pid, rt] of personas) {
+      if (pid === 'default' || !rt?.chatId?.pubKey) continue;
+      let theirs = null;
+      try { theirs = (await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', parts, { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null; } catch { theirs = null; }
+      for (const c of theirs?.circles ?? []) { const id = idOf(c); if (id && !seen.has(id)) { seen.add(id); circles.push(c); } }
+      if (Array.isArray(left) && Array.isArray(theirs?.left)) for (const l of theirs.left) if (!left.includes(l)) left.push(l);
+    }
+    return { ...reply, circles, ...(left !== undefined ? { left } : {}) };
+  };
   // WHO GREETED THIS DEVICE survives a reload. The security layer's bindings — "this key is Bea",
   // established by her greeting — lived in memory only, so a reload (every web session) or a restart
   // (every deploy of a box) forgot every contact, and their next message was refused as a stranger's,
@@ -2255,8 +2285,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       : Promise.resolve({ circleId: entry.id, ok: false, steps: [], error: 'no-consume' })),   // a composition without the step joins nothing
     leave: leaveFollowed,
     // PUT AWAY (opbergen): the mark lives on the circle's registry record (restore carries it); a sibling's newer lands
-    sightOf: async (circleId) => (await readSelfCircleMemberships().catch(() => ({})))?.[circleId]?.sight ?? null,
-    setSight: (circleId, sight) => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, sight }),
+    sightOf: async (circleId) => (await readAllSelvesCircleMemberships().catch(() => ({})))?.[circleId]?.sight ?? null,
+    setSight: (circleId, sight) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, sight }),
     onLanded: (r) => console.info(`[circle-follow] ${r.steps.includes('left') ? (r.ok ? 'left' : 'could not leave') : (r.ok ? 'joined' : 'could not join')} ${String(r.circleId).slice(0, 12)}… after a sibling (${r.steps.join(' ')})`),
   });
   circleFollowSync.setConsume = (fn) => { circleFollowConsume = typeof fn === 'function' ? fn : null; };
@@ -2980,6 +3010,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     return { ok: true, address: circleAddressFor(circleId) };
   };
   /** WHO this device is in a circle: the circle's persona's webid, the address it sends AS (null for the default), its person key. */
+  /** The ref this device signs as in a circle: its persona there, else the default — what every lane names as author. */
+  const circleSelfRef = (circleId) => circleSelf(circleId).webid ?? chatId.pubKey;
   const circleSelf = (circleId) => {
     const p = personaOf(circleId);
     const isDefault = p === persona;
@@ -3533,7 +3565,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       .filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId),
     memberships: () => readSelfCircleMemberships(),
     addressFor: circleAddressFor,
-    write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address }),
+    write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, address }),
     log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
   }).catch(() => { /* the next boot tries again */ });
 
@@ -3609,7 +3641,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipRail = makeMembershipRail({
       eventLog: opts.deviceLog,
       circleIdentityFor,
-      myRef: chatId.pubKey,
+      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     });
     // A membership statement that LANDS (fan or catch-up) changes the roster without a write through the
@@ -3663,7 +3695,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     membershipEmit = makeMembershipEmitter({
       rail: membershipRail,
-      myRef: chatId.pubKey,
+      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
@@ -3697,7 +3729,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     taskRail = makeTaskRail({
       eventLog: opts.deviceLog,
       circleIdentityFor,
-      myRef: chatId.pubKey,
+      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
       storeFor: (circleId) => (circleId === OWN_DEVICES_SCOPE ? ownStoreNow : (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null)),
       // the person's own scope: between their own devices only (see the own store above)
@@ -3770,7 +3802,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     chatRail = makeChatRail({
       eventLog: opts.deviceLog,
       circleIdentityFor,
-      myRef: chatId.pubKey,
+      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
     });
     chatEmit = makeChatEmitter({
@@ -3792,7 +3824,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const keyRail = makeKeyRail({
     eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
     circleIdentityFor,
-    myRef: chatId.pubKey,
+    myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
   });
   // Every key statement this device writes — the shells' sinks and the revoke ceremony all emit through
@@ -3813,7 +3845,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     rail: makeGovernanceRail({
       eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
       circleIdentityFor,
-      myRef: chatId.pubKey,
+      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     }),
     fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
@@ -3827,7 +3859,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     rail: makeGovernanceRail({
       eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
       circleIdentityFor,
-      myRef: chatId.pubKey,
+      myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
     }),
     fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
@@ -5253,7 +5285,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts, stoopActAs(realArgs));
         const first  = Array.isArray(result) ? result[0] : null;
-        const reply  = first?.data ?? null;
+        let reply    = first?.data ?? null;
+        // THE DEVICE'S CIRCLES are every self's: stoop answers `listMyCircles` for its caller, so the person's list (the
+        // launcher, the circle switcher, every shell) is the default's answer merged with each persona's — a circle
+        // founded or joined as a persona stays in the person's list. (Internal reads that must stay the default's —
+        // what the default's names are told to — ask stoop directly, not through here.)
+        if (realOpId === 'listMyCircles' && reply && Array.isArray(reply.circles)) reply = await withPersonaCircles(reply, parts);
         rawReply = reply;
         // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
         // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
@@ -5319,7 +5356,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           // NOT awaited: the create answers first. Inside the create's wait, an agents store that did not
           // answer held "Creating circle…" for minutes over a circle that already existed (walk, 2026-10-09).
           // A write that fails here is not lost — `healRestoreList` puts the circle on the list at the next boot.
-          Promise.resolve().then(() => callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, address }))
+          Promise.resolve().then(() => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, address }))
             .catch((err) => {
               if (typeof console !== 'undefined') console.warn(`[restore-data] the created circle ${String(circleId).slice(0, 12)}… is not in the restore list yet (the next boot retries): ${err?.message ?? err}`);
             });
@@ -6785,13 +6822,13 @@ export async function createRealHouseholdAgent(opts = {}) {
      */
     setCircleSight: async (circleId, putAway) => {
       const sight = { putAway: putAway === true, at: Date.now() };
-      const r = await callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId, sight });
+      const r = await callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, sight });
       if (r?.ok) circleFollowSync?.fanSight?.(circleId).catch?.(() => {});
       return r?.ok ? { ok: true, sight } : { ok: false, reason: r?.reason ?? 'not-recorded' };
     },
     /** `{ [circleId]: { putAway, at } }` — the marks this device holds. */
     circleSights: async () => {
-      const m = await readSelfCircleMemberships().catch(() => ({}));
+      const m = await readAllSelvesCircleMemberships().catch(() => ({}));   // every self's circles: a persona's put away too
       return Object.fromEntries(Object.entries(m ?? {}).filter(([, r]) => r?.sight).map(([id, r]) => [id, { ...r.sight }]));
     },   // where the registry rides: local / cache, and the probe outcome
 

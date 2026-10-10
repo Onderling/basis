@@ -25,6 +25,7 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { assertProfileId } from './profileIds.js';
 
 // HKDF domain-separation inputs — mirror circleAddress.js. The salt is PERMANENT: changing it
 // re-derives every enrolled device's keys (a mass re-enroll), never do that.
@@ -48,6 +49,36 @@ export function deriveDeviceSeed(profileSeed, deviceId) {
   }
   const info = new TextEncoder().encode(`${HKDF_INFO_NS}device:${deviceId}`);
   return hkdf(sha256, profileSeed, _DEVICE_SEED_SALT, info, 32);
+}
+
+const _WIRE_ID_SALT = new TextEncoder().encode('onderling-device-wire-id-v1');
+
+/**
+ * A device's secret for its wire ids: 32 random bytes, minted once per device, kept sealed in the person's own registry
+ * entry beside the internal id. It never leaves the person's devices; it only makes the wire id.
+ * @returns {Uint8Array}
+ */
+export function mintDeviceSalt() {
+  return nacl.randomBytes(32);
+}
+
+/**
+ * The id a device shows ON THE WIRE for one persona — in its delegation record, and so in every device statement
+ * that carries it. Per persona and keyed by the device's secret salt: two personas on one device show two unrelated
+ * ids, and an old record's internal id plus a persona id are not enough to compute either. The internal id still keys
+ * the device's seed (`deriveDeviceSeed`), so no address changes.
+ * @param {Uint8Array} deviceSalt  the device's 32-byte secret (`mintDeviceSalt`).
+ * @param {string} profileId       a persona id.
+ * @returns {string} `d-<32 hex>`
+ */
+export function wireDeviceId(deviceSalt, profileId) {
+  if (!(deviceSalt instanceof Uint8Array) || deviceSalt.length !== 32) {
+    throw new Error('wireDeviceId: the device salt must be a 32-byte Uint8Array');
+  }
+  assertProfileId(profileId);
+  const out = hkdf(sha256, deviceSalt, _WIRE_ID_SALT, new TextEncoder().encode(`${HKDF_INFO_NS}wire-device-id:${profileId}`), 16);
+  let hex = ''; for (const b of out) hex += b.toString(16).padStart(2, '0');
+  return `d-${hex}`;
 }
 
 /** The delegation pubKey a device seed presents (same encoding as every identity pubKey). */
@@ -87,16 +118,6 @@ export function signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey }
 }
 
 /**
- * The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
- * `Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
- * from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
- * record to "the same owner as me" without the owner's registry: both custodies hold the root's
- * fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
- * whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
- * @param {string} pubKeyB64  a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
- * @returns {string|null} the 16 hex-character fingerprint, or null.
- */
-/**
  * The FIRST device's id, derived from the root. A person's first device mints its own delegation at first boot
  * (2026-09-16) instead of deriving from the profile seed; giving it a root-derived id — rather than a random one —
  * keeps the property the profile derivation had: a device that holds the phrase can re-derive the first device's
@@ -112,10 +133,14 @@ export function firstDeviceIdFor(root) {
 }
 
 /**
- * A short fingerprint of an owner root's public key: the first 16 hex characters of its SHA-256. Compares a
- * delegation record's signer with a known root without carrying the whole key.
- * @param {string} pubKeyB64  the root's 32-byte Ed25519 public key, base64
- * @returns {string|null}  null when the key is not 32 bytes or does not decode
+ * The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
+ * `Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
+ * from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
+ * record to "the same owner as me" without the owner's registry: both custodies hold the root's
+ * fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
+ * whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
+ * @param {string} pubKeyB64  a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
+ * @returns {string|null} the 16 hex-character fingerprint, or null.
  */
 export function ownerRootFingerprint(pubKeyB64) {
   try {

@@ -30,6 +30,7 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 import { Emitter } from '../Emitter.js';
+import { assertProfileId } from './profileIds.js';
 import {
   generateMnemonic,
   mnemonicToSeed,
@@ -50,6 +51,8 @@ const SALT_LEN     = 16;
  * ALONE — so the salt is a constant. Changing it would re-key every derived profile.
  */
 const _AGENT_SEED_SALT = new TextEncoder().encode('onderling-agent-seed-v1');
+// A persona's authority key (`deriveProfileAuthority`). PERMANENT, like the agent-seed salt.
+const _PROFILE_AUTHORITY_SALT = new TextEncoder().encode('onderling-profile-authority-v1');
 
 /**
  * FIXED HKDF salt for the vault at-rest key (`deriveVaultAtRestKey`).
@@ -208,6 +211,26 @@ export class Bootstrap {
     }
     const info = new TextEncoder().encode(`${HKDF_INFO_NS}agent-seed:${label}`);
     return hkdf(sha256, this.#secret, _AGENT_SEED_SALT, info, HKDF_LEN);
+  }
+
+  /**
+   * Derive a persona's 32-byte AUTHORITY seed — the Ed25519 key that signs everything the persona's owner signs on
+   * the wire: its device delegations and revocations, its ceremony reveals, its ceremony commitment. The root's own key
+   * signs nothing that leaves the device, so two personas of one person cannot be linked by a shared signer, and no
+   * record shows the root.
+   *
+   *   seed = HKDF-SHA256(ikm=root_secret, salt=_PROFILE_AUTHORITY_SALT (fixed),
+   *                      info="onderling-identity-v1:profile-authority:" + profileId, len=32)
+   *
+   * Fixed salt for the same reason as `deriveAgentSeed`: the phrase re-derives every persona's authority anywhere.
+   *
+   * @param   {string} profileId  a persona id (`'default'` or `p-<12 hex>`; never a reserved root label).
+   * @returns {Uint8Array} 32-byte seed.
+   */
+  deriveProfileAuthority(profileId) {
+    assertProfileId(profileId);
+    const info = new TextEncoder().encode(`${HKDF_INFO_NS}profile-authority:${profileId}`);
+    return hkdf(sha256, this.#secret, _PROFILE_AUTHORITY_SALT, info, HKDF_LEN);
   }
 
   /**

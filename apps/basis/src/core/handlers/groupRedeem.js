@@ -212,6 +212,9 @@ export function ownProvenCircleAddress(groupId, { circleAddressFor, signCircleAd
  */
 export function makeSendGroupRedeemRequest({
   currentPersonKey = null,   // () => { version, pubKey } | null — this device's person key, announced on the join
+  // (groupId) => { webid, sendAs, personKey } | null — WHO joins this circle: the persona it is being joined as. A
+  // persona's redeem leaves AS that persona (its own socket) and announces ITS person key; the default's is unchanged.
+  circleSelfFor = null,
   sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
 } = {}) {
   if (typeof sendPeer !== 'function') {
@@ -261,8 +264,14 @@ export function makeSendGroupRedeemRequest({
       if (own) { circleAddress = own.circleAddress; proof = own.circleAddressProof; }
     }
     const linkArg = (circleAddress && proof) ? { circleAddress, circleAddressProof: proof } : {};
+    let self = null;
+    try { self = typeof circleSelfFor === 'function' ? (circleSelfFor(groupId) ?? null) : null; } catch { self = null; }
+    const asPersona = typeof self?.sendAs === 'string' && self.sendAs ? self.sendAs : null;
     let ownKey = null;
-    try { ownKey = typeof currentPersonKey === 'function' ? (currentPersonKey() ?? null) : null; } catch { ownKey = null; }
+    if (asPersona) ownKey = self.personKey ?? null;
+    else {
+      try { ownKey = typeof currentPersonKey === 'function' ? (currentPersonKey() ?? null) : null; } catch { ownKey = null; }
+    }
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -288,7 +297,9 @@ export function makeSendGroupRedeemRequest({
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
         sentAt: Date.now(),
       };
-      if (typeof relayUrl === 'string' && relayUrl) await sendPeer(adminPeerAddr, request, { scope: { points: [relayUrl] } });
+      const as = asPersona ? { sendAs: asPersona } : {};
+      if (typeof relayUrl === 'string' && relayUrl) await sendPeer(adminPeerAddr, request, { scope: { points: [relayUrl] }, ...as });
+      else if (asPersona) await sendPeer(adminPeerAddr, request, as);
       else await sendPeer(adminPeerAddr, request);
     } catch (err) {
       const entry = pendingMap.get(requestId);

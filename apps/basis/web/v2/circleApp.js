@@ -8506,6 +8506,7 @@ async function boot() {
     circleSendPeerRedeem = makeSendGroupRedeemRequest({
       sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
       currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (2026-09-16)
+      circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.

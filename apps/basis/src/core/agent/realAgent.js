@@ -2931,6 +2931,39 @@ export async function createRealHouseholdAgent(opts = {}) {
     catch (err) { return [DataPart({ ok: false, outcome: 'failed', error: err?.message ?? String(err) })]; }
   });
 
+  // JOINING AS A PERSONA (the bind before the redeem): the circle is the persona's from here — its keys and its "me" —
+  // the persona's chat key and person key are identities of ours that it owns, and it is on the circle's relay on a
+  // socket of its own. `personaId` null/'default' gives the circle back to the default (a join that did not happen).
+  const bindCirclePersona = async ({ circleId, personaId = null, relayUrl = null } = {}) => {
+    if (typeof circleId !== 'string' || !circleId) return { ok: false, reason: 'circleId-required' };
+    if (!personaId || personaId === 'default') { circlePersonas.delete(circleId); return { ok: true, address: circleAddressFor(circleId) }; }
+    const rt = personas.get(personaId);
+    if (!rt?.chatId) return { ok: false, reason: 'no-such-persona' };
+    circlePersonas.set(circleId, personaId);
+    const owner = rt.chatId.pubKey;
+    try {
+      sa.registerSelfIdentity?.(owner, rt.chatId, { owner });
+      if (!rt.personIdentity && rt.personKey?.seed) rt.personIdentity = await AgentIdentity.fromSeed(rt.personKey.seed, new VaultMemory());
+      if (rt.personIdentity) sa.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
+    } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
+    if (typeof relayUrl === 'string' && relayUrl) {
+      try { await sa.relays.add(relayUrl, { identity: rt.chatId, awaitReady: true }); }
+      catch (err) { console.warn(`[persona] ${personaId} could not dial ${relayUrl}: ${err?.message ?? err}`); }
+    }
+    return { ok: true, address: circleAddressFor(circleId) };
+  };
+  /** WHO this device is in a circle: the circle's persona's webid, the address it sends AS (null for the default), its person key. */
+  const circleSelf = (circleId) => {
+    const p = personaOf(circleId);
+    const isDefault = p === persona;
+    const pk = p.personKey ? { version: p.personKey.version, pubKey: personKeyPubKeyB64(p.personKey.seed) } : null;
+    return { webid: (isDefault ? chatId : p.chatId)?.pubKey ?? null, sendAs: isDefault ? null : (p.chatId?.pubKey ?? null), personKey: pk };
+  };
+  hostAgent.register('bindCirclePersona', async ({ parts }) => {
+    const d = parts?.[0]?.data ?? {};
+    return [DataPart(await bindCirclePersona({ circleId: d.circleId, personaId: d.personaId ?? null, relayUrl: d.relayUrl ?? null }))];
+  });
+
   hostAgent.register('stashEnrollOffer', async ({ parts }) => {
     const offer = parts?.[0]?.data?.offer;
     if (typeof offer !== 'string' || !offer.trim()) return [DataPart({ ok: true, outcome: 'no-offer' })];
@@ -7071,6 +7104,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     ceremonyCommitmentFor, signCeremonyCommitment,
     /** The persona runtime this device runs for a persona id (personaRuntime.js) — 'default' only today. */
     persona: (id = 'default') => personas.get(id) ?? null,
+    /** WHO this device is in a circle (its persona): `{ webid, sendAs, personKey }` — the redeem and stoop's "me" read it. */
+    circleSelf,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
     restorePending: () => restorePendingAtBoot,   // a phrase ceremony ran here and the restore-finish flow has not asked yet

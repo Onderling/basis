@@ -94,19 +94,20 @@ export function deviceDelegationMessage(profileId, deviceId, pubKey) {
 /**
  * Mint the root-signed delegation record for a device. Called at the enrollment ceremony, where
  * the phrase (and so the root secret) is transiently present.
- * @param {Uint8Array} rootSecret   the owner root's 32-byte secret (Bootstrap#secret).
+ * @param {Uint8Array} authoritySecret  the signing persona's 32-byte authority (`Bootstrap.deriveProfileAuthority`) —
+ *                                  never the owner root, whose key must not appear on the wire.
  * @param {{profileId: string, deviceId: string, pubKey: string}} a  pubKey = deviceDelegationPubKey(seed).
  * @returns {{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}}
- *          `by` = the root's derived pubKey (b64), `sig` = base64url Ed25519 over the statement.
+ *          `by` = the authority's pubKey (b64), `sig` = base64url Ed25519 over the statement.
  */
-export function signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey } = {}) {
-  if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) {
-    throw new Error('signDeviceDelegation: rootSecret must be a 32-byte Uint8Array');
+export function signDeviceDelegation(authoritySecret, { profileId, deviceId, pubKey } = {}) {
+  if (!(authoritySecret instanceof Uint8Array) || authoritySecret.length !== 32) {
+    throw new Error('signDeviceDelegation: authoritySecret must be a 32-byte Uint8Array');
   }
   if (!profileId || !deviceId || !pubKey) {
     throw new Error('signDeviceDelegation: profileId, deviceId and pubKey are required');
   }
-  const kp = nacl.sign.keyPair.fromSeed(rootSecret);
+  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
   const msg = new TextEncoder().encode(deviceDelegationMessage(profileId, deviceId, pubKey));
   return {
     profileId: String(profileId),
@@ -181,16 +182,16 @@ export function deviceRevocationMessage(profileId, deviceId) {
  * Mint the root-signed REVOCATION of a device — the tombstone a party outside the person's own devices can check
  * (a companion the person owns): the registry's `{revoked: true}` mark is the person's own bookkeeping and signs
  * nothing. Minted at the revoke ceremony, where the phrase (and so the root secret) is transiently present.
- * @param {Uint8Array} rootSecret
+ * @param {Uint8Array} authoritySecret  the persona's authority (as for `signDeviceDelegation`)
  * @param {{profileId: string, deviceId: string}} a
  * @returns {{profileId:string, deviceId:string, by:string, sig:string}}
  */
-export function signDeviceRevocation(rootSecret, { profileId, deviceId } = {}) {
-  if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) {
-    throw new Error('signDeviceRevocation: rootSecret must be a 32-byte Uint8Array');
+export function signDeviceRevocation(authoritySecret, { profileId, deviceId } = {}) {
+  if (!(authoritySecret instanceof Uint8Array) || authoritySecret.length !== 32) {
+    throw new Error('signDeviceRevocation: authoritySecret must be a 32-byte Uint8Array');
   }
   if (!profileId || !deviceId) throw new Error('signDeviceRevocation: profileId and deviceId are required');
-  const kp = nacl.sign.keyPair.fromSeed(rootSecret);
+  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
   const msg = new TextEncoder().encode(deviceRevocationMessage(profileId, deviceId));
   return {
     profileId: String(profileId),

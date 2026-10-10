@@ -56,13 +56,22 @@ const _b64url = (bytes) => {
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-/** A fresh enrollment id — crypto.randomUUID where available, a random hex fallback elsewhere. */
-const _newDeviceId = () => {
-  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID(); } catch { /* fall through */ }
+/**
+ * A fresh internal device id, from a cryptographic random source or not at all. It needs no secrecy (the wire id is
+ * keyed by its own secret salt) but it must be UNIQUE: two devices with one id derive one seed, one key set on two
+ * devices, and neither could be retired alone — so a platform without a CSPRNG cannot enrol, rather than guessing.
+ * @param {{ crypto?: { randomUUID?: () => string, getRandomValues?: (b: Uint8Array) => Uint8Array } }} [env]
+ * @returns {string}
+ */
+export function newDeviceId({ crypto: c = globalThis.crypto } = {}) {
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  if (!c || typeof c.getRandomValues !== 'function') {
+    throw new Error('enrol: this platform has no cryptographic random source — a device id cannot be minted safely');
+  }
   const bytes = new Uint8Array(16);
-  try { crypto.getRandomValues(bytes); } catch { for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256); }
+  c.getRandomValues(bytes);
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-};
+}
 
 /**
  * Restore an identity from its recovery phrase.
@@ -107,7 +116,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
   try {
     // Every phrase ceremony ENROLLS (a restore is enrollment as this profile's next device); the
     // delegation seed is deterministic from (phrase, profileId, deviceId).
-    const deviceId = _newDeviceId();
+    const deviceId = newDeviceId();
     const delegationSeed = deriveDeviceSeed(root.deriveAgentSeed(DEFAULT_PROFILE), deviceId);
     const delegationCustody = !!markerVault;
 
@@ -143,7 +152,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     // The ROOT-SIGNED delegation record, pre-signed HERE (the one moment the root exists) and
     // carried in the blob — the boot's registry self-heal registers it without ever needing the
     // root again. Non-secret: a statement + a signature.
-    blob.record = signDeviceDelegation(root.secret, {
+    blob.record = signDeviceDelegation(root.deriveProfileAuthority(DEFAULT_PROFILE), {
       profileId: DEFAULT_PROFILE, deviceId, pubKey: deviceDelegationPubKey(delegationSeed),
     });
     if (blob.label) blob.record = { ...blob.record, label: blob.label };

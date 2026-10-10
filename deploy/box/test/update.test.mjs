@@ -43,7 +43,7 @@ function makeBox({ roles = [], paths = {}, caddySnippets = {} } = {}) {
   // the fake docker: appends every argv line to calls.log; `compose … exec/ps` answer ok
   const bin = join(root, 'bin'); mkdirSync(bin);
   // like the real docker compose, the fake stats "." first — an unreadable cwd is the 2026-09-06 failure
-  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n' | { if [ -f "${box}/ASSISTANT_DOWN" ]; then grep -vx assistant; else cat; fi; };; esac\ncase "$*" in *"run --rm --no-deps"*"find"*) [ -f "${box}/SHELF_FRESH" ] \&\& echo /data/assistant/exports/household-export-2026-10-07-0300.json; exit 0;; esac\ncase "$*" in *"export-now"*) [ -f "${box}/EXPORT_FAIL" ] \&\& exit 1;; esac\nexit 0\n`);
+  writeFileSync(join(bin, 'docker'), `#!/usr/bin/env bash\nls . >/dev/null 2>&1 || { echo "stat .: permission denied" >&2; exit 1; }\necho "$*" >> "${root}/calls.log"\ncase "$*" in *"ps --status running"*) printf '${all.join('\\n')}\\n' | { if [ -f "${box}/ASSISTANT_DOWN" ]; then grep -vx assistant; else cat; fi; };; esac\ncase "$*" in *"run --rm --no-deps"*"find"*) [ -f "${box}/SHELF_FRESH" ] \&\& echo /data/assistant/exports/household-export-2026-10-07-0300.json; exit 0;; esac\ncase "$*" in *"export-now"*) [ -f "${box}/EXPORT_FAIL" ] \&\& exit 1;; esac\ncase "$*" in *"printenv"*"ONDERLING_PROFILE_KIND"*) [ -f "${box}/KIND_READ_FAIL" ] \&\& exit 1; [ -f "${box}/PERSONAL_DEVICE" ] || echo function; exit 0;; esac\nexit 0\n`);
   chmodSync(join(bin, 'docker'), 0o755);
 
   const commit = (msg, tag, file = 'CHANGE') => {
@@ -432,6 +432,53 @@ test('a fresh export of the running assistant comes first; when it fails, the up
   rmSync(join(b.box, 'EXPORT_FAIL'));
   assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
   assert.notEqual(b.headOfBox(), before);
+});
+
+test('a PERSONAL device holds no household to export: its update is not held on an export it never answers', () => {
+  // 2026-10-09: the public box (a person's device, no ONDERLING_PROFILE_KIND) held every release for two days — only a
+  // household bot answers export requests, so export-now timed out on every run and the relay stayed four releases back.
+  const b = makeBox({ roles: ['assistant'] });
+  b.run({ FORCE: '1' });
+  // a HOUSEHOLD bot still exports first: no answer → held (the safety step stays where there is a household)
+  writeFileSync(join(b.box, 'EXPORT_FAIL'), '');          // it would never answer
+  const atBot = b.headOfBox();
+  b.commit('v2');
+  assert.notEqual(b.run().status, 0, 'a household bot without an export is held');
+  assert.equal(b.headOfBox(), atBot, 'nothing checked out for the household bot');
+  // a person's own device: the same silence does not hold it
+  writeFileSync(join(b.box, 'PERSONAL_DEVICE'), '');
+  const before = b.headOfBox();
+  b.clearCalls();
+  const r = b.run({ RETRY_AFTER: '0' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.notEqual(b.headOfBox(), before, 'the release is taken');
+  assert.ok(!b.calls().some((c) => /export-now/.test(c)), 'no export is asked of a device that has no household');
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /not a household bot \(personal\) — no export to take; going ahead/);
+  // …and when it is down too: not held on an empty shelf
+  writeFileSync(join(b.box, 'ASSISTANT_DOWN'), '');
+  const before2 = b.headOfBox();
+  b.commit('v3');
+  assert.equal(b.run({ RETRY_AFTER: '0' }).status, 0);
+  assert.notEqual(b.headOfBox(), before2, 'taken while the device is down, too');
+});
+
+test('the assistant\'s kind cannot be read (a docker hiccup): held, as before — the read never fails open', () => {
+  const b = makeBox({ roles: ['assistant'] });
+  b.run({ FORCE: '1' });
+  writeFileSync(join(b.box, 'KIND_READ_FAIL'), '');
+  const before = b.headOfBox();
+  const stateBefore = readFileSync(join(b.box, 'state.json'), 'utf8');
+  b.clearCalls();
+  b.commit('v2');
+  assert.notEqual(b.run().status, 0, 'held');
+  assert.equal(b.headOfBox(), before, 'nothing checked out');
+  assert.ok(!b.calls().some((c) => /compose .* (build|up -d)/.test(c)), 'nothing built or started');
+  assert.equal(readFileSync(join(b.box, 'state.json'), 'utf8'), stateBefore, 'state untouched');
+  assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /could not read the assistant's kind — update held/);
+  // …and while it is down, the same
+  writeFileSync(join(b.box, 'ASSISTANT_DOWN'), '');
+  assert.notEqual(b.run({ RETRY_AFTER: '0' }).status, 0, 'held while down too');
+  assert.equal(b.headOfBox(), before);
 });
 
 test('the last working version is written down; a red gate goes back to it; ROLLBACK=1 returns to it by hand', () => {

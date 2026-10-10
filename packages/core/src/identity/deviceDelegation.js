@@ -25,7 +25,6 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
-import { assertProfileId } from './profileIds.js';
 
 // HKDF domain-separation inputs — mirror circleAddress.js. The salt is PERMANENT: changing it
 // re-derives every enrolled device's keys (a mass re-enroll), never do that.
@@ -54,29 +53,21 @@ export function deriveDeviceSeed(profileSeed, deviceId) {
 const _WIRE_ID_SALT = new TextEncoder().encode('onderling-device-wire-id-v1');
 
 /**
- * A device's secret for its wire ids: 32 random bytes, minted once per device, kept sealed in the person's own registry
- * entry beside the internal id. It never leaves the person's devices; it only makes the wire id.
- * @returns {Uint8Array}
- */
-export function mintDeviceSalt() {
-  return nacl.randomBytes(32);
-}
-
-/**
  * The id a device shows ON THE WIRE for one persona — in its delegation record, and so in every device statement
- * that carries it. Per persona and keyed by the device's secret salt: two personas on one device show two unrelated
- * ids, and an old record's internal id plus a persona id are not enough to compute either. The internal id still keys
- * the device's seed (`deriveDeviceSeed`), so no address changes.
- * @param {Uint8Array} deviceSalt  the device's 32-byte secret (`mintDeviceSalt`).
- * @param {string} profileId       a persona id.
+ * that carries it — and the id its device seed derives from (`deriveDeviceSeed(profileSeed, wireDeviceId(...))`).
+ * Keyed by the persona's own SEED, which the phrase rebuilds: the internal id never appears, two personas' records of
+ * one device are unrelated, an old record plus a persona id give nothing without that persona's seed, and a
+ * revocation works from the record alone plus the phrase (the seed derives from the id the record names).
+ * @param {Uint8Array} profileSeed  the persona's 32-byte seed (`Bootstrap.deriveAgentSeed(profileId)`).
+ * @param {string} internalId       the device's own id (random at enrolment; root-derived for the first device).
  * @returns {string} `d-<32 hex>`
  */
-export function wireDeviceId(deviceSalt, profileId) {
-  if (!(deviceSalt instanceof Uint8Array) || deviceSalt.length !== 32) {
-    throw new Error('wireDeviceId: the device salt must be a 32-byte Uint8Array');
+export function wireDeviceId(profileSeed, internalId) {
+  if (!(profileSeed instanceof Uint8Array) || profileSeed.length !== 32) {
+    throw new Error('wireDeviceId: the persona seed must be a 32-byte Uint8Array');
   }
-  assertProfileId(profileId);
-  const out = hkdf(sha256, deviceSalt, _WIRE_ID_SALT, new TextEncoder().encode(`${HKDF_INFO_NS}wire-device-id:${profileId}`), 16);
+  if (typeof internalId !== 'string' || !internalId) throw new Error('wireDeviceId: an internal device id is required');
+  const out = hkdf(sha256, profileSeed, _WIRE_ID_SALT, new TextEncoder().encode(`${HKDF_INFO_NS}wire-device-id:${internalId}`), 16);
   let hex = ''; for (const b of out) hex += b.toString(16).padStart(2, '0');
   return `d-${hex}`;
 }

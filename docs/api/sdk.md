@@ -172,7 +172,6 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |
 | `MergeContracts` | constant | [`core.md`](core.md#mergecontracts) |
-| `mintDeviceSalt` | function | [`core.md`](core.md#mintdevicesalt) |
 | `mintProfileId` | function | [`core.md`](core.md#mintprofileid) |
 | `mkEnvelope` | function | [`core.md`](core.md#mkenvelope) |
 | `mnemonicToSeed` | function | [`core.md`](core.md#mnemonictoseed) |

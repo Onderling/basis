@@ -26,7 +26,7 @@
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
-  circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
+  circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed, wireDeviceId,
   signDeviceRevocation, signDeviceStatement, STATEMENT_DOMAINS,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
   deriveCircleSeed, ceremonyCommitment, authorityPubKeyB64Of, ownerRootFingerprint, signCeremonyReveal, signCeremonyCommitmentFromSeed, b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey, storePersonKey, PERSON_KEY_KIND, personKeyFacts, signWithPersonKey, firstDeviceIdFor, signPersonKeyLink, sealToPersonKey, openFromPersonKey } from '@onderling/core';
@@ -216,7 +216,7 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -653,6 +653,18 @@ export async function createRealHouseholdAgent(opts = {}) {
         const decoded = seedFromString(blob.seed);
         if (decoded instanceof Uint8Array && decoded.length === 32) {
           deviceDerivationSeed = decoded;
+          // A record minted before the persona's authority signed names the ROOT as its signer. The root is resident
+          // here, so it is re-signed in place by the authority — same id, same key, so no address moves; the id itself
+          // becomes a wire id at this device's next phrase ceremony (the self-enrol migration mints one).
+          if (ownerRoot && blob.record && blob.record.by !== authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority('default'))) {
+            try {
+              const resigned = signDeviceDelegation(ownerRoot.deriveProfileAuthority('default'), {
+                profileId: blob.record.profileId ?? 'default', deviceId: blob.deviceId, pubKey: blob.record.pubKey,
+              });
+              blob.record = blob.record.label ? { ...resigned, label: blob.record.label } : resigned;
+              await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+            } catch (err) { console.warn(`[realAgent] could not re-sign this device's delegation by its authority: ${err?.message ?? err}`); }
+          }
           enrolledDevice = {
             deviceId: blob.deviceId, selfMinted: blob.selfMinted === true,
             ...(blob.label ? { label: blob.label } : {}),
@@ -688,10 +700,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // with a root-signed delegation; the profile seed derives nothing a peer sees, and the profile key signs nothing.
   if (ownerRoot && !enrolledDevice && defaultProfileSeed) {
     try {
-      const deviceId = firstDeviceIdFor(ownerRoot);   // root-derived, so a later device holding the phrase can re-derive this one
+      // the internal id is root-derived, so a later device holding the phrase can re-derive this one; the id it SHOWS is
+      // the persona-keyed wire id, and the seed derives from that (the phrase + the record's id reproduce it anywhere)
+      const internalId = firstDeviceIdFor(ownerRoot);
+      const deviceId = wireDeviceId(defaultProfileSeed, internalId);
       const seed = deriveDeviceSeed(defaultProfileSeed, deviceId);
       const record = signDeviceDelegation(ownerRoot.deriveProfileAuthority('default'), { profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(seed) });
-      await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, record, selfMinted: true }));
+      await chatVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: seedToString(seed), deviceId, internalId, record, selfMinted: true }));
       deviceDerivationSeed = seed;
       enrolledDevice = { deviceId, record, selfMinted: true };
     } catch (err) {
@@ -2604,7 +2619,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch { /* no registry → only the profile address can be retired */ }
       // The FIRST device (its id derives from the root — identity/deviceDelegation.js): retired by derivation even
       // when this device never saw its registry record, exactly as its profile-derived address used to be.
-      const firstId = firstDeviceIdFor(root);
+      // its WIRE id: the first device shows (and derives its seed from) the persona-keyed id of its root-derived one
+      const firstId = wireDeviceId(profileSeed, firstDeviceIdFor(root));
       if (myDeviceId !== firstId && !retired.some((r) => r.deviceId === firstId)) {
         retired.push({ deviceId: firstId, seed: deriveDeviceSeed(profileSeed, firstId) });
       }
@@ -2813,9 +2829,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // must not migrate it again onto yet another device id.
       if (ownerRoot && !selfEnrolledThisSession) {
         try {
-          const selfDeviceId = enrolledDevice?.deviceId
-            ?? ((typeof crypto !== 'undefined' && crypto.randomUUID)
-              ? crypto.randomUUID() : `dev-${Math.random().toString(36).slice(2, 10)}`);
+          // a fresh device id is a CSPRNG internal id shown as its persona-keyed wire id (never Math.random: two
+          // devices with one id would derive one key set)
+          const selfDeviceId = enrolledDevice?.deviceId ?? wireDeviceId(root.deriveAgentSeed('default'), newDeviceId());
           const selfSeed = enrolledDevice
             ? deviceDerivationSeed
             : deriveDeviceSeed(root.deriveAgentSeed('default'), selfDeviceId);

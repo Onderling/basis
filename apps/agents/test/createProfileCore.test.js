@@ -14,10 +14,10 @@ describe('createProfile core (step 4)', () => {
   let registry; let created;
   // a fake `profiles` collaborator standing in for the owner-root-backed registry createProfile
   const profiles = {
-    async create({ profileId, name, properties }) {
+    async create({ profileId = 'p-0123456789ab', name, properties }) {   // the real one mints the id when absent
       created.push({ profileId, name, properties });
       await registry.register({ agentId: profileId, pubKey: `pk-${profileId}`, agentUri: `u:${profileId}`, role: 'profile', name, properties });
-      return { entry: null };
+      return { entry: null, profileId };
     },
   };
   beforeEach(() => { registry = mkReg(); created = []; });
@@ -44,9 +44,22 @@ describe('createProfile core (step 4)', () => {
     expect(res).toMatchObject({ created: false, reason: 'profiles-unavailable' });
   });
 
-  it('requires an id', async () => {
-    const res = await createProfile({ registry, profiles }, { name: 'no id' });
-    expect(res).toMatchObject({ created: false, reason: 'id-required' });
+  it('a name alone: the id is minted, not taken from the name — and the name is kept as the name', async () => {
+    const res = await createProfile({ registry, profiles }, { name: 'Buurt' });
+    expect(created[0].profileId).toBe('p-0123456789ab');
+    expect(created[0].name).toBe('Buurt');
+    expect(res).toMatchObject({ created: true, id: 'p-0123456789ab' });
+  });
+
+  it('needs a name (or an id): neither → nothing created', async () => {
+    const res = await createProfile({ registry, profiles }, {});
+    expect(res).toMatchObject({ created: false, reason: 'name-required' });
     expect(created).toHaveLength(0);
+  });
+
+  it('a refusal by the derivation (delegation custody) is reported as one, not as created', async () => {
+    const refusing = { create: async () => ({ ok: false, reason: 'ceremony-required' }) };
+    const res = await createProfile({ registry, profiles: refusing }, { name: 'Werk' });
+    expect(res).toMatchObject({ created: false, reason: 'ceremony-required' });
   });
 });

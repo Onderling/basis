@@ -531,9 +531,11 @@ export async function purgeAgent(store, args = {}) {
  */
 export async function createProfile(store, args = {}) {
   const s = asStore(store);
-  const id = typeof args?.id === 'string' ? args.id.trim() : '';
-  if (typeof s.profiles?.create !== 'function' || !id) {
-    return { created: false, reason: !id ? 'id-required' : 'profiles-unavailable', agent: null };
+  // The id is the persona's stable key label, minted by the derivation when absent; the NAME is what a person typed.
+  const given = typeof args?.id === 'string' ? args.id.trim() : '';
+  const name = typeof args?.name === 'string' && args.name.trim() ? args.name.trim() : null;
+  if (typeof s.profiles?.create !== 'function' || (!given && !name)) {
+    return { created: false, reason: (!given && !name) ? 'name-required' : 'profiles-unavailable', agent: null };
   }
   // properties may arrive as an object (programmatic) or a JSON string (surface). Best-effort parse.
   let properties = {};
@@ -541,7 +543,9 @@ export async function createProfile(store, args = {}) {
   else if (typeof args?.properties === 'string' && args.properties.trim()) {
     try { properties = JSON.parse(args.properties); } catch { properties = {}; }
   }
-  const result = await s.profiles.create({ profileId: id, name: typeof args?.name === 'string' ? args.name : null, properties });
+  const result = await s.profiles.create({ ...(given ? { profileId: given } : {}), name, properties });
+  if (result?.ok === false) return { created: false, reason: result.reason ?? 'refused', agent: null };
+  const id = result?.profileId ?? given;
   return { created: true, id, pubKey: result?.pubKey ?? null, agent: await readBack(s.registry, id) };
 }
 

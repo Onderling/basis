@@ -585,7 +585,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const registerPersonIdentity = () => {
     const sa2 = secureAgentRef.current;
     if (!sa2 || !persona.personIdentity) return;
-    try { sa2.registerSelfIdentity?.(persona.personIdentity.pubKey, persona.personIdentity); } catch { /* the send path falls back to canonical and says so */ }
+    try { sa2.registerSelfIdentity?.(persona.personIdentity.pubKey, persona.personIdentity, { owner: persona.chatId?.pubKey ?? null }); } catch { /* the send path falls back to canonical and says so */ }
   };
   const registerPersonAddressOnRelays = async () => {
     const sa2 = secureAgentRef.current;
@@ -608,10 +608,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     await registerPersonAddressOnRelays();
   };
 
-  const {
-    deviceDerivationSeed, enrolledDevice, circleIdentityFor, circleAddressFor, circleSealingKeyPairFor,
-    authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
-  } = persona;
+  // The device-wide half stays the default persona's: its delegation (the grants lane's signer), its custody.
+  const { deviceDerivationSeed, enrolledDevice, authorityPubKeyB64 } = persona;
+  // A CIRCLE BELONGS TO THE PERSONA IT WAS JOINED AS: the registry records it under one profile, and from then on its
+  // per-circle keys — address, signing identity, sealing keys, commitment, link proofs — are that persona's. Unrecorded
+  // circles (and every circle while only the default runs) are the default's, as before.
+  const circlePersonas = new Map();   // circleId → profileId (non-default only)
+  const personaOf = (circleId) => personas.get(circlePersonas.get(circleId)) ?? persona;
+  const deviceSeedFor = (circleId) => personaOf(circleId).deviceDerivationSeed;
+  const circleIdentityFor = (circleId) => personaOf(circleId).circleIdentityFor(circleId);
+  const circleAddressFor = (circleId) => personaOf(circleId).circleAddressFor(circleId);
+  const circleSealingKeyPairFor = (circleId) => personaOf(circleId).circleSealingKeyPairFor(circleId);
+  const ceremonyCommitmentFor = (circleId) => personaOf(circleId).ceremonyCommitmentFor(circleId);
+  const signCeremonyCommitment = (circleId, address, commitment) => personaOf(circleId).signCeremonyCommitment(circleId, address, commitment);
+  // Which persona an identity of ours belongs to, for the secure agent's routing: its chat key (the default's too, said
+  // explicitly — once a second persona exists, an owner-less registration is refused there).
+  const ownerFor = (circleId) => personaOf(circleId).chatId?.pubKey ?? null;
 
   // A caller's own `policyEngine` opts, pulled out BEFORE the spread so its `isRevoked` can be
   // unioned into this factory's rather than replacing it (see the composition below). `false` is
@@ -1429,7 +1441,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (ownerRoot) {
       try {
         for (const entry of (await agentsRegistry.list?.()) ?? []) {
-          if (entry?.role === 'profile' && typeof entry.agentId === 'string' && /^p-[0-9a-f]{12}$/.test(entry.agentId)) await runPersona(entry.agentId);
+          if (entry?.role === 'profile' && typeof entry.agentId === 'string' && /^p-[0-9a-f]{12}$/.test(entry.agentId)) {
+            if (!(await runPersona(entry.agentId))) continue;
+            // the circles it was joined as are its own (their keys and traffic)
+            for (const circleId of Object.keys(circleMembershipsOf(entry))) circlePersonas.set(circleId, entry.agentId);
+          }
         }
       } catch (err) { console.warn(`[persona] the registry's personas could not be read: ${err?.message ?? err}`); }
     }
@@ -1489,6 +1505,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (key != null) record.key = key;
         if (sight != null) record.sight = sight;   // the circle PUT AWAY (opbergen) — a field picked here, or it is dropped
         await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
+        // the circle is now this persona's: its keys and its traffic follow (the default is the map's absence)
+        if (profileId === 'default') circlePersonas.delete(circleId); else circlePersonas.set(circleId, profileId);
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
         if (!wasIn && profileId === 'default') circleFollowSync?.fanJoined(circleId).catch(() => { /* the sibling asks on connect */ });
@@ -1501,6 +1519,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (!cur) return { ok: true, removed: false };
         if (!circleMembershipsOf(cur)[circleId]) return { ok: true, removed: false };
         await agentsRegistry.register({ ...cur, properties: registryRemoveCircleMembership(cur.properties ?? {}, circleId) });
+        if (circlePersonas.get(circleId) === profileId) circlePersonas.delete(circleId);
         return { ok: true, removed: true };
       },
       // Personas — the PERSISTED per-context disclosure policy ("what this persona shares in circle X").
@@ -2274,7 +2293,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleId: cid,
         memberWebid: chatId.pubKey,
         circleAddressFor,
-        signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
+        signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceSeedFor(cid2), cid2, cid2, address),
         ceremonyCommitmentFor, signCeremonyCommitment,
       }),
     }),
@@ -3081,7 +3100,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           // itself back with (`rosterSeed`), minted while this device still holds the key.
           ownAnnouncement: ownCircleAddressAnnouncement({
             circleId, memberWebid: chatId.pubKey, circleAddressFor,
-            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
+            signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceSeedFor(cid2), cid2, cid2, address),
             ceremonyCommitmentFor, signCeremonyCommitment,
           }),
         });
@@ -3435,7 +3454,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           circleIds: memberCircleIds,
           circleAddressFor,
           circleIdentityFor,
-          registerSelfIdentity: (address, identity) => sa.registerSelfIdentity(address, identity),
+          registerSelfIdentity: (address, identity, meta) => sa.registerSelfIdentity(address, identity, { owner: ownerFor(meta?.circleId) }),
           onFailed: (cid) => console.warn(`[restore-open] no per-circle signing identity for ${cid} — messages `
             + 'sealed to its per-circle address cannot be opened until it derives.'),
         });
@@ -3823,7 +3842,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // boot is deliberate: the send path must not depend on a boot step having happened first.
     const sendAs = await useCircleSigningIdentity({
       circleId, circleAddressFor, circleIdentityFor,
-      registerSelfIdentity: (address, id) => sa.registerSelfIdentity(address, id),
+      registerSelfIdentity: (address, id, meta) => sa.registerSelfIdentity(address, id, { owner: ownerFor(meta?.circleId) }),
     });
     return sa.peer.sendTo(to, envelope, {
       guarantee: 'hold-forward',
@@ -5137,7 +5156,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           && typeof realArgs.groupId === 'string' && realArgs.groupId
           && !realArgs.circleAddress) {
         try {
-          realArgs = { ...realArgs, circleAddress: deriveCircleAddress(deviceDerivationSeed, realArgs.groupId) };
+          realArgs = { ...realArgs, circleAddress: circleAddressFor(realArgs.groupId) };
         } catch { /* address derivation is additive — never block the redeem/create */ }
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
@@ -7066,7 +7085,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The address IS a public key, so registering it on a relay means answering a challenge with the
     // matching private key. This is that signer — it stays beside circleAddressFor because the two are
     // one fact: an address you cannot prove is an address you cannot register.
-    circleAddressSignerFor: (circleId) => circleAddressSigner(deviceDerivationSeed, circleId),
+    circleAddressSignerFor: (circleId) => circleAddressSigner(deviceSeedFor(circleId), circleId),
     // Decision 4 — the per-circle SIGNING identity behind that address, and the one call a shell
     // makes to switch it on. `installCircleIdentities(ids)` must run for every circle this device is
     // in: without it this device cannot OPEN what was sent to its per-circle address, and a shell
@@ -7148,7 +7167,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleIds,
       circleAddressFor,
       circleIdentityFor,
-      registerSelfIdentity: (address, id) => sa.registerSelfIdentity(address, id),
+      registerSelfIdentity: (address, id, meta) => sa.registerSelfIdentity(address, id, { owner: ownerFor(meta?.circleId) }),
       onFailed: (cid) => console.warn(`[realAgent] no per-circle signing identity for ${cid} — this `
         + 'device signs that circle as its global identity, and messages sealed to its per-circle '
         + 'address cannot be opened.'),
@@ -7228,7 +7247,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.
-    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(deviceDerivationSeed, circleId, groupId, address),
+    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(deviceSeedFor(circleId), circleId, groupId, address),
     /**
      * Mount an app's LOCAL ops on this agent's waist — today `basis`, whose handlers end in the
      * device's own affordances (a picker, a camera, a panel, a pod login) and so cannot be agent

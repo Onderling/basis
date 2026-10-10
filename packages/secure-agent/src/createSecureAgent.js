@@ -2670,7 +2670,13 @@ export async function createSecureAgent(opts = {}) {
      */
     registerSelfIdentity(address, selfIdentity, { owner = null } = {}) {
       if (typeof agent.security?.addSelfIdentity !== 'function') return false;
-      // `owner`: the persona this address belongs to (its chat key). Absent → the default identity, as before.
+      // `owner`: the persona this address belongs to (its chat key). Absent → the default identity — but only while
+      // no persona exists: once one does, an owner-less identity would route a persona's key as the default's without
+      // anyone noticing, so it is refused and said.
+      if (!owner && selfOwners.size > 0) {
+        if (typeof console !== 'undefined') console.warn(`[secure-agent] refused an identity of ours without an owner (${String(address).slice(0, 16)}…) — a persona exists, so every registration names its owner`);
+        return false;
+      }
       if (owner && owner !== identity.pubKey) selfOwners.set(address, owner); else selfOwners.delete(address);
       return agent.security.addSelfIdentity(address, selfIdentity);
     },

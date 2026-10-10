@@ -80,3 +80,20 @@ describe('a persona dials on its own socket, and speaks only there', () => {
     }
   }, 30_000);
 });
+describe('once a persona exists, every identity of ours names its owner', () => {
+  it('an owner-less registration is refused — it would silently route a persona\'s key as the default\'s', async () => {
+    const anna = await agent();
+    const persona = await AgentIdentity.generate(new VaultMemory());
+    const circleKey = await AgentIdentity.generate(new VaultMemory());
+    const other = await AgentIdentity.generate(new VaultMemory());
+    try {
+      // while only the default exists, the old call still works (every existing registration)
+      expect(anna.registerSelfIdentity(circleKey.pubKey, circleKey)).toBe(true);
+      // a persona registers itself as its own owner …
+      expect(anna.registerSelfIdentity(persona.pubKey, persona, { owner: persona.pubKey })).toBe(true);
+      // … and from then on an identity without an owner is refused, while one that names its owner is taken
+      expect(anna.registerSelfIdentity(other.pubKey, other)).toBe(false);
+      expect(anna.registerSelfIdentity(other.pubKey, other, { owner: anna.identity.pubKey })).toBe(true);
+    } finally { await anna.shutdown(); }
+  });
+});

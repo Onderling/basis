@@ -530,6 +530,9 @@ export const householdManifest = {
       params: [
         { name: 'mnemonic', kind: 'secret', required: true },
         { name: 'label',    kind: 'string' },
+        // WHICH PERSONAS this device is handed (a list of persona ids, picked from the offer's sealed list — opened with
+        // the phrase on this device); absent or empty = the default only, the low-trust device's set
+        { name: 'personas', kind: 'object' },
       ],
       // CEREMONY-ONLY: reached through the enroll-device flow (the first-run/settings shells
       // start it); no chat/slash surface — a phrase does not belong in a chat box.

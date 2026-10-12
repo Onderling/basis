@@ -49,7 +49,7 @@ export const RESTORE_PENDING_KEY = 'restore-pending';
 // The delegation blob's slot is one of a persona's vault slots (personaVault.js); re-exported for the callers that
 // import it from here.
 export { DEVICE_DELEGATION_VAULT_KEY } from './personaVault.js';
-import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
+import { DEVICE_DELEGATION_VAULT_KEY, HELD_PERSONAS_VAULT_KEY, personaVault } from './personaVault.js';
 
 const _b64url = (bytes) => {
   let s = '';
@@ -108,7 +108,7 @@ export function newDeviceId({ crypto: c = globalThis.crypto } = {}) {
  *                                    (root in the key door) so legacy callers keep working.
  * @returns {Promise<{ok: true, pubKey: string, deviceId?: string, custody?: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [] } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [], personas = [] } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
   if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
@@ -164,6 +164,25 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     });
     if (blob.label) blob.record = { ...blob.record, label: blob.label };
     await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+    // 3b. THE PICKED PERSONAS (the picker): each is handed here, the one moment the root is in hand — its chat identity,
+    //     its person key, and its own delegation (its wire id of this device, its device seed, the record signed by its
+    //     own authority) — into its own slots. A delegated device can never derive a persona later; what it is not
+    //     handed now, it does not run. The list it holds is kept beside the default's slots for its boots.
+    const held = [];
+    for (const pid of Array.isArray(personas) ? personas : []) {
+      if (typeof pid !== 'string' || !/^p-[0-9a-f]{12}$/.test(pid) || held.includes(pid)) continue;
+      const pSeed = root.deriveAgentSeed(pid);
+      const pVault = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), pid);
+      await loadProfile({ ownerRoot: root, profileId: pid, vault: pVault });
+      await storePersonKey(pVault, { version: 1, seed: derivePersonKeySeed(pSeed, 1), linkKeyPub: personKeyPubKeyB64(derivePersonLinkKeySeed(pSeed)) });
+      const pWire = wireDeviceId(pSeed, internalId);
+      const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
+      let pRecord = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
+      if (blob.label) pRecord = { ...pRecord, label: blob.label };
+      await pVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: _b64url(pDeviceSeed), deviceId: pWire, internalId, record: pRecord, ...(blob.label ? { label: blob.label } : {}) }));
+      held.push(pid);
+    }
+    await sealedChat.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify(held));
     // The note the NEXT boot reads: a restore happened here, finish it (the restore-finish flow asks what
     // came back and what the person wants). Plain, device-local, cleared by that flow's first step.
     if (markerVault) { try { await markerVault.set(RESTORE_PENDING_KEY, JSON.stringify({ at: new Date().toISOString() })); } catch { /* the flow can be started by hand */ } }

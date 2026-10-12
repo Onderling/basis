@@ -2343,7 +2343,7 @@ function buildCircleBot(agent) {
     onReturned: contactReturned,
     // the first message to a contact carries MY card, and a card that arrives (naming its sender) goes into the book —
     // so whoever writes to me is a NAMED row, on every device (the book carry), not a key (2026-09-21)
-    myCard: async () => { try { return (await rawCallSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await rawCallSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: contactCardArrived,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits

@@ -810,7 +810,7 @@ export async function bootAgentBundle(opts = {}) {
     onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); },
     // the first message to a contact carries MY card; a card that arrives (naming its sender) goes into the book, so
     // whoever writes to me is a named row on every device (web parity, 2026-09-21)
-    myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await agent.callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     // web parity (circleApp's contactCardArrived): a card riding a message has no moment to choose in, so
     // the default is recorded EXPLICITLY rather than left absent — "not recorded" is a different fact.
     onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); },

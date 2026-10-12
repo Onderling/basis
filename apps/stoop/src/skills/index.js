@@ -4608,10 +4608,13 @@ export function buildSkills({
       const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
         ? a.trustOffer : 'bekend';
       const me = members ? await members.resolveByWebid(from) : null;
+      // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
+      // no fallback to this agent's identity, which every self of the device shares and so would link them.
+      const asPersona = !!localActor && from !== localActor;
       const card = {
         webid:        from,
-        pubKey:       me?.pubKey       ?? agent?.identity?.pubKey ?? null,
-        stableId:     me?.stableId     ?? agent?.identity?.stableId ?? null,
+        pubKey:       me?.pubKey       ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     me?.stableId     ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
         avatarUrl:    me?.avatarUrl    ?? null,

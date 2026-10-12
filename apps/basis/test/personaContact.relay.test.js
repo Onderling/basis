@@ -11,6 +11,7 @@ import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
 import { pairCircleIdFor } from '../src/v2/pairRoster.js';
 import { EventLog } from '../src/eventLog.js';
+import { decodeContactCard } from '../src/v2/contactCardLink.js';
 
 describe('a contact filed under a persona talks to that persona', () => {
   let relay; let phone; let cor; let B; let personaId;
@@ -59,4 +60,18 @@ describe('a contact filed under a persona talks to that persona', () => {
     expect(ids).not.toContain(theDefaults);
     expect(phone.agent.circleSelf(mine).webid, 'and it is B\'s').toBe(B.chatId.pubKey);
   }, 90_000);
+
+  it('Cor\'s book learns B from B\'s own card — B\'s key, B\'s address — and nothing of the default', async () => {
+    const A = phone.pubKey;
+    const row = await until(async () => (((await cor.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === B.chatId.pubKey) ?? null), { timeout: 20_000, step: 200 });
+    expect(row, 'Cor has a contact row for B, from the card the turn carried').toBeTruthy();
+    expect(JSON.stringify(row).includes(A), 'B\'s card carries no byte of the default').toBe(false);
+    // the card the phone hands out AS B, inspected whole
+    const card = await phone.agent.callSkill('stoop', 'getContactShareQr', { persona: personaId });
+    const decoded = decodeContactCard(card?.payload);
+    expect(decoded, 'a card').toBeTruthy();
+    const text = JSON.stringify(decoded);
+    expect(text.includes(A), 'the persona card names nothing of the default').toBe(false);
+    expect(text.includes(B.chatId.pubKey), 'it names B').toBe(true);
+  }, 60_000);
 });

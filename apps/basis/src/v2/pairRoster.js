@@ -51,11 +51,10 @@ export function createPairRoster({
   // carries the commitment without its proof, so the joiner must hear the founder's own announcement before the
   // founder's rotations can fold there — the whole point of the pair roster.
   announceOwn = null, logger = console,
-  // THE LENS (persona step 3, 2026-09-24): which persona this contact sees you as. `personaFor(webid)` reads the
-  // contact row's persona (default: the book, through `personaOfContact` — never a silent 'default'); the founder
-  // pushes that persona's RELEASE onto the pair circle through `shareRelease(circleId, personaId)` (the shells'
-  // `shareDisclosureToCircle`), and the joiner joins AS it, so the release `finalSubmit` computes is that persona's.
-  // Same identity, same address, same pair id — only what the contact receives differs (`contactPersona.js`).
+  // WHICH OF YOU this contact knows: `personaFor(webid)` reads the contact row's persona (default: the book, through
+  // `personaOfContact` — never a silent 'default'); the pair circle is THAT persona's with them (`selfWebidOf` below),
+  // the founder pushes that persona's RELEASE onto it through `shareRelease(circleId, personaId)` (the shells'
+  // `shareDisclosureToCircle`), and the joiner joins AS it (`contactPersona.js`).
   personaFor = null, shareRelease = null,
   // WHO I AM TO A CONTACT: `selfWebidOf(personaId)` → that persona's webid (its chat key). A contact filed
   // under a persona talks to THAT persona: the pair circle is the persona's with them (its id from the persona's webid),

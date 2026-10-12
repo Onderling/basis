@@ -1091,12 +1091,13 @@ first, third and fourth are in the code; the second's identity half is not:
   identity, so a persona is the same on all your devices; a device is never a persona (see the paragraph
   above). Infrastructure attaches to a profile-in-the-registry, never to a loaded instance.
 
-**Contacts carry a persona as a lens, not as an identity** (2026-09-24). Every contact row records which
-persona that contact sees you as (`contactPersona.js`), and that persona's release founds and joins the pair
-circle with them; the add sheet chooses the persona and the disclosure level, with the default prefilled, and the
-thread header changes it afterwards. What it does not change is who they talk to: the contact book is still one list for the whole agent and every
-contact holds the default profile's address and pair id. So the honest sentence is "this contact sees you
-as …", never "this contact knows a different you"; the second waits on a persona running as its own person.
+**A contact knows one of you — the persona it is filed under** (2026-10-12; a lens over one identity from
+2026-09-24 until then). Every contact row records its persona (`contactPersona.js`), and that persona is WHO the
+contact talks to: turns are authored by and sent as it, carry its own card, are sealed from its person key, and the
+pair circle is the persona's with them (`pairCircleIdFor(persona.webid, them)`, founded AS it). Nothing of the default
+rides along. The add sheet chooses the persona and the disclosure level, with the default prefilled; the thread header
+changes it afterwards — which gives the contact a NEW contact on their side, while what they knew of the old one stays.
+The contact book is still one list with a persona column. The honest sentence is "this contact knows a different you".
 
 **Out of sight is a mark that follows the person, never a statement to anyone else.** Hiding a contact is a
 mark on the book row, carried between the person's own devices newest-wins; their next message brings them

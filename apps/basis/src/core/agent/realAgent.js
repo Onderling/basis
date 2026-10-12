@@ -2107,6 +2107,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       return to ? { sealed: 'person', to } : { sealed: 'device' };
     },
     sealFor: async (peerAddr, content) => {
+      // to a contact filed under a PERSONA: sealed FROM that persona's person key (never the default's)
+      const self = await contactSelf(peerAddr).catch(() => null);
+      const pk = self?.personaId ? personas.get(self.personaId)?.personKey : null;
+      if (self?.personaId) {
+        const to = pk ? await contactPersonKeyOf(peerAddr) : null;
+        if (!to || !pk) return null;
+        const { sealed, nonce } = await sealToPersonKey(pk.seed, to.pubKey, content);
+        return { to, from: { version: pk.version, pubKey: personKeyPubKeyB64(pk.seed) }, sealed, nonce };
+      }
       const to = await sealTargetFor(peerAddr);
       if (!to) {
         if (persona.personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
@@ -2116,6 +2125,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       return { to, from: currentPersonKey(), sealed, nonce };
     },
     openFor: async (s, fromAddr) => {
+      // sealed to one of my PERSONAS' person keys: that persona's seed opens it
+      for (const [pid, rt] of personas) {
+        if (pid === 'default' || !rt?.personKey?.seed) continue;
+        if (s?.to?.pubKey && personKeyPubKeyB64(rt.personKey.seed) === s.to.pubKey) return openFromPersonKey(rt.personKey.seed, s?.from?.pubKey, s);
+      }
       const seed = personSeedFor(s?.to?.version);
       if (!seed) { console.warn(`[contact-seal] a message sealed to person-key version ${s?.to?.version} — this device holds no such version`); return null; }
       const content = await openFromPersonKey(seed, s?.from?.pubKey, s);
@@ -2143,6 +2157,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // WHO this device's own stoop call is: in a persona's circle (the args name it), the persona — `actAs` at the core's
   // in-process membrane, so the skill's `from` and the trail's actor are it. Anything else: the default, as before.
   const stoopActAs = (args) => {
+    // a call that names WHICH persona it is for (a card) is made as that persona
+    if (typeof args?.persona === 'string' && args.persona !== 'default') {
+      const w = personas.get(args.persona)?.chatId?.pubKey ?? null;
+      if (w) return { actAs: w };
+    }
     const c = args?.groupId ?? args?.circleId ?? null;
     if (typeof c !== 'string' || !c) return {};
     let as = null;
@@ -3070,7 +3089,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!pid || pid === 'default') return null;
     const rt = personas.get(pid);
     const me = rt?.chatId?.pubKey ?? null;
-    return me ? { webid: me, sendAs: me } : null;
+    return me ? { webid: me, sendAs: me, personaId: pid } : null;
   };
   /** The relay sockets a circle's self speaks on: a persona's own (null for the default — the shells' default list). */
   const relaysFor = (circleId) => {
@@ -5252,17 +5271,30 @@ export async function createRealHouseholdAgent(opts = {}) {
           // opts stays as a test override; no shell passes it.
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
         );
-        if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
-        // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
-        if (persona.personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(persona.personKey.links) ? persona.personKey.links : [] };
+        // A PERSONA's card: its own chat address (its socket's), its own person key and chain, the relays IT is on — and the
+        // card is asked AS it (`stoopActAs`), so nothing of the default rides along.
+        const cardPersona = typeof realArgs.persona === 'string' && realArgs.persona !== 'default' ? personas.get(realArgs.persona) : null;
+        if (realArgs.persona && realArgs.persona !== 'default' && !cardPersona?.chatId) return { error: 'no-such-persona' };
+        if (cardPersona) {
+          const pk = cardPersona.personKey;
+          realArgs = {
+            ...realArgs,
+            ...(myPeerAddr ? { peerAddr: cardPersona.chatId.pubKey } : {}),
+            ...(pk ? { personKey: { version: pk.version, pubKey: personKeyPubKeyB64(pk.seed), ...(pk.linkKeyPub ? { linkKeyPub: pk.linkKeyPub } : {}) }, personKeyLinks: Array.isArray(pk.links) ? pk.links : [] } : {}),
+          };
+        } else {
+          if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
+          // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
+          if (persona.personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(persona.personKey.links) ? persona.personKey.links : [] };
+        }
         // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
         // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
         // an unlinkability strategy, and a card listing every relay hands its holder a linkage across
         // them). Never mDNS. An extra relay this device is NOT on is not put on the card: a card must
         // not name a place the person cannot be reached. Under the same publication lock as the address.
         if (myPeerAddr) {
-          const on = (() => { try { return sa.relays.list().map((r) => r.url).filter(Boolean); } catch { return []; } })();
-          const primary = sa.relay?.url ?? on[0] ?? null;
+          const on = (() => { try { return sa.relays.list(cardPersona ? { identity: cardPersona.chatId.pubKey } : undefined).map((r) => r.url).filter(Boolean); } catch { return []; } })();
+          const primary = cardPersona ? (on[0] ?? null) : (sa.relay?.url ?? on[0] ?? null);
           const wanted = String(realArgs.extraRelays ?? realArgs['extra-relays'] ?? '').split(',').map((u) => u.trim()).filter(Boolean);
           const relays = [];
           if (primary) relays.push(primary);
@@ -5271,7 +5303,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         // a FUNCTION profile (a household bot) says so on its card — for display and the add-flow's words only; what a
         // person's app signs to is decided by their own admission, never by this claim
-        try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ }
+        if (!cardPersona) { try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ } }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }

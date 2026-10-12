@@ -536,6 +536,37 @@ alone, which flips the flag and keeps the signed fields intact.
 - `deviceId` `string`
 - `patch` `object` — a full record, or `{revoked: true}` for an existing one
 
+### `DEVICE_INTERNAL_IDS_KEY`
+
+**Kind:** constant · **Import:** `DEVICE_INTERNAL_IDS_KEY` from `'@onderling/agent-registry'`
+
+THE PRIVATE DEVICE MAP — `{ [default wire id]: internal id }`, on the DEFAULT profile, beside (never inside) the
+delegation records. A device is known to each persona by a wire id derived from THAT persona's seed over the
+device's internal id, so no two personas' records can be linked — by design. The person's own revoke ceremony
+must still retire a lost device under every persona it held, and for that it needs the internal id: each device
+writes its own here. This lives on the person's own registry (their devices + the sealed pod) and is never part of a
+signed record, so a delegation record that travels carries none of it.
+
+### `deviceInternalIdOf`
+
+**Kind:** function · **Import:** `deviceInternalIdOf` from `'@onderling/agent-registry'`
+
+```js
+deviceInternalIdOf(entry, wireId)
+```
+
+The internal id recorded for a device (by its DEFAULT wire id), or null.
+
+### `setDeviceInternalId`
+
+**Kind:** function · **Import:** `setDeviceInternalId` from `'@onderling/agent-registry'`
+
+```js
+setDeviceInternalId(properties, wireId, internalId)
+```
+
+Record a device's internal id under its default wire id (pure; returns the new properties).
+
 ## `src/disclosure.js`
 
 ### `createDisclosurePolicy`

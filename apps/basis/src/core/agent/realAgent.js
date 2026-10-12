@@ -2537,10 +2537,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Never retire the address this device presents — except at the one moment it is leaving it
       // (the self-enrol migration, which has already introduced the address it moves to).
       if (!address || (!includeOwn && address === circleAddressFor(circleId))) continue;
-      const reveal = signCeremonyReveal(root.deriveProfileAuthority('default'), { circleId, kind: 'address-revoke', subject: address, authorRef: chatId.pubKey });
+      // as the circle's own self: its persona's authority reveals, its persona's ref says it (the default's, by default)
+      const me = circleSelfRef(circleId);
+      const reveal = signCeremonyReveal(root.deriveProfileAuthority(profileIdOf(circleId)), { circleId, kind: 'address-revoke', subject: address, authorRef: me });
       const stmt = await membershipEmit({
         kind: 'address-revoke', circleId, subject: address,
-        payload: { by: chatId.pubKey, reveal }, actor: chatId.pubKey,
+        payload: { by: me, reveal }, actor: me,
       }).catch(() => null);
       if (stmt) revokedIn.push({ circleId, address });
       try {
@@ -2797,6 +2799,42 @@ export async function createRealHouseholdAgent(opts = {}) {
         await personKeySync.carryCurrent({ exclude: [...circleIds].map((cid) => deriveCircleAddress(revokedSeed, cid)) });
       } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
+      // EVERY PERSONA THE DEVICE HELD loses it too. Each persona knows the device by its own wire id (its seed over the
+      // device's internal id — unlinkable by design); the internal id is on the person's private device map (a
+      // `device-link` row in the own-devices scope, each device writes its own), so the ceremony — root in hand — derives
+      // each persona's wire id for it, tombstones it on that persona's record (minted already revoked when absent, as the
+      // default's is), and retires its addresses in that persona's circles as that persona.
+      const revokedUnder = { default: deviceId };
+      try {
+        const store = await getOwnStore();
+        const link = ((await store.list?.()) ?? []).find((it) => it?.type === 'device-link' && it.wireId === deviceId) ?? null;
+        const internalId = link?.internalId ?? null;
+        const entries = internalId ? ((await bounded(agentsRegistryRef?.list?.())) ?? []) : [];
+        for (const entry of entries) {
+          const pid = entry?.agentId;
+          if (typeof pid !== 'string' || !pid.startsWith('p-')) continue;
+          const pSeed = root.deriveAgentSeed(pid);
+          const pWire = wireDeviceId(pSeed, internalId);
+          const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
+          try {
+            const rec = deviceDelegationOf(entry, pWire);
+            let props = entry.properties ?? {};
+            if (!rec) {
+              const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
+              props = registrySetDeviceDelegation(props, pWire, { ...minted, revoked: true });
+            } else if (rec.revoked !== true) {
+              props = registrySetDeviceDelegation(props, pWire, { revoked: true });
+            }
+            if (props !== (entry.properties ?? {})) await bounded(agentsRegistryRef.register({ ...entry, properties: props }));
+          } catch (err) { console.warn(`[ceremony] the device's record under a persona was not tombstoned: ${err?.message ?? err}`); }
+          revokedUnder[pid] = pWire;
+          const pCircles = Object.keys(circleMembershipsOf(entry));
+          if (pCircles.length) {
+            revokedIn.push(...await retireAddresses({ root, circleIds: pCircles, addressFor: (cid) => deriveCircleAddress(pDeviceSeed, cid) }));
+          }
+        }
+        if (!internalId && entries.length === 0) console.info('[ceremony] no device-link row for this device — its personas (if any) are not known to this device yet');
+      } catch (err) { console.warn(`[ceremony] the device's personas were not all retired: ${err?.message ?? err}`); }
       // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
       // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
       // key to its own delegation-derived one, write the delegation blob (pre-signed record
@@ -2885,7 +2923,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // turns there are a stranger's. Sent held-forward: a bot that is away hears it when it is back.
       const botsTold = await tellLinkedBotsRevoked(root, deviceId);
       return [DataPart({
-        ok: true, deviceId, known, revokedIn, circles: revokedIn.length, nodesTold, botsTold,
+        ok: true, deviceId, known, revokedIn, revokedUnder, circles: revokedIn.length, nodesTold, botsTold,
         ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
@@ -7418,6 +7456,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: pid, circleId, address }),
       log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
     }).catch(() => { /* the next boot tries again */ });
+  }
+  // THIS DEVICE ON THE PERSON'S PRIVATE DEVICE MAP: its default wire id and its internal id, as a `device-link` row in
+  // the own-devices scope (sealed, carried between the person's own devices only). The revoke ceremony on another
+  // device reads it to retire this one under every persona it holds. Written once; best-effort (the next boot retries).
+  {
+    const myWire = persona.enrolledDevice?.deviceId ?? null;
+    const myInternal = persona.internalDeviceId ?? null;
+    if (myWire && myInternal) {
+      getOwnStore().then(async (st) => {
+        const have = ((await st.list?.()) ?? []).some((it) => it?.type === 'device-link' && it.wireId === myWire && it.internalId === myInternal);
+        if (!have) await st.put({ type: 'device-link', id: `device-link:${myWire}`, wireId: myWire, internalId: myInternal }, { by: chatId.pubKey });
+      }).catch((err) => console.warn(`[device-map] this device is not on the private device map yet (the next boot retries): ${err?.message ?? err}`));
+    }
   }
   selfAgent = api;
   return api;

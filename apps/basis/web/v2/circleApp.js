@@ -2312,6 +2312,8 @@ function buildCircleBot(agent) {
   // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
   // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
   circlePairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => rawCallSkill ? rawCallSkill(app, op, args) : agent.callSkill(app, op, args),
     sendPeerRedeem: (...a) => (circleSendPeerRedeem ? circleSendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -2327,6 +2329,8 @@ function buildCircleBot(agent) {
     shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   circleContactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     blobStore: circleAttachmentBlobs,
     pair: circlePairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included
@@ -3158,7 +3162,7 @@ async function deleteContactWithConfirm(contactId, name) {
     opId: 'deleteContact',
   });
   if (!ok) return;
-  const pairCircleId = circlePairRoster?.pairCircleIdFor?.(contactId) ?? null;
+  const pairCircleId = (await circlePairRoster?.pairCircleIdFor?.(contactId)) ?? null;
   const r = await deleteContact({
     agent: _peerAgent, callSkill: rawCallSkill, contactWebid: contactId, pairCircleId,
     unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({

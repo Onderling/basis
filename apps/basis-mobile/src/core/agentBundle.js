@@ -772,6 +772,8 @@ export async function bootAgentBundle(opts = {}) {
     circleId, personaId, lastShared: disclosureShareMemo, resealMediaForCircle,
   });
   const pairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => agent.callSkill(app, op, args),
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -788,6 +790,8 @@ export async function bootAgentBundle(opts = {}) {
     shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   const contactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included (web parity)

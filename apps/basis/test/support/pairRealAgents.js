@@ -264,6 +264,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
   const pairRoster = createPairRoster({
     selfWebid: pubKey,
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,   // as the shells compose it
     callSkill: (app, op, args) => callSkill(app, op, args),
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
@@ -290,6 +291,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   });
   const contactThreadChannel = contactChannel
     ? createContactThreadChannel({
+        selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,   // as the shells compose it
         sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
         itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
         // the shells' peer-graph upsert, recorded: the senders this device would list in Contacten

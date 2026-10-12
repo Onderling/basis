@@ -66,6 +66,7 @@ export const householdManifest = {
     help: 'read',
     register: 'write',
     'enroll-device': 'write',
+    'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
@@ -457,6 +458,28 @@ export const householdManifest = {
       // — a restored device lands it, announces itself to every member and pulls the lanes from them.
       params: [
         { name: 'rosters', kind: 'string', required: false },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'listReceivablePersonas', group: 'device',
+      verb: 'list',
+      // THE RESTORE PICKER's list: the person's personas (their registry, as a restore brought it back) that THIS device
+      // does not run yet — names and ids only. Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'receivePersonas', group: 'device',
+      verb: 'receive-personas',
+      writes: { scope: 'person' },   // the picked personas' keys, into this install's sealed slots
+      // THESE PERSONAS HERE TOO — a phrase ceremony (the root is in hand only now): the picked personas are handed to
+      // this device (their chat identity, person key and their own delegation of it); the next boot runs them. The
+      // phrase is SECRET-kind; the runner never persists it. CEREMONY-ONLY: no chat/slash surface.
+      params: [
+        { name: 'mnemonic', kind: 'secret', required: true },
+        // the picked persona ids (from `listReceivablePersonas`)
+        { name: 'personas', kind: 'object', required: true },
       ],
       surfaces: {},
     },

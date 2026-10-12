@@ -100,6 +100,9 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
           if (blob.label) enrolledDevice.label = blob.label;
           if (blob.record) enrolledDevice.record = blob.record;
         }
+        // the device's own internal id rides the blob too — a later "these personas here too" derives each persona's
+        // wire id of this device from it
+        if (typeof blob.internalId === 'string' && blob.internalId) deviceInternalId = blob.internalId;
       } else {
         // Root custody, enrolled (the pre-cutover interim): the blob supplies the derivation root.
         const decoded = seedFromString(blob.seed);

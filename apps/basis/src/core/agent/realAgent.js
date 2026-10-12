@@ -216,7 +216,7 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, HELD_PERSONAS_VAULT_KEY } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
@@ -1477,6 +1477,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
     };
     // a delegated device: the personas it holds start now (their circles bind as their memberships are written)
+    // (its circles bind where every self's circles reopen at boot — `reopenMemberCircles`)
     if (!ownerRoot) { for (const id of heldPersonas) await runPersona(id); }
     if (ownerRoot) {
       try {
@@ -3278,7 +3279,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
-      const circleIds = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {}));
+      // every SELF's circles: the default's and each persona's (a restored device that is handed a persona later finds
+      // that persona's circles' rosters in the same file — read here as that persona, through the waist)
+      const circleIds = [...new Set((body.agents ?? [])
+        .filter((a) => a?.agentId === 'default' || /^p-[0-9a-f]{12}$/.test(String(a?.agentId ?? '')))
+        .flatMap((a) => Object.keys(circleMembershipsOf(a))))];
       // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
       // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
       // would serve as a seed — for every circle the person ticked; all of them unless the caller says
@@ -3434,6 +3439,35 @@ export async function createRealHouseholdAgent(opts = {}) {
     return [DataPart({ ok: true, outcome: intent, intent })];
   }, { visibility: 'private' });
 
+  // WHICH PERSONAS THIS DEVICE MAY STILL RECEIVE — the person's personas (the registry, as a restore brought it back)
+  // that this device does not run; the picker's list after a restore. Names only, from the person's own registry.
+  hostAgent.register('listReceivablePersonas', async () => {
+    try {
+      const out = [];
+      for (const entry of (await agentsRegistryRef?.list?.()) ?? []) {
+        const id = entry?.agentId;
+        if (entry?.role !== 'profile' || typeof id !== 'string' || !/^p-[0-9a-f]{12}$/.test(id) || personas.has(id)) continue;
+        out.push({ id, name: entry.name ?? null });
+      }
+      return [DataPart({ ok: true, personas: out })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
+  }, { visibility: 'private' });
+  // THESE PERSONAS HERE TOO — the picker's act after a restore (or any time): the phrase typed again is the one moment
+  // the root is in hand, and the picked personas are handed into this device's slots (`handPersonasInto`, the same
+  // hand-over as the enrol ceremony). A reload runs them.
+  hostAgent.register('receivePersonas', async ({ parts }) => {
+    const proof = verifyOwnerPhrase(String(parts?.[0]?.data?.mnemonic ?? ''));
+    if (!proof.ok) return [DataPart({ ok: false, outcome: proof.outcome, error: proof.outcome })];
+    const picked = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
+    if (picked.length === 0) return [DataPart({ ok: false, error: 'none-picked' })];
+    try {
+      const held = await handPersonasInto({
+        root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
+        label: persona.enrolledDevice?.label ?? null, personas: picked,
+      });
+      return [DataPart({ ok: true, held, reloadRequired: true })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'hand-over-failed' })]; }
+  }, { visibility: 'private' });
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
     let root;
@@ -3637,7 +3671,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     const reopened = [];
     let memberCircleIds = [];
     try {
-      memberCircleIds = Object.keys(await readSelfCircleMemberships())
+      // the default's circles, and those of every persona this device RUNS (a persona it does not hold stays closed here)
+      const ids = new Set(Object.keys(await readSelfCircleMemberships()));
+      for (const [pid] of personas) {
+        if (pid === 'default') continue;
+        try { for (const cid of Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {}))) { ids.add(cid); circlePersonas.set(cid, pid); } } catch { /* next */ }
+      }
+      memberCircleIds = [...ids]
         .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household');
     } catch (err) {
       if (typeof console !== 'undefined') console.warn('[restore-open] membership enumeration failed — no circles auto-reopened', err?.message ?? err);

@@ -47,6 +47,7 @@ import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
+import ReceivePersonasModal from './ReceivePersonasModal.js';
 import { useRelayQuestion } from './RelayQuestionModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
@@ -90,7 +91,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [signInErr, setSignInErr] = useState('');
   const [privacy, setPrivacy] = useState([]);
   const [metrics, setMetrics] = useState({});
-  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
+  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | 'receive-personas' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
   const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
   const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
@@ -454,6 +455,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
+        </Pressable>
+        {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
         </Pressable>
         {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
         <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
@@ -960,6 +965,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         />
       )}
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
+      <ReceivePersonasModal visible={wizard === 'receive-personas'} callSkill={callSkill} onClose={() => setWizard(null)} />
       {relayQuestionModal}
       <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
       <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"

@@ -4552,6 +4552,7 @@ async function showMyData() {
   const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
+  const onReceivePersonas = () => showReceivePersonas();
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
@@ -4646,7 +4647,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -5218,6 +5219,64 @@ function _restoreOverlay() {
   wrap.appendChild(card);
   document.body.appendChild(wrap);
   return { wrap, card, close: () => wrap.remove() };
+}
+
+// PERSONAS ON THIS DEVICE — the restore picker (and any time): the person's personas this device does not run yet,
+// ticked, then handed over with the phrase typed here (the one moment the root is in hand). A reload runs them.
+async function showReceivePersonas() {
+  const { card, close } = _restoreOverlay();
+  const listed = (await rawCallSkill('household', 'listReceivablePersonas', {}).catch(() => null))?.personas ?? [];
+  card.innerHTML = '';
+  const h = document.createElement('h3');
+  h.textContent = t('circle.receive_personas.title');
+  card.appendChild(h);
+  const done = (key, reload = false) => {
+    card.innerHTML = '';
+    const p = document.createElement('p');
+    p.textContent = t(key);
+    card.appendChild(p);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cc-btn cc-btn--primary';
+    b.textContent = t(reload ? 'circle.receive_personas.reload' : 'circle.receive_personas.close');
+    b.addEventListener('click', () => (reload ? window.location.reload() : close()));
+    card.appendChild(b);
+  };
+  if (listed.length === 0) { done('circle.receive_personas.none'); return; }
+  const body = document.createElement('p');
+  body.textContent = t('circle.receive_personas.body');
+  card.appendChild(body);
+  const picked = new Set();
+  for (const p of listed) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.dataset.personaId = p.id;
+    box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); });
+    const name = document.createElement('span');
+    name.textContent = p.name ?? p.id;
+    row.append(box, name);
+    card.appendChild(row);
+  }
+  const phrase = document.createElement('textarea');
+  phrase.rows = 3; phrase.autocomplete = 'off'; phrase.spellcheck = false;
+  phrase.placeholder = t('circle.receive_personas.phrase_placeholder');
+  phrase.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+  card.appendChild(phrase);
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'cc-btn cc-btn--primary';
+  go.textContent = t('circle.receive_personas.submit');
+  go.addEventListener('click', async () => {
+    if (picked.size === 0) return;
+    go.disabled = true;
+    const r = await rawCallSkill('household', 'receivePersonas', { mnemonic: phrase.value, personas: [...picked] }).catch(() => null);
+    phrase.value = '';
+    if (r?.ok) done('circle.receive_personas.done_reload', true);
+    else done(r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase' ? 'circle.receive_personas.wrong_phrase' : 'circle.receive_personas.failed');
+  });
+  card.appendChild(go);
 }
 
 function showEnrollDeviceFlow({ needs = null } = {}) {

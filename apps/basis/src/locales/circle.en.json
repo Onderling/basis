@@ -6061,6 +6061,7 @@
       "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a backup file, to be able to pick this up somewhere else.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
+    "receive_personas": "Personas on this device",
     "enroll_device": "Add a device",
     "recovery_export": "Save a recovery file",
     "recovery_import": "Load a recovery file",
@@ -7019,6 +7020,18 @@
       "text": "Tap Start to get going; once you're in, open the chat (← chat) and run /restore-from-mnemonic to swap in your recovery phrase.  A boot-time restore lands in a future update.",
       "doc": "Fallback notice body."
     }
+  },
+  "receive_personas": {
+    "close": "Close",
+    "title": "Personas on this device",
+    "body": "Choose which of your personas this device also gets. It takes your recovery phrase: only with it can their keys come here.",
+    "none": "There are no other personas to bring here.",
+    "phrase_placeholder": "Your recovery phrase (12 words)",
+    "submit": "Put them on this device",
+    "done_reload": "Done. Restart the app; after that this device also runs these personas.",
+    "wrong_phrase": "That is not this account's recovery phrase. Nothing changed.",
+    "failed": "That did not work. Nothing changed.",
+    "reload": "Restart"
   },
   "enroll": {
     "title": "Add this device",

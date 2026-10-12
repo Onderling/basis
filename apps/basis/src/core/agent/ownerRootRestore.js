@@ -168,21 +168,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //     its person key, and its own delegation (its wire id of this device, its device seed, the record signed by its
     //     own authority) — into its own slots. A delegated device can never derive a persona later; what it is not
     //     handed now, it does not run. The list it holds is kept beside the default's slots for its boots.
-    const held = [];
-    for (const pid of Array.isArray(personas) ? personas : []) {
-      if (typeof pid !== 'string' || !/^p-[0-9a-f]{12}$/.test(pid) || held.includes(pid)) continue;
-      const pSeed = root.deriveAgentSeed(pid);
-      const pVault = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), pid);
-      await loadProfile({ ownerRoot: root, profileId: pid, vault: pVault });
-      await storePersonKey(pVault, { version: 1, seed: derivePersonKeySeed(pSeed, 1), linkKeyPub: personKeyPubKeyB64(derivePersonLinkKeySeed(pSeed)) });
-      const pWire = wireDeviceId(pSeed, internalId);
-      const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
-      let pRecord = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
-      if (blob.label) pRecord = { ...pRecord, label: blob.label };
-      await pVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: _b64url(pDeviceSeed), deviceId: pWire, internalId, record: pRecord, ...(blob.label ? { label: blob.label } : {}) }));
-      held.push(pid);
-    }
-    await sealedChat.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify(held));
+    await handPersonasInto({ root, chatVault, atRestKey, internalId, label: blob.label ?? null, personas });
     // The note the NEXT boot reads: a restore happened here, finish it (the restore-finish flow asks what
     // came back and what the person wants). Plain, device-local, cleared by that flow's first step.
     if (markerVault) { try { await markerVault.set(RESTORE_PENDING_KEY, JSON.stringify({ at: new Date().toISOString() })); } catch { /* the flow can be started by hand */ } }
@@ -209,4 +195,35 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
   } catch (err) {
     return { ok: false, code: 'storage', detail: err?.message ?? String(err) };
   }
+}
+
+/**
+ * HAND PERSONAS TO THIS DEVICE — at a phrase ceremony, the one moment the root is in hand: each picked persona's chat
+ * identity, person key and its OWN delegation (its wire id of this device, its device seed, the record signed by its own
+ * authority) into its slots; the device's held list grows by them. Shared by the enrol/restore ceremony and the later
+ * "these personas here too" step (`receivePersonas`). A persona not handed is never run on a device without the root.
+ *
+ * @param {{ root: object, chatVault: object, atRestKey: Uint8Array, internalId: string, label?: string|null, personas: string[] }} a
+ * @returns {Promise<string[]>} the device's held list after the hand-over
+ */
+export async function handPersonasInto({ root, chatVault, atRestKey, internalId, label = null, personas = [] } = {}) {
+  const sealed = new VaultEncrypted({ backing: chatVault, key: atRestKey });
+  const defaultSlots = personaVault(sealed, DEFAULT_PROFILE);
+  let held = [];
+  try { const list = JSON.parse((await defaultSlots.get(HELD_PERSONAS_VAULT_KEY)) ?? '[]'); held = Array.isArray(list) ? list : []; } catch { held = []; }
+  for (const pid of Array.isArray(personas) ? personas : []) {
+    if (typeof pid !== 'string' || !/^p-[0-9a-f]{12}$/.test(pid) || held.includes(pid)) continue;
+    const pSeed = root.deriveAgentSeed(pid);
+    const pVault = personaVault(sealed, pid);
+    await loadProfile({ ownerRoot: root, profileId: pid, vault: pVault });
+    await storePersonKey(pVault, { version: 1, seed: derivePersonKeySeed(pSeed, 1), linkKeyPub: personKeyPubKeyB64(derivePersonLinkKeySeed(pSeed)) });
+    const pWire = wireDeviceId(pSeed, internalId);
+    const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
+    let pRecord = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
+    if (label) pRecord = { ...pRecord, label };
+    await pVault.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify({ seed: _b64url(pDeviceSeed), deviceId: pWire, internalId, record: pRecord, ...(label ? { label } : {}) }));
+    held.push(pid);
+  }
+  await defaultSlots.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify(held));
+  return held;
 }

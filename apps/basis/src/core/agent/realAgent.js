@@ -564,6 +564,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   // device seed its per-circle keys derive from, its delegation record, its per-circle identities, the authority its
   // commitments name, and its person key's starting point. Named once there; the agent reads it. Only 'default' runs.
   const personas = new Map([['default', await createPersonaRuntime({ profileId: 'default', ownerRoot, custody, custodySeed, chatVault })]]);
+  /** A persona's chat key and person key, registered as identities of ours that the persona owns (the secure agent then
+   *  signs a send as it, on its own sockets). Idempotent; late-bound to the secure agent (`secureAgentRef`). */
+  const registerPersonaIdentities = async (personaId, rt) => {
+    const sa2 = secureAgentRef.current;
+    if (!sa2 || !rt?.chatId) return;
+    const owner = rt.chatId.pubKey;
+    try {
+      sa2.registerSelfIdentity?.(owner, rt.chatId, { owner });
+      if (!rt.personIdentity && rt.personKey?.seed) rt.personIdentity = await AgentIdentity.fromSeed(rt.personKey.seed, new VaultMemory());
+      if (rt.personIdentity) sa2.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
+    } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
+  };
   const persona = personas.get('default');
   persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
@@ -1454,6 +1466,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       try {
         const rt = await createPersonaRuntime({ profileId: id, ownerRoot, chatVault, internalDeviceId: persona.internalDeviceId });
         personas.set(id, rt);
+        // its identities are OURS from the moment it runs — a contact's turn sent as it (no circle bound yet) must sign
+        // as it, never fall back to the default's canonical identity
+        await registerPersonaIdentities(id, rt);
         return rt;
       } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
     };
@@ -3030,12 +3045,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const rt = personas.get(personaId);
     if (!rt?.chatId) return { ok: false, reason: 'no-such-persona' };
     circlePersonas.set(circleId, personaId);
-    const owner = rt.chatId.pubKey;
-    try {
-      sa.registerSelfIdentity?.(owner, rt.chatId, { owner });
-      if (!rt.personIdentity && rt.personKey?.seed) rt.personIdentity = await AgentIdentity.fromSeed(rt.personKey.seed, new VaultMemory());
-      if (rt.personIdentity) sa.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
-    } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
+    await registerPersonaIdentities(personaId, rt);
     if (typeof relayUrl === 'string' && relayUrl) {
       try { await sa.relays.add(relayUrl, { identity: rt.chatId, awaitReady: true }); }
       catch (err) { console.warn(`[persona] ${personaId} could not dial ${relayUrl}: ${err?.message ?? err}`); }
@@ -3045,6 +3055,23 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** WHO this device is in a circle: the circle's persona's webid, the address it sends AS (null for the default), its person key. */
   /** The ref this device signs as in a circle: its persona there, else the default — what every lane names as author. */
   const circleSelfRef = (circleId) => circleSelf(circleId).webid ?? chatId.pubKey;
+  /**
+   * WHO I AM TO A CONTACT: the persona its book row is filed under, when this device runs it —
+   * `{ webid, sendAs }` (the persona's chat key); null for the default (and for a persona this device does not hold).
+   */
+  const contactSelf = async (peerAddr) => {
+    if (typeof peerAddr !== 'string' || !peerAddr) return null;
+    let row = null;
+    try {
+      const rows = (await rawStoop('listContacts', {}))?.contacts ?? [];
+      row = rows.find((c) => c?.webid === peerAddr || c?.pubKey === peerAddr || c?.peerAddr === peerAddr || c?.personKey?.pubKey === peerAddr) ?? null;
+    } catch { row = null; }
+    const pid = row?.persona;
+    if (!pid || pid === 'default') return null;
+    const rt = personas.get(pid);
+    const me = rt?.chatId?.pubKey ?? null;
+    return me ? { webid: me, sendAs: me } : null;
+  };
   /** The relay sockets a circle's self speaks on: a persona's own (null for the default — the shells' default list). */
   const relaysFor = (circleId) => {
     const as = circleSelf(circleId).sendAs;
@@ -7047,6 +7074,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // each self on its own sockets: the shells' circle-address registration asks per circle (`relaysOf` / `alsoAddressesOf`)
     relaysFor,
     ownAddressBindingsFor,
+    // who this device is to a contact (its persona) — the contact channel's `selfFor` and the pair roster's `selfWebidOf`
+    contactSelf,
+    personaWebid: (personaId) => personas.get(personaId)?.chatId?.pubKey ?? null,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
 

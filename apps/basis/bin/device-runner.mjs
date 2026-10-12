@@ -434,6 +434,8 @@ if (relayUrl) {
   const pairSeams = { sendPeerRedeem: null, onJoined: null };
   const pendingPeerRedeems = new Map();
   pairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill,
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -450,6 +452,8 @@ if (relayUrl) {
     }),
   });
   contactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     pair: pairRoster,
     // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
     authFor: agent.linkedTurnAuth ?? null,

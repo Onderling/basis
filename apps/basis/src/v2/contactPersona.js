@@ -7,10 +7,12 @@
  * name, face and properties a given circle or contact receives. Same key, same address, same pair id — only
  * the release differs.
  *
- * Say it that way on every surface: *"dit contact ziet je als …"*, never *"dit contact kent een andere jij"*.
- * A persona as a separate person on the wire is designed and NOT built — that is ledger L123, after the
- * runtime arc, and it is key-sensitive work with its own sitting. Promising it in the UI before it exists
- * would be a privacy claim the code does not keep.
+ * ON THE WIRE (2026-10-12, persona step d1): a contact filed under a persona this device runs now talks to THAT
+ * persona — its turns are authored by and sent as the persona, the pair circle is the persona's with them
+ * (`pairCircleIdFor(persona.webid, other)`, founded AS it), and nothing of the default rides along (no default card,
+ * seal, linked-bot statement or own-device fan). What is NOT yet per persona: the card and the identity-link offer a
+ * contact first learns you from (step d2). Until that lands, keep saying *"dit contact ziet je als …"* on every
+ * surface — the promise *"dit contact kent een andere jij"* flips in the PR that makes the card the persona's too.
  *
  * The persona lives on the CONTACT ROW because the founding needs it before the pair circle exists; once the
  * circle exists, the release on its roster is the derived truth. One input, one projection — not two facts.

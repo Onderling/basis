@@ -131,7 +131,7 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
       { text: t('circle.contacts.lens.cancel'), style: 'cancel' },
       { text: t('circle.contacts.delete_confirm'), style: 'destructive', onPress: async () => {
         const agent = bundle?.agent;
-        const pairCircleId = bundle?.pairRoster?.pairCircleIdFor?.(contactId) ?? null;
+        const pairCircleId = (await bundle?.pairRoster?.pairCircleIdFor?.(contactId)) ?? null;
         const r = await deleteContact({
           agent, callSkill: bundle?.callSkill, contactWebid: contactId, pairCircleId,
           unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({

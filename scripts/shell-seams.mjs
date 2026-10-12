@@ -59,6 +59,11 @@ export const SEAMS = Object.freeze([
   // Each self on its own sockets: a persona's circle registers its per-circle address (and the persona's person address)
   // on the persona's OWN relay sockets, never the default's — or replies to it land on the default's socket and the
   // relay sees two selves on one connection (2026-10-10).
+  // A contact filed under a persona talks to THAT persona: the contact channel sends as it (`selfFor`) and the pair roster
+  // founds the persona's pair circle with them (`selfWebidOf`). A shell without them would answer every persona's contact
+  // as the default — the very link a persona exists to prevent (2026-10-12).
+  { id: 'contact-self-per-persona', pattern: /selfFor:\s*\(peerAddr\)\s*=>\s*agent\.contactSelf/, why: 'a contact filed under a persona hears from that persona, never the default, from every shell' },
+  { id: 'pair-roster-per-persona', pattern: /selfWebidOf:\s*\(personaId\)\s*=>\s*agent\.personaWebid/, why: 'a persona\'s contact gets the persona\'s own pair circle, from every shell' },
   { id: 'circle-address-per-self', pattern: /relaysOf:\s*\(cid\)\s*=>\s*agent\.relaysFor/, why: 'a persona\'s circle traffic crosses the wire on the persona\'s own socket, from every shell' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner

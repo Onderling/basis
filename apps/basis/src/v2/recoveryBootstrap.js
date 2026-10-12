@@ -105,6 +105,9 @@ export function bootstrapOfferFromRosters({ body, selfPubKey, memberships = {} }
   const circles = [];
   const relays = [];
   for (const [id, snap] of Object.entries(rostersOf(body))) {
+    // only the circles of the SELF this bootstrap is for (its memberships): the file carries every self's rosters, and
+    // announcing this device in a circle of a persona it does not run would put the wrong self on that roster
+    if (!memberships || !Object.hasOwn(memberships, id)) continue;
     const rows = (Array.isArray(snap?.members) ? snap.members : [])
       .filter((m) => m && typeof m.webid === 'string' && m.webid && m.webid !== selfPubKey);
     const ordered = [...rows.filter((m) => m.role === 'admin'), ...rows.filter((m) => m.role !== 'admin')];

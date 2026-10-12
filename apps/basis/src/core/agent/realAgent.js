@@ -3308,13 +3308,14 @@ export async function createRealHouseholdAgent(opts = {}) {
           // This device's proven address in the circle — the same announcement the seed serve introduces
           // itself back with (`rosterSeed`), minted while this device still holds the key.
           ownAnnouncement: ownCircleAddressAnnouncement({
-            circleId, memberWebid: chatId.pubKey, circleAddressFor,
+            // the circle's OWN self: in a persona's circle the persona — never the default's webid there
+            circleId, memberWebid: circleSelfRef(circleId), circleAddressFor,
             signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceSeedFor(cid2), cid2, cid2, address),
             ceremonyCommitmentFor, signCeremonyCommitment,
           }),
         });
         rosters[circleId] = snap;
-        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== chatId.pubKey).length : null;
+        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== circleSelfRef(circleId)).length : null;
       }
       const file = sealRecoveryFile({ strategy, body: bodyWithRosters({ body, rosters }) });
       return [DataPart({ ok: true, file, circles: circleIds.length, rosters: carried })];
@@ -3465,7 +3466,33 @@ export async function createRealHouseholdAgent(opts = {}) {
         root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
         label: persona.enrolledDevice?.label ?? null, personas: picked,
       });
-      return [DataPart({ ok: true, held, reloadRequired: true })];
+      // ...and each received persona REJOINS its circles at the next boot, as a restored device rejoins the default's:
+      // the members it knows (the rosters the recovery file landed here) become a bootstrap offer — announce this
+      // device's fresh address in each circle AS the persona, pull the lanes — the same offer the boot consumes.
+      let bootstrap = null;
+      try {
+        const rosters = {};
+        const memberships = {};
+        const selves = [];
+        for (const pid of picked) {
+          const entry = await agentsRegistryRef?.lookup?.(pid);
+          const own = circleMembershipsOf(entry ?? {});
+          const webid = (await AgentIdentity.fromSeed(proof.root.deriveAgentSeed(pid), new VaultMemory())).pubKey;
+          selves.push(webid);
+          for (const [cid, rec] of Object.entries(own)) {
+            memberships[cid] = rec;
+            const members = ((await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? []).filter((m) => m?.webid && m.webid !== webid);
+            rosters[cid] = { rows: [], members };
+          }
+        }
+        const made = bootstrapOfferFromRosters({ body: bodyWithRosters({ body: {}, rosters }), selfPubKey: selves[0] ?? null, memberships });
+        if (made) {
+          let stashed = false;
+          if (opts.enrollOfferStorage) { try { stashed = (await stashEnrollOffer(opts.enrollOfferStorage, made.offer)).ok === true; } catch { stashed = false; } }
+          bootstrap = { ...made, stashed };
+        }
+      } catch { bootstrap = null; }
+      return [DataPart({ ok: true, held, reloadRequired: true, ...(bootstrap ? { bootstrap } : {}) })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'hand-over-failed' })]; }
   }, { visibility: 'private' });
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {

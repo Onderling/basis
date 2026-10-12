@@ -1942,8 +1942,34 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE ONE SIBLING CARRY (L100): my other devices as a standing peer of every circle lane. The chat and task
   // emitters hand it every statement this device WRITES (after the member fan); the lane table hands it every
   // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
+  // A PERSONA'S SIBLINGS are the devices holding THAT persona: its rows in its own circles (its webid at an address
+  // that is not this device's). No person-level lane on the wire: a persona's circle traffic is carried to them only.
+  const personaSiblings = async (pid) => {
+    const rt = personas.get(pid);
+    if (!rt?.chatId?.pubKey) return [];
+    const rows = await siblingDevices({
+      callSkill: (...a) => callSkill(...a),
+      selfPubKey: rt.chatId.pubKey,
+      circleAddressFor,
+      circleIds: async () => {
+        const ids = new Set(Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})));
+        try {
+          const r = (await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data;
+          for (const c of r?.circles ?? []) { const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id); if (id) ids.add(id); }
+        } catch { /* the record's list alone still serves */ }
+        return [...ids];
+      },
+    }).catch(() => []);
+    return rows.map((d) => d.address);
+  };
+  /** The siblings a payload is carried to: its circle's self's devices (a persona's own), else the default's set. */
+  const siblingsFor = async (payload) => {
+    const cid = typeof payload?.circleId === 'string' ? payload.circleId : null;
+    const pid = cid ? circlePersonas.get(cid) : null;
+    return pid ? personaSiblings(pid) : ownDeviceSiblings();
+  };
   const siblingCarry = makeSiblingCarry({
-    siblings: ownDeviceSiblings,
+    siblings: siblingsFor,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
   // THE PERSON'S OWN STORE (the own-devices scope): ONE per node — what the shell hands in (sealed on its medium),
@@ -2274,13 +2300,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       agent: { forgetPeerAddress: (address) => sa.forgetPeerAddress?.(address) ?? false, forgetCircleSenders: (cid) => circleSenders.forgetCircleSenders(cid) },
       callSkill: (app, op, args) => callSkill(app, op, args), circleId, followed: true,
       unregister: () => unregisterCircleAddressesOnRelays({
-        relays: sa.relays?.list?.() ?? [], circleIds: [circleId], circleAddressFor: (cid) => circleAddressFor(cid),
+        relays: sa.relays?.list?.() ?? [], relaysOf: (cid) => relaysFor(cid), circleIds: [circleId], circleAddressFor: (cid) => circleAddressFor(cid),
       }),
     });
     return { ok: r?.ok === true, ...r };
   };
   circleFollowSync = createCircleFollowSync({
-    siblings: ownDeviceSiblings,
+    // per circle: a persona's circle is told only to the devices holding that persona (no person-level lane)
+    siblings: (circleId) => (circleId ? siblingsFor({ circleId }) : ownDeviceSiblings()),
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     myEntries: myCircleEntries,
     myLeft: async () => { try { return (await rawStoop('listMyCircles', {}))?.left ?? []; } catch { return []; } },

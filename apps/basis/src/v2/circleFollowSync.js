@@ -124,7 +124,8 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
       const circle = entries.find((e) => e?.id === circleId);
       if (!validEntry(circle)) return { attempted: 0 };
       let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { attempted: 0 }; }
+      // the siblings of the circle's own self (a persona's circle: only the devices holding that persona)
+      try { addrs = (await siblings(circleId)) ?? []; } catch { return { attempted: 0 }; }
       let attempted = 0;
       await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, wire(circle), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
       return { attempted };
@@ -137,7 +138,8 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     async fanLeft(circleId) {
       if (typeof circleId !== 'string' || !circleId) return { attempted: 0 };
       let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { attempted: 0 }; }
+      // the siblings of the circle's own self (a persona's circle: only the devices holding that persona)
+      try { addrs = (await siblings(circleId)) ?? []; } catch { return { attempted: 0 }; }
       let attempted = 0;
       await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, leftWire(circleId), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
       return { attempted };

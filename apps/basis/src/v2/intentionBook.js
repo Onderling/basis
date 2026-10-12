@@ -88,8 +88,10 @@ export function createIntentionBook({ store, circles = null, actor, signerFor = 
         where = held.get(scope) ?? (await readCircles()).get(scope);
         if (!where) throw new Error(`intend: this host holds no circle ${scope}`);
       }
+      // born NOW by the book's own clock (the one it is handed): what is owed is counted from here, and a store's
+      // stamp would read a different clock than the one every due-check reads
       let row = {
-        type: 'intention', trigger, op, args, actsAs, state: 'open',
+        type: 'intention', trigger, op, args, actsAs, state: 'open', createdAt: iso(now()),
         ...(appOrigin ? { appOrigin } : {}), ...(label ? { label } : {}), ...(win !== undefined ? { window: win } : {}),
       };
       // a circle row carries its author's signature over what it does and as whom (its id fixed first)

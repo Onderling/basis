@@ -114,6 +114,9 @@ export function parseEnrollOffer(uri) {
   return { ok: true, relays, circles, personasSealed: typeof body.p === 'string' && body.p ? body.p : null };
 }
 
+/** The enrol op's param the shells paint as the persona PICKER (checkboxes from `openOfferPersonas`), never a text field. */
+export const ENROL_PERSONAS_PARAM = 'personas';
+
 /* ── The personas, sealed to the phrase ────────────────────────────────────────────────────────
  * The offer is public by design, so the person's personas never ride it in the clear — a list of them in one offer
  * would tell anyone who sees it that they are one person. It carries them SEALED to a key the PHRASE derives

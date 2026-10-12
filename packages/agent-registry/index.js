@@ -44,7 +44,6 @@ export {
 export {
   DEVICE_DELEGATIONS_KEY, isDeviceDelegationRecord, normaliseDeviceDelegation,
   deviceDelegationsOf, deviceDelegationOf, profileHasOtherDevices, setDeviceDelegation,
-  DEVICE_INTERNAL_IDS_KEY, deviceInternalIdOf, setDeviceInternalId,
   } from './src/deviceDelegations.js';
 // The headless nodes the person claimed (a companion): where they are owner, so every device manages them and
 // every claimed node hears of a revoked device.

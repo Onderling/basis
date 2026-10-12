@@ -95,31 +95,3 @@ export function setDeviceDelegation(properties, deviceId, patch) {
   if (!rec) throw new TypeError('setDeviceDelegation: invalid delegation record');
   return setOwn(properties, DEVICE_DELEGATIONS_KEY, { ...curMap, [deviceId]: rec });
 }
-
-/**
- * THE PRIVATE DEVICE MAP — `{ [default wire id]: internal id }`, on the DEFAULT profile, beside (never inside) the
- * delegation records. A device is known to each persona by a wire id derived from THAT persona's seed over the
- * device's internal id, so no two personas' records can be linked — by design. The person's own revoke ceremony
- * must still retire a lost device under every persona it held, and for that it needs the internal id: each device
- * writes its own here. This lives on the person's own registry (their devices + the sealed pod) and is never part of a
- * signed record, so a delegation record that travels carries none of it.
- */
-export const DEVICE_INTERNAL_IDS_KEY = 'deviceInternalIds';
-
-/** The internal id recorded for a device (by its DEFAULT wire id), or null. */
-export function deviceInternalIdOf(entry, wireId) {
-  const cur = entry?.properties?.[DEVICE_INTERNAL_IDS_KEY];
-  const map = cur?.mode === 'own' && cur.value && typeof cur.value === 'object' && !Array.isArray(cur.value) ? cur.value : {};
-  const v = typeof wireId === 'string' ? map[wireId] : null;
-  return typeof v === 'string' && v ? v : null;
-}
-
-/** Record a device's internal id under its default wire id (pure; returns the new properties). */
-export function setDeviceInternalId(properties, wireId, internalId) {
-  if (typeof wireId !== 'string' || !wireId) throw new TypeError('setDeviceInternalId: wireId required');
-  if (typeof internalId !== 'string' || !internalId) throw new TypeError('setDeviceInternalId: internalId required');
-  const cur = properties?.[DEVICE_INTERNAL_IDS_KEY];
-  const curMap = (cur?.mode === 'own' && cur.value && typeof cur.value === 'object' && !Array.isArray(cur.value)) ? cur.value : {};
-  if (curMap[wireId] === internalId) return properties;
-  return setOwn(properties, DEVICE_INTERNAL_IDS_KEY, { ...curMap, [wireId]: internalId });
-}

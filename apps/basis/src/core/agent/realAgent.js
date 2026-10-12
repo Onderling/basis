@@ -895,7 +895,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * announces itself any other way.
    */
   const circleSenders = createCircleSenderAuthorization({
-    ownKeysLive: () => [personAddress()].filter(Boolean),
+    // every self's current person key — the default's and each persona's — is admitted live as our own
+    ownKeysLive: () => [personAddress(), ...[...personas].filter(([pid]) => pid !== 'default').map(([, rt]) => rt?.personIdentity?.pubKey)].filter(Boolean),
     onUnknownRoster: ({ ownAddress }) => console.warn(
       `[realAgent] no roster recorded for own circle address ${String(ownAddress).slice(0, 12)}… — `
       + 'traffic to it is ACCEPTED unchecked until this circle\'s membership has been read once.',
@@ -1867,6 +1868,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // resolves to a roster member (2026-09-19: the maker's own person address was a nameless row on their laptop).
   const ownAddresses = async () => {
     const out = new Set([personAddress(), chatId.pubKey].filter(Boolean));
+    // ...and every persona's: its chat key and its person address are this person's own too
+    for (const [pid, rt] of personas) {
+      if (pid === 'default') continue;
+      for (const a of [rt?.chatId?.pubKey, rt?.personIdentity?.pubKey]) if (a) out.add(a);
+    }
     let rows = [];
     try { rows = await ownDeviceSiblingRows(); } catch { rows = []; }
     for (const d of rows) { if (d?.address) out.add(d.address); if (d?.circleId) { const mine = circleAddressFor(d.circleId); if (mine) out.add(mine); } }
@@ -3569,17 +3575,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     return { reopened };
   }
   await reopenMemberCircles();
-  // Every circle this device is in belongs on the restore list. A create writes its record after answering; one
-  // that did not land (an agents store that was down) is written here, at the next boot. Not awaited: boot does
-  // not wait on it, and each write is bounded.
-  healRestoreList({
-    circleIds: async () => circleIdsFrom(await rawStoop('listMyCircles', {}))
-      .filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId),
-    memberships: () => readSelfCircleMemberships(),
-    addressFor: circleAddressFor,
-    write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, address }),
-    log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
-  }).catch(() => { /* the next boot tries again */ });
 
   // Pre-seed the demo circle with 4 starter tasks — the demo + journey
   // fixtures expect /mytasks to show these out of the box.  DEMO-ONLY: a real
@@ -4272,7 +4267,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!shouldFanNoticeboardItem(item)) return;
     try {
       const explicit = noticeboardItemCircle(item);
-      const circleIds = explicit ? [explicit] : await _listMyKnownCircles();
+      // a post that names no circle goes to the circles of the self that WROTE it — never across selves (a persona's
+      // post to the persona's circles, the default's to the default's)
+      const asSelf = [...personas.values()].find((rt) => rt !== persona && rt?.chatId?.pubKey && rt.chatId.pubKey === (item?.addedBy ?? item?.actor ?? null))?.chatId?.pubKey ?? null;
+      const circleIds = explicit ? [explicit] : await _listMyKnownCircles(asSelf);
       if (circleIds.length === 0) {
         if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard: the item names no circle and none is known — it stays local');
         return;
@@ -4295,10 +4293,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The shell's bridge for a post that LANDED in a circle store from another member (see noticeboardCarry.js). */
   let _noticeboardLanded = null;
 
-  async function _listMyKnownCircles() {
+  /** The circles ONE self is in — the default's, or (`asSelf`, a persona's chat key) that persona's. Never the union:
+   *  its callers (the circle-less noticeboard fan, the reachability scope) must not cross selves. */
+  async function _listMyKnownCircles(asSelf = null) {
     try {
       const result = await chatAgent.invoke(
-        stoopAgent.address, 'listMyCircles', [DataPart({})],
+        stoopAgent.address, 'listMyCircles', [DataPart({})], asSelf ? { actAs: asSelf } : {},
       );
       const circles = result?.[0]?.data?.circles ?? [];
       return Array.isArray(circles) ? circles : [];
@@ -5340,7 +5340,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // (2026-09-22): each still in it leaves too. A leave that FOLLOWS a sibling's tells nobody — the sibling did.
       if (realOpId === 'leaveGroup' && !out?.error && typeof realArgs.groupId === 'string' && realArgs.groupId) {
         const circleId = realArgs.groupId;
-        try { await callSkill('agents', 'removeProfileCircleMembership', { id: 'default', circleId }); }
+        // off the record of the self that was in it — a persona's circle off the persona's, or a restore re-opens it
+        try { await callSkill('agents', 'removeProfileCircleMembership', { id: profileIdOf(circleId), circleId }); }
         catch (err) { if (typeof console !== 'undefined') console.warn(`[restore-data] the left circle ${String(circleId).slice(0, 12)}… is still on the restore list: ${err?.message ?? err}`); }
         if (realArgs.followed !== true) circleFollowSync?.fanLeft(circleId).catch(() => { /* the sibling asks on connect */ });
       }
@@ -7393,6 +7394,31 @@ export async function createRealHouseholdAgent(opts = {}) {
       else mountedLocalApps.delete(appOrigin);
     },
   };
+  // (Run HERE, at the END of boot: from its old place it raced boot — it reads stoop's circle list and writes through the
+  // waist, and a heal that got there before either existed read nothing or wrote nothing, silently.)
+  // Every circle this device is in belongs on the restore list. A create writes its record after answering; one
+  // that did not land (an agents store that was down) is written here, at the next boot. Not awaited: boot does
+  // not wait on it, and each write is bounded.
+  healRestoreList({
+    circleIds: async () => circleIdsFrom(await rawStoop('listMyCircles', {}))
+      .filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId),
+    memberships: () => readSelfCircleMemberships(),
+    addressFor: circleAddressFor,
+    write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, address }),
+    log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
+  }).catch(() => { /* the next boot tries again */ });
+  // ...and each persona's, over ITS circles (stoop asked AS it), ITS record and ITS address — written under its own
+  // profile, which also gives the circle back its binding when the record was what had gone missing.
+  for (const [pid, rt] of personas) {
+    if (pid === 'default' || !rt?.chatId?.pubKey) continue;
+    healRestoreList({
+      circleIds: async () => circleIdsFrom((await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null),
+      memberships: async () => circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {}),
+      addressFor: (circleId) => rt.circleAddressFor(circleId),
+      write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: pid, circleId, address }),
+      log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
+    }).catch(() => { /* the next boot tries again */ });
+  }
   selfAgent = api;
   return api;
 }

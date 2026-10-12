@@ -100,3 +100,30 @@ describe('the create wizard founds as the persona', () => {
     expect(calls.some((c) => c.startsWith('household.bindCirclePersona'))).toBe(false);
   });
 });
+
+describe('never across selves: the circle-less noticeboard post', () => {
+  it('a post that names no circle stays the default\'s — never in a persona\'s circle', async () => {
+    const agent = await createRealHouseholdAgent({
+      seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(),
+      registryBackend: createMemoryBackend(), deviceLog: new EventLog({ initial: [], muted: [] }),
+    });
+    const { id } = await agent.callSkill('agents', 'createProfile', { name: 'Buurt' });
+    for (const [gid, persona] of [['circle-of-mine', 'default'], [Y, id]]) {
+      const st = createInitial();
+      st.groupId = gid; st.name = gid; st.purpose = 't'; st.persona = persona;
+      expect((await createSubmit({ state: st, callSkill: (a, o, x) => agent.callSkill(a, o, x) })).result).toBeTruthy();
+    }
+    const lines = [];
+    const orig = console.info;
+    console.info = (...a) => { lines.push(a.join(' ')); return orig.apply(console, a); };
+    try {
+      await agent.callSkill('stoop', 'postRequest', { text: 'wie leent me een ladder', kind: 'request' });
+      for (let i = 0; i < 30 && !lines.some((l) => l.includes('noticeboard') && l.includes('circle store')); i++) await new Promise((r) => setTimeout(r, 100));
+    } finally { console.info = orig; }
+    const fanned = lines.filter((l) => l.includes('noticeboard') && l.includes('circle store'));
+    // it lands in the default's own noticeboard circle (stoop's bundle group) — the default's, by construction
+    expect(fanned.length, 'it fanned somewhere').toBeGreaterThan(0);
+    expect(fanned.some((l) => l.includes(Y)), 'never to the persona\'s').toBe(false);
+    await agent.shutdown?.();
+  }, 60_000);
+});

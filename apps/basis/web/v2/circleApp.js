@@ -1003,6 +1003,9 @@ async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
       // refused here and only here: the invariant-2 half of a change that landed on one shell.
       circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+      relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+      alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
       circlesForPoint,
       // The relay this device connects to IS the deployment default — unmapped circles land here alone.
       defaultRelayUrl: CIRCLE_RELAY_URL,
@@ -3159,7 +3162,7 @@ async function deleteContactWithConfirm(contactId, name) {
   const r = await deleteContact({
     agent: _peerAgent, callSkill: rawCallSkill, contactWebid: contactId, pairCircleId,
     unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({
-      relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [pairCircleId],
+      relays: _peerAgent?.relays?.list?.() ?? [], relaysOf: (cid) => _peerAgent?.relaysFor?.(cid) ?? null, circleIds: [pairCircleId],
       circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
     }) : null,
   });
@@ -3666,7 +3669,7 @@ async function onLeaveCircle(id, circle) {
       agent: _peerAgent, callSkill: rawCallSkill,
       circleId: id,
       unregister: () => unregisterCircleAddressesOnRelays({
-        relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [id],
+        relays: _peerAgent?.relays?.list?.() ?? [], relaysOf: (cid) => _peerAgent?.relaysFor?.(cid) ?? null, circleIds: [id],
         circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
       }),
     });

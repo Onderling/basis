@@ -1553,7 +1553,7 @@ export default function CircleLauncherScreen({
                   agent: bundle.agent, callSkill: bundle.callSkill,
                   circleId: cid,
                   unregister: () => unregisterCircleAddressesOnRelays({
-                    relays: bundle.agent?.relays?.list?.() ?? [], circleIds: [cid],
+                    relays: bundle.agent?.relays?.list?.() ?? [], relaysOf: (id) => bundle.agent?.relaysFor?.(id) ?? null, circleIds: [cid],
                     circleAddressFor: (id) => bundle.agent?.circleAddressFor?.(id) ?? null,
                   }),
                 });

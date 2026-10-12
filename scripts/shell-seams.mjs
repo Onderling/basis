@@ -56,6 +56,10 @@ export const SEAMS = Object.freeze([
   // persona on its own socket and announces its person key. A shell that built the redeem without it would join every
   // circle as the default, whatever the person picked (2026-10-10).
   { id: 'redeem-as-circle-self', pattern: /circleSelfFor:\s*\(gid\)\s*=>\s*agent\.circleSelf/, why: 'a circle joined as a persona is joined AS it, from every shell' },
+  // Each self on its own sockets: a persona's circle registers its per-circle address (and the persona's person address)
+  // on the persona's OWN relay sockets, never the default's — or replies to it land on the default's socket and the
+  // relay sees two selves on one connection (2026-10-10).
+  { id: 'circle-address-per-self', pattern: /relaysOf:\s*\(cid\)\s*=>\s*agent\.relaysFor/, why: 'a persona\'s circle traffic crosses the wire on the persona\'s own socket, from every shell' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).

@@ -1266,17 +1266,9 @@
       "text": "{{count}} circles",
       "doc": "α.3 — filter summary for many."
     },
-    "seed_name": {
-      "text": "Stream",
-      "doc": "α.3 — name of the auto-seeded default screen."
-    },
     "seed_my_things": {
       "text": "My things",
       "doc": "α.4 — seeded screen aggregating tasks assigned to me across circles."
-    },
-    "seed_my_calendar": {
-      "text": "My calendar",
-      "doc": "α.4 — seeded screen aggregating upcoming events across circles."
     }
   },
   "recipe": {

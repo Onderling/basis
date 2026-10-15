@@ -1266,17 +1266,9 @@
       "text": "{{count}} kringen",
       "doc": "α.3 — filter summary."
     },
-    "seed_name": {
-      "text": "Stroom",
-      "doc": "α.3 — name of the auto-seeded default screen."
-    },
     "seed_my_things": {
       "text": "Mijn dingen",
       "doc": "α.4 — seeded screen aggregating tasks."
-    },
-    "seed_my_calendar": {
-      "text": "Mijn agenda",
-      "doc": "α.4 — seeded screen aggregating events."
     }
   },
   "recipe": {

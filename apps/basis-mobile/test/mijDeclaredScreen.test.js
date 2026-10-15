@@ -3,7 +3,7 @@
  * the declared blocks (`meBlocks`, filled by the shared `mijScreenBlocks`, painted by each shell's block painter),
  * plus one door to My data and, behind the developer switch, Advanced. Neither lists a section by hand: the identity
  * fields and the location moved to the person's own editor, the overview to Vandaag, the other doors into My data
- * (declared once in `myDataDoors.js`). RN cannot render under Vitest, so this reads the sources.
+ * (declared in the manifest, `myDataActions`). RN cannot render under Vitest, so this reads the sources.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -44,8 +44,8 @@ describe('Mij — one declared screen on both shells', () => {
   });
 
   it('the doors Mij gave up are on both My data screens, from the one declaration', () => {
-    expect(code(read('../../basis/web/v2/circleMyData.js'))).toMatch(/myDataDoorsFor\(/);
-    expect(code(read('../src/screens/v2/CircleMyDataScreen.js'))).toMatch(/myDataDoorsFor\(/);
+    expect(code(read('../../basis/web/v2/circleMyData.js'))).toMatch(/myDataActionsFor\(basisManifest/);
+    expect(code(read('../src/screens/v2/CircleMyDataScreen.js'))).toMatch(/myDataActionsMobile\(basisManifest/);
   });
 
   it('the identity fields and the location live in the person\'s own editor on both shells', () => {

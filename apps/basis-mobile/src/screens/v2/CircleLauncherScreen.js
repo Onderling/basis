@@ -946,6 +946,7 @@ export default function CircleLauncherScreen({
     eventLog, circles, seenAt, myRefs: unreadMyRefs, availabilityStore,
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
+    selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
   }), [eventLog, circles, seenAt, unreadMyRefs, availabilityStore, bundle]);
   // SILENT out-of-circle delivery — the per-user "shared with me" inbox. The store is instantiated ON THE
   // BUNDLE (agentBundle.js) so the ChatScreen receive handler + this launcher share ONE instance; here we just
@@ -1203,7 +1204,9 @@ export default function CircleLauncherScreen({
           // path and this sibling kept the wrong one): 'calendar' arg-shifted into the opId and the
           // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
           // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
-          hostOps: { callSkill: bundle?.callSkill, eventLog, circles, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs },
+          hostOps: { callSkill: bundle?.callSkill, eventLog, circles, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs,
+            // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+            selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } } },
         });
         if (!alive) return;
         setScreenViewBlocks(blocks);
@@ -1897,7 +1900,7 @@ export default function CircleLauncherScreen({
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
-          doors={{ availability: () => setView('availability'), 'connection-points': () => setView('points'), 'shared-with-me': () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
+          doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
           personClock={personClockRef.current} />
       </WithTabBar>
     );

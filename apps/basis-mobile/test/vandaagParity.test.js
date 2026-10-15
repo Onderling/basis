@@ -23,6 +23,9 @@ describe('Vandaag — parity', () => {
     for (const src of [webHost, mobileHost]) {
       expect(src).toMatch(/ensureVandaagBook\(\{/);
       expect(src).toMatch(/materializeScreen\(\{/);
+      // "mine" per circle: the self this device speaks as there, never one id for every circle
+      expect(src).toMatch(/selfIn: /);
+      expect(src).toMatch(/circleSelf\?\.\(/);
     }
   });
 

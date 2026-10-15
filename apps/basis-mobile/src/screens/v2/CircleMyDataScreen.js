@@ -56,14 +56,15 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
-import { myDataDoorsFor } from '../../../../basis/src/v2/myDataDoors.js';
+import { myDataActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
+import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
 export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
   eventLog = null,
-  // the doors that sat on Mij, declared once (`myDataDoors.js`): id → what opens it here
+  // the doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here
   doors = {},
   // the person's own week overview (a row in their own store, switched here): the clock, or null on a shell without one
   personClock = null }) {
@@ -375,9 +376,9 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       </View>
 
       {/* the doors that sat on Mij: availability · connection points · shared with me · blocked (web: circleMyData.js) */}
-      {myDataDoorsFor(doors).length ? (
+      {myDataActionsMobile(basisManifest, doors).length ? (
         <Section title={t('circle.profile.mydata_more')}>
-          {myDataDoorsFor(doors).map((d) => (
+          {myDataActionsMobile(basisManifest, doors).map((d) => (
             <Pressable key={d.id} style={styles.relaySave} onPress={d.open} testID={`mydata-door-${d.id}`}>
               <Text style={styles.relaySaveText}>{t(d.labelKey)}</Text>
             </Pressable>

@@ -21,7 +21,7 @@ import CircleScreenView from './CircleScreenView.js';
  * @param {object} p
  * @param {Function} p.callSkill   the targeted 3-arg waist
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
- *   availabilityStore, relays: () => rows, deviceId: () => id }`
+ *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
  */
 export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onEditMe, onAdvanced, onMeAction }) {
   const theme = useTheme();
@@ -38,6 +38,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
       const b = await mijScreenBlocks({ hostOps: {
         callSkill, eventLog: sources.eventLog ?? null, circles: sources.circles ?? [],
         seenAt: sources.seenAt ?? {}, myRefs: sources.myRefs ?? [],
+        ...(typeof sources.selfIn === 'function' ? { selfIn: sources.selfIn } : {}),
         availability,
         // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
         online: relays.length ? relays.some((r) => r.connected) : undefined,

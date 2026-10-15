@@ -387,6 +387,7 @@ import {
   addScreen as addUserScreen, renameScreen as renameUserScreen,
   removeScreen as removeUserScreen, setActiveScreen, getActiveScreen, updateScreen,
 } from '../../src/v2/userScreens.js';
+import { ensureVandaagBook } from '../../src/v2/vandaag.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
 import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
@@ -4055,25 +4056,8 @@ async function showScreens() {
   let book;
   try { book = await userScreenStore.get(); }
   catch { book = { screens: [], activeId: null }; }
-  // First-run seed: three default screens so the Screens tab is
-  // immediately useful — Stream (noticeboard across all circles),
-  // My things (tasks assigned to me, α.4), My calendar (agenda
-  // events, α.4).  Once at least one screen exists we never
-  // re-seed; the user can delete or rename any of them freely.
-  if (book.screens.length === 0) {
-    book = await userScreenStore.update((cur) => {
-      let next = addUserScreen(cur, t('circle.screens.seed_name'));
-      let id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'noticeboard'));
-      next = addUserScreen(next, t('circle.screens.seed_my_things'));
-      id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'tasks'));
-      next = addUserScreen(next, t('circle.screens.seed_my_calendar'));
-      id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'calendar'));
-      return next;
-    });
-  }
+  // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with mobile
+  book = await ensureVandaagBook({ store: userScreenStore, t });
   _screensBook = book;
   _screensRerender();
 }
@@ -4117,6 +4101,11 @@ function _screensRerender() {
   });
 }
 
+// what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
+function onScreenAction(action) {
+  if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
+}
+
 async function _showActiveScreen() {
   // View-mode: render the materialized screen + a back link to picker.
   const screen = _screensBook?.screens?.find((s) => s.id === _viewingScreenId)
@@ -4158,7 +4147,7 @@ async function _showActiveScreen() {
   if (token !== _showActiveScreenToken || _viewingScreenId !== screen.id) return;
   if (Array.isArray(cached)) {
     _screenViewBlocks = cached;
-    renderCircleScreen(body, { blocks: cached, t, refreshing: true });
+    renderCircleScreen(body, { blocks: cached, t, refreshing: true, onAction: onScreenAction });
   } else {
     renderCircleScreen(body, { blocks: null, t });
   }
@@ -4175,6 +4164,8 @@ async function _showActiveScreen() {
         // empty. The same bug sat in mobile's sibling; both found by the §3 rename.
         callSkill: rawCallSkill,
         eventLog, circles: circlesCache,
+        // the circles-with-news block counts what the circle tiles count
+        seenAt: readSeenAt(), myRefs: unreadMyRefs,
       },
       // mutedCircleIds wires in α.5 (per-user mute UI).
     });
@@ -4186,7 +4177,7 @@ async function _showActiveScreen() {
   // overwritten with stale content from a previously-open screen.
   if (token !== _showActiveScreenToken || _viewingScreenId !== screen.id) return;
   _screenViewBlocks = blocks;
-  renderCircleScreen(body, { blocks, t, refreshing: false });
+  renderCircleScreen(body, { blocks, t, refreshing: false, onAction: onScreenAction });
   // Save the fresh blocks back to the cache so the next open is also
   // instant.  Best-effort: a quota / serialization failure is silent.
   screenBlocksCache.set(screen.id, blocks).catch(() => { /* ignore */ });

@@ -1061,8 +1061,9 @@ export const basisManifest = {
   // back); an act an op performs targets the OP — never a nav row with the same meaning. That is what makes a button, a
   // slash command and a chat line one door (strict validation refuses a nav `to` that names an op: `nav-shadows-op`).
   tabs: [
+    // Vandaag — the person's own pages (the screen book), the home: first, so the bar reads Vandaag · Kringen · Contacten · Mij
+    { id: 'screens',   labelKey: 'circle.tab.vandaag',   target: { kind: 'nav', to: 'screens' } },
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
-    { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
     // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
     // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line.
     { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },

@@ -4,9 +4,9 @@
     "doc": "Heading of the circle launcher (board 1B)."
   },
   "tab": {
-    "screens": {
-      "text": "Schermen",
-      "doc": "α.3 — primary tab."
+    "vandaag": {
+      "text": "Vandaag",
+      "doc": "The home tab: the person's own pages (the screen book) — a few capped blocks of what matters today."
     },
     "circles": {
       "text": "Kringen",
@@ -1136,6 +1136,10 @@
     }
   },
   "screen": {
+    "unread_count": {
+      "text": "{{count}} nieuw",
+      "doc": "Vandaag, circles-with-news block: how many lines are new in that circle since this device last looked. count = how many."
+    },
     "items_title": {
       "task": "Mijn dingen",
       "calendar-event": "Agenda",
@@ -1202,6 +1206,10 @@
     }
   },
   "screens": {
+    "vandaag_page": {
+      "text": "Vandaag",
+      "doc": "The name of the first page of the person's own pages (Vandaag), seeded once."
+    },
     "picker_title": {
       "text": "Schermen",
       "doc": "α.3 — picker heading."

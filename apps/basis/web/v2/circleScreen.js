@@ -149,6 +149,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       else renderItems(section, block, tr);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
+    case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
     default:
       section.textContent = tr('circle.screen.block_unknown', { type: block.type });
   }
@@ -206,6 +207,34 @@ function renderPhoto(section, block, _tr) {
     cap.textContent = caption;
     section.appendChild(cap);
   }
+}
+
+// The circles with news: each a row with its name and how many unread; a tap opens the circle (the screen's
+// `onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does).
+function renderCirclesUnread(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.recipe.block.circlesUnread');
+  section.appendChild(title);
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__circles-unread';
+  for (const row of block.content?.items ?? []) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__circles-unread-row';
+    li.dataset.circleId = row.circleId ?? '';
+    const name = document.createElement('span');
+    name.textContent = row.name ?? row.circleId;
+    const n = document.createElement('span');
+    n.className = 'circle-screen__circles-unread-count';
+    n.textContent = tr('circle.screen.unread_count', { count: row.unread });
+    li.append(name, n);
+    if (typeof onAction === 'function') {
+      li.tabIndex = 0;
+      li.addEventListener('click', () => onAction({ kind: 'open-circle', circleId: row.circleId }));
+    }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
 }
 
 function renderNoticeboard(section, block, tr) {

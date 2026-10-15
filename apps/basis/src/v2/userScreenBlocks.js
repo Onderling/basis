@@ -36,6 +36,7 @@ import { effectiveCircleIds, isAllCircles } from './userScreens.js';
 import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
+import { buildTilePreviews } from './circleTilePreviews.js';
 
 /**
  * Materialize a Screen.  Returns Promise<Array<MaterializedBlock>>
@@ -93,6 +94,10 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
       case 'rules':
         return await materializeRules(block, activeCircleIds, hostOps, screenIsAll);
 
+      // the circles with news: each circle's unread lines (another person's, since this device last looked), newest first
+      case 'circlesUnread':
+        return materializeCirclesUnread(block, activeCircleIds, hostOps);
+
       default:
         return { blockId: block?.id, type: block?.type, status: 'error',
                  content: {}, error: 'unknown type' };
@@ -101,6 +106,26 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
     return { blockId: block?.id, type: block?.type, status: 'error',
              content: {}, error: String(err?.message ?? err) };
   }
+}
+
+/**
+ * The circles where something is new: the circle tiles' own count (`buildTilePreviews` — another person's line on the
+ * human lane, since this device last looked), for the page's circles, newest first, capped by the block's limit.
+ * `hostOps.seenAt` and `hostOps.myRefs` are what the tiles use; without them every line counts as new once.
+ */
+function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [] } = {}) {
+  const limit = clampInt(block.config?.limit, 1, 50, 5);
+  const base = { blockId: block.id, type: 'circlesUnread', titleKey: 'circle.recipe.block.circlesUnread' };
+  if (!eventLog?.query || activeCircleIds.length === 0) return { ...base, status: 'empty', content: { items: [] } };
+  const wanted = new Set(activeCircleIds);
+  const inPage = (circles ?? []).filter((c) => c?.id && wanted.has(c.id));
+  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [] });
+  const items = inPage
+    .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0 }))
+    .filter((r) => r.unread > 0)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, limit);
+  return { ...base, status: items.length > 0 ? 'ok' : 'empty', content: { items } };
 }
 
 function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = {}) {

@@ -101,3 +101,21 @@ describe('Mij — the declared screen', () => {
     expect(agentRowWords({ kind: 'bot', label: 'Huishoudbot' }, t)).toBe('circle.profile.agent_bot{"label":"Huishoudbot"}');
   });
 });
+
+describe('Mij follows the switcher', () => {
+  it('one persona ticked: its own name, its own devices (its device here marked), no bots of the person', async () => {
+    const callSkill = async (app, op, args) => {
+      if (app === 'stoop' && op === 'getMyProfile') return { entry: { displayName: 'Frits' } };
+      if (app === 'agents' && op === 'getProfileProperties') {
+        return args?.id === 'p-werk'
+          ? { properties: { deviceDelegations: { mode: 'own', value: { wd: { deviceId: 'wd', label: 'werklaptop' } } } } }
+          : registry;
+      }
+      if (app === 'stoop' && op === 'listContacts') return { contacts: [{ displayName: 'Huishoudbot', peerAddr: 'bot', linkedRow: 'r' }] };
+      return null;
+    };
+    const [line, agents] = await mijScreenBlocks({ hostOps: { callSkill, circles: [], mijSelf: { id: 'p-werk', name: 'Werk', deviceId: 'wd' } } });
+    expect(line.content.name).toBe('Werk');
+    expect(agents.content.items.map((r) => [r.kind, r.label, r.here === true])).toEqual([['device', 'werklaptop', true]]);
+  });
+});

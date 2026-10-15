@@ -34,6 +34,9 @@ test('the switcher narrows what the app shows to the ticked selves, and "Alle" b
 
   await expect(tiles, 'Kringen shows only the persona\'s circles (it has none yet)').toHaveCount(0, { timeout: 15_000 });
   await expect(page.locator('.cc-header-avatar__initials'), 'the avatar is the persona\'s').toHaveText('W');
+  await page.locator('[data-tab="mij"]').first().click();
+  await expect(page.locator('[data-block-type="identityLine"] .cc-profile__title'), 'Mij is the persona\'s').toHaveText('Werk', { timeout: 20_000 });
+  await page.locator('[data-tab="circles"]').first().click();
 
   await page.locator('.cc-header-avatar__button').click();
   await page.locator('.cc-persona-switcher__all').click();

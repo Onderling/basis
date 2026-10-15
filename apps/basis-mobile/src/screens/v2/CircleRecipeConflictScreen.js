@@ -21,7 +21,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
-import { BLOCK_REGISTRY } from '@onderling-app/basis';
+import { BLOCK_DESCRIPTORS } from '@onderling-app/basis';
 
 /**
  * @param {object} props
@@ -86,7 +86,7 @@ export default function CircleRecipeConflictScreen({
             {blockConflicts.map((bc) => {
               const ref = lBlockMap.get(bc.blockId) ?? iBlockMap.get(bc.blockId);
               const type = ref?.type ?? 'unknown';
-              const meta = BLOCK_REGISTRY[type];
+              const meta = BLOCK_DESCRIPTORS[type];
               const emoji = meta?.emoji ? `${meta.emoji} ` : '';
               const typeLabel = t(`circle.recipe.block.${type}`);
               const label = t('circle.recipe.conflict.block_label', { name: `${emoji}${typeLabel}` });

@@ -37,6 +37,7 @@ const word = (v) => (typeof v === 'string' ? v.trim() : '');
  * @param {string} actId
  * @param {Record<string, string>} values   a datetime is a picker's local "YYYY-MM-DDTHH:mm" or words ("morgen om 14:00")
  * @returns {{app: string, opId: string, args: object}|{error: string}}
+ *   (who it is made AS — the switcher's ticked self — is the call's, not the op's: the host passes `{ actAs }`)
  */
 export function plusOp(actId, values = {}) {
   if (actId === 'own-note') {

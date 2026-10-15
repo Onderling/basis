@@ -4769,7 +4769,9 @@ export async function createRealHouseholdAgent(opts = {}) {
    * in the circle's own data; every other door acts as its caller.
    */
   const doorCircleOf = (ctx) => (typeof ctx?.doorCircleId === 'string' && ctx.doorCircleId ? ctx.doorCircleId : null);
-  const actorOf = (ctx) => (doorCircleOf(ctx) && typeof ctx?.doorActor === 'string' && ctx.doorActor ? ctx.doorActor : (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null));
+  // who acts: a door's person; else a local call made AS one of this device's selves (`actAs`, checked at the waist)
+  const actorOf = (ctx) => (doorCircleOf(ctx) && typeof ctx?.doorActor === 'string' && ctx.doorActor ? ctx.doorActor
+    : (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : (typeof ctx?.actAs === 'string' && ctx.actAs ? ctx.actAs : null)));
   /** A circle's people as the chore rules read them: its folded roster, by ref, with their handle and role. */
   async function circlePeople(circleId) {
     const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
@@ -4996,6 +4998,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
   const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
+    // A local call made AS one of this device's selves (the kernel's `actAs`, at the waist): only a self this device runs,
+    // and never with a door's person (a door names who acts itself). What it makes carries that self as its maker.
+    // THIS is the check that binds: the kernel's invoke `actAs` refuses only a call that would leave the process — it does
+    // not ask whether the identity is one held here.
+    if (typeof ctx?.actAs === 'string' && ctx.actAs) {
+      const own = ctx.actAs === chatId?.pubKey || [...personas.values()].some((p) => p?.chatId?.pubKey === ctx.actAs);
+      if (!own || (typeof ctx?.caller === 'string' && ctx.caller)) return { ok: false, code: 'not-a-self-here', error: 'not-a-self-here' };
+    }
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       // the op the call reaches — its app and its op: household's `listOpen` is not the chores', whatever a menu shows
@@ -7580,6 +7590,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     ceremonyCommitmentFor, signCeremonyCommitment,
     /** The persona runtime this device runs for a persona id (personaRuntime.js) — 'default' only today. */
     persona: (id = 'default') => personas.get(id) ?? null,
+    /** The selves this device runs, for the header switcher: the default first, then each held persona — `{ id, name,
+     *  webid }`, the name from its registry entry (the default's: the person's own name, or null). */
+    personasHere: async () => {
+      const out = [];
+      for (const [id, rt] of personas) {
+        let name = null;
+        try { name = (await agentsRegistryRef?.lookup?.(id))?.name ?? null; } catch { /* nameless */ }
+        out.push({ id, name, webid: rt?.chatId?.pubKey ?? null });
+      }
+      return out.sort((a, b) => (a.id === 'default' ? -1 : b.id === 'default' ? 1 : 0));
+    },
     /** WHO this device is in a circle (its persona): `{ webid, sendAs, personKey }` — the redeem and stoop's "me" read it. */
     circleSelf,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)

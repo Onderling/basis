@@ -24,7 +24,7 @@
  * Pure projections. The shells paint and dispatch; every write goes through the waist
  * (`grantSurface` · `revokeSurface` · `listSurfaceGrants`).
  */
-import { NEVER_DELEGABLE } from '@onderling/app-manifest';
+import { NEVER_DELEGABLE, isDeviceOp } from '@onderling/app-manifest';
 
 /** Sections a person can grant, beyond their circles. Kept tiny on purpose — a section is a thing
  *  someone can picture, not an entry-kind taxonomy. */
@@ -58,7 +58,7 @@ export function connectionOpChoices({ manifests = [] } = {}) {
       const op = o?.id ?? o?.op;
       if (typeof op !== 'string' || !op) continue;
       const id = `${app}.${op}`;
-      if (withheld.has(id)) continue;
+      if (withheld.has(id) || isDeviceOp(o)) continue;   // a device op is never a connection's (the group is the rule)
       rows.push({
         id, app, op,
         label: o.title ?? o.label ?? op,

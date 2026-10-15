@@ -118,7 +118,7 @@ import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
-import { encodeEnrollOffer } from '../../v2/enrollOffer.js';
+import { encodeEnrollOffer, sealOfferPersonas } from '../../v2/enrollOffer.js';
 // The roster seed (pod-less enroll S1): a sibling serves its membership trail rows, device-set
 // verified, so a trail-less enrolled device can project rosters and fold statements.
 import {
@@ -218,7 +218,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
-import { personaVault } from './personaVault.js';
+import { personaVault, HELD_PERSONAS_VAULT_KEY } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -564,6 +564,18 @@ export async function createRealHouseholdAgent(opts = {}) {
   // device seed its per-circle keys derive from, its delegation record, its per-circle identities, the authority its
   // commitments name, and its person key's starting point. Named once there; the agent reads it. Only 'default' runs.
   const personas = new Map([['default', await createPersonaRuntime({ profileId: 'default', ownerRoot, custody, custodySeed, chatVault })]]);
+  /** A persona's chat key and person key, registered as identities of ours that the persona owns (the secure agent then
+   *  signs a send as it, on its own sockets). Idempotent; late-bound to the secure agent (`secureAgentRef`). */
+  const registerPersonaIdentities = async (personaId, rt) => {
+    const sa2 = secureAgentRef.current;
+    if (!sa2 || !rt?.chatId) return;
+    const owner = rt.chatId.pubKey;
+    try {
+      sa2.registerSelfIdentity?.(owner, rt.chatId, { owner });
+      if (!rt.personIdentity && rt.personKey?.seed) rt.personIdentity = await AgentIdentity.fromSeed(rt.personKey.seed, new VaultMemory());
+      if (rt.personIdentity) sa2.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
+    } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
+  };
   const persona = personas.get('default');
   persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
@@ -1449,14 +1461,23 @@ export async function createRealHouseholdAgent(opts = {}) {
     // root + register it. Owner-root-backed (kept out of the dependency-free cores).
     // EVERY PERSONA THE REGISTRY HOLDS RUNS (root custody: each derives from the resident root). One device internal id,
     // shown per persona as its own wire id. A delegated device runs only the personas a ceremony handed it (later).
+    // the personas this device was HANDED at its ceremony (a delegated device runs these, and no other)
+    let heldPersonas = [];
+    try { const list = JSON.parse((await persona.vault.get(HELD_PERSONAS_VAULT_KEY)) ?? '[]'); heldPersonas = Array.isArray(list) ? list : []; } catch { heldPersonas = []; }
     const runPersona = async (id) => {
-      if (!ownerRoot || id === 'default' || personas.has(id)) return personas.get(id) ?? null;
+      if (id === 'default' || personas.has(id)) return personas.get(id) ?? null;
+      if (!ownerRoot && !heldPersonas.includes(id)) return null;   // not derivable here, and not handed
       try {
         const rt = await createPersonaRuntime({ profileId: id, ownerRoot, chatVault, internalDeviceId: persona.internalDeviceId });
         personas.set(id, rt);
+        // its identities are OURS from the moment it runs — a contact's turn sent as it (no circle bound yet) must sign
+        // as it, never fall back to the default's canonical identity
+        await registerPersonaIdentities(id, rt);
         return rt;
       } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
     };
+    // a delegated device: the personas it holds start now (their circles bind as their memberships are written)
+    if (!ownerRoot) { for (const id of heldPersonas) await runPersona(id); }
     if (ownerRoot) {
       try {
         for (const entry of (await agentsRegistry.list?.()) ?? []) {
@@ -1942,8 +1963,34 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE ONE SIBLING CARRY (L100): my other devices as a standing peer of every circle lane. The chat and task
   // emitters hand it every statement this device WRITES (after the member fan); the lane table hands it every
   // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
+  // A PERSONA'S SIBLINGS are the devices holding THAT persona: its rows in its own circles (its webid at an address
+  // that is not this device's). No person-level lane on the wire: a persona's circle traffic is carried to them only.
+  const personaSiblings = async (pid) => {
+    const rt = personas.get(pid);
+    if (!rt?.chatId?.pubKey) return [];
+    const rows = await siblingDevices({
+      callSkill: (...a) => callSkill(...a),
+      selfPubKey: rt.chatId.pubKey,
+      circleAddressFor,
+      circleIds: async () => {
+        const ids = new Set(Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})));
+        try {
+          const r = (await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data;
+          for (const c of r?.circles ?? []) { const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id); if (id) ids.add(id); }
+        } catch { /* the record's list alone still serves */ }
+        return [...ids];
+      },
+    }).catch(() => []);
+    return rows.map((d) => d.address);
+  };
+  /** The siblings a payload is carried to: its circle's self's devices (a persona's own), else the default's set. */
+  const siblingsFor = async (payload) => {
+    const cid = typeof payload?.circleId === 'string' ? payload.circleId : null;
+    const pid = cid ? circlePersonas.get(cid) : null;
+    return pid ? personaSiblings(pid) : ownDeviceSiblings();
+  };
   const siblingCarry = makeSiblingCarry({
-    siblings: ownDeviceSiblings,
+    siblings: siblingsFor,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
   // THE PERSON'S OWN STORE (the own-devices scope): ONE per node — what the shell hands in (sealed on its medium),
@@ -2066,6 +2113,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       return to ? { sealed: 'person', to } : { sealed: 'device' };
     },
     sealFor: async (peerAddr, content) => {
+      // to a contact filed under a PERSONA: sealed FROM that persona's person key (never the default's)
+      const self = await contactSelf(peerAddr).catch(() => null);
+      const pk = self?.personaId ? personas.get(self.personaId)?.personKey : null;
+      if (self?.personaId) {
+        const to = pk ? await contactPersonKeyOf(peerAddr) : null;
+        if (!to || !pk) return null;
+        const { sealed, nonce } = await sealToPersonKey(pk.seed, to.pubKey, content);
+        return { to, from: { version: pk.version, pubKey: personKeyPubKeyB64(pk.seed) }, sealed, nonce };
+      }
       const to = await sealTargetFor(peerAddr);
       if (!to) {
         if (persona.personKey && !sealedWarned.has(peerAddr)) { sealedWarned.add(peerAddr); console.info(`[contact-seal] no person key on record for ${String(peerAddr).slice(0, 12)}… — this thread stays sealed to the device only until their card or a shared circle brings one`); }
@@ -2075,6 +2131,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       return { to, from: currentPersonKey(), sealed, nonce };
     },
     openFor: async (s, fromAddr) => {
+      // sealed to one of my PERSONAS' person keys: that persona's seed opens it
+      for (const [pid, rt] of personas) {
+        if (pid === 'default' || !rt?.personKey?.seed) continue;
+        if (s?.to?.pubKey && personKeyPubKeyB64(rt.personKey.seed) === s.to.pubKey) return openFromPersonKey(rt.personKey.seed, s?.from?.pubKey, s);
+      }
       const seed = personSeedFor(s?.to?.version);
       if (!seed) { console.warn(`[contact-seal] a message sealed to person-key version ${s?.to?.version} — this device holds no such version`); return null; }
       const content = await openFromPersonKey(seed, s?.from?.pubKey, s);
@@ -2102,6 +2163,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // WHO this device's own stoop call is: in a persona's circle (the args name it), the persona — `actAs` at the core's
   // in-process membrane, so the skill's `from` and the trail's actor are it. Anything else: the default, as before.
   const stoopActAs = (args) => {
+    // a call that names WHICH persona it is for (a card) is made as that persona
+    if (typeof args?.persona === 'string' && args.persona !== 'default') {
+      const w = personas.get(args.persona)?.chatId?.pubKey ?? null;
+      if (w) return { actAs: w };
+    }
     const c = args?.groupId ?? args?.circleId ?? null;
     if (typeof c !== 'string' || !c) return {};
     let as = null;
@@ -2274,13 +2340,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       agent: { forgetPeerAddress: (address) => sa.forgetPeerAddress?.(address) ?? false, forgetCircleSenders: (cid) => circleSenders.forgetCircleSenders(cid) },
       callSkill: (app, op, args) => callSkill(app, op, args), circleId, followed: true,
       unregister: () => unregisterCircleAddressesOnRelays({
-        relays: sa.relays?.list?.() ?? [], circleIds: [circleId], circleAddressFor: (cid) => circleAddressFor(cid),
+        relays: sa.relays?.list?.() ?? [], relaysOf: (cid) => relaysFor(cid), circleIds: [circleId], circleAddressFor: (cid) => circleAddressFor(cid),
       }),
     });
     return { ok: r?.ok === true, ...r };
   };
   circleFollowSync = createCircleFollowSync({
-    siblings: ownDeviceSiblings,
+    // per circle: a persona's circle is told only to the devices holding that persona (no person-level lane)
+    siblings: (circleId) => (circleId ? siblingsFor({ circleId }) : ownDeviceSiblings()),
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     myEntries: myCircleEntries,
     myLeft: async () => { try { return (await rawStoop('listMyCircles', {}))?.left ?? []; } catch { return []; } },
@@ -2448,7 +2515,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       const circles = (await myCircleEntries()).map(({ id, handle, address }) => ({ id, handle, address }));
       if (circles.length === 0) return [DataPart({ ok: false, error: 'no-circles' })];
-      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles });
+      // the person's personas, SEALED to the phrase (only the device it is typed into can read them, and pick) — with the
+      // root resident only; a delegated device runs no persona to offer
+      let personasSealed = null;
+      if (ownerRoot) {
+        const list = [];
+        for (const [pid] of personas) {
+          if (pid === 'default') continue;
+          let name = null;
+          try { name = (await agentsRegistryRef?.lookup?.(pid))?.name ?? null; } catch { name = null; }
+          list.push({ id: pid, ...(name ? { name } : {}) });
+        }
+        personasSealed = sealOfferPersonas(ownerRoot, list);
+      }
+      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles, personasSealed });
       return [DataPart({ ok: true, uri, circles: circles.length })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
   }, { visibility: 'private' });   // enumerates the person's circles: owner-only
@@ -2481,6 +2561,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device's addresses in every roster's set. The phrase itself is never persisted.
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
     const label = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
+    // the personas the person PICKED for this device (ids from the offer's sealed list) — none: the default only
+    const pickedPersonas = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
     try {
       // The THROWAWAY self's circle ids, read while its registry is still this device's. The clear that
       // follows on the next boot is named after them, and by then there is no agent to ask.
@@ -2489,7 +2571,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       catch { /* a registry that cannot be read leaves the named stores to the list's own constants */ }
       const r = await restoreOwnerRoot({
         mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,
-        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds,
+        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds, personas: pickedPersonas,
       });
       if (!r.ok) {
         const outcome = (r.code === 'invalid' || r.code === 'empty') ? 'invalid-phrase' : 'error';
@@ -3041,12 +3123,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const rt = personas.get(personaId);
     if (!rt?.chatId) return { ok: false, reason: 'no-such-persona' };
     circlePersonas.set(circleId, personaId);
-    const owner = rt.chatId.pubKey;
-    try {
-      sa.registerSelfIdentity?.(owner, rt.chatId, { owner });
-      if (!rt.personIdentity && rt.personKey?.seed) rt.personIdentity = await AgentIdentity.fromSeed(rt.personKey.seed, new VaultMemory());
-      if (rt.personIdentity) sa.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
-    } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
+    await registerPersonaIdentities(personaId, rt);
     if (typeof relayUrl === 'string' && relayUrl) {
       try { await sa.relays.add(relayUrl, { identity: rt.chatId, awaitReady: true }); }
       catch (err) { console.warn(`[persona] ${personaId} could not dial ${relayUrl}: ${err?.message ?? err}`); }
@@ -3056,6 +3133,23 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** WHO this device is in a circle: the circle's persona's webid, the address it sends AS (null for the default), its person key. */
   /** The ref this device signs as in a circle: its persona there, else the default — what every lane names as author. */
   const circleSelfRef = (circleId) => circleSelf(circleId).webid ?? chatId.pubKey;
+  /**
+   * WHO I AM TO A CONTACT: the persona its book row is filed under, when this device runs it —
+   * `{ webid, sendAs }` (the persona's chat key); null for the default (and for a persona this device does not hold).
+   */
+  const contactSelf = async (peerAddr) => {
+    if (typeof peerAddr !== 'string' || !peerAddr) return null;
+    let row = null;
+    try {
+      const rows = (await rawStoop('listContacts', {}))?.contacts ?? [];
+      row = rows.find((c) => c?.webid === peerAddr || c?.pubKey === peerAddr || c?.peerAddr === peerAddr || c?.personKey?.pubKey === peerAddr) ?? null;
+    } catch { row = null; }
+    const pid = row?.persona;
+    if (!pid || pid === 'default') return null;
+    const rt = personas.get(pid);
+    const me = rt?.chatId?.pubKey ?? null;
+    return me ? { webid: me, sendAs: me, personaId: pid } : null;
+  };
   /** The relay sockets a circle's self speaks on: a persona's own (null for the default — the shells' default list). */
   const relaysFor = (circleId) => {
     const as = circleSelf(circleId).sendAs;
@@ -5236,17 +5330,30 @@ export async function createRealHouseholdAgent(opts = {}) {
           // opts stays as a test override; no shell passes it.
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
         );
-        if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
-        // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
-        if (persona.personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(persona.personKey.links) ? persona.personKey.links : [] };
+        // A PERSONA's card: its own chat address (its socket's), its own person key and chain, the relays IT is on — and the
+        // card is asked AS it (`stoopActAs`), so nothing of the default rides along.
+        const cardPersona = typeof realArgs.persona === 'string' && realArgs.persona !== 'default' ? personas.get(realArgs.persona) : null;
+        if (realArgs.persona && realArgs.persona !== 'default' && !cardPersona?.chatId) return { error: 'no-such-persona' };
+        if (cardPersona) {
+          const pk = cardPersona.personKey;
+          realArgs = {
+            ...realArgs,
+            ...(myPeerAddr ? { peerAddr: cardPersona.chatId.pubKey } : {}),
+            ...(pk ? { personKey: { version: pk.version, pubKey: personKeyPubKeyB64(pk.seed), ...(pk.linkKeyPub ? { linkKeyPub: pk.linkKeyPub } : {}) }, personKeyLinks: Array.isArray(pk.links) ? pk.links : [] } : {}),
+          };
+        } else {
+          if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
+          // My current person key and its chain ride the card — the Hi between persons (2026-09-16).
+          if (persona.personKey) realArgs = { ...realArgs, personKey: personKeyForContacts(), personKeyLinks: Array.isArray(persona.personKey.links) ? persona.personKey.links : [] };
+        }
         // WHERE I CAN BE FOUND (Frits, 2026-09-11): the primary relay by default; every extra relay this
         // device is on only when the person named it (`extraRelays`, off by default — relay diversity is
         // an unlinkability strategy, and a card listing every relay hands its holder a linkage across
         // them). Never mDNS. An extra relay this device is NOT on is not put on the card: a card must
         // not name a place the person cannot be reached. Under the same publication lock as the address.
         if (myPeerAddr) {
-          const on = (() => { try { return sa.relays.list().map((r) => r.url).filter(Boolean); } catch { return []; } })();
-          const primary = sa.relay?.url ?? on[0] ?? null;
+          const on = (() => { try { return sa.relays.list(cardPersona ? { identity: cardPersona.chatId.pubKey } : undefined).map((r) => r.url).filter(Boolean); } catch { return []; } })();
+          const primary = cardPersona ? (on[0] ?? null) : (sa.relay?.url ?? on[0] ?? null);
           const wanted = String(realArgs.extraRelays ?? realArgs['extra-relays'] ?? '').split(',').map((u) => u.trim()).filter(Boolean);
           const relays = [];
           if (primary) relays.push(primary);
@@ -5255,7 +5362,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         // a FUNCTION profile (a household bot) says so on its card — for display and the add-flow's words only; what a
         // person's app signs to is decided by their own admission, never by this claim
-        try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ }
+        if (!cardPersona) { try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ } }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -7058,6 +7165,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // each self on its own sockets: the shells' circle-address registration asks per circle (`relaysOf` / `alsoAddressesOf`)
     relaysFor,
     ownAddressBindingsFor,
+    // who this device is to a contact (its persona) — the contact channel's `selfFor` and the pair roster's `selfWebidOf`
+    contactSelf,
+    personaWebid: (personaId) => personas.get(personaId)?.chatId?.pubKey ?? null,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
 

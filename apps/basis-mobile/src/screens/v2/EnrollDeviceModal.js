@@ -14,6 +14,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
+import { openOfferPersonas, ENROL_PERSONAS_PARAM } from '../../../../basis/src/v2/enrollOffer.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -44,6 +45,16 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
 
   if (!visible) return null;
   const view = inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
+  // THE PERSONA PICKER: the offer's sealed list, opened ON THIS DEVICE with the phrase being typed (nothing leaves it);
+  // the person ticks which personas this device gets. Nothing ticked = the default only.
+  const pickerOffer = offerDraft.trim() || needs?.offer || '';
+  const listedPersonas = pickerOffer && drafts.mnemonic ? openOfferPersonas(pickerOffer, drafts.mnemonic) : [];
+  const picked = new Set(Array.isArray(drafts[ENROL_PERSONAS_PARAM]) ? drafts[ENROL_PERSONAS_PARAM] : []);
+  const togglePersona = (id) => setDrafts((d) => {
+    const next = new Set(Array.isArray(d[ENROL_PERSONAS_PARAM]) ? d[ENROL_PERSONAS_PARAM] : []);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return { ...d, [ENROL_PERSONAS_PARAM]: [...next] };
+  });
   const outcome = inst?.steps?.ceremony?.outcome;
 
   const submit = async () => {
@@ -124,7 +135,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
                 testID="enroll-offer-paste"
               />
               {offerInvalid ? <Text style={styles.offerErr}>{t('circle.enroll.offer_paste_invalid')}</Text> : null}
-              {view.form.params.map((param) => (
+              {view.form.params.filter((param) => param.name !== ENROL_PERSONAS_PARAM).map((param) => (
                 <TextInput
                   key={param.name}
                   style={[styles.input, param.kind === 'secret' && styles.secret]}
@@ -139,6 +150,17 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
                   testID={`enroll-${param.name}`}
                 />
               ))}
+              {listedPersonas.length ? (
+                <View testID="enroll-personas">
+                  <Text style={styles.body}>{t('circle.enroll.personas_title')}</Text>
+                  <Text style={styles.cancelText}>{t('circle.enroll.personas_hint')}</Text>
+                  {listedPersonas.map((p) => (
+                    <Pressable key={p.id} onPress={() => togglePersona(p.id)} accessibilityRole="checkbox" accessibilityState={{ checked: picked.has(p.id) }} testID={`enroll-persona-${p.id}`}>
+                      <Text style={styles.body}>{picked.has(p.id) ? '☑' : '☐'} {p.name ?? p.id}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
               <View style={styles.row}>
                 <Pressable style={styles.button} onPress={submit} testID="enroll-submit">
                   <Text style={styles.buttonText}>{t('circle.enroll.submit')}</Text>

@@ -211,7 +211,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -2312,6 +2312,8 @@ function buildCircleBot(agent) {
   // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
   // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
   circlePairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => rawCallSkill ? rawCallSkill(app, op, args) : agent.callSkill(app, op, args),
     sendPeerRedeem: (...a) => (circleSendPeerRedeem ? circleSendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -2327,6 +2329,8 @@ function buildCircleBot(agent) {
     shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   circleContactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     blobStore: circleAttachmentBlobs,
     pair: circlePairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included
@@ -2339,7 +2343,7 @@ function buildCircleBot(agent) {
     onReturned: contactReturned,
     // the first message to a contact carries MY card, and a card that arrives (naming its sender) goes into the book —
     // so whoever writes to me is a NAMED row, on every device (the book carry), not a key (2026-09-21)
-    myCard: async () => { try { return (await rawCallSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await rawCallSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: contactCardArrived,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits
@@ -3158,7 +3162,7 @@ async function deleteContactWithConfirm(contactId, name) {
     opId: 'deleteContact',
   });
   if (!ok) return;
-  const pairCircleId = circlePairRoster?.pairCircleIdFor?.(contactId) ?? null;
+  const pairCircleId = (await circlePairRoster?.pairCircleIdFor?.(contactId)) ?? null;
   const r = await deleteContact({
     agent: _peerAgent, callSkill: rawCallSkill, contactWebid: contactId, pairCircleId,
     unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({
@@ -5317,15 +5321,49 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
       offerErr.textContent = t('circle.enroll.offer_paste_invalid');
       card.appendChild(offerErr);
       const values = {};
+      // THE PERSONA PICKER: once an offer and the phrase are both here, the offer's sealed list opens ON THIS DEVICE
+      // (nothing leaves it) and the person ticks which personas this device gets. Nothing ticked = the default only.
+      const picker = document.createElement('div');
+      picker.style.cssText = 'margin:.6rem 0;';
+      const paintPicker = () => {
+        picker.innerHTML = '';
+        const offerUri = offerInput.value.trim() || needs?.offer || '';
+        const listed = offerUri && values.mnemonic ? openOfferPersonas(offerUri, values.mnemonic) : [];
+        if (listed.length === 0) { delete values[ENROL_PERSONAS_PARAM]; return; }
+        const title = document.createElement('p');
+        title.textContent = t('circle.enroll.personas_title');
+        const hint = document.createElement('p');
+        hint.className = 'cc-hint';
+        hint.textContent = t('circle.enroll.personas_hint');
+        picker.append(title, hint);
+        const picked = new Set(values[ENROL_PERSONAS_PARAM] ?? []);
+        for (const p of listed) {
+          const row = document.createElement('label');
+          row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
+          const box = document.createElement('input');
+          box.type = 'checkbox';
+          box.checked = picked.has(p.id);
+          box.dataset.personaId = p.id;
+          box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); values[ENROL_PERSONAS_PARAM] = [...picked]; });
+          const name = document.createElement('span');
+          name.textContent = p.name ?? p.id;
+          row.append(box, name);
+          picker.appendChild(row);
+        }
+        values[ENROL_PERSONAS_PARAM] = [...picked];
+      };
+      offerInput.addEventListener('input', paintPicker);
       for (const param of view.form.params) {
+        if (param.name === ENROL_PERSONAS_PARAM) continue;   // painted by the picker below
         const input = document.createElement(param.kind === 'secret' ? 'textarea' : 'input');
         if (param.kind !== 'secret') input.type = 'text';
         input.placeholder = t(`circle.enroll.${param.name}_placeholder`, { defaultValue: param.name });
         input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
         if (param.kind === 'secret') { input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false; }
-        input.addEventListener('input', () => { values[param.name] = input.value; });
+        input.addEventListener('input', () => { values[param.name] = input.value; if (param.name === 'mnemonic') paintPicker(); });
         card.appendChild(input);
       }
+      card.appendChild(picker);
       const go = document.createElement('button');
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';

@@ -772,6 +772,8 @@ export async function bootAgentBundle(opts = {}) {
     circleId, personaId, lastShared: disclosureShareMemo, resealMediaForCircle,
   });
   const pairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => agent.callSkill(app, op, args),
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -788,6 +790,8 @@ export async function bootAgentBundle(opts = {}) {
     shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   const contactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included (web parity)
@@ -806,7 +810,7 @@ export async function bootAgentBundle(opts = {}) {
     onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); },
     // the first message to a contact carries MY card; a card that arrives (naming its sender) goes into the book, so
     // whoever writes to me is a named row on every device (web parity, 2026-09-21)
-    myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await agent.callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     // web parity (circleApp's contactCardArrived): a card riding a message has no moment to choose in, so
     // the default is recorded EXPLICITLY rather than left absent — "not recorded" is a different fact.
     onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); },

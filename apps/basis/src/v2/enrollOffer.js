@@ -32,6 +32,8 @@ import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor, announceOwnCircleAddr
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
+import nacl from 'tweetnacl';
+import { Bootstrap } from '@onderling/core';
 
 /** The scheme. Distinct from `onderling-connect://` — see the header. */
 export const ENROLL_SCHEME = 'onderling-enroll://';
@@ -66,7 +68,7 @@ const b64url = {
  *   per-circle address (the sibling target).
  * @returns {string} an `onderling-enroll://…` URI
  */
-export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
+export function encodeEnrollOffer({ relays = [], circles = [], personasSealed = null } = {}) {
   const c = (Array.isArray(circles) ? circles : [])
     .filter((x) => x && typeof x.id === 'string' && x.id && typeof x.address === 'string' && x.address)
     .map((x) => ({
@@ -82,7 +84,7 @@ export function encodeEnrollOffer({ relays = [], circles = [] } = {}) {
     }));
   if (c.length === 0) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
   const r = (Array.isArray(relays) ? relays : []).filter((u) => typeof u === 'string' && u);
-  return ENROLL_SCHEME + b64url.encode({ v: 1, ...(r.length ? { r } : {}), c });
+  return ENROLL_SCHEME + b64url.encode({ v: 1, ...(r.length ? { r } : {}), c, ...(typeof personasSealed === 'string' && personasSealed ? { p: personasSealed } : {}) });
 }
 
 /**
@@ -109,7 +111,57 @@ export function parseEnrollOffer(uri) {
     }));
   if (circles.length === 0) return { ok: false, reason: 'incomplete' };
   const relays = (Array.isArray(body.r) ? body.r : []).filter((u) => typeof u === 'string' && u);
-  return { ok: true, relays, circles };
+  return { ok: true, relays, circles, personasSealed: typeof body.p === 'string' && body.p ? body.p : null };
+}
+
+/** The enrol op's param the shells paint as the persona PICKER (checkboxes from `openOfferPersonas`), never a text field. */
+export const ENROL_PERSONAS_PARAM = 'personas';
+
+/* ── The personas, sealed to the phrase ────────────────────────────────────────────────────────
+ * The offer is public by design, so the person's personas never ride it in the clear — a list of them in one offer
+ * would tell anyone who sees it that they are one person. It carries them SEALED to a key the PHRASE derives
+ * (`deriveAgentSeed('enroll-personas')`, a reserved label): only the device the person types their phrase into can
+ * read which personas there are, and pick. A device that shows an offer without the root resident (delegation
+ * custody) runs no persona to offer. */
+const PERSONAS_LABEL = 'enroll-personas';
+const bytesB64 = (u8) => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const bytesFrom = (s) => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4)), (c) => c.charCodeAt(0));
+const personasKey = (root) => root.deriveAgentSeed(PERSONAS_LABEL).slice(0, 32);
+
+/**
+ * Seal the person's personas for an offer (the root is in hand on the device that shows it).
+ * @param {object} root  the owner root (`Bootstrap`)
+ * @param {Array<{id: string, name?: string}>} personas
+ * @returns {string|null}
+ */
+export function sealOfferPersonas(root, personas = []) {
+  const list = (Array.isArray(personas) ? personas : []).filter((p) => p && typeof p.id === 'string' && p.id).map((p) => ({ id: p.id, ...(typeof p.name === 'string' && p.name ? { name: p.name } : {}) }));
+  if (!root || list.length === 0) return null;
+  const nonce = nacl.randomBytes(24);
+  const box = nacl.secretbox(new TextEncoder().encode(JSON.stringify(list)), nonce, personasKey(root));
+  const out = new Uint8Array(nonce.length + box.length);
+  out.set(nonce); out.set(box, nonce.length);
+  return bytesB64(out);
+}
+
+/**
+ * The personas an offer names, opened with the phrase the person typed — `[]` when it names none, or the phrase is not
+ * the one it was sealed to (never an error: the picker then offers the default only).
+ * @param {string} uri
+ * @param {string} mnemonic
+ * @returns {Array<{id: string, name: string|null}>}
+ */
+export function openOfferPersonas(uri, mnemonic) {
+  const parsed = parseEnrollOffer(uri);
+  if (!parsed.ok || !parsed.personasSealed) return [];
+  try {
+    const root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim());
+    const raw = bytesFrom(parsed.personasSealed);
+    const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), personasKey(root));
+    if (!opened) return [];
+    const list = JSON.parse(new TextDecoder().decode(opened));
+    return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.id === 'string' && /^p-[0-9a-f]{12}$/.test(p.id)).map((p) => ({ id: p.id, name: typeof p.name === 'string' ? p.name : null }));
+  } catch { return []; }
 }
 
 /* ── The link form — the same offer as a clickable https URL ──────────────────────────────────

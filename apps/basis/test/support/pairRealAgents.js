@@ -264,6 +264,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const pairSeams = { sendPeerRedeem: null, membershipCatchUp: null };
   const pairRoster = createPairRoster({
     selfWebid: pubKey,
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,   // as the shells compose it
     callSkill: (app, op, args) => callSkill(app, op, args),
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
@@ -290,6 +291,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   });
   const contactThreadChannel = contactChannel
     ? createContactThreadChannel({
+        selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,   // as the shells compose it
         sendToPeer: (addr, payload, opts) => (opts ? agent.sendPeerMessage(addr, payload, opts) : agent.sendPeerMessage(addr, payload)),
         itemStore:  createContactDmStore({ dataSource: null, localActor: pubKey }),
         // the shells' peer-graph upsert, recorded: the senders this device would list in Contacten
@@ -301,7 +303,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         isHidden: async (contactId) => ((await agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
         onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
         // the first message carries my card; an arriving card goes into the book — as the shells compose it
-        myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+        myCard: async (personaId = null) => { try { return (await agent.callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
         onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card }); },
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,

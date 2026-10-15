@@ -32,7 +32,9 @@
 
 /**
  * @param {object} a
- * @param {() => Promise<string[]>} a.siblings   the person's other proven device addresses
+ * @param {(payload?: object) => Promise<string[]>} a.siblings   the other proven device addresses of the SELF this payload
+ *   belongs to — for a circle's traffic, the devices holding that circle's self (a persona's are its own); never the
+ *   person's whole device set
  * @param {(to: string, payload: object, opts?: object) => Promise<any>} a.sendToPeer  hold-forward send
  * @param {(line: string) => void} [a.onWarn]
  * @returns {{ carry: (payload: object, opts?: { from?: string|null }) => Promise<{ attempted: number, skipped: string|null, outcomes: Array }> }}
@@ -56,7 +58,8 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
       return { attempted: 0, skipped: 'not-a-lane-payload', outcomes: [] };
     }
     let addrs = [];
-    try { addrs = (await siblings()) ?? []; } catch { addrs = []; }
+    // the siblings of THIS payload's self: a circle's traffic goes only to the devices holding the circle's self
+    try { addrs = (await siblings(payload)) ?? []; } catch { addrs = []; }
     // What a SIBLING carried here has reached the whole set already — carrying it on would ping-pong
     // between a person's devices (the rails would dedupe it, but every hop is a send).
     if (from && addrs.includes(from)) return { attempted: 0, skipped: 'carried-by-a-sibling', outcomes: [] };

@@ -44,10 +44,15 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   const isDefault = profileId === 'default';
   // A persona other than the default derives everything from the root, so it runs only where the root is resident; a
   // delegated device is handed a persona at a ceremony (enrol/restore), never derives one.
-  if (!isDefault && !ownerRoot) throw new Error(`createPersonaRuntime: persona "${profileId}" needs the owner root on this device (ceremony-required)`);
-  if (!isDefault) custody = { mode: 'root' };
+  // A persona with no root resident runs only if it was HANDED here at a ceremony (its delegation blob in its slots).
+  if (!isDefault) custody = { mode: ownerRoot ? 'root' : 'handed' };
   // The persona's slots in the device's chat vault (personaVault.js): its chat seed, person key and delegation blob.
   const vault = personaVault(chatVault, profileId);
+  if (custody.mode === 'handed') {
+    let handed = null;
+    try { handed = await vault.get(DEVICE_DELEGATION_VAULT_KEY); } catch { handed = null; }
+    if (!handed) throw new Error(`createPersonaRuntime: persona "${profileId}" was not handed to this device (ceremony-required)`);
+  }
   // The persona's seed — the source of its chat identity, its device seed, its person key. Root custody only.
   const profileSeed = ownerRoot ? ownerRoot.deriveAgentSeed(profileId) : null;
 

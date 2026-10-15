@@ -434,6 +434,8 @@ if (relayUrl) {
   const pairSeams = { sendPeerRedeem: null, onJoined: null };
   const pendingPeerRedeems = new Map();
   pairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill,
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -450,6 +452,8 @@ if (relayUrl) {
     }),
   });
   contactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     pair: pairRoster,
     // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
     authFor: agent.linkedTurnAuth ?? null,
@@ -470,7 +474,7 @@ if (relayUrl) {
     },
     // The first message to a contact carries the person's card; one that arrives (naming its sender) goes into the
     // book here — and the book carry names that person on the phone and the laptop (2026-09-21).
-    myCard: async () => { try { return (await callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: async ({ contactId, card }) => {
       const r = await callSkill('stoop', 'addContactFromQr', { payload: card });
       walkLog({ kind: 'contact-card', contactId: String(contactId).slice(0, 12), name: r?.contact?.displayName ?? r?.contact?.handle ?? null });

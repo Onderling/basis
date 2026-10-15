@@ -55,7 +55,7 @@ async function closePanel(page) {
 async function openPersonaPanel(page) {
   await closePanel(page);
   await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1500);
-  await page.locator('.cc-profile__offerings-moved-link').first().click(); await page.waitForTimeout(2000);
+  await page.locator('.circle-screen__identity-edit').first().click(); await page.waitForTimeout(2000);
 }
 /** Press this circle's share / stop-sharing button in Mij's table. Names the branch it took. */
 async function pressShareFor(page, circleId) {

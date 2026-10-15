@@ -1086,6 +1086,17 @@ export const basisManifest = {
   ],
 
   /**
+   * Me is ONE declared screen: below the actions above, these blocks, in order — filled by the one screen materializer
+   * (`mijScreenBlocks`) and painted by each shell's block painter. No shell lists a section of Me by hand.
+   *   identityLine — the person's name, and the readings named here (each answers one thing about now)
+   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens My data)
+   */
+  meBlocks: [
+    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'openChores', 'nextAppointment'] } },
+    { type: 'agents',       config: {} },
+  ],
+
+  /**
    * Nav-chrome (D / Surface 2) — the circle DETAIL ACTION BAR + the live circle
    * ⋯ overflow menu.  These sibling-screen buttons WERE hand-written and had
    * DIVERGED across THREE places: web detail bar (`circleDetail.js`

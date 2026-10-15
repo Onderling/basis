@@ -15,6 +15,7 @@ import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { historyStatusLine } from '../../src/v2/historyMirror.js';
+import { myDataDoorsFor } from '../../src/v2/myDataDoors.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -102,6 +103,15 @@ export function renderCircleMyData(container, {
   onOpenRelayPanel,       // Objective D / Surface 4:  => void — open the set-relay op in the docked
                           // side-panel (openPagePanel). When provided, the relay row is an entry button that
                           // routes through the generic panel instead of the bespoke inline form below.
+  // The doors that sat on Mij, declared once (`myDataDoors.js`): id → what opens it here. A door without one is omitted.
+  doors = {},
+  // the person's own week overview (a card of the coming week on Saturday morning): `{ on, onToggle }`; on null while
+  // it loads or switches; absent = no switch (no clock here)
+  weekOverview = undefined,
+  // The build this tab runs (the tag the publish baked in; '' on a dev server). Absent ⇒ no line; given ⇒ the last
+  // line, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's build looked
+  // like a laptop that receives nothing).
+  version,
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleMyData.js');
@@ -123,6 +133,22 @@ export function renderCircleMyData(container, {
   title.textContent = tr('circle.mydata.title');
   header.appendChild(title);
   container.appendChild(header);
+
+  // ── the doors Mij gave up: availability · connection points · shared with me · blocked ──
+  const doorRow = myDataDoorsFor(doors);
+  if (doorRow.length) {
+    const sec = section(tr('circle.profile.mydata_more'));
+    sec.classList.add('cc-mydata__doors');
+    for (const d of doorRow) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `cc-profile__${d.id}`;
+      b.textContent = tr(d.labelKey);
+      b.addEventListener('click', () => d.open());
+      sec.appendChild(b);
+    }
+    container.appendChild(sec);
+  }
 
   // ── where your data lives ─────────────────────────────────────────────────
   const storage = section(tr('circle.mydata.storage'));
@@ -563,6 +589,20 @@ export function renderCircleMyData(container, {
     container.appendChild(sec0);
   }
 
+  // the person's own week overview: a card of their coming week, switched here
+  if (weekOverview) {
+    const sec = section(tr('circle.profile.week_switch'));
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cc-profile__week-toggle cc-btn';
+    btn.dataset.on = weekOverview.on ? 'true' : 'false';
+    btn.disabled = weekOverview.on === null;
+    btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
+    btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
+    sec.appendChild(btn);
+    container.appendChild(sec);
+  }
+
   if (historyMirror && typeof onToggleHistoryMirror === 'function') {
     const h = historyMirror;
     const sec2 = section(tr('circle.mydata.history'));
@@ -902,6 +942,12 @@ export function renderCircleMyData(container, {
       usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
     }
     container.appendChild(usage);
+  }
+  if (typeof version === 'string') {
+    const v = document.createElement('div');
+    v.className = 'cc-profile__version';
+    v.textContent = tr('circle.profile.version', { tag: version || tr('circle.profile.version_dev') });
+    container.appendChild(v);
   }
   return container;
 

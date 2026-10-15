@@ -501,6 +501,10 @@
     "text": "← Mij",
     "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
   },
+  "back_mydata": {
+    "text": "← Mijn gegevens",
+    "doc": "Back link from a screen behind My data (availability, shared with me, blocked) to My data — one key for all of them."
+  },
   "back": {
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
@@ -5830,8 +5834,8 @@
       "doc": "S2 — no location yet."
     },
     "loc_disclosure_hint": {
-      "text": "Wie je locatie ziet, regel je bij Mij → persona's",
-      "doc": "location-fold-in (audit §4) — quiet pointer: location is now a disclosure-controlled property on the Mij persona layer; the geo-editor here stays for setting the coarse place."
+      "text": "Wie je locatie ziet, stel je hieronder in, per kring.",
+      "doc": "The person's own editor → under the location: who SEES it is a disclosure per circle, set further down in the same editor (the persona layer)."
     },
     "geo_placeholder": {
       "text": "Zoek een plaats…",
@@ -5874,10 +5878,10 @@
       "doc": "What the version line says for a build with no tag (a dev server)."
     },
     "scan": {
-        "text": "Scan",
-        "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
-      },
-      "share_contact": {
+      "text": "Scan",
+      "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "share_contact": {
       "text": "Deel mijn kaart",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     },
@@ -5932,6 +5936,70 @@
     "planned_where": {
       "text": " · {{circle}}",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "reading_available": {
+      "text": "beschikbaar",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_away": {
+      "text": "weg tot {{until}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_away_open": {
+      "text": "weg",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_quiet": {
+      "text": "stil tot {{until}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_online": {
+      "text": "online",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
+    },
+    "reading_offline": {
+      "text": "offline",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
+    },
+    "reading_unread": {
+      "text": "{{count}} ongelezen",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_open_chores": {
+      "text": "{{count}} open",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The person's open chores, across circles."
+    },
+    "reading_next": {
+      "text": "straks: {{title}} {{when}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The next appointment."
+    },
+    "agent_here": {
+      "text": "dit apparaat",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_device": {
+      "text": "apparaat: {{label}}",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_device_unnamed": {
+      "text": "een ander apparaat",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_companion": {
+      "text": "companion: {{label}}",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_bot": {
+      "text": "bot: {{label}}, aan jou gekoppeld",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "mydata_more": {
+      "text": "Meer",
+      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
+    },
+    "edit": {
+      "text": "Aanpassen",
+      "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
     }
   },
   "blocked": {

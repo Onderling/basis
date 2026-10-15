@@ -7619,6 +7619,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The person key between my devices: the lane table spreads its handlers; the shells kick its request on connect.
     /** The primary-device choice (sync-policy §12): `isMine()`, `claim()`, `requestFromSiblings()`, `handlers`. */
     primaryDevice,
+    /** This device's own id among the person's devices (the delegation it holds), or null before one exists. */
+    myDeviceId: () => enrolledDevice?.deviceId ?? custody.deviceId ?? null,
     /** Where a message to a contact goes once their pair roster exists (`pairRoster.js`): `{ to, circleId, personKey }` or null. */
     pairRouteFor: (contactWebid) => pairRouteFor({ callSkill: (a, o, g) => callSkill(a, o, g), selfWebid: chatId.pubKey, contactWebid }),
     claimPrimaryDevice: () => primaryDevice.claim(),

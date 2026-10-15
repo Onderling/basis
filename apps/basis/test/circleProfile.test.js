@@ -1,15 +1,60 @@
 /**
- * circleProfile — the Mij profile editor (S2). @vitest-environment happy-dom
+ * Mij — the declared screen (name + readings, agents, the Me actions, one door to My data), the person's own basics
+ * (handle, name, location — in their own editor), and the doors that moved behind My data. @vitest-environment happy-dom
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleProfile } from '../web/v2/circleProfile.js';
+import { renderProfileBasics } from '../web/v2/profileBasics.js';
+import { renderCircleMyData } from '../web/v2/circleMyData.js';
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
-describe('renderCircleProfile — identity', () => {
+const identityBlock = (content) => ({ blockId: 'mij-identityLine-0', type: 'identityLine', status: 'ok', content });
+const agentsBlock = (items) => ({ blockId: 'mij-agents-1', type: 'agents', status: 'ok', titleKey: 'circle.recipe.block.agents', content: { items } });
+
+describe('renderCircleProfile — the declared screen', () => {
+  it('the name is the title, the readings one line under it, "Edit" opens the person\'s own editor', () => {
+    const onBlockAction = vi.fn();
+    const el = renderCircleProfile(document.createElement('div'), {
+      t, onBlockAction,
+      blocks: [identityBlock({ name: 'Frits', readings: [{ key: 'online', on: true }, { key: 'unread', count: 2 }] }), agentsBlock([])],
+    });
+    expect(el.querySelectorAll('.cc-profile__title')).toHaveLength(1);
+    expect(el.querySelector('.cc-profile__title').textContent).toBe('Frits');
+    expect(el.querySelector('.circle-screen__identity-readings').textContent).toBe('circle.profile.reading_online · circle.profile.reading_unread:{"count":2}');
+    el.querySelector('.circle-screen__identity-edit').click();
+    expect(onBlockAction).toHaveBeenCalledWith({ kind: 'edit-me' });
+  });
+
+  it('the agents block: one sentence a row; a tap opens My data', () => {
+    const onBlockAction = vi.fn();
+    const el = renderCircleProfile(document.createElement('div'), {
+      t, onBlockAction,
+      blocks: [identityBlock({ name: 'Frits', readings: [] }), agentsBlock([{ kind: 'device', label: null, here: true }, { kind: 'bot', label: 'Huishoudbot' }])],
+    });
+    const rows = [...el.querySelectorAll('.circle-screen__agents-row')];
+    expect(rows.map((r) => r.textContent)).toEqual(['circle.profile.agent_here', 'circle.profile.agent_bot:{"label":"Huishoudbot"}']);
+    rows[1].click();
+    expect(onBlockAction).toHaveBeenCalledWith({ kind: 'open-my-data' });
+  });
+
+  it('one door to My data; Advanced only behind the developer switch; no hand-listed section', () => {
+    const onMyData = vi.fn();
+    const el = renderCircleProfile(document.createElement('div'), { t, onMyData, blocks: [] });
+    el.querySelector('.cc-profile__mydata').click();
+    expect(onMyData).toHaveBeenCalled();
+    expect(el.querySelector('.cc-profile__advanced')).toBeNull();
+    expect(renderCircleProfile(document.createElement('div'), { t, onAdvanced: () => {} }).querySelector('.cc-profile__advanced')).not.toBeNull();
+    for (const gone of ['.cc-profile__section', '.cc-profile__availability', '.cc-profile__shared-with-me', '.cc-profile__blocked', '.cc-profile__version', '.cc-profile__handle']) {
+      expect(el.querySelector(gone), gone).toBeNull();
+    }
+  });
+});
+
+describe('renderProfileBasics — identity (the person\'s own editor)', () => {
   it('prefills handle + displayName and saves the trimmed values', () => {
     const onSaveProfile = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), {
+    const el = renderProfileBasics(document.createElement('div'), {
       profile: { handle: 'jan', displayName: 'Jan de Buur' }, t, onSaveProfile,
     });
     expect(el.querySelector('.cc-profile__handle').value).toBe('jan');
@@ -20,58 +65,24 @@ describe('renderCircleProfile — identity', () => {
   });
 });
 
-describe('renderCircleProfile — offerings moved to Mij → persona\'s (fold-in phase C)', () => {
-  it('renders NO offerings editor any more — only the quiet pointer row, which opens the Mij surface', () => {
-    const onOpenMij = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), {
-      profile: { skills: [{ categoryId: 'klus' }] }, t, onOpenMij,
-    });
-    // The old editor is gone even when a legacy roster profile still carries offerings.
-    expect(el.querySelector('.cc-profile__offering')).toBeNull();
-    expect(el.querySelector('.cc-profile__offering-select')).toBeNull();
-    expect(el.querySelector('.cc-profile__offering-add-btn')).toBeNull();
-    // The pointer row is there and clicks through.
-    const link = el.querySelector('.cc-profile__offerings-moved-link');
-    expect(link.textContent).toBe('circle.profile.offerings_moved');
-    link.click();
-    expect(onOpenMij).toHaveBeenCalled();
-  });
-
-  it('degrades to plain text without onOpenMij (older callers)', () => {
-    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t });
-    const row = el.querySelector('.cc-profile__offerings-moved');
-    expect(row.textContent).toBe('circle.profile.offerings_moved');
-    expect(row.querySelector('button')).toBeNull();
-  });
-});
-
-describe('renderCircleProfile — location', () => {
+describe('renderProfileBasics — location', () => {
   it('shows no-location + geocodes a query', () => {
     const onGeocode = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onGeocode });
+    const el = renderProfileBasics(document.createElement('div'), { profile: {}, t, onGeocode });
     expect(el.querySelector('.cc-profile__loc-current').textContent).toBe('circle.profile.loc_none');
     el.querySelector('.cc-profile__geo-input').value = 'Groningen';
     el.querySelector('.cc-profile__geo-search').click();
     expect(onGeocode).toHaveBeenCalledWith('Groningen');
   });
 
-  it('the who-sees-my-location hint is a DOOR to the persona surface, not a note', () => {
-    // The geo editor sets the coarse place; who may SEE it is a disclosure on the persona layer, so
-    // the hint has to open that layer. Its twin (the offerings pointer, above) was already pinned;
-    // this one was not, and an unpinned door is one refactor away from being a paragraph again —
-    // which is exactly what it still is on a shell that forgets to wire the handler.
-    const onOpenMij = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onOpenMij });
-    const link = el.querySelector('.cc-profile__loc-disclosure-link');
-    expect(link, 'the location hint should be a link when the host wires onOpenMij').not.toBeNull();
-    expect(link.textContent).toBe('circle.profile.loc_disclosure_hint');
-    link.click();
-    expect(onOpenMij).toHaveBeenCalled();
+  it('who sees the location is said where it is set: in the same editor, below', () => {
+    const el = renderProfileBasics(document.createElement('div'), { profile: {}, t });
+    expect(el.querySelector('.cc-profile__loc-disclosure-hint').textContent).toBe('circle.profile.loc_disclosure_hint');
   });
 
   it('renders a geocode result + saves it; shows current + clear when set', () => {
     const onSaveLocation = vi.fn(); const onClearLocation = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), {
+    const el = renderProfileBasics(document.createElement('div'), {
       profile: { location: { label: 'Selwerd' } }, geocodeResult: { cell: 'g', label: 'Groningen' },
       t, onSaveLocation, onClearLocation,
     });
@@ -83,51 +94,48 @@ describe('renderCircleProfile — location', () => {
   });
 });
 
-describe('renderCircleProfile — availability link', () => {
-  it('fires onAvailability', () => {
-    const onAvailability = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onAvailability });
-    el.querySelector('.cc-profile__availability').click();
-    expect(onAvailability).toHaveBeenCalled();
+describe('My data — the doors Mij gave up', () => {
+  it('paints the declared doors this shell can open, in order; each fires its own', () => {
+    const availability = vi.fn(); const blocked = vi.fn();
+    const el = renderCircleMyData(document.createElement('div'), { t, doors: { blocked, availability } });
+    const btns = [...el.querySelectorAll('.cc-mydata__doors button')];
+    expect(btns.map((b) => b.textContent)).toEqual(['circle.profile.availability', 'circle.profile.blocked']);
+    btns[0].click();
+    expect(availability).toHaveBeenCalled();
+    expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-mydata__doors')).toBeNull();
+  });
+
+  it('the week-overview switch is here now', () => {
+    const onToggle = vi.fn();
+    const el = renderCircleMyData(document.createElement('div'), { t, weekOverview: { on: false, onToggle } });
+    const btn = el.querySelector('.cc-profile__week-toggle');
+    expect(btn.textContent).toBe('circle.profile.week_off');
+    btn.click();
+    expect(onToggle).toHaveBeenCalled();
   });
 });
 
-describe('renderCircleProfile — the version line (2026-09-19)', () => {
+describe('My data — the version line (2026-09-19)', () => {
   it('says which build this tab runs, at the bottom; a build without a tag says so', () => {
-    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, version: 'v0.1.13-alpha' });
+    const el = renderCircleMyData(document.createElement('div'), { t, version: 'v0.1.13-alpha' });
     const line = el.querySelector('.cc-profile__version');
     expect(line.textContent).toBe('circle.profile.version:{"tag":"v0.1.13-alpha"}');
     expect(el.lastElementChild).toBe(line);
-    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t, version: '' }).querySelector('.cc-profile__version').textContent).toBe('circle.profile.version:{"tag":"circle.profile.version_dev"}');
-    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__version')).toBeNull();
+    expect(renderCircleMyData(document.createElement('div'), { t, version: '' }).querySelector('.cc-profile__version').textContent).toBe('circle.profile.version:{"tag":"circle.profile.version_dev"}');
+    expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-profile__version')).toBeNull();
   });
 });
 
 describe('renderCircleProfile — the Me actions, from the declaration (share my contact 2026-09-19 · scan 2026-10-09)', () => {
   it('paints the declared Me actions (share-contact, scan) and hands the chosen id back; none without the seam', () => {
     const onMeAction = vi.fn();
-    const el = renderCircleProfile(document.createElement('div'), { profile: {}, t, onMeAction });
+    const el = renderCircleProfile(document.createElement('div'), { t, onMeAction });
     const link = el.querySelector('.cc-profile__share-contact');
     expect(link.textContent).toBe('circle.profile.share_contact');
     link.click();
     expect(onMeAction).toHaveBeenCalledWith('share-contact');
     el.querySelector('.cc-profile__scan').click();
     expect(onMeAction).toHaveBeenCalledWith('scan');
-    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__share-contact')).toBeNull();
-  });
-});
-
-describe('renderCircleProfile — Gepland (what is coming for me)', () => {
-  it('while loading says so; with nothing says so; with lines lists them', () => {
-    const loading = renderCircleProfile(document.createElement('div'), { profile: {}, t, plannedLines: null });
-    expect(loading.querySelector('.cc-profile__planned').textContent).toContain('circle.profile.planned_loading');
-    const none = renderCircleProfile(document.createElement('div'), { profile: {}, t, plannedLines: [] });
-    expect(none.querySelector('.cc-profile__planned').textContent).toContain('circle.profile.planned_none');
-    const some = renderCircleProfile(document.createElement('div'), { profile: {}, t, plannedLines: ['do 8 14:00 · tandarts · Huis', 'vr 9 · vuilnis'] });
-    expect([...some.querySelectorAll('.cc-profile__planned-item')].map((li) => li.textContent)).toEqual(['do 8 14:00 · tandarts · Huis', 'vr 9 · vuilnis']);
-  });
-
-  it('a shell that hands no lines paints no section (it does not know Gepland yet)', () => {
-    expect(renderCircleProfile(document.createElement('div'), { profile: {}, t }).querySelector('.cc-profile__planned')).toBeNull();
+    expect(renderCircleProfile(document.createElement('div'), { t }).querySelector('.cc-profile__share-contact')).toBeNull();
   });
 });

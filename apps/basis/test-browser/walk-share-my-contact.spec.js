@@ -22,9 +22,10 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     // A gives itself a name, so B's row for A reads as a person, not a key.
     await A.page.locator('[data-tab="mij"]').first().click();
     await A.page.waitForTimeout(1200);
-    await A.page.locator('.cc-profile__display').fill('Anna');
+    await A.page.locator('.circle-screen__identity-edit').click(); await A.page.locator('.cc-profile__display').fill('Anna');
     await A.page.locator('.cc-profile__save').click();
     await A.page.waitForTimeout(1500);
+    await A.page.locator('.cc-screen-panel__close').click();
     // ── Mij → share my contact: the panel with the QR, the code, the link ──────────────────────────
     await A.page.locator('.cc-profile__share-contact').click();
     await expect(A.page.locator('.cc-share__title')).toBeVisible();
@@ -69,7 +70,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     // ── B writes to Anna; A's screen shows it ─────────────────────────────────────────────────────
     // B names itself first, as a tester does under Mij: the first message carries B's card, so A's row for B reads "Bea".
     await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
-    await B.page.locator('.cc-profile__display').fill('Bea'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500);
+    await B.page.locator('.circle-screen__identity-edit').click(); await B.page.locator('.cc-profile__display').fill('Bea'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500); await B.page.locator('.cc-screen-panel__close').click();
     await gotoCircles(B.page);
     const marker = `hoi Anna, via je link ${Date.now().toString(36)}`;
     // What B's send returned (route, verdict), kept for a red.
@@ -187,7 +188,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     const bId = (await B.page.evaluate(async () => window.onderlingCall('stoop', 'whoAmI', {})))?.webid;
     await gotoCircles(B.page);   // B sits in the thread after STEP4: back to the launcher, where Mij is
     await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
-    await B.page.locator('.cc-profile__display').fill('Beatrix'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500);
+    await B.page.locator('.circle-screen__identity-edit').click(); await B.page.locator('.cc-profile__display').fill('Beatrix'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500); await B.page.locator('.cc-screen-panel__close').click();
     await gotoCircles(A.page);
     await A.page.locator('[data-tab="contacten"]').first().click(); await A.page.waitForTimeout(1000);
     const aRowName = async () => {

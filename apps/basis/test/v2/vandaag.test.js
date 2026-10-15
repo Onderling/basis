@@ -70,3 +70,19 @@ describe('the block filters, materialized', () => {
     expect(await ids({ limit: 10, labels: ['werk'], withinDays: 7 }), 'and only this week').toEqual(['n2']);
   });
 });
+
+describe('Vandaag — whose chores are "mine"', () => {
+  it('a host that does not name the person: the materializer asks who I am, so "my tasks" are mine', async () => {
+    const chores = [{ id: 't1', text: 'stoep vegen', assignee: 'me-webid', state: 'open' }, { id: 't2', text: 'afwas', assignee: 'bea', state: 'open' }];
+    const callSkill = async (app, op) => {
+      if (app === 'stoop' && op === 'whoAmI') return { webid: 'me-webid' };
+      if (app === 'tasks' || app === 'household') return { items: chores, result: chores };
+      return null;
+    };
+    const [block] = await materializeScreen({
+      screen: { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'x', type: 'tasks', config: { scope: 'assigned-to-me' } }] },
+      hostOps: { callSkill, circles: [{ id: 'a', name: 'Thuis' }] },
+    });
+    expect(block.content.items.map((r) => r.id)).toEqual(['t1']);
+  });
+});

@@ -111,7 +111,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
       await gotoCircles(A.page);
       await A.page.locator('[data-tab="mij"]').first().click();
       await A.page.waitForTimeout(1500);
-      await A.page.locator('.cc-profile__offerings-moved-link').first().click();
+      await A.page.locator('.circle-screen__identity-edit').first().click();
       await A.page.waitForTimeout(2500);
       // SCOPED TO THIS CIRCLE'S ROW. `.first()` on the button and `.first()` on the status are two
       // independent selectors over a table with a row per circle — they are not necessarily the same row,

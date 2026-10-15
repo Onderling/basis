@@ -103,9 +103,9 @@ export const SEAMS = Object.freeze([
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.
   { id: 'announcer', pattern: /createAnnouncer\(/, shells: ['box'], why: 'the household hears of a shared appointment, a move or a cancel, and a chore given to them, when it happens' },
-  // What is coming for me, wherever it lives (my circles' appointments, my own, my dated chores) — read on the
-  // person's device, no bot (the household bot is optional). The box hosts no person, so it has no Mij.
-  { id: 'planned-for-me', pattern: /plannedForMe\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Mij, from every circle and their own calendar' },
+  // What is coming for me, wherever it lives (my circles' appointments, my own, my chores) — Vandaag's seeded page,
+  // read on the person's device, no bot (the household bot is optional). The box hosts no person, so it has no Vandaag.
+  { id: 'planned-for-me', pattern: /ensureVandaagBook\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Vandaag, from every circle and their own calendar' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   // The device log's retention windows come from the register (`retention.chatDays`), applied after boot on every
   // shell. The box composed none until 2026-10-08 and ran on the built-in defaults: the same numbers today, but a

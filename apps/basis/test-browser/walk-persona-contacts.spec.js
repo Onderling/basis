@@ -21,7 +21,7 @@ const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.o
 const bookRow = async (page, webid) => ((await call(page, 'stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
 async function nameMe(page, name) {
   await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1200);
-  await page.locator('.cc-profile__display').fill(name); await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500);
+  await page.locator('.circle-screen__identity-edit').click(); await page.locator('.cc-profile__display').fill(name); await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500); await page.locator('.cc-screen-panel__close').click();
 }
 async function openThread(page, contactId) {
   await gotoCircles(page);

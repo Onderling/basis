@@ -34,7 +34,7 @@ test('B discloses a property and shares it from Mij; A\'s roster row for B carri
     await gotoCircles(B.page);
     await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1500);
     // the per-circle disclosure table lives on the persona panel ("Mij → persona's")
-    await B.page.locator('.cc-profile__offerings-moved-link').first().click(); await B.page.waitForTimeout(2000);
+    await B.page.locator('.circle-screen__identity-edit').first().click(); await B.page.waitForTimeout(2000);
     const share = B.page.locator('.cc-mij__cell-action button').first();
     if (!(await share.count())) {
       const mij = await B.page.evaluate(() => ({ text: document.body.innerText.slice(0, 1500), buttons: [...document.querySelectorAll('button')].map((b) => `${b.className}:${b.textContent.trim().slice(0, 30)}`).slice(0, 40) }));

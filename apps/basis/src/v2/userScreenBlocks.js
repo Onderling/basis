@@ -38,6 +38,10 @@ import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
+import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
+import { linkedBotsOf } from './identityLink.js';
+import { bookRowsOf } from './contactsSource.js';
+import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 
 /**
  * Materialize a Screen.  Returns Promise<Array<MaterializedBlock>>
@@ -63,8 +67,16 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   // When the user has muted EVERY circle in the filter, an empty active
   // list means circle-aware blocks render empty ("hide entirely").
 
+  // whose rows are "mine": the host may name the person; when it does not, ask (a "my tasks" block without it shows none)
+  let ops = hostOps;
+  const needsMe = (b) => b?.type === 'tasks' || b?.type === 'identityLine' || (['items', 'notes'].includes(b?.type) && b?.config?.scope === 'mine');
+  if (!hostOps.myWebid && typeof hostOps.callSkill === 'function' && screen.blocks.some(needsMe)) {
+    const me = await hostOps.callSkill('stoop', 'whoAmI', {}).then((r) => r?.webid ?? null).catch(() => null);
+    if (me) ops = { ...hostOps, myWebid: me };
+  }
+
   return Promise.all(screen.blocks.map((block) => materializeOneBlock({
-    block, activeCircleIds, allCircleIds, hostOps,
+    block, activeCircleIds, allCircleIds, hostOps: ops,
     screenIsAll: isAllCircles(screen),
   })));
 }
@@ -105,6 +117,12 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       case 'circlesUnread':
         return materializeCirclesUnread(block, activeCircleIds, hostOps);
 
+      // Me's own blocks: the name with the readings its config names, and the person's agents and devices
+      case 'identityLine':
+        return await materializeIdentityLine(block, activeCircleIds, hostOps);
+      case 'agents':
+        return await materializeAgents(block, hostOps);
+
       default:
         return { blockId: block?.id, type: block?.type, status: 'error',
                  content: {}, error: 'unknown type' };
@@ -133,6 +151,91 @@ function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, s
     .sort((a, b) => b.ts - a.ts)
     .slice(0, limit);
   return { ...base, status: items.length > 0 ? 'ok' : 'empty', content: { items } };
+}
+
+/** The readings an identity line may show, each answering one thing about now. */
+export const MIJ_READINGS = Object.freeze(['availability', 'online', 'unread', 'openChores', 'nextAppointment']);
+
+/** A chore in one of these states is no longer open. */
+const CLOSED_TASK_STATES = new Set(['done', 'approved', 'completed', 'cancelled', 'archived']);
+
+/**
+ * The identity line: the person's name and the readings the block's config names, in that order. A reading whose
+ * source the shell did not hand (availability, online) or that has nothing to say (no appointment coming) is left out
+ * — never a guess.
+ */
+async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
+  const { callSkill } = hostOps;
+  const want = (Array.isArray(block.config?.readings) ? block.config.readings : []).filter((r) => MIJ_READINGS.includes(r));
+  let name = null;
+  try {
+    const prof = typeof callSkill === 'function' ? await callSkill('stoop', 'getMyProfile', {}) : null;
+    name = prof?.entry?.displayName || prof?.entry?.handle || null;
+  } catch { /* nameless: the painter says "Mij" */ }
+  const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
+  const readings = [];
+  for (const key of want) {
+    if (key === 'availability') {
+      if (!hostOps.availability) continue;
+      const a = normalizeAvailability(hostOps.availability);
+      if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) readings.push({ key, state: 'away', until: a.holiday.until });
+      else if (isPushSuppressed(a, new Date(now))) readings.push({ key, state: 'quiet', until: a.quietHours.to });
+      else readings.push({ key, state: 'available' });
+    } else if (key === 'online') {
+      const on = typeof hostOps.online === 'function' ? hostOps.online() : hostOps.online;
+      if (typeof on === 'boolean') readings.push({ key, on });
+    } else if (key === 'unread') {
+      const r = materializeCirclesUnread({ id: block.id, config: { limit: 50 } }, activeCircleIds, hostOps);
+      readings.push({ key, count: (r.content?.items ?? []).reduce((n, row) => n + (row.unread ?? 0), 0) });
+    } else if (key === 'openChores') {
+      const r = await materializeItems({ id: block.id, config: { noun: 'task', scope: 'mine', limit: 200 } }, activeCircleIds, hostOps);
+      if (r.status !== 'error') readings.push({ key, count: (r.content?.items ?? []).filter((row) => !CLOSED_TASK_STATES.has(row.state)).length });
+    } else if (key === 'nextAppointment') {
+      // the circles' appointments and my own; with no circle, only my own (the items block reads none without one)
+      const r = activeCircleIds.length
+        ? await materializeItems({ id: block.id, config: { noun: 'calendar-event', scope: 'all', horizonDays: 30, limit: 20 } }, activeCircleIds, hostOps)
+        : { content: { items: await ownAppointments(callSkill) } };
+      const next = (r.content?.items ?? []).find((row) => row.when && row.when >= now);
+      if (next) readings.push({ key, title: next.label, when: next.when, circleName: next.circleName ?? '' });
+    }
+  }
+  return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name, readings } };
+}
+
+/** My own appointments (no circle) in the coming month, as items-block rows. */
+async function ownAppointments(callSkill) {
+  if (typeof callSkill !== 'function') return [];
+  const presenter = ITEM_PRESENTERS['calendar-event'];
+  const own = await callSkill('calendar', 'listEvents', { days: 30 }).catch(() => null);
+  return (Array.isArray(own?.items) ? own.items : [])
+    .map((e) => ({ label: presenter.label(e), when: presenter.when(e) || null, circleName: '' }))
+    .sort((a, b) => (a.when ?? 0) - (b.when ?? 0));
+}
+
+/**
+ * The person's agents and devices: the live devices on their registry entry (this one marked — and listed even when
+ * it is not among the delegations, as a first device is not), the nodes they claimed, the bots linked to them. One
+ * row each; read-only — what may be done with one lives in My data.
+ */
+async function materializeAgents(block, { callSkill, deviceId = null } = {}) {
+  const base = { blockId: block.id, type: 'agents', titleKey: 'circle.recipe.block.agents' };
+  if (typeof callSkill !== 'function') return { ...base, status: 'empty', content: { items: [] } };
+  const entry = await callSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null);
+  const props = { properties: entry?.properties ?? {} };
+  const items = Object.values(deviceDelegationsOf(props))
+    .filter((d) => d && !d.revoked)
+    .map((d) => ({ kind: 'device', label: d.label || null, here: Boolean(deviceId) && d.deviceId === deviceId }));
+  if (!items.some((d) => d.here)) items.unshift({ kind: 'device', label: null, here: true });
+  for (const n of Object.values(ownedNodesOf(props))) {
+    const addr = typeof n?.address === 'string' ? n.address : '';
+    items.push({ kind: 'companion', label: n?.label || (addr ? `${addr.slice(0, 8)}…` : null), here: false });
+  }
+  const contacts = await callSkill('stoop', 'listContacts', {}).then((r) => r?.contacts ?? []).catch(() => []);
+  const bots = new Set(linkedBotsOf(contacts));
+  const names = new Map();
+  for (const c of bookRowsOf({ contacts })) for (const a of [c?.peerAddr, c?.webid]) if (a) names.set(a, c.displayName || c.handle || null);
+  for (const addr of bots) items.push({ kind: 'bot', label: names.get(addr) || `${addr.slice(0, 8)}…`, here: false });
+  return { ...base, status: 'ok', content: { items } };
 }
 
 function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = {}) {

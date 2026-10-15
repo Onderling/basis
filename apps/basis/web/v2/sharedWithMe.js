@@ -24,7 +24,7 @@ export function renderSharedWithMe(container, {
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'shared-with-me__back';
-  back.textContent = tr('circle.back');
+  back.textContent = tr('circle.back_mydata');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
 

@@ -1,288 +1,75 @@
 /**
- * basis v2 — profile editor (web DOM renderer, identity + matching).
+ * basis v2 — Mij (web DOM renderer): identity, ONE declared screen.
  *
- * The "Mij" surface: your handle + display name (#5) and your coarse location
- * (#7). Pure render — the host (`circleApp.js` showMij) loads `getMyProfile`
- * and dispatches the stoop mutations behind the callbacks.
+ * What Me shows is declared in the manifest, never listed here: the Me actions (`meActions` — share my card, scan)
+ * and the Me blocks (`meBlocks` — the identity line with the person's name and readings, their agents and devices),
+ * which the host fills through the shared `mijScreenBlocks` and this paints with the screen's own block painter.
+ * Below them, one door to My data (where the other doors went) and, behind the developer switch, Advanced. The
+ * identity fields and the location are in the person's own editor (the identity line's "Edit"); the overview is on
+ * Vandaag.
  *
- * Offering→property fold-in phase C (2026-07-17, NOTE-skills-properties-audit §3c):
- * the personal-offering editor (`cc-profile__offering*` + onAddOffering/onRemoveOffering)
- * LEFT this screen — offerings are driver-like items on the persona truth layer
- * now (`circleMij.js`, "Mij → persona's"). A quiet pointer row (`onOpenMij`)
- * replaces it. NOT to be confused with `showSkills` (the circle's openness
- * *policy* surface, circleOfferingEditor.js — a different feature, untouched).
- *
- * D / consumer-switch (second live surface) — the "Mij" (Me) screen
- * header is sourced from the manifest PAGE projection: the `me` op declares
- * `surfaces.page`, renderWeb projects it into NavModel.pages[], and the header
- * label flows `page.labelKey → t()` via the shared `pageLabel` selector — not a
- * hardcoded tr('circle.profile.title'). Pure selector lives in shared src.
+ * The page's fallback title (no name yet) comes from the manifest PAGE projection: the `me` op declares
+ * `surfaces.page`, and its labelKey flows through the shared `pageLabel` selector.
  */
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { meActionsFor } from '../../src/v2/meActionProjection.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
-import { MIJ_OVERVIEW_TITLE_KEY } from '../../src/v2/mijOverview.js';
 import { renderCircleScreen } from './circleScreen.js';
 
 export function renderCircleProfile(container, {
-  profile = {},
-  geocodeResult = null,
-  busy = false,
   t,
-  onSaveProfile,
-  // Fold-in phase C — open the "Mij → persona's" surface (where offerings live now).
-  // Absent ⇒ the pointer renders as plain text (older callers / tests).
-  onOpenMij,
-  // Mijn overzicht, top: Gepland's lines (shared `plannedLines`); null while they load; absent = no Gepland rows
-  plannedLines = undefined,
-  // Mijn overzicht, below: the shared overview's materialized blocks (`mijOverviewBlocks`), drawn by the screen's own
-  // block painter; null while they load; absent = no blocks. Neither given = no section.
-  overviewBlocks = undefined,
-  // the person's own week overview: `{ on, onToggle }` (absent = no switch; on null while it loads)
-  weekOverview = undefined,
-  onGeocode,
-  onSaveLocation,
-  onClearLocation,
-  onAvailability,
+  // the materialized Me blocks (`mijScreenBlocks`); null while they load
+  blocks = null,
+  // what a block's tap means here: `{ kind: 'edit-me' }` (the identity line's door) · `{ kind: 'open-my-data' }`
+  onBlockAction,
   onMyData,
-  // Nearby step I — the connection-point list. Absent ⇒ the link is simply omitted, like the others.
-  onConnectionPoints,
-  // SILENT out-of-circle delivery — open the personal, cross-circle "shared with me"
-  // inbox (sealed copies peers pushed to this device). A Mij sub-screen link, peer of
-  // availability/my-data. Absent ⇒ the link is simply omitted (older callers / tests).
-  onSharedWithMe,
-  // The people this device has blocked. A block has to be reversible from a place you can FIND —
-  // the block itself is one tap on a post, and until this existed the only way back was to type
-  // `/unblock` with a key nobody can read off a screen. Absent ⇒ omitted, like its peers.
-  onBlocked,
-  // The advanced surface — surface-less ops + settable params. Absent ⇒ omitted.
+  // The advanced surface — surface-less ops + settable params; given only when the developer switch is on.
   onAdvanced,
-  // The build this tab runs (the tag the publish baked in; '' on a dev server). Absent ⇒ no line; given ⇒ the
-  // last line of Mij, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's
-  // build looked like a laptop that receives nothing).
-  version,
   // The Me actions (Share my card · Scan) — DECLARED in the manifest (`meActions`), painted here from the projection;
   // this one callback carries the chosen id back (like the tab bar's handlers). Absent ⇒ none painted.
   onMeAction,
-  // D / consumer-switch — the projected PAGE surface for the `me` op
-  // (renderWeb(manifest).pages[] entry, selected via pageForOp). When present,
-  // the header label is derived from `page.labelKey` via t, making this
-  // a genuine runtime consumer of the manifest projection. Absent (older callers
-  // / tests) ⇒ the header falls back to tr('circle.profile.title') bit-for-bit.
+  // the projected PAGE surface for the `me` op: the title while the name is not known
   profilePage = null,
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleProfile.js');
   container.innerHTML = '';
   container.className = 'cc-profile';
+  const fallbackTitle = pageLabel(profilePage, tr, tr('circle.profile.title'));
 
-  const heading = document.createElement('h2');
-  heading.className = 'cc-profile__title';
-  // D / consumer-switch — label FROM the manifest projection: the `me`
-  // op's `surfaces.page.labelKey`, projected by renderWeb, resolved through t()
-  // . Falls back to the raw page.title, then to the pre-existing
-  // tr('circle.profile.title') when no projected page is passed.
-  heading.textContent = pageLabel(profilePage, tr, tr('circle.profile.title'));
-  container.appendChild(heading);
+  // the declared blocks; the identity line carries the page's title (the name)
+  const body = document.createElement('div');
+  body.className = 'cc-profile__blocks';
+  renderCircleScreen(body, {
+    blocks,
+    t: (k, v) => (k === 'circle.profile.title' ? fallbackTitle : tr(k, v)),
+    onAction: typeof onBlockAction === 'function' ? onBlockAction : undefined,
+  });
 
   // ── the Me actions, from the declaration (Share my card · Scan) ──
   if (typeof onMeAction === 'function') {
     const row = document.createElement('div');
     row.className = 'cc-profile__me-actions';
     for (const a of meActionsFor(basisManifest)) row.appendChild(button(tr(a.labelKey), `cc-profile__${a.id}`, () => onMeAction(a.id)));
-    container.appendChild(row);
+    // under the name: the identity line is the first block
+    const first = body.firstElementChild;
+    if (first && first.dataset?.blockType === 'identityLine') first.after(row); else container.appendChild(row);
+  }
+  container.prepend(body);
+  // while the blocks load (or a page without the identity line): the page's own title, so Me is never untitled
+  if (!body.querySelector('.cc-profile__title')) {
+    const heading = document.createElement('h2');
+    heading.className = 'cc-profile__title';
+    heading.textContent = fallbackTitle;
+    container.prepend(heading);
   }
 
-  // ── identity (handle + display name) ────────────────────────────────────
-  const idSection = section(tr('circle.profile.identity'));
-
-  const handle = labelledInput(tr('circle.profile.handle'), profile.handle ?? '', 'cc-profile__handle');
-  const display = labelledInput(tr('circle.profile.displayName'), profile.displayName ?? '', 'cc-profile__display');
-  idSection.appendChild(handle.wrap);
-  idSection.appendChild(display.wrap);
-  const save = button(tr('circle.profile.save'), 'cc-profile__save', () => {
-    if (typeof onSaveProfile === 'function') onSaveProfile({ handle: handle.input.value.trim(), displayName: display.input.value.trim() });
-  });
-  idSection.appendChild(save);
-  container.appendChild(idSection);
-
-  // ── offerings — moved (fold-in phase C, 2026-07-17) ──────────────────────
-  // A single quiet pointer to the "Mij → persona's" surface where offerings live
-  // now. Clickable when the host wires onOpenMij; plain text otherwise.
-  const moved = document.createElement('p');
-  moved.className = 'cc-profile__offerings-moved';
-  if (typeof onOpenMij === 'function') {
-    moved.appendChild(button(tr('circle.profile.offerings_moved'), 'cc-profile__offerings-moved-link', onOpenMij));
-  } else {
-    moved.textContent = tr('circle.profile.offerings_moved');
-  }
-  container.appendChild(moved);
-
-  // ── Mijn overzicht — ONE section: Gepland's rows on top (what is coming for me, wherever it lives; the shell hands
-  // the lines, null while they load) with the week-overview switch beside them, then "Mijn dingen" (my chores across
-  // every circle, the shared block, drawn by the screen's own block painter). Read-only: no screens manager. ────────
-  if (plannedLines !== undefined || overviewBlocks !== undefined) {
-    const overview = section(tr(MIJ_OVERVIEW_TITLE_KEY));
-    overview.classList.add('cc-profile__overview');
-    if (plannedLines !== undefined) {
-      const planned = document.createElement('div');
-      planned.className = 'cc-profile__planned';
-      if (plannedLines === null || !Array.isArray(plannedLines) || plannedLines.length === 0) {
-        const p = document.createElement('p');
-        p.className = 'cc-profile__planned-empty';
-        p.textContent = tr(plannedLines === null ? 'circle.profile.planned_loading' : 'circle.profile.planned_none');
-        planned.appendChild(p);
-      } else {
-        const ul = document.createElement('ul');
-        ul.className = 'cc-profile__planned-list';
-        for (const line of plannedLines) {
-          const li = document.createElement('li');
-          li.className = 'cc-profile__planned-item';
-          li.textContent = line;
-          ul.appendChild(li);
-        }
-        planned.appendChild(ul);
-      }
-      if (weekOverview) {
-        const row = document.createElement('div');
-        row.className = 'cc-profile__week';
-        const label = document.createElement('span');
-        label.className = 'cc-profile__week-label';
-        label.textContent = tr('circle.profile.week_switch');
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'cc-profile__week-toggle cc-btn';
-        btn.dataset.on = weekOverview.on ? 'true' : 'false';
-        btn.disabled = weekOverview.on === null;
-        btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
-        btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
-        row.append(label, btn);
-        planned.appendChild(row);
-      }
-      overview.appendChild(planned);
-    }
-    if (overviewBlocks !== undefined) {
-      const body = document.createElement('div');
-      overview.appendChild(body);
-      renderCircleScreen(body, { blocks: overviewBlocks, t: tr });
-    }
-    container.appendChild(overview);
-  }
-
-  // ── location ──────────────────────────────────────────────────────────────
-  const locSection = section(tr('circle.profile.location'));
-  const current = document.createElement('p');
-  current.className = 'cc-profile__loc-current';
-  current.textContent = profile.location?.label
-    ? tr('circle.profile.loc_current', { label: profile.location.label })
-    : tr('circle.profile.loc_none');
-  locSection.appendChild(current);
-  const geoRow = document.createElement('div');
-  geoRow.className = 'cc-profile__geo';
-  const geoInput = document.createElement('input');
-  geoInput.type = 'text';
-  geoInput.className = 'cc-profile__geo-input';
-  geoInput.placeholder = tr('circle.profile.geo_placeholder');
-  geoRow.appendChild(geoInput);
-  geoRow.appendChild(button(tr('circle.profile.geo_search'), 'cc-profile__geo-search', () => {
-    const q = geoInput.value.trim();
-    if (q && typeof onGeocode === 'function') onGeocode(q);
-  }));
-  locSection.appendChild(geoRow);
-  if (geocodeResult?.label) {
-    const res = document.createElement('div');
-    res.className = 'cc-profile__geo-result';
-    const lbl = document.createElement('span');
-    lbl.textContent = geocodeResult.label;
-    res.appendChild(lbl);
-    res.appendChild(button(tr('circle.profile.geo_use'), 'cc-profile__geo-use', () => { if (typeof onSaveLocation === 'function') onSaveLocation(); }));
-    locSection.appendChild(res);
-  }
-  if (profile.location?.label) {
-    locSection.appendChild(button(tr('circle.profile.loc_clear'), 'cc-profile__loc-clear', () => { if (typeof onClearLocation === 'function') onClearLocation(); }));
-  }
-  // location fold-in (audit §4) — this geo editor stays (it sets the coarse place),
-  // but WHO sees your location is now a disclosure-controlled property on the Mij
-  // persona layer. A quiet pointer (like offerings' onOpenMij), never a removal.
-  const locHint = document.createElement('p');
-  locHint.className = 'cc-profile__loc-disclosure-hint';
-  if (typeof onOpenMij === 'function') {
-    locHint.appendChild(button(tr('circle.profile.loc_disclosure_hint'), 'cc-profile__loc-disclosure-link', onOpenMij));
-  } else {
-    locHint.textContent = tr('circle.profile.loc_disclosure_hint');
-  }
-  locSection.appendChild(locHint);
-  container.appendChild(locSection);
-
-  // ── availability + my-data links ──────────────────────────────────────────
-  if (typeof onAvailability === 'function') {
-    const avail = button(tr('circle.profile.availability'), 'cc-profile__availability', onAvailability);
-    container.appendChild(avail);
-  }
-  if (typeof onMyData === 'function') {
-    const myData = button(tr('circle.profile.mydata'), 'cc-profile__mydata', onMyData);
-    container.appendChild(myData);
-  }
-  if (typeof onConnectionPoints === 'function') {
-    const points = button(
-      tr('circle.nearbyScreen.points_open'), 'cc-profile__connection-points', onConnectionPoints,
-    );
-    container.appendChild(points);
-  }
-  if (typeof onSharedWithMe === 'function') {
-    const shared = button(tr('circle.profile.sharedWithMe'), 'cc-profile__shared-with-me', onSharedWithMe);
-    container.appendChild(shared);
-  }
-  if (typeof onBlocked === 'function') {
-    const blocked = button(tr('circle.profile.blocked'), 'cc-profile__blocked', onBlocked);
-    container.appendChild(blocked);
-  }
-  // The ADVANCED entry — the default place every op and settable value has (the
-  // "default places for any new opId" rule). Absent ⇒ omitted, like its peers.
-  if (typeof onAdvanced === 'function') {
-    const adv = button(tr('circle.advanced.title'), 'cc-profile__advanced', onAdvanced);
-    container.appendChild(adv);
-  }
-
-  if (busy) {
-    const b = document.createElement('div');
-    b.className = 'cc-profile__busy';
-    b.textContent = tr('circle.profile.saving');
-    container.appendChild(b);
-  }
-  if (typeof version === 'string') {
-    const v = document.createElement('div');
-    v.className = 'cc-profile__version';
-    v.textContent = tr('circle.profile.version', { tag: version || tr('circle.profile.version_dev') });
-    container.appendChild(v);
-  }
+  // ── one door to My data; Advanced only behind the developer switch ──
+  if (typeof onMyData === 'function') container.appendChild(button(tr('circle.profile.mydata'), 'cc-profile__mydata', onMyData));
+  if (typeof onAdvanced === 'function') container.appendChild(button(tr('circle.advanced.title'), 'cc-profile__advanced', onAdvanced));
   return container;
 
-  // ── helpers ──
-  function section(titleText) {
-    const s = document.createElement('section');
-    s.className = 'cc-profile__section';
-    const h = document.createElement('h3');
-    h.className = 'cc-profile__section-title';
-    h.textContent = titleText;
-    s.appendChild(h);
-    return s;
-  }
-  function labelledInput(labelText, value, cls) {
-    const wrap = document.createElement('label');
-    wrap.className = 'cc-profile__field';
-    const span = document.createElement('span');
-    span.className = 'cc-profile__field-label';
-    span.textContent = labelText;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = cls;
-    input.value = value;
-    wrap.appendChild(span);
-    wrap.appendChild(input);
-    return { wrap, input };
-  }
   function button(text, cls, onClick) {
     const b = document.createElement('button');
     b.type = 'button';

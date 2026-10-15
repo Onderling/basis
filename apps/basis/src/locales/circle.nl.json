@@ -5901,6 +5901,10 @@
       "text": "Aan — {{count}} berichten gespiegeld, verzegeld, naar je eigen opslag.",
       "doc": "spiegel-statusregel als hij loopt."
     },
+    "history_needs_phrase": {
+      "text": "Nog niet: typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken).",
+      "doc": "history mirror state line on a device that has no recovery seal yet."
+    },
     "history_waiting": {
       "text": "Aanzetten…",
       "doc": "spiegel-statusregel tussen de flip en de eerste status."
@@ -7031,7 +7035,10 @@
     "done_reload": "Klaar. Herstart de app; daarna draait dit apparaat ook als deze persona's.",
     "wrong_phrase": "Dat is niet de herstelzin van dit account. Er is niets veranderd.",
     "failed": "Dat lukte niet. Er is niets veranderd.",
-    "reload": "Herstarten"
+    "reload": "Herstarten",
+    "seal_only": "Niets aangevinkt: alleen de sleutel voor je back-ups.",
+    "needs_seal": "Dit apparaat heeft de sleutel voor je back-ups nog niet. Typ je herstelzin om hem hierheen te halen.",
+    "done_seal_reload": "Klaar. Herstart de app; daarna maakt dit apparaat weer back-ups."
   },
   "enroll": {
     "title": "Dit apparaat toevoegen",
@@ -7234,6 +7241,10 @@
       "err_failed": {
         "text": "Het laden is niet gelukt. Probeer het opnieuw.",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_needs_phrase": {
+        "text": "Typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken); daarna maakt het weer back-ups.",
+        "doc": "export refused on a device that has no recovery seal yet (enrolled before it existed): how to get it."
       }
     },
     "create": {

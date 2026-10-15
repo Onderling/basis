@@ -478,7 +478,7 @@ export const householdManifest = {
       // phrase is SECRET-kind; the runner never persists it. CEREMONY-ONLY: no chat/slash surface.
       params: [
         { name: 'mnemonic', kind: 'secret', required: true },
-        // the picked persona ids (from `listReceivablePersonas`)
+        // the picked persona ids (from `listReceivablePersonas`); none picked hands over only the recovery seal
         { name: 'personas', kind: 'object', required: true },
       ],
       surfaces: {},

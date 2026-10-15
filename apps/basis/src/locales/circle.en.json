@@ -5901,6 +5901,10 @@
       "text": "On — {{count}} entries mirrored, sealed, to your own storage.",
       "doc": "history mirror state line when running."
     },
+    "history_needs_phrase": {
+      "text": "Not yet: type your recovery phrase once on this device (My data → Personas on this device, tick nothing).",
+      "doc": "history mirror state line on a device that has no recovery seal yet."
+    },
     "history_waiting": {
       "text": "Turning on…",
       "doc": "history mirror state line between the flip and the first status."
@@ -7031,7 +7035,10 @@
     "done_reload": "Done. Restart the app; after that this device also runs these personas.",
     "wrong_phrase": "That is not this account's recovery phrase. Nothing changed.",
     "failed": "That did not work. Nothing changed.",
-    "reload": "Restart"
+    "reload": "Restart",
+    "seal_only": "Nothing ticked: only the key for your backups.",
+    "needs_seal": "This device does not have the key for your backups yet. Type your recovery phrase to bring it here.",
+    "done_seal_reload": "Done. Restart the app; after that this device makes backups again."
   },
   "enroll": {
     "title": "Add this device",
@@ -7234,6 +7241,10 @@
       "err_failed": {
         "text": "Loading the file did not work. Try again.",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_needs_phrase": {
+        "text": "Type your recovery phrase once on this device (My data → Personas on this device, tick nothing); after that it makes backups again.",
+        "doc": "export refused on a device that has no recovery seal yet (enrolled before it existed): how to get it."
       }
     },
     "create": {

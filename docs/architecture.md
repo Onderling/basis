@@ -1282,9 +1282,11 @@ imported from My data on both shells. A person with neither loses the list, not 
 one body) and the recovery file are sealed to a key derived from the root under its own label (`recovery-seal`), and
 the mirror's opaque pod name derives from it too. A device may hold a chosen set of personas, the default among them or
 not, so no persona's key could open them on every device; every phrase ceremony leaves the seal on the device instead
-(a device with the root resident derives it). A device enrolled before the seal existed has none until its next phrase
-ceremony: its registry stays local and its export refuses. The settings and history mirrors are still sealed to the
-default persona's key. What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
+(a device with the root resident derives it). The settings mirror and the history mirror (and its exported archive) use the same seal: one
+key for everything the person seals to themselves, so one thing to hand over at a ceremony. A device enrolled before
+the seal existed has none until its next phrase ceremony — My data → "Persona's op dit apparaat" with nothing ticked
+hands over only the seal; until then its mirrors stay local, and the export and the history status say how to get it.
+The own-devices lane is still sealed to the default persona's key. What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
 names the circle's self, and the restore bootstrap announces a device only in the circles of a self it runs.
 
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding

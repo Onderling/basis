@@ -5227,7 +5227,10 @@ function _restoreOverlay() {
 // ticked, then handed over with the phrase typed here (the one moment the root is in hand). A reload runs them.
 async function showReceivePersonas() {
   const { card, close } = _restoreOverlay();
-  const listed = (await rawCallSkill('household', 'listReceivablePersonas', {}).catch(() => null))?.personas ?? [];
+  const answer = await rawCallSkill('household', 'listReceivablePersonas', {}).catch(() => null);
+  const listed = answer?.personas ?? [];
+  // a device without the recovery seal takes this step even with nothing to tick: the phrase hands it the seal
+  const needsSeal = answer?.hasRecoverySeal === false;
   card.innerHTML = '';
   const h = document.createElement('h3');
   h.textContent = t('circle.receive_personas.title');
@@ -5244,9 +5247,9 @@ async function showReceivePersonas() {
     b.addEventListener('click', () => (reload ? window.location.reload() : close()));
     card.appendChild(b);
   };
-  if (listed.length === 0) { done('circle.receive_personas.none'); return; }
+  if (listed.length === 0 && !needsSeal) { done('circle.receive_personas.none'); return; }
   const body = document.createElement('p');
-  body.textContent = t('circle.receive_personas.body');
+  body.textContent = t(listed.length ? 'circle.receive_personas.body' : 'circle.receive_personas.needs_seal');
   card.appendChild(body);
   const picked = new Set();
   for (const p of listed) {
@@ -5261,6 +5264,11 @@ async function showReceivePersonas() {
     row.append(box, name);
     card.appendChild(row);
   }
+  if (listed.length) {
+    const sealOnly = document.createElement('p');
+    sealOnly.textContent = t('circle.receive_personas.seal_only');
+    card.appendChild(sealOnly);
+  }
   const phrase = document.createElement('textarea');
   phrase.rows = 3; phrase.autocomplete = 'off'; phrase.spellcheck = false;
   phrase.placeholder = t('circle.receive_personas.phrase_placeholder');
@@ -5271,11 +5279,10 @@ async function showReceivePersonas() {
   go.className = 'cc-btn cc-btn--primary';
   go.textContent = t('circle.receive_personas.submit');
   go.addEventListener('click', async () => {
-    if (picked.size === 0) return;
     go.disabled = true;
     const r = await rawCallSkill('household', 'receivePersonas', { mnemonic: phrase.value, personas: [...picked] }).catch(() => null);
     phrase.value = '';
-    if (r?.ok) done('circle.receive_personas.done_reload', true);
+    if (r?.ok) done(picked.size ? 'circle.receive_personas.done_reload' : 'circle.receive_personas.done_seal_reload', true);
     else done(r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase' ? 'circle.receive_personas.wrong_phrase' : 'circle.receive_personas.failed');
   });
   card.appendChild(go);

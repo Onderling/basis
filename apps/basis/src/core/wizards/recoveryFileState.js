@@ -59,6 +59,13 @@ export const canImport = (state) => typeof state?.fileText === 'string' && state
 export function importErrorKey(code) {
   if (code === 'not-your-file') return 'circle.wizard.recovery.err_not_yours';
   if (code === 'unreadable-file') return 'circle.wizard.recovery.err_unreadable';
+  if (code === 'no-recovery-seal') return 'circle.wizard.recovery.err_needs_phrase';
+  return 'circle.wizard.recovery.err_failed';
+}
+
+/** The translation key for an export refusal code: a device without the recovery seal is told how to get it. */
+export function exportErrorKey(code) {
+  if (code === 'no-recovery-seal') return 'circle.wizard.recovery.err_needs_phrase';
   return 'circle.wizard.recovery.err_failed';
 }
 

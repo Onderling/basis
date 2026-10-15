@@ -72,7 +72,7 @@ import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnec
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
 // into the ENCAPSULATED identity secret (only the closure escapes).
-import { makeSharedWithMeStoreRN } from './circleStoresRN.js';
+import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../../basis/src/v2/circleSecurityPriming.js';
 
@@ -307,6 +307,8 @@ export async function bootAgentBundle(opts = {}) {
     agent = await createRealHouseholdAgent({
       // the shell's translator (App.js hands it): the agent's own lines follow the person's language
       t: opts.t,
+      // the person's one availability record (read here; the launcher's store writes it): away matches no offering
+      availability: () => makeAvailabilityStoreRN(AsyncStorage).get(),
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
       // …which is my OWN store (the own-devices scope): sealed, in AsyncStorage, back after a restart

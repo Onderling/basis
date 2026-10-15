@@ -152,39 +152,8 @@ describe('Stoop V1 Phase 13.5 — dupCheck', () => {
   });
 });
 
-// ── Vakantie modus ───────────────────────────────────────────────────────
-
-describe('Stoop V1 Phase 13.1 — vakantie modus', () => {
-  it('flips all active skills to gepauzeerd; on=false restores actief', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'klusjes' });
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'tuin' });
-
-    const on = await callSkill(bundle.agent, 'setSkillsHolidayMode', { on: true });
-    expect(on.holidayMode).toBe(true);
-    let list = await callSkill(bundle.agent, 'listMySkills');
-    expect(list.skills.every(s => s.status === 'paused')).toBe(true);
-
-    const off = await callSkill(bundle.agent, 'setSkillsHolidayMode', { on: false });
-    expect(off.holidayMode).toBe(false);
-    list = await callSkill(bundle.agent, 'listMySkills');
-    expect(list.skills.every(s => s.status === 'active')).toBe(true);
-  });
-
-  it('does not unarchive gearchiveerd skills', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'klusjes', status: 'archived' });
-    await callSkill(bundle.agent, 'setSkillsHolidayMode', { on: true });
-    await callSkill(bundle.agent, 'setSkillsHolidayMode', { on: false });
-    const list = await callSkill(bundle.agent, 'listMySkills');
-    expect(list.skills[0].status).toBe('archived');
-  });
-
-  it('rejects invalid arg', async () => {
-    const bundle = await buildAgent();
-    expect(await callSkill(bundle.agent, 'setSkillsHolidayMode', {})).toEqual({ error: 'on (bool) required' });
-  });
-});
+// (holiday mode over the roster offerings retired 2026-10-15 with the offering writers: 'away' is the person's one
+// availability record, which the host's offering match reads)
 
 // ── Stale-post nudge ─────────────────────────────────────────────────────
 

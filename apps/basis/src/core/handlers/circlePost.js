@@ -16,18 +16,22 @@ import { notifyIfResonant } from './driverMatchNotify.js';
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {(event: object) => void}                                        [args.publishEvent]
  * @param {() => Promise<Record<string,object>>} [args.getDrivers]  loads the user's drivers (for match→notify); defaults to getProfileDrivers on the default persona
- * @param {string} [args.personaId='default']  the persona whose drivers match the feed
+ * @param {string} [args.personaId='default']  the persona whose drivers match a post outside any known circle
+ * @param {(circleId: string) => string} [args.profileIdOf]  the self this device is in a circle (a persona's circle is
+ *   the persona's) — a post resonates with THAT self's drivers; absent = `personaId` throughout
  * @param {{info?, warn?, error?}}                                         [args.logger]
  * @returns {(fromAddr: string, envelope: object) => Promise<void>}
  */
 export function makeHandleCirclePost({
-  callSkill, publishEvent, getDrivers, personaId = 'default', logger = console,
+  callSkill, publishEvent, getDrivers, personaId = 'default', profileIdOf = null, logger = console,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleCirclePost: callSkill required');
   // Drivers #5 — load MY private drivers on-device to match incoming posts (default: the default persona).
+  // …of the self this device is in the post's circle (the device acts as that circle's self)
+  const selfFor = (groupId) => (groupId && typeof profileIdOf === 'function' ? (profileIdOf(groupId) ?? personaId) : personaId);
   const loadDrivers = typeof getDrivers === 'function'
     ? getDrivers
-    : async () => (await callSkill('agents', 'getProfileDrivers', { id: personaId }))?.drivers ?? {};
+    : async (groupId) => (await callSkill('agents', 'getProfileDrivers', { id: selfFor(groupId) }))?.drivers ?? {};
 
   return async function handleCirclePost(fromAddr, envelope) {
     const { groupId, fromPubKey, payload } = envelope ?? {};
@@ -79,7 +83,7 @@ export function makeHandleCirclePost({
     try {
       await notifyIfResonant({
         item: { ...payload, id: result?.itemId ?? payload.requestId, title: payload.text },
-        getDrivers: loadDrivers,
+        getDrivers: () => loadDrivers(groupId),
         notify: (p) => publishEvent?.({
           app: 'stoop', type: 'notification', actor: payload.from ?? fromAddr,
           payload: {

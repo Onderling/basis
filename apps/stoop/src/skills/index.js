@@ -136,7 +136,6 @@ import {
   MAX_ATTACHMENTS_PER_POST,
 } from '../lib/Attachments.js';
 import { update as updateInterest, score as scoreInterest, combinedRelevance } from '../lib/InterestProfile.js';
-import { matchesProfile } from '../lib/offeringsMatch.js';
 import { encodeContactCard, decodeContactCard } from '../lib/contactCard.js';
 
 /**
@@ -2186,93 +2185,6 @@ export function buildSkills({
     }),
 
     /**
-     * setMyOfferings({skills: [{categoryId, freeTags?, availability?, radius?, status?}, ...]})
-     *   — replace the calling actor's full offerings array.  Each item
-     *   picks a `categoryId` from the fixed taxonomy (Phase 12).
-     *   `status` defaults to `'active'`.
-     */
-    // B★ B3 NOT wired (conflict c): the op declares `skills` as `kind:'string'`,
-    // but the skill also accepts a raw array (web/mobile pass the array directly) —
-    // wireSkill's string check would reject the array form. Kept hand-written.
-    defineSkill('setMyOfferings', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      // 2026-05-27 slash audit close-out — the chat-shell's slash
-      // surface declares `skills` as `kind: 'string'` (consumer
-      // JSON-encodes the array).  Accept the JSON-string handoff:
-      // parse-then-validate so `/skills [{...}]` reaches the skill
-      // without the LLM-tool-call (`kind: 'json'` grammar extension is
-      // tracked as a separate follow-up — see slash-audit doc).
-      let skillsArr = a.skills;
-      if (typeof skillsArr === 'string') {
-        try { skillsArr = JSON.parse(skillsArr); }
-        catch { return { error: 'skills array required' }; }
-      }
-      if (!Array.isArray(skillsArr)) return { error: 'skills array required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, offerings: skillsArr });
-      const off = updated.offerings ?? updated.skills ?? [];
-      // Result blob writes the new `offerings` field + a transitional
-      // `skills` alias so un-migrated readers keep working (read-accept).
-      return { offerings: off, skills: off, _sync: simulateSync() };
-    }, {
-      description: 'Replace the calling actor\'s offerings array.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * addMyOffering({categoryId, freeTags?, availability?, radius?, status?})
-     *   — append (or update if same categoryId) one offering to the
-     *   calling actor's profile.
-     */
-    ...withLegacyIds(defineSkill('addMyOffering', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.categoryId !== 'string' || !a.categoryId) {
-        return { error: 'categoryId required' };
-      }
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const existing = Array.isArray(me.offerings) ? me.offerings
-        : (Array.isArray(me.skills) ? me.skills : []);
-      const filtered = existing.filter(s => s.categoryId !== a.categoryId);
-      filtered.push({
-        categoryId:   a.categoryId,
-        freeTags:     Array.isArray(a.freeTags) ? a.freeTags : [],
-        availability: a.availability ?? null,
-        radius:       a.radius ?? null,
-        status:       a.status ?? 'active',
-      });
-      const updated = await members.addMember({ ...me, offerings: filtered });
-      const off = updated.offerings ?? updated.skills ?? [];
-      return { offerings: off, skills: off, _sync: simulateSync() };
-    }, {
-      description: 'Add or update one offering on the calling actor\'s profile.',
-      visibility:  'authenticated',
-    }), 'addMySkill'),
-
-    /**
-     * removeMyOffering({categoryId})
-     *   — drop an offering from the calling actor's profile.
-     */
-    ...withLegacyIds(defineSkill('removeMyOffering', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.categoryId !== 'string' || !a.categoryId) {
-        return { error: 'categoryId required' };
-      }
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const existing = Array.isArray(me.offerings) ? me.offerings
-        : (Array.isArray(me.skills) ? me.skills : []);
-      const next = existing.filter(s => s.categoryId !== a.categoryId);
-      const updated = await members.addMember({ ...me, offerings: next });
-      const off = updated.offerings ?? updated.skills ?? [];
-      return { offerings: off, skills: off, _sync: simulateSync() };
-    }, {
-      description: 'Remove an offering from the calling actor\'s profile.',
-      visibility:  'authenticated',
-    }), 'removeMySkill'),
-
-    /**
      * listMyOfferings() — diagnostic / settings UI.
      */
     ...withLegacyIds(defineSkill('listMyOfferings', async ({ from }) => {
@@ -3461,39 +3373,6 @@ export function buildSkills({
     // ── Stoop V1 Phase 10 (2026-05-06) — closed-beta hardening ────────────
 
     // ── Stoop V1 Phase 13 (2026-05-06) — UX completeness ─────────────────
-
-    /**
-     * setSkillsHolidayMode({on: bool})
-     *   — bulk-flip every active skill to `'paused'`; flipping
-     *   back restores them to `'active'`.  Net effect: OfferingMatch
-     *   and Layer-1 matching ignore my profile while paused.
-     *   Note: distinct from `setHolidayMode` (which sets a single
-     *   cross-device flag without touching per-skill status).  Apps
-     *   typically wire both: the flag for the UI banner + the bulk
-     *   flip for actual matching behaviour.
-     *
-     *   Status enum values (`actief` / `gepauzeerd` / `gearchiveerd`)
-     *   are intentional Dutch domain vocabulary — locked-in by V1.
-     */
-    defineSkill('setSkillsHolidayMode', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.on !== 'boolean') return { error: 'on (bool) required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const skills = Array.isArray(me.skills) ? me.skills : [];
-      const targetStatus = a.on ? 'paused' : 'active';
-      const updated = skills.map(s => ({
-        ...s,
-        // Only flip skills that are not 'archived' — leaving
-        // archived ones alone so holiday-mode isn't a re-archive event.
-        status: s.status === 'archived' ? 'archived' : targetStatus,
-      }));
-      await members.addMember({ ...me, offerings: updated });
-      return { holidayMode: a.on, skillCount: updated.length, _sync: simulateSync() };
-    }, {
-      description: 'Bulk-flip every active skill between paused (gepauzeerd) and active (actief); does not touch archived skills.',
-      visibility:  'authenticated',
-    }),
 
     /**
      * checkDuplicate({text})
@@ -5702,23 +5581,19 @@ export function buildSkills({
     /* ── Phase 22: Layer-2 personal interest matching ──────────── */
 
     /**
-     * scorePostRelevance({ text, categoryId?, tags?, member? })
-     *   — Combines Layer 1 (deterministic skill match) with Layer 2
-     *   (TF-IDF over the user's response history).  Returns
-     *   `{matched, ...}` with `via: 'category'|'tags'|'interest'`
-     *   when matched, plus the raw `layer2Score` for inspection.
-     *
-     *   `member` defaults to the calling actor's MemberMap entry.
+     * scorePostRelevance({ text, categoryId?, tags?, circleId? })
+     *   — Combines Layer 1 (does it meet what I offer: the host's `matchesMine` over the drivers of the self I am in
+     *   that circle) with Layer 2 (TF-IDF over the user's response history).  Returns `{matched, ...}` with
+     *   `via: 'offering'|'interest'` when matched, plus the raw `layer2Score` for inspection.
      */
-    defineSkill('scorePostRelevance', async ({ parts, from }) => {
+    defineSkill('scorePostRelevance', async ({ parts }) => {
       const a = dataArgs(parts);
       if (typeof a.text !== 'string' || !a.text) return { error: 'text required' };
 
-      const member = a.member ?? (members ? await members.resolveByWebid(from) : null);
-      const layer1 = matchesProfile(
-        { categoryId: a.categoryId ?? null, tags: a.tags ?? [] },
-        member ?? {},
-      );
+      const mine = typeof bundle?.matchesMine === 'function'
+        ? await bundle.matchesMine(a.circleId ?? null, { text: a.text, categoryId: a.categoryId ?? null, skillTags: Array.isArray(a.tags) ? a.tags : [] }).catch(() => false)
+        : false;
+      const layer1 = mine ? { matched: true, via: 'offering' } : { matched: false, reason: 'no-offering-match' };
       const layer2 = bundle?.interestProfile
         ? scoreInterest(bundle.interestProfile, a.text)
         : 0;

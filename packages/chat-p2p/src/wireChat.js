@@ -107,6 +107,9 @@ export function wireChat({
   emitEnvelopeType      = DEFAULT_EMIT_ENVELOPE_TYPE,
   acceptedEnvelopeTypes = DEFAULT_ACCEPTED_ENVELOPE_TYPES,
   attachmentSupport     = null,
+  // "a post matches what I offer", judged on this device against the drivers of the self I am in that circle — the
+  // host's local closure (`(circleId, post) => Promise<boolean>`); absent = no offering match (contacts still count)
+  matchesMine           = null,
 }) {
   const acceptedSet = new Set(acceptedEnvelopeTypes);
 
@@ -361,7 +364,7 @@ export function wireChat({
 
       // Phase 27.7 — decide whether this post is "notify-worthy":
       //   - sender is in my ContactBook at any trust level, OR
-      //   - the post's text/category intersects my skills profile.
+      //   - the post meets what I offer (the host's `matchesMine`: my drivers of kind 'offering', on this device).
       // Loose-contact posts that don't match stay silent (mirror
       // only; no banner / notification).
       let isContact = false;
@@ -371,15 +374,12 @@ export function wireChat({
         isContact = sender?.relation === 'contact';
       } catch {}
       try {
-        const me = await members?.resolveByWebid(localActor);
-        // 2026-05-08: matchesProfile lives in
-        // @onderling/identity-resolver since the Phase 3 lift.
-        const { matchesProfile } = await import('@onderling/identity-resolver');
         const post = {
+          text:       typeof data.text === 'string' ? data.text : '',
           categoryId: data.categoryId ?? null,
-          tags:       Array.isArray(data.skillTags) ? data.skillTags : [],
+          skillTags:  Array.isArray(data.skillTags) ? data.skillTags : [],
         };
-        matchesSkills = matchesProfile(post, me ?? {}).matched === true;
+        matchesSkills = typeof matchesMine === 'function' && (await matchesMine(data.circleId ?? null, post)) === true;
       } catch {}
       const notifyWorthy = isContact || matchesSkills;
 

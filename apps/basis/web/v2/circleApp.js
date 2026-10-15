@@ -3116,7 +3116,8 @@ async function openMandatePicker({ taskId, circleId } = {}) {
   // WHAT — only offerings I hold appear; that IS the attenuation, made visible.
   let offerings = [];
   try {
-    const drivers = (await rawCallSkill('agents', 'getProfileDrivers', { id: 'default' }))?.drivers ?? {};
+    // the offerings of the self this device is in this circle (a persona's circle is the persona's)
+    const drivers = (await rawCallSkill('agents', 'getProfileDrivers', { id: profileIdOfCircle(circleId) }))?.drivers ?? {};
     offerings = Object.entries(drivers)
       .filter(([, v]) => v && v.kind === 'offering')
       .map(([key, v]) => ({ key, text: v.text || key }));
@@ -6688,7 +6689,8 @@ function showCircle(id, circle, policy) {
       try {
         noticeboardPosts = await annotateResonantPosts({
           posts:      noticeboardPosts,
-          getDrivers: async () => (await rawCallSkill('agents', 'getProfileDrivers', { id: 'default' }))?.drivers ?? {},
+          // the drivers of the self this device is in this circle (a persona's circle is the persona's)
+          getDrivers: async () => (await rawCallSkill('agents', 'getProfileDrivers', { id: profileIdOfCircle(id) }))?.drivers ?? {},
         });
       } catch { /* resonance is a nicety; never block the board */ }
     } catch { noticeboardPosts = []; }
@@ -8530,6 +8532,8 @@ async function boot() {
 
   try {
     const agent = await createRealHouseholdAgent({
+      // the person's one availability record: away matches no offering (the post matcher, on this device)
+      availability: () => availabilityStore.get(),
       // the agent's own lines (list and calendar defaults, task confirmations, a paused circle) in the person's language
       t,
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
@@ -9090,7 +9094,8 @@ async function boot() {
       // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
       // the shell bridges it into stoop's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
-        handleCirclePost: makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
+        // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
+        handleCirclePost: makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog, profileIdOf: (cid) => agent.profileIdOf?.(cid) ?? 'default' }),
         self: agent.identity?.pubKey ?? null,
       }));
       // Rebuild the delivery ladder from the ONE log (the outbox-as-projection): my recent sends seed

@@ -154,8 +154,10 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // 2026-09-24: 97 — `setContactPersona`, what a contact sees of you, changed on the thread.
   // 2026-09-26: 96 — `broadcastCirclePolicy` retired: the circle's policy rides the governance lane as a signed
   // admin statement, caught up by joiners (the broadcast fired only on a settings save and never reached them).
-  it('ships the full chat+slash surface (one stoop manifest, 96 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(96);
+  // 2026-10-15: -3, the per-person offering writers (setMyOfferings, addMyOffering, removeMyOffering) retired —
+  // offerings are the person's drivers, matched on their own device (the host's `matchesMine`) → 93.
+  it('ships the full chat+slash surface (one stoop manifest, 93 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(93);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

@@ -5,12 +5,12 @@
  * All pure functions; no agent / network setup needed.
  */
 
+import { matchProfileDrivers } from '@onderling/agent-registry';
 import { describe, it, expect } from 'vitest';
 import {
   TAXONOMY,
   normaliseTag,
   categoryFor,
-  matchesProfile,
   isKnownCategory,
 } from '../src/lib/offeringsMatch.js';
 
@@ -99,87 +99,23 @@ describe('Stoop V1 Phase 12 — categoryFor', () => {
   });
 });
 
-// ── matchesProfile (Layer 1 hit logic) ────────────────────────────────────
-
-describe('Stoop V1 Phase 12 — matchesProfile', () => {
-  const member = {
-    skills: [
-      { categoryId: 'vervoer', freeTags: ['bicycle', 'driving'], status: 'active' },
-      { categoryId: 'tech',    freeTags: ['computer'],          status: 'active' },
-      { categoryId: 'tuin',    freeTags: [],                    status: 'paused' },
-    ],
-  };
-
-  it('hits via category match', () => {
-    const r = matchesProfile({ categoryId: 'vervoer' }, member);
-    expect(r.matched).toBe(true);
-    expect(r.viaCategory).toBe('vervoer');
-  });
-
-  it('hits via tag overlap', () => {
-    const r = matchesProfile({ tags: ['bicycle'] }, member);
-    expect(r.matched).toBe(true);
-    expect(r.viaTags).toContain('bicycle');
-  });
-
-  it('misses when neither category nor tags match', () => {
-    const r = matchesProfile({ categoryId: 'kinderopvang', tags: ['babysitting'] }, member);
-    expect(r.matched).toBe(false);
-    expect(r.reason).toBe('no-overlap');
-  });
-
-  it('skips skills with status !== actief', () => {
-    // The post is in tuin, but member's tuin skill is gepauzeerd.
-    const r = matchesProfile({ categoryId: 'tuin' }, member);
-    expect(r.matched).toBe(false);
-  });
-
-  it('returns no-active-skills when the member has none active', () => {
-    const r = matchesProfile({ categoryId: 'vervoer' }, { skills: [] });
-    expect(r.matched).toBe(false);
-    expect(r.reason).toBe('no-active-skills');
-  });
-
-  // availability unification: 'away' IS holiday mode — skill-match routes
-  // around a member whose unified availability is away, regardless of skills.
-  it('routes AROUND a member whose availability is away', () => {
-    const away = { ...member, availability: 'away' };
-    const r = matchesProfile({ categoryId: 'vervoer' }, away);
-    expect(r.matched).toBe(false);
-    expect(r.reason).toBe('away');
-  });
-
-  it('still matches when availability is open/limited', () => {
-    expect(matchesProfile({ categoryId: 'vervoer' }, { ...member, availability: 'open' }).matched).toBe(true);
-    expect(matchesProfile({ categoryId: 'vervoer' }, { ...member, availability: 'limited' }).matched).toBe(true);
-  });
-
-  it('honours the legacy holidayMode flag for un-migrated entries', () => {
-    const r = matchesProfile({ categoryId: 'vervoer' }, { ...member, holidayMode: true });
-    expect(r.matched).toBe(false);
-    expect(r.reason).toBe('away');
-  });
-});
-
-// ── Cross-language matching end-to-end ────────────────────────────────────
-
-describe('Stoop V1 Phase 12 — cross-language matching (Dutch post → English skill)', () => {
-  it('a Dutch fietsen post matches a member with category vervoer + tag "bicycle"', () => {
+// ── Layer 1 is the person's own offerings (the driver matcher; the roster's `matchesProfile` retired 2026-10-15) ──
+// What a post meets is judged by `matchProfileDrivers` over the drivers of kind 'offering' — the taxonomy category is
+// one tag on both sides, so a post that only names its category still meets an offering of that category.
+describe('Stoop V1 Phase 12 — cross-language matching (Dutch post → English offering)', () => {
+  // an offering as the person's driver: its category and its own tags
+  const offering = { fiets: { kind: 'offering', text: 'Fietsen maken', tags: ['bicycle'], categoryId: 'vervoer' } };
+  it('a Dutch fietsen post meets an offering of category vervoer', async () => {
     const post = categoryFor('iemand die m\'n fiets kan repareren');
-    const member = {
-      skills: [{ categoryId: 'vervoer', freeTags: ['bicycle'], status: 'active' }],
-    };
-    expect(matchesProfile(post, member).matched).toBe(true);
+    expect((await matchProfileDrivers({ properties: offering, item: post })).length).toBeGreaterThan(0);
   });
 
-  it('an English bicycle post matches a Dutch profile (vervoer + fiets-tags-normalised)', () => {
+  it('an English bicycle post meets the same offering — the category is language-free', async () => {
     const post = categoryFor('Need help with my bicycle');
-    // The dictionary stores canonical 'bicycle' regardless of input language,
-    // so a member who tagged themselves with 'bicycle' (English canonical)
-    // matches a Dutch post about fietsen.  This is the multilingual win.
-    const member = {
-      skills: [{ categoryId: 'vervoer', freeTags: ['bicycle'], status: 'active' }],
-    };
-    expect(matchesProfile(post, member).matched).toBe(true);
+    expect((await matchProfileDrivers({ properties: offering, item: post })).length).toBeGreaterThan(0);
+  });
+
+  it('a post of another category does not', async () => {
+    expect((await matchProfileDrivers({ properties: offering, item: { text: 'x', categoryId: 'tuin' } })).length).toBe(0);
   });
 });

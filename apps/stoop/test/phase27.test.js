@@ -54,7 +54,7 @@ async function buildBundle({ peers = [] } = {}) {
   return bundle;
 }
 
-async function buildPair({ bobBlocks } = {}) {
+async function buildPair({ bobBlocks, bobOffers = null } = {}) {
   const bus = new InternalBus();
   const anneId = await AgentIdentity.generate(new VaultMemory());
   const bobId  = await AgentIdentity.generate(new VaultMemory());
@@ -70,6 +70,8 @@ async function buildPair({ bobBlocks } = {}) {
                   peers: [{ pubKey: anneId.pubKey }] },
     members: [{ webid: ANNE, pubKey: anneId.pubKey }, { webid: BOB }],
     mutedSet: bobBlocks,
+    // what Bob offers, as the host judges it on Bob's device (his drivers; here: a category)
+    ...(bobOffers ? { matchesMine: async (_circleId, post) => post?.categoryId === bobOffers } : {}),
   });
   anne.agent.addPeer(bobId.pubKey, bobId.pubKey);
   bob.agent.addPeer(anneId.pubKey, anneId.pubKey);
@@ -271,9 +273,8 @@ describe('Stoop V2 Phase 27.4/27.7 — broadcast-post receiver filter', () => {
   });
 
   it('notifyWorthy: true when post matches my skills (loose contact + skill match)', async () => {
-    const { anne, bob } = await buildPair();
-    // Bob has 'vervoer' as an active skill.
-    await callSkill(bob.agent, 'addMySkill', { categoryId: 'vervoer' }, BOB);
+    // Bob offers 'vervoer' (his own drivers, judged on his device)
+    const { anne, bob } = await buildPair({ bobOffers: 'vervoer' });
 
     await anne.chat.send({
       toWebid:  BOB,

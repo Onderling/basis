@@ -30,13 +30,15 @@ async function callSkill(agent, skillId, args) {
   });
 }
 
-async function buildBundle({ skills } = {}) {
+async function buildBundle({ offers = null } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
   const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
-    members:    [{ webid: ANNE, skills: skills ?? [] }],
+    members:    [{ webid: ANNE }],
+    // what Anne offers, as the host judges it on her device (her drivers; here: a category)
+    ...(offers ? { matchesMine: async (_circleId, post) => post?.categoryId === offers } : {}),
   });
   await bundle.offeringMatch.start();
   return bundle;
@@ -89,11 +91,11 @@ describe('Stoop V1.5 Phase 22 — InterestProfile lib', () => {
 
 describe('Stoop V1.5 Phase 22 — skills', () => {
   it('scorePostRelevance falls back to Layer 2 when Layer 1 misses', async () => {
-    const bundle = await buildBundle({ skills: [{ categoryId: 'tuinieren', status: 'active' }] });
+    const bundle = await buildBundle({ offers: 'tuinieren' });
     update(bundle.interestProfile, 'kun je mijn fiets versnellingen afstellen?');
     update(bundle.interestProfile, 'fiets band repareren spaak');
 
-    // Layer 1 misses (post is "vervoer", member skill is "tuinieren").
+    // Layer 1 misses (post is "vervoer", what Anne offers is "tuinieren").
     // Layer 2 should hit because the body overlaps the profile.
     const r = await callSkill(bundle.agent, 'scorePostRelevance', {
       text:       'iemand die fiets band kan repareren?',
@@ -107,13 +109,13 @@ describe('Stoop V1.5 Phase 22 — skills', () => {
   });
 
   it('scorePostRelevance: Layer 1 hit short-circuits', async () => {
-    const bundle = await buildBundle({ skills: [{ categoryId: 'vervoer', status: 'active' }] });
+    const bundle = await buildBundle({ offers: 'vervoer' });
     const r = await callSkill(bundle.agent, 'scorePostRelevance', {
       text:       'fiets repareren',
       categoryId: 'vervoer',
     });
     expect(r.matched).toBe(true);
-    expect(r.viaCategory).toBe('vervoer');
+    expect(r.via).toBe('offering');
   });
 
   it('getInterestProfile returns top terms', async () => {

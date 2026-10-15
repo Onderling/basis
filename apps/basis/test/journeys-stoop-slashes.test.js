@@ -7,7 +7,6 @@
  *
  *   /lend-assign  → assignLend       (open → assigned)
  *   /lend-return  → markReturned     (assigned → returned)
- *   /offerings    → setMyOfferings   (profile setup)
  *   /leave-group  → leaveGroup       (destructive — confirm-gated in mock)
  *   /tree         → getItemTree      (read-only graph walk)
  *   sign-out → signOutOfPod (confirm-gated)
@@ -171,15 +170,15 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
  * future regression where stoopManifest drops one).
  * ══════════════════════════════════════════════════════════ */
 
-describe('CC-ST-audit — catalogue has all 8 audit slashes', () => {
+describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
 
-  it('commandMenu declares /lend-assign /lend-return /offerings /leave-group /tree /sign-out /report /bulletin', () => {
+  it('commandMenu declares /lend-assign /lend-return /leave-group /tree /sign-out /report /bulletin', () => {
     const cmds = new Set(ws.catalogue().commandMenu.map((e) => e.command));
     for (const cmd of [
-      // `/skills` retired with the setMySkills alias — `/offerings` is the one route to that op.
-      '/lend-assign', '/lend-return', '/offerings', '/leave-group',
+      // `/offerings` retired 2026-10-15 with the per-person offering writers (offerings are the person's drivers).
+      '/lend-assign', '/lend-return', '/leave-group',
       '/tree', '/sign-out', '/report', '/bulletin',
     ]) {
       expect(cmds.has(cmd)).toBe(true);
@@ -189,7 +188,7 @@ describe('CC-ST-audit — catalogue has all 8 audit slashes', () => {
   it('every audit slash is owned by stoop', () => {
     const menu = ws.catalogue().commandMenu;
     const audit = [
-      '/lend-assign', '/lend-return', '/offerings', '/leave-group',
+      '/lend-assign', '/lend-return', '/leave-group',
       '/tree', '/sign-out', '/report', '/bulletin',
     ];
     for (const cmd of audit) {
@@ -279,47 +278,8 @@ describe('CC-ST.A2 — /lend-return wires markReturned', () => {
   });
 });
 
-/* ════════════════════════════════════════════════════════════
- * 3. /offerings — setMyOfferings dispatch
- *    Manifest declares one required string param (`skills`) that
- *    consumers pass as a JSON-encoded array.  body default 'match'
- *    → _match → skills.  Substrate parses the string and validates
- *    `Array.isArray`.
- * ══════════════════════════════════════════════════════════ */
+// (`/offerings` → setMyOfferings retired 2026-10-15 with the per-person offering writers.)
 
-// Was `/skills`, which dispatched to a `setMySkills` alias kept only so a stored slash from before
-// the skill→offering rename still resolved. That alias is retired (no back-compat is the standing
-// rule), and `/offerings` is the one route — the same op the alias always pointed at.
-describe('CC-ST.A3 — /offerings wires setMyOfferings', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
-
-  it('/offerings <json-array> dispatches; substrate parses + validates', async () => {
-    // The slash surface declares `skills` as a STRING param (the
-    // consumer JSON-encodes the array).  The substrate skill itself
-    // expects an actual array.  So this slash dispatch will get
-    // {skills: '<json string>'} on the wire and the substrate's
-    // 'skills array required' branch will fire — expected V0
-    // behaviour (slash is line-oriented; arrays need the form/LLM
-    // surface per manifest header).  Either way, dispatch ran end-
-    // to-end through the substrate.
-    const body = JSON.stringify([{ categoryId: 'plumbing', status: 'active' }]);
-    const r = await ws.userInput(`/offerings ${body}`);
-    if (r.error) {
-      expect(String(r.error.message)).toMatch(/skills array required|skills/i);
-    } else {
-      const reply = r.payload;
-      expect(reply).toBeTruthy();
-      expect(reply.error ?? reply.skills ?? reply.ok ?? null).not.toBeNull();
-    }
-  });
-
-  it('bare /offerings → needsForm for skills param', async () => {
-    const r = await ws.userInput('/offerings');
-    expect(r.kind).toBe('needsForm');
-    expect(r.missing).toContain('skills');
-  });
-});
 
 /* ════════════════════════════════════════════════════════════
  * 4. /leave-group — leaveGroup (destructive)

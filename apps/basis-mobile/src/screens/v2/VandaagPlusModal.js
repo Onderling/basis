@@ -9,19 +9,22 @@ import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { PLUS_ACTS } from '../../../../basis/src/v2/vandaagPlus.js';
 
-export default function VandaagPlusModal({ visible, onSave, onClose }) {
+export default function VandaagPlusModal({ visible, onSave, onClose,
+  // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
+  selves = [], writeAsSelf = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
   const [values, setValues] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); } }, [visible]);
+  const [asSelf, setAsSelf] = useState(writeAsSelf);
+  useEffect(() => { if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); } }, [visible, writeAsSelf]);
   if (!visible) return null;
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
   const save = async () => {
     setBusy(true);
-    const line = await onSave?.(act.id, values);
+    const line = await onSave?.(act.id, values, asSelf);
     setBusy(false);
     if (line) setError(line);
   };
@@ -30,7 +33,16 @@ export default function VandaagPlusModal({ visible, onSave, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
           <Text style={styles.title}>{t('circle.vandaag.plus')}</Text>
-          {!act ? PLUS_ACTS.map((a) => (
+          {selves.length > 1 && !asSelf ? (
+            <View>
+              <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
+              {selves.map((p) => (
+                <Pressable key={p.id} style={styles.btn} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}>
+                  <Text style={styles.btnText}>{p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : !act ? PLUS_ACTS.map((a) => (
             <Pressable key={a.id} style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
               <Text style={styles.btnText}>{t(a.labelKey)}</Text>
             </Pressable>

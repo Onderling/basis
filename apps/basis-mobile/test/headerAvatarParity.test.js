@@ -25,10 +25,11 @@ describe('the header avatar — parity', () => {
     expect(sites.length).toBeGreaterThan(0);
     for (const s of sites) expect(s, s).toMatch(/avatar=\{headerAvatar\}/);
   });
-  it('a tap opens the person\'s editor; closing it reloads the avatar', () => {
-    expect(webHost).toMatch(/onOpen: \(\) => openAboutMePanel\('default'\)/);
+  it('a tap opens the person\'s editor (the switcher with several selves); closing it reloads the avatar', () => {
+    // one self: the editor; several: the switcher (whose rows open each self's editor)
+    expect(webHost).toMatch(/\? \(\) => showPersonaSwitcher\(\) : \(\) => openAboutMePanel\('default'\)/);
     expect(fnOf(webHost, 'openAboutMePanel')).toMatch(/refreshHeaderAvatar\(\)/);
-    expect(mobileHost).toMatch(/setMyPersona\('default'\)/);
+    expect(mobileHost).toMatch(/setSwitcherOpen\(true\)[\s\S]*setMyPersona\('default'\)/);
     expect(mobileHost).toMatch(/setMyPersona\(null\); refreshHeaderAvatar\(\)/);
   });
   it('the picture ref is read once, shared', () => {

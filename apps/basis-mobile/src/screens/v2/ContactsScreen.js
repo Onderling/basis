@@ -21,7 +21,9 @@ import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
-export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null }) {
+export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null,
+  // the contacts of the selves ticked in the header (shared `contactsInSet`); absent = all
+  keep = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -47,7 +49,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const reload = useCallback(async () => {
     // The one Contacten read (web parity): the graph less aliases and my own addresses, the book, merged, and every
     // contact with a pair roster here named by what they said on it.
-    try { setContacts(await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill, names: contactNames })); }
+    try { const all = await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill, names: contactNames }); setContacts(typeof keep === 'function' ? keep(all) : all); }
     catch { setContacts([]); }
   }, [peerGraph, callSkill, contactNames]);
 

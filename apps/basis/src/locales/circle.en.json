@@ -5901,6 +5901,10 @@
       "text": "On — {{count}} entries mirrored, sealed, to your own storage.",
       "doc": "history mirror state line when running."
     },
+    "devices_needs_phrase": {
+      "text": "This device does not share your own data with your other devices yet: type your recovery phrase once on this device (My data → Personas on this device, tick nothing).",
+      "doc": "My data, devices section, on a device without the recovery seal: its own lanes carry nothing until the phrase is typed once."
+    },
     "history_needs_phrase": {
       "text": "Not yet: type your recovery phrase once on this device (My data → Personas on this device, tick nothing).",
       "doc": "history mirror state line on a device that has no recovery seal yet."

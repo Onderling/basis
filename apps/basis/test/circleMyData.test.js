@@ -99,6 +99,14 @@ describe('renderCircleMyData', () => {
     expect(onRevokeDevice).toHaveBeenCalledWith('dev-1');
   });
 
+  it('devices: a device without the recovery seal says how to get it (its own data reaches no other device until then)', () => {
+    const base = { t, podStatus: { signedIn: true }, onRevokeDevice: vi.fn(), devices: [{ deviceId: 'dev-1', label: 'telefoon', revoked: false }] };
+    const without = renderCircleMyData(document.createElement('div'), { ...base, devicesNeedPhrase: true });
+    expect(without.querySelector('[data-role="devices-needs-phrase"]')?.textContent).toBe('circle.mydata.devices_needs_phrase');
+    const withSeal = renderCircleMyData(document.createElement('div'), base);
+    expect(withSeal.querySelector('[data-role="devices-needs-phrase"]')).toBe(null);
+  });
+
   it('the history-mirror row: state line reflects off/on/error; the toggle fires the flip', () => {
     const onToggleHistoryMirror = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {

@@ -7,7 +7,7 @@
  * Self-contained: loads + mutates via the injected stoop-capable `callSkill`.
  * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
@@ -56,11 +56,17 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
+import { myDataDoorsFor } from '../../../../basis/src/v2/myDataDoors.js';
+import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
 export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
-  onOpenConnectionPoints, eventLog = null }) {
+  eventLog = null,
+  // the doors that sat on Mij, declared once (`myDataDoors.js`): id → what opens it here
+  doors = {},
+  // the person's own week overview (a row in their own store, switched here): the clock, or null on a shell without one
+  personClock = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -170,7 +176,27 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
 
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.
-  const openPoints = useCallback(() => { onOpenConnectionPoints?.(); }, [onOpenConnectionPoints]);
+  // the person's own week overview: on · off · null while it loads or switches (undefined: no clock here)
+  const [weekOn, setWeekOn] = useState(undefined);
+  const weekMe = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const clock = personClock ? await personClock : null;
+      const me = (await callSkill?.('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      weekMe.current = me;
+      if (alive && clock && me) setWeekOn(personWeekOn(clock.book, me));
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [personClock, callSkill]);
+  const toggleWeek = useCallback(async () => {
+    const clock = personClock ? await personClock : null;
+    if (!clock || !weekMe.current) return;
+    const next = !personWeekOn(clock.book, weekMe.current);
+    setWeekOn(null);
+    try { await switchPersonWeek(clock.book, weekMe.current, next); } catch { /* shown as it stands below */ }
+    setWeekOn(personWeekOn(clock.book, weekMe.current));
+  }, [personClock]);
 
   const deliveryStore = React.useMemo(
     () => createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage)), [],
@@ -348,6 +374,26 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Text style={styles.title}>{t('circle.mydata.title')}</Text>
       </View>
 
+      {/* the doors that sat on Mij: availability · connection points · shared with me · blocked (web: circleMyData.js) */}
+      {myDataDoorsFor(doors).length ? (
+        <Section title={t('circle.profile.mydata_more')}>
+          {myDataDoorsFor(doors).map((d) => (
+            <Pressable key={d.id} style={styles.relaySave} onPress={d.open} testID={`mydata-door-${d.id}`}>
+              <Text style={styles.relaySaveText}>{t(d.labelKey)}</Text>
+            </Pressable>
+          ))}
+        </Section>
+      ) : null}
+      {weekOn !== undefined ? (
+        <Section title={t('circle.profile.week_switch')}>
+          <Pressable testID="profile-week-toggle" accessibilityRole="switch"
+            accessibilityState={{ checked: weekOn === true, disabled: weekOn === null }}
+            disabled={weekOn === null} onPress={toggleWeek} style={styles.relaySave}>
+            <Text style={styles.relaySaveText}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
+          </Pressable>
+        </Section>
+      ) : null}
+
       <Section title={t('circle.mydata.storage')}>
         <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
         {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
@@ -377,11 +423,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         </View>
         {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
         <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
-        {/* The LIST behind the single field above — which points this device knows, what rides each, and
-            what removing one would cost (Nearby step I). */}
-        <Pressable style={styles.relaySave} onPress={openPoints} testID="open-connection-points">
-          <Text style={styles.relaySaveText}>{t('circle.nearbyScreen.points_open')}</Text>
-        </Pressable>
 
         {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
             tells you what others see about your receipt setting, because nothing in the model reveals it.

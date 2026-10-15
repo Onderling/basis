@@ -41,7 +41,7 @@ export default function SharedWithMeScreen({
     <View style={styles.page} testID="shared-with-me">
       <View style={styles.bar}>
         <Pressable onPress={onBack} accessibilityRole="button" testID="shared-with-me-back">
-          <Text style={styles.back}>{t('circle.back_me')}</Text>
+          <Text style={styles.back}>{t('circle.back_mydata')}</Text>
         </Pressable>
       </View>
       <Text style={styles.title}>{t('circle.sharedWithMe.title')}</Text>

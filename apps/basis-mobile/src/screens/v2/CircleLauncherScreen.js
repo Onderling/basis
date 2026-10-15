@@ -941,6 +941,12 @@ export default function CircleLauncherScreen({
   const availabilityStore = useMemo(() => makeAvailabilityStoreRN(AsyncStorage, {
     getPodWriter: () => sessionToPodWriterRN(sessionRef?.current ?? null),
   }), []);
+  // What Mij's declared blocks read beside the waist (the identity line's readings, the agents list)
+  const mijSources = useMemo(() => ({
+    eventLog, circles, seenAt, myRefs: unreadMyRefs, availabilityStore,
+    relays: () => bundle?.agent?.relays?.list?.() ?? [],
+    deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
+  }), [eventLog, circles, seenAt, unreadMyRefs, availabilityStore, bundle]);
   // SILENT out-of-circle delivery — the per-user "shared with me" inbox. The store is instantiated ON THE
   // BUNDLE (agentBundle.js) so the ChatScreen receive handler + this launcher share ONE instance; here we just
   // LOAD its list when the Mij sub-view opens (web≡mobile: mirrors web's `showSharedWithMe` reading the store).
@@ -1595,9 +1601,10 @@ export default function CircleLauncherScreen({
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
       // Hop screen lives under the Mij tab.
       if (view === 'hop') { setView('availability'); return true; }
-      if (view === 'blocked') { setView('profile'); return true; }
+      if (view === 'blocked') { setView('mydata'); return true; }
       if (view === 'shareContact') { setView('profile'); return true; }
-      // S2/S5 — Mij sub-views.
+      // Mij's sub-views; availability, blocked and shared-with-me sit behind My data.
+      if (view === 'availability' || view === 'sharedWithMe') { setView('mydata'); return true; }
       if (view === 'mydata') { setView('profile'); return true; }
       if (view === 'advanced') { setView('profile'); return true; }
       // S3 — admin panel is a sub-view of the circle detail.
@@ -1830,11 +1837,11 @@ export default function CircleLauncherScreen({
       </WithTabBar>
     );
   }
-  // S2 — Mij = your profile (identity + skills + location); availability is a sub-view.
+  // Mij = identity, the declared screen; its other doors are behind My data.
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} personClock={personClockRef.current} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onBlocked={() => setView('blocked')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onOpenMij={() => setMyPersona('default')} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -1847,7 +1854,7 @@ export default function CircleLauncherScreen({
   if (view === 'blocked') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('profile')} />
+        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('mydata')} />
       </WithTabBar>
     );
   }
@@ -1880,7 +1887,7 @@ export default function CircleLauncherScreen({
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
-          onBack={() => setView('profile')}
+          onBack={() => setView('mydata')}
         />
       </WithTabBar>
     );
@@ -1889,7 +1896,9 @@ export default function CircleLauncherScreen({
   if (view === 'mydata') {
     return (
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
-        <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer} onOpenConnectionPoints={() => setView('points')} />
+        <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+          doors={{ availability: () => setView('availability'), 'connection-points': () => setView('points'), 'shared-with-me': () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
+          personClock={personClockRef.current} />
       </WithTabBar>
     );
   }
@@ -1898,7 +1907,7 @@ export default function CircleLauncherScreen({
       <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAvailabilityScreen
           store={availabilityStore}
-          onBack={() => setView('profile')}
+          onBack={() => setView('mydata')}
           onHop={() => setView('hop')}
         />
       </WithTabBar>

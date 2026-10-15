@@ -24,6 +24,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, Image } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import ProfileBasics from './ProfileBasics.js';
 import { shareOutcome, SHARING_NOW, mediaRefusedHere } from '../../../../basis/src/v2/shareOutcome.js';
 import {
   loadMijModel, setGeneralProperty, addGeneralOffering, createPersona,
@@ -162,6 +163,8 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
 
   return (
     <ScrollView contentContainerStyle={styles.root}>
+      {/* the person's own basics on top (handle, name, location) — Mij's "Edit" leads here (web: profileBasics.js) */}
+      {personaId === 'default' || personaId === model.defaultId ? <ProfileBasics callSkill={callSkill} /> : null}
       {/* ── 1 · MIJN ALGEMENE PERSONA — de waarheidslaag ─────────────────── */}
       <Section eyebrowKey="circle.mij.general_eyebrow" taglineKey="circle.mij.general_tagline">
         <View style={styles.panel}>

@@ -55,7 +55,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
       {onBack ? (
         <View style={styles.bar}>
           <Pressable onPress={onBack} accessibilityRole="button" testID="circle-availability-back">
-            <Text style={styles.back}>{t('circle.back_me')}</Text>
+            <Text style={styles.back}>{t('circle.back_mydata')}</Text>
           </Pressable>
         </View>
       ) : null}

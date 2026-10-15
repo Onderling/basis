@@ -13,15 +13,16 @@ import { fileURLToPath } from 'node:url';
 import { BASIS_USER_PARAMS, DEVELOPER_PARAM_KEY } from '../../basis/src/v2/paramsService.js';
 
 const read = (name) => readFileSync(fileURLToPath(new URL(`../src/screens/v2/${name}`, import.meta.url)), 'utf8');
-const SUBSCREENS = ['ShareMyContactScreen.js', 'CircleAvailabilityScreen.js', 'SharedWithMeScreen.js', 'CircleBlockedScreen.js', 'CircleAdvancedScreen.js'];
+// where each one goes back to: Me, or My data (availability, shared with me and blocked sit behind My data since 2026-10-15)
+const SUBSCREENS = { 'ShareMyContactScreen.js': 'back_me', 'CircleAvailabilityScreen.js': 'back_mydata', 'SharedWithMeScreen.js': 'back_mydata', 'CircleBlockedScreen.js': 'back_mydata', 'CircleAdvancedScreen.js': 'back_me' };
 
 describe('the screens under Me', () => {
-  for (const name of SUBSCREENS) {
-    it(`${name}: clears the status bar and says "← Me"`, () => {
+  for (const [name, backKey] of Object.entries(SUBSCREENS)) {
+    it(`${name}: clears the status bar and says where back goes`, () => {
       const src = read(name);
       expect(src).toMatch(/useSafeAreaInsets\(\)/);
       expect(src).toMatch(/insets\?\.top/);
-      expect(src).toMatch(/t\('circle\.back_me'\)/);
+      expect(src).toMatch(new RegExp(`t\\('circle\\.${backKey}'\\)`));
       expect(src).not.toMatch(/t\('circle\.back'\)/);
     });
   }
@@ -30,7 +31,7 @@ describe('the screens under Me', () => {
     expect(read('CircleAdvancedScreen.js')).toMatch(/onBack/);
     const launcher = read('CircleLauncherScreen.js');
     expect(launcher).toMatch(/<CircleAdvancedScreen[^>]*onBack=\{\(\) => setView\('profile'\)\}/);
-    expect(launcher).toMatch(/<CircleAvailabilityScreen\s+store=\{availabilityStore\}\s+onBack=\{\(\) => setView\('profile'\)\}/);
+    expect(launcher).toMatch(/<CircleAvailabilityScreen\s+store=\{availabilityStore\}\s+onBack=\{\(\) => setView\('mydata'\)\}/);
   });
 
   it('Availability paints its field text in ink, and its placeholders in the soft ink', () => {

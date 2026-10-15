@@ -43,6 +43,7 @@ import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
+import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -809,10 +810,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       {agent && typeof agent.historyMirrorStatus === 'function' ? (() => {
         const on = agent.getParamValue?.('history.mirror') === true;
         const hs = agent.historyMirrorStatus();
-        const stateLine = !on ? t('circle.mydata.history_off')
-          : hs?.lastError ? t('circle.mydata.history_error', { error: hs.lastError })
-          : hs ? t('circle.mydata.history_on', { count: (hs.mirrored ?? 0) + (hs.pending ?? 0) })
-          : t('circle.mydata.history_waiting');
+        const line = historyStatusLine({ enabled: on, status: hs });
+        const stateLine = t(line.key, line.vars);
         return (
           <Section title={t('circle.mydata.history')}>
             <Text style={styles.privacyBody} testID="mydata-history-status">{stateLine}</Text>

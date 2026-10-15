@@ -34,6 +34,7 @@
 // realAgent.js.
 import { createLocalBuiltins }   from '../../../basis/src/core/localBuiltins.js';
 import AsyncStorage              from '@react-native-async-storage/async-storage';
+import { makeUserScreenStoreRN } from './circleStoresRN.js';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 
 // Media mobile twin (2026-07) — the sealed-media upgrade gate (shared
@@ -201,6 +202,8 @@ export function buildMobileLocalBuiltins({
     openQrScanner,
     openFilePicker,
     showPersonCard,
+    // the person's pages: the screen ops edit this book (the same AsyncStorage key the launcher reads)
+    screenStore: makeUserScreenStoreRN(AsyncStorage),
     // Media mobile twin (2026-07) — the sealed-media deps ride the same
     // injection route every other seam takes.  encodeImage defaults to the
     // identity-shaped adapter: the RN picker already resized + thumbnailed,

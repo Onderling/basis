@@ -7,7 +7,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Modal, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 import {
-  initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey,
+  initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey, exportErrorKey,
   loadExportChoices, toggleRosterChoice,
 } from '../../core/wizards/recoveryFileState.js';
 import { Body, Actions, ErrorBanner, Submitting, Checkbox } from './_kit.js';
@@ -87,7 +87,7 @@ export default function RecoveryFileWizardModal({ visible, mode = 'export', call
                 {state.file && (state.choices ?? []).filter((c) => c.roster && state.rosters && !state.rosters[c.id]).map((c) => (
                   <Text key={c.id} style={styles.note}>{c.name ?? c.id}: {t('circle.wizard.recovery.roster_none')}</Text>
                 ))}
-                <ErrorBanner message={state.submitError} />
+                <ErrorBanner message={state.submitError ? t(exportErrorKey(state.submitError)) : null} />
                 <Submitting visible={state.submitting} label={t('circle.wizard.recovery.sealing')} />
               </Body>
             )}

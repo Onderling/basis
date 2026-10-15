@@ -848,11 +848,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Absent/no-pod/failure → stays local (honest degrade), never a broken boot.
   if (typeof opts.provisionSettingsMedium === 'function' && typeof settingsDataSource?.attachInner === 'function') {
     try {
-      // The seal-to-self strategy is derived from THIS agent's identity (owner-root → deriveAgentSeed), so it
-      // is identical on every device of the user → agent-scoped settings sealed here open on the user's other
-      // devices. The shell supplies the pod (fetch/podRoot); realAgent supplies the key. No key material
-      // escapes — only the `{seal, open}` closures. Null strategy (no identity) → no pod sync, stays local.
-      const strategy = settingsSealStrategyForIdentity(chatId);
+      // Sealed to the person's RECOVERY SEAL (derived from the root, handed at every phrase ceremony), so it is
+      // identical on every device of the user whichever personas it holds → settings sealed here open on the user's
+      // other devices. The shell supplies the pod (fetch/podRoot); realAgent supplies the key. No key material
+      // escapes — only the `{seal, open}` closures. No seal on this device yet → no pod sync, stays local.
+      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
       const medium   = strategy ? await opts.provisionSettingsMedium(strategy) : null;
       settingsRestoreCtx.medium = medium;
       if (medium) {
@@ -3499,17 +3499,19 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (entry?.role !== 'profile' || typeof id !== 'string' || !/^p-[0-9a-f]{12}$/.test(id) || personas.has(id)) continue;
         out.push({ id, name: entry.name ?? null });
       }
-      return [DataPart({ ok: true, personas: out })];
+      // …and whether this device holds the recovery seal: one enrolled before the seal existed takes this step with
+      // nothing ticked to receive only the seal
+      return [DataPart({ ok: true, personas: out, hasRecoverySeal: !!recoverySealIdentity })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
   }, { visibility: 'private' });
   // THESE PERSONAS HERE TOO — the picker's act after a restore (or any time): the phrase typed again is the one moment
   // the root is in hand, and the picked personas are handed into this device's slots (`handPersonasInto`, the same
-  // hand-over as the enrol ceremony). A reload runs them.
+  // hand-over as the enrol ceremony). A reload runs them. Nothing picked hands over only the recovery seal (every phrase
+  // ceremony leaves it), which is how a device enrolled before the seal existed gets it.
   hostAgent.register('receivePersonas', async ({ parts }) => {
     const proof = verifyOwnerPhrase(String(parts?.[0]?.data?.mnemonic ?? ''));
     if (!proof.ok) return [DataPart({ ok: false, outcome: proof.outcome, error: proof.outcome })];
     const picked = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
-    if (picked.length === 0) return [DataPart({ ok: false, error: 'none-picked' })];
     try {
       const held = await handPersonasInto({
         root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
@@ -3519,7 +3521,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the members it knows (the rosters the recovery file landed here) become a bootstrap offer — announce this
       // device's fresh address in each circle AS the persona, pull the lanes — the same offer the boot consumes.
       let bootstrap = null;
-      try {
+      if (picked.length > 0) try {
         const rosters = {};
         const memberships = {};
         const selves = [];
@@ -6660,7 +6662,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (historyMirror) return;   // already following
       try {
-        const strategy = settingsSealStrategyForIdentity(chatId);
+        const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
         const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
         if (!source) return;
         // INSTANT RESTORE (the ladder): a fresh install's log is empty — hydrate the mirror back
@@ -6808,14 +6810,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
     // retention window. Reads only; writes go through callSkill('params','set-param',…).
     getParamValue: (key) => paramsService.register.valueOf(key),
-    /** The history mirror's live status for the my-data surface (null = not running on this boot). */
-    historyMirrorStatus: () => historyMirror?.status?.() ?? null,
+    /** The history mirror's live status for the my-data surface (null = not running on this boot; `needsPhrase` = this
+     *  device has no recovery seal yet, so it cannot run until a phrase step hands it one). */
+    historyMirrorStatus: () => historyMirror?.status?.() ?? (recoverySealIdentity ? null : { needsPhrase: true }),
     /** One-shot sealed export of the whole live device log — "mirror to a file", the same sink and
      *  the same seal; `archiveSource` + `hydrateHistory` open it again on any future install. */
     exportHistoryArchive: async () => {
       if (!opts.deviceLog) throw new Error('no device log on this composition');
-      const strategy = settingsSealStrategyForIdentity(chatId);
-      if (!strategy) throw new Error('no seal identity — sign in first');
+      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      if (!strategy) throw new Error('no-recovery-seal');
       return exportHistoryArchive({
         eventLog: opts.deviceLog,
         strategy,

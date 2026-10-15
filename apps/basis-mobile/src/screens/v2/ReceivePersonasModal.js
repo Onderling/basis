@@ -1,7 +1,8 @@
 /**
  * PERSONAS ON THIS DEVICE — the restore picker (and any time): the person's personas this device does not run yet
  * (`listReceivablePersonas`), ticked, then handed over with the phrase typed here (`receivePersonas`, the one moment
- * the root is in hand). A restart runs them. Web parity: `showReceivePersonas` in circleApp.js — the same two ops,
+ * the root is in hand). A restart runs them. Nothing ticked hands over only the recovery seal (a device enrolled before it
+ * existed gets it this way). Web parity: `showReceivePersonas` in circleApp.js — the same two ops,
  * the same words; this file only paints.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -13,15 +14,16 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [listed, setListed] = useState(null);   // null = loading
+  const [needsSeal, setNeedsSeal] = useState(false);   // no recovery seal here yet: the step runs with nothing to tick
   const [picked, setPicked] = useState(() => new Set());
   const [phrase, setPhrase] = useState('');
   const [result, setResult] = useState(null);   // null | 'done' | 'wrong' | 'failed'
   useEffect(() => {
     if (!visible || typeof callSkill !== 'function') return;
     let alive = true;
-    setListed(null); setPicked(new Set()); setPhrase(''); setResult(null);
+    setListed(null); setPicked(new Set()); setPhrase(''); setResult(null); setNeedsSeal(false);
     callSkill('household', 'listReceivablePersonas', {})
-      .then((r) => { if (alive) setListed(r?.personas ?? []); })
+      .then((r) => { if (alive) { setListed(r?.personas ?? []); setNeedsSeal(r?.hasRecoverySeal === false); } })
       .catch(() => { if (alive) setListed([]); });
     return () => { alive = false; };
   }, [visible, callSkill]);
@@ -29,16 +31,16 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
 
   const toggle = (id) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const submit = async () => {
-    if (picked.size === 0) return;
     const r = await callSkill('household', 'receivePersonas', { mnemonic: phrase, personas: [...picked] }).catch(() => null);
     setPhrase('');
-    setResult(r?.ok ? 'done' : (r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase') ? 'wrong' : 'failed');
+    setResult(r?.ok ? (picked.size ? 'done' : 'done-seal') : (r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase') ? 'wrong' : 'failed');
   };
 
   const message = result === 'done' ? t('circle.receive_personas.done_reload')
+    : result === 'done-seal' ? t('circle.receive_personas.done_seal_reload')
     : result === 'wrong' ? t('circle.receive_personas.wrong_phrase')
       : result === 'failed' ? t('circle.receive_personas.failed')
-        : (listed && listed.length === 0) ? t('circle.receive_personas.none') : null;
+        : (listed && listed.length === 0 && !needsSeal) ? t('circle.receive_personas.none') : null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -54,12 +56,13 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
             </View>
           ) : listed ? (
             <View>
-              <Text style={styles.body}>{t('circle.receive_personas.body')}</Text>
+              <Text style={styles.body}>{t(listed.length ? 'circle.receive_personas.body' : 'circle.receive_personas.needs_seal')}</Text>
               {listed.map((p) => (
                 <Pressable key={p.id} onPress={() => toggle(p.id)} accessibilityRole="checkbox" accessibilityState={{ checked: picked.has(p.id) }} testID={`receive-persona-${p.id}`}>
                   <Text style={styles.body}>{picked.has(p.id) ? '☑' : '☐'} {p.name ?? p.id}</Text>
                 </Pressable>
               ))}
+              {listed.length ? <Text style={styles.body}>{t('circle.receive_personas.seal_only')}</Text> : null}
               <TextInput
                 style={[styles.input, styles.secret]}
                 placeholder={t('circle.receive_personas.phrase_placeholder')}

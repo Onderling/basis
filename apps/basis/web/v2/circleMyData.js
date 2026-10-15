@@ -14,6 +14,7 @@ import { renderUserLlmSettings } from './userLlmSettings.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { historyStatusLine } from '../../src/v2/historyMirror.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -541,10 +542,8 @@ export function renderCircleMyData(container, {
     const state = document.createElement('p');
     state.className = 'cc-mydata__history-status';
     state.dataset.role = 'history-status';
-    if (!h.enabled) state.textContent = tr('circle.mydata.history_off');
-    else if (h.status?.lastError) state.textContent = tr('circle.mydata.history_error', { error: h.status.lastError });
-    else if (h.status) state.textContent = tr('circle.mydata.history_on', { count: h.status.mirrored + (h.status.pending ?? 0) });
-    else state.textContent = tr('circle.mydata.history_waiting');
+    const line = historyStatusLine({ enabled: h.enabled, status: h.status });
+    state.textContent = tr(line.key, line.vars);
     sec2.appendChild(state);
     const what = document.createElement('p');
     what.className = 'cc-mydata__history-what';

@@ -51,6 +51,7 @@ describe('Canonical types — registration via default registry', () => {
       'circle',
       'claim',
       'contact',
+      'device-link',
       'inbox-item',
       'intention',
       'list',
@@ -117,6 +118,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'inbox-item':        { kind: 'subtask-proposal' },
     // Pending work: a waist call to run as a person when a trigger fires.
     'intention':         { op: 'weekOverview', trigger: { every: 'week', on: 'sun', at: '18:00' }, actsAs: 'telegram:1' },
+    // A device of the person, own-devices scope only: its default wire id and its internal id.
+    'device-link':       { wireId: 'd-0123', internalId: 'i-0123' },
   };
 
   for (const [name, extra] of Object.entries(MINIMAL)) {

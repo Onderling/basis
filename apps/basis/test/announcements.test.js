@@ -61,8 +61,10 @@ describe('the announcer: at once, held through quiet hours, said once', async ()
     const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
     threads.setQuiet('telegram:3', '09:00-12:00');   // telegram:3 is in quiet hours at 10:00
-    const log = new EventLog({ initial: [], muted: [] });
     let at = Date.parse('2026-10-07T08:00:00Z');   // Wed 10:00
+    // the log keeps the world's clock: its retention prunes against it, so a mark stamped on 10-07 stays while the world
+    // is on 10-07 (on the real clock it aged out a week later and the test went red)
+    const log = new EventLog({ initial: [], muted: [], now: () => at });
     let household = { events: [], chores: [] };
     const sent = [];
     const reach = { sendToPerson: async (id, m) => { sent.push({ id, text: m.text }); return { ok: true }; } };
@@ -135,7 +137,7 @@ describe('the door\'s announce op: the host\'s runner calls it, nobody else', as
     const rows = [{ id: 'telegram:1', role: 'member' }, { id: 'telegram:2', role: 'member' }];
     const announcer = createAnnouncer({
       users: { list: async () => rows }, threads, t: (k) => k, tz: 'Europe/Amsterdam', quiet: () => '23:00-07:00',
-      reach: { sendToPerson: async (id) => { sent.push(id); return { ok: true }; } }, log: new EventLog({ initial: [], muted: [] }), now: () => Date.parse('2026-10-07T10:00:00Z'),
+      reach: { sendToPerson: async (id) => { sent.push(id); return { ok: true }; } }, log: new EventLog({ initial: [], muted: [], now: () => Date.parse('2026-10-07T10:00:00Z') }), now: () => Date.parse('2026-10-07T10:00:00Z'),
     });
     const callSkill = async (app, op) => { calls.push(`${app}.${op}`); return { ok: true, items: [] }; };
     const calls = [];

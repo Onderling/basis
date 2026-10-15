@@ -40,7 +40,7 @@ const pad = (n) => String(n).padStart(2, '0');
 export function createReminderTick({ sources, users, threads, reach, t, tz, settings, now = Date.now, every = REMINDER_TICK_MS, onSent = null, log = null, announcer = null }) {
   let running = null;
   // what was said: a done-mark per occurrence on the device log (an in-memory one when none is handed in)
-  const marks = doneMarksOn(log ?? new EventLog({ initial: [], muted: [] }), now);
+  const marks = doneMarksOn(log ?? new EventLog({ initial: [], muted: [], now }), now);   // one clock for the stamp and the log's retention
   const timeOf = (iso) => { const w = wallClockInTz(new Date(iso).getTime(), tz); return `${pad(w.hour)}:${pad(w.minute)}`; };
   // in each person's own language when they fixed one (`/taal`), else the bot's
   const tFor = (personId) => { const lang = threads?.langOf?.(personId) ?? null; return lang ? (k, p) => t(k, p, lang) : t; };

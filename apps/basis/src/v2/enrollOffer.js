@@ -35,6 +35,9 @@ import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
 import nacl from 'tweetnacl';
 import { Bootstrap } from '@onderling/core';
 
+/** A persona's id (a minted label, never a name). */
+const PERSONA_ID = /^p-[0-9a-f]{12}$/;
+
 /** The scheme. Distinct from `onderling-connect://` — see the header. */
 export const ENROLL_SCHEME = 'onderling-enroll://';
 
@@ -81,8 +84,13 @@ export function encodeEnrollOffer({ relays = [], circles = [], personasSealed = 
       // sibling, as before.
       ...(x.member === true ? { m: 1 } : {}),
       ...(Array.isArray(x.others) && x.others.length ? { o: x.others.filter((u) => typeof u === 'string' && u) } : {}),
+      // `s` — the persona this circle is joined as. Only ever on the NEW device's own stash (`offerWithPersonaCircles`): the
+      // offer it was shown carries a persona's circles sealed, never in the clear.
+      ...(typeof x.persona === 'string' && PERSONA_ID.test(x.persona) ? { s: x.persona } : {}),
     }));
-  if (c.length === 0) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
+  const hasSealed = typeof personasSealed === 'string' && personasSealed;
+  // a person whose circles are all under personas offers none in the clear: the sealed part carries them
+  if (c.length === 0 && !hasSealed) throw new Error('encodeEnrollOffer: at least one circle with an address is required');
   const r = (Array.isArray(relays) ? relays : []).filter((u) => typeof u === 'string' && u);
   return ENROLL_SCHEME + b64url.encode({ v: 1, ...(r.length ? { r } : {}), c, ...(typeof personasSealed === 'string' && personasSealed ? { p: personasSealed } : {}) });
 }
@@ -108,8 +116,9 @@ export function parseEnrollOffer(uri) {
       address: x.a,
       member: x.m === 1,
       others: (Array.isArray(x.o) ? x.o : []).filter((u) => typeof u === 'string' && u),
+      ...(typeof x.s === 'string' && PERSONA_ID.test(x.s) ? { persona: x.s } : {}),
     }));
-  if (circles.length === 0) return { ok: false, reason: 'incomplete' };
+  if (circles.length === 0 && !(typeof body.p === 'string' && body.p)) return { ok: false, reason: 'incomplete' };
   const relays = (Array.isArray(body.r) ? body.r : []).filter((u) => typeof u === 'string' && u);
   return { ok: true, relays, circles, personasSealed: typeof body.p === 'string' && body.p ? body.p : null };
 }
@@ -124,6 +133,9 @@ export const ENROL_PERSONAS_PARAM = 'personas';
  * read which personas there are, and pick. A device that shows an offer without the root resident (delegation
  * custody) runs no persona to offer. */
 const PERSONAS_LABEL = 'enroll-personas';
+/** The sealed list's plaintext is padded to a multiple of this many bytes (see `sealOfferPersonas`): small enough that
+ *  the offer still fits a QR code, large enough that a few personas and their circles all look alike. */
+const SEALED_STEP = 512;
 const bytesB64 = (u8) => { let s = ''; for (const b of u8) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const bytesFrom = (s) => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4)), (c) => c.charCodeAt(0));
 const personasKey = (root) => root.deriveAgentSeed(PERSONAS_LABEL).slice(0, 32);
@@ -135,10 +147,18 @@ const personasKey = (root) => root.deriveAgentSeed(PERSONAS_LABEL).slice(0, 32);
  * @returns {string|null}
  */
 export function sealOfferPersonas(root, personas = []) {
-  const list = (Array.isArray(personas) ? personas : []).filter((p) => p && typeof p.id === 'string' && p.id).map((p) => ({ id: p.id, ...(typeof p.name === 'string' && p.name ? { name: p.name } : {}) }));
-  if (!root || list.length === 0) return null;
+  const list = (Array.isArray(personas) ? personas : []).filter((p) => p && typeof p.id === 'string' && p.id).map((p) => ({
+    id: p.id, ...(typeof p.name === 'string' && p.name ? { name: p.name } : {}),
+    // the persona's circles, as the clear part lists the default's: id, handle, this device's address there
+    ...(Array.isArray(p.circles) && p.circles.length ? { c: p.circles.filter((c) => c && typeof c.id === 'string' && typeof c.address === 'string').map((c) => ({ id: c.id, ...(c.handle ? { h: c.handle } : {}), a: c.address })) } : {}),
+  }));
+  if (!root) return null;
+  // Sealed ALWAYS (an empty list too) and padded to a fixed step: the clear part shows that a root is resident, never
+  // whether the person has personas, nor how many, nor how many circles they are in (the length of a box would).
+  const plain = JSON.stringify(list);
+  const padded = plain + ' '.repeat((SEALED_STEP - (new TextEncoder().encode(plain).length % SEALED_STEP)) % SEALED_STEP);
   const nonce = nacl.randomBytes(24);
-  const box = nacl.secretbox(new TextEncoder().encode(JSON.stringify(list)), nonce, personasKey(root));
+  const box = nacl.secretbox(new TextEncoder().encode(padded), nonce, personasKey(root));
   const out = new Uint8Array(nonce.length + box.length);
   out.set(nonce); out.set(box, nonce.length);
   return bytesB64(out);
@@ -147,21 +167,49 @@ export function sealOfferPersonas(root, personas = []) {
 /**
  * The personas an offer names, opened with the phrase the person typed — `[]` when it names none, or the phrase is not
  * the one it was sealed to (never an error: the picker then offers the default only).
- * @param {string} uri
+ * @param {string|object} uri  the offer, or the offer as `parseEnrollOffer` returns it
  * @param {string} mnemonic
- * @returns {Array<{id: string, name: string|null}>}
+ * @returns {Array<{id: string, name: string|null, circles: Array<{id: string, handle: string|null, address: string}>}>}
  */
 export function openOfferPersonas(uri, mnemonic) {
-  const parsed = parseEnrollOffer(uri);
-  if (!parsed.ok || !parsed.personasSealed) return [];
+  const parsed = typeof uri === 'string' ? parseEnrollOffer(uri) : uri;
+  if (!parsed?.ok || !parsed.personasSealed) return [];
   try {
     const root = Bootstrap.fromMnemonic(String(mnemonic ?? '').trim());
     const raw = bytesFrom(parsed.personasSealed);
     const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), personasKey(root));
     if (!opened) return [];
     const list = JSON.parse(new TextDecoder().decode(opened));
-    return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.id === 'string' && /^p-[0-9a-f]{12}$/.test(p.id)).map((p) => ({ id: p.id, name: typeof p.name === 'string' ? p.name : null }));
+    return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.id === 'string' && PERSONA_ID.test(p.id)).map((p) => ({
+      id: p.id, name: typeof p.name === 'string' ? p.name : null,
+      circles: (Array.isArray(p.c) ? p.c : []).filter((c) => c && typeof c.id === 'string' && c.id && typeof c.a === 'string' && c.a)
+        .map((c) => ({ id: c.id, handle: typeof c.h === 'string' && c.h ? c.h : null, address: c.a })),
+    }));
   } catch { return []; }
+}
+
+/**
+ * The offer as the NEW device keeps it after the ceremony: the picked personas' circles opened (the phrase is in hand
+ * only now) and added to its own stash, each tagged with the persona it is joined as, so the boot's consume rejoins them
+ * AS that persona. Never shown or shared: it is the device's own bootstrap.
+ * @param {string|object} uri  the offer, or the offer as `parseEnrollOffer` / `pendingEnrollOffer` return it
+ * @param {string} mnemonic
+ * @param {string[]} picked
+ * @returns {string|null}  the offer to stash, or null when it adds nothing
+ */
+export function offerWithPersonaCircles(uri, mnemonic, picked = []) {
+  const parsed = typeof uri === 'string' ? parseEnrollOffer(uri) : uri;
+  if (!parsed?.ok) return null;
+  const want = new Set((Array.isArray(picked) ? picked : []).filter((id) => typeof id === 'string'));
+  const added = openOfferPersonas(parsed, mnemonic).filter((p) => want.has(p.id))
+    .flatMap((p) => p.circles.map((c) => ({ ...c, persona: p.id })));
+  if (added.length === 0) return null;
+  const have = new Set(parsed.circles.map((c) => c.id));
+  return encodeEnrollOffer({
+    relays: parsed.relays,
+    circles: [...parsed.circles, ...added.filter((c) => !have.has(c.id))],
+    personasSealed: parsed.personasSealed,
+  });
 }
 
 /* ── The link form — the same offer as a clickable https URL ──────────────────────────────────
@@ -265,6 +313,21 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
   for (const url of relays) {
     try { if (!agent.relays?.has?.(url)) await agent.addRelay?.(url, { awaitReady: true }); }
     catch { /* an unreachable relay must not stop a circle that rides the one we are on */ }
+  }
+  // A circle the offer names FOR a persona (the picked personas' circles, opened at the ceremony) is bound to that persona
+  // first — the same device op as joining as one — when this device runs it; one it does not run is skipped, never
+  // rejoined as the default.
+  let boundHere = false;
+  if (c.persona) {
+    if (!agent.persona?.(c.persona)) return { ...row, ok: false, error: 'persona-not-held' };
+    if (agent.circleSelf?.(c.id)?.sendAs !== agent.persona(c.persona)?.chatId?.pubKey) {
+      try {
+        const b = await callSkill('household', 'bindCirclePersona', { circleId: c.id, personaId: c.persona });
+        if (!b?.ok) return { ...row, ok: false, error: 'persona-bind-failed' };
+        boundHere = true;
+        row.steps.push('persona');
+      } catch { return { ...row, ok: false, error: 'persona-bind-failed' }; }
+    }
   }
   // WHO this device is in this circle: its persona there (a persona's circle rejoins AS the persona — recorded on its
   // profile, the sibling bound to its webid, its first words sent as it), else the default, as always
@@ -427,6 +490,11 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
   } catch (err) {
     row.ok = false;
     row.error = err?.message ?? String(err);
+    // bound here, and broken off before this device said anything in the circle: the binding is undone (as a failed
+    // join undoes its own), so the next attempt starts where this one did
+    if (boundHere && !row.steps.includes('announce')) {
+      try { await callSkill('household', 'bindCirclePersona', { circleId: c.id, personaId: null }); } catch { /* the next consume binds again */ }
+    }
   }
   return row;
 }

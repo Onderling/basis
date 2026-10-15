@@ -1159,6 +1159,15 @@ then runs the add-a-device consume: announce the fresh address to every member, 
 them. The snapshot is as old as the file; what happened since folds on top as signed statements as
 soon as one member is online. No new trust admission anywhere.
 
+**A device added with a persona rejoins that persona's circles, as it** (2026-10-15). The add-a-device offer is
+public, so it lists only the default's circles in the clear; the person's personas — each with its circles — ride
+sealed to the phrase and padded, so the offer does not say whether there are personas or how many. On the new
+device the phrase opens them at the ceremony; the picked personas' circles go into that device's own stashed
+offer, each tagged with its persona, and the boot's consume binds each circle to its persona before it records,
+announces or asks for anything. The roster seed between siblings runs per circle self: a persona's circle is asked
+of, verified against and answered by that persona's devices only, with that persona's device key and record. A
+persona the device was handed writes its own registry entry at boot, so its circles reopen from it.
+
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
 device-only — never a cloud keychain backup, because the phrase re-derives it anywhere and a synced copy

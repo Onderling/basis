@@ -24,8 +24,7 @@ import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, c
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
-import { plannedForMe, plannedLines } from '../../src/v2/plannedForMe.js';
-import { mijOverviewBlocks } from '../../src/v2/mijOverview.js';
+import { mijScreenBlocks } from '../../src/v2/mijScreen.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -167,6 +166,7 @@ import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
 import { renderCircleProfile } from './circleProfile.js';
+import { renderProfileBasics } from './profileBasics.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
@@ -3786,7 +3786,7 @@ function showConnectionPoints() {
     // them have a socket right now, and since 2026-09-08 that is several at once.
     relays: _peerAgent?.relays?.list?.() ?? [],
     agentUp: !!_peerAgent,
-    onBack: showLauncher,
+    onBack: showMyData,
     onAdopt: (url) => { store.adopt(url); draw(); },
     // Ask before removing: the impact report is the point of this screen.
     onRemove: (url) => { removing = { url, ...store.impactOfRemoving(url) }; draw(); },
@@ -4070,6 +4070,11 @@ async function _setActivePage(pageId) {
  * VANDAAG: the active page of the person's own pages, its blocks capped, each with "meer"; the pages as sub-tabs only
  * when there is more than one (no page manager of its own — adding, renaming and removing pages is in "Pas aan").
  */
+/** Who "mine" is in a circle: the self this device speaks as there (a persona's circle is the persona's; no circle = the default). */
+function mySelfIn(circleId) {
+  try { return circleHouseholdAgent?.circleSelf?.(circleId ?? null)?.webid ?? null; } catch { return null; }
+}
+
 async function _showVandaag() {
   const book = _screensBook ?? { screens: [], activeId: null };
   const screen = getActiveScreen(book);
@@ -4138,6 +4143,8 @@ async function _showVandaag() {
         eventLog, circles: circlesCache,
         // the circles-with-news block counts what the circle tiles count
         seenAt: readSeenAt(), myRefs: unreadMyRefs,
+        // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+        selfIn: mySelfIn,
       },
     });
   } catch (err) {
@@ -4185,109 +4192,27 @@ function onScreenAction(action) {
 // the function sat unreachable since). The LOG is untouched: `allCircleRows`/`projectEntries` remain the
 // projectors every surface uses — the Stream was only ever a view over them.
 
-// "Mij" tab — personal availability (holiday quiet hours) plus
-// the device-global Hopping stance.
-// the Mij tab is now your PROFILE (handle + display name + location),
-// backed by stoop's profile ops. Availability/quiet-hours moves to a
-// sub-screen reached from here.
-// Offering→property fold-in phase C (2026-07-17): the personal-offering editor
-// (stoop addMyOffering/removeMyOffering + listOfferingCategories) left this screen —
-// offerings are persona drivers now, edited on "Mij → persona's" (openAboutMePanel
-// → circleMij.js). The stoop offering ops themselves STAY: the roster projection
-// still uses the roster shape, and mobile CircleProfileScreen still calls them
-// until the mobile mirror lands.
+// "Mij" tab — identity, ONE declared screen (manifest `meActions` + `meBlocks`): the name with its readings, the
+// person's agents and devices, one door to My data, Advanced behind the developer switch. The identity fields and
+// the location are in the person's own editor (the identity line's "Edit" → openAboutMePanel); the overview is on
+// Vandaag; the other doors are behind My data.
 async function showMij() {
   showTabBar('mij');
   // The Advanced screen is a developer tool (raw parameter keys): offered only when the developer switch is on.
   let developer = false;
   try { developer = (await circleHouseholdAgent?.callSkill?.('params', 'get-param', { key: DEVELOPER_PARAM_KEY }))?.value === true; } catch { /* off */ }
-  let profile = {};
-  let geocodeResult = null;
-  let busy = false;
-  // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
-  let planned = null;
-  let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
-  // Mijn overzicht, below Gepland: my chores across every circle (the shared block); null while it loads
-  let overview = null;
-
-  async function load() {
-    try {
-      const prof = await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null);
-      profile = prof?.entry ?? {};
-    } catch { /* keep defaults */ }
-    rerender();
-    try {
-      const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
-      // the overview beside Gepland, not waiting on it (a block that fails says so under its own title)
-      mijOverviewBlocks({ callSkill: rawCallSkill, me }).then((blocks) => { overview = blocks; rerender(); });
-      const r = await plannedForMe({ callSkill: rawCallSkill, me });
-      planned = plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: currentLang() });
-      // the person's own week overview: a row in their own store, switched here
-      const clock = await personClock;
-      if (clock && me) {
-        weekOverview = {
-          on: personWeekOn(clock.book, me),
-          onToggle: async () => {
-            weekOverview = { ...weekOverview, on: null }; rerender();
-            try { await switchPersonWeek(clock.book, me, !personWeekOn(clock.book, me)); } catch (e) { console.warn('[person-clock] switch failed:', e?.message ?? e); }
-            weekOverview = { ...weekOverview, on: personWeekOn(clock.book, me) }; rerender();
-          },
-        };
-      }
-    } catch { planned = []; }
-    rerender();
-  }
-
-  // D / consumer-switch (second live surface) — the "Mij" profile header
-  // is sourced from the manifest PAGE projection.  renderWeb(basisManifest)
-  // projects the `me` op's `surfaces.page` into pages[]; pageForOp selects it and
-  // its labelKey → t() drives the header label (invariant #4 — the manifest is
-  // the source of truth for surfaces; no more hardcoded tr('circle.profile.title')).
+  let blocks = null;
+  // the manifest PAGE projection for the `me` op: the title while the name is not known
   const profilePage = pageForOp(basisManifest, 'me');
-
   const rerender = () => renderCircleProfile(rootEl, {
-    profile, geocodeResult, busy, t,
-    plannedLines: planned,
-    overviewBlocks: overview,
-    weekOverview,
-    // the projected PAGE surface drives the header label (labelKey via t).
-    profilePage,
-    onSaveProfile: async ({ handle, displayName }) => {
-      busy = true; rerender();
-      try {
-        if (handle && handle !== profile.handle) await rawCallSkill('stoop', 'setMyHandle', { handle });
-        if (displayName !== (profile.displayName ?? '')) await rawCallSkill('stoop', 'setMyDisplayName', { displayName });
-      } catch { /* surfaced on reload */ }
-      busy = false; await load();
+    t, blocks, profilePage,
+    onBlockAction: (a) => {
+      if (a?.kind === 'edit-me') openAboutMePanel('default');
+      else if (a?.kind === 'open-my-data') showMyData();
     },
-    // Fold-in phase C — the quiet skills pointer opens the persona surface.
-    onOpenMij: () => openAboutMePanel('default'),
-    onGeocode: async (query) => {
-      try { const r = await rawCallSkill('stoop', 'geocode', { query }); geocodeResult = r?.error ? null : r; }
-      catch { geocodeResult = null; }
-      rerender();
-    },
-    onSaveLocation: async () => {
-      if (!geocodeResult) return;
-      try { await rawCallSkill('stoop', 'setMyLocation', { cell: geocodeResult.cell, label: geocodeResult.label, source: 'geocode' }); } catch { /* */ }
-      geocodeResult = null; await load();
-    },
-    onClearLocation: async () => {
-      try { await rawCallSkill('stoop', 'clearMyLocation', {}); } catch { /* */ }
-      await load();
-    },
-    onAvailability: showAvailability,
     onMyData: showMyData,
-    // Nearby step I — the connection-point LIST, beside the single-relay field in My data.
-    onConnectionPoints: showConnectionPoints,
-    // SILENT out-of-circle delivery — the personal, cross-circle "shared with me" inbox.
-    onSharedWithMe: showSharedWithMe,
-    // The way back from a block. Blocking is one tap on a post; without this the only undo was
-    // `/unblock <key>`, typed from memory.
-    onBlocked: showBlocked,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
-    version: APP_VERSION,
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
     // The Me actions are DECLARED (manifest `meActions`); this is what each id does here.
     onMeAction: (id) => {
@@ -4296,7 +4221,16 @@ async function showMij() {
     },
   });
   rerender();
-  load();
+  const relays = (() => { try { return _peerAgent?.relays?.list?.() ?? []; } catch { return []; } })();
+  blocks = await mijScreenBlocks({ hostOps: {
+    callSkill: rawCallSkill, eventLog, circles: circlesCache,
+    seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
+    availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
+    // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
+    online: relays.length ? relays.some((r) => r.connected) : undefined,
+    deviceId: circleHouseholdAgent?.myDeviceId?.() ?? null,
+  } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
+  if (_activeTab === 'mij') rerender();
 }
 
 // Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card stoop makes
@@ -4331,7 +4265,7 @@ async function showSharedWithMe() {
   const opener = openerForIdentity(circleCoreAgent?.identity);   // network-derived; null → deny-safe no-op
   renderSharedWithMe(rootEl, {
     entries, t,
-    onBack: showMij,
+    onBack: showMyData,
     onOpen: async (entry) => {
       if (typeof opener !== 'function') return;   // deny-safe: no opener → no-op (no leak)
       try { await openSharedCopy(entry, opener); } catch { /* wrong key / not a recipient — deny-safe */ }
@@ -4360,7 +4294,7 @@ async function showBlocked() {
     }
     renderBlockedList(rootEl, {
       rows: buildBlockedList({ peers, members }),
-      t, loading, onBack: showMij,
+      t, loading, onBack: showMyData,
       onUnblock: async (key) => {
         try { await rawCallSkill('basis', 'unmute', { peer: key }); } catch { /* re-read tells the truth */ }
         await paint(false);
@@ -4528,6 +4462,7 @@ async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
+  let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
@@ -4638,7 +4573,11 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
+    // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
+    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
+    weekOverview, version: APP_VERSION,
+    onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -4741,6 +4680,18 @@ async function showMyData() {
       } catch (err) { console.warn('[history-export]', err?.message ?? err); }
     } });
   getWebPushState().then((s) => { notifications = s; rerender(); }).catch(() => {});
+  // the person's own week overview: a row in their own store, switched here
+  (async () => {
+    const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+    const clock = await personClock;
+    if (!clock || !me) return;
+    const toggle = async () => {
+      weekOverview = { on: null, onToggle: toggle }; rerender();
+      try { await switchPersonWeek(clock.book, me, !personWeekOn(clock.book, me)); } catch (e) { console.warn('[person-clock] switch failed:', e?.message ?? e); }
+      weekOverview = { on: personWeekOn(clock.book, me), onToggle: toggle }; rerender();
+    };
+    weekOverview = { on: personWeekOn(clock.book, me), onToggle: toggle }; rerender();
+  })().catch(() => {});
   rerender();
   const [loc, status, priv, met, profProps] = await Promise.all([
     rawCallSkill('stoop', 'getDataLocation', {}).catch(() => null),
@@ -5957,9 +5908,45 @@ async function openAboutMePanel(personaId) {
   close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
   head.appendChild(title); head.appendChild(close);
   card.appendChild(head);
+  // the person's own basics on top (handle, name, location) — Mij's "Edit" leads here; the persona layer below
+  const basicsEl = document.createElement('div');
+  if (id === 'default' || id === '') card.appendChild(basicsEl);
   const body = document.createElement('div');
   card.appendChild(body);
   overlay.appendChild(card);
+  let profile = {};
+  let geocodeResult = null;
+  let busy = false;
+  const loadBasics = async () => {
+    try { profile = (await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null))?.entry ?? {}; } catch { /* keep */ }
+    drawBasics();
+  };
+  const drawBasics = () => renderProfileBasics(basicsEl, {
+    profile, geocodeResult, busy, t,
+    onSaveProfile: async ({ handle, displayName }) => {
+      busy = true; drawBasics();
+      try {
+        if (handle && handle !== profile.handle) await rawCallSkill('stoop', 'setMyHandle', { handle });
+        if (displayName !== (profile.displayName ?? '')) await rawCallSkill('stoop', 'setMyDisplayName', { displayName });
+      } catch { /* surfaced on reload */ }
+      busy = false; await loadBasics();
+    },
+    onGeocode: async (query) => {
+      try { const r = await rawCallSkill('stoop', 'geocode', { query }); geocodeResult = r?.error ? null : r; }
+      catch { geocodeResult = null; }
+      drawBasics();
+    },
+    onSaveLocation: async () => {
+      if (!geocodeResult) return;
+      try { await rawCallSkill('stoop', 'setMyLocation', { cell: geocodeResult.cell, label: geocodeResult.label, source: 'geocode' }); } catch { /* */ }
+      geocodeResult = null; await loadBasics();
+    },
+    onClearLocation: async () => {
+      try { await rawCallSkill('stoop', 'clearMyLocation', {}); } catch { /* */ }
+      await loadBasics();
+    },
+  });
+  if (basicsEl.parentNode) { drawBasics(); loadBasics(); }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
 
@@ -6100,7 +6087,7 @@ async function showAvailability() {
     availability: working,
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
-    onSave: async () => { await availabilityStore.update(working); showMij(); },
+    onSave: async () => { await availabilityStore.update(working); showMyData(); },
     onHop: showHop,
   });
   rerender();

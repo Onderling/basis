@@ -127,19 +127,9 @@ export async function run({ relayUrl }) {
     check('the asker can accept the answer (the control)', !refused(accepted),
       JSON.stringify(accepted)?.slice(0, 140));
 
-    // ── 4. OFFERINGS — what a person says they can do ─────────────────────────────────────────────
-    const cats = await call(bram, 'listOfferingCategories', {}, BRAM);
-    const categoryId = (cats?.categories ?? [])[0]?.id ?? null;
-    check('the offering taxonomy is available to choose from', !!categoryId,
-      `${(cats?.categories ?? []).length} categories`);
-
-    if (categoryId) {
-      const added = await call(bram, 'addMyOffering', { categoryId }, BRAM);
-      check('a neighbour can record what they can offer', !refused(added), JSON.stringify(added)?.slice(0, 120));
-      const mine = await call(bram, 'listMyOfferings', {}, BRAM);
-      check('…and read it back on their own device',
-        (mine?.offerings ?? mine?.items ?? []).length > 0, JSON.stringify(mine)?.slice(0, 120));
-    }
+    // ── 4. OFFERINGS — what a person says they can do: persona drivers (`agents:setProfileDriver`, kind 'offering'),
+    // set in the person's own editor, which this stoop-only journey does not boot. The stoop roster list it used to
+    // walk has no door any more (2026-10-15) — walking it here proved an op nobody reaches.
 
     // ── 5. LENDING — the object leaves the house and comes back ───────────────────────────────────
     const lend = await call(anne, 'postRequest', { text: 'Ladder te leen', intent: 'lend' }, ANNE);

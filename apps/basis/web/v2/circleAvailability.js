@@ -25,7 +25,7 @@ export function renderCircleAvailability(container, { availability, t, onChange,
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'circle-availability__back';
-    back.textContent = tr('circle.back');
+    back.textContent = tr('circle.back_mydata');
     back.addEventListener('click', () => onBack());
     container.appendChild(back);
   }

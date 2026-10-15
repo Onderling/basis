@@ -15,8 +15,8 @@ export const whoAmI = async (page) => (await call(page, 'stoop', 'whoAmI'))?.web
 export async function nameMe(page, name) {
   await gotoCircles(page);
   await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1200);
-  await page.locator('.cc-profile__display').fill(name);
-  await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500);
+  await page.locator('.circle-screen__identity-edit').click(); await page.locator('.cc-profile__display').fill(name);
+  await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500); await page.locator('.cc-screen-panel__close').click();
   await gotoCircles(page);
 }
 

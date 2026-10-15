@@ -29,7 +29,10 @@ export async function myCircles(callSkill) {
  * @param {number} [a.limit]
  * @returns {Promise<{ok: true, items: Array<{kind: 'event'|'chore', id: string, title: string, when: number, circleId: string|null, circleName: string}>}>}
  */
-export async function plannedForMe({ callSkill, me, horizonDays = 7, now = Date.now(), limit = 30 }) {
+/** How far ahead "what is coming" looks: the week. Gepland's window, and Vandaag's seeded agenda (its twin) by the same number. */
+export const PLANNED_HORIZON_DAYS = 7;
+
+export async function plannedForMe({ callSkill, me, horizonDays = PLANNED_HORIZON_DAYS, now = Date.now(), limit = 30 }) {
   const until = now + horizonDays * DAY;
   const startOfToday = (() => { const d = new Date(now); d.setHours(0, 0, 0, 0); return d.getTime(); })();
   const circles = await myCircles(callSkill);

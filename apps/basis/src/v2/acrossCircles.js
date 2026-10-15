@@ -18,7 +18,8 @@ import { ITEM_PRESENTERS } from './itemPresenters.js';
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill
  * @param {(circleId: string) => Record<string, Function>} [a.genericFor]  `createGenericAtomHandlers(store)` per circle
  * @param {'mine'|'all'} [a.scope='all']
- * @param {string|null} [a.me]   who "mine" means
+ * @param {string|null|((circleId: string|null) => string|null)} [a.me]   who "mine" means — one id, or per circle (a
+ *   persona's circle is the persona's)
  * @param {(row: object) => boolean} [a.filter]   a further filter (a window, a state)
  * @param {number} [a.limit=50]
  * @returns {Promise<{ok: true, items: object[], errors?: string[]}|{ok: false, reason: string, error?: string}>}
@@ -43,7 +44,8 @@ export async function acrossCircles({ circles, noun, manifests, callSkill, gener
     } catch (err) { errors.push(String(err?.message ?? err)); return []; }   // one circle that does not answer does not empty the view
   }));
   let rows = buckets.flat();
-  if (scope === 'mine') rows = rows.filter((r) => presenter.isMine(r, me));
+  const meIn = typeof me === 'function' ? me : () => me;
+  if (scope === 'mine') rows = rows.filter((r) => presenter.isMine(r, meIn(r.circleId ?? null)));
   if (typeof filter === 'function') rows = rows.filter(filter);
   const sign = presenter.order === 'asc' ? 1 : -1;
   rows.sort((a, b) => sign * (presenter.when(a) - presenter.when(b)));

@@ -9,10 +9,12 @@
 import { addScreen, updateScreen, setActiveScreen, getActiveScreen } from './userScreens.js';
 import { addBlock, BLOCK_DESCRIPTORS, blockTypesFor } from './circleRecipe.js';
 import { carriesLabels, parseLabels } from './itemLabels.js';
+import { PLANNED_HORIZON_DAYS } from './plannedForMe.js';
 
 /** The first page's blocks, in order: what is on today, what is mine to do, where something is new. */
 export const VANDAAG_DEFAULT_BLOCKS = Object.freeze([
-  Object.freeze({ type: 'calendar', config: Object.freeze({ horizonDays: 7, limit: 5 }) }),
+  // the week ahead across every circle and my own: Gepland's twin when opened whole ("meer"), by the same window
+  Object.freeze({ type: 'calendar', config: Object.freeze({ horizonDays: PLANNED_HORIZON_DAYS, limit: 5 }) }),
   Object.freeze({ type: 'tasks', config: Object.freeze({ scope: 'assigned-to-me', limit: 5 }) }),
   Object.freeze({ type: 'circlesUnread', config: Object.freeze({ limit: 5 }) }),
 ]);

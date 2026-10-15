@@ -1086,6 +1086,29 @@ export const basisManifest = {
   ],
 
   /**
+   * Nav-chrome (My data) — the doors at the top of My data: the views Me gave up when it became one declared screen
+   * (2026-10-15). Views no op backs, so `nav` rows (strict validation refuses one that names an op). Both shells paint
+   * them from this declaration (`myDataActionsFor`), each `to` mapped to the view it opens there.
+   */
+  myDataActions: [
+    { id: 'availability',      labelKey: 'circle.profile.availability',     target: { kind: 'nav', to: 'availability' } },
+    { id: 'connection-points', labelKey: 'circle.nearbyScreen.points_open', target: { kind: 'nav', to: 'points' } },
+    { id: 'shared-with-me',    labelKey: 'circle.profile.sharedWithMe',     target: { kind: 'nav', to: 'sharedWithMe' } },
+    { id: 'blocked',           labelKey: 'circle.profile.blocked',          target: { kind: 'nav', to: 'blocked' } },
+  ],
+
+  /**
+   * Me is ONE declared screen: below the actions above, these blocks, in order — filled by the one screen materializer
+   * (`mijScreenBlocks`) and painted by each shell's block painter. No shell lists a section of Me by hand.
+   *   identityLine — the person's name, and the readings named here (each answers one thing about now)
+   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens My data)
+   */
+  meBlocks: [
+    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'openChores', 'nextAppointment'] } },
+    { type: 'agents',       config: {} },
+  ],
+
+  /**
    * Nav-chrome (D / Surface 2) — the circle DETAIL ACTION BAR + the live circle
    * ⋯ overflow menu.  These sibling-screen buttons WERE hand-written and had
    * DIVERGED across THREE places: web detail bar (`circleDetail.js`

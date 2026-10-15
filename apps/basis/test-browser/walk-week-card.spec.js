@@ -1,5 +1,5 @@
 /**
- * THE PERSON'S OWN WEEK OVERVIEW, ON A REAL SCREEN (2026-10-07). Mij → Gepland switches it on (a row in their own store,
+ * THE PERSON'S OWN WEEK OVERVIEW, ON A REAL SCREEN (2026-10-07). My data switches it on (a row in their own store,
  * still on after a reload); when their clock runs it, a card of their week shows at the top of the app, saying it shows
  * because the app is open.
  *
@@ -11,16 +11,17 @@ import { bootPeer, teardown, gotoCircles, log } from './peerHarness.js';
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-test('the week overview is switched on in Gepland, survives a reload, and its card shows', async ({ browser }) => {
+test('the week overview is switched on in My data, survives a reload, and its card shows', async ({ browser }) => {
   test.setTimeout(180_000);
   let A = null;
   try {
     A = await bootPeer(browser, 'A');
     await gotoCircles(A.page);
-    const openMij = async () => { await A.page.locator('[data-tab="mij"]').first().click(); };
+    // the switch sits in My data (since 2026-10-15; it was beside Gepland on Mij)
+    const openMij = async () => { await A.page.locator('[data-tab="mij"]').first().click(); await A.page.locator('.cc-profile__mydata').first().click(); };
     await openMij();
     const toggle = A.page.locator('.cc-profile__week-toggle').first();
-    await expect(toggle, 'Gepland offers the week overview').toBeVisible({ timeout: 30_000 });
+    await expect(toggle, 'My data offers the week overview').toBeVisible({ timeout: 30_000 });
     await expect(toggle).toHaveAttribute('data-on', 'false');
     await toggle.click();
     await expect(toggle, 'switched on').toHaveAttribute('data-on', 'true', { timeout: 15_000 });

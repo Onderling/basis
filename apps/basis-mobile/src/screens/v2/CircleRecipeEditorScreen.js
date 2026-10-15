@@ -24,7 +24,7 @@ import {
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import {
-  BLOCK_TYPES, BLOCK_REGISTRY,
+  BLOCK_DESCRIPTORS, blockTypesFor,
   detectRecipeConflicts, applyResolution,
 } from '@onderling-app/basis';
 import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
@@ -308,9 +308,8 @@ function RecipeMode({ book, recipeId, onBackToBook, onAddBlock, onRemoveBlock, o
     );
   }
 
-  const sortedTypes = [...BLOCK_TYPES].sort(
-    (a, b) => (BLOCK_REGISTRY[a]?.order ?? 99) - (BLOCK_REGISTRY[b]?.order ?? 99),
-  );
+  // a circle's editor offers the circle's blocks only (the block table says where each may live)
+  const sortedTypes = blockTypesFor('circle');
 
   return (
     <View style={styles.page} testID="circle-recipe-editor-recipe">
@@ -343,7 +342,7 @@ function RecipeMode({ book, recipeId, onBackToBook, onAddBlock, onRemoveBlock, o
           <Text style={styles.paletteTitle}>{t('circle.recipe.editor.add_block_title')}</Text>
           <View style={styles.paletteBtns}>
             {sortedTypes.map((type) => {
-              const meta = BLOCK_REGISTRY[type];
+              const meta = BLOCK_DESCRIPTORS[type];
               return (
                 <Pressable
                   key={type}
@@ -368,7 +367,7 @@ function RecipeMode({ book, recipeId, onBackToBook, onAddBlock, onRemoveBlock, o
 function BlockRow({ block, index, total, recipeId, onRemoveBlock, onMoveBlock, onUpdateBlock }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const meta = BLOCK_REGISTRY[block.type];
+  const meta = BLOCK_DESCRIPTORS[block.type];
   return (
     <View style={styles.blockRow} testID={`block-row-${block.id}`}>
       <View style={styles.blockHead}>

@@ -1304,6 +1304,64 @@
       "text": {
         "text": "Tekst",
         "doc": "α.1b — block palette label."
+      },
+      "circlesUnread": {
+        "text": "Kringen met nieuws",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "identityLine": {
+        "text": "Over mij",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "agents": {
+        "text": "Mijn apparaten en helpers",
+        "doc": "Block palette label (Mij / Vandaag)."
+      }
+    },
+    "block_desc": {
+      "quickActions": {
+        "text": "De handelingen die je in deze kring het vaakst doet, als knoppen.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "announcement": {
+        "text": "Een vaste mededeling van de beheerder bovenaan de kring.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "noticeboard": {
+        "text": "De nieuwste berichten op het prikbord: vragen en aanbod.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "calendar": {
+        "text": "Komende afspraken, voor de periode die je kiest.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "tasks": {
+        "text": "Openstaande taken, die van jou of alle.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "rules": {
+        "text": "De huisregels van de kring.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "photo": {
+        "text": "Een foto met een onderschrift.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "text": {
+        "text": "Een eigen stuk tekst.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "circlesUnread": {
+        "text": "De kringen waar iets nieuws is, met het aantal ongelezen berichten.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "identityLine": {
+        "text": "Je naam en een paar dingen in één regel: bereikbaar, ongelezen, open taken, je volgende afspraak.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "agents": {
+        "text": "Je apparaten, je hulpdiensten en de bots die je hebt toegelaten, elk in één zin.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       }
     },
     "editor": {

@@ -202,12 +202,14 @@ export function makeSilentEntry({ circleId, kind, payload, id, ts, actor } = {})
  * @param {string} [a.via='owner']             the authority used
  * @param {string} [a.circleId]                when it happened inside a circle; null otherwise
  * @param {'agent-action'|'settings-change'} [a.kind='agent-action']
+ * @param {{previous: number|null, current: number|null}} [a.version]  the kept versions a settings change went between
+ *   (timestamps in the store's version history — what an undo restores; never the content itself)
  * @param {string} [a.id]  @param {number} [a.ts]
  * @returns {LoggedEvent|null}  null when actor/op are missing — an unattributed trail row is noise
  */
 export function makeAgentTrailEntry({
   actor, op, target = null, outcome = null, via = 'owner', circleId = null,
-  kind = 'agent-action', id, ts,
+  kind = 'agent-action', version = null, id, ts,
 } = {}) {
   if (!actor || typeof op !== 'string' || !op) return null;
   const k = kind === 'settings-change' ? 'settings-change' : 'agent-action';
@@ -219,6 +221,8 @@ export function makeAgentTrailEntry({
         ? { target: { kind: target.kind ?? null, ref: target.ref ?? null } } : {}),
       ...(outcome != null ? { outcome: String(outcome) } : {}),
       via: typeof via === 'string' && via ? via : 'owner',
+      ...(version && typeof version === 'object'
+        ? { version: { previous: Number.isFinite(version.previous) ? version.previous : null, current: Number.isFinite(version.current) ? version.current : null } } : {}),
     },
   });
 }

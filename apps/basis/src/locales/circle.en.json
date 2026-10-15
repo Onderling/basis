@@ -1304,6 +1304,64 @@
       "text": {
         "text": "Text",
         "doc": "α.1b — block palette label."
+      },
+      "circlesUnread": {
+        "text": "Circles with news",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "identityLine": {
+        "text": "About me",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "agents": {
+        "text": "My devices and helpers",
+        "doc": "Block palette label (Mij / Vandaag)."
+      }
+    },
+    "block_desc": {
+      "quickActions": {
+        "text": "The actions you use most in this circle, as buttons.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "announcement": {
+        "text": "A standing notice from the admin at the top of the circle.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "noticeboard": {
+        "text": "The newest noticeboard posts: asks and offers.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "calendar": {
+        "text": "Coming appointments, for the period you choose.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "tasks": {
+        "text": "Open tasks, yours or all of them.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "rules": {
+        "text": "The circle's house rules.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "photo": {
+        "text": "A photo with a caption.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "text": {
+        "text": "A piece of text of your own.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "circlesUnread": {
+        "text": "The circles where something is new, with how many unread messages.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "identityLine": {
+        "text": "Your name and a few things in one line: available, unread, open tasks, your next appointment.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "agents": {
+        "text": "Your devices, your helper services and the bots you admitted, one sentence each.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       }
     },
     "editor": {

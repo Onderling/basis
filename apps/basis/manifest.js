@@ -18,15 +18,17 @@ export const basisManifest = {
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).
   // Every other op maps to an SDK atom.
-  domainVerbs: { help: 'read' },
+  domainVerbs: { help: 'read', undo: 'write' },
 
   // §1a (declared-authoritative capability surface): INTENTIONALLY no `nouns` block.
   // This is the shell/unifier manifest — every op is an app-level command (help/settings/
   // mute/newthread/…) that names NO item noun, so it has ZERO (atom × noun) capabilities to
-  // curate. Adding `nouns:{}` would flip it to declared-authoritative and silently DROP any
-  // future chat-thread/chat-message capability. The `noun-declaration discipline` fitness guard
-  // (test/atom-discipline.test.js) enforces exactly this: a `nouns` block is required the moment
-  // an op here starts naming a noun (via appliesTo.type or a `type`-enum param), not before.
+  // curate. The person's pages (the screen ops) are a device setting kept as versions, not
+  // items in a store, so they name no noun either. Adding `nouns:{}` would flip it to
+  // declared-authoritative and silently DROP any future chat-thread/chat-message capability.
+  // The `noun-declaration discipline` fitness guard (test/atom-discipline.test.js) enforces
+  // exactly this: a `nouns` block is required the moment an op here starts naming a noun (via
+  // appliesTo.type or a `type`-enum param), not before.
 
   operations: [
     /**
@@ -821,6 +823,206 @@ export const basisManifest = {
       surfaces: {
         // No CHAT surface — see `signin`. Ending a session is the person's act.
         slash: { command: '/signout' },
+      },
+    },
+
+    /**
+     * `/page-add` — a new page of the person's own (Vandaag), optionally showing only some circles.
+     */
+    {
+      id:    'screen-add-page',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'add',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'name', kind: 'string' },
+        { name: 'circleIds', kind: 'object' },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-add', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-remove` — remove one of the person's pages.
+     */
+    {
+      id:    'screen-remove-page',
+      group: 'device',
+      verb:  'remove',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-remove', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-rename` — rename a page.
+     */
+    {
+      id:    'screen-rename-page',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'name', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-rename', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-show` — the page the home opens on.
+     */
+    {
+      id:    'screen-set-active',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-show', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-circles` — which circles a page shows (none named = all).
+     */
+    {
+      id:    'screen-set-circles',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'circleIds', kind: 'object' },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-circles', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-add` — add a block from the block table (only those the person's pages may hold).
+     */
+    {
+      id:    'screen-add-block',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'add',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'type', kind: 'string', required: true },
+        { name: 'config', kind: 'object' },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-add', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-remove` — remove a block from a page.
+     */
+    {
+      id:    'screen-remove-block',
+      group: 'device',
+      verb:  'remove',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'blockId', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-remove', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-move` — move a block to another place on its page.
+     */
+    {
+      id:    'screen-move-block',
+      group: 'device',
+      verb:  'move',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'blockId', kind: 'string', required: true },
+        { name: 'index', kind: 'number', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-move', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-set` — change a block's settings (its circles, mine/all, horizon, limit…).
+     */
+    {
+      id:    'screen-set-block-config',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'blockId', kind: 'string', required: true },
+        { name: 'config', kind: 'object', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-set', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-undo` — undo the newest change to the person's pages (each change is kept as a version and logged).
+     */
+    {
+      id:    'screen-undo',
+      group: 'device',
+      verb:  'undo',
+      writes: { scope: 'device' },
+      params: [
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-undo', body: 'none' },
       },
     },
 

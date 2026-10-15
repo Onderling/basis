@@ -15,8 +15,7 @@
  * Pure DOM.  No drag-reorder yet (use ↑/↓ buttons); image picker on
  * the photo block is a follow-up (free-text src for now).
  */
-import { BLOCK_TYPES } from '../../src/v2/circleRecipe.js';
-import { BLOCK_REGISTRY } from '../../src/v2/circleRecipeBlocks.js';
+import { BLOCK_DESCRIPTORS, blockTypesFor } from '../../src/v2/circleRecipe.js';
 import { detectRecipeConflicts, applyResolution } from '../../src/v2/recipeConflict.js';
 import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
@@ -372,11 +371,10 @@ function renderRecipeMode(container, {
   paletteTitle.textContent = tr('circle.recipe.editor.add_block_title');
   palette.appendChild(paletteTitle);
 
-  const sortedTypes = [...BLOCK_TYPES].sort(
-    (a, b) => (BLOCK_REGISTRY[a]?.order ?? 99) - (BLOCK_REGISTRY[b]?.order ?? 99),
-  );
+  // a circle's editor offers the circle's blocks only (the block table says where each may live)
+  const sortedTypes = blockTypesFor('circle');
   for (const type of sortedTypes) {
-    const meta = BLOCK_REGISTRY[type];
+    const meta = BLOCK_DESCRIPTORS[type];
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'circle-recipe-editor__palette-btn';
@@ -400,7 +398,7 @@ function renderBlockRow(block, index, total, {
   // Header — type label + move/remove buttons.
   const head = document.createElement('div');
   head.className = 'circle-recipe-editor__block-head';
-  const meta = BLOCK_REGISTRY[block.type];
+  const meta = BLOCK_DESCRIPTORS[block.type];
   const label = document.createElement('span');
   label.className = 'circle-recipe-editor__block-label';
   label.textContent = `${meta?.emoji ? meta.emoji + ' ' : ''}${tr(`circle.recipe.block.${block.type}`)}`;

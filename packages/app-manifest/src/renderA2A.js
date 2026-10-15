@@ -77,6 +77,18 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
 ]));
 
 /**
+ * An op of a manifest's `device` group is THIS device's own business (its custody, its recovery, the person's pages
+ * on it): never delegable, in whatever manifest it is declared — the group is the rule, so a new device op cannot be
+ * forgotten off a list. `NEVER_DELEGABLE` below names the rest by id.
+ * @param {{group?: string}} op
+ * @returns {boolean}
+ */
+export function isDeviceOp(op) {
+  return op?.group === 'device';
+}
+
+
+/**
  * Project manifests into A2A skill definitions for peers — the never-delegable ops withheld, each call run as the
  * verified caller when `ctxFor` says so.
  * @param {import('./schema.js').Manifest|import('./schema.js').Manifest[]} manifestOrList
@@ -118,7 +130,7 @@ export function renderA2A(manifestOrList, args, opts = {}) {
         id,
         // `requires-token` for everything reachable: an external caller must PRESENT authority, it is
         // never inferred from being able to reach us. `never` short-circuits before any token is even read.
-        policy:      isNever(id) ? 'never' : 'requires-token',
+        policy:      (isNever(id) || isDeviceOp(op)) ? 'never' : 'requires-token',
         visibility:  'authenticated',
         description: op.surfaces?.chat?.hint ?? `${op.verb ?? 'call'} ${op.id}`,
         handler:     async (hctx) => {

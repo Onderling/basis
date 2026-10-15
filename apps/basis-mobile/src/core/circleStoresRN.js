@@ -166,9 +166,9 @@ export function makeCircleRulesStoreRN(storage) {
   });
 }
 
-/** α.2 — per-user screens store (single book; key: `cc.userScreens`). */
+/** The person's pages on this device (single book; key: `cc.userScreens`), each change kept as a version (undoable). */
 export function makeUserScreenStoreRN(storage) {
-  return createUserScreenStore({ io: asyncFixedIo('cc.userScreens', storage) });
+  return createUserScreenStore({ io: asyncFixedIo('cc.userScreens', storage), versions: asyncStorageObjectVersions('screens', storage) });
 }
 
 /**

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  BLOCK_REGISTRY, materializeBlock, materializeRecipe,
+  materializeBlock, materializeRecipe,
 } from '../../src/v2/circleRecipeBlocks.js';
-import { addBlock, emptyRecipe } from '../../src/v2/circleRecipe.js';
+import { addBlock, emptyRecipe, BLOCK_DESCRIPTORS } from '../../src/v2/circleRecipe.js';
 
 function fakeEventLog(events = []) {
   return { query: () => events };
@@ -11,7 +11,7 @@ function fakeEventLog(events = []) {
 describe('circleRecipeBlocks · α.1b — registry', () => {
   it('lists every BLOCK_TYPES entry with metadata', () => {
     for (const t of ['announcement', 'noticeboard', 'calendar', 'rules', 'photo', 'text']) {
-      expect(BLOCK_REGISTRY[t]).toMatchObject({
+      expect(BLOCK_DESCRIPTORS[t]).toMatchObject({
         labelKey: expect.stringMatching(/^circle\.recipe\.block\./),
         emoji:    expect.any(String),
         order:    expect.any(Number),

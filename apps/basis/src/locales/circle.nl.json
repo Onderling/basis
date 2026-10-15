@@ -5959,6 +5959,10 @@
       "text": "Aan — {{count}} berichten gespiegeld, verzegeld, naar je eigen opslag.",
       "doc": "spiegel-statusregel als hij loopt."
     },
+    "devices_needs_phrase": {
+      "text": "Dit apparaat deelt je eigen gegevens nog niet met je andere apparaten: typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken).",
+      "doc": "My data, devices section, on a device without the recovery seal: its own lanes carry nothing until the phrase is typed once."
+    },
     "history_needs_phrase": {
       "text": "Nog niet: typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken).",
       "doc": "history mirror state line on a device that has no recovery seal yet."

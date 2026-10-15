@@ -1284,7 +1284,7 @@ under an **opaque name** only a holder of the owner's key can compute, so the ho
 exists and not what it is. It carries the settings mirror's restore gate too: before the first write-through
 it probes the pod copy, and a copy sealed under another key (a fresh install without the phrase) holds rather
 than being overwritten by a one-device list. Without a pod, the pod-less carrier of the same fact is the
-**recovery file** — the registry and the owner root sealed into a passphrase-protected file, exported and
+**recovery file** — the registry (and each circle's roster) sealed to the recovery seal, never the root itself, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.
 
 **Sealed to the recovery seal, not to a persona.** The registry's pod mirror (every persona's profile and circles in
@@ -1295,7 +1295,10 @@ not, so no persona's key could open them on every device; every phrase ceremony 
 key for everything the person seals to themselves, so one thing to hand over at a ceremony. A device enrolled before
 the seal existed has none until its next phrase ceremony — My data → "Persona's op dit apparaat" with nothing ticked
 hands over only the seal; until then its mirrors stay local, and the export and the history status say how to get it.
-The own-devices lane is still sealed to the default persona's key. What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
+The person's OWN scope (their device map, their own appointments, the planned book) rides one lane per self the device
+holds — each row the lane of the self that wrote it, carried as that self to that self's devices only, sealed to the
+recovery seal; the device map's row is on every held self's lane, so a device that shares only one persona with a lost
+one can still revoke it under every self (the ceremony reads the lost device's internal id there). What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
 names the circle's self, and the restore bootstrap announces a device only in the circles of a self it runs.
 
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding

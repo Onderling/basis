@@ -35,6 +35,7 @@ export function renderCircleMyData(container, {
   onClaimCompanion,
   devices = [],
   onRevokeDevice,
+  devicesNeedPhrase = false,
   // The nodes this person owns (a companion they claimed): `[{node, short}]`. `onOpenCompanionGrant(node)` reads what
   // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
   // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
@@ -245,6 +246,13 @@ export function renderCircleMyData(container, {
   // ceremony) acts on the live rows — gated on the callback like every identity act above.
   if (typeof onRevokeDevice === 'function' && Array.isArray(devices) && devices.length) {
     const sec = section(tr('circle.mydata.devices'));
+    // without the recovery seal this device carries nothing of the person's own scope to the others: say how to fix it
+    if (devicesNeedPhrase) {
+      const note = document.createElement('p');
+      note.dataset.role = 'devices-needs-phrase';
+      note.textContent = tr('circle.mydata.devices_needs_phrase');
+      sec.appendChild(note);
+    }
     for (const d of devices) {
       const row = document.createElement('div');
       row.className = 'cc-mydata__device';

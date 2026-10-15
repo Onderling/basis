@@ -385,6 +385,7 @@ import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBl
 // this shell to change the book).
 import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../src/v2/vandaag.js';
+import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
 import { renderCircleView, paintDeliveryChip } from './circleView.js';
@@ -2884,6 +2885,8 @@ function showTabBar(active) {
     onMij: showMij,
     badges: { contacten: totalUnread(_contactUnread) },
   });
+  // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
+  try { window.localStorage.setItem(LAST_TAB_STORAGE_KEY, active); } catch { /* private window: the default stands */ }
 }
 
 // WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
@@ -3569,7 +3572,8 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  */
 async function circlesChangedUnderneath() {
   try { circlesCache = await loadCircles(sources); } catch { return; }
-  if (getActiveCircle() == null) { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
+  // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
+  if (getActiveCircle() == null && _activeTab === 'circles') { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
 }
 
 function paintLauncher() {
@@ -3715,7 +3719,8 @@ async function refreshLauncherProposals() {
   const sameKeys = Object.keys(next).length === Object.keys(launcherProposals).length
     && Object.keys(next).every((k) => next[k] === launcherProposals[k]);
   launcherProposals = next;
-  if (!sameKeys && getActiveCircle() == null) showLauncher();
+  // a background count: repaint the circles list only when it is the tab showing
+  if (!sameKeys && getActiveCircle() == null && _activeTab === 'circles') showLauncher();
 }
 
 // Nearby screen on web. mDNS isn't live in the browser
@@ -4698,6 +4703,12 @@ async function showMyData() {
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel,
     // The personal history mirror — live health from the agent + the switch through the one
     // kind-gated write (the agent starts/stops the sink LIVE on the flip).
+    // where the app opens on this device (a user param; the same write as every setting)
+    startScreen: { value: circleHouseholdAgent?.getParamValue?.('home.startScreen') ?? 'vandaag', choices: START_SCREEN_CHOICES },
+    onSetStartScreen: async (value) => {
+      try { await circleHouseholdAgent.callSkill('params', 'set-param', { key: 'home.startScreen', value }); } catch { /* the row re-reads the truth */ }
+      rerender();
+    },
     historyMirror: {
       enabled: circleHouseholdAgent?.getParamValue?.('history.mirror') === true,
       status:  circleHouseholdAgent?.historyMirrorStatus?.() ?? null,
@@ -9146,11 +9157,15 @@ async function boot() {
   // In-app onboarding (task #13) — provision the default help circle + the Onderling-bot once (idempotent),
   // then refresh the launcher list so its tile appears. Best-effort; a failure never blocks the app.
   await maybeProvisionHelpCircle();
-  // The landing tab is CIRCLES for now (Frits, 2026-08-31): a fresh person should meet the social
-  // front door, not the screen manager. The landing choice is to become a SETTING later — with
-  // "last used" among its options — so this stays a default, not a rule. (Screens' first-run seed
-  // still happens on the first visit to that tab.)
-  showLauncher();
+  // WHERE THE APP OPENS — the person's setting on this device (startScreen.js): Vandaag by default, the circles list,
+  // or the tab last used. (The landing was the circles list until Vandaag became the home, 2026-10-15.)
+  let lastTab = null;
+  try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
+  const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
+  if (start === 'screens') showScreens();
+  else if (start === 'contacten') showContacts();
+  else if (start === 'mij') showMij();
+  else showLauncher();
 }
 
 // A `/scherm` link (or the bot's "Open het scherm" button inside Telegram) opens the web app as a SCREEN for a household

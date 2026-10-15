@@ -56,13 +56,7 @@ describe('the set-param op — the kind gate (decision D)', () => {
     // `assistant.assignPolicy`: whether a household bot's roles decide who may give a chore to someone else.
     // `app.developer`: the developer switch — the Advanced screen (raw param keys) is shown only when it is on.
     expect(params.map((p) => p.key).sort()).toEqual([
-      'app.developer', 'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.calendarFeed', 'assistant.cancelPolicy', 'assistant.householdInApp', 'assistant.memoryDefault', 'assistant.monthlyTokenLimit', 'assistant.names', 'assistant.passedItems', 'assistant.passedKeepDays', 'assistant.quietHours', 'assistant.reminderRules', 'assistant.reminders', 'assistant.roles', 'assistant.usageVisible', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
-      'history.restore.maxPerCircle', 'history.restore.recencyDays',
-      'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
-      'privacy.shareNknAddress', 'relay.url', 'surface.pref',
-      // what THIS device keeps (sync-policy §11): three silos, the kringen off-list, the file bytes
-      'sync.files.bytes', 'sync.kringenOff', 'sync.silo.chat', 'sync.silo.contacts', 'sync.silo.tasks',
-      'transport.mode', 'wake.nudges',
+      'app.developer', 'app.lang', 'assistant.apps', 'assistant.assignPolicy', 'assistant.calendarFeed', 'assistant.cancelPolicy', 'assistant.householdInApp', 'assistant.memoryDefault', 'assistant.monthlyTokenLimit', 'assistant.names', 'assistant.passedItems', 'assistant.passedKeepDays', 'assistant.quietHours', 'assistant.reminderRules', 'assistant.reminders', 'assistant.roles', 'assistant.usageVisible', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror', 'history.restore.maxPerCircle', 'history.restore.recencyDays', 'home.startScreen', 'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs', 'privacy.shareNknAddress', 'relay.url', 'surface.pref', 'sync.files.bytes', 'sync.kringenOff', 'sync.silo.chat', 'sync.silo.contacts', 'sync.silo.tasks', 'transport.mode', 'wake.nudges',
     ]);
     // Both are kind:user; internal caps are never here.
     expect(params.every((p) => ['agent', 'device'].includes(p.scope))).toBe(true);

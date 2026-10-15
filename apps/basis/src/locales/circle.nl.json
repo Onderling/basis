@@ -6053,6 +6053,22 @@
       "text": "Aan — {{count}} berichten gespiegeld, verzegeld, naar je eigen opslag.",
       "doc": "spiegel-statusregel als hij loopt."
     },
+    "start_title": {
+      "text": "Openen op",
+      "doc": "My data, the start-screen setting: its heading (where the app opens on this device)."
+    },
+    "start_vandaag": {
+      "text": "Vandaag",
+      "doc": "Start-screen choice: Vandaag (the default)."
+    },
+    "start_circles": {
+      "text": "Kringen",
+      "doc": "Start-screen choice: the circles list."
+    },
+    "start_last": {
+      "text": "Laatst gebruikt",
+      "doc": "Start-screen choice: the tab used last on this device."
+    },
     "devices_needs_phrase": {
       "text": "Dit apparaat deelt je eigen gegevens nog niet met je andere apparaten: typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken).",
       "doc": "My data, devices section, on a device without the recovery seal: its own lanes carry nothing until the phrase is typed once."

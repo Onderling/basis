@@ -26,7 +26,7 @@ export function renderCircleMyData(container, {
   onBackup,
   onViewMnemonic,
   onRestore,
-  onEnroll,
+  onEnroll, onReceivePersonas,
   onExportRecovery,
   onImportRecovery,
   onReplaceDevice,
@@ -214,6 +214,8 @@ export function renderCircleMyData(container, {
     // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
     // never on a device that already has authority).
     ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
+    // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
+    ['cc-mydata__receive-personas', 'circle.mydata.receive_personas', onReceivePersonas],
     // The recovery file: the circle list sealed to the phrase — the pod-less way back.
     ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
     ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],

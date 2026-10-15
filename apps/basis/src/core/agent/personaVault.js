@@ -19,6 +19,11 @@ export const DEVICE_DELEGATION_VAULT_KEY = 'device-delegation-seed';
 /** Which personas this device was HANDED at its ceremony (a JSON list of ids, in the default's slot): a delegated device
  *  runs exactly these besides the default — it holds no root to derive any other. */
 export const HELD_PERSONAS_VAULT_KEY = 'held-personas';
+/** The person's RECOVERY SEAL: the seed the recovery file and the registry's pod mirror are sealed to, derived from the
+ *  root under its own label (`RECOVERY_SEAL_LABEL`) — not any persona's key, so a device opens them whichever personas
+ *  it holds. Every phrase ceremony leaves it here, a device entry; a device with the root derives it instead. */
+export const RECOVERY_SEAL_VAULT_KEY = 'recovery-seal-seed';
+export const RECOVERY_SEAL_LABEL = 'recovery-seal';
 
 /** The chat vault entries that belong to ONE persona. */
 export const PERSONA_SLOT_KEYS = Object.freeze(new Set(['agent-privkey', PERSON_KEY_VAULT_KEY, DEVICE_DELEGATION_VAULT_KEY]));

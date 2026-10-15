@@ -216,9 +216,9 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
-import { personaVault, HELD_PERSONAS_VAULT_KEY } from './personaVault.js';
+import { personaVault, HELD_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -774,6 +774,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   const chatId    = chatAgent.identity;
   // the persona's chat identity (its webid): the secure agent loaded it from the persona's slot
   persona.chatId = chatId;
+  // THE RECOVERY SEAL — what the recovery file and the registry's pod mirror are sealed to: derived from the root where
+  // it is resident, else the one a phrase ceremony left on this device. Never a persona's key, so a device opens them
+  // whichever personas it holds. A device with neither (enrolled before the seal existed) has none until its next
+  // phrase ceremony: its registry stays local and its export refuses.
+  const recoverySealIdentity = await (async () => {
+    try {
+      const seed = ownerRoot ? ownerRoot.deriveAgentSeed(RECOVERY_SEAL_LABEL)
+        : await persona.vault.get(RECOVERY_SEAL_VAULT_KEY).then((s) => (s ? seedFromString(s) : null));
+      return seed ? await AgentIdentity.fromSeed(seed, new VaultMemory()) : null;
+    } catch (err) { console.warn(`[recovery-seal] not loaded: ${err?.message ?? err}`); return null; }
+  })();
   // A household bot's circle id is its own, derived from its key (`tasksCircleId` is then a function of it). Its rows
   // from before (under the bare `household` id) move there ONCE, beneath the store: item ids unchanged, nothing fanned;
   // a second boot finds the circle holding rows and moves nothing.
@@ -1277,13 +1288,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   let upsertCircleKeyRef = async () => false;
   // THE CARRIER: the registry rides its OWN pseudo-pod — a persistent local backend the shell
   // passes (`opts.registryBackend`; memory when absent, as before), and when signed in a cache-mode
-  // mirror to the owner's pod, sealed to self under an opaque name (`opts.provisionRegistryMedium`, the
+  // mirror to the owner's pod, sealed to the recovery seal under an opaque name (`opts.provisionRegistryMedium`, the
   // settings medium's sibling). `attach()` runs the probe gate BEFORE the self-registration below, which
   // is a write: a fresh install must never overwrite the owner's pod copy with a one-device list.
   let registryCarrierStatus = () => ({ mode: 'local', probe: null });
   const registryPseudoPod = await (async () => {
     try {
-      const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(chatId) : null;
+      const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(recoverySealIdentity) : null;
       const medium   = strategy ? await opts.provisionRegistryMedium(strategy) : null;
       const carrier  = createRegistryCarrier({
         // Sealed at rest: the registry holds who this device belongs to — the person's curated
@@ -1294,7 +1305,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           ? createSealingBackend({ backend: opts.registryBackend, getStrategy: () => contentSeal })
           : null,
         deviceId: chatId.pubKey,
-        medium, name: medium ? registryPodName(chatId) : null,
+        medium, name: medium ? registryPodName(recoverySealIdentity) : null,
         onKeyMismatch: () => opts.onRegistryKeyMismatch?.(),
         warn: (m) => { if (typeof console !== 'undefined') console.warn(m); },
       });
@@ -1477,6 +1488,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
     };
     // a delegated device: the personas it holds start now (their circles bind as their memberships are written)
+    // (its circles bind where every self's circles reopen at boot — `reopenMemberCircles`)
     if (!ownerRoot) { for (const id of heldPersonas) await runPersona(id); }
     if (ownerRoot) {
       try {
@@ -3306,17 +3318,21 @@ export async function createRealHouseholdAgent(opts = {}) {
   }, { visibility: 'private' });   // ends another agent's authority on the person's node: owner-only
 
   /* ─── The RECOVERY FILE: the pod-less carrier of the circle list ─────────────────────
-   * Export seals the registry exactly as the pod mirror does (seal-to-self, the profile-derived key),
+   * Export seals the registry exactly as the pod mirror does (the recovery seal, derived from the root),
    * so the phrase is the only secret; import opens it with this device's key and upserts every entry
    * through the registry handle, then runs the boot re-open loop. A file sealed by someone else's
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
   hostAgent.register('exportRecoveryFile', async ({ parts }) => {
     try {
-      const strategy = settingsSealStrategyForIdentity(chatId);
-      if (!strategy) return [DataPart({ ok: false, error: 'no-identity' })];
+      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      if (!strategy) return [DataPart({ ok: false, error: 'no-recovery-seal' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
-      const circleIds = Object.keys(circleMembershipsOf(body.agents.find((a) => a.agentId === 'default') ?? {}));
+      // every SELF's circles: the default's and each persona's (a restored device that is handed a persona later finds
+      // that persona's circles' rosters in the same file — read here as that persona, through the waist)
+      const circleIds = [...new Set((body.agents ?? [])
+        .filter((a) => a?.agentId === 'default' || /^p-[0-9a-f]{12}$/.test(String(a?.agentId ?? '')))
+        .flatMap((a) => Object.keys(circleMembershipsOf(a))))];
       // THE MEMBER LIST, per circle (Frits, 2026-09-13: "why not back up the roster itself?"): the file
       // carries each ticked circle's roster — the trail rows and the member rows, the same a sibling
       // would serve as a seed — for every circle the person ticked; all of them unless the caller says
@@ -3341,13 +3357,14 @@ export async function createRealHouseholdAgent(opts = {}) {
           // This device's proven address in the circle — the same announcement the seed serve introduces
           // itself back with (`rosterSeed`), minted while this device still holds the key.
           ownAnnouncement: ownCircleAddressAnnouncement({
-            circleId, memberWebid: chatId.pubKey, circleAddressFor,
+            // the circle's OWN self: in a persona's circle the persona — never the default's webid there
+            circleId, memberWebid: circleSelfRef(circleId), circleAddressFor,
             signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceSeedFor(cid2), cid2, cid2, address),
             ceremonyCommitmentFor, signCeremonyCommitment,
           }),
         });
         rosters[circleId] = snap;
-        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== chatId.pubKey).length : null;
+        carried[circleId] = snap ? snap.members.filter((m) => m.webid !== circleSelfRef(circleId)).length : null;
       }
       const file = sealRecoveryFile({ strategy, body: bodyWithRosters({ body, rosters }) });
       return [DataPart({ ok: true, file, circles: circleIds.length, rosters: carried })];
@@ -3370,8 +3387,8 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
-    const strategy = settingsSealStrategyForIdentity(chatId);
-    if (!strategy) return { ok: false, error: 'no-identity' };
+    const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+    if (!strategy) return { ok: false, error: 'no-recovery-seal' };
     if (!agentsRegistryRef?.register) return { ok: false, error: 'no-registry' };
     let body;
     try { body = openRecoveryFile({ strategy, file: String(file) }); }
@@ -3472,6 +3489,61 @@ export async function createRealHouseholdAgent(opts = {}) {
     return [DataPart({ ok: true, outcome: intent, intent })];
   }, { visibility: 'private' });
 
+  // WHICH PERSONAS THIS DEVICE MAY STILL RECEIVE — the person's personas (the registry, as a restore brought it back)
+  // that this device does not run; the picker's list after a restore. Names only, from the person's own registry.
+  hostAgent.register('listReceivablePersonas', async () => {
+    try {
+      const out = [];
+      for (const entry of (await agentsRegistryRef?.list?.()) ?? []) {
+        const id = entry?.agentId;
+        if (entry?.role !== 'profile' || typeof id !== 'string' || !/^p-[0-9a-f]{12}$/.test(id) || personas.has(id)) continue;
+        out.push({ id, name: entry.name ?? null });
+      }
+      return [DataPart({ ok: true, personas: out })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
+  }, { visibility: 'private' });
+  // THESE PERSONAS HERE TOO — the picker's act after a restore (or any time): the phrase typed again is the one moment
+  // the root is in hand, and the picked personas are handed into this device's slots (`handPersonasInto`, the same
+  // hand-over as the enrol ceremony). A reload runs them.
+  hostAgent.register('receivePersonas', async ({ parts }) => {
+    const proof = verifyOwnerPhrase(String(parts?.[0]?.data?.mnemonic ?? ''));
+    if (!proof.ok) return [DataPart({ ok: false, outcome: proof.outcome, error: proof.outcome })];
+    const picked = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
+    if (picked.length === 0) return [DataPart({ ok: false, error: 'none-picked' })];
+    try {
+      const held = await handPersonasInto({
+        root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
+        label: persona.enrolledDevice?.label ?? null, personas: picked,
+      });
+      // ...and each received persona REJOINS its circles at the next boot, as a restored device rejoins the default's:
+      // the members it knows (the rosters the recovery file landed here) become a bootstrap offer — announce this
+      // device's fresh address in each circle AS the persona, pull the lanes — the same offer the boot consumes.
+      let bootstrap = null;
+      try {
+        const rosters = {};
+        const memberships = {};
+        const selves = [];
+        for (const pid of picked) {
+          const entry = await agentsRegistryRef?.lookup?.(pid);
+          const own = circleMembershipsOf(entry ?? {});
+          const webid = (await AgentIdentity.fromSeed(proof.root.deriveAgentSeed(pid), new VaultMemory())).pubKey;
+          selves.push(webid);
+          for (const [cid, rec] of Object.entries(own)) {
+            memberships[cid] = rec;
+            const members = ((await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? []).filter((m) => m?.webid && m.webid !== webid);
+            rosters[cid] = { rows: [], members };
+          }
+        }
+        const made = bootstrapOfferFromRosters({ body: bodyWithRosters({ body: {}, rosters }), selfPubKey: selves[0] ?? null, memberships });
+        if (made) {
+          let stashed = false;
+          if (opts.enrollOfferStorage) { try { stashed = (await stashEnrollOffer(opts.enrollOfferStorage, made.offer)).ok === true; } catch { stashed = false; } }
+          bootstrap = { ...made, stashed };
+        }
+      } catch { bootstrap = null; }
+      return [DataPart({ ok: true, held, reloadRequired: true, ...(bootstrap ? { bootstrap } : {}) })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'hand-over-failed' })]; }
+  }, { visibility: 'private' });
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
     let root;
@@ -3675,7 +3747,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     const reopened = [];
     let memberCircleIds = [];
     try {
-      memberCircleIds = Object.keys(await readSelfCircleMemberships())
+      // the default's circles, and those of every persona this device RUNS (a persona it does not hold stays closed here)
+      const ids = new Set(Object.keys(await readSelfCircleMemberships()));
+      for (const [pid] of personas) {
+        if (pid === 'default') continue;
+        try { for (const cid of Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {}))) { ids.add(cid); circlePersonas.set(cid, pid); } } catch { /* next */ }
+      }
+      memberCircleIds = [...ids]
         .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household');
     } catch (err) {
       if (typeof console !== 'undefined') console.warn('[restore-open] membership enumeration failed — no circles auto-reopened', err?.message ?? err);
@@ -7168,6 +7246,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // who this device is to a contact (its persona) — the contact channel's `selfFor` and the pair roster's `selfWebidOf`
     contactSelf,
     personaWebid: (personaId) => personas.get(personaId)?.chatId?.pubKey ?? null,
+    // whose registry record a circle's membership is (its persona's, else 'default') — the rejoin records it there
+    profileIdOf,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
 

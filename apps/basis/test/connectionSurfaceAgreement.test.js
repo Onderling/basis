@@ -77,3 +77,17 @@ describe('the person\'s registry is theirs — a connection may see what acts fo
     }
   });
 });
+
+describe('this device\'s custody is never a connection\'s to act on', () => {
+  // The household's `device` group is the device's own custody: enrolling and revoking devices, the recovery
+  // file, restore, which persona a circle is joined as, which personas this device runs. A connection acts as
+  // the person SOMEWHERE ELSE; none of these is a thing to do to this device from there. Marking an op
+  // `group: 'device'` is what puts it out of reach — a new device op cannot be forgotten off the list.
+  it('every household device op is refused at the door and absent from the menu', () => {
+    const deviceOps = householdManifest.operations.filter((o) => o.group === 'device').map((o) => `household.${o.id}`);
+    expect(deviceOps.length).toBeGreaterThan(0);
+    expect(deviceOps.filter((id) => !NEVER_DELEGABLE.has(id)), 'device ops a connection could reach').toEqual([]);
+    const offered = new Set(connectionOpChoices({ manifests: MANIFESTS }).map((c) => c.id));
+    expect(deviceOps.filter((id) => offered.has(id))).toEqual([]);
+  });
+});

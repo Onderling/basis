@@ -6061,6 +6061,7 @@
       "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een back-upbestand, om hier ergens anders mee verder te kunnen.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
+    "receive_personas": "Persona's op dit apparaat",
     "enroll_device": "Apparaat toevoegen",
     "recovery_export": "Herstelbestand opslaan",
     "recovery_import": "Herstelbestand laden",
@@ -7019,6 +7020,18 @@
       "text": "Tik op Start om te beginnen; open daarna de chat (← chat) en gebruik /restore-from-mnemonic om je herstelzin in te laden.  Herstellen bij het opstarten komt in een latere update.",
       "doc": "Fallback-melding tekst."
     }
+  },
+  "receive_personas": {
+    "close": "Sluiten",
+    "title": "Persona's op dit apparaat",
+    "body": "Kies welke van je persona's dit apparaat ook krijgt. Dat vraagt je herstelzin: alleen daarmee kunnen hun sleutels hierheen.",
+    "none": "Er zijn geen andere persona's om hierheen te halen.",
+    "phrase_placeholder": "Je herstelzin (12 woorden)",
+    "submit": "Op dit apparaat zetten",
+    "done_reload": "Klaar. Herstart de app; daarna draait dit apparaat ook als deze persona's.",
+    "wrong_phrase": "Dat is niet de herstelzin van dit account. Er is niets veranderd.",
+    "failed": "Dat lukte niet. Er is niets veranderd.",
+    "reload": "Herstarten"
   },
   "enroll": {
     "title": "Dit apparaat toevoegen",

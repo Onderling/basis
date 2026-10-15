@@ -707,7 +707,8 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
   const joinerCallSkill = (app, op, args) => joiner.agent.callSkill(app, op, args);
 
-  const invite = await buildCircleInviteUri({ callSkill: adminCallSkill, circleId: groupId, adminPeerAddr: admin.pubKey });
+  // the circle's own self as the admin to redeem with, as the shells name it
+  const invite = await buildCircleInviteUri({ callSkill: adminCallSkill, circleId: groupId, adminPeerAddr: admin.agent.circleSelf?.(groupId)?.webid ?? admin.pubKey });
   if (invite?.error) throw new Error(`buildCircleInviteUri failed: ${invite.error}`);
 
   const joined = await joinCircleFromInvite({

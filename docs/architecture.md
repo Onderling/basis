@@ -1278,6 +1278,15 @@ than being overwritten by a one-device list. Without a pod, the pod-less carrier
 **recovery file** — the registry and the owner root sealed into a passphrase-protected file, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.
 
+**Sealed to the recovery seal, not to a persona.** The registry's pod mirror (every persona's profile and circles in
+one body) and the recovery file are sealed to a key derived from the root under its own label (`recovery-seal`), and
+the mirror's opaque pod name derives from it too. A device may hold a chosen set of personas, the default among them or
+not, so no persona's key could open them on every device; every phrase ceremony leaves the seal on the device instead
+(a device with the root resident derives it). A device enrolled before the seal existed has none until its next phrase
+ceremony: its registry stays local and its export refuses. The settings and history mirrors are still sealed to the
+default persona's key. What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
+names the circle's self, and the restore bootstrap announces a device only in the circles of a self it runs.
+
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding
 structure.** Apps address a **storage function** ("this circle's items", "my notes"), and a routing layer
 resolves it to a URI, consulting a per-pod mapping config where an explicit override wins. Two properties

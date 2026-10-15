@@ -28,6 +28,14 @@ describe('Vandaag — the "+"', () => {
     expect(new Date(op.args.when).getTime()).toBe(new Date('2026-10-20T14:00').getTime());
   });
 
+  it('a moment in words is read by the one bounded reader — and one it cannot read is said, not guessed', () => {
+    const op = plusOp('own-appointment', { title: 'tandarts', when: 'morgen om 14:00' });
+    const d = new Date(op.args.when);
+    const tomorrow = new Date(Date.now() + 86_400_000);
+    expect([d.getDate(), d.getHours(), d.getMinutes()]).toEqual([tomorrow.getDate(), 14, 0]);
+    expect(plusOp('own-appointment', { title: 'x', when: 'ooit eens' })).toEqual({ error: 'circle.vandaag.plus_when_unread' });
+  });
+
   it('an empty field is refused before any op', () => {
     expect(plusOp('own-note', { body: '  ' })).toEqual({ error: 'circle.vandaag.plus_empty' });
     expect(plusOp('own-appointment', { title: 'x', when: '' })).toEqual({ error: 'circle.vandaag.plus_empty' });

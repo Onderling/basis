@@ -6,6 +6,7 @@
 import { encodeGenericOpId } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { getActiveScreen } from './userScreens.js';
+import { readDayAndTime } from '../forms/parseDate.js';
 
 /** The acts the "+" offers, in order; each field names its input kind and its words. */
 export const PLUS_ACTS = Object.freeze([
@@ -19,12 +20,22 @@ export const PLUS_ACTS = Object.freeze([
 ]);
 
 const EMPTY = { error: 'circle.vandaag.plus_empty' };
+
+/** A moment from what was filled in: a picker's "YYYY-MM-DDTHH:mm", or words ("morgen om 14:00", "vrijdag 10:30") read
+ *  by the one bounded reader; a day without a time is that day at nine. Null when it cannot be read. */
+function momentOf(text) {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) { const d = new Date(text); return Number.isNaN(d.getTime()) ? null : d; }
+  const r = readDayAndTime(text);
+  if (!r?.day) return null;
+  const d = new Date(`${r.day}T${r.time ?? '09:00'}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 const word = (v) => (typeof v === 'string' ? v.trim() : '');
 
 /**
  * The op an act compiles to, from what was filled in — or `{error}` (a locale key) when something is missing.
  * @param {string} actId
- * @param {Record<string, string>} values   a datetime is the input's local "YYYY-MM-DDTHH:mm"
+ * @param {Record<string, string>} values   a datetime is a picker's local "YYYY-MM-DDTHH:mm" or words ("morgen om 14:00")
  * @returns {{app: string, opId: string, args: object}|{error: string}}
  */
 export function plusOp(actId, values = {}) {
@@ -34,8 +45,9 @@ export function plusOp(actId, values = {}) {
   }
   if (actId === 'own-appointment') {
     const title = word(values.title);
-    const at = new Date(word(values.when));
-    if (!title || Number.isNaN(at.getTime())) return EMPTY;
+    if (!title || !word(values.when)) return EMPTY;
+    const at = momentOf(word(values.when));
+    if (!at) return { error: 'circle.vandaag.plus_when_unread' };
     // no circle: the agent files it in the person's own agenda
     return { app: 'calendar', opId: 'addEvent', args: { title, when: at.toISOString() } };
   }

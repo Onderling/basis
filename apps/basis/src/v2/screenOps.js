@@ -21,6 +21,7 @@ import { makeAgentTrailEntry } from '../eventLog.js';
 export const SCREEN_OP_IDS = Object.freeze([
   'screen-add-page', 'screen-remove-page', 'screen-rename-page', 'screen-set-active', 'screen-set-circles',
   'screen-add-block', 'screen-remove-block', 'screen-move-block', 'screen-set-block-config', 'screen-undo',
+  'screen-set-personas',
 ]);
 
 const PAGE_PLACE = 'mij';
@@ -77,6 +78,12 @@ export function createScreenOps({ store, log = null, actor = 'owner' } = {}) {
     'screen-remove-block': async ({ pageId, blockId } = {}) => change('screen-remove-block', pageCheck(pageId), onPage(pageId, (s) => removeBlock(s, blockId))),
     'screen-move-block': async ({ pageId, blockId, index } = {}) => change('screen-move-block', pageCheck(pageId), onPage(pageId, (s) => moveBlock(s, blockId, Number(index)))),
     'screen-set-block-config': async ({ pageId, blockId, config } = {}) => change('screen-set-block-config', pageCheck(pageId), onPage(pageId, (s) => updateBlock(s, blockId, config && typeof config === 'object' ? config : {}))),
+    /** Which of this device's selves the app shows (the header switcher): a list of self ids, or none (= all). */
+    'screen-set-personas': async ({ ids } = {}) => change('screen-set-personas', null, (book) => {
+      const { personaSet: _old, ...rest } = book ?? {};
+      const list = Array.isArray(ids) ? ids.filter((id) => typeof id === 'string' && id) : [];
+      return list.length ? { ...rest, personaSet: [...new Set(list)] } : rest;
+    }),
     /** Undo: the book steps back to the version before the one it stands at (the versions decide); the undo is logged. */
     'screen-undo': async () => {
       const r = typeof store.undo === 'function' ? await store.undo() : null;

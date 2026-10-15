@@ -74,3 +74,17 @@ describe("a person's own notes are the person's — no door reaches them", () =>
     expect(a.householdService?.stores?.has?.(`${OWN_DEVICES_SCOPE}:p-werk`) ?? false).toBe(false);
   });
 });
+
+describe("an own note written as a persona", () => {
+  it('carries that persona\'s webid, so it rides that persona\'s own lane; a self not held here is refused', async () => {
+    const { VaultMemory } = await import('@onderling/vault');
+    const ds = memoryDataSource();
+    const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
+    const made = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
+    await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'werkbriefje', asSelf: made.id });
+    const note = (await createOwnDevicesStore({ dataSource: ds }).listByType('note')).find((n) => n.body === 'werkbriefje');
+    expect(note?.createdBy).toBe(a.persona(made.id).chatId.pubKey);
+    const r = await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'x', asSelf: 'p-000000000000' });
+    expect(r?.ok).toBe(false);
+  });
+});

@@ -6,7 +6,9 @@
 import { PLUS_ACTS } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderVandaagPlus(container, { t, actId = null, error = null, onPick, onSave, onClose } = {}) {
+export function renderVandaagPlus(container, { t, actId = null, error = null, onPick, onSave, onClose,
+  // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
+  selves = null, asSelf = null, onPickSelf } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
@@ -15,7 +17,20 @@ export function renderVandaagPlus(container, { t, actId = null, error = null, on
   title.textContent = tr('circle.vandaag.plus');
   container.appendChild(title);
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
-  if (!act) {
+  if (Array.isArray(selves) && selves.length > 1 && !asSelf) {
+    const ask = document.createElement('p');
+    ask.textContent = tr('circle.vandaag.plus_as');
+    container.appendChild(ask);
+    for (const self of selves) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'circle-vandaag-plus__self';
+      b.dataset.self = self.id;
+      b.textContent = self.id === 'default' ? tr('circle.switcher.you') : (self.name || self.id);
+      b.addEventListener('click', () => onPickSelf?.(self.id));
+      container.appendChild(b);
+    }
+  } else if (!act) {
     for (const a of PLUS_ACTS) {
       const b = document.createElement('button');
       b.type = 'button';

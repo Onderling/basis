@@ -907,6 +907,25 @@ export const basisManifest = {
     },
 
     /**
+     * `/personas` — which of this device's selves the app shows now (the header switcher; none named = all). Kept on
+     * the screens book, so it is a page change like the others: logged, undoable.
+     */
+    {
+      id:    'screen-set-personas',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'ids', kind: 'object' },
+      ],
+      surfaces: {
+        slash: { command: '/personas', body: 'flags' },
+      },
+    },
+
+    /**
      * `/page-circles` — which circles a page shows (none named = all).
      */
     {

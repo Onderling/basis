@@ -5119,7 +5119,16 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
         const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
-        const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
+        // written as one of this device's personas (the switcher's one ticked self): its webid is the maker, so the item
+        // rides that persona's own lane; a self this device does not run is refused
+        let ownBy = capCtx.by;
+        if (ownCap && typeof args?.asSelf === 'string' && args.asSelf && args.asSelf !== 'default') {
+          const rt = personas.get(args.asSelf);
+          if (!rt?.chatId?.pubKey) return { ok: false, code: 'not-a-self-here', error: 'not-a-self-here' };
+          ownBy = rt.chatId.pubKey;
+        }
+        if (ownCap && args && 'asSelf' in args) { const { asSelf: _s, ...rest } = args; args = rest; }
+        const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: ownBy }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.
         if (isPeopleWritten(householdManifest, g.noun) && ['get', 'update', 'remove'].includes(g.atom)) {
@@ -7580,6 +7589,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     ceremonyCommitmentFor, signCeremonyCommitment,
     /** The persona runtime this device runs for a persona id (personaRuntime.js) — 'default' only today. */
     persona: (id = 'default') => personas.get(id) ?? null,
+    /** The selves this device runs, for the header switcher: the default first, then each held persona — `{ id, name,
+     *  webid }`, the name from its registry entry (the default's: the person's own name, or null). */
+    personasHere: async () => {
+      const out = [];
+      for (const [id, rt] of personas) {
+        let name = null;
+        try { name = (await agentsRegistryRef?.lookup?.(id))?.name ?? null; } catch { /* nameless */ }
+        out.push({ id, name, webid: rt?.chatId?.pubKey ?? null });
+      }
+      return out.sort((a, b) => (a.id === 'default' ? -1 : b.id === 'default' ? 1 : 0));
+    },
     /** WHO this device is in a circle (its persona): `{ webid, sendAs, personKey }` — the redeem and stoop's "me" read it. */
     circleSelf,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)

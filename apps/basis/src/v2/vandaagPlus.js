@@ -36,12 +36,14 @@ const word = (v) => (typeof v === 'string' ? v.trim() : '');
  * The op an act compiles to, from what was filled in — or `{error}` (a locale key) when something is missing.
  * @param {string} actId
  * @param {Record<string, string>} values   a datetime is a picker's local "YYYY-MM-DDTHH:mm" or words ("morgen om 14:00")
+ * @param {{asSelf?: string|null}} [o]   the self it is written as (the switcher's one ticked persona); none = the default
  * @returns {{app: string, opId: string, args: object}|{error: string}}
  */
-export function plusOp(actId, values = {}) {
+export function plusOp(actId, values = {}, { asSelf = null } = {}) {
   if (actId === 'own-note') {
     const body = word(values.body);
-    return body ? { app: 'household', opId: encodeGenericOpId('household', 'add', 'note'), args: { circleId: OWN_DEVICES_SCOPE, body } } : EMPTY;
+    // written as a persona, it rides that persona's own lane (its other devices, never the default's)
+    return body ? { app: 'household', opId: encodeGenericOpId('household', 'add', 'note'), args: { circleId: OWN_DEVICES_SCOPE, body, ...(asSelf && asSelf !== 'default' ? { asSelf } : {}) } } : EMPTY;
   }
   if (actId === 'own-appointment') {
     const title = word(values.title);

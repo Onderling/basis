@@ -278,7 +278,7 @@ export const ITEM_MANIFESTS = Object.freeze([
  * `acrossCircles` (the type's own list per circle, its presenter for mine / order). Appointments also take the person's
  * own calendar (no circle) — the fold keeps those on the person's store.
  */
-async function materializeItems(block, activeCircleIds, { callSkill, selfIn = () => null, circles } = {}, { pageIsAll = true } = {}) {
+async function materializeItems(block, activeCircleIds, { callSkill, selfIn = () => null, circles, selfSet = null } = {}, { pageIsAll = true } = {}) {
   const noun = String(block.config?.noun ?? '');
   const scope = block.config?.scope === 'mine' ? 'mine' : 'all';
   const limit = clampInt(block.config?.limit, 1, 200, 10);
@@ -308,6 +308,13 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
       : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE }).catch((err) => { ownError = String(err?.message ?? err); return null; });
     let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true }));
     if (scope === 'mine') mine = mine.filter((e) => presenter.isMine(e, selfIn(null)));
+    // the switcher's set: an own item shows when the self that made it is on — its maker's webid among this device's
+    // selves; any other maker (an own appointment is made as 'me') is the default's
+    if (selfSet && Array.isArray(selfSet.on) && selfSet.on.length) {
+      const byWebid = new Map((selfSet.held ?? []).filter((x) => x?.webid).map((x) => [x.webid, x.id]));
+      const on = new Set(selfSet.on);
+      mine = mine.filter((e) => on.has(byWebid.get(e.createdBy) ?? 'default'));
+    }
     const sign = presenter.order === 'asc' ? 1 : -1;
     rows = [...rows, ...mine].filter((e) => !isAgenda || !presenter.when(e) || presenter.when(e) <= until)
       .sort((a, b) => sign * ((presenter.when(a) || 0) - (presenter.when(b) || 0)));

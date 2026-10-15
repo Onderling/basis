@@ -119,6 +119,12 @@ export function setAllCircles(screen) {
 /* ScreenBook helpers                                                     */
 /* ─────────────────────────────────────────────────────────────────────── */
 
+/** The book's persona set (the header switcher's ticks), carried as is: a non-empty list of self ids, or absent (= all). */
+function personaSetOf(book) {
+  const ids = Array.isArray(book?.personaSet) ? book.personaSet.filter((id) => typeof id === 'string' && id) : [];
+  return ids.length ? { personaSet: ids } : {};
+}
+
 export function normalizeScreenBook(raw) {
   if (!raw || typeof raw !== 'object') return { screens: [], activeId: null };
   const arr = Array.isArray(raw.screens) ? raw.screens : [];
@@ -127,7 +133,7 @@ export function normalizeScreenBook(raw) {
   if (activeId && !screens.some((s) => s.id === activeId)) activeId = null;
   if (!activeId && screens.length > 0) activeId = screens[0].id;
   const history = normalizeHistory(raw.history);
-  return { screens, activeId, ...(history ? { history } : {}) };
+  return { screens, activeId, ...personaSetOf(raw), ...(history ? { history } : {}) };
 }
 
 /** How many parent links the book keeps (the version store keeps 50 per series). */
@@ -153,7 +159,7 @@ export function addScreen(book, name = '', circleFilter = ALL_CIRCLES) {
   const cur = normalizeScreenBook(book);
   const screen = emptyScreen(name, circleFilter);
   const screens = [...cur.screens, screen];
-  return { screens, activeId: cur.activeId ?? screen.id };
+  return { screens, activeId: cur.activeId ?? screen.id, ...personaSetOf(cur) };
 }
 
 export function renameScreen(book, screenId, newName) {
@@ -167,7 +173,7 @@ export function removeScreen(book, screenId) {
   const screens = cur.screens.filter((s) => s.id !== screenId);
   let activeId = cur.activeId;
   if (activeId === screenId) activeId = screens.length > 0 ? screens[0].id : null;
-  return { screens, activeId };
+  return { screens, activeId, ...personaSetOf(cur) };
 }
 
 export function setActiveScreen(book, screenId) {

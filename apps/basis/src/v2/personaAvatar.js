@@ -22,12 +22,15 @@ export function pictureRefOf(properties) {
  * @param {object} a
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill   the shell's targeted call
  * @param {string} [a.profileId='default']
+ * @param {string|null} [a.name]   a persona's own name (its registry entry); the default's is the person's profile name
  * @returns {Promise<{name: string|null, initials: string, picture: any}>}
  */
-export async function loadPersonaAvatar({ callSkill, profileId = 'default' } = {}) {
-  let name = null;
+export async function loadPersonaAvatar({ callSkill, profileId = 'default', name: given = null } = {}) {
+  let name = profileId === 'default' ? null : given;
   let picture = null;
-  try { const p = await callSkill('stoop', 'getMyProfile', {}); name = p?.entry?.displayName || p?.entry?.handle || null; } catch { /* nameless */ }
+  if (profileId === 'default') {
+    try { const p = await callSkill('stoop', 'getMyProfile', {}); name = p?.entry?.displayName || p?.entry?.handle || null; } catch { /* nameless */ }
+  }
   try { picture = pictureRefOf((await callSkill('agents', 'getProfileProperties', { id: profileId }))?.properties); } catch { /* no picture */ }
   return { name, initials: initialsOf(name), picture };
 }

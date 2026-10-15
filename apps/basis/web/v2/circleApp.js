@@ -171,6 +171,8 @@ import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
+import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
+import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
@@ -2900,22 +2902,63 @@ function showTabBar(active) {
 let _headerAvatar = null;          // { name, initials, picture } from the shared loader
 let _headerAvatarUrl = null;       // the picture, opened with this device's own opener
 let _headerAvatarEl = null;
+// THE SWITCHER'S SET: this device's selves (`personasHere`) and which of them the app shows (the screens book's
+// `personaSet`, changed only through `screen-set-personas`). With one self there is nothing to switch.
+let _selfSet = { on: ['default'], held: [] };
+const profileIdOfCircle = (circleId) => { try { return circleHouseholdAgent?.profileIdOf?.(circleId) ?? 'default'; } catch { return 'default'; } };
+/** The circles of the selves ticked in the header (all of them with one self). */
+function circlesShown() {
+  return _selfSet.held.length > 1 ? circlesInSet(circlesCache ?? [], _selfSet.on, profileIdOfCircle) : (circlesCache ?? []);
+}
+async function refreshSelfSet() {
+  let held = [];
+  try { held = (await circleHouseholdAgent?.personasHere?.()) ?? []; } catch { held = []; }
+  let book = _screensBook;
+  try { book = await userScreenStore.get(); _screensBook = book; } catch { /* the book as held stands */ }
+  _selfSet = { held, on: held.length ? activeSelves(book ?? {}, held) : ['default'] };
+}
 function paintHeaderAvatar() {
   if (!_headerAvatarEl) {
     _headerAvatarEl = document.createElement('div');
     _headerAvatarEl.style.cssText = 'position:fixed;top:.5rem;right:.75rem;z-index:50;';
     document.body.appendChild(_headerAvatarEl);
   }
-  renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen: () => openAboutMePanel('default') });
+  // with one self the avatar is the person's editor; with several it is the switcher
+  const onOpen = _selfSet.held.length > 1 ? () => showPersonaSwitcher() : () => openAboutMePanel('default');
+  renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen });
 }
 async function refreshHeaderAvatar() {
   try {
-    _headerAvatar = await loadPersonaAvatar({ callSkill: rawCallSkill });
+    await refreshSelfSet();
+    // the avatar of the one self ticked; with several on (or one self here), the person's own
+    const selfId = writeAs(_selfSet.on) ?? 'default';
+    const named = _selfSet.held.find((p) => p.id === selfId);
+    _headerAvatar = await loadPersonaAvatar({ callSkill: rawCallSkill, profileId: selfId, name: named?.name ?? null });
     const opener = (await Promise.resolve().then(() => getSelfMediaComposition()).catch(() => null))?.mediaGateway?.opener;
     const resolve = makeCirclePictureResolver(opener);
     _headerAvatarUrl = _headerAvatar.picture && resolve ? (await Promise.resolve(resolve(_headerAvatar.picture)).catch(() => null)) : null;
   } catch { /* the initials stand */ }
   paintHeaderAvatar();
+}
+// the switcher: tick selves (an op on the book: logged, undoable), "alle", or open a self's own editor
+function showPersonaSwitcher() {
+  const { card, close } = _restoreOverlay();
+  const paint = () => renderPersonaSwitcher(card, {
+    model: switcherModel({ book: _screensBook ?? {}, held: _selfSet.held }), t,
+    onAct: async ({ opId, args }) => {
+      await rawCallSkill('basis', opId, args).catch(() => null);
+      await refreshHeaderAvatar();
+      paint();
+    },
+    onEdit: (id) => { close(); openAboutMePanel(id); },
+    onClose: () => { close(); repaintActiveTab(); },
+  });
+  paint();
+}
+/** Repaint whichever top-level tab is showing (after the switcher changed what it shows). */
+function repaintActiveTab() {
+  const show = { screens: showScreens, circles: showLauncher, contacten: showContacts, mij: showMij }[_activeTab];
+  if (typeof show === 'function') show();
 }
 
 // WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
@@ -2950,6 +2993,8 @@ async function showContacts() {
   showTabBar('contacten');
   let contacts = [];
   try { contacts = await loadAllContacts(); } catch { contacts = []; }
+  // the contacts of the selves ticked in the header (a contact is its pair circle's self)
+  if (_selfSet.held.length > 1) contacts = contactsInSet(contacts, _selfSet.on, profileIdOfCircle);
   const unread = await refreshContactUnread();
   showTabBar('contacten');   // the sum may have changed
   renderContactsRoster(rootEl, {
@@ -3616,7 +3661,7 @@ function paintLauncher() {
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
-    circles: circlesCache,
+    circles: circlesShown(),   // the circles of the selves ticked in the header
     previews,
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,
@@ -4176,7 +4221,9 @@ async function _showVandaag() {
       hostOps: {
         // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
         callSkill: rawCallSkill,
-        eventLog, circles: circlesCache,
+        eventLog, circles: circlesShown(),
+        // the switcher's set: own items show when the self that made them is ticked
+        ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
         // the circles-with-news block counts what the circle tiles count
         seenAt: readSeenAt(), myRefs: unreadMyRefs,
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
@@ -4198,11 +4245,15 @@ function showVandaagPlus() {
   const { card, close } = _restoreOverlay();
   let actId = null;
   let error = null;
+  // written as the one self ticked in the header; with several ticked, the sheet asks which
+  let asSelf = writeAs(_selfSet.on);
+  const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
   const paint = () => renderVandaagPlus(card, {
-    t, actId, error,
+    t, actId, error, selves, asSelf,
+    onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     onSave: async (id, values) => {
-      const op = plusOp(id, values);
+      const op = plusOp(id, values, { asSelf });
       if (op.error) { error = t(op.error); paint(); return; }
       const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }

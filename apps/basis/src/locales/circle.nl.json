@@ -1377,6 +1377,10 @@
     "plus_when_unread": {
       "text": "Zeg de dag en de tijd, bijv. \"morgen om 14:00\".",
       "doc": "Vandaag → '+' → own appointment: the moment typed could not be read (the bounded day-and-time reader)."
+    },
+    "plus_as": {
+      "text": "Als wie?",
+      "doc": "Vandaag → '+': several selves are ticked in the header — which one this is written as."
     }
   },
   "screens": {
@@ -9086,6 +9090,24 @@
     "removed": {
       "text": "Vergeten: {{text}}",
       "doc": "A note was removed."
+    }
+  },
+  "switcher": {
+    "title": {
+      "text": "Laat zien als",
+      "doc": "The header switcher: which of this device's selves (personas) the app shows now."
+    },
+    "all": {
+      "text": "Alle",
+      "doc": "The header switcher: tick every self."
+    },
+    "you": {
+      "text": "Jij",
+      "doc": "The header switcher: the default self (the person themselves), beside their personas."
+    },
+    "edit": {
+      "text": "Aanpassen",
+      "doc": "The header switcher: open that self's own editor."
     }
   }
 }

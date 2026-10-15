@@ -43,7 +43,21 @@ export function itemSignature(item) {
     ...(Array.isArray(src.skillTags) ? src.skillTags : []),
     ...(Array.isArray(src.requiredSkills) ? src.requiredSkills : []),
   ];
-  return deriveSignature({ text: item?.text ?? item?.title ?? '', tags });
+  // the taxonomy category is one more tag, the same on the driver side (`categoryTag`): a post that only names its
+  // category still meets an offering of that category — one matcher, no second rule
+  const cat = typeof item?.categoryId === 'string' && item.categoryId ? item.categoryId : (typeof src.categoryId === 'string' ? src.categoryId : null);
+  return deriveSignature({ text: item?.text ?? item?.title ?? '', tags: cat ? [...tags, categoryTag(cat)] : tags });
+}
+
+/** The tag a taxonomy category is on both sides of a match (item and driver). */
+export function categoryTag(categoryId) {
+  return `category-${categoryId}`;
+}
+
+/** A driver's tags as the matcher reads them: its own, plus its category's tag when it has one. */
+function driverTags(driver) {
+  const own = Array.isArray(driver?.tags) ? driver.tags : [];
+  return typeof driver?.categoryId === 'string' && driver.categoryId ? [...own, categoryTag(driver.categoryId)] : own;
 }
 
 /**
@@ -161,11 +175,12 @@ export function jaccard(a = [], b = []) {
  * @returns {{kind:string, score:number, sharedTags:string[], reason:{kind:'tags',tags:string[]}}|null}
  */
 export function scoreDriver(driver, signature, { minShared = 1 } = {}) {
-  const shared = sharedTags(driver?.tags ?? [], signature?.tags ?? []);
+  const tags = normalizeTags(driverTags(driver));
+  const shared = sharedTags(tags, signature?.tags ?? []);
   if (shared.length < minShared) return null;
   return {
     kind: driver?.kind ?? 'driver',
-    score: jaccard(driver?.tags ?? [], signature?.tags ?? []),
+    score: jaccard(tags, signature?.tags ?? []),
     sharedTags: shared,
     reason: { kind: 'tags', tags: shared },
   };
@@ -224,11 +239,12 @@ export async function matchDriversSemantic({ drivers, signature, judge, minShare
   const judgeCandidates = [];
   for (const [key, driver] of entries) {
     const outKey = isArray ? null : key;
-    const shared = sharedTags(driver?.tags ?? [], sig.tags);
+    const tags = normalizeTags(driverTags(driver));
+    const shared = sharedTags(tags, sig.tags);
     if (shared.length >= minShared) {
       tagMatches.push({
         key: outKey, kind: driver?.kind ?? 'driver',
-        score: jaccard(driver?.tags ?? [], sig.tags),
+        score: jaccard(tags, sig.tags),
         sharedTags: shared, reason: { kind: 'tags', tags: shared },
       });
     } else {

@@ -177,6 +177,8 @@ import {
 // that mints a `request` task instead of executing an offering. Wired below onto the
 // live host agent as the `requestOffering` peer-facing dispatcher op.
 import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers } from '@onderling/item-store';
+import { matchProfileDrivers } from '@onderling/agent-registry';
+import { isAwayNow } from '../../v2/memberAvailability.js';
 
 /**
  * Pick the right vault for the runtime.  Used here only for the
@@ -4302,7 +4304,21 @@ export async function createRealHouseholdAgent(opts = {}) {
       ...(sendAs ? { sendAs } : {}),
     });
   }
+  // "A POST MATCHES WHAT I OFFER" — judged here, on this device, against the drivers of kind 'offering' of the self this
+  // device is in that circle (a persona's circle is the persona's; no circle = the default), by the one driver matcher.
+  // A local closure the stoop agent calls: reachable by no op and no wire, so no value leaves the device. Away (the
+  // person's one availability record, `opts.availability`) matches nothing.
+  const matchesMine = async (circleId, post) => {
+    try {
+      if (typeof opts.availability === 'function' && isAwayNow(await opts.availability())) return false;
+      const pid = circleId ? profileIdOf(circleId) : 'default';
+      const drivers = (await callSkill('agents', 'getProfileDrivers', { id: pid }))?.drivers ?? {};
+      const offerings = Object.fromEntries(Object.entries(drivers).filter(([, d]) => d?.kind === 'offering'));
+      return (await matchProfileDrivers({ properties: offerings, item: post })).length > 0;
+    } catch { return false; }
+  };
   const stoopAgent = await createBrowserStoopAgent({
+    matchesMine,
     bus,
     identityVault: stoopIdentityVault,
     // Circle-scoped spine signing (principle 5): each membership statement is signed with the PER-CIRCLE

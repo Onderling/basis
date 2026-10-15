@@ -10,6 +10,5 @@ export {
   TAXONOMY,
   normaliseTag,
   categoryFor,
-  matchesProfile,
   isKnownCategory,
 } from './offeringsMatch.js';

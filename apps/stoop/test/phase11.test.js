@@ -41,47 +41,7 @@ async function buildAgent({ members } = {}) {
 
 // ── Skill management ──────────────────────────────────────────────────────
 
-describe('Stoop V1 Phase 11 — setMyOfferings / addMySkill / removeMySkill', () => {
-  it('setMyOfferings replaces the full array', async () => {
-    const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'setMyOfferings', {
-      skills: [
-        { categoryId: 'klusjes', freeTags: ['fiets'] },
-        { categoryId: 'tuin' },
-      ],
-    });
-    expect(r.skills).toHaveLength(2);
-    expect(r.skills[0].categoryId).toBe('klusjes');
-    expect(r.skills[1].status).toBe('active');     // default
-  });
-
-  it('addMySkill upserts by categoryId', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'klusjes', freeTags: ['fiets'] });
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'klusjes', freeTags: ['paint'] });
-    const list = await callSkill(bundle.agent, 'listMySkills');
-    expect(list.skills).toHaveLength(1);
-    expect(list.skills[0].freeTags).toEqual(['paint']);   // overwritten
-  });
-
-  it('removeMySkill drops by categoryId', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'klusjes' });
-    await callSkill(bundle.agent, 'addMySkill', { categoryId: 'tuin' });
-    await callSkill(bundle.agent, 'removeMySkill', { categoryId: 'klusjes' });
-    const list = await callSkill(bundle.agent, 'listMySkills');
-    expect(list.skills.map(s => s.categoryId)).toEqual(['tuin']);
-  });
-
-  it('rejects missing required args', async () => {
-    const bundle = await buildAgent();
-    expect(await callSkill(bundle.agent, 'setMyOfferings', {})).toEqual({ error: 'skills array required' });
-    expect(await callSkill(bundle.agent, 'addMySkill', {})).toEqual({ error: 'categoryId required' });
-    expect(await callSkill(bundle.agent, 'removeMySkill', {})).toEqual({ error: 'categoryId required' });
-  });
-});
-
-// ── stableId end-to-end through the agent factory ─────────────────────────
+// (the per-person offering writers set/add/remove retired 2026-10-15 — offerings are the person's drivers)
 
 describe('Stoop V1 Phase 11 — stableId reaches the bundle', () => {
   it('bundle.agent.identity.stableId is non-null + survives offeringMatch start', async () => {

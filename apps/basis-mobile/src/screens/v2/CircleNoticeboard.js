@@ -31,7 +31,7 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
+export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
@@ -98,7 +98,8 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
       try {
         annotated = await annotateResonantPosts({
           posts: mapped,
-          getDrivers: async () => (await callSkill('agents', 'getProfileDrivers', { id: 'default' }))?.drivers ?? {},
+          // the drivers of the self this device is in this circle (a persona's circle is the persona's)
+          getDrivers: async () => (await callSkill('agents', 'getProfileDrivers', { id: selfProfileId }))?.drivers ?? {},
         });
       } catch { /* resonance is a nicety; never block the board */ }
       setPosts(annotated);

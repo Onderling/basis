@@ -2324,6 +2324,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        selfProfileId={profileIdOfCircle(selected?.id)}
         circle={selected}
         deliveryStateMap={deliveryStateMap}
         registerCircleBotSink={registerCircleBotSink}
@@ -2770,6 +2771,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // the self this device is in this circle (a persona's circle is the persona's): whose drivers it reads
+  selfProfileId = 'default',
   circle, items, resolveSkill, rawCallSkill, catalogue: rawCatalogue, policy, override = null, myListTasks = [],
   deliveryStateMap = null,
   registerCircleBotSink = null,
@@ -3519,7 +3522,7 @@ function CircleDetail({
     // WHAT — only offerings I hold appear; that IS the attenuation, made visible.
     let offerings = [];
     try {
-      const drivers = (await rawCallSkill('agents', 'getProfileDrivers', { id: 'default' }))?.drivers ?? {};
+      const drivers = (await rawCallSkill('agents', 'getProfileDrivers', { id: selfProfileId }))?.drivers ?? {};
       offerings = Object.entries(drivers)
         .filter(([, v]) => v && v.kind === 'offering')
         .map(([key, v]) => ({ key, text: v.text || key }));
@@ -4337,7 +4340,7 @@ function CircleDetail({
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
-          <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
+          <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia} selfProfileId={selfProfileId}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}

@@ -30,13 +30,15 @@ async function callSkill(agent, skillId, args) {
   });
 }
 
-async function buildBundle({ skills } = {}) {
+async function buildBundle({ offers = null } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
   const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
-    members:    [{ webid: ANNE, skills: skills ?? [] }],
+    members:    [{ webid: ANNE }],
+    // what Anne offers, as the host judges it on her device (her drivers; here: a category)
+    ...(offers ? { matchesMine: async (_circleId, post) => post?.categoryId === offers } : {}),
   });
   await bundle.offeringMatch.start();
   return bundle;
@@ -89,11 +91,11 @@ describe('Stoop V1.5 Phase 22 — InterestProfile lib', () => {
 
 describe('Stoop V1.5 Phase 22 — skills', () => {
   it('scorePostRelevance falls back to Layer 2 when Layer 1 misses', async () => {
-    const bundle = await buildBundle({ skills: [{ categoryId: 'tuinieren', status: 'active' }] });
+    const bundle = await buildBundle({ offers: 'tuinieren' });
     update(bundle.interestProfile, 'kun je mijn fiets versnellingen afstellen?');
     update(bundle.interestProfile, 'fiets band repareren spaak');
 
-    // Layer 1 misses (post is "vervoer", member skill is "tuinieren").
+    // Layer 1 misses (post is "vervoer", what Anne offers is "tuinieren").
     // Layer 2 should hit because the body overlaps the profile.
     const r = await callSkill(bundle.agent, 'scorePostRelevance', {
       text:       'iemand die fiets band kan repareren?',
@@ -107,13 +109,13 @@ describe('Stoop V1.5 Phase 22 — skills', () => {
   });
 
   it('scorePostRelevance: Layer 1 hit short-circuits', async () => {
-    const bundle = await buildBundle({ skills: [{ categoryId: 'vervoer', status: 'active' }] });
+    const bundle = await buildBundle({ offers: 'vervoer' });
     const r = await callSkill(bundle.agent, 'scorePostRelevance', {
       text:       'fiets repareren',
       categoryId: 'vervoer',
     });
     expect(r.matched).toBe(true);
-    expect(r.viaCategory).toBe('vervoer');
+    expect(r.via).toBe('offering');
   });
 
   it('getInterestProfile returns top terms', async () => {
@@ -154,5 +156,22 @@ describe('Stoop V1.5 Phase 22 — skills', () => {
     // we test that path directly via the lib tests above.  Here we
     // just assert: no crash, profile is still well-formed.
     expect(bundle.interestProfile.totalDocs).toBeGreaterThanOrEqual(before);
+  });
+});
+
+describe('scorePostRelevance answers this device only', () => {
+  // It now answers over the person's PRIVATE offerings (the host's matchesMine): from a peer it would be an oracle over
+  // them — per category, and per circle a peer may name. Only the device's own calls get a verdict.
+  it('a peer\'s task is refused; the shell\'s own call answers', async () => {
+    const bundle = await buildBundle({ offers: 'vervoer' });
+    const def = bundle.agent.skills.get('scorePostRelevance');
+    const ask = (from, extra = {}) => def.handler({ parts: [DataPart({ text: 'fiets?', categoryId: 'vervoer', ...extra })], from, agent: bundle.agent, envelope: null });
+    const own = await ask(ANNE);
+    expect(own.matched).toBe(true);
+    const peer = await ask('https://id.example/bob');
+    expect(peer.matched).toBeUndefined();
+    expect(peer.error).toBe('not-yours');
+    const probe = await ask('https://id.example/bob', { circleId: 'someone-elses-circle' });
+    expect(probe.error).toBe('not-yours');
   });
 });

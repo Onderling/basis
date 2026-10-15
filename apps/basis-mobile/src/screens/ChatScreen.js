@@ -454,7 +454,8 @@ export default function ChatScreen({
     // A noticeboard post from another member LANDS in the circle store through the task lane (one carry,
     // web parity); the shell bridges it into stoop's index + the notification through the same handler.
     agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
-      handleCirclePost: makeHandleCirclePost({ callSkill, publishEvent }),
+      // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
+      handleCirclePost: makeHandleCirclePost({ callSkill, publishEvent, profileIdOf: (cid) => agent.profileIdOf?.(cid) ?? 'default' }),
       self: agent.identity?.pubKey ?? null,
     }));
     const getMyPubKey = () =>

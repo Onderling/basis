@@ -436,33 +436,6 @@ export const stoopManifest = {
     },
     // ── Profile / reveals ───────────────────────────────────────────
     {
-      id:   'setMyOfferings', group: 'compose',
-      verb: 'set',  // F-SP1-e: non-canonical.  This is a profile
-                    // mutation — not add/remove/list of an item.
-                    // Resolved 2026-05-21 (owner): kept as one
-                    // `setMyOfferings` op (vs splitting into addMyOffering +
-                    // removeMyOffering).  Slash is line-oriented; "set my
-                    // offerings" is the natural user mental model.
-                    // Granular `addMyOffering`/`removeMyOffering` already
-                    // exist as skills and can be added to a future LLM-
-                    // only manifest layer (D.2) if needed.
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
-      params: [
-        // Complex param — array of {categoryId, freeTags?,
-        // availability?, radius?, status?}.  Slash surface can't
-        // express this directly; declared as a string the consumer
-        // parses (e.g. JSON-encoded form-submit payload).
-        { name: 'skills', kind: 'string', required: true, ...STR_NONEMPTY },
-      ],
-      surfaces: {
-        chat:  { hint: "Replace the calling actor's offerings array." },
-        slash: {
-          command: '/offerings',
-          shape:   '/offerings <json-array-of-offering-entries>',
-        },
-      },
-    },
-    {
       id:   'setPeerReveal', group: 'compose',
       verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
       writes: { scope: 'device' },   // a reveal flag kept on this device
@@ -919,30 +892,14 @@ export const stoopManifest = {
     },
 
     // ── What you offer ──────────────────────────────────────────────
+    // The per-person offering WRITERS (set/add/remove) retired 2026-10-15: offerings are persona drivers
+    // (`agents:setProfileDriver`, kind 'offering'), set in the person's own editor; the reads below stay (the
+    // one-time offerings/availability migrations lift an older roster list into the drivers).
     // Declared 2026-08-19. These have had handlers all along and the shells have been calling them;
     // nothing declared them, so the manifest was not the contract it is supposed to be (invariant 4)
     // and a typo'd op id resolved to silence. Params are derived from the handlers, not invented.
     // Surfaces are deliberately empty where the shells reach these through their own screens: an op
     // with a screen does not need a slash command invented for it.
-    {
-      id:   'addMyOffering', verb: 'add',
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
-      // An offering set converges per CATEGORY: two devices adding different categories must both
-      // survive, and the same category added twice is one entry. Last write wins WITHIN a category
-      // (its free tags), which is content, not a claim — nobody is racing for exclusive ownership.
-      resolves: [{ field: 'freeTags', policy: 'content' }],
-      params: [
-        { name: 'categoryId', kind: 'string', required: true },
-        { name: 'freeTags',   kind: 'object', schema: { type: 'array', items: { type: 'string' } } },
-      ],
-      surfaces: { chat: { hint: 'Add something you can offer to your neighbours, by category id (see listOfferingCategories). Optional free tags.' } , ui: { control: 'button' } },
-    },
-    {
-      id:   'removeMyOffering', verb: 'remove',
-      writes: { scope: 'circle' },   // the person's row in this circle's member map
-      params: [{ name: 'categoryId', kind: 'string', required: true }],
-      surfaces: { chat: { hint: 'Stop offering a category you had listed.' } , ui: { control: 'button' } },
-    },
     {
       id:   'listMyOfferings', verb: 'list',
       params: [],

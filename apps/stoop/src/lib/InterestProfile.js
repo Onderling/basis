@@ -7,7 +7,7 @@
  *
  * Idea
  * ────
- * Layer 1 (`skillsMatch.matchesProfile`) is fast and deterministic:
+ * Layer 1 (the host's `matchesMine`: the person's own offerings, the driver matcher) is fast and deterministic:
  * if the post's `categoryId` lines up with one of the user's skills,
  * it's a match.  But Layer 1 misses borderline posts whose body
  * happens to mention things the user has shown interest in before

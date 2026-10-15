@@ -6953,6 +6953,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** The history mirror's live status for the my-data surface (null = not running on this boot; `needsPhrase` = this
      *  device has no recovery seal yet, so it cannot run until a phrase step hands it one). */
     historyMirrorStatus: () => historyMirror?.status?.() ?? (recoverySealIdentity ? null : { needsPhrase: true }),
+    /** Does this device hold the person's recovery seal? Without it, nothing sealed to the person syncs from here: the
+     *  backups stay local and its own lanes carry nothing — My data says how to get it (the phrase, once). */
+    hasRecoverySeal: () => Boolean(recoverySealIdentity),
     /** One-shot sealed export of the whole live device log — "mirror to a file", the same sink and
      *  the same seal; `archiveSource` + `hydrateHistory` open it again on any future install. */
     exportHistoryArchive: async () => {

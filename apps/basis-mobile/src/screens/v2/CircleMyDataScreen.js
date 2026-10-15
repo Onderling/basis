@@ -540,6 +540,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           no door. The revoke button opens the phrase-proven ceremony for that device. */}
       {devices.length > 0 && (
         <Section title={t('circle.mydata.devices')}>
+          {/* without the recovery seal this device carries nothing of the person's own scope to the others */}
+          {agent?.hasRecoverySeal?.() === false ? (
+            <Text style={styles.privacyBody} testID="mydata-devices-needs-phrase">{t('circle.mydata.devices_needs_phrase')}</Text>
+          ) : null}
           {devices.map((d) => (
             <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
               <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>

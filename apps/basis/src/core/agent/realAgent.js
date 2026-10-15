@@ -626,6 +626,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // per-circle keys — address, signing identity, sealing keys, commitment, link proofs — are that persona's. Unrecorded
   // circles (and every circle while only the default runs) are the default's, as before.
   const circlePersonas = new Map();   // circleId → profileId (non-default only)
+  let onPersonaStarted = null;   // set once the own store exists: a persona that starts writes its device-map row
   const personaOf = (circleId) => personas.get(circlePersonas.get(circleId)) ?? persona;
   const deviceSeedFor = (circleId) => personaOf(circleId).deviceDerivationSeed;
   const circleIdentityFor = (circleId) => personaOf(circleId).circleIdentityFor(circleId);
@@ -1484,6 +1485,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // its identities are OURS from the moment it runs — a contact's turn sent as it (no circle bound yet) must sign
         // as it, never fall back to the default's canonical identity
         await registerPersonaIdentities(id, rt);
+        try { onPersonaStarted?.(id); } catch { /* the device map row is written at the next boot */ }
         return rt;
       } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
     };
@@ -1994,8 +1996,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the revoke walk, 2026-09-14). The circle comes from the sibling table; a caller that knows it
   // already — a seed reply to a device not yet on any roster — names it in the payload.
   const sendToSibling = async (to, payload, o = {}) => {
-    let circleId = typeof payload?.circleId === 'string' && payload.circleId !== OWN_DEVICES_SCOPE ? payload.circleId : null;
-    if (!circleId) circleId = (await ownDeviceSiblingRows()).find((d) => d.address === to)?.circleId ?? null;
+    // an OWN lane names no circle: the sibling is reached in a circle that lane's self shares with it — the default's
+    // lane over the default's circles, a persona's over that persona's (so it travels as that self, never another)
+    const ownSelf = typeof payload?.circleId === 'string' ? selfOfOwnLane(payload.circleId) : null;
+    let circleId = typeof payload?.circleId === 'string' && !ownSelf ? payload.circleId : null;
+    if (!circleId) {
+      const rows = ownSelf && ownSelf !== 'default' ? await personaSiblingRows(ownSelf) : await ownDeviceSiblingRows();
+      circleId = rows.find((d) => d.address === to)?.circleId ?? null;
+    }
     if (!circleId) throw new Error(`not a device of mine on any circle: ${String(to).slice(0, 12)}…`);
     const { circleId: _ignored, ...rest } = o;   // eslint-disable-line no-unused-vars
     return sendCircleScoped(to, payload, { ...rest, circleId });
@@ -2046,10 +2054,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
   // A PERSONA'S SIBLINGS are the devices holding THAT persona: its rows in its own circles (its webid at an address
   // that is not this device's). No person-level lane on the wire: a persona's circle traffic is carried to them only.
-  const personaSiblings = async (pid) => {
+  const personaSiblingRows = async (pid) => {
     const rt = personas.get(pid);
     if (!rt?.chatId?.pubKey) return [];
-    const rows = await siblingDevices({
+    return siblingDevices({
       callSkill: (...a) => callSkill(...a),
       selfPubKey: rt.chatId.pubKey,
       circleAddressFor,
@@ -2062,11 +2070,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         return [...ids];
       },
     }).catch(() => []);
-    return rows.map((d) => d.address);
   };
-  /** The siblings a payload is carried to: its circle's self's devices (a persona's own), else the default's set. */
+  const personaSiblings = async (pid) => (await personaSiblingRows(pid)).map((d) => d.address);
+  /** The siblings a payload is carried to: its circle's self's devices (a persona's own), else the default's set — an own
+   *  lane's to that lane's self's devices. */
   const siblingsFor = async (payload) => {
     const cid = typeof payload?.circleId === 'string' ? payload.circleId : null;
+    const own = cid ? selfOfOwnLane(cid) : null;
+    if (own) return own === 'default' ? ownDeviceSiblings() : personaSiblings(own);
     const pid = cid ? circlePersonas.get(cid) : null;
     return pid ? personaSiblings(pid) : ownDeviceSiblings();
   };
@@ -2084,19 +2095,38 @@ export async function createRealHouseholdAgent(opts = {}) {
   let ownStoreNow = null;
   let ownStoreMade = null;
   let ownLaneWired = false;
-  const ownSeal = settingsSealStrategyForIdentity(chatId);
+  // ONE LANE PER SELF. The one store holds the person's own rows; each rides the lane of the self that wrote it (its
+  // `createdBy` — a row nobody of a persona wrote is the default's), carried AS that self to that self's siblings only,
+  // so nothing of one persona's own scope ever travels over another's addresses. Sealed in flight to the recovery seal
+  // (every device of the person holds it, whichever personas it runs).
+  const ownLaneOf = (selfId) => (!selfId || selfId === 'default' ? OWN_DEVICES_SCOPE : `${OWN_DEVICES_SCOPE}:${selfId}`);
+  const selfOfOwnLane = (scope) => {
+    if (scope === OWN_DEVICES_SCOPE) return 'default';
+    const prefix = `${OWN_DEVICES_SCOPE}:`;
+    return typeof scope === 'string' && scope.startsWith(prefix) && /^p-[0-9a-f]{12}$/.test(scope.slice(prefix.length)) ? scope.slice(prefix.length) : null;
+  };
+  const isOwnLane = (scope) => selfOfOwnLane(scope) !== null;
+  const selfOfOwnItem = (item) => {
+    const by = item?.createdBy ?? null;
+    for (const [pid, rt] of personas) if (pid !== 'default' && by && rt?.chatId?.pubKey === by) return pid;
+    return 'default';
+  };
+  /** The own lanes this device rides: its default's and each persona's it runs. */
+  const ownLanes = () => [...personas.keys()].map(ownLaneOf);
+  const ownSeal = settingsSealStrategyForIdentity(recoverySealIdentity);
   function wireOwnLane() {
     if (ownLaneWired || !ownStoreNow || !taskEmit) return;
     ownLaneWired = true;
-    const valve = routeTaskMirror({ circleId: OWN_DEVICES_SCOPE, emitter: taskEmit });
+    const valves = new Map();
+    const valveFor = (lane) => valves.get(lane) ?? valves.set(lane, routeTaskMirror({ circleId: lane, emitter: taskEmit })).get(lane);
     // …and the composition hears what this node wrote there, as it hears a circle's writes (`opts.onCircleWrite`)
     const wrote = (item, removedId) => { try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
     wireStoreMirror(ownStoreNow, {
-      publishItem:        (item)         => { const r = valve.publishItem(item); wrote(item); return r; },
-      publishItemRemoved: (rid, removed) => { const r = valve.publishItemRemoved(rid, removed); wrote(null, rid); return r; },
+      publishItem:        (item)         => { const r = valveFor(ownLaneOf(selfOfOwnItem(item))).publishItem(item); wrote(item); return r; },
+      publishItemRemoved: (rid, removed) => { const r = valveFor(ownLaneOf(selfOfOwnItem(removed))).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
     });
     // what landed for it before it was open (parked on the log) is applied now
-    Promise.resolve(taskRail?.rebuildHead?.(OWN_DEVICES_SCOPE)).catch(() => {});
+    for (const lane of ownLanes()) Promise.resolve(taskRail?.rebuildHead?.(lane)).catch(() => {});
   }
   const getOwnStore = () => (ownStoreMade ??= (async () => {
     ownStoreNow = await (typeof opts.ownStore === 'function' ? opts.ownStore() : createOwnDevicesStore());
@@ -2875,8 +2905,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // accepting it. The revoked device becomes an island; enforcement lives at the OTHER ends.
     // Group-key rotation & per-device sealing ride the custody refinement (a recorded open call).
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
-    const deviceId = String(parts?.[0]?.data?.deviceId ?? '').trim();
-    if (!deviceId) return [DataPart({ ok: false, outcome: 'error', error: 'deviceId-required' })];
+    const namedId = String(parts?.[0]?.data?.deviceId ?? '').trim();
+    if (!namedId) return [DataPart({ ok: false, outcome: 'error', error: 'deviceId-required' })];
     let root;
     try { root = Bootstrap.fromMnemonic(mnemonic); }
     catch { return [DataPart({ ok: false, outcome: 'invalid-phrase', error: 'invalid-phrase' })]; }
@@ -2900,6 +2930,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       // wasn't there). Present → flip the tombstone; absent → mint the full root-signed record
       // already revoked, so the registry ends self-contained either way. `known` tells the shell
       // which case it was (the typo-feedback the UI wants), without blocking the act.
+      // THE DEVICE AS THIS DEVICE KNOWS IT: the id may be its wire id under any self (a device that shares only Werk with
+      // it knows it by its Werk wire id). The private device map names its internal id; the default's wire id of it
+      // derives from that, and is what the default's part of the ceremony acts on.
+      let deviceId = namedId;
+      let linkedInternalId = null;
+      try {
+        const rows = (await (await getOwnStore()).list?.()) ?? [];
+        linkedInternalId = rows.find((it) => it?.type === 'device-link' && it.wireId === namedId)?.internalId ?? null;
+        if (linkedInternalId) deviceId = wireDeviceId(root.deriveAgentSeed('default'), linkedInternalId);
+      } catch { /* no map: the id is taken as the default's, as before */ }
       const revokedSeed = deriveDeviceSeed(root.deriveAgentSeed('default'), deviceId);
       let known = false;
       // Best-effort bookkeeping behind a hard timeout: the STATEMENTS below are the enforcement,
@@ -2992,9 +3032,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // default's is), and retires its addresses in that persona's circles as that persona.
       const revokedUnder = { default: deviceId };
       try {
-        const store = await getOwnStore();
-        const link = ((await store.list?.()) ?? []).find((it) => it?.type === 'device-link' && it.wireId === deviceId) ?? null;
-        const internalId = link?.internalId ?? null;
+        const internalId = linkedInternalId;
         const entries = internalId ? ((await bounded(agentsRegistryRef?.list?.())) ?? []) : [];
         for (const entry of entries) {
           const pid = entry?.agentId;
@@ -3614,21 +3652,25 @@ export async function createRealHouseholdAgent(opts = {}) {
       // device's fresh address in each circle AS the persona, pull the lanes — the same offer the boot consumes.
       let bootstrap = null;
       if (picked.length > 0) try {
-        const rosters = {};
-        const memberships = {};
-        const selves = [];
+        // ONE bootstrap per received self (its own webid excluded from its circles' targets), merged into one offer with
+        // each circle tagged with its persona — the consume binds each to its own before it says anything there
+        const entries = [];
+        const relays = [];
         for (const pid of picked) {
           const entry = await agentsRegistryRef?.lookup?.(pid);
           const own = circleMembershipsOf(entry ?? {});
           const webid = (await AgentIdentity.fromSeed(proof.root.deriveAgentSeed(pid), new VaultMemory())).pubKey;
-          selves.push(webid);
-          for (const [cid, rec] of Object.entries(own)) {
-            memberships[cid] = rec;
+          const rosters = {};
+          for (const cid of Object.keys(own)) {
             const members = ((await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? []).filter((m) => m?.webid && m.webid !== webid);
             rosters[cid] = { rows: [], members };
           }
+          const one = bootstrapOfferFromRosters({ body: bodyWithRosters({ body: {}, rosters }), selfPubKey: webid, memberships: own, persona: pid });
+          if (!one) continue;
+          entries.push(...one.entries);
+          for (const url of one.relays) if (!relays.includes(url)) relays.push(url);
         }
-        const made = bootstrapOfferFromRosters({ body: bodyWithRosters({ body: {}, rosters }), selfPubKey: selves[0] ?? null, memberships });
+        const made = entries.length ? { offer: encodeEnrollOffer({ relays, circles: entries }), circles: entries.length } : null;
         if (made) {
           let stashed = false;
           if (opts.enrollOfferStorage) { try { stashed = (await stashEnrollOffer(opts.enrollOfferStorage, made.offer)).ok === true; } catch { stashed = false; } }
@@ -4042,14 +4084,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleIdentityFor,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
-      storeFor: (circleId) => (circleId === OWN_DEVICES_SCOPE ? ownStoreNow : (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null)),
+      storeFor: (circleId) => (isOwnLane(circleId) ? ownStoreNow : (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null)),
       // the person's own scope: between their own devices only (see the own store above)
+      // …one lane per self this device holds: each signed, carried and verified as that self's devices
       own: {
-        scope: OWN_DEVICES_SCOPE,
-        signer: () => grantsSignerPromise,
-        verifyBinding: deviceSetVerifier,
+        isOwn: isOwnLane,
+        signer: (scope) => deviceKitOf(selfOfOwnLane(scope))?.signer ?? null,
+        verifyBinding: (a) => { const kit = deviceKitOf(selfOfOwnLane(a?.circleId)); return kit ? kit.verify(a) : false; },
         seal: () => ownSeal,
-        delegation: () => enrolledDevice?.record ?? null,
+        delegation: (scope) => deviceKitOf(selfOfOwnLane(scope))?.record ?? null,
+        belongs: (scope, item) => ownLaneOf(selfOfOwnItem(item)) === scope,
       },
       // A landed snapshot that is a noticeboard post goes to the shell's bridge (stoop's index + notification).
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
@@ -4065,7 +4109,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // and nothing said so — 2026-08-20). Under-delivery and rejection both warn; catch-up reconciles
       // either way, but now the log says WHEN it will have to.
       // the person's own scope has no members to fan to: it reaches their other devices by the one carry, only
-      fan: (circleId, statement) => (circleId === OWN_DEVICES_SCOPE
+      fan: (circleId, statement) => (isOwnLane(circleId)
         ? siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
         : callSkill('stoop', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
@@ -4093,14 +4137,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
         subtypes: OWN_TASK_CATCHUP_SUBTYPES,
         statementsFor: (circleId) => taskRail.catchUpStatements(circleId),
-        mayServe: async (fromPeerAddr, circleId) => circleId === OWN_DEVICES_SCOPE && (await ownDeviceSiblings()).includes(fromPeerAddr),
+        // each own lane to that lane's self's devices only
+        mayServe: async (fromPeerAddr, circleId) => isOwnLane(circleId) && (await siblingsFor({ circleId })).includes(fromPeerAddr),
       });
       ownStoreSync = {
         ...replay,
         async requestFromSiblings() {
           let requested = 0;
-          for (const addr of await ownDeviceSiblings().catch(() => [])) {
-            try { await replay.requestFrom(addr, OWN_DEVICES_SCOPE); requested += 1; } catch { /* the next connect asks again */ }
+          for (const lane of ownLanes()) {
+            for (const addr of await siblingsFor({ circleId: lane }).catch(() => [])) {
+              try { await replay.requestFrom(addr, lane); requested += 1; } catch { /* the next connect asks again */ }
+            }
           }
           return { requested };
         },
@@ -7745,15 +7792,22 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THIS DEVICE ON THE PERSON'S PRIVATE DEVICE MAP: its default wire id and its internal id, as a `device-link` row in
   // the own-devices scope (sealed, carried between the person's own devices only). The revoke ceremony on another
   // device reads it to retire this one under every persona it holds. Written once; best-effort (the next boot retries).
+  // ONE ROW PER SELF this device holds — that self's wire id of it, written AS that self, so it rides that self's own lane
+  // to that self's devices: a device that shares only Werk with this one still finds it, by the id it knows it by.
   {
-    const myWire = persona.enrolledDevice?.deviceId ?? null;
-    const myInternal = persona.internalDeviceId ?? null;
-    if (myWire && myInternal) {
+    const writeDeviceLink = (pid) => {
+      const rt = personas.get(pid);
+      const myWire = rt?.enrolledDevice?.deviceId ?? null;
+      const myInternal = persona.internalDeviceId ?? null;
+      const by = pid === 'default' ? chatId.pubKey : rt?.chatId?.pubKey;
+      if (!myWire || !myInternal || !by) return;
       getOwnStore().then(async (st) => {
         const have = ((await st.list?.()) ?? []).some((it) => it?.type === 'device-link' && it.wireId === myWire && it.internalId === myInternal);
-        if (!have) await st.put({ type: 'device-link', id: `device-link:${myWire}`, wireId: myWire, internalId: myInternal }, { by: chatId.pubKey });
+        if (!have) await st.put({ type: 'device-link', id: `device-link:${myWire}`, wireId: myWire, internalId: myInternal }, { by });
       }).catch((err) => console.warn(`[device-map] this device is not on the private device map yet (the next boot retries): ${err?.message ?? err}`));
-    }
+    };
+    for (const pid of personas.keys()) writeDeviceLink(pid);
+    onPersonaStarted = writeDeviceLink;   // …and a persona that starts later (created here, or handed) writes its own
   }
   selfAgent = api;
   return api;

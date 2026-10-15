@@ -1910,9 +1910,12 @@ export default function CircleLauncherScreen({
           onSave={async (actId, values, asSelf) => {
             // the act's op through the waist (shared `plusOp`), written as the ticked self; a page with no block showing
             // it gets one (undoable)
-            const op = plusOp(actId, values, { asSelf });
+            const op = plusOp(actId, values);
             if (op.error) return t(op.error);
-            const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+            // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
+            const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
+            const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+              .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
             if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
             const follow = plusFollowUp(screensBook, actId);
             if (follow) await runScreenOp(follow.opId, follow.args);

@@ -36,6 +36,8 @@ export const NOT_MERGED = Object.freeze({
   'removed-list': 'kept aside; offered back by /list-restore, never merged into a view',
   // an intention is never a chore, an item or a reminder: what is planned is read by `upcoming` (intentions.js) only
   intention: 'pending work; read by `upcoming` only, never merged into chores, "Mijn dingen" or reminders',
+  // a device-link is the person's private device map (own-devices scope, read by the revoke ceremony) — never shown
+  'device-link': 'the private device map; read by the revoke ceremony only, never shown in any view',
 });
 
 /** Canonical nouns without a presenter yet — this list only shrinks. */

@@ -131,7 +131,7 @@ describe('materializeScreen · α.2.b — agenda', () => {
     expect(out[0].content.items.map((i) => i.id)).toEqual(['a', 'b']);
   });
 
-  it('all-muted: agenda renders empty (no events fetched)', async () => {
+  it('all-muted: no circle\'s events are fetched — only my own agenda (muting a circle never hides me)', async () => {
     const screen = addBlock(emptyScreen('Stream'), 'calendar');
     const callSkill = vi.fn(async () => ({ items: [] }));
     const out = await materializeScreen({
@@ -140,7 +140,8 @@ describe('materializeScreen · α.2.b — agenda', () => {
       mutedCircleIds: ['g1', 'g2', 'g3'],
     });
     expect(out[0].status).toBe('empty');
-    expect(callSkill).not.toHaveBeenCalled();
+    expect(callSkill.mock.calls.filter(([, , a]) => a?.circleId)).toEqual([]);
+    expect(callSkill.mock.calls.map(([app, op]) => `${app}:${op}`)).toEqual(['calendar:listEvents']);
   });
 });
 

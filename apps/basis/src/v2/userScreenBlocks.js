@@ -38,6 +38,7 @@ import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
+import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
 import { linkedBotsOf } from './identityLink.js';
 import { bookRowsOf } from './contactsSource.js';
@@ -105,14 +106,14 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       // ONE block for any item type over the one cross-circle projection; a screen that still holds the older
       // `tasks` / `calendar` block is read as the items block it is (no second path to keep in step)
       case 'items':
-        return await materializeItems(block, activeCircleIds, hostOps);
+        return await materializeItems(block, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
       case 'calendar':
-        return await materializeItems({ ...block, config: { noun: 'calendar-event', scope: 'all', ...(block.config ?? {}) } }, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { noun: 'calendar-event', scope: 'all', ...(block.config ?? {}) } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
       case 'tasks':
-        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine' } }, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
       // the notes across circles — the block a labels filter means something on (notes carry tags)
       case 'notes':
-        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'note', scope: block.config?.scope === 'mine' ? 'mine' : 'all' } }, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'note', scope: block.config?.scope === 'mine' ? 'mine' : 'all' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
 
       case 'rules':
         return await materializeRules(block, activeCircleIds, hostOps, screenIsAll);
@@ -262,6 +263,9 @@ function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = 
   };
 }
 
+/** The item types a person also keeps of their own (no circle, the own-devices store): an items block shows those beside the circles'. */
+const OWN_NOUNS = new Set(['calendar-event', 'note']);
+
 /** The apps whose `list` a cross-circle items block may resolve (first that answers the noun). */
 export const ITEM_MANIFESTS = Object.freeze([
   { appOrigin: 'calendar', manifest: calendarManifest },
@@ -274,32 +278,39 @@ export const ITEM_MANIFESTS = Object.freeze([
  * `acrossCircles` (the type's own list per circle, its presenter for mine / order). Appointments also take the person's
  * own calendar (no circle) — the fold keeps those on the person's store.
  */
-async function materializeItems(block, activeCircleIds, { callSkill, selfIn = () => null, circles } = {}) {
+async function materializeItems(block, activeCircleIds, { callSkill, selfIn = () => null, circles } = {}, { pageIsAll = true } = {}) {
   const noun = String(block.config?.noun ?? '');
   const scope = block.config?.scope === 'mine' ? 'mine' : 'all';
   const limit = clampInt(block.config?.limit, 1, 200, 10);
   const horizonDays = clampInt(block.config?.horizonDays, 1, 365, 14);
   const empty = { blockId: block.id, type: 'items', status: 'empty', content: { noun, scope, items: [] } };
-  if (typeof callSkill !== 'function' || activeCircleIds.length === 0) return empty;
+  // a person's OWN items of this type (no circle) show beside the circles' — on a page over every circle (muting a
+  // circle hides that circle, never me) and a block not narrowed to some circles
+  const withOwn = OWN_NOUNS.has(noun) && pageIsAll && !(Array.isArray(block.config?.circleIds) && block.config.circleIds.length);
+  if (typeof callSkill !== 'function' || (activeCircleIds.length === 0 && !withOwn)) return empty;
   const presenter = ITEM_PRESENTERS[noun];
   if (!presenter) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: 'no presenter' };
   const names = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
   const isAgenda = noun === 'calendar-event';
   const until = Date.now() + horizonDays * 86_400_000;
-  const r = await acrossCircles({
+  const r = activeCircleIds.length ? await acrossCircles({
     circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
     manifests: ITEM_MANIFESTS,
     callSkill: (app, op, args) => callSkill(app, op, isAgenda ? { ...args, days: horizonDays } : args),
     genericFor: (circleId) => ({ list: async (n) => (await callSkill('household', encodeGenericOpId('household', 'list', n), { circleId }))?.result ?? [] }),
-  });
+  }) : { ok: true, items: [] };
   let rows = r.ok ? r.items : [];
   let ownError = null;
-  if (isAgenda) {
-    // my own appointments (no circle), beside the circles'
-    const own = await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; });
-    const mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '' }));
-    rows = [...rows, ...mine].filter((e) => !presenter.when(e) || presenter.when(e) <= until)
-      .sort((a, b) => presenter.when(a) - presenter.when(b));
+  if (withOwn) {
+    // my own (no circle), beside the circles': appointments from my own agenda, notes from my own store
+    const own = isAgenda
+      ? await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; })
+      : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE }).catch((err) => { ownError = String(err?.message ?? err); return null; });
+    let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true }));
+    if (scope === 'mine') mine = mine.filter((e) => presenter.isMine(e, selfIn(null)));
+    const sign = presenter.order === 'asc' ? 1 : -1;
+    rows = [...rows, ...mine].filter((e) => !isAgenda || !presenter.when(e) || presenter.when(e) <= until)
+      .sort((a, b) => sign * ((presenter.when(a) || 0) - (presenter.when(b) || 0)));
   }
   // THE BLOCK'S FILTERS (Vandaag's "Pas aan"): labels — on a type that carries them (its schema has `tags`), a row
   // shows when one of its tags is among the block's labels; a type without labels ignores the filter — and a relative
@@ -313,10 +324,10 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     rows = rows.filter((row) => { const w = presenter.when(row); return !w || Math.abs(w - now) <= span; });
   }
   // nothing answered (every circle, and my own calendar when it is asked): a failure, said as one
-  if (!r.ok && r.reason === 'unreachable' && (!isAgenda || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };
+  if (!r.ok && r.reason === 'unreachable' && (!withOwn || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };
   const items = rows.slice(0, limit).map((row) => ({
     id: row.id, label: row.label ?? presenter.label(row), when: presenter.when(row) || null,
-    circleId: row.circleId ?? null, circleName: row.circleName ?? '', mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
+    circleId: row.circleId ?? null, circleName: row.circleName ?? '', ...(row.own ? { own: true } : {}), mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
     // what a chore row also shows: its words, its state, its "see also" links
     text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
   }));

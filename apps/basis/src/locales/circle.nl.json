@@ -1333,6 +1333,46 @@
     "limit_n": {
       "text": "{{n}} regels",
       "doc": "A block's cap. n = how many rows."
+    },
+    "plus": {
+      "text": "Toevoegen",
+      "doc": "Vandaag → the '+' beside 'Pas aan': add an own note or an own appointment (the person's own store; never a circle)."
+    },
+    "plus_note": {
+      "text": "Eigen notitie",
+      "doc": "Vandaag → '+': a note of your own, on your own devices only."
+    },
+    "plus_appointment": {
+      "text": "Eigen afspraak",
+      "doc": "Vandaag → '+': an appointment of your own, on your own devices only."
+    },
+    "plus_note_ph": {
+      "text": "Notitie",
+      "doc": "Vandaag → '+' → own note: the text."
+    },
+    "plus_title_ph": {
+      "text": "Wat",
+      "doc": "Vandaag → '+' → own appointment: what it is."
+    },
+    "plus_when": {
+      "text": "Wanneer",
+      "doc": "Vandaag → '+' → own appointment: the moment."
+    },
+    "plus_save": {
+      "text": "Bewaren",
+      "doc": "Vandaag → '+': save the own note or appointment."
+    },
+    "plus_empty": {
+      "text": "Vul dit eerst in.",
+      "doc": "Vandaag → '+': something needed is empty."
+    },
+    "plus_failed": {
+      "text": "Niet bewaard: {{error}}",
+      "doc": "Vandaag → '+': the save failed; the reason follows."
+    },
+    "own_tag": {
+      "text": "jij",
+      "doc": "Vandaag: the tag on one of the person's own items (no circle), where a circle's items name their circle."
     }
   },
   "screens": {

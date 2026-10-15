@@ -12,7 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
-import { ensureVandaagBook } from '../../../../basis/src/v2/vandaag.js';
+import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
@@ -76,10 +76,8 @@ import {
   // α.1d.3 — recipe-editor mutation helpers.
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
-  // α.2 — user-owned cross-circle screens + α.3 picker.
-  createUserScreenStore, addScreen as addUserScreen,
-  renameScreen as renameUserScreen, removeScreen as removeUserScreen,
-  setActiveScreen, updateScreen, materializeScreen,
+  // the person's own pages (Vandaag): read here, edited only through the screen ops
+  getActiveScreen, materializeScreen,
   // δ.2 — per-message delivery state for optimistic circle chat sends.
   createDeliveryStateMap,
   // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out).
@@ -270,7 +268,7 @@ import CircleRulesConsentScreen from './CircleRulesConsentScreen.js';
 import CircleTabBar from './CircleTabBar.js';
 import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
-import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
+import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
@@ -702,12 +700,11 @@ export default function CircleLauncherScreen({
   // Loaded when the recipe screen opens; cleared after γ.3 resolver
   // applies or discards.
   const [incomingRecipe, setIncomingRecipe] = useState(null);
-  // α.3 — Screens-tab state.  Two sub-modes: 'picker' (CRUD list) +
-  // 'view' (render the materialized active screen).  Book + blocks
-  // live here so they survive sub-mode switches without refetching.
+  // Vandaag (the screens tab): the book and the painted blocks live here, so a page change does not refetch.
   const [screensBook, setScreensBook] = useState({ screens: [], activeId: null });
-  const [screensSubMode, setScreensSubMode] = useState('picker');
-  const [viewingScreenId, setViewingScreenId] = useState(null);
+  // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
+  const [expandedBlockId, setExpandedBlockId] = useState(null);
+  const [customiseOpen, setCustomiseOpen] = useState(false);
   const [screenViewBlocks, setScreenViewBlocks] = useState(null);
   // δ.1 — true while a fresh materialize runs after a cache-hit render.
   // Drives the subtle refresh pip in CircleScreenView.
@@ -1150,23 +1147,28 @@ export default function CircleLauncherScreen({
     try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
     setScreensBook(book);
   }, [userScreenStore]);
-  const applyScreenMutation = useCallback(async (mutator) => {
-    try { setScreensBook(await userScreenStore.update(mutator)); }
-    catch (err) { console.warn('[screens] mutation failed:', err?.message ?? err); }
-  }, [userScreenStore]);
+  // every edit of the person's pages is a screen op (kept, logged, undoable); the book is re-read after it
+  const runScreenOp = useCallback(async (opId, args) => {
+    try { await bundle?.callSkill?.('basis', opId, args); }
+    catch (err) { console.warn('[vandaag] op failed:', err?.message ?? err); }
+    try { setScreensBook(await userScreenStore.get()); } catch { /* the book as painted stands */ }
+  }, [bundle, userScreenStore]);
   // Refresh + materialize whenever we land on the screens view.
   useEffect(() => {
     if (view !== 'screens') return;
     refreshScreensBook();
   }, [view, refreshScreensBook]);
   useEffect(() => {
-    if (view !== 'screens' || screensSubMode !== 'view' || !viewingScreenId) {
+    if (view !== 'screens') {
       setScreenViewBlocks(null);
       setScreenViewRefreshing(false);
       return;
     }
-    const screen = screensBook.screens.find((s) => s.id === viewingScreenId);
-    if (!screen) { setScreenViewBlocks([]); setScreenViewRefreshing(false); return; }
+    const active = getActiveScreen(screensBook);
+    if (!active) { setScreenViewBlocks([]); setScreenViewRefreshing(false); return; }
+    // the page, or one of its blocks opened whole ("meer"); only the page is cached
+    const screen = expandedBlockId ? (expandedPage(active, expandedBlockId) ?? active) : active;
+    const cacheKey = expandedBlockId ? null : active.id;
     // δ.1 — cache-first render: paint the last materialized payload
     // immediately so the press feels instant, then materialize fresh
     // in the background.  On a cache miss we keep the existing null →
@@ -1177,8 +1179,7 @@ export default function CircleLauncherScreen({
     (async () => {
       // Cache-first read.  Any failure → fall through to the cold path.
       let cached = null;
-      try { cached = await screenBlocksCache.get(viewingScreenId); }
-      catch { /* ignore */ }
+      if (cacheKey) { try { cached = await screenBlocksCache.get(cacheKey); } catch { /* ignore */ } }
       if (!alive) return;
       if (Array.isArray(cached)) {
         setScreenViewBlocks(cached);
@@ -1202,7 +1203,7 @@ export default function CircleLauncherScreen({
         setScreenViewRefreshing(false);
         // Best-effort: write the fresh blocks back so the next open is
         // also instant.  Quota / serialisation failures are silent.
-        screenBlocksCache.set(viewingScreenId, blocks).catch(() => { /* ignore */ });
+        if (cacheKey) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
       } catch (err) {
         console.warn('[screens] materialize failed:', err?.message ?? err);
         if (!alive) return;
@@ -1214,7 +1215,7 @@ export default function CircleLauncherScreen({
       }
     })();
     return () => { alive = false; };
-  }, [view, screensSubMode, viewingScreenId, screensBook, bundle, eventLog, circles, screenBlocksCache]);
+  }, [view, expandedBlockId, screensBook, bundle, eventLog, circles, screenBlocksCache, seenAt, unreadMyRefs]);
 
   // `resolveSkill`, not `callSkill`: the 2-arg RESOLVING waist. The targeted 3-arg one lives on
   // `bundle.callSkill`; giving them one name is the arity trap (it has now bitten three times).
@@ -1581,12 +1582,8 @@ export default function CircleLauncherScreen({
       if (menuCircle) { setMenuCircle(null); return true; }
       // Inline cancel: creating-circle input row.
       if (creating) { setCreating(false); return true; }   // back closes the create wizard
-      // α.3 — viewing a screen (Screens tab "view" sub-mode) → back to
-      // the picker (the screens-tab equivalent of returning from a
-      // sub-view to the list).
-      if (view === 'screens' && screensSubMode === 'view') {
-        setScreensSubMode('picker'); setViewingScreenId(null); return true;
-      }
+      // Vandaag: a block opened whole → back to the page
+      if (view === 'screens' && expandedBlockId) { setExpandedBlockId(null); return true; }
       // Sub-views under a selected circle → back to detail.
       if (selected && (
         view === 'settings' || view === 'override' || view === 'viewas'
@@ -1618,7 +1615,7 @@ export default function CircleLauncherScreen({
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', handler);
     return () => sub.remove();
-  }, [view, selected, creating, menuCircle, screensSubMode]);
+  }, [view, selected, creating, menuCircle, expandedBlockId]);
 
   // Bottom tab bar (Screens / Circles / Mij).  α.3 — Screens is the
   // new primary; Stroom is retired (now lives as the seeded "Stream"
@@ -1780,47 +1777,40 @@ export default function CircleLauncherScreen({
 
   const page = (() => {
   if (view === 'screens') {
-    // α.3 — Screens primary tab.  Two sub-modes: 'picker' (CRUD list)
-    // and 'view' (render the active screen's materialized blocks).
-    if (screensSubMode === 'view') {
-      const screen = screensBook.screens.find((s) => s.id === viewingScreenId);
-      return (
-        <WithTabBar active="screens" onSelect={onTab} badges={tabBadges}>
-          <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
-            <Pressable
-              onPress={() => { setScreensSubMode('picker'); setViewingScreenId(null); }}
-              accessibilityRole="button"
-              testID="screens-view-back"
-            >
-              <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>
-                ← {t('circle.screens.picker_title')}
-              </Text>
-            </Pressable>
-            <Text style={{ fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink, marginBottom: 12 }}>
-              {screen?.name || t('circle.screens.untitled')}
-            </Text>
-            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-              <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
-                onAction={(a) => { if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); } }} />
-            </ScrollView>
-          </View>
-        </WithTabBar>
-      );
-    }
+    // VANDAAG: the active page of the person's own pages, its blocks capped with "meer"; the pages as sub-tabs only
+    // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
+    const active = getActiveScreen(screensBook);
     return (
       <WithTabBar active="screens" onSelect={onTab} badges={tabBadges}>
-        <CircleScreensPickerScreen
-          book={screensBook}
-          onOpenScreen={(sid) => { setViewingScreenId(sid); setScreensSubMode('view'); }}
-          onAddScreen={(name) => applyScreenMutation((cur) => {
-            const next = addUserScreen(cur, name);
-            const newId = next.screens[next.screens.length - 1].id;
-            return updateScreen(next, newId, (s) => addBlock(s, 'noticeboard'));
-          })}
-          onRenameScreen={(sid, name) => applyScreenMutation((cur) => renameUserScreen(cur, sid, name))}
-          onRemoveScreen={(sid) => applyScreenMutation((cur) => removeUserScreen(cur, sid))}
-          onSetActive={(sid) => applyScreenMutation((cur) => setActiveScreen(cur, sid))}
-        />
+        <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
+          {screensBook.screens.length > 1 && !expandedBlockId ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }} accessibilityRole="tablist">
+              {screensBook.screens.map((page) => (
+                <Pressable key={page.id} accessibilityRole="tab" accessibilityState={{ selected: page.id === active?.id }}
+                  onPress={() => { if (page.id !== active?.id) { setExpandedBlockId(null); runScreenOp('screen-set-active', { pageId: page.id }); } }}
+                  testID={`vandaag-page-${page.id}`}>
+                  <Text style={{ color: page.id === active?.id ? theme.color.ink : theme.color.inkSoft, fontSize: 14, fontWeight: page.id === active?.id ? '600' : '400' }}>
+                    {page.name || t('circle.screens.untitled')}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          <Pressable onPress={() => (expandedBlockId ? setExpandedBlockId(null) : setCustomiseOpen(true))} accessibilityRole="button"
+            testID={expandedBlockId ? 'vandaag-more-back' : 'vandaag-customise'}>
+            <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>
+              {expandedBlockId ? `← ${t('circle.screen.more_back')}` : t('circle.vandaag.customise')}
+            </Text>
+          </Pressable>
+          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+            <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
+              onMore={expandedBlockId ? null : setExpandedBlockId}
+              onAction={(a) => { if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); } }} />
+          </ScrollView>
+        </View>
+        <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook)}
+          onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
+          onClose={() => setCustomiseOpen(false)} />
       </WithTabBar>
     );
   }

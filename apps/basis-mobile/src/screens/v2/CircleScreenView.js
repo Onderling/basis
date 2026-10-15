@@ -37,7 +37,7 @@ function matchesHighlight(rowId, highlightRef) {
   return rowId === highlightRef || String(highlightRef).endsWith(String(rowId));
 }
 
-export default function CircleScreenView({ blocks = null, refreshing = false, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
+export default function CircleScreenView({ blocks = null, refreshing = false, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, onMore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // null = still materializing (host hasn't resolved yet).  Distinguish
@@ -73,7 +73,7 @@ export default function CircleScreenView({ blocks = null, refreshing = false, on
         </Text>
       ) : null}
       {blocks.map((block) => (
-        <BlockSection key={block.blockId} block={block} onAction={onAction} onEmbedOpen={onEmbedOpen}
+        <BlockSection key={block.blockId} block={block} onAction={onAction} onEmbedOpen={onEmbedOpen} onMore={onMore}
           highlightRef={highlightRef} highlightRowRef={highlightRowRef} onHighlightLayout={onHighlightLayout} />
       ))}
     </View>
@@ -86,7 +86,7 @@ function blockName(block) {
   return block.titleKey ? t(block.titleKey) : block.type;
 }
 
-function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
+function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, onMore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const baseStyle = [styles.block, styles[`block_${block.type}`] ?? null];
@@ -128,7 +128,17 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     default:
       body = <Text style={styles.blockEmptyText}>{t('circle.screen.block_unknown', { type: block.type })}</Text>;
   }
-  return <View style={baseStyle} testID={`screen-block-${block.blockId}`}>{body}</View>;
+  return (
+    <View style={baseStyle} testID={`screen-block-${block.blockId}`}>
+      {body}
+      {/* a capped block on the person's pages: "meer" opens it whole (the host's `onMore(blockId)`) */}
+      {typeof onMore === 'function' && block.status === 'ok' ? (
+        <Pressable onPress={() => onMore(block.blockId)} testID={`screen-more-${block.blockId}`}>
+          <Text style={styles.blockEmptyText}>{t('circle.screen.more')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */

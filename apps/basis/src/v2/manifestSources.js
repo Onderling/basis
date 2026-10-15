@@ -78,6 +78,8 @@ export function allManifests() {
  * when exactly ONE app declares it (as the bot's door map reads it — two declarers is ambiguous, refused); a generic op
  * (`__generic__:app:atom:noun`) counts when its app declares the noun. A door reaches declared ops only — its role
  * widens which of them a person reaches, never the set itself.
+ * It reads the DEFAULT household manifest (`allManifests()`), not one a shell may inject: should a shell ever inject
+ * a wider one, a door there refuses more, never less — it fails closed.
  * @param {string} qualified
  * @returns {boolean}
  */

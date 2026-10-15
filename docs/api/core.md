@@ -1851,7 +1851,7 @@ true when the entry changed.
 
 **Kind:** constant · **Import:** `RESERVED_PROFILE_LABELS` from `'@onderling/core'`
 
-Labels the platform already derives other keys from (`first-device` from the owner root; `household-export` on the export's own root) — never a persona's id, so no persona ever shares a key label with them.
+Labels the platform already derives other keys from (`first-device` from the owner root; `household-export` on the export's own root; `recovery-seal` for the recovery file and the registry mirror) — never a persona's id, so no persona ever shares a key label with them.
 
 ### `isReservedProfileLabel`
 

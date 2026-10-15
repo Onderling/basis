@@ -10,8 +10,8 @@
  */
 import nacl from 'tweetnacl';
 
-/** Labels the platform already derives other keys from (`first-device` from the owner root; `household-export` on the export's own root) — never a persona's id, so no persona ever shares a key label with them. */
-export const RESERVED_PROFILE_LABELS = Object.freeze(['first-device', 'household-export', 'enroll-personas']);
+/** Labels the platform already derives other keys from (`first-device` from the owner root; `household-export` on the export's own root; `recovery-seal` for the recovery file and the registry mirror) — never a persona's id, so no persona ever shares a key label with them. */
+export const RESERVED_PROFILE_LABELS = Object.freeze(['first-device', 'household-export', 'enroll-personas', 'recovery-seal']);
 
 const ID_SHAPE = /^(default|p-[0-9a-f]{12})$/;
 

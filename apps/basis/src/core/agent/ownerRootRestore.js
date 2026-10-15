@@ -30,7 +30,7 @@
  */
 
 import { Bootstrap, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
-import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
+import { VaultEncrypted, migrateVaultToEncrypted, seedToString } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
 import { markForgetPending } from '../../v2/enrolForgets.js';
@@ -49,7 +49,7 @@ export const RESTORE_PENDING_KEY = 'restore-pending';
 // The delegation blob's slot is one of a persona's vault slots (personaVault.js); re-exported for the callers that
 // import it from here.
 export { DEVICE_DELEGATION_VAULT_KEY } from './personaVault.js';
-import { DEVICE_DELEGATION_VAULT_KEY, HELD_PERSONAS_VAULT_KEY, personaVault } from './personaVault.js';
+import { DEVICE_DELEGATION_VAULT_KEY, HELD_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL, personaVault } from './personaVault.js';
 
 const _b64url = (bytes) => {
   let s = '';
@@ -202,6 +202,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
  * identity, person key and its OWN delegation (its wire id of this device, its device seed, the record signed by its own
  * authority) into its slots; the device's held list grows by them. Shared by the enrol/restore ceremony and the later
  * "these personas here too" step (`receivePersonas`). A persona not handed is never run on a device without the root.
+ * Every call also leaves the person's recovery seal (`RECOVERY_SEAL_VAULT_KEY`) on the device.
  *
  * @param {{ root: object, chatVault: object, atRestKey: Uint8Array, internalId: string, label?: string|null, personas: string[] }} a
  * @returns {Promise<string[]>} the device's held list after the hand-over
@@ -225,5 +226,7 @@ export async function handPersonasInto({ root, chatVault, atRestKey, internalId,
     held.push(pid);
   }
   await defaultSlots.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify(held));
+  // the recovery seal, which opens the person's recovery file and registry mirror whichever personas this device holds
+  await defaultSlots.set(RECOVERY_SEAL_VAULT_KEY, seedToString(root.deriveAgentSeed(RECOVERY_SEAL_LABEL)));
   return held;
 }

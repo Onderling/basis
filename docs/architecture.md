@@ -1278,15 +1278,14 @@ than being overwritten by a one-device list. Without a pod, the pod-less carrier
 **recovery file** — the registry and the owner root sealed into a passphrase-protected file, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.
 
-**Sealed to the default profile's key, on purpose — with personas too** (2026-10-12). The registry (every persona's
-profile and circles among it), the settings mirror, the history mirror and the recovery file are all sealed to the
-DEFAULT profile's key, which every device of the person holds. A dedicated root-derived seal key was weighed and
-not taken: the only thing it would hide is the envelope's recipient id, which can be recomputed only by someone
-who already knows the default identity AND holds the blob (the pod host holds the whole pod anyway), while it would
-need new key material handed to every device at every phrase ceremony. Nothing a persona-only party (a co-member of a
-persona's circle, a contact of a persona) can see is tied to the default through these. What must stay per SELF
-is what the file is REPLAYED into: a circle's own address announcement names the circle's self (a persona's circle,
-the persona), and the restore bootstrap announces a device only in the circles of a self it runs.
+**Sealed to the recovery seal, not to a persona.** The registry's pod mirror (every persona's profile and circles in
+one body) and the recovery file are sealed to a key derived from the root under its own label (`recovery-seal`), and
+the mirror's opaque pod name derives from it too. A device may hold a chosen set of personas, the default among them or
+not, so no persona's key could open them on every device; every phrase ceremony leaves the seal on the device instead
+(a device with the root resident derives it). A device enrolled before the seal existed has none until its next phrase
+ceremony: its registry stays local and its export refuses. The settings and history mirrors are still sealed to the
+default persona's key. What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
+names the circle's self, and the restore bootstrap announces a device only in the circles of a self it runs.
 
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding
 structure.** Apps address a **storage function** ("this circle's items", "my notes"), and a routing layer

@@ -9,10 +9,13 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory, RootKeyStoreVault } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { startJourneyRelay } from './support/testRelay.js';
-import { bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses, sendCircleChat, until, teardown } from './support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { consumeEnrollOffer } from '../src/v2/enrollOffer.js';
 import { EventLog } from '../src/eventLog.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const Y = 'buurt-circle';
 const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); } }; };
@@ -42,17 +45,23 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
 
     // a NEW device: the phrase, the file, Buurt received — then the boot that rejoins
     const ownerRootVault = new VaultMemory();
-    const vaults = { ownerRootVault, rootKeyStore: new RootKeyStoreVault({ vault: ownerRootVault }), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() };
+    // what a shell keeps on its disk across the restart: the vaults, the registry, the circle stores and the device log
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-rejoin-'));
+    const vaults = { ownerRootVault, rootKeyStore: new RootKeyStoreVault({ vault: ownerRootVault }), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), stoopPersistDb: { path: path.join(dir, 'stoop-state.json') } };
+    const d2Log = log();
     const storage = memStorage();
     const pre = await bootRealAgentNode('d2-pre', { agentOpts: { ...vaults } });
     expect((await pre.agent.callSkill('household', 'restoreOwnerPhrase', { mnemonic: phrase })).ok).toBe(true);
     await teardown(pre);
-    const mid = await bootRealAgentNode('d2-mid', { agentOpts: { ...vaults, enrollOfferStorage: storage, deviceLog: log() } });
+    const mid = await bootRealAgentNode('d2-mid', { agentOpts: { ...vaults, enrollOfferStorage: storage, deviceLog: d2Log } });
     expect((await mid.agent.callSkill('household', 'importRecoveryFile', { file }))?.ok).toBe(true);
     const got = await mid.agent.callSkill('household', 'receivePersonas', { mnemonic: phrase, personas: [b] });
     expect(got.ok, JSON.stringify(got)).toBe(true);
+    // the shell's stores write behind; a person restarts after the write has landed (the file's temp copy is gone)
+    await until(async () => (fs.existsSync(path.join(dir, 'stoop-state.json')) && !fs.existsSync(path.join(dir, 'stoop-state.json.tmp'))
+      && fs.statSync(path.join(dir, 'stoop-state.json')).size > 1000) || null, { timeout: 10_000, step: 100 });
     await teardown(mid);
-    const d2 = await bootRealAgentNode('d2', { agentOpts: { ...vaults, enrollOfferStorage: storage, deviceLog: log() } });
+    const d2 = await bootRealAgentNode('d2', { agentOpts: { ...vaults, enrollOfferStorage: storage, deviceLog: d2Log } });
     nodes.push(d2);
     expect(d2.agent.circleSelf(Y).webid, 'Y is Buurt\'s on the new device').toBe(B.chatId.pubKey);
     await d2.agent.connectPeerTransport({ relayUrl: relay.url, onPeerMessage: (env) => d2._routerRef.fn?.(env), awaitRelayReady: true });
@@ -74,5 +83,30 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
     }, { timeout: 30_000, step: 300 });
     expect(atCor, 'Cor learned the new device\'s address under Buurt').toBeTruthy();
     expect(JSON.stringify(atCor).includes(phone.pubKey), 'nothing of the default on Buurt\'s circle').toBe(false);
+    // no readmission: still the same two members, and the steps were the bootstrap's own (no invite, no redeem)
+    expect(atCor.map((m) => m.webid).sort(), 'the same two members').toEqual([B.chatId.pubKey, cor.pubKey].sort());
+    expect(row.steps.some((s) => /redeem|invite/.test(s)), JSON.stringify(row.steps)).toBe(false);
+    // the circle is on the new device with its roster
+    const atD2 = await until(async () => {
+      const members = (await d2.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? [];
+      return members.some((m) => m.webid === cor.pubKey) ? members : null;
+    }, { timeout: 20_000, step: 300 });
+    expect(atD2, 'Cor is on Y\'s roster on the new device').toBeTruthy();
+    // the first device is untouched: Y is still Buurt's there, and its address stays in Buurt's set at Cor
+    const phoneAddr = phone.agent.circleAddressFor(Y);
+    expect(phone.agent.circleSelf(Y).webid).toBe(B.chatId.pubKey);
+    expect(atCor.find((m) => m.webid === B.chatId.pubKey).circleAddresses, 'both devices under Buurt').toEqual(expect.arrayContaining([phoneAddr, d2Addr]));
+
+    // what Cor says in Y reaches the new device. A restore is a replacement, as for the default: the new device is
+    // announced as Buurt's PRIMARY address, so that is where Cor delivers (the first device keeps its proven address).
+    const primaryAtCor = await until(async () => {
+      const r = ((await cor.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? []).find((m) => m.webid === B.chatId.pubKey);
+      return r?.circleAddress === d2Addr ? r : null;
+    }, { timeout: 20_000, step: 300 });
+    expect(primaryAtCor, 'the new device is Buurt\'s primary at Cor').toBeTruthy();
+    const sent = await sendCircleChat(cor, { groupId: Y, msgId: 'cor-1', text: 'welkom terug' });
+    expect(sent?.error ?? null, JSON.stringify(sent)).toBe(null);
+    const heard = (n) => until(async () => n.chatRail.storedStatements(Y).find((st) => st?.body?.payload?.text === 'welkom terug') ?? null, { timeout: 20_000, step: 200 });
+    expect(await heard(d2), 'Cor\'s message reached the new device').toBeTruthy();
   }, 300_000);
 });

@@ -1726,7 +1726,8 @@ export default function CircleLauncherScreen({
       if (!relayUrl) { try { relayUrl = await resolveMobileRelayUrl(); } catch { relayUrl = null; } }
       r = await buildCircleInviteUri({
         callSkill: bundle?.callSkill, circleId,
-        adminPeerAddr: bundle?.agent?.householdSelfAddr ?? null,
+        // the circle's OWN self as the admin to redeem with (a persona's circle: the persona) — never the default there
+        adminPeerAddr: bundle?.agent?.circleSelf?.(circleId)?.webid ?? bundle?.agent?.householdSelfAddr ?? null,
         // Gated by the publication lock (J-CS8): with sharing off the invite carries no NKN address.
         // A lock that held only on web would invite trust on the wrong device.
         adminNknAddr:  shareableAddress(bundle?.agent?.peer?.address ?? null, shareNknAddress),

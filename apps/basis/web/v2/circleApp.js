@@ -169,6 +169,8 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
+import { renderHeaderAvatar } from './headerAvatar.js';
+import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
@@ -2889,6 +2891,31 @@ function showTabBar(active) {
   });
   // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
   try { window.localStorage.setItem(LAST_TAB_STORAGE_KEY, active); } catch { /* private window: the default stands */ }
+  paintHeaderAvatar();
+  if (!_headerAvatar) refreshHeaderAvatar();
+}
+
+// THE HEADER AVATAR — top-right on every tab: the persona's picture or initials; a tap opens the person's own editor.
+// Loaded once (and again after the editor closes); every tab repaints the one element.
+let _headerAvatar = null;          // { name, initials, picture } from the shared loader
+let _headerAvatarUrl = null;       // the picture, opened with this device's own opener
+let _headerAvatarEl = null;
+function paintHeaderAvatar() {
+  if (!_headerAvatarEl) {
+    _headerAvatarEl = document.createElement('div');
+    _headerAvatarEl.style.cssText = 'position:fixed;top:.5rem;right:.75rem;z-index:50;';
+    document.body.appendChild(_headerAvatarEl);
+  }
+  renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen: () => openAboutMePanel('default') });
+}
+async function refreshHeaderAvatar() {
+  try {
+    _headerAvatar = await loadPersonaAvatar({ callSkill: rawCallSkill });
+    const opener = (await Promise.resolve().then(() => getSelfMediaComposition()).catch(() => null))?.mediaGateway?.opener;
+    const resolve = makeCirclePictureResolver(opener);
+    _headerAvatarUrl = _headerAvatar.picture && resolve ? (await Promise.resolve(resolve(_headerAvatar.picture)).catch(() => null)) : null;
+  } catch { /* the initials stand */ }
+  paintHeaderAvatar();
 }
 
 // WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
@@ -5937,7 +5964,8 @@ async function openAboutMePanel(personaId) {
   close.className = 'cc-screen-panel__close';
   close.setAttribute('aria-label', t('common.close'));
   close.textContent = '✕';
-  close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
+  // closing the editor repaints the header avatar (a new picture or name shows at once)
+  close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } refreshHeaderAvatar(); });
   head.appendChild(title); head.appendChild(close);
   card.appendChild(head);
   // the person's own basics on top (handle, name, location) — Mij's "Edit" leads here; the persona layer below
@@ -5979,7 +6007,7 @@ async function openAboutMePanel(personaId) {
     },
   });
   if (basicsEl.parentNode) { drawBasics(); loadBasics(); }
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); refreshHeaderAvatar(); } });
   document.body.appendChild(overlay);
 
   // Load → build model → render; re-run after each edit so the surface always
@@ -6001,9 +6029,7 @@ async function openAboutMePanel(personaId) {
     const _selfComp = await getSelfMediaComposition();
     let currentPicture = null;
     try {
-      const _props = (await rawCallSkill('agents', 'getProfileProperties', { id: model.defaultId ?? 'default' }))?.properties ?? {};
-      const _entry = _props.profilePicture;
-      currentPicture = (_entry && typeof _entry === 'object' && _entry.value !== undefined) ? _entry.value : (_entry ?? null);
+      currentPicture = pictureRefOf((await rawCallSkill('agents', 'getProfileProperties', { id: model.defaultId ?? 'default' }))?.properties);
     } catch { /* no picture set */ }
     // Which circles can carry a picture right now (a seal strategy for their media) — Mij does not offer the
     // picture where a share would have to drop it, and says why.

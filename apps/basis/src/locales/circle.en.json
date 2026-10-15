@@ -4189,6 +4189,18 @@
     "reminders_usual": {
       "text": "For {{text}} the usual reminders apply again.",
       "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "added_many": {
+      "text": "{{count}} added to {{name}}: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "removed_many": {
+      "text": "{{count}} taken off {{name}}: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "done_named_many": {
+      "text": "{{count}} ticked off: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
     }
   },
   "share": {

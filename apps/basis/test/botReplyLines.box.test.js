@@ -51,7 +51,7 @@ describe('the box words what it did', () => {
 
     await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 });
     await ask('/start');   // the admin's welcome
-    expect(await ask('zet melk, brood en kaas op de boodschappen')).toEqual(['Op de lijst Boodschappen: melk, brood, kaas.']);
+    expect(await ask('zet melk, brood en kaas op de boodschappen')).toEqual(['3 toegevoegd aan Boodschappen: melk, brood en kaas.']);
     await ask('nieuwe taak: lamp vervangen');
     // the claimer hears it once: the store records the person as the claim's writer, so the announcer does not tell
     // them "Voor jou: …" as if someone else had given it to them

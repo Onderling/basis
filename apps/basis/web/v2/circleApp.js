@@ -383,7 +383,7 @@ import {
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
 // α.2 — user-owned cross-circle screens (the Screens tab) + α.3 picker.
 import {
-  createUserScreenStore, localStorageScreenIo,
+  localUserScreenStore,
   addScreen as addUserScreen, renameScreen as renameUserScreen,
   removeScreen as removeUserScreen, setActiveScreen, getActiveScreen, updateScreen,
 } from '../../src/v2/userScreens.js';
@@ -878,6 +878,8 @@ function mountBasisOpsOnAgent(agent) {
     callSkill: rawCallSkill,
     localActor: LOCAL_ACTOR,
     eventLog,
+    // the person's pages: the screen ops edit this book (kept as versions, logged, undoable)
+    screenStore: userScreenStore,
     podAuth,
     openFilePicker: webFilePicker,
     // /send-file resizes a photo the way a circle photo is resized (the one encoder, the one cap).
@@ -1192,7 +1194,7 @@ const circleRulesPendingStore = createCircleRulesPendingStoreLocal();
 const screenBlocksCache = createScreenBlocksCacheLocal();
 // α.3 — per-user screens store.  One book per user (not per-circle); the
 // active screen drives the new Screens tab.
-const userScreenStore = createUserScreenStore({ io: localStorageScreenIo() });
+const userScreenStore = localUserScreenStore();
 const overrideStore = createMemberOverrideStore(localStorageOverrideIo());
 // The mute membrane's circle↔person index — fed by every roster read (householdRosterPairing), consumed
 // by the receive path (circleEnforcement). One per agent; attached to the agent post-boot below.

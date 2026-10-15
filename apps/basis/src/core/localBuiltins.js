@@ -30,6 +30,7 @@ import { createMediaEmbed, hasMediaGateway, isImageMime } from './handlers/media
 // (or anything else up to 8 MB) ride a direct message while the same photo in a circle was resized. Full-size
 // waits for the media carrier.
 import { MAX_NOTICEBOARD_BYTES_PER_ATT } from '../v2/attachmentEncoder.js';
+import { createScreenOps } from '../v2/screenOps.js';
 
 
 // lazy chrono import for createTimeEmbed's
@@ -79,8 +80,11 @@ export function createLocalBuiltins({
   encodeImage,                // media — web canvas encoder (attachmentEncoder.encodeImageFile); optional
   storeMediaItem,             // media — item-store seam for the `media` item; optional (absent ⇒ item rides on the embed)
   showPersonCard,             // the person's clock — how this shell paints a card for the person (their week); optional
+  screenStore,                // the person's pages on this device (the shell's screen book store, with its versions)
 }) {
   return {
+    // the person's pages, edited through ops: kept as versions, logged, undoable (`screenOps.js`)
+    ...createScreenOps({ store: screenStore ?? null, log: eventLog ?? null, actor: localActor ?? 'owner' }),
     help: async () => formatHelp(catalogue, t),
     embed:     async (args) => createEmbed(args, { catalogue, callSkill, t, localActor }),
     'embed-file': async (args) => createFileEmbed(args, {

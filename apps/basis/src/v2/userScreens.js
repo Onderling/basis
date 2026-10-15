@@ -39,6 +39,7 @@
 
 /** Empty book — what a fresh user starts with (host can seed defaults). */
 import { BLOCK_TYPES } from './circleRecipe.js';
+import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 export const EMPTY_SCREEN_BOOK = Object.freeze({ screens: [], activeId: null });
 
 /** Sentinel for "all circles" in circleFilter (vs `[circleId, …]`). */
@@ -189,8 +190,10 @@ export function updateScreen(book, screenId, mutator) {
  *   const book = await store.get();
  *   await store.update((cur) => addScreen(cur, 'Stream'));
  */
-export function createUserScreenStore({ io = {} } = {}) {
+export function createUserScreenStore({ io = {}, versions = null } = {}) {
   const { load, save } = io;
+  const hasVersions = Boolean(versions && typeof versions.capture === 'function' && typeof versions.list === 'function');
+  const newestTs = async () => (hasVersions ? ((await versions.list(SCREEN_VERSIONS_KEY))[0]?.ts ?? null) : null);
   return {
     async get() {
       let raw = null;
@@ -209,7 +212,38 @@ export function createUserScreenStore({ io = {} } = {}) {
       if (typeof save === 'function') await save(next);
       return next;
     },
+    /**
+     * The same change, kept as a VERSION (the `versions` adapter the circle recipe, policy and rules stores take): the
+     * book before is captured when it is not the newest yet, then the book after. Returns both versions' timestamps so
+     * the change can be logged with what it replaced, and undone by restoring `previous`.
+     * @returns {Promise<{book: object, previous: number|null, current: number|null}>}
+     */
+    async updateVersioned(mutator) {
+      const cur = await this.get();
+      if (hasVersions) await versions.capture(SCREEN_VERSIONS_KEY, cur);
+      const previous = await newestTs();
+      const book = await this.update(mutator);
+      if (hasVersions) await versions.capture(SCREEN_VERSIONS_KEY, book);
+      return { book, previous, current: await newestTs() };
+    },
+    /** Put the book back as it was at version `ts` (itself kept as a new version, so a restore is undoable too). */
+    async restoreVersion(ts) {
+      if (!hasVersions || typeof versions.restore !== 'function') return null;
+      const value = await versions.restore(SCREEN_VERSIONS_KEY, ts);
+      if (!value) return null;
+      const book = await this.set(value);
+      await versions.capture(SCREEN_VERSIONS_KEY, book);
+      return { book, current: await newestTs() };
+    },
   };
+}
+
+/** The one series the person's screen book is versioned under (it is the device's: there is one book per device). */
+export const SCREEN_VERSIONS_KEY = 'device';
+
+/** A device's own screen book with its versions (each change kept, so it can be undone) — what the web shell composes. */
+export function localUserScreenStore(storage = globalThis.localStorage) {
+  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', storage) });
 }
 
 /**

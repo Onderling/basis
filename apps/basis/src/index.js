@@ -217,7 +217,7 @@ export {
   addCircleToScreen, removeCircleFromScreen, setAllCircles,
   normalizeScreenBook,
   addScreen, renameScreen, removeScreen, setActiveScreen, getActiveScreen, updateScreen,
-  createUserScreenStore, localStorageScreenIo,
+  createUserScreenStore, localStorageScreenIo, localUserScreenStore, SCREEN_VERSIONS_KEY,
 } from './v2/userScreens.js';
 export { materializeScreen } from './v2/userScreenBlocks.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).

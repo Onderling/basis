@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { ensureVandaagBook } from '../../../../basis/src/v2/vandaag.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
@@ -1145,23 +1146,8 @@ export default function CircleLauncherScreen({
     let book;
     try { book = await userScreenStore.get(); }
     catch { book = { screens: [], activeId: null }; }
-    // First-run seed: three default screens (Stream, My things,
-    // My calendar) so the Screens tab is immediately useful.  Once
-    // any screen exists we never re-seed.
-    if (book.screens.length === 0) {
-      book = await userScreenStore.update((cur) => {
-        let next = addUserScreen(cur, t('circle.screens.seed_name'));
-        let id   = next.screens[next.screens.length - 1].id;
-        next = updateScreen(next, id, (s) => addBlock(s, 'noticeboard'));
-        next = addUserScreen(next, t('circle.screens.seed_my_things'));
-        id   = next.screens[next.screens.length - 1].id;
-        next = updateScreen(next, id, (s) => addBlock(s, 'tasks'));
-        next = addUserScreen(next, t('circle.screens.seed_my_calendar'));
-        id   = next.screens[next.screens.length - 1].id;
-        next = updateScreen(next, id, (s) => addBlock(s, 'calendar'));
-        return next;
-      });
-    }
+    // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with web
+    try { book = await ensureVandaagBook({ store: userScreenStore, t }); } catch { /* the book as read stands */ }
     setScreensBook(book);
   }, [userScreenStore]);
   const applyScreenMutation = useCallback(async (mutator) => {
@@ -1208,7 +1194,8 @@ export default function CircleLauncherScreen({
           // This site held the 2-arg resolver — the arity trap's third catch (#16 fixed the recipe
           // path and this sibling kept the wrong one): 'calendar' arg-shifted into the opId and the
           // agenda materialised empty. Found by the rename that makes the two waists unmistakable.
-          hostOps: { callSkill: bundle?.callSkill, eventLog, circles, fetchImpl: getCirclePodFetch() || undefined },
+          // …and the circles-with-news block counts what the circle tiles count (their 'seen' and 'me')
+          hostOps: { callSkill: bundle?.callSkill, eventLog, circles, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs },
         });
         if (!alive) return;
         setScreenViewBlocks(blocks);
@@ -1813,7 +1800,8 @@ export default function CircleLauncherScreen({
               {screen?.name || t('circle.screens.untitled')}
             </Text>
             <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-              <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing} />
+              <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
+                onAction={(a) => { if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); } }} />
             </ScrollView>
           </View>
         </WithTabBar>

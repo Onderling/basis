@@ -5109,7 +5109,16 @@ export async function createRealHouseholdAgent(opts = {}) {
         // A person's OWN item (no circle): the own scope named as the circle reaches their own store — carried to their
         // other devices, never to a circle's members — through the same generic atoms; never a household circle store
         // named after the scope.
-        const ownCap = args?.circleId === OWN_DEVICES_SCOPE ? createGenericAtomHandlers(await getOwnStore()) : null;
+        // A persona's own LANE is a carry, not a place: naming it as a circle is refused (it would make a household store
+        // of that name). And the own scope is the person's on THIS device only — a door's call never reaches it: the waist
+        // strips a door caller's circle above (a circle door pins its own), and this says so again where it matters.
+        // An own note made here carries the DEFAULT's `by`, so it rides the default's lane; a note made on a Werk page
+        // riding Werk's lane waits for the persona picker.
+        if (typeof args?.circleId === 'string' && args.circleId.startsWith(`${OWN_DEVICES_SCOPE}:`)) {
+          return { ok: false, code: 'own-lane-not-a-circle', error: 'own-lane-not-a-circle' };
+        }
+        const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
+        const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
         const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.

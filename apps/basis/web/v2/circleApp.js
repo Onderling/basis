@@ -3630,7 +3630,7 @@ function showLauncher() {
   const before = launcherPinMuteSignature();
   Promise.all([refreshLauncherPins(), refreshLauncherMutes(), refreshLauncherSights()])
     .then(() => {
-      if (getActiveCircle() != null) return;
+      if (getActiveCircle() != null || _activeTab !== 'circles') return;   // the person moved on: paint nothing over it
       if (launcherPinMuteSignature() === before) return;   // nothing changed → do not rebuild under a press
       paintLauncher();
     })
@@ -4152,16 +4152,26 @@ async function _showVandaag() {
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
 function showVandaagCustomise() {
   const { card, close } = _restoreOverlay();
+  // the edits run one after another, and closing waits for the last one — so the page never paints a book from
+  // before an edit still in flight
+  let pending = Promise.resolve();
   const paint = () => renderVandaagCustomise(card, {
     model: customiseModel(_screensBook ?? { screens: [], activeId: null }),
     t,
-    onAct: async (act, args) => {
-      const { opId, args: opArgs } = customiseOp(act, args ?? {});
-      await rawCallSkill('basis', opId, opArgs).catch(() => null);
-      _screensBook = await userScreenStore.get();
-      paint();
+    onAct: (act, args) => {
+      pending = pending.then(async () => {
+        const { opId, args: opArgs } = customiseOp(act, args ?? {});
+        await rawCallSkill('basis', opId, opArgs).catch(() => null);
+        _screensBook = await userScreenStore.get();
+        paint();
+      });
     },
-    onClose: () => { close(); _showVandaag(); },
+    onClose: async () => {
+      close();
+      await pending;
+      _screensBook = await userScreenStore.get();
+      _showVandaag();
+    },
   });
   paint();
 }

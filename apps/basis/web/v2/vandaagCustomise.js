@@ -25,6 +25,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
   const button = (label, act, args, extra = {}) => {
     const b = document.createElement('button');
     b.type = 'button';
+    b.className = 'cc-btn cc-btn--quiet';
     b.textContent = label;
     b.dataset.act = act;
     if (extra.disabled) b.disabled = true;
@@ -91,6 +92,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
   container.appendChild(nameInput);
   const rename = document.createElement('button');
   rename.type = 'button';
+  rename.className = 'cc-btn cc-btn--quiet';
   rename.dataset.act = 'rename-page';
   rename.textContent = tr('circle.vandaag.rename_page');
   rename.addEventListener('click', () => onAct?.('rename-page', { pageId: model.pageId, name: nameInput.value }));
@@ -100,6 +102,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
   container.appendChild(button(tr('circle.vandaag.undo'), 'undo', {}));
   const done = document.createElement('button');
   done.type = 'button';
+  done.className = 'cc-btn cc-btn--primary';
   done.dataset.act = 'done';
   done.textContent = tr('circle.vandaag.done');
   done.addEventListener('click', () => onClose?.());

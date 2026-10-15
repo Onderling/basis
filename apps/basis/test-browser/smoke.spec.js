@@ -19,7 +19,7 @@ test('v2 app boots clean (no page error)', async ({ page }) => {
   await page.goto('/');
   await page.waitForTimeout(4000);
   expect(errs).toEqual([]);
-  await expect(page.locator('.circle-screens-picker, .circle-launcher')).toHaveCount(1);
+  await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag (the home)').toHaveCount(1);
 });
 
 test('circle composer dispatches a command → a bot reply bubble lands', async ({ page }) => {

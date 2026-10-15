@@ -36,7 +36,25 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                     <Btn label={t('circle.vandaag.down')} act="down" args={base} disabled={!b.canDown} testID={`customise-down-${b.blockId}`} />
                     <Btn label={t('circle.vandaag.remove')} act="remove" args={base} testID={`customise-remove-${b.blockId}`} />
                   </View>
-                  {b.controls.map((c) => (
+                  {b.controls.map((c) => (c.text ? (
+                    // labels, typed: "werk, thuis" — applied when the field is left
+                    <LabelsField key={c.kind} control={c} styles={styles}
+                      onApply={(value) => onAct?.('config', { ...base, kind: c.kind, value })} testID={`customise-labels-${b.blockId}`} />
+                  ) : c.multi ? (
+                    // the block's own circles: none ticked = all the page's
+                    <View key={c.kind} style={styles.row}>
+                      {c.options.map((o) => {
+                        const on = c.value.includes(o.value);
+                        return (
+                          <Pressable key={o.value} style={[styles.chip, on && styles.chipOn]} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
+                            onPress={() => onAct?.('config', { ...base, kind: c.kind, value: on ? c.value.filter((v) => v !== o.value) : [...c.value, o.value] })}
+                            testID={`customise-circle-${b.blockId}-${o.value}`}>
+                            <Text style={styles.chipText}>{o.label}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : (
                     <View key={c.kind} style={styles.row}>
                       {c.options.map((o) => (
                         <Pressable key={String(o.value)} style={[styles.chip, o.value === c.value && styles.chipOn]}
@@ -46,7 +64,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                         </Pressable>
                       ))}
                     </View>
-                  ))}
+                  )))}
                 </View>
               );
             })}
@@ -72,6 +90,16 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
         </View>
       </View>
     </Modal>
+  );
+}
+
+function LabelsField({ control, styles, onApply, testID }) {
+  const [text, setText] = useState(control.value);
+  useEffect(() => { setText(control.value); }, [control.value]);
+  return (
+    <TextInput style={[styles.input, { marginTop: 6 }]} value={text} onChangeText={setText}
+      placeholder={t('circle.vandaag.labels_placeholder')} accessibilityLabel={t('circle.vandaag.labels_title')}
+      autoCapitalize="none" onEndEditing={() => { if (text !== control.value) onApply(text); }} testID={testID} />
   );
 }
 

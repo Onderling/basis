@@ -379,7 +379,8 @@ export function wireChat({
           categoryId: data.categoryId ?? null,
           skillTags:  Array.isArray(data.skillTags) ? data.skillTags : [],
         };
-        matchesSkills = typeof matchesMine === 'function' && (await matchesMine(data.circleId ?? null, post)) === true;
+        // a contact-fanout post is in no circle (its envelope names none): it is judged by the default self
+        matchesSkills = typeof matchesMine === 'function' && (await matchesMine(null, post)) === true;
       } catch {}
       const notifyWorthy = isContact || matchesSkills;
 

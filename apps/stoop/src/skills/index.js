@@ -5586,8 +5586,12 @@ export function buildSkills({
      *   that circle) with Layer 2 (TF-IDF over the user's response history).  Returns `{matched, ...}` with
      *   `via: 'offering'|'interest'` when matched, plus the raw `layer2Score` for inspection.
      */
-    defineSkill('scorePostRelevance', async ({ parts }) => {
+    defineSkill('scorePostRelevance', async ({ parts, from }) => {
       const a = dataArgs(parts);
+      // It answers over the person's PRIVATE offerings (the host's matchesMine): to anyone but this device it would be an
+      // oracle over them — per category, and per circle the caller names (linking one persona to another). Only this
+      // device's own call gets a verdict: its own actor, or its self in the named circle (`localActorIn`).
+      if (!from || (from !== localActor && from !== localActorIn(a.circleId ?? null))) return { error: 'not-yours' };
       if (typeof a.text !== 'string' || !a.text) return { error: 'text required' };
 
       const mine = typeof bundle?.matchesMine === 'function'

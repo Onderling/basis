@@ -42,7 +42,7 @@ describe('a post matched against my own offerings', () => {
     expect((await score(a, { categoryId: 'tuin' }))?.layer1?.matched, 'back').toBe(true);
   }, 60_000);
 
-  it('the source is reachable by no op and no wire — no manifest declares it', () => {
+  it('the SOURCE (the drivers it reads) is returned by no op — the verdict is, by one op, local-only (scorePostRelevance refuses a peer)', () => {
     const ids = (stoopManifest.operations ?? []).map((o) => o.id);
     for (const gone of ['addMyOffering', 'removeMyOffering', 'setMyOfferings', 'myOfferings', 'myOfferingsFor']) expect(ids, gone).not.toContain(gone);
   });

@@ -158,3 +158,20 @@ describe('Stoop V1.5 Phase 22 — skills', () => {
     expect(bundle.interestProfile.totalDocs).toBeGreaterThanOrEqual(before);
   });
 });
+
+describe('scorePostRelevance answers this device only', () => {
+  // It now answers over the person's PRIVATE offerings (the host's matchesMine): from a peer it would be an oracle over
+  // them — per category, and per circle a peer may name. Only the device's own calls get a verdict.
+  it('a peer\'s task is refused; the shell\'s own call answers', async () => {
+    const bundle = await buildBundle({ offers: 'vervoer' });
+    const def = bundle.agent.skills.get('scorePostRelevance');
+    const ask = (from, extra = {}) => def.handler({ parts: [DataPart({ text: 'fiets?', categoryId: 'vervoer', ...extra })], from, agent: bundle.agent, envelope: null });
+    const own = await ask(ANNE);
+    expect(own.matched).toBe(true);
+    const peer = await ask('https://id.example/bob');
+    expect(peer.matched).toBeUndefined();
+    expect(peer.error).toBe('not-yours');
+    const probe = await ask('https://id.example/bob', { circleId: 'someone-elses-circle' });
+    expect(probe.error).toBe('not-yours');
+  });
+});

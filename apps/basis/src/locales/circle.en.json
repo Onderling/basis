@@ -4,9 +4,9 @@
     "doc": "Heading of the circle launcher (board 1B)."
   },
   "tab": {
-    "screens": {
-      "text": "Screens",
-      "doc": "α.3 — primary tab: user's screens (default landing)."
+    "vandaag": {
+      "text": "Today",
+      "doc": "The home tab: the person's own pages (the screen book) — a few capped blocks of what matters today."
     },
     "circles": {
       "text": "Circles",
@@ -1136,6 +1136,18 @@
     }
   },
   "screen": {
+    "more": {
+      "text": "more",
+      "doc": "Under a capped block on Vandaag: open the whole block on its own."
+    },
+    "more_back": {
+      "text": "back",
+      "doc": "Back from one block shown whole, to the page."
+    },
+    "unread_count": {
+      "text": "{{count}} new",
+      "doc": "Vandaag, circles-with-news block: how many lines are new in that circle since this device last looked. count = how many."
+    },
     "items_title": {
       "task": "My things",
       "calendar-event": "Agenda",
@@ -1201,7 +1213,97 @@
       "doc": "α.1c — defensive label for a block type the renderer doesn't recognize (forward-compat)."
     }
   },
+  "vandaag": {
+    "customise": {
+      "text": "Customise",
+      "doc": "The button on Vandaag that opens the customise sheet."
+    },
+    "customise_title": {
+      "text": "Customise this page",
+      "doc": "Title of the customise sheet."
+    },
+    "blocks_title": {
+      "text": "On this page",
+      "doc": "Heading over the page's blocks in the customise sheet."
+    },
+    "add_block_title": {
+      "text": "Add a block",
+      "doc": "Heading over the blocks that can be added."
+    },
+    "page_title": {
+      "text": "Page",
+      "doc": "Heading over the page acts (rename, add, remove)."
+    },
+    "rename_page": {
+      "text": "Rename",
+      "doc": "Rename the active page."
+    },
+    "add_page": {
+      "text": "New page",
+      "doc": "Add a page to the person's pages."
+    },
+    "new_page_name": {
+      "text": "New page",
+      "doc": "The name a new page starts with."
+    },
+    "remove_page": {
+      "text": "Remove page",
+      "doc": "Remove the active page (not the last one)."
+    },
+    "undo": {
+      "text": "Undo",
+      "doc": "Undo the newest change to the person's pages."
+    },
+    "up": {
+      "text": "Move up",
+      "doc": "Move a block up."
+    },
+    "down": {
+      "text": "Move down",
+      "doc": "Move a block down."
+    },
+    "remove": {
+      "text": "Remove",
+      "doc": "Remove a block from the page."
+    },
+    "done": {
+      "text": "Done",
+      "doc": "Close the customise sheet."
+    },
+    "horizon_today": {
+      "text": "Today",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_3days": {
+      "text": "3 days",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_week": {
+      "text": "Week",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_month": {
+      "text": "Month",
+      "doc": "Calendar block horizon preset."
+    },
+    "scope_mine": {
+      "text": "Mine",
+      "doc": "Tasks block: only my tasks."
+    },
+    "scope_all": {
+      "text": "All",
+      "doc": "Tasks block: every open task."
+    },
+    "limit_n": {
+      "text": "{{n}} rows",
+      "doc": "A block's cap. n = how many rows."
+    }
+  },
   "screens": {
+    "vandaag_page": {
+      "text": "Today",
+      "doc": "The name of the first page of the person's own pages (Vandaag), seeded once."
+    },
     "picker_title": {
       "text": "Screens",
       "doc": "α.3 — picker heading."
@@ -1258,17 +1360,9 @@
       "text": "{{count}} circles",
       "doc": "α.3 — filter summary for many."
     },
-    "seed_name": {
-      "text": "Stream",
-      "doc": "α.3 — name of the auto-seeded default screen."
-    },
     "seed_my_things": {
       "text": "My things",
       "doc": "α.4 — seeded screen aggregating tasks assigned to me across circles."
-    },
-    "seed_my_calendar": {
-      "text": "My calendar",
-      "doc": "α.4 — seeded screen aggregating upcoming events across circles."
     }
   },
   "recipe": {
@@ -5958,6 +6052,22 @@
     "history_on": {
       "text": "On — {{count}} entries mirrored, sealed, to your own storage.",
       "doc": "history mirror state line when running."
+    },
+    "start_title": {
+      "text": "Open on",
+      "doc": "My data, the start-screen setting: its heading (where the app opens on this device)."
+    },
+    "start_vandaag": {
+      "text": "Today",
+      "doc": "Start-screen choice: Vandaag (the default)."
+    },
+    "start_circles": {
+      "text": "Circles",
+      "doc": "Start-screen choice: the circles list."
+    },
+    "start_last": {
+      "text": "Last used",
+      "doc": "Start-screen choice: the tab used last on this device."
     },
     "devices_needs_phrase": {
       "text": "This device does not share your own data with your other devices yet: type your recovery phrase once on this device (My data → Personas on this device, tick nothing).",

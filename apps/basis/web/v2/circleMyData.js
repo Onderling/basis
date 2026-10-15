@@ -36,6 +36,8 @@ export function renderCircleMyData(container, {
   devices = [],
   onRevokeDevice,
   devicesNeedPhrase = false,
+  startScreen = null,
+  onSetStartScreen,
   // The nodes this person owns (a companion they claimed): `[{node, short}]`. `onOpenCompanionGrant(node)` reads what
   // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
   // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
@@ -544,6 +546,23 @@ export function renderCircleMyData(container, {
   }
 
   // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
+  // where the app opens on this device: Vandaag · the circles list · the tab last used
+  if (startScreen && typeof onSetStartScreen === 'function') {
+    const sec0 = section(tr('circle.mydata.start_title'));
+    const sel = document.createElement('select');
+    sel.dataset.role = 'start-screen';
+    for (const c of startScreen.choices ?? []) {
+      const o = document.createElement('option');
+      o.value = c.value;
+      o.textContent = tr(c.labelKey);
+      if (c.value === startScreen.value) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => onSetStartScreen(sel.value));
+    sec0.appendChild(sel);
+    container.appendChild(sec0);
+  }
+
   if (historyMirror && typeof onToggleHistoryMirror === 'function') {
     const h = historyMirror;
     const sec2 = section(tr('circle.mydata.history'));

@@ -34,6 +34,11 @@ export function circleSlug(name) {
  * this helper keeps working when a step gains a field and fails loudly if a step gains a required one.
  */
 export async function createCircleViaWizard(page, name, { handle = 'founder' } = {}) {
+  // the app opens on Vandaag (the home) since 2026-10-15: the create button lives on the circles list
+  if (await page.locator('.circle-launcher__new').count() === 0) {
+    await page.locator('[data-tab="circles"]').first().click();
+    await page.locator('.circle-launcher__new').waitFor({ timeout: 15_000 });
+  }
   await page.locator('.circle-launcher__new').click();
   await page.waitForTimeout(3500);
   const inputs = page.locator('.cc-wizard-input:visible');

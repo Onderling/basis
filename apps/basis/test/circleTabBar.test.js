@@ -17,7 +17,7 @@ describe('renderCircleTabBar', () => {
   it('renders the alpha tabs in order — Circles, Contacten, Mij (Schermen and Nearby are hidden, not removed)', () => {
     const el = renderCircleTabBar(document.createElement('nav'), { active: 'circles', t });
     const tabs = [...el.querySelectorAll('.circle-tabbar__tab')].map((b) => b.dataset.tab);
-    expect(tabs).toEqual(['circles', 'contacten', 'mij']);
+    expect(tabs).toEqual(['screens', 'circles', 'contacten', 'mij']);
     expect(el.querySelector('[data-tab="circles"]').classList.contains('is-active')).toBe(true);
   });
 
@@ -34,7 +34,7 @@ describe('renderCircleTabBar', () => {
   it('is a genuine projection consumer: the DOM tabs match manifest.tabs (ids + labels)', () => {
     const projected = circleTabs(basisManifest);
     // The manifest is the single source of the roster (no per-shell literal).
-    expect(projected.map((tab) => tab.id)).toEqual(['circles', 'contacten', 'mij']);
+    expect(projected.map((tab) => tab.id)).toEqual(['screens', 'circles', 'contacten', 'mij']);
     const el = renderCircleTabBar(document.createElement('nav'), { active: 'mij', t });
     const btns = [...el.querySelectorAll('.circle-tabbar__tab')];
     expect(btns.map((b) => b.dataset.tab)).toEqual(projected.map((tab) => tab.id));

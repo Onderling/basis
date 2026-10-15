@@ -37,7 +37,7 @@ function matchesHighlight(rowId, highlightRef) {
   return rowId === highlightRef || String(highlightRef).endsWith(String(rowId));
 }
 
-export default function CircleScreenView({ blocks = null, refreshing = false, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
+export default function CircleScreenView({ blocks = null, refreshing = false, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, onMore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // null = still materializing (host hasn't resolved yet).  Distinguish
@@ -73,7 +73,7 @@ export default function CircleScreenView({ blocks = null, refreshing = false, on
         </Text>
       ) : null}
       {blocks.map((block) => (
-        <BlockSection key={block.blockId} block={block} onAction={onAction} onEmbedOpen={onEmbedOpen}
+        <BlockSection key={block.blockId} block={block} onAction={onAction} onEmbedOpen={onEmbedOpen} onMore={onMore}
           highlightRef={highlightRef} highlightRowRef={highlightRowRef} onHighlightLayout={onHighlightLayout} />
       ))}
     </View>
@@ -86,7 +86,7 @@ function blockName(block) {
   return block.titleKey ? t(block.titleKey) : block.type;
 }
 
-function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
+function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, onMore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const baseStyle = [styles.block, styles[`block_${block.type}`] ?? null];
@@ -124,10 +124,21 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       else body = renderItems(block, styles);
       break;
     case 'rules':        body = renderRules(block, styles); break;
+    case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
     default:
       body = <Text style={styles.blockEmptyText}>{t('circle.screen.block_unknown', { type: block.type })}</Text>;
   }
-  return <View style={baseStyle} testID={`screen-block-${block.blockId}`}>{body}</View>;
+  return (
+    <View style={baseStyle} testID={`screen-block-${block.blockId}`}>
+      {body}
+      {/* a capped block on the person's pages: "meer" opens it whole (the host's `onMore(blockId)`) */}
+      {typeof onMore === 'function' && block.status === 'ok' ? (
+        <Pressable onPress={() => onMore(block.blockId)} testID={`screen-more-${block.blockId}`}>
+          <Text style={styles.blockEmptyText}>{t('circle.screen.more')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
@@ -178,6 +189,24 @@ function renderPhoto(block, styles) {
         resizeMode="cover"
       />
       {caption ? <Text style={styles.photoCaption}>{caption}</Text> : null}
+    </View>
+  );
+}
+
+// The circles with news: each a row with its name and how many unread; a tap opens the circle
+// (`onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does). Web parity: circleScreen.js.
+function renderCirclesUnread(block, onAction, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t('circle.recipe.block.circlesUnread')}</Text>
+      {items.map((row) => (
+        <Pressable key={row.circleId} style={styles.noticeRow} testID={`circles-unread-${row.circleId}`}
+          disabled={typeof onAction !== 'function'}
+          onPress={() => onAction?.({ kind: 'open-circle', circleId: row.circleId })}>
+          <Text style={styles.noticeText}>{row.name ?? row.circleId} · {t('circle.screen.unread_count', { count: row.unread })}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }

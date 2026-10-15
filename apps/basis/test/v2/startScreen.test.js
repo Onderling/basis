@@ -1,0 +1,33 @@
+// @vitest-environment happy-dom
+/**
+ * Where the app opens: Vandaag by default, the circles list, or the tab last used — a device setting in the param
+ * register, painted on My data, written through set-param like every setting.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { startTabFor, START_SCREEN, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
+import { renderCircleMyData } from '../../web/v2/circleMyData.js';
+
+const t = (k) => k;
+
+describe('the start screen', () => {
+  it('opens on Vandaag unless the person chose otherwise', () => {
+    expect(START_SCREEN).toBe('vandaag');
+    expect(startTabFor(undefined, null)).toBe('screens');
+    expect(startTabFor('vandaag', 'mij')).toBe('screens');
+    expect(startTabFor('circles', 'mij')).toBe('circles');
+    expect(startTabFor('last', 'contacten')).toBe('contacten');
+    expect(startTabFor('last', null), 'no last tab yet: the home').toBe('screens');
+    expect(startTabFor('last', 'nearby'), 'a tab the alpha does not paint: the home').toBe('screens');
+  });
+
+  it('My data shows the choice and writes it', () => {
+    const onSetStartScreen = vi.fn();
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, podStatus: { signedIn: true }, startScreen: { value: 'circles', choices: START_SCREEN_CHOICES }, onSetStartScreen,
+    });
+    const sel = el.querySelector('[data-role="start-screen"]');
+    expect(sel.value).toBe('circles');
+    sel.value = 'last'; sel.dispatchEvent(new Event('change'));
+    expect(onSetStartScreen).toHaveBeenCalledWith('last');
+  });
+});

@@ -42,9 +42,11 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
  * @param {(actionKey: string) => void} [args.onAction] invoked when a
  *        quickActions pill is tapped (host routes the feature to a tab /
  *        action).  Omitted → pills render disabled.
+ * @param {(blockId: string) => void} [args.onMore] when given, each shown block gets a "meer" that calls it (the
+ *        person's pages: a capped block opened whole)
  * @returns {HTMLElement}
  */
-export function renderCircleScreen(container, { blocks = [], t, refreshing = false, onAction, onEmbedOpen, highlightRef } = {}) {
+export function renderCircleScreen(container, { blocks = [], t, refreshing = false, onAction, onEmbedOpen, highlightRef, onMore } = {}) {
   const tr = translatorOr(t, 'circleScreen.js');
   container.innerHTML = '';
   container.classList.add('circle-screen');
@@ -68,7 +70,18 @@ export function renderCircleScreen(container, { blocks = [], t, refreshing = fal
   }
 
   for (const block of blocks) {
-    container.appendChild(renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }));
+    const section = renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef });
+    // a capped block on the person's pages: "meer" opens it whole (`onMore(blockId)`, given by the host)
+    if (typeof onMore === 'function' && block.status === 'ok') {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'circle-screen__more';
+      more.dataset.blockId = block.blockId ?? '';
+      more.textContent = tr('circle.screen.more');
+      more.addEventListener('click', () => onMore(block.blockId));
+      section.appendChild(more);
+    }
+    container.appendChild(section);
   }
   // δ.1 — subtle refresh pip when rendering cached blocks while a fresh
   // materialize is in flight.  Static glyph (⟳) is enough; no animation
@@ -149,6 +162,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       else renderItems(section, block, tr);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
+    case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
     default:
       section.textContent = tr('circle.screen.block_unknown', { type: block.type });
   }
@@ -206,6 +220,34 @@ function renderPhoto(section, block, _tr) {
     cap.textContent = caption;
     section.appendChild(cap);
   }
+}
+
+// The circles with news: each a row with its name and how many unread; a tap opens the circle (the screen's
+// `onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does).
+function renderCirclesUnread(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.recipe.block.circlesUnread');
+  section.appendChild(title);
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__circles-unread';
+  for (const row of block.content?.items ?? []) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__circles-unread-row';
+    li.dataset.circleId = row.circleId ?? '';
+    const name = document.createElement('span');
+    name.textContent = row.name ?? row.circleId;
+    const n = document.createElement('span');
+    n.className = 'circle-screen__circles-unread-count';
+    n.textContent = tr('circle.screen.unread_count', { count: row.unread });
+    li.append(name, n);
+    if (typeof onAction === 'function') {
+      li.tabIndex = 0;
+      li.addEventListener('click', () => onAction({ kind: 'open-circle', circleId: row.circleId }));
+    }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
 }
 
 function renderNoticeboard(section, block, tr) {

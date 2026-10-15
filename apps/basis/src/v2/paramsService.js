@@ -34,6 +34,7 @@ import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
 import { DEFAULT_THEME_PREF } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
+import { START_SCREEN } from './startScreen.js';
 import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, QUIET_KEY, QUIET_DEFAULT, USAGE_VISIBLE_KEY, USAGE_VISIBLE, MONTHLY_TOKEN_LIMIT_KEY, MONTHLY_TOKEN_LIMIT, ROLES_KEY, ROLES_PRESET, HOUSEHOLD_IN_APP_KEY, IN_APP_MODE, CALENDAR_FEED_KEY, CALENDAR_FEED_MODE } from './botSettings.js';
 import { REMINDER_RULES_KEY, REMINDER_RULES_PARAM } from './reminderWords.js';
 
@@ -102,6 +103,8 @@ export const BASIS_USER_PARAMS = [
   // Which apps a door's assistant may act in when the door is not a circle (the box's Telegram chat). Set by the
   // owner, read at the door's boot; the model never sets it.
   { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },
+  // where the app opens on this device: Vandaag (default) · the circles list · the tab last used (startScreen.js)
+  { key: 'home.startScreen',                    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: START_SCREEN },
   // How much a door's assistant remembers of a person's conversation when they have not chosen (off · short · long);
   // the person's own choice on their thread wins. Set by the bot's admin.
   { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE },

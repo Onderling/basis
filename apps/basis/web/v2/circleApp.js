@@ -167,6 +167,8 @@ import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBac
 import { renderContactsRoster } from './contactsRoster.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
+import { renderVandaagPlus } from './vandaagPlus.js';
+import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
@@ -4112,6 +4114,13 @@ async function _showVandaag() {
     edit.textContent = t('circle.vandaag.customise');
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
+    // the "+": an own note or an own appointment, into the person's own store (never a circle)
+    const plus = document.createElement('button');
+    plus.type = 'button';
+    plus.className = 'circle-vandaag__plus';
+    plus.textContent = `+ ${t('circle.vandaag.plus')}`;
+    plus.addEventListener('click', () => showVandaagPlus());
+    head.appendChild(plus);
   }
   rootEl.appendChild(head);
   if (!screen) return;
@@ -4157,6 +4166,29 @@ async function _showVandaag() {
 }
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
+// "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
+function showVandaagPlus() {
+  const { card, close } = _restoreOverlay();
+  let actId = null;
+  let error = null;
+  const paint = () => renderVandaagPlus(card, {
+    t, actId, error,
+    onPick: (id) => { actId = id; error = null; paint(); },
+    onSave: async (id, values) => {
+      const op = plusOp(id, values);
+      if (op.error) { error = t(op.error); paint(); return; }
+      const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+      if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
+      const follow = plusFollowUp(_screensBook, id);
+      if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
+      close(); _showVandaag();
+    },
+    onClose: () => close(),
+  });
+  paint();
+}
+
 function showVandaagCustomise() {
   const { card, close } = _restoreOverlay();
   // the edits run one after another, and closing waits for the last one — so the page never paints a book from

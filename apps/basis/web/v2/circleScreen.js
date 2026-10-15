@@ -29,6 +29,7 @@ import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '.
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
+import { whereTag } from '../../src/v2/rowWhere.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -348,10 +349,10 @@ function renderAgenda(section, block, tr, highlightRef) {
     li.className = 'circle-screen__agenda-row';
     li.dataset.eventId = ev.id ?? '';
     // merged across circles: which circle it is in (a circle's own agenda has none to say)
-    if (ev.circleName) {
+    if (whereTag(ev, tr)) {
       const tag = document.createElement('span');
       tag.className = 'circle-screen__tasks-circle';
-      tag.textContent = ev.circleName;
+      tag.textContent = whereTag(ev, tr);
       li.appendChild(tag);
     }
     const lbl = document.createElement('span');
@@ -380,10 +381,10 @@ function renderItems(section, block, tr) {
     const li = document.createElement('li');
     li.className = 'circle-screen__items-row';
     li.dataset.itemId = it.id ?? '';
-    if (it.circleName) {
+    if (whereTag(it, tr)) {
       const tag = document.createElement('span');
       tag.className = 'circle-screen__tasks-circle';
-      tag.textContent = it.circleName;
+      tag.textContent = whereTag(it, tr);
       li.appendChild(tag);
     }
     const text = document.createElement('span');
@@ -412,10 +413,10 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
       li.classList.add('circle-screen__tasks-row--highlight');
       scrollRowIntoView(li);
     }
-    if (task.circleName) {
+    if (whereTag(task, tr)) {
       const tag = document.createElement('span');
       tag.className = 'circle-screen__tasks-circle';
-      tag.textContent = task.circleName;
+      tag.textContent = whereTag(task, tr);
       li.appendChild(tag);
     }
     const text = document.createElement('span');

@@ -176,7 +176,7 @@ import {
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
 // that mints a `request` task instead of executing an offering. Wired below onto the
 // live host agent as the `requestOffering` peer-facing dispatcher op.
-import { createTaskStore, requestableSkillHandler, memoryDataSource } from '@onderling/item-store';
+import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers } from '@onderling/item-store';
 
 /**
  * Pick the right vault for the runtime.  Used here only for the
@@ -5106,10 +5106,24 @@ export async function createRealHouseholdAgent(opts = {}) {
           // household bot was "made by the bot" for everyone, and whose it was could not be judged
           by:       actorOf(ctx) ?? chatId?.pubKey,
         };
+        // A person's OWN item (no circle): the own scope named as the circle reaches their own store — carried to their
+        // other devices, never to a circle's members — through the same generic atoms; never a household circle store
+        // named after the scope.
+        // A persona's own LANE is a carry, not a place: naming it as a circle is refused (it would make a household store
+        // of that name). And the own scope is the person's on THIS device only — a door's call never reaches it: the waist
+        // strips a door caller's circle above (a circle door pins its own), and this says so again where it matters.
+        // An own note made here carries the DEFAULT's `by`, so it rides the default's lane; a note made on a Werk page
+        // riding Werk's lane waits for the persona picker.
+        if (typeof args?.circleId === 'string' && args.circleId.startsWith(`${OWN_DEVICES_SCOPE}:`)) {
+          return { ok: false, code: 'own-lane-not-a-circle', error: 'own-lane-not-a-circle' };
+        }
+        const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
+        const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
+        const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.
         if (isPeopleWritten(householdManifest, g.noun) && ['get', 'update', 'remove'].includes(g.atom)) {
-          const listed = await householdService.callCapability('list', g.noun, {}, capCtx);
+          const listed = await cap('list', g.noun, {});
           const items = (listed?.result?.items ?? listed?.items ?? []).filter((i) => i && i.type === g.noun);
           const ref = String(args?.id ?? '').trim();
           const wordsOf = (i) => String(i.body ?? i.text ?? i.title ?? '');
@@ -5125,7 +5139,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           }
           args = { ...(args ?? {}), id: item.id, _words: wordsOf(item) };
         }
-        const done = await householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx);
+        const done = await cap(g.atom, g.noun, args ?? {});
         // A people-written noun answers in words a door can say: what was written or taken away, and the list as a list.
         if (isPeopleWritten(householdManifest, g.noun) && done?.ok !== false) {
           const inner = done?.result ?? done;
@@ -5135,7 +5149,9 @@ export async function createRealHouseholdAgent(opts = {}) {
           if (g.atom === 'remove') return { ...done, entry: args?._words ?? '', message: agentT('circle.notes.removed', { text: args?._words ?? '' }) };
           if (g.atom === 'list') {
             const items = (inner?.items ?? []).filter((i) => i && i.type === g.noun && words(i).trim());
-            return { ...done, title: agentT('circle.notes.title'), items: items.map((i) => ({ id: i.id, label: words(i), text: words(i), type: g.noun })) };
+            // each row keeps its moments and its maker, so a view across circles can order it and say whose it is
+            return { ...done, title: agentT('circle.notes.title'), items: items.map((i) => ({ id: i.id, label: words(i), text: words(i), type: g.noun,
+              ...(i.createdAt ? { createdAt: i.createdAt } : {}), ...(i.updatedAt ? { updatedAt: i.updatedAt } : {}), ...(i.createdBy ? { createdBy: i.createdBy } : {}) })) };
           }
         }
         return done;

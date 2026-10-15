@@ -41,16 +41,7 @@ import { isNoticeboardPost } from './circleStoopScope.js';
  * default ordering shown in α.1d's editor.  `labelKey` resolves via
  * the standard `t()` localizer (locale keys land with α.1d).
  */
-export const BLOCK_REGISTRY = Object.freeze({
-  quickActions: { order: 0, labelKey: 'circle.recipe.block.quickActions', emoji: '⭐' },
-  announcement: { order: 1, labelKey: 'circle.recipe.block.announcement', emoji: '📣' },
-  noticeboard:  { order: 2, labelKey: 'circle.recipe.block.noticeboard',  emoji: '📌' },
-  calendar:       { order: 3, labelKey: 'circle.recipe.block.calendar',       emoji: '📅' },
-  tasks:        { order: 4, labelKey: 'circle.recipe.block.tasks',        emoji: '✅' },
-  rules:        { order: 5, labelKey: 'circle.recipe.block.rules',        emoji: '📜' },
-  photo:        { order: 6, labelKey: 'circle.recipe.block.photo',        emoji: '🖼️' },
-  text:         { order: 7, labelKey: 'circle.recipe.block.text',         emoji: '✏️' },
-});
+
 
 /**
  * Materialize a single block.  Returns a Promise resolving to the

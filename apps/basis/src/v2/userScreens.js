@@ -38,6 +38,7 @@
 /* ─────────────────────────────────────────────────────────────────────── */
 
 /** Empty book — what a fresh user starts with (host can seed defaults). */
+import { BLOCK_TYPES } from './circleRecipe.js';
 export const EMPTY_SCREEN_BOOK = Object.freeze({ screens: [], activeId: null });
 
 /** Sentinel for "all circles" in circleFilter (vs `[circleId, …]`). */
@@ -245,11 +246,8 @@ function normalizeCircleFilter(raw) {
   return out.length > 0 ? out : ALL_CIRCLES;
 }
 
-// Lifted from circleRecipe.js (same shape, same predicate).  Kept
-// inline rather than importing to avoid a circular dependency if
-// circleRecipe ever wants a Screen reference later.  Keep in sync
-// with circleRecipe.BLOCK_TYPES — α.4 added 'tasks'.
-const BLOCK_TYPES = ['announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text'];
+// The one block table (circleRecipe.js): a page keeps any block type the table knows; which ones an editor OFFERS is
+// the table's `places` (a copy of the list lived here and had already drifted from it).
 
 function normalizeBlocks(raw) {
   const arr = Array.isArray(raw) ? raw : [];

@@ -188,7 +188,7 @@ export {
 // α.1a/b — screen "recipe book" model + per-block content materializer
 // (v2 §2 RECEPT · SCREEN-WEERGAVE INRICHTEN).
 export {
-  BLOCK_TYPES, EMPTY_RECIPE_BOOK,
+  BLOCK_TYPES, BLOCK_DESCRIPTORS, blockTypesFor, EMPTY_RECIPE_BOOK,
   emptyRecipe, normalizeRecipe, defaultConfigForBlock,
   addBlock, removeBlock, moveBlock, updateBlock,
   normalizeRecipeBook,
@@ -197,7 +197,7 @@ export {
   createCircleRecipeStore, localStorageRecipeIo,
 } from './v2/circleRecipe.js';
 export {
-  BLOCK_REGISTRY, materializeBlock, materializeRecipe,
+  materializeBlock, materializeRecipe,
 } from './v2/circleRecipeBlocks.js';
 // γ.3 — recipe conflict detection + resolution (Phase 9 sync absorption).
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';

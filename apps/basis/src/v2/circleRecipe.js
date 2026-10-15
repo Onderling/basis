@@ -35,40 +35,49 @@
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { sealedKeyValue } from './localStoreSeal.js';
 
-/** Block types the v2 PDF §2 palette exposes (in editor display order). */
-export const BLOCK_TYPES = Object.freeze([
-  'quickActions',     // D1 (§5A) — "Veel-gebruikt" top-N most-used actions
-  'announcement',     // pinned admin message (free text)
-  'noticeboard',      // top-N recent posts (asks/offer)
-  'calendar',           // upcoming calendar events
-  'tasks',            // α.4 — tasks aggregated across circles (assignee filter)
-  'rules',            // rendered houseRules doc
-  'photo',            // static image with optional caption (folio-backed src)
-  'text',             // free-form text / markdown block
-]);
-
-/** Default config per block type — kept minimal so editors fill in.
+/**
+ * THE BLOCK TABLE — every block a page can hold, ONE place: its palette order, label, the one plain sentence that says
+ * what it shows (the customise sheet shows it; a later model that reorders a page reads it), where it may live, and its
+ * default config.
  *
- * The four list-shaped types (announcement, noticeboard, agenda, tasks)
- * carry a `compact: false` default — α.5c surfaces a "Compact" toggle
- * in the per-block config drawer that tightens row padding + font on
- * the rendered screen.  rules/photo/text are not list-shaped → they
- * deliberately have no `compact` key. */
-const DEFAULT_CONFIGS = Object.freeze({
-  // D1 (§5A) — `limit` caps how many action pills show (PDF shows 4).
-  // No `compact` key: the pill row is already compact by nature.
-  quickActions: () => ({ limit: 4 }),
-  announcement: () => ({ text: '', compact: false }),
-  noticeboard:  () => ({ limit: 5, compact: false }),
-  calendar:       () => ({ limit: 5, horizonDays: 14, compact: false }),
-  // α.4 — tasks block: scope filters by assignee.  V0 supports
-  // 'assigned-to-me' (the Mijn dingen aggregation); 'all' shows
-  // every open task across the active circles.
-  tasks:        () => ({ scope: 'assigned-to-me', limit: 10, compact: false }),
-  rules:        () => ({}),
-  photo:        () => ({ src: '', caption: '' }),
-  text:         () => ({ text: '' }),
+ * `places`: 'circle' = a circle's own screen (its recipe); 'mij' = the person's own pages (Vandaag, Mij). An editor
+ * offers only the blocks of its place — a circle never offers what is about the person (circles-unread,
+ * identity-line), the person's pages never offer what a circle's admin curates (announcement, rules) or a circle's own
+ * actions (quickActions).
+ *
+ * The list-shaped blocks carry a `compact: false` default — a "Compact" toggle in the block's config drawer tightens
+ * row padding and font; the others deliberately have no `compact` key.
+ */
+const BOTH = Object.freeze(['circle', 'mij']);
+export const BLOCK_DESCRIPTORS = Object.freeze({
+  // `limit` caps how many action pills show
+  quickActions:  { order: 0,  emoji: '⭐', places: ['circle'], config: () => ({ limit: 4 }) },
+  announcement:  { order: 1,  emoji: '📣', places: ['circle'], config: () => ({ text: '', compact: false }) },
+  noticeboard:   { order: 2,  emoji: '📌', places: BOTH,       config: () => ({ limit: 5, compact: false }) },
+  calendar:      { order: 3,  emoji: '📅', places: BOTH,       config: () => ({ limit: 5, horizonDays: 14, compact: false }) },
+  // `scope`: 'assigned-to-me' (mine) or 'all' (every open task across the active circles)
+  tasks:         { order: 4,  emoji: '✅', places: BOTH,       config: () => ({ scope: 'assigned-to-me', limit: 10, compact: false }) },
+  rules:         { order: 5,  emoji: '📜', places: ['circle'], config: () => ({}) },
+  photo:         { order: 6,  emoji: '🖼️', places: BOTH,       config: () => ({ src: '', caption: '' }) },
+  text:          { order: 7,  emoji: '✏️', places: BOTH,       config: () => ({ text: '' }) },
+  // the person's own pages: the circles with news, a one-line "about me", the person's devices and helpers
+  circlesUnread: { order: 8,  emoji: '🔔', places: ['mij'],    config: () => ({ limit: 5 }) },
+  identityLine:  { order: 9,  emoji: '🙂', places: ['mij'],    config: () => ({ readings: [] }) },
+  agents:        { order: 10, emoji: '🤝', places: ['mij'],    config: () => ({}) },
 });
+for (const [type, d] of Object.entries(BLOCK_DESCRIPTORS)) {
+  d.labelKey = `circle.recipe.block.${type}`;
+  d.descriptionKey = `circle.recipe.block_desc.${type}`;
+  Object.freeze(d);
+}
+
+/** Every block type, in palette order. */
+export const BLOCK_TYPES = Object.freeze(Object.keys(BLOCK_DESCRIPTORS).sort((a, b) => BLOCK_DESCRIPTORS[a].order - BLOCK_DESCRIPTORS[b].order));
+
+/** The block types an editor of `place` ('circle' | 'mij') offers, in palette order. */
+export function blockTypesFor(place) {
+  return BLOCK_TYPES.filter((t) => BLOCK_DESCRIPTORS[t].places.includes(place));
+}
 
 /** Empty recipe book — what an un-customised circle shows for screen-mode. */
 export const EMPTY_RECIPE_BOOK = Object.freeze({ recipes: [], activeId: null });
@@ -95,7 +104,7 @@ export function normalizeRecipe(raw) {
 
 /** Default config for a block type (deep-copied). */
 export function defaultConfigForBlock(type) {
-  const fn = DEFAULT_CONFIGS[type];
+  const fn = BLOCK_DESCRIPTORS[type]?.config;
   return fn ? fn() : {};
 }
 

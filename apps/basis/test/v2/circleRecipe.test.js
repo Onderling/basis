@@ -26,7 +26,7 @@ describe('circleRecipe · α.1a — single Recipe', () => {
   });
 
   it('the one block table: every type says where it lives, with a label and one plain sentence', () => {
-    expect(blockTypesFor('mij')).toEqual(['noticeboard', 'calendar', 'tasks', 'photo', 'text', 'circlesUnread', 'identityLine', 'agents']);
+    expect(blockTypesFor('mij')).toEqual(['noticeboard', 'calendar', 'tasks', 'photo', 'text', 'circlesUnread', 'identityLine', 'agents', 'notes']);
     for (const t of BLOCK_TYPES) {
       const d = BLOCK_DESCRIPTORS[t];
       expect(d.labelKey).toBe(`circle.recipe.block.${t}`);

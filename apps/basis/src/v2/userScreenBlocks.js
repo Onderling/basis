@@ -29,6 +29,7 @@
 import { acrossCircles } from './acrossCircles.js';
 import { ITEM_PRESENTERS } from './itemPresenters.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
+import { carriesLabels, normLabel } from './itemLabels.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { tasksManifest } from '../../../tasks-v0/manifest.js';
 import { householdManifest } from '../../../household/manifest.js';
@@ -70,7 +71,10 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
 
 /* ─────────────────────────────────────────────────────────────────────── */
 
-async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAll }) {
+async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, hostOps, screenIsAll }) {
+  // THE BLOCK'S OWN CIRCLES: a block may narrow the page's circles to some of them (`config.circleIds`); never widen
+  const want = Array.isArray(block?.config?.circleIds) ? block.config.circleIds.filter((c) => typeof c === 'string' && c) : [];
+  const activeCircleIds = want.length ? pageCircleIds.filter((id) => want.includes(id)) : pageCircleIds;
   try {
     switch (block?.type) {
       // Circle-agnostic: identical to per-circle materializer's behaviour.
@@ -89,7 +93,10 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
       case 'calendar':
         return await materializeItems({ ...block, config: { noun: 'calendar-event', scope: 'all', ...(block.config ?? {}) } }, activeCircleIds, hostOps);
       case 'tasks':
-        return await materializeItems({ ...block, config: { noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine', limit: block.config?.limit } }, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine' } }, activeCircleIds, hostOps);
+      // the notes across circles — the block a labels filter means something on (notes carry tags)
+      case 'notes':
+        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'note', scope: block.config?.scope === 'mine' ? 'mine' : 'all' } }, activeCircleIds, hostOps);
 
       case 'rules':
         return await materializeRules(block, activeCircleIds, hostOps, screenIsAll);
@@ -186,6 +193,17 @@ async function materializeItems(block, activeCircleIds, { callSkill, myWebid, ci
     const mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '' }));
     rows = [...rows, ...mine].filter((e) => !presenter.when(e) || presenter.when(e) <= until)
       .sort((a, b) => presenter.when(a) - presenter.when(b));
+  }
+  // THE BLOCK'S FILTERS (Vandaag's "Pas aan"): labels — on a type that carries them (its schema has `tags`), a row
+  // shows when one of its tags is among the block's labels; a type without labels ignores the filter — and a relative
+  // date, "within N days" (an agenda's is its horizon above), by the type's own moment (`presenter.when`)
+  const labels = Array.isArray(block.config?.labels) ? block.config.labels.map(normLabel).filter(Boolean) : [];
+  if (labels.length && carriesLabels(noun)) rows = rows.filter((row) => Array.isArray(row.tags) && row.tags.some((tg) => labels.includes(normLabel(tg))));
+  const withinDays = Number(block.config?.withinDays);
+  if (!isAgenda && Number.isFinite(withinDays) && withinDays > 0) {
+    const now = Date.now();
+    const span = withinDays * 86_400_000;
+    rows = rows.filter((row) => { const w = presenter.when(row); return !w || Math.abs(w - now) <= span; });
   }
   // nothing answered (every circle, and my own calendar when it is asked): a failure, said as one
   if (!r.ok && r.reason === 'unreachable' && (!isAgenda || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };

@@ -32,7 +32,7 @@ describe('Pas aan', () => {
     const m = customiseModel(await store.get());
     expect(m.blocks.map((b) => b.type)).toEqual(['calendar', 'tasks', 'circlesUnread']);
     expect(m.blocks[0].controls.map((c) => c.kind)).toEqual(['horizonDays', 'limit']);
-    expect(m.blocks[1].controls.map((c) => c.kind)).toEqual(['scope', 'limit']);
+    expect(m.blocks[1].controls.map((c) => c.kind)).toEqual(['scope', 'limit', 'withinDays']);
     expect(m.blocks[0].canUp).toBe(false);
     expect(m.addable.map((a) => a.type)).not.toContain('rules');
     expect(m.addable.every((a) => a.descriptionKey.startsWith('circle.recipe.block_desc.'))).toBe(true);
@@ -58,6 +58,25 @@ describe('Pas aan', () => {
     expect((await store.get()).screens).toHaveLength(2);
   });
 
+  it('the filters: a block narrows to some of the page\'s circles, labels only where the type carries them, a relative date', async () => {
+    const { store, act } = await world();
+    const circles = [{ id: 'a', name: 'Thuis' }, { id: 'b', name: 'Werk' }];
+    let m = customiseModel(await store.get(), { circles });
+    expect(m.blocks[0].controls.find((c) => c.kind === 'circleIds')?.options.map((o) => o.value)).toEqual(['a', 'b']);
+    expect(m.blocks.some((b) => b.controls.some((c) => c.kind === 'labels')), 'no block on the first page carries labels').toBe(false);
+    await act('add', { pageId: m.pageId, type: 'notes' });
+    m = customiseModel(await store.get(), { circles });
+    const notes = m.blocks.find((b) => b.type === 'notes');
+    expect(notes.controls.map((c) => c.kind)).toEqual(['limit', 'circleIds', 'labels', 'withinDays']);
+    await act('config', { pageId: m.pageId, blockId: notes.blockId, kind: 'labels', value: 'Werk, thuis ,werk' });
+    await act('config', { pageId: m.pageId, blockId: notes.blockId, kind: 'circleIds', value: ['b'] });
+    const cfg = getActiveScreen(await store.get()).blocks.find((b) => b.type === 'notes').config;
+    expect(cfg.labels).toEqual(['werk', 'thuis']);
+    expect(cfg.circleIds).toEqual(['b']);
+    // one circle on the page: nothing to narrow to
+    expect(customiseModel(await store.get(), { circles: [circles[0]] }).blocks[0].controls.some((c) => c.kind === 'circleIds')).toBe(false);
+  });
+
   it('"meer" opens one block whole: that block only, its cap lifted', async () => {
     const { store } = await world();
     const page = getActiveScreen(await store.get());
@@ -78,5 +97,23 @@ describe('Pas aan', () => {
     expect(onAct).toHaveBeenLastCalledWith('config', expect.objectContaining({ kind: 'horizonDays', value: 30 }));
     el.querySelector('[data-act="undo"]').click();
     expect(onAct).toHaveBeenLastCalledWith('undo', {});
+  });
+});
+
+describe('the web sheet\'s filters', () => {
+  it('circles as ticks, labels as text — each reported as its act', async () => {
+    let book = null;
+    const store = createUserScreenStore({ io: { load: async () => book, save: async (b) => { book = b; } } });
+    await ensureVandaagBook({ store, t });
+    const model = customiseModel(await store.get(), { circles: [{ id: 'a', name: 'Thuis' }, { id: 'b', name: 'Werk' }] });
+    model.blocks.push({ blockId: 'n', type: 'notes', labelKey: 'x', index: 3, canUp: true, canDown: false, controls: [{ kind: 'labels', text: true, value: '' }] });
+    const onAct = vi.fn();
+    const el = renderVandaagCustomise(document.createElement('div'), { model, t, onAct, onClose: () => {} });
+    const tick = el.querySelector('[data-control="circleIds"] input[value="b"]');
+    tick.checked = true; tick.dispatchEvent(new Event('change'));
+    expect(onAct).toHaveBeenLastCalledWith('config', expect.objectContaining({ kind: 'circleIds', value: ['b'] }));
+    const labels = el.querySelector('input[data-control="labels"]');
+    labels.value = 'werk'; labels.dispatchEvent(new Event('change'));
+    expect(onAct).toHaveBeenLastCalledWith('config', expect.objectContaining({ kind: 'labels', value: 'werk' }));
   });
 });

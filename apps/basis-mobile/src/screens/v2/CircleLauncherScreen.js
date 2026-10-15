@@ -13,6 +13,7 @@
  * Flagged for device verification.
  */
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
+import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
@@ -1627,7 +1628,22 @@ export default function CircleLauncherScreen({
     else if (id === 'nearby') { setActiveCircle(null); setSelected(null); setView('nearby'); }
     else if (id === 'contacten') { setContactThread(null); setView('contacten'); }
     else if (id === 'mij') setView('profile');   // S2 — Mij is now the profile
+    // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
+    AsyncStorage.setItem(LAST_TAB_STORAGE_KEY, id).catch(() => {});
   };
+  // WHERE THE APP OPENS — the person's setting on this device (startScreen.js): Vandaag by default, the circles list,
+  // or the tab last used. Once, when the agent is there; a person who already moved somewhere keeps their place.
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (startedRef.current || !bundle?.agent) return;
+    startedRef.current = true;
+    (async () => {
+      let lastTab = null;
+      try { lastTab = await AsyncStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
+      if (view !== 'list' || selected) return;
+      onTab(startTabFor(bundle.agent.getParamValue?.('home.startScreen'), lastTab));
+    })();
+  }, [bundle]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // OBJ-2 — scanned a circle invite QR → hand it to the shared join wizard.
   const onJoinScan = useCallback((res) => {

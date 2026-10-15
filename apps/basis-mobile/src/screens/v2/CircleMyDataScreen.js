@@ -44,6 +44,7 @@ import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encrypt
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
+import { START_SCREEN_CHOICES } from '../../../../basis/src/v2/startScreen.js';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
@@ -807,6 +808,28 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         ) : null}
         <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
       </Section>
+
+      {/* Where the app opens on this device — the start-screen setting (startScreen.js), written through set-param like
+          every setting. Web parity: circleMyData.js. Omitted without an agent. */}
+      {agent && typeof agent.getParamValue === 'function' ? (
+        <Section title={t('circle.mydata.start_title')}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {START_SCREEN_CHOICES.map((c) => {
+              const on = (agent.getParamValue('home.startScreen') ?? 'vandaag') === c.value;
+              return (
+                <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-start-${c.value}`}
+                  accessibilityState={{ selected: on }}
+                  onPress={async () => {
+                    try { await callSkill('params', 'set-param', { key: 'home.startScreen', value: c.value }); } catch { /* the row re-reads the truth */ }
+                    setHistoryTick((n) => n + 1);
+                  }}>
+                  <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+      ) : null}
 
       {/* The personal history mirror — live health from the agent; the toggle flips the
           history.mirror register param through the one kind-gated write (the agent starts/stops

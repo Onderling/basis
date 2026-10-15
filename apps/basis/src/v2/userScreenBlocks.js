@@ -67,12 +67,16 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   // When the user has muted EVERY circle in the filter, an empty active
   // list means circle-aware blocks render empty ("hide entirely").
 
-  // whose rows are "mine": the host may name the person; when it does not, ask (a "my tasks" block without it shows none)
-  let ops = hostOps;
+  // whose rows are "mine": in each circle, the self this device speaks as there (a persona's circle is the persona's) —
+  // the host hands `selfIn(circleId)`; a host without personas may name one person (`myWebid`), else it is asked once
   const needsMe = (b) => b?.type === 'tasks' || b?.type === 'identityLine' || (['items', 'notes'].includes(b?.type) && b?.config?.scope === 'mine');
-  if (!hostOps.myWebid && typeof hostOps.callSkill === 'function' && screen.blocks.some(needsMe)) {
-    const me = await hostOps.callSkill('stoop', 'whoAmI', {}).then((r) => r?.webid ?? null).catch(() => null);
-    if (me) ops = { ...hostOps, myWebid: me };
+  let ops = hostOps;
+  if (typeof hostOps.selfIn !== 'function') {
+    let me = hostOps.myWebid ?? null;
+    if (!me && typeof hostOps.callSkill === 'function' && screen.blocks.some(needsMe)) {
+      me = await hostOps.callSkill('stoop', 'whoAmI', {}).then((r) => r?.webid ?? null).catch(() => null);
+    }
+    ops = { ...hostOps, selfIn: () => me };
   }
 
   return Promise.all(screen.blocks.map((block) => materializeOneBlock({
@@ -270,7 +274,7 @@ export const ITEM_MANIFESTS = Object.freeze([
  * `acrossCircles` (the type's own list per circle, its presenter for mine / order). Appointments also take the person's
  * own calendar (no circle) — the fold keeps those on the person's store.
  */
-async function materializeItems(block, activeCircleIds, { callSkill, myWebid, circles } = {}) {
+async function materializeItems(block, activeCircleIds, { callSkill, selfIn = () => null, circles } = {}) {
   const noun = String(block.config?.noun ?? '');
   const scope = block.config?.scope === 'mine' ? 'mine' : 'all';
   const limit = clampInt(block.config?.limit, 1, 200, 10);
@@ -283,7 +287,7 @@ async function materializeItems(block, activeCircleIds, { callSkill, myWebid, ci
   const isAgenda = noun === 'calendar-event';
   const until = Date.now() + horizonDays * 86_400_000;
   const r = await acrossCircles({
-    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: myWebid ?? null, limit: 500,
+    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
     manifests: ITEM_MANIFESTS,
     callSkill: (app, op, args) => callSkill(app, op, isAgenda ? { ...args, days: horizonDays } : args),
     genericFor: (circleId) => ({ list: async (n) => (await callSkill('household', encodeGenericOpId('household', 'list', n), { circleId }))?.result ?? [] }),
@@ -312,7 +316,7 @@ async function materializeItems(block, activeCircleIds, { callSkill, myWebid, ci
   if (!r.ok && r.reason === 'unreachable' && (!isAgenda || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };
   const items = rows.slice(0, limit).map((row) => ({
     id: row.id, label: row.label ?? presenter.label(row), when: presenter.when(row) || null,
-    circleId: row.circleId ?? null, circleName: row.circleName ?? '', mine: presenter.isMine(row, myWebid ?? null),
+    circleId: row.circleId ?? null, circleName: row.circleName ?? '', mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
     // what a chore row also shows: its words, its state, its "see also" links
     text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
   }));

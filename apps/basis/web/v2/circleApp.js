@@ -4070,6 +4070,11 @@ async function _setActivePage(pageId) {
  * VANDAAG: the active page of the person's own pages, its blocks capped, each with "meer"; the pages as sub-tabs only
  * when there is more than one (no page manager of its own — adding, renaming and removing pages is in "Pas aan").
  */
+/** Who "mine" is in a circle: the self this device speaks as there (a persona's circle is the persona's; no circle = the default). */
+function mySelfIn(circleId) {
+  try { return circleHouseholdAgent?.circleSelf?.(circleId ?? null)?.webid ?? null; } catch { return null; }
+}
+
 async function _showVandaag() {
   const book = _screensBook ?? { screens: [], activeId: null };
   const screen = getActiveScreen(book);
@@ -4138,6 +4143,8 @@ async function _showVandaag() {
         eventLog, circles: circlesCache,
         // the circles-with-news block counts what the circle tiles count
         seenAt: readSeenAt(), myRefs: unreadMyRefs,
+        // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+        selfIn: mySelfIn,
       },
     });
   } catch (err) {
@@ -4217,7 +4224,7 @@ async function showMij() {
   const relays = (() => { try { return _peerAgent?.relays?.list?.() ?? []; } catch { return []; } })();
   blocks = await mijScreenBlocks({ hostOps: {
     callSkill: rawCallSkill, eventLog, circles: circlesCache,
-    seenAt: readSeenAt(), myRefs: unreadMyRefs,
+    seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
     availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
     online: relays.length ? relays.some((r) => r.connected) : undefined,
@@ -4567,8 +4574,8 @@ async function showMyData() {
     });
   };
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
-    // the doors that sat on Mij (declared once in myDataDoors.js), and the week switch + version line that went with them
-    doors: { availability: showAvailability, 'connection-points': showConnectionPoints, 'shared-with-me': showSharedWithMe, blocked: showBlocked },
+    // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
+    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
     weekOverview, version: APP_VERSION,
     onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's

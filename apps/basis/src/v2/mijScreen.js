@@ -18,7 +18,8 @@ export function mijBlocks(manifest = basisManifest) {
 /**
  * Materialize Me's blocks.
  * @param {object} a
- * @param {object} a.hostOps   the shell's sources: `callSkill`, `circles`, `eventLog`, `seenAt`, `myRefs`, `myWebid`,
+ * @param {object} a.hostOps   the shell's sources: `callSkill`, `circles`, `eventLog`, `seenAt`, `myRefs`, `selfIn(circleId)`
+ *   (who "mine" is in each circle — a persona's circle is the persona's),
  *   and for the identity line `availability` (the stored record) and `online` (this device reached its relays), for
  *   the agents block `deviceId` (this device)
  * @returns {Promise<Array<object>>}

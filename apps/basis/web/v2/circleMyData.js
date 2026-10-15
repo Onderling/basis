@@ -15,7 +15,8 @@ import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { historyStatusLine } from '../../src/v2/historyMirror.js';
-import { myDataDoorsFor } from '../../src/v2/myDataDoors.js';
+import { myDataActionsFor } from '../../src/v2/meActionProjection.js';
+import { basisManifest } from '../../src/index.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -103,7 +104,8 @@ export function renderCircleMyData(container, {
   onOpenRelayPanel,       // Objective D / Surface 4:  => void — open the set-relay op in the docked
                           // side-panel (openPagePanel). When provided, the relay row is an entry button that
                           // routes through the generic panel instead of the bespoke inline form below.
-  // The doors that sat on Mij, declared once (`myDataDoors.js`): id → what opens it here. A door without one is omitted.
+  // The doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here.
+  // A door without one is omitted.
   doors = {},
   // the person's own week overview (a card of the coming week on Saturday morning): `{ on, onToggle }`; on null while
   // it loads or switches; absent = no switch (no clock here)
@@ -135,7 +137,7 @@ export function renderCircleMyData(container, {
   container.appendChild(header);
 
   // ── the doors Mij gave up: availability · connection points · shared with me · blocked ──
-  const doorRow = myDataDoorsFor(doors);
+  const doorRow = myDataActionsFor(basisManifest, doors);
   if (doorRow.length) {
     const sec = section(tr('circle.profile.mydata_more'));
     sec.classList.add('cc-mydata__doors');

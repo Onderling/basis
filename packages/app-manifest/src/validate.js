@@ -317,15 +317,17 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // Nav-chrome (Me) — `manifest.meActions` declares the ordered actions at the top of the person's own page (Me):
-  // "Share my card" and "Scan" (2026-10-09). The SAME NavItem shape and helper as `tabs`, so both shells paint them
-  // from the declaration, never from a screen file's list. Forward-additive: absent → no Me actions.
-  if (manifest.meActions !== undefined) {
-    if (!Array.isArray(manifest.meActions)) {
-      errors.push({ path: '/meActions', message: 'meActions must be an array if present' });
+  // "Share my card" and "Scan" (2026-10-09); `manifest.myDataActions` the doors at the top of My data (the views Me
+  // gave up, 2026-10-15). The SAME NavItem shape and helper as `tabs`, so both shells paint them from the declaration,
+  // never from a screen file's list. Forward-additive: absent → none.
+  for (const key of ['meActions', 'myDataActions']) {
+    if (manifest[key] === undefined) continue;
+    if (!Array.isArray(manifest[key])) {
+      errors.push({ path: `/${key}`, message: `${key} must be an array if present` });
     } else {
-      const meIds = new Set();
-      manifest.meActions.forEach((item, i) => {
-        validateNavItem(item, `/meActions/${i}`, manifest, errors, meIds, strict);
+      const ids = new Set();
+      manifest[key].forEach((item, i) => {
+        validateNavItem(item, `/${key}/${i}`, manifest, errors, ids, strict);
       });
     }
   }

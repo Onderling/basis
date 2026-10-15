@@ -97,7 +97,7 @@ describe('renderProfileBasics — location', () => {
 describe('My data — the doors Mij gave up', () => {
   it('paints the declared doors this shell can open, in order; each fires its own', () => {
     const availability = vi.fn(); const blocked = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), { t, doors: { blocked, availability } });
+    const el = renderCircleMyData(document.createElement('div'), { t, doors: { blocked, availability } });   // keyed by the view each opens
     const btns = [...el.querySelectorAll('.cc-mydata__doors button')];
     expect(btns.map((b) => b.textContent)).toEqual(['circle.profile.availability', 'circle.profile.blocked']);
     btns[0].click();

@@ -4,7 +4,7 @@
  *
  * The view (renderSharedWithMe) + selector (buildSharedWithMe) already existed; this proves the
  * missing piece — a personal, cross-circle NAV entry that OPENS that view fed with the per-user
- * store's entries. Placement: one of the doors behind My data (declared once in `myDataDoors.js`),
+ * store's entries. Placement: one of the doors behind My data (declared in the manifest, `myDataActions`),
  * peer of availability and blocked — Mij keeps one door, My data. web ≡ mobile: the web adapter reads the store
  * and projects through the SAME `buildSharedWithMe` the mobile SharedWithMeScreen runs internally.
  */
@@ -23,7 +23,7 @@ describe('shared-with-me nav entry (a door behind My data)', () => {
     expect(without.querySelector('.cc-profile__shared-with-me')).toBeNull();
 
     const withEntry = mount();
-    renderCircleMyData(withEntry, { t: tagT, doors: { 'shared-with-me': () => {} } });
+    renderCircleMyData(withEntry, { t: tagT, doors: { sharedWithMe: () => {} } });
     const btn = withEntry.querySelector('.cc-profile__shared-with-me');
     expect(btn).not.toBeNull();
     expect(btn.textContent).toBe('T:circle.profile.sharedWithMe');
@@ -32,7 +32,7 @@ describe('shared-with-me nav entry (a door behind My data)', () => {
   it('invokes the handler on click', () => {
     const el = mount();
     const onSharedWithMe = vi.fn();
-    renderCircleMyData(el, { t: tagT, doors: { 'shared-with-me': onSharedWithMe } });
+    renderCircleMyData(el, { t: tagT, doors: { sharedWithMe: onSharedWithMe } });
     el.querySelector('.cc-profile__shared-with-me').click();
     expect(onSharedWithMe).toHaveBeenCalledTimes(1);
   });
@@ -47,7 +47,7 @@ describe('shared-with-me nav entry (a door behind My data)', () => {
     // The host wiring showMyData performs: tapping the entry projects the store list through the
     // SHARED selector and renders the view into the same root.
     const openSharedWithMe = () => renderSharedWithMe(root, { entries: buildSharedWithMe(received), t: tagT });
-    renderCircleMyData(root, { t: tagT, doors: { 'shared-with-me': openSharedWithMe } });
+    renderCircleMyData(root, { t: tagT, doors: { sharedWithMe: openSharedWithMe } });
 
     // Before: My data is showing, no shared-with-me surface yet.
     expect(root.classList.contains('shared-with-me')).toBe(false);

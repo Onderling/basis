@@ -65,6 +65,7 @@ describe('restore with the picker', () => {
     const rejoin = got?.bootstrap?.offer ? parseEnrollOffer(got.bootstrap.offer) : null;
     expect((rejoin?.circles ?? []).map((c) => c.id), 'Buurt\'s circle is bootstrapped (announce + pull) at the next boot').toContain(Y);
     expect(got.bootstrap.stashed, 'stashed where the boot consumes it').toBe(true);
+    expect(rejoin.circles.find((c) => c.id === Y)?.persona, 'tagged with the persona it rejoins as (one bootstrap per received self)').toBe(b);
     const after = await boot();
     expect(after.persona(b)?.chatId?.pubKey, 'Buurt, the same persona as on the phone').toBe(phone.persona(b).chatId.pubKey);
     expect(after.persona(w), 'not Werk').toBeFalsy();

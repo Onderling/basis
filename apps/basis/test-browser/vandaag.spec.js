@@ -27,15 +27,9 @@ test('opens on Vandaag; a block moved in "Pas aan" stays moved after a reload', 
   await page.locator('.vandaag-customise [data-act="down"]').first().click();
   await page.locator('.vandaag-customise [data-act="done"]').click();
   await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([b, a, c]);
-  // the device log saves a moment after a change (and flushes when the page goes): give it that moment
-  await page.waitForTimeout(1000);
-
   await page.reload();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([b, a, c]);
-  // the device log (what undo reads) loads a moment after the page paints
-  await page.waitForTimeout(3000);
-
   // …and "Ongedaan maken" puts it back
   await page.locator('.circle-vandaag__customise').click();
   await page.locator('.vandaag-customise [data-act="undo"]').click();

@@ -36,7 +36,7 @@ describe('the screen book through ops', () => {
     expect(entry.payload.version.current).not.toBe(entry.payload.version.previous);
   });
 
-  it('undo walks back one change at a time, and is logged', async () => {
+  it('undo walks back one change at a time (the versions decide), and is logged', async () => {
     const { store, log, ops } = world();
     await ops['screen-add-page']({ name: 'Vandaag' });
     const pageId = (await store.get()).screens[0].id;
@@ -44,17 +44,31 @@ describe('the screen book through ops', () => {
     await ops['screen-rename-page']({ pageId, name: 'Thuis' });
     expect((await store.get()).screens[0]).toMatchObject({ name: 'Thuis' });
 
-    expect((await ops['screen-undo']()).undid).toBe('screen-rename-page');
+    expect((await ops['screen-undo']()).ok).toBe(true);
     expect((await store.get()).screens[0]).toMatchObject({ name: 'Vandaag' });
     expect((await store.get()).screens[0].blocks.map((b) => b.type)).toEqual(['calendar']);
-
-    expect((await ops['screen-undo']()).undid).toBe('screen-add-block');
+    expect((await ops['screen-undo']()).ok).toBe(true);
     expect((await store.get()).screens[0].blocks).toEqual([]);
-
-    expect((await ops['screen-undo']()).undid).toBe('screen-add-page');
+    expect((await ops['screen-undo']()).ok).toBe(true);
     expect((await store.get()).screens).toEqual([]);
     expect((await ops['screen-undo']()).error).toBe('nothing-to-undo');
     expect(pageChanges(log).filter((e) => e.payload.op === 'screen-undo')).toHaveLength(3);
+  });
+
+  it('undo never reads the log: it works with no log at all, and after an edit it steps back through that edit\'s parent', async () => {
+    const { store, ops: logged } = world();
+    const ops = createScreenOps({ store, log: null });
+    await logged['screen-add-page']({ name: 'A' });
+    const pageId = (await store.get()).screens[0].id;
+    await ops['screen-rename-page']({ pageId, name: 'B' });
+    await ops['screen-rename-page']({ pageId, name: 'C' });
+    await ops['screen-undo']();
+    expect((await store.get()).screens[0].name).toBe('B');
+    await ops['screen-rename-page']({ pageId, name: 'D' });   // an edit after an undo
+    await ops['screen-undo']();
+    expect((await store.get()).screens[0].name, 'back to where the edit was made, never to the undone C').toBe('B');
+    await ops['screen-undo']();
+    expect((await store.get()).screens[0].name).toBe('A');
   });
 
   it('refuses a block the person\'s pages may not hold, and a page that does not exist', async () => {

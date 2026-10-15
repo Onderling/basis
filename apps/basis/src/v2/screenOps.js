@@ -6,8 +6,9 @@
  *
  * Each change is KEPT as a version of the book (the store's `versions` adapter, the one the circle recipe, policy and
  * rules stores use) and WRITTEN to the device log as a settings change naming the op and the two versions it went
- * between — the log is what the person sees in their history; the version is what an undo puts back. An undo restores
- * the version before the newest change not undone yet, and is itself a logged change.
+ * between. The versions are the mechanism: an undo steps the book back to the version before the one it stands at
+ * (`store.undo`). The log is the record — what the person sees in their history — and never decides what undo does;
+ * an undo is logged like any change.
  *
  * The bodies are the pure book functions (`userScreens.js`) and block functions (`circleRecipe.js`); nothing here
  * re-implements them. A block the person's pages may not hold (the block table's `places`) is refused.
@@ -76,18 +77,12 @@ export function createScreenOps({ store, log = null, actor = 'owner' } = {}) {
     'screen-remove-block': async ({ pageId, blockId } = {}) => change('screen-remove-block', pageCheck(pageId), onPage(pageId, (s) => removeBlock(s, blockId))),
     'screen-move-block': async ({ pageId, blockId, index } = {}) => change('screen-move-block', pageCheck(pageId), onPage(pageId, (s) => moveBlock(s, blockId, Number(index)))),
     'screen-set-block-config': async ({ pageId, blockId, config } = {}) => change('screen-set-block-config', pageCheck(pageId), onPage(pageId, (s) => updateBlock(s, blockId, config && typeof config === 'object' ? config : {}))),
-    /** Undo the newest page change not undone yet: its `previous` version comes back, and the undo is logged. */
+    /** Undo: the book steps back to the version before the one it stands at (the versions decide); the undo is logged. */
     'screen-undo': async () => {
-      if (!log || typeof log.query !== 'function') return { ok: false, error: 'no-history' };
-      const entries = log.query({ filter: { type: 'settings-change' } })
-        .filter((e) => typeof e?.payload?.op === 'string' && SCREEN_OP_IDS.includes(e.payload.op));
-      const undone = new Set(entries.filter((e) => e.payload.op === 'screen-undo').map((e) => e.payload.target?.ref).filter(Boolean));
-      const last = entries.find((e) => e.payload.op !== 'screen-undo' && !undone.has(e.id) && Number.isFinite(e.payload.version?.previous));
-      if (!last) return { ok: false, error: 'nothing-to-undo' };
-      const r = await store.restoreVersion(last.payload.version.previous);
-      if (!r) return { ok: false, error: 'version-gone' };
-      record('screen-undo', { previous: last.payload.version.current, current: r.current }, last.id);
-      return { ok: true, book: r.book, undid: last.payload.op };
+      const r = typeof store.undo === 'function' ? await store.undo() : null;
+      if (!r) return { ok: false, error: 'nothing-to-undo' };
+      record('screen-undo', { previous: r.previous, current: r.current });
+      return { ok: true, book: r.book };
     },
   };
 }

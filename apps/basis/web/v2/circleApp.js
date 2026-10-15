@@ -4156,7 +4156,7 @@ function showVandaagCustomise() {
   // before an edit still in flight
   let pending = Promise.resolve();
   const paint = () => renderVandaagCustomise(card, {
-    model: customiseModel(_screensBook ?? { screens: [], activeId: null }),
+    model: customiseModel(_screensBook ?? { screens: [], activeId: null }, { circles: circlesCache ?? [] }),
     t,
     onAct: (act, args) => {
       pending = pending.then(async () => {

@@ -8,6 +8,7 @@
  */
 import { addScreen, updateScreen, setActiveScreen, getActiveScreen } from './userScreens.js';
 import { addBlock, BLOCK_DESCRIPTORS, blockTypesFor } from './circleRecipe.js';
+import { carriesLabels, parseLabels } from './itemLabels.js';
 
 /** The first page's blocks, in order: what is on today, what is mine to do, where something is new. */
 export const VANDAAG_DEFAULT_BLOCKS = Object.freeze([
@@ -58,6 +59,15 @@ export const HORIZON_PRESETS = Object.freeze([
 ]);
 /** The caps a block offers. */
 export const LIMIT_PRESETS = Object.freeze([3, 5, 10]);
+/** The relative-date presets ("within"): any time · today · this week · this month. */
+export const WITHIN_PRESETS = Object.freeze([
+  Object.freeze({ value: 0, labelKey: 'circle.vandaag.within_any' }),
+  Object.freeze({ value: 1, labelKey: 'circle.vandaag.within_1' }),
+  Object.freeze({ value: 7, labelKey: 'circle.vandaag.within_7' }),
+  Object.freeze({ value: 30, labelKey: 'circle.vandaag.within_30' }),
+]);
+/** The blocks that show circles' contents, so may narrow to some of the page's circles. */
+const CIRCLE_AWARE = new Set(['noticeboard', 'calendar', 'tasks', 'notes', 'circlesUnread']);
 const SCOPE_OPTIONS = Object.freeze([
   Object.freeze({ value: 'assigned-to-me', labelKey: 'circle.vandaag.scope_mine' }),
   Object.freeze({ value: 'all', labelKey: 'circle.vandaag.scope_all' }),
@@ -70,10 +80,14 @@ const SCOPE_OPTIONS = Object.freeze([
  * @param {object} book
  * @returns {object|null}
  */
-export function customiseModel(book) {
+export function customiseModel(book, { circles = [] } = {}) {
   const page = getActiveScreen(book);
   if (!page) return null;
   const blocks = page.blocks ?? [];
+  // the circles a block may narrow to: the page's own (all the person's, unless the page picked some)
+  const pageCircles = (Array.isArray(page.circleFilter) && page.circleFilter.length
+    ? circles.filter((c) => page.circleFilter.includes(c.id)) : circles)
+    .filter((c) => c?.id).map((c) => ({ value: c.id, label: c.name ?? c.id }));
   return {
     pageId: page.id,
     pageName: page.name ?? '',
@@ -84,6 +98,12 @@ export function customiseModel(book) {
       if (b.type === 'calendar') controls.push({ kind: 'horizonDays', value: cfg.horizonDays ?? 14, options: HORIZON_PRESETS });
       if (b.type === 'tasks') controls.push({ kind: 'scope', value: cfg.scope ?? 'assigned-to-me', options: SCOPE_OPTIONS });
       if ('limit' in cfg) controls.push({ kind: 'limit', value: cfg.limit, options: LIMIT_PRESETS.map((n) => ({ value: n, labelKey: 'circle.vandaag.limit_n', params: { n } })) });
+      // the filters (Frits: "filters like labels and (relative) dates"): the block's own circles, its labels on a type
+      // that carries them, a relative date on the types listed by their moment
+      if (CIRCLE_AWARE.has(b.type) && pageCircles.length > 1) controls.push({ kind: 'circleIds', multi: true, value: Array.isArray(cfg.circleIds) ? cfg.circleIds : [], options: pageCircles });
+      const noun = BLOCK_DESCRIPTORS[b.type]?.noun;
+      if (noun && carriesLabels(noun)) controls.push({ kind: 'labels', text: true, value: (Array.isArray(cfg.labels) ? cfg.labels : []).join(', ') });
+      if (b.type === 'tasks' || b.type === 'notes') controls.push({ kind: 'withinDays', value: Number(cfg.withinDays) || 0, options: WITHIN_PRESETS });
       return {
         blockId: b.id, type: b.type, labelKey: BLOCK_DESCRIPTORS[b.type]?.labelKey ?? b.type,
         canUp: i > 0, canDown: i < blocks.length - 1, index: i, controls,
@@ -105,7 +125,7 @@ export function customiseOp(act, { pageId, blockId, index, kind, value, type, na
     case 'up': return { opId: 'screen-move-block', args: { pageId, blockId, index: index - 1 } };
     case 'down': return { opId: 'screen-move-block', args: { pageId, blockId, index: index + 1 } };
     case 'remove': return { opId: 'screen-remove-block', args: { pageId, blockId } };
-    case 'config': return { opId: 'screen-set-block-config', args: { pageId, blockId, config: { [kind]: value } } };
+    case 'config': return { opId: 'screen-set-block-config', args: { pageId, blockId, config: { [kind]: kind === 'labels' ? parseLabels(value) : value } } };
     case 'add': return { opId: 'screen-add-block', args: { pageId, type } };
     case 'rename-page': return { opId: 'screen-rename-page', args: { pageId, name } };
     case 'add-page': return { opId: 'screen-add-page', args: { name } };

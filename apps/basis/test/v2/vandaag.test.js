@@ -46,3 +46,27 @@ describe('Vandaag', () => {
     expect(seen.status).toBe('empty');
   });
 });
+
+describe('the block filters, materialized', () => {
+  const page = (block) => ({ id: 's', name: 'Vandaag', circleFilter: null, blocks: [block] });
+  it('a block\'s own circles narrow the page\'s; labels filter a type that carries them; a relative date drops the old', async () => {
+    const now = Date.now();
+    const notes = {
+      a: [{ id: 'n1', type: 'note', text: 'boodschappen', tags: ['Thuis'], updatedAt: new Date(now - 3600_000).toISOString() }],
+      b: [
+        { id: 'n2', type: 'note', text: 'planning', tags: ['werk'], updatedAt: new Date(now - 3600_000).toISOString() },
+        { id: 'n3', type: 'note', text: 'oud', tags: ['werk'], updatedAt: new Date(now - 40 * 86_400_000).toISOString() },
+      ],
+    };
+    const callSkill = async (app, op, args) => ({ result: notes[args?.circleId] ?? [] });
+    const hostOps = { callSkill, circles: [{ id: 'a', name: 'Thuis' }, { id: 'b', name: 'Werk' }] };
+    const ids = async (config) => {
+      const [b] = await materializeScreen({ screen: page({ id: 'x', type: 'notes', config }), hostOps });
+      return (b.content?.items ?? []).map((r) => r.id).sort();
+    };
+    expect(await ids({ limit: 10 })).toEqual(['n1', 'n2', 'n3']);
+    expect(await ids({ limit: 10, circleIds: ['b'] }), 'only the block\'s circle').toEqual(['n2', 'n3']);
+    expect(await ids({ limit: 10, labels: ['WERK'] }), 'only the label').toEqual(['n2', 'n3']);
+    expect(await ids({ limit: 10, labels: ['werk'], withinDays: 7 }), 'and only this week').toEqual(['n2']);
+  });
+});

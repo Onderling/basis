@@ -1824,7 +1824,7 @@ export default function CircleLauncherScreen({
               onAction={(a) => { if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); } }} />
           </ScrollView>
         </View>
-        <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook)}
+        <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
       </WithTabBar>

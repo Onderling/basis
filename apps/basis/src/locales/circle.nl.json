@@ -1214,6 +1214,38 @@
     }
   },
   "vandaag": {
+    "circles_all": {
+      "text": "Alle kringen",
+      "doc": "A block filter: the page's circles, all of them."
+    },
+    "circles_title": {
+      "text": "Kringen",
+      "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "labels_title": {
+      "text": "Labels",
+      "doc": "A block filter on a type that carries labels: only rows with one of these (comma-separated)."
+    },
+    "labels_placeholder": {
+      "text": "bijv. werk, thuis",
+      "doc": "Placeholder of the labels filter field."
+    },
+    "within_any": {
+      "text": "Altijd",
+      "doc": "Relative-date filter: no limit."
+    },
+    "within_1": {
+      "text": "Vandaag",
+      "doc": "Relative-date filter: within a day."
+    },
+    "within_7": {
+      "text": "Deze week",
+      "doc": "Relative-date filter: within 7 days."
+    },
+    "within_30": {
+      "text": "Deze maand",
+      "doc": "Relative-date filter: within 30 days."
+    },
     "customise": {
       "text": "Pas aan",
       "doc": "The button on Vandaag that opens the customise sheet."
@@ -1410,6 +1442,10 @@
       "agents": {
         "text": "Mijn apparaten en helpers",
         "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "notes": {
+        "text": "Notities",
+        "doc": "Block palette label (Mij / Vandaag)."
       }
     },
     "block_desc": {
@@ -1455,6 +1491,10 @@
       },
       "agents": {
         "text": "Je apparaten, je hulpdiensten en de bots die je hebt toegelaten, elk in één zin.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "notes": {
+        "text": "De notities in je kringen, eventueel alleen die met bepaalde labels.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       }
     },

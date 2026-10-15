@@ -54,3 +54,20 @@ test('"meer" opens one block whole, and back returns to the page', async ({ page
   await page.locator('.circle-vandaag__back').click();
   await expect.poll(() => blockTypes(page), { timeout: 20_000 }).toHaveLength(3);
 });
+
+test('a notes block added in "Pas aan" takes a labels filter, kept after a reload', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.circle-vandaag__customise').click();
+  await page.locator('.vandaag-customise [data-act="add"]').filter({ hasText: /^(Notities|Notes)$/ }).click();
+  const labels = page.locator('.vandaag-customise input[data-control="labels"]');
+  await expect(labels).toBeVisible({ timeout: 10_000 });
+  await labels.fill('Werk, thuis');
+  await labels.blur();
+  await expect(page.locator('.vandaag-customise input[data-control="labels"]')).toHaveValue('werk, thuis', { timeout: 10_000 });
+  await page.locator('.vandaag-customise [data-act="done"]').click();
+  await page.reload();
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.circle-vandaag__customise').click();
+  await expect(page.locator('.vandaag-customise input[data-control="labels"]')).toHaveValue('werk, thuis');
+});

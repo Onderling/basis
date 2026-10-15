@@ -45,6 +45,8 @@ import { sealedKeyValue } from './localStoreSeal.js';
  * identity-line), the person's pages never offer what a circle's admin curates (announcement, rules) or a circle's own
  * actions (quickActions).
  *
+ * `noun`: the item type a block lists (its filters ask the type — e.g. whether it carries labels).
+ *
  * The list-shaped blocks carry a `compact: false` default — a "Compact" toggle in the block's config drawer tightens
  * row padding and font; the others deliberately have no `compact` key.
  */
@@ -54,9 +56,9 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   quickActions:  { order: 0,  emoji: '⭐', places: ['circle'], config: () => ({ limit: 4 }) },
   announcement:  { order: 1,  emoji: '📣', places: ['circle'], config: () => ({ text: '', compact: false }) },
   noticeboard:   { order: 2,  emoji: '📌', places: BOTH,       config: () => ({ limit: 5, compact: false }) },
-  calendar:      { order: 3,  emoji: '📅', places: BOTH,       config: () => ({ limit: 5, horizonDays: 14, compact: false }) },
+  calendar:      { order: 3,  emoji: '📅', places: BOTH,       noun: 'calendar-event',       config: () => ({ limit: 5, horizonDays: 14, compact: false }) },
   // `scope`: 'assigned-to-me' (mine) or 'all' (every open task across the active circles)
-  tasks:         { order: 4,  emoji: '✅', places: BOTH,       config: () => ({ scope: 'assigned-to-me', limit: 10, compact: false }) },
+  tasks:         { order: 4,  emoji: '✅', places: BOTH,       noun: 'task',       config: () => ({ scope: 'assigned-to-me', limit: 10, compact: false }) },
   rules:         { order: 5,  emoji: '📜', places: ['circle'], config: () => ({}) },
   photo:         { order: 6,  emoji: '🖼️', places: BOTH,       config: () => ({ src: '', caption: '' }) },
   text:          { order: 7,  emoji: '✏️', places: BOTH,       config: () => ({ text: '' }) },
@@ -64,6 +66,8 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   circlesUnread: { order: 8,  emoji: '🔔', places: ['mij'],    config: () => ({ limit: 5 }) },
   identityLine:  { order: 9,  emoji: '🙂', places: ['mij'],    config: () => ({ readings: [] }) },
   agents:        { order: 10, emoji: '🤝', places: ['mij'],    config: () => ({}) },
+  // the notes across the page's circles — filterable by label (notes carry tags)
+  notes:         { order: 11, emoji: '🗒️', places: ['mij'],    noun: 'note',    config: () => ({ limit: 5, labels: [] }) },
 });
 for (const [type, d] of Object.entries(BLOCK_DESCRIPTORS)) {
   d.labelKey = `circle.recipe.block.${type}`;

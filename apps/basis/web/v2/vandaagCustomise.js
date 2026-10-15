@@ -49,6 +49,44 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
     row.appendChild(button(tr('circle.vandaag.down'), 'down', base, { disabled: !b.canDown }));
     row.appendChild(button(tr('circle.vandaag.remove'), 'remove', base));
     for (const c of b.controls) {
+      if (c.multi) {
+        // the block's own circles: none ticked = all the page's
+        const box = document.createElement('fieldset');
+        box.className = 'vandaag-customise__circles';
+        box.dataset.control = c.kind;
+        const legend = document.createElement('legend');
+        legend.textContent = tr('circle.vandaag.circles_title');
+        box.appendChild(legend);
+        const picked = new Set(c.value);
+        for (const o of c.options) {
+          const lab = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = o.value;
+          cb.checked = picked.has(o.value);
+          cb.addEventListener('change', () => {
+            if (cb.checked) picked.add(o.value); else picked.delete(o.value);
+            onAct?.('config', { ...base, kind: c.kind, value: [...picked] });
+          });
+          lab.append(cb, document.createTextNode(` ${o.label}`));
+          box.appendChild(lab);
+        }
+        row.appendChild(box);
+        continue;
+      }
+      if (c.text) {
+        // labels, typed: "werk, thuis" — applied when the field is left or Enter is pressed
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.dataset.control = c.kind;
+        input.value = c.value;
+        input.placeholder = tr('circle.vandaag.labels_placeholder');
+        input.setAttribute('aria-label', tr('circle.vandaag.labels_title'));
+        const apply = () => { if (input.value !== c.value) onAct?.('config', { ...base, kind: c.kind, value: input.value }); };
+        input.addEventListener('change', apply);
+        row.appendChild(input);
+        continue;
+      }
       const sel = document.createElement('select');
       sel.dataset.control = c.kind;
       for (const o of c.options) {

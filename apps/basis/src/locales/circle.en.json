@@ -1214,6 +1214,38 @@
     }
   },
   "vandaag": {
+    "circles_all": {
+      "text": "All circles",
+      "doc": "A block filter: the page's circles, all of them."
+    },
+    "circles_title": {
+      "text": "Circles",
+      "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "labels_title": {
+      "text": "Labels",
+      "doc": "A block filter on a type that carries labels: only rows with one of these (comma-separated)."
+    },
+    "labels_placeholder": {
+      "text": "e.g. work, home",
+      "doc": "Placeholder of the labels filter field."
+    },
+    "within_any": {
+      "text": "Any time",
+      "doc": "Relative-date filter: no limit."
+    },
+    "within_1": {
+      "text": "Today",
+      "doc": "Relative-date filter: within a day."
+    },
+    "within_7": {
+      "text": "This week",
+      "doc": "Relative-date filter: within 7 days."
+    },
+    "within_30": {
+      "text": "This month",
+      "doc": "Relative-date filter: within 30 days."
+    },
     "customise": {
       "text": "Customise",
       "doc": "The button on Vandaag that opens the customise sheet."
@@ -1410,6 +1442,10 @@
       "agents": {
         "text": "My devices and helpers",
         "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "notes": {
+        "text": "Notes",
+        "doc": "Block palette label (Mij / Vandaag)."
       }
     },
     "block_desc": {
@@ -1455,6 +1491,10 @@
       },
       "agents": {
         "text": "Your devices, your helper services and the bots you admitted, one sentence each.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "notes": {
+        "text": "The notes in your circles, optionally only those with certain labels.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       }
     },

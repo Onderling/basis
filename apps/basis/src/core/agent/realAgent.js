@@ -2123,6 +2123,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const wrote = (item, removedId) => { try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
     wireStoreMirror(ownStoreNow, {
       publishItem:        (item)         => { const r = valveFor(ownLaneOf(selfOfOwnItem(item))).publishItem(item); wrote(item); return r; },
+      // a removal whose item is not known here (no `createdBy` to read) rides the default's lane, as an item no persona wrote
       publishItemRemoved: (rid, removed) => { const r = valveFor(ownLaneOf(selfOfOwnItem(removed))).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
     });
     // what landed for it before it was open (parked on the log) is applied now

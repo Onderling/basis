@@ -31,6 +31,7 @@ export async function setGeneralProperty({ callSkill, defaultId, key, value }) {
 
 /** The shared offering key derivation — keyed by the phrase; re-using it edits. */
 export { offeringKeyFor } from '../../../basis/src/core/offeringsMigration.js';
+import { pictureRefOf } from '../../../basis/src/v2/personaAvatar.js';
 import { offeringKeyFor as sharedOfferingKeyFor } from '../../../basis/src/core/offeringsMigration.js';
 
 /** Offerings — add an offering-kind driver ({text, tags}) to the GENERAL persona. */
@@ -84,9 +85,7 @@ export async function setProfilePicture({ callSkill, defaultId, mediaGateway, op
 /** Read the general persona's current `profilePicture` ref (null when unset). */
 export async function loadCurrentPicture({ callSkill, defaultId }) {
   try {
-    const props = (await callSkill('agents', 'getProfileProperties', { id: defaultId ?? 'default' }))?.properties ?? {};
-    const entry = props.profilePicture;
-    return (entry && typeof entry === 'object' && entry.value !== undefined) ? entry.value : (entry ?? null);
+    return pictureRefOf((await callSkill('agents', 'getProfileProperties', { id: defaultId ?? 'default' }))?.properties);
   } catch { return null; }
 }
 

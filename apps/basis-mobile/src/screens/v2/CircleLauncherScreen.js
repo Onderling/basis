@@ -1003,11 +1003,17 @@ export default function CircleLauncherScreen({
   }), []);
   // What Mij's declared blocks read beside the waist (the identity line's readings, the agents list)
   const mijSources = useMemo(() => ({
-    eventLog, circles, seenAt, myRefs: unreadMyRefs, availabilityStore,
+    eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, availabilityStore,
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
     selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
-  }), [eventLog, circles, seenAt, unreadMyRefs, availabilityStore, bundle]);
+    // Mij follows the switcher: with one persona ticked, that persona's name and devices; otherwise the person's
+    ...(() => {
+      const one = writeAs(selvesOn);
+      if (!one || one === 'default') return {};
+      return { mijSelf: { id: one, name: heldSelves.find((p) => p.id === one)?.name ?? null, deviceId: bundle?.agent?.persona?.(one)?.enrolledDevice?.deviceId ?? null } };
+    })(),
+  }), [eventLog, circles, circlesShown, seenAt, unreadMyRefs, availabilityStore, bundle, selvesOn, heldSelves]);
   // SILENT out-of-circle delivery — the per-user "shared with me" inbox. The store is instantiated ON THE
   // BUNDLE (agentBundle.js) so the ChatScreen receive handler + this launcher share ONE instance; here we just
   // LOAD its list when the Mij sub-view opens (web≡mobile: mirrors web's `showSharedWithMe` reading the store).

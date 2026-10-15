@@ -39,6 +39,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         callSkill, eventLog: sources.eventLog ?? null, circles: sources.circles ?? [],
         seenAt: sources.seenAt ?? {}, myRefs: sources.myRefs ?? [],
         ...(typeof sources.selfIn === 'function' ? { selfIn: sources.selfIn } : {}),
+        ...(sources.mijSelf ? { mijSelf: sources.mijSelf } : {}),
         availability,
         // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
         online: relays.length ? relays.some((r) => r.connected) : undefined,

@@ -7197,6 +7197,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // who this device is to a contact (its persona) — the contact channel's `selfFor` and the pair roster's `selfWebidOf`
     contactSelf,
     personaWebid: (personaId) => personas.get(personaId)?.chatId?.pubKey ?? null,
+    // whose registry record a circle's membership is (its persona's, else 'default') — the rejoin records it there
+    profileIdOf,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
 

@@ -4914,7 +4914,9 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
-  const adminPeerAddr = circleHouseholdAgent?.householdSelfAddr ?? null;
+  // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
+  // address in a persona's circle, which the joiner's trail would record as its confirming admin
+  const adminPeerAddr = _peerAgent?.circleSelf?.(circleId)?.webid ?? circleHouseholdAgent?.householdSelfAddr ?? null;
   // the admin's NKN native address (distinct from the pubKey), so a pure-NKN
   // joiner can route the redeem handshake. Best-effort: null when NKN isn't up.
   // …gated: with sharing off the invite simply carries no NKN address, and a joiner falls back to the

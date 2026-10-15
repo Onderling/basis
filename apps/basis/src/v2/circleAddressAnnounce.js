@@ -54,7 +54,13 @@ export { CIRCLE_ADDRESS_ANNOUNCE_KIND };
  * @param {object} agent
  * @returns {string|null}
  */
-export function selfWebidOf(agent) {
+export function selfWebidOf(agent, circleId = null) {
+  // in a circle, the circle's OWN self (a persona's circle: the persona) — the device is one member per circle
+  if (circleId) {
+    let w = null;
+    try { w = agent?.circleSelf?.(circleId)?.webid ?? null; } catch { w = null; }
+    if (typeof w === 'string' && w) return w;
+  }
   return agent?.identity?.chat?.pubKey
     ?? agent?.identity?.pubKey
     ?? agent?.peer?.address
@@ -101,7 +107,7 @@ export function ownAnnouncementFor({ agent, circleId, primary = false } = {}) {
   return ownCircleAddressAnnouncement({
     circleId,
     primary,
-    memberWebid:       selfWebidOf(agent),
+    memberWebid:       selfWebidOf(agent, circleId),
     circleAddressFor:  (cid) => agent?.circleAddressFor?.(cid) ?? null,
     // The same signature the join and the redeem response already carry: signed by the key behind
     // the address, over a challenge bound to this circle (`signCircleLink`). No new primitive.
@@ -338,7 +344,7 @@ export async function propagateCircleAddressesAfterJoin({
   //    ready yet (below).
   const settled = members
     .map((m) => (typeof m?.webid === 'string' ? m.webid : null))
-    .filter((w) => w && w !== newMemberWebid && w !== selfWebidOf(agent));
+    .filter((w) => w && w !== newMemberWebid && w !== selfWebidOf(agent, circleId));
   if (newcomer.length && settled.length) {
     try {
       const r = await agent.callSkill('stoop', 'broadcastCircleAddresses', {

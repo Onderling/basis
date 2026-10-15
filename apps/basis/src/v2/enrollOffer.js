@@ -266,6 +266,11 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     try { if (!agent.relays?.has?.(url)) await agent.addRelay?.(url, { awaitReady: true }); }
     catch { /* an unreachable relay must not stop a circle that rides the one we are on */ }
   }
+  // WHO this device is in this circle: its persona there (a persona's circle rejoins AS the persona — recorded on its
+  // profile, the sibling bound to its webid, its first words sent as it), else the default, as always
+  const self = (() => { try { return agent.circleSelf?.(c.id) ?? null; } catch { return null; } })();
+  const asPersona = typeof self?.sendAs === 'string' && self.sendAs ? self.sendAs : null;
+  const send = asPersona ? { guarantee: 'hold-forward', sendAs: asPersona } : SEND;
   try {
     const ownAddress = agent.circleAddressFor?.(c.id) ?? null;
     // 1 — the registry record (what reopenMemberCircles reads on every future boot). The handle is optional
@@ -274,7 +279,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     if (ownAddress) {
       try {
         const r = await callSkill('agents', 'setProfileCircleMembership', {
-          id: 'default', circleId: c.id, address: ownAddress,
+          id: agent.profileIdOf?.(c.id) ?? 'default', circleId: c.id, address: ownAddress,
           ...(c.handle ? { handle: c.handle } : {}),
           ...(relays.length ? { relays } : {}),
         });
@@ -295,7 +300,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     // answer went to the PROFILE address, which every device of the person registers and the relay
     // maps to whichever registered last: this device, as often as not, greeting itself while the
     // send waited out its five seconds and was held (2026-09-14).
-    const me = agent.identity?.chat?.pubKey ?? null;
+    const me = asPersona ?? agent.identity?.chat?.pubKey ?? null;
     if (me && typeof agent.registerPeerAddress === 'function') {
       try { agent.registerPeerAddress(c.address, me, { signingKey: c.address }); } catch { /* the greeting still works when the relay maps our way */ }
     }
@@ -311,7 +316,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
         await sendPeerMessage(to, {
           type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: c.id,
           msgId: `enroll-announce-${c.id}`, ts: Date.now(), announcements: [mine],
-        }, SEND);
+        }, send);
       }
       row.steps.push('announce');
     }
@@ -328,7 +333,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
       try {
         const req = await agent.rosterSeed.buildRequest(c.id, ownAddress);
         if (req) {
-          await sendPeerMessage(c.address, req, SEND);
+          await sendPeerMessage(c.address, req, send);
           row.steps.push('seed-requested');
           // Wait for the SIBLING'S ADDRESS to be on my own row — the seed applied, and the sibling's
           // own announcement (it rides inside the parcel) recorded. That is the one fact the pulls
@@ -354,7 +359,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
             } catch { /* keep waiting */ }
             if (Date.now() >= nextResend) {
               nextResend = Date.now() + 2500;
-              try { await sendPeerMessage(c.address, req, SEND); } catch { /* next tick */ }
+              try { await sendPeerMessage(c.address, req, send); } catch { /* next tick */ }
             }
             await new Promise((resolve) => setTimeout(resolve, 250));
           }
@@ -407,7 +412,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
     for (const to of targets) {
       for (const subtype of [MEMBERSHIP_CATCHUP_SUBTYPES.request, GOV_CATCHUP_REQUEST, KEY_CATCHUP_SUBTYPES.request]) {
         // held per lane per circle per peer — one that is offline meets one request, not one per attempt
-        await sendPeerMessage(to, { subtype, circleId: c.id }, { ...SEND, holdKey: `${subtype}:${c.id}:${to}` });
+        await sendPeerMessage(to, { subtype, circleId: c.id }, { ...send, holdKey: `${subtype}:${c.id}:${to}` });
       }
     }
     row.steps.push('catch-up');

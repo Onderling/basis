@@ -7037,6 +7037,8 @@
     "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
     "offer_error": "Could not build the code (this device is not in any circle yet).",
     "offer_paste_label": "Code from your current device (optional)",
+    "personas_title": "Which personas does this device get?",
+    "personas_hint": "Only what you tick comes to this device. Nothing ticked: just you, as always. Give a device you trust less fewer of them.",
     "offer_paste_invalid": "That is not a valid add-device code.",
     "offer_back": "Back",
     "offer_code_label": "Code:",

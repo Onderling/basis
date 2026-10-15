@@ -211,7 +211,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -5321,15 +5321,49 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
       offerErr.textContent = t('circle.enroll.offer_paste_invalid');
       card.appendChild(offerErr);
       const values = {};
+      // THE PERSONA PICKER: once an offer and the phrase are both here, the offer's sealed list opens ON THIS DEVICE
+      // (nothing leaves it) and the person ticks which personas this device gets. Nothing ticked = the default only.
+      const picker = document.createElement('div');
+      picker.style.cssText = 'margin:.6rem 0;';
+      const paintPicker = () => {
+        picker.innerHTML = '';
+        const offerUri = offerInput.value.trim() || needs?.offer || '';
+        const listed = offerUri && values.mnemonic ? openOfferPersonas(offerUri, values.mnemonic) : [];
+        if (listed.length === 0) { delete values[ENROL_PERSONAS_PARAM]; return; }
+        const title = document.createElement('p');
+        title.textContent = t('circle.enroll.personas_title');
+        const hint = document.createElement('p');
+        hint.className = 'cc-hint';
+        hint.textContent = t('circle.enroll.personas_hint');
+        picker.append(title, hint);
+        const picked = new Set(values[ENROL_PERSONAS_PARAM] ?? []);
+        for (const p of listed) {
+          const row = document.createElement('label');
+          row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
+          const box = document.createElement('input');
+          box.type = 'checkbox';
+          box.checked = picked.has(p.id);
+          box.dataset.personaId = p.id;
+          box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); values[ENROL_PERSONAS_PARAM] = [...picked]; });
+          const name = document.createElement('span');
+          name.textContent = p.name ?? p.id;
+          row.append(box, name);
+          picker.appendChild(row);
+        }
+        values[ENROL_PERSONAS_PARAM] = [...picked];
+      };
+      offerInput.addEventListener('input', paintPicker);
       for (const param of view.form.params) {
+        if (param.name === ENROL_PERSONAS_PARAM) continue;   // painted by the picker below
         const input = document.createElement(param.kind === 'secret' ? 'textarea' : 'input');
         if (param.kind !== 'secret') input.type = 'text';
         input.placeholder = t(`circle.enroll.${param.name}_placeholder`, { defaultValue: param.name });
         input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
         if (param.kind === 'secret') { input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false; }
-        input.addEventListener('input', () => { values[param.name] = input.value; });
+        input.addEventListener('input', () => { values[param.name] = input.value; if (param.name === 'mnemonic') paintPicker(); });
         card.appendChild(input);
       }
+      card.appendChild(picker);
       const go = document.createElement('button');
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';

@@ -118,7 +118,7 @@ import { makePolicyUpdateEmitter } from '../../v2/policyUpdateLane.js';
 import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
-import { encodeEnrollOffer } from '../../v2/enrollOffer.js';
+import { encodeEnrollOffer, sealOfferPersonas } from '../../v2/enrollOffer.js';
 // The roster seed (pod-less enroll S1): a sibling serves its membership trail rows, device-set
 // verified, so a trail-less enrolled device can project rosters and fold statements.
 import {
@@ -218,7 +218,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
-import { personaVault } from './personaVault.js';
+import { personaVault, HELD_PERSONAS_VAULT_KEY } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -1461,8 +1461,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // root + register it. Owner-root-backed (kept out of the dependency-free cores).
     // EVERY PERSONA THE REGISTRY HOLDS RUNS (root custody: each derives from the resident root). One device internal id,
     // shown per persona as its own wire id. A delegated device runs only the personas a ceremony handed it (later).
+    // the personas this device was HANDED at its ceremony (a delegated device runs these, and no other)
+    let heldPersonas = [];
+    try { const list = JSON.parse((await persona.vault.get(HELD_PERSONAS_VAULT_KEY)) ?? '[]'); heldPersonas = Array.isArray(list) ? list : []; } catch { heldPersonas = []; }
     const runPersona = async (id) => {
-      if (!ownerRoot || id === 'default' || personas.has(id)) return personas.get(id) ?? null;
+      if (id === 'default' || personas.has(id)) return personas.get(id) ?? null;
+      if (!ownerRoot && !heldPersonas.includes(id)) return null;   // not derivable here, and not handed
       try {
         const rt = await createPersonaRuntime({ profileId: id, ownerRoot, chatVault, internalDeviceId: persona.internalDeviceId });
         personas.set(id, rt);
@@ -1472,6 +1476,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         return rt;
       } catch (err) { console.warn(`[persona] ${id} could not start: ${err?.message ?? err}`); return null; }
     };
+    // a delegated device: the personas it holds start now (their circles bind as their memberships are written)
+    if (!ownerRoot) { for (const id of heldPersonas) await runPersona(id); }
     if (ownerRoot) {
       try {
         for (const entry of (await agentsRegistry.list?.()) ?? []) {
@@ -2509,7 +2515,20 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       const circles = (await myCircleEntries()).map(({ id, handle, address }) => ({ id, handle, address }));
       if (circles.length === 0) return [DataPart({ ok: false, error: 'no-circles' })];
-      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles });
+      // the person's personas, SEALED to the phrase (only the device it is typed into can read them, and pick) — with the
+      // root resident only; a delegated device runs no persona to offer
+      let personasSealed = null;
+      if (ownerRoot) {
+        const list = [];
+        for (const [pid] of personas) {
+          if (pid === 'default') continue;
+          let name = null;
+          try { name = (await agentsRegistryRef?.lookup?.(pid))?.name ?? null; } catch { name = null; }
+          list.push({ id: pid, ...(name ? { name } : {}) });
+        }
+        personasSealed = sealOfferPersonas(ownerRoot, list);
+      }
+      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles, personasSealed });
       return [DataPart({ ok: true, uri, circles: circles.length })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
   }, { visibility: 'private' });   // enumerates the person's circles: owner-only
@@ -2542,6 +2561,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // device's addresses in every roster's set. The phrase itself is never persisted.
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
     const label = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
+    // the personas the person PICKED for this device (ids from the offer's sealed list) — none: the default only
+    const pickedPersonas = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
     try {
       // The THROWAWAY self's circle ids, read while its registry is still this device's. The clear that
       // follows on the next boot is named after them, and by then there is no agent to ask.
@@ -2550,7 +2571,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       catch { /* a registry that cannot be read leaves the named stores to the list's own constants */ }
       const r = await restoreOwnerRoot({
         mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,
-        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds,
+        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds, personas: pickedPersonas,
       });
       if (!r.ok) {
         const outcome = (r.code === 'invalid' || r.code === 'empty') ? 'invalid-phrase' : 'error';

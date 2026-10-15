@@ -30,6 +30,7 @@ import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
+import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
 // carries only the local id (T2).  Match the raw ref OR its local-id tail so a
@@ -297,7 +298,7 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
             onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
-            <Text style={labelStyle}>{ev.circleName ? `${ev.circleName} · ` : ''}{ev.label ?? ''}</Text>
+            <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{ev.label ?? ''}</Text>
           </View>
         );
       })}
@@ -313,7 +314,7 @@ function renderItems(block, styles) {
       <Text style={styles.blockTitle}>{t(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`)}</Text>
       {items.map((it) => (
         <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
-          <Text style={styles.agendaLabel}>{it.circleName ? `${it.circleName} · ` : ''}{it.label ?? ''}</Text>
+          <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>
         </View>
       ))}
     </View>
@@ -342,7 +343,7 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
             onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
-            {task.circleName ? <Text style={circleStyle}>{task.circleName}</Text> : null}
+            {whereTag(task, t) ? <Text style={circleStyle}>{whereTag(task, t)}</Text> : null}
             <Text style={textStyle}>{task.text ?? ''}</Text>
             {embeds.length > 0 && (
               <View style={styles.embeds}>

@@ -270,6 +270,8 @@ import CircleTabBar from './CircleTabBar.js';
 import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
+import VandaagPlusModal from './VandaagPlusModal.js';
+import { plusOp, plusFollowUp } from '../../../../basis/src/v2/vandaagPlus.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
@@ -706,6 +708,7 @@ export default function CircleLauncherScreen({
   // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": an own note or an own appointment
   const [screenViewBlocks, setScreenViewBlocks] = useState(null);
   // δ.1 — true while a fresh materialize runs after a cache-hit render.
   // Drives the subtle refresh pip in CircleScreenView.
@@ -1822,12 +1825,19 @@ export default function CircleLauncherScreen({
               ))}
             </View>
           ) : null}
-          <Pressable onPress={() => (expandedBlockId ? setExpandedBlockId(null) : setCustomiseOpen(true))} accessibilityRole="button"
-            testID={expandedBlockId ? 'vandaag-more-back' : 'vandaag-customise'}>
-            <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>
-              {expandedBlockId ? `← ${t('circle.screen.more_back')}` : t('circle.vandaag.customise')}
-            </Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <Pressable onPress={() => (expandedBlockId ? setExpandedBlockId(null) : setCustomiseOpen(true))} accessibilityRole="button"
+              testID={expandedBlockId ? 'vandaag-more-back' : 'vandaag-customise'}>
+              <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>
+                {expandedBlockId ? `← ${t('circle.screen.more_back')}` : t('circle.vandaag.customise')}
+              </Text>
+            </Pressable>
+            {expandedBlockId ? null : (
+              <Pressable onPress={() => setPlusOpen(true)} accessibilityRole="button" testID="vandaag-plus-open">
+                <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>{`+ ${t('circle.vandaag.plus')}`}</Text>
+              </Pressable>
+            )}
+          </View>
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
@@ -1837,6 +1847,18 @@ export default function CircleLauncherScreen({
         <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
+        <VandaagPlusModal visible={plusOpen} onClose={() => setPlusOpen(false)}
+          onSave={async (actId, values) => {
+            // the act's op through the waist (shared `plusOp`); a page with no block showing it gets one (undoable)
+            const op = plusOp(actId, values);
+            if (op.error) return t(op.error);
+            const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+            if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
+            const follow = plusFollowUp(screensBook, actId);
+            if (follow) await runScreenOp(follow.opId, follow.args);
+            setPlusOpen(false); refreshScreensBook();
+            return null;
+          }} />
       </WithTabBar>
     );
   }

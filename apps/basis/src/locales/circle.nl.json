@@ -1136,6 +1136,14 @@
     }
   },
   "screen": {
+    "more": {
+      "text": "meer",
+      "doc": "Under a capped block on Vandaag: open the whole block on its own."
+    },
+    "more_back": {
+      "text": "terug",
+      "doc": "Back from one block shown whole, to the page."
+    },
     "unread_count": {
       "text": "{{count}} nieuw",
       "doc": "Vandaag, circles-with-news block: how many lines are new in that circle since this device last looked. count = how many."
@@ -1203,6 +1211,92 @@
     "block_unknown": {
       "text": "Onbekend bloktype: {{type}}",
       "doc": "α.1c — forward-compat fallback."
+    }
+  },
+  "vandaag": {
+    "customise": {
+      "text": "Pas aan",
+      "doc": "The button on Vandaag that opens the customise sheet."
+    },
+    "customise_title": {
+      "text": "Deze pagina aanpassen",
+      "doc": "Title of the customise sheet."
+    },
+    "blocks_title": {
+      "text": "Op deze pagina",
+      "doc": "Heading over the page's blocks in the customise sheet."
+    },
+    "add_block_title": {
+      "text": "Blok toevoegen",
+      "doc": "Heading over the blocks that can be added."
+    },
+    "page_title": {
+      "text": "Pagina",
+      "doc": "Heading over the page acts (rename, add, remove)."
+    },
+    "rename_page": {
+      "text": "Naam wijzigen",
+      "doc": "Rename the active page."
+    },
+    "add_page": {
+      "text": "Nieuwe pagina",
+      "doc": "Add a page to the person's pages."
+    },
+    "new_page_name": {
+      "text": "Nieuwe pagina",
+      "doc": "The name a new page starts with."
+    },
+    "remove_page": {
+      "text": "Pagina weghalen",
+      "doc": "Remove the active page (not the last one)."
+    },
+    "undo": {
+      "text": "Ongedaan maken",
+      "doc": "Undo the newest change to the person's pages."
+    },
+    "up": {
+      "text": "Omhoog",
+      "doc": "Move a block up."
+    },
+    "down": {
+      "text": "Omlaag",
+      "doc": "Move a block down."
+    },
+    "remove": {
+      "text": "Weghalen",
+      "doc": "Remove a block from the page."
+    },
+    "done": {
+      "text": "Klaar",
+      "doc": "Close the customise sheet."
+    },
+    "horizon_today": {
+      "text": "Vandaag",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_3days": {
+      "text": "3 dagen",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_week": {
+      "text": "Week",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_month": {
+      "text": "Maand",
+      "doc": "Calendar block horizon preset."
+    },
+    "scope_mine": {
+      "text": "Van mij",
+      "doc": "Tasks block: only my tasks."
+    },
+    "scope_all": {
+      "text": "Alles",
+      "doc": "Tasks block: every open task."
+    },
+    "limit_n": {
+      "text": "{{n}} regels",
+      "doc": "A block's cap. n = how many rows."
     }
   },
   "screens": {

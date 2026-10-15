@@ -381,13 +381,11 @@ import {
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
-// α.2 — user-owned cross-circle screens (the Screens tab) + α.3 picker.
-import {
-  localUserScreenStore,
-  addScreen as addUserScreen, renameScreen as renameUserScreen,
-  removeScreen as removeUserScreen, setActiveScreen, getActiveScreen, updateScreen,
-} from '../../src/v2/userScreens.js';
-import { ensureVandaagBook } from '../../src/v2/vandaag.js';
+// The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
+// this shell to change the book).
+import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
+import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../src/v2/vandaag.js';
+import { renderVandaagCustomise } from './vandaagCustomise.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
 import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
@@ -734,7 +732,6 @@ import { renderCircleScreen } from './circleScreen.js';
 import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
-import { renderScreensPicker } from './circleScreensPicker.js';
 import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
 import { normalizeHopMode } from '@onderling/kring-host/circleHop';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
@@ -4039,148 +4036,134 @@ async function showHop() {
 // (circleFilter=null + noticeboard block) so the tab is useful right away.
 //
 // (mute) honoured: materializeScreen drops muted circles entirely.
-let _screenSubMode = 'picker';
-let _viewingScreenId = null;
 let _screensBook = null;
 let _screenViewBlocks = null;
-// δ.1 — monotonically-increasing token for each `_showActiveScreen` call.
-// The async materialize compares its captured token against the latest
-// before mutating the DOM, so a slow materialize from screen-A can't
-// stomp the body once the user has navigated to screen-B (or back to
-// the picker).
+let _expandedBlockId = null;   // a block of the page opened whole ("meer"), or null for the page
+// δ.1 — monotonically-increasing token for each paint of Vandaag. The async materialize compares its captured token
+// against the latest before touching the DOM, so a slow materialize from one page cannot stomp another.
 let _showActiveScreenToken = 0;
 
 async function showScreens() {
   if (!isAlphaTab('screens')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
   showTabBar('screens');
-  let book;
-  try { book = await userScreenStore.get(); }
-  catch { book = { screens: [], activeId: null }; }
+  _expandedBlockId = null;
   // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with mobile
-  book = await ensureVandaagBook({ store: userScreenStore, t });
-  _screensBook = book;
-  _screensRerender();
+  try { _screensBook = await ensureVandaagBook({ store: userScreenStore, t }); }
+  catch { _screensBook = { screens: [], activeId: null }; }
+  _showVandaag();
 }
 
-function _screensRerender() {
-  if (_screenSubMode === 'view') {
-    _showActiveScreen();
-    return;
-  }
-  // Picker mode: list of screens with CRUD.
-  renderScreensPicker(rootEl, {
-    book: _screensBook,
-    t,
-    onOpenScreen:   (sid) => {
-      _viewingScreenId = sid;
-      _screenSubMode = 'view';
-      _showActiveScreen();
-    },
-    onAddScreen: async (name) => {
-      _screensBook = await userScreenStore.update((cur) => {
-        const next = addUserScreen(cur, name);
-        const newId = next.screens[next.screens.length - 1].id;
-        // Seed every new screen with a default noticeboard block so
-        // it's not empty on first open.
-        return updateScreen(next, newId, (s) => addBlock(s, 'noticeboard'));
-      });
-      _screensRerender();
-    },
-    onRenameScreen: async (sid, name) => {
-      _screensBook = await userScreenStore.update((cur) => renameUserScreen(cur, sid, name));
-      _screensRerender();
-    },
-    onRemoveScreen: async (sid) => {
-      _screensBook = await userScreenStore.update((cur) => removeUserScreen(cur, sid));
-      _screensRerender();
-    },
-    onSetActive: async (sid) => {
-      _screensBook = await userScreenStore.update((cur) => setActiveScreen(cur, sid));
-      _screensRerender();
-    },
-  });
+// The page change goes through the screen op, as every edit of the person's pages does (kept, logged, undoable)
+async function _setActivePage(pageId) {
+  await rawCallSkill('basis', 'screen-set-active', { pageId }).catch(() => null);
+  _screensBook = await userScreenStore.get();
+  _expandedBlockId = null;
+  _showVandaag();
 }
 
-// what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
-function onScreenAction(action) {
-  if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
-}
-
-async function _showActiveScreen() {
-  // View-mode: render the materialized screen + a back link to picker.
-  const screen = _screensBook?.screens?.find((s) => s.id === _viewingScreenId)
-              ?? getActiveScreen(_screensBook);
-  if (!screen) {
-    _screenSubMode = 'picker'; _viewingScreenId = null;
-    _screensRerender();
-    return;
-  }
+/**
+ * VANDAAG: the active page of the person's own pages, its blocks capped, each with "meer"; the pages as sub-tabs only
+ * when there is more than one (no page manager of its own — adding, renaming and removing pages is in "Pas aan").
+ */
+async function _showVandaag() {
+  const book = _screensBook ?? { screens: [], activeId: null };
+  const screen = getActiveScreen(book);
   rootEl.innerHTML = '';
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.className = 'circle-screens-view__back';
-  back.textContent = `← ${t('circle.screens.picker_title')}`;
-  back.addEventListener('click', () => {
-    _screenSubMode = 'picker';
-    _viewingScreenId = null;
-    _screensRerender();
-  });
-  rootEl.appendChild(back);
-  const title = document.createElement('h2');
-  title.className = 'circle-screens-view__title';
-  title.textContent = screen.name || t('circle.screens.untitled');
-  rootEl.appendChild(title);
+  const head = document.createElement('div');
+  head.className = 'circle-vandaag__head';
+  if (book.screens.length > 1 && !_expandedBlockId) {
+    const tabs = document.createElement('div');
+    tabs.className = 'circle-vandaag__pages';
+    tabs.setAttribute('role', 'tablist');
+    for (const page of book.screens) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'circle-vandaag__page';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(page.id === screen?.id));
+      b.dataset.pageId = page.id;
+      b.textContent = page.name || t('circle.screens.untitled');
+      b.addEventListener('click', () => { if (page.id !== screen?.id) _setActivePage(page.id); });
+      tabs.appendChild(b);
+    }
+    head.appendChild(tabs);
+  }
+  if (_expandedBlockId) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'circle-vandaag__back';
+    back.textContent = `← ${t('circle.screen.more_back')}`;
+    back.addEventListener('click', () => { _expandedBlockId = null; _showVandaag(); });
+    head.appendChild(back);
+  } else {
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'circle-vandaag__customise';
+    edit.textContent = t('circle.vandaag.customise');
+    edit.addEventListener('click', () => showVandaagCustomise());
+    head.appendChild(edit);
+  }
+  rootEl.appendChild(head);
+  if (!screen) return;
+  const shown = _expandedBlockId ? (expandedPage(screen, _expandedBlockId) ?? screen) : screen;
+  const onMore = _expandedBlockId ? undefined : (blockId) => { _expandedBlockId = blockId; _showVandaag(); };
 
-  // δ.1 — cache-first render: read the LAST materialized payload for this
-  // screen and paint immediately so the press feels instant.  On a cache
-  // miss we fall through to the existing Loading→fresh flow (null sentinel
-  // → renderCircleScreen shows the loading hint).  Either way the fresh
-  // materialize runs in the background; on result we swap in the result
-  // and re-save the cache.  Race-token guards against a stale materialize
-  // from a previously-open screen stomping the body once the user has
-  // navigated away.
+  // δ.1 — cache-first render (the page only; a block opened whole is fetched fresh): paint the last materialized
+  // payload at once, then the fresh one when it is in. The token drops a stale result once the person moved on.
   const body = document.createElement('div');
   rootEl.appendChild(body);
   const token = ++_showActiveScreenToken;
+  const cacheKey = _expandedBlockId ? null : screen.id;
   let cached = null;
-  try { cached = await screenBlocksCache.get(screen.id); } catch { /* ignore */ }
-  if (token !== _showActiveScreenToken || _viewingScreenId !== screen.id) return;
+  if (cacheKey) { try { cached = await screenBlocksCache.get(cacheKey); } catch { /* ignore */ } }
+  if (token !== _showActiveScreenToken) return;
   if (Array.isArray(cached)) {
     _screenViewBlocks = cached;
-    renderCircleScreen(body, { blocks: cached, t, refreshing: true, onAction: onScreenAction });
+    renderCircleScreen(body, { blocks: cached, t, refreshing: true, onAction: onScreenAction, onMore });
   } else {
     renderCircleScreen(body, { blocks: null, t });
   }
-
-  // Materialize blocks (with muted-circle filter when available later).
   let blocks = [];
   try {
     blocks = await materializeScreen({
-      screen,
+      screen: shown,
       hostOps: {
         // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
-        // This read `resolveSkill ?? rawCallSkill`, i.e. it PREFERRED the 2-arg resolver whenever the
-        // bot had booted (always): 'calendar' arg-shifted into the opId and the agenda materialised
-        // empty. The same bug sat in mobile's sibling; both found by the §3 rename.
         callSkill: rawCallSkill,
         eventLog, circles: circlesCache,
         // the circles-with-news block counts what the circle tiles count
         seenAt: readSeenAt(), myRefs: unreadMyRefs,
       },
-      // mutedCircleIds wires in α.5 (per-user mute UI).
     });
   } catch (err) {
-    console.warn('[showScreens] materializeScreen failed', err);
+    console.warn('[vandaag] materializeScreen failed', err);
   }
-  // Drop the result if the user navigated away (or to a different screen)
-  // while materialize was in flight — otherwise the body could be
-  // overwritten with stale content from a previously-open screen.
-  if (token !== _showActiveScreenToken || _viewingScreenId !== screen.id) return;
+  if (token !== _showActiveScreenToken) return;
   _screenViewBlocks = blocks;
-  renderCircleScreen(body, { blocks, t, refreshing: false, onAction: onScreenAction });
-  // Save the fresh blocks back to the cache so the next open is also
-  // instant.  Best-effort: a quota / serialization failure is silent.
-  screenBlocksCache.set(screen.id, blocks).catch(() => { /* ignore */ });
+  renderCircleScreen(body, { blocks, t, refreshing: false, onAction: onScreenAction, onMore });
+  if (cacheKey) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
+}
+
+// "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
+function showVandaagCustomise() {
+  const { card, close } = _restoreOverlay();
+  const paint = () => renderVandaagCustomise(card, {
+    model: customiseModel(_screensBook ?? { screens: [], activeId: null }),
+    t,
+    onAct: async (act, args) => {
+      const { opId, args: opArgs } = customiseOp(act, args ?? {});
+      await rawCallSkill('basis', opId, opArgs).catch(() => null);
+      _screensBook = await userScreenStore.get();
+      paint();
+    },
+    onClose: () => { close(); _showVandaag(); },
+  });
+  paint();
+}
+
+// what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
+function onScreenAction(action) {
+  if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
 }
 
 // (Batch 5) `showStream` is GONE — the cross-circle Stream VIEW retired (α.3 already removed its tab;

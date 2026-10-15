@@ -4253,9 +4253,12 @@ function showVandaagPlus() {
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     onSave: async (id, values) => {
-      const op = plusOp(id, values, { asSelf });
+      const op = plusOp(id, values);
       if (op.error) { error = t(op.error); paint(); return; }
-      const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+      // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
+      const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
+      const r = await Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+        .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
       const follow = plusFollowUp(_screensBook, id);

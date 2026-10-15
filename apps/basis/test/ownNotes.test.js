@@ -75,16 +75,23 @@ describe("a person's own notes are the person's — no door reaches them", () =>
   });
 });
 
-describe("an own note written as a persona", () => {
-  it('carries that persona\'s webid, so it rides that persona\'s own lane; a self not held here is refused', async () => {
+describe("an own item made AS a persona (the waist's actAs)", () => {
+  it('a note made as the persona carries its webid, so they ride its own lane; a self not held here is refused', async () => {
     const { VaultMemory } = await import('@onderling/vault');
     const ds = memoryDataSource();
     const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
     const made = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
-    await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'werkbriefje', asSelf: made.id });
+    const werk = a.persona(made.id).chatId.pubKey;
+    await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'werkbriefje' }, { actAs: werk });
     const note = (await createOwnDevicesStore({ dataSource: ds }).listByType('note')).find((n) => n.body === 'werkbriefje');
-    expect(note?.createdBy).toBe(a.persona(made.id).chatId.pubKey);
-    const r = await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'x', asSelf: 'p-000000000000' });
+    expect(note?.createdBy).toBe(werk);
+    // a door's caller naming a self of this device as actAs: refused (a door names who acts itself)
+    await a.setDoorCaller('door-person', 'admin');
+    const viaDoor = await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'deur-als-werk' }, { caller: 'door-person', threadId: 'door-person', actAs: werk });
+    expect(viaDoor?.ok, 'a door caller cannot act as a self of this device').toBe(false);
+    expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).some((n) => n.body === 'deur-als-werk')).toBe(false);
+    const r = await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'x' }, { actAs: 'not-a-self-of-mine' });
     expect(r?.ok).toBe(false);
+    expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).some((n) => n.body === 'x')).toBe(false);
   });
 });

@@ -71,12 +71,6 @@ describe('the persona set', () => {
 });
 
 describe('the persona set — what follows it', () => {
-  it('the "+" writes as the ticked self: the op carries it, and the agent files the note on that self\'s lane', async () => {
-    const { plusOp } = await import('../../src/v2/vandaagPlus.js');
-    expect(plusOp('own-note', { body: 'x' }, { asSelf: 'p-werk' }).args.asSelf).toBe('p-werk');
-    expect(plusOp('own-note', { body: 'x' }).args.asSelf).toBeUndefined();
-  });
-
   it('the avatar of a persona carries its own name, not the person\'s', async () => {
     const { loadPersonaAvatar } = await import('../../src/v2/personaAvatar.js');
     const callSkill = async (app, op) => (op === 'getMyProfile' ? { entry: { displayName: 'Frits' } } : { properties: {} });

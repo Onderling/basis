@@ -4769,7 +4769,9 @@ export async function createRealHouseholdAgent(opts = {}) {
    * in the circle's own data; every other door acts as its caller.
    */
   const doorCircleOf = (ctx) => (typeof ctx?.doorCircleId === 'string' && ctx.doorCircleId ? ctx.doorCircleId : null);
-  const actorOf = (ctx) => (doorCircleOf(ctx) && typeof ctx?.doorActor === 'string' && ctx.doorActor ? ctx.doorActor : (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : null));
+  // who acts: a door's person; else a local call made AS one of this device's selves (`actAs`, checked at the waist)
+  const actorOf = (ctx) => (doorCircleOf(ctx) && typeof ctx?.doorActor === 'string' && ctx.doorActor ? ctx.doorActor
+    : (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : (typeof ctx?.actAs === 'string' && ctx.actAs ? ctx.actAs : null)));
   /** A circle's people as the chore rules read them: its folded roster, by ref, with their handle and role. */
   async function circlePeople(circleId) {
     const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
@@ -4996,6 +4998,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
   const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
+    // A local call made AS one of this device's selves (the kernel's `actAs`, at the waist): only a self this device runs,
+    // and never with a door's person (a door names who acts itself). What it makes carries that self as its maker.
+    // THIS is the check that binds: the kernel's invoke `actAs` refuses only a call that would leave the process — it does
+    // not ask whether the identity is one held here.
+    if (typeof ctx?.actAs === 'string' && ctx.actAs) {
+      const own = ctx.actAs === chatId?.pubKey || [...personas.values()].some((p) => p?.chatId?.pubKey === ctx.actAs);
+      if (!own || (typeof ctx?.caller === 'string' && ctx.caller)) return { ok: false, code: 'not-a-self-here', error: 'not-a-self-here' };
+    }
     // A door's call carries its person: check them first, and let tasks record who asked (the host vouches).
     if (typeof ctx?.caller === 'string' && ctx.caller) {
       // the op the call reaches — its app and its op: household's `listOpen` is not the chores', whatever a menu shows
@@ -5119,16 +5129,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
         const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
-        // written as one of this device's personas (the switcher's one ticked self): its webid is the maker, so the item
-        // rides that persona's own lane; a self this device does not run is refused
-        let ownBy = capCtx.by;
-        if (ownCap && typeof args?.asSelf === 'string' && args.asSelf && args.asSelf !== 'default') {
-          const rt = personas.get(args.asSelf);
-          if (!rt?.chatId?.pubKey) return { ok: false, code: 'not-a-self-here', error: 'not-a-self-here' };
-          ownBy = rt.chatId.pubKey;
-        }
-        if (ownCap && args && 'asSelf' in args) { const { asSelf: _s, ...rest } = args; args = rest; }
-        const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: ownBy }) : householdService.callCapability(atom, noun, a, capCtx));
+        const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.
         if (isPeopleWritten(householdManifest, g.noun) && ['get', 'update', 'remove'].includes(g.atom)) {

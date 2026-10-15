@@ -172,11 +172,15 @@ const CLOSED_TASK_STATES = new Set(['done', 'approved', 'completed', 'cancelled'
 async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
   const { callSkill } = hostOps;
   const want = (Array.isArray(block.config?.readings) ? block.config.readings : []).filter((r) => MIJ_READINGS.includes(r));
-  let name = null;
-  try {
-    const prof = typeof callSkill === 'function' ? await callSkill('stoop', 'getMyProfile', {}) : null;
-    name = prof?.entry?.displayName || prof?.entry?.handle || null;
-  } catch { /* nameless: the painter says "Mij" */ }
+  // the self Mij shows (the switcher's one ticked persona): its own name; the default is the person's profile name
+  const self = hostOps.mijSelf && hostOps.mijSelf.id && hostOps.mijSelf.id !== 'default' ? hostOps.mijSelf : null;
+  let name = self ? (self.name ?? null) : null;
+  if (!self) {
+    try {
+      const prof = typeof callSkill === 'function' ? await callSkill('stoop', 'getMyProfile', {}) : null;
+      name = prof?.entry?.displayName || prof?.entry?.handle || null;
+    } catch { /* nameless: the painter says "Mij" */ }
+  }
   const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
   const readings = [];
   for (const key of want) {
@@ -222,10 +226,13 @@ async function ownAppointments(callSkill) {
  * it is not among the delegations, as a first device is not), the nodes they claimed, the bots linked to them. One
  * row each; read-only — what may be done with one lives in My data.
  */
-async function materializeAgents(block, { callSkill, deviceId = null } = {}) {
+async function materializeAgents(block, { callSkill, deviceId: personDeviceId = null, mijSelf = null } = {}) {
+  // the self Mij shows: a persona's own registry entry and its own device id here; the bots are the person's (default)
+  const self = mijSelf && mijSelf.id && mijSelf.id !== 'default' ? mijSelf : null;
+  const deviceId = self ? (self.deviceId ?? null) : personDeviceId;
   const base = { blockId: block.id, type: 'agents', titleKey: 'circle.recipe.block.agents' };
   if (typeof callSkill !== 'function') return { ...base, status: 'empty', content: { items: [] } };
-  const entry = await callSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null);
+  const entry = await callSkill('agents', 'getProfileProperties', { id: self ? self.id : 'default' }).catch(() => null);
   const props = { properties: entry?.properties ?? {} };
   const items = Object.values(deviceDelegationsOf(props))
     .filter((d) => d && !d.revoked)
@@ -235,7 +242,7 @@ async function materializeAgents(block, { callSkill, deviceId = null } = {}) {
     const addr = typeof n?.address === 'string' ? n.address : '';
     items.push({ kind: 'companion', label: n?.label || (addr ? `${addr.slice(0, 8)}…` : null), here: false });
   }
-  const contacts = await callSkill('stoop', 'listContacts', {}).then((r) => r?.contacts ?? []).catch(() => []);
+  const contacts = self ? [] : await callSkill('stoop', 'listContacts', {}).then((r) => r?.contacts ?? []).catch(() => []);
   const bots = new Set(linkedBotsOf(contacts));
   const names = new Map();
   for (const c of bookRowsOf({ contacts })) for (const a of [c?.peerAddr, c?.webid]) if (a) names.set(a, c.displayName || c.handle || null);

@@ -31,4 +31,7 @@ describe('the header switcher — parity', () => {
       expect(src).not.toMatch(/personaSet\s*[:=]/);   // the set is the book's, changed only through the op
     }
   });
+  it('Mij follows the switcher on both shells: the one ticked self is the screen\'s self', () => {
+    for (const src of [webHost, mobileHost]) expect(src).toMatch(/mijSelf: \{ id: one|mijSelf = oneSelf/);
+  });
 });

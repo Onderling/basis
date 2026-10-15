@@ -4335,8 +4335,14 @@ async function showMij() {
   });
   rerender();
   const relays = (() => { try { return _peerAgent?.relays?.list?.() ?? []; } catch { return []; } })();
+  // Mij follows the switcher: with one persona ticked, that persona's name and devices; otherwise the person's
+  await refreshSelfSet();
+  const oneSelf = writeAs(_selfSet.on);
+  const mijSelf = oneSelf && oneSelf !== 'default'
+    ? { id: oneSelf, name: _selfSet.held.find((p) => p.id === oneSelf)?.name ?? null, deviceId: circleHouseholdAgent?.persona?.(oneSelf)?.enrolledDevice?.deviceId ?? null }
+    : null;
   blocks = await mijScreenBlocks({ hostOps: {
-    callSkill: rawCallSkill, eventLog, circles: circlesCache,
+    callSkill: rawCallSkill, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
     seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
     availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)

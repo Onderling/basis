@@ -22,7 +22,7 @@ import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFac
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image } from 'react-native';
 import { useTheme } from './themeContext.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
@@ -210,6 +210,7 @@ import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../ba
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
+import { loadPersonaAvatar } from '../../../../basis/src/v2/personaAvatar.js';
 import FaceView from './FaceView.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
@@ -467,7 +468,7 @@ function PersonaPanel({
   );
 }
 
-function WithTabBar({ active, onSelect, badges, children }) {
+function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, children }) {
   // The tab frame paints the app's GROUND. It used to be a bare `flex: 1` View, which is transparent,
   // so any screen inside it that themed its text but not its background showed the platform's default
   // white — themed (light) ink on white, unreadable, and glaring beside an otherwise dark app. The
@@ -477,8 +478,24 @@ function WithTabBar({ active, onSelect, badges, children }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.color.paper }}>
       <View style={{ flex: 1 }}>{children}</View>
+      {/* the header avatar, top-right on every tab: the persona's picture or initials; a tap opens the person's editor */}
+      {avatar ? <HeaderAvatar avatar={avatar} onPress={onAvatar} /> : null}
       <CircleTabBar active={active} onSelect={onSelect} badges={badges} />
     </View>
+  );
+}
+
+function HeaderAvatar({ avatar, onPress }) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('circle.profile.edit')} testID="header-avatar"
+      style={{ position: 'absolute', top: (insets?.top ?? 0) + 8, right: 12, width: 34, height: 34, borderRadius: 17, overflow: 'hidden',
+        backgroundColor: theme.color.accent, alignItems: 'center', justifyContent: 'center' }}>
+      {avatar.uri
+        ? <Image source={{ uri: avatar.uri }} style={{ width: 34, height: 34 }} accessibilityLabel={avatar.name ?? ''} />
+        : <Text style={{ color: theme.color.white, fontWeight: '700', fontSize: 13 }}>{avatar.initials ?? '?'}</Text>}
+    </Pressable>
   );
 }
 
@@ -873,6 +890,17 @@ export default function CircleLauncherScreen({
     encodeImage:    encodePickedImage,
     localActor: getCircleActorWebId() || 'me',
   }), [getSelfMediaComposition]);
+  // THE HEADER AVATAR — loaded from the shared loader, the picture opened with this device's self-opener; reloaded when
+  // the person's editor closes (a new picture or name shows at once). A tap goes to Mij and opens the editor there.
+  const [headerAvatar, setHeaderAvatar] = useState(null);
+  const refreshHeaderAvatar = useCallback(async () => {
+    if (typeof bundle?.callSkill !== 'function') return;
+    const a = await loadPersonaAvatar({ callSkill: bundle.callSkill });
+    const opener = a.picture ? await profilePicture.getOpener().catch(() => null) : null;
+    setHeaderAvatar({ ...a, uri: a.picture && opener ? resolveSealedThumbUri(a.picture, opener) : null });
+  }, [bundle, profilePicture]);
+  useEffect(() => { refreshHeaderAvatar(); }, [refreshHeaderAvatar]);
+  const openMyEditor = useCallback(() => { setView('profile'); setMyPersona('default'); }, []);
   // §8 unification — the ONE report write path (member · post · message) → the governance
   // report host, so every report propagates + shows in the governance Reports section (folds
   // the older reportPost). Best-effort; scoped to the active circle.
@@ -1810,7 +1838,7 @@ export default function CircleLauncherScreen({
     // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
     const active = getActiveScreen(screensBook);
     return (
-      <WithTabBar active="screens" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="screens" onSelect={onTab} badges={tabBadges}>
         <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
           {screensBook.screens.length > 1 && !expandedBlockId ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }} accessibilityRole="tablist">
@@ -1865,10 +1893,10 @@ export default function CircleLauncherScreen({
   // Mij = identity, the declared screen; its other doors are behind My data.
   if (view === 'profile') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
-          personaId={myPersona} onClose={() => setMyPersona(null)} styles={styles}
+          personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
         />
       </WithTabBar>
@@ -1878,7 +1906,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('mydata')} />
       </WithTabBar>
     );
@@ -1886,7 +1914,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -1895,7 +1923,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -1908,7 +1936,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -1920,7 +1948,7 @@ export default function CircleLauncherScreen({
   // S5 — "My data": data-location + privacy + usage (read-only); sub-view of Mij.
   if (view === 'mydata') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
           personClock={personClockRef.current} />
@@ -1929,7 +1957,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'availability') {
     return (
-      <WithTabBar active="mij" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="mij" onSelect={onTab} badges={tabBadges}>
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => setView('mydata')}
@@ -1942,7 +1970,7 @@ export default function CircleLauncherScreen({
   if (view === 'contacten') {
     if (contactThread) {
       return (
-        <WithTabBar active="contacten" onSelect={onTab} badges={tabBadges}>
+        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="contacten" onSelect={onTab} badges={tabBadges}>
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
@@ -1954,7 +1982,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar active="contacten" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="contacten" onSelect={onTab} badges={tabBadges}>
         <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)} />
       </WithTabBar>
     );
@@ -2076,7 +2104,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar active="nearby" onSelect={onTab} badges={tabBadges}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="nearby" onSelect={onTab} badges={tabBadges}>
         <NearbyScreenHost
           bundle={bundle}
           onBack={() => setView('list')}
@@ -2367,7 +2395,7 @@ export default function CircleLauncherScreen({
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
-    <WithTabBar active="circles" onSelect={onTab} badges={tabBadges}>
+    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} active="circles" onSelect={onTab} badges={tabBadges}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>

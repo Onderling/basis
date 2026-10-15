@@ -1922,8 +1922,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return { ...kit, sendAs: rt.personIdentity?.pubKey ?? null };
   };
-  /** The device kit of a circle's self on this device. */
-  const deviceKitFor = (circleId) => deviceKitOf(profileIdOf(circleId)) ?? deviceKitOf('default');
+  /** The device kit of a circle's self on this device — or null when that self is a persona this device does not run (a
+   *  circle the person's registry files under a persona, bound here or not). Never the default's kit standing in. */
+  const deviceKitFor = async (circleId) => {
+    const bound = circlePersonas.get(circleId);
+    if (bound) return deviceKitOf(bound);
+    try {
+      for (const entry of (await agentsRegistryRef?.list?.()) ?? []) {
+        const pid = entry?.agentId;
+        if (typeof pid === 'string' && /^p-[0-9a-f]{12}$/.test(pid) && Object.prototype.hasOwnProperty.call(circleMembershipsOf(entry), circleId)) {
+          return deviceKitOf(pid);   // null unless this device runs it
+        }
+      }
+    } catch { return null; }   // an unreadable registry cannot say whose circle it is: no kit
+    return deviceKitOf('default');
+  };
   const grantsRail = makeGrantsRail({
     eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
     signerFor: () => grantsSignerPromise,
@@ -2467,11 +2480,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const rosterSeed = {
     subtypes: ROSTER_SEED_SUBTYPES,
     // as the circle's self: a persona's circle is asked of that persona's devices, with its device key and record
-    buildRequest: (circleId, replyTo) => buildRosterSeedRequest({
-      signer: deviceKitFor(circleId).signer,
-      delegationRecord: deviceKitFor(circleId).record,
-      circleId, replyTo,
-    }),
+    buildRequest: async (circleId, replyTo) => {
+      const kit = await deviceKitFor(circleId);
+      return kit ? buildRosterSeedRequest({ signer: kit.signer, delegationRecord: kit.record, circleId, replyTo }) : null;
+    },
     onRequest: makeRosterSeedServer({
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
       signerPromise: grantsSignerPromise,
@@ -2488,7 +2500,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (as && as === personAddress()) await registerPersonAddressOnRelays();   // the relay must hold the person address before it speaks
         return sa.peer.sendTo(to, payload, { guarantee: 'hold-forward', ...(as ? { sendAs: as } : {}) });
       },
-      forCircle: (cid) => (profileIdOf(cid) === 'default' ? null : (() => { const k = deviceKitFor(cid); return { signer: k.signer, delegationRecord: k.record, verifyDeviceSet: k.verify, selfPubKey: k.selfPubKey, sendAs: k.sendAs }; })()),
+      forCircle: async (cid) => { const k = await deviceKitFor(cid); return k ? { signer: k.signer, delegationRecord: k.record, verifyDeviceSet: k.verify, selfPubKey: k.selfPubKey, sendAs: k.sendAs } : null; },
       // The introduce-back (see the serve): the fresh sibling can only bind statements THIS
       // device signs once it holds this device's per-circle address as a proven fact.
       ownAnnouncement: (cid) => ownCircleAddressAnnouncement({
@@ -2503,7 +2515,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       callSkill: (...a) => callSkill(...a),
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
-      forCircle: (cid) => (profileIdOf(cid) === 'default' ? null : { verifyDeviceSet: deviceKitFor(cid).verify, selfPubKey: deviceKitFor(cid).selfPubKey }),
+      forCircle: async (cid) => { const k = await deviceKitFor(cid); return k ? { verifyDeviceSet: k.verify, selfPubKey: k.selfPubKey } : null; },
       // `api` is this agent's surface, composed further down this scope; the handler only runs once it is.
       refreshBindings: (cid) => bindCircleAddressKeysFor({ agent: api, circleId: cid }),
     }),

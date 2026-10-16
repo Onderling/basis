@@ -578,6 +578,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!held.includes(primaryId)) throw new Error(`the custody marker names "${primaryId}", which this device does not hold — restore with the recovery phrase`);
   }
   const personas = new Map([[primaryId, await createPersonaRuntime({ profileId: primaryId, ownerRoot, custody, custodySeed, chatVault })]]);
+  // …and the marker must AGREE with the door: the door's seed is the primary's delegation, so its public key is the one
+  // the primary's handed record names. A marker rewritten at rest to name another held self would otherwise run that
+  // self while every phrase check silently failed — a broken install, refused like an unheld one.
+  if (custodySeed) {
+    const handedPub = personas.get(primaryId)?.enrolledDevice?.record?.pubKey ?? null;
+    if (handedPub && handedPub !== deviceDelegationPubKey(custodySeed)) {
+      throw new Error(`the custody marker names "${primaryId}", but the key door holds another self's delegation — restore with the recovery phrase`);
+    }
+  }
   /** A persona's chat key and person key, registered as identities of ours that the persona owns (the secure agent then
    *  signs a send as it, on its own sockets). Idempotent; late-bound to the secure agent (`secureAgentRef`). */
   const registerPersonaIdentities = async (personaId, rt) => {

@@ -87,6 +87,24 @@ describe('a device without the general persona', () => {
     await phone.shutdown?.(); await pre.shutdown?.();
   }, 120_000);
 
+  it('a marker rewritten to name ANOTHER held self refuses to boot (the door\'s seed is not that self\'s delegation)', async () => {
+    const phone = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
+    const phrase = (await phone.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const w = (await phone.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
+    const p = (await phone.callSkill('agents', 'createProfile', { name: 'Privé' })).id;
+    const ownerRootVault = new VaultMemory();
+    const rootKeyStore = new RootKeyStoreVault({ vault: ownerRootVault });
+    const chatVault = new VaultMemory();
+    const pre = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault, registryBackend: createMemoryBackend() });
+    expect((await pre.callSkill('household', 'enrollDevice', { mnemonic: phrase, personas: [w, p], withDefault: false })).ok).toBe(true);
+    const marker = JSON.parse(await ownerRootVault.get(CUSTODY_MODE_KEY));
+    expect(marker.profileId).toBe(w);
+    await ownerRootVault.set(CUSTODY_MODE_KEY, JSON.stringify({ ...marker, profileId: p }));   // held, but not the door's
+    await expect(createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault, registryBackend: createMemoryBackend() }))
+      .rejects.toThrow(/key door/);
+    await phone.shutdown?.(); await pre.shutdown?.();
+  }, 120_000);
+
   it('a device must hold at least one self: no general persona and none picked is refused, and nothing changes', async () => {
     const phone = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
     const phrase = (await phone.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;

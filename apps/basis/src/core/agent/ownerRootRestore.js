@@ -29,7 +29,7 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { Bootstrap, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
+import { AgentIdentity, Bootstrap, deriveDeviceSeed, wireDeviceId, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, storePersonKey } from '@onderling/core';
 import { VaultEncrypted, migrateVaultToEncrypted, seedToString } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 import { cutoverToDelegation } from './ownerRootCustody.js';
@@ -108,13 +108,20 @@ export function newDeviceId({ crypto: c = globalThis.crypto } = {}) {
  *                                    (root in the key door) so legacy callers keep working.
  * @returns {Promise<{ok: true, pubKey: string, deviceId?: string, custody?: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [], personas = [] } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault, throwawayCircleIds = [], personas = [], withDefault = true } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
   if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
   let root;
   try { root = Bootstrap.fromMnemonic(mnemonic.trim()); }
   catch { return { ok: false, code: 'invalid' }; }
+  // THE SELVES THIS DEVICE WILL HOLD: the general persona unless the person left it off, then the picked personas. The
+  // first is the PRIMARY — the self this device speaks as, whose delegation seed the key door holds and the custody
+  // marker names. A device holds at least one self; leaving the general persona off needs delegation custody (a
+  // root-custody device derives every persona, so there is nothing to leave off).
+  const picked = (Array.isArray(personas) ? personas : []).filter((pid, i, all) => typeof pid === 'string' && /^p-[0-9a-f]{12}$/.test(pid) && all.indexOf(pid) === i);
+  if (!withDefault && (!picked.length || !markerVault)) return { ok: false, code: 'no-persona' };
+  const primaryId = withDefault ? DEFAULT_PROFILE : picked[0];
 
   try {
     // Every phrase ceremony ENROLLS (a restore is enrollment as this profile's next device); the
@@ -122,8 +129,9 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     // The id the device shows is its persona-keyed WIRE id; the seed derives from it, so the phrase + the record's id
     // reproduce the seed anywhere (a revocation needs nothing else). The internal id stays in the sealed blob.
     const internalId = newDeviceId();
-    const deviceId = wireDeviceId(root.deriveAgentSeed(DEFAULT_PROFILE), internalId);
-    const delegationSeed = deriveDeviceSeed(root.deriveAgentSeed(DEFAULT_PROFILE), deviceId);
+    // the PRIMARY's wire id and device seed: what the key door holds and the marker names
+    const deviceId = wireDeviceId(root.deriveAgentSeed(primaryId), internalId);
+    const delegationSeed = deriveDeviceSeed(root.deriveAgentSeed(primaryId), deviceId);
     const delegationCustody = !!markerVault;
 
     // 1. The key door FIRST: if the later steps fail, a boot still finds a working identity.
@@ -131,44 +139,25 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    Legacy (no markerVault): the root seed, exactly as before the cutover.
     if (!delegationCustody) await rootKeyStore.setSeed(root.secret);
 
-    // 2. The default profile, derived — never from the mnemonic's raw entropy: the chat key is a
-    //    CHILD of the root (`deriveAgentSeed`). It lands through the vault-at-rest layer, sealed
-    //    under whichever seed this custody boots from (the fingerprint-bound migration wipes a
-    //    previous identity's leftovers either way — the fingerprint stays the ROOT's, the "same
-    //    person" tag across all their devices).
+    // 2. The vault-at-rest layer, sealed under whichever seed this custody boots from (the PRIMARY's delegation seed,
+    //    or the root's): every self's slots land through it. The fingerprint-bound migration wipes a previous identity's
+    //    leftovers either way — the fingerprint stays the ROOT's, the "same person" tag across all their devices. A
+    //    chat key is a CHILD of the root (`deriveAgentSeed`), never the mnemonic's raw entropy.
     const atRestKey = delegationCustody ? deriveVaultAtRestKeyFrom(delegationSeed) : root.deriveVaultAtRestKey();
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
-    // the default persona's slots (its chat seed, person key and delegation blob), as personaVault names them
-    const sealedChat = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), DEFAULT_PROFILE);
-    const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
-    // 2b. The PERSON KEY (rotating, per profile): the one moment this device has the root, so it is handed
-    //     the current version's seed and keeps it sealed. Version 1 until the rotation ceremony exists; a
-    //     later ceremony only ever raises it.
-    //     The link key's PUBLIC half rides with it (the seed is derived here, used for nothing, and dropped): this
-    //     device builds cards and answers chain pulls with the pub; only a ceremony can vouch for a rotation.
-    try {
-      const profileSeed = root.deriveAgentSeed(DEFAULT_PROFILE);
-      await storePersonKey(sealedChat, { version: 1, seed: derivePersonKeySeed(profileSeed, 1), linkKeyPub: personKeyPubKeyB64(derivePersonLinkKeySeed(profileSeed)) });
-    }
-    catch (err) { console.warn(`[ceremony] the person key could not be stored — this device announces no key at joins: ${err?.message ?? err}`); }
-
-    // 3. The delegation blob (the label carrier + the enrolled-boot signal for root-custody
-    //    installs; under delegation custody the key door + marker are the boot authority).
-    const blob = { seed: _b64url(delegationSeed), deviceId, internalId };
-    if (typeof enrollDevice?.label === 'string' && enrollDevice.label) blob.label = enrollDevice.label;
-    // The ROOT-SIGNED delegation record, pre-signed HERE (the one moment the root exists) and
-    // carried in the blob — the boot's registry self-heal registers it without ever needing the
-    // root again. Non-secret: a statement + a signature.
-    blob.record = signDeviceDelegation(root.deriveProfileAuthority(DEFAULT_PROFILE), {
-      profileId: DEFAULT_PROFILE, deviceId, pubKey: deviceDelegationPubKey(delegationSeed),
-    });
-    if (blob.label) blob.record = { ...blob.record, label: blob.label };
-    await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+    // 2–3. THE GENERAL PERSONA'S SLOTS (its chat seed, person key and delegation blob — the bare names, as personaVault
+    //      names them), only when this device holds it: a device without it has nothing of it, not even an empty slot.
+    let identity = null;
+    const label = typeof enrollDevice?.label === 'string' && enrollDevice.label ? enrollDevice.label : null;
+    if (withDefault) ({ identity } = await handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label }));
     // 3b. THE PICKED PERSONAS (the picker): each is handed here, the one moment the root is in hand — its chat identity,
     //     its person key, and its own delegation (its wire id of this device, its device seed, the record signed by its
     //     own authority) — into its own slots. A delegated device can never derive a persona later; what it is not
-    //     handed now, it does not run. The list it holds is kept beside the default's slots for its boots.
-    await handPersonasInto({ root, chatVault, atRestKey, internalId, label: blob.label ?? null, personas });
+    //     handed now, it does not run. The list it holds is a device entry, read at its boots.
+    const held = await handPersonasInto({ root, chatVault, atRestKey, internalId, label, personas: picked });
+    // without the general persona the primary is the first picked — the one this device now speaks as
+    if (!withDefault) identity = { pubKey: (await AgentIdentity.restore(personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), primaryId)))?.pubKey ?? null };
+    if (!withDefault && !held.includes(primaryId)) return { ok: false, code: 'storage', detail: 'the primary persona was not handed' };
     // The note the NEXT boot reads: a restore happened here, finish it (the restore-finish flow asks what
     // came back and what the person wants). Plain, device-local, cleared by that flow's first step.
     if (markerVault) { try { await markerVault.set(RESTORE_PENDING_KEY, JSON.stringify({ at: new Date().toISOString() })); } catch { /* the flow can be started by hand */ } }
@@ -183,7 +172,7 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
     //    A failed cutover falls back to root custody so the ceremony never strands the device.
     if (delegationCustody) {
       const ok = await cutoverToDelegation({
-        rootKeyStore, markerVault, delegationSeed, deviceId, fingerprint: root.fingerprint(),
+        rootKeyStore, markerVault, delegationSeed, deviceId, profileId: primaryId, fingerprint: root.fingerprint(),
       });
       if (!ok) {
         await rootKeyStore.setSeed(root.secret);
@@ -195,6 +184,41 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
   } catch (err) {
     return { ok: false, code: 'storage', detail: err?.message ?? String(err) };
   }
+}
+
+/**
+ * The GENERAL PERSONA's slots on this device, at a phrase ceremony: its chat identity, its person key, and the delegation
+ * blob (its wire id, its device seed, the record signed by its own authority). Written only when the device holds it.
+ * @returns {Promise<{identity: object}>}
+ */
+async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delegationSeed, internalId, label = null }) {
+  // the general persona's slots (its chat seed, person key and delegation blob), as personaVault names them
+  const sealedChat = personaVault(new VaultEncrypted({ backing: chatVault, key: atRestKey }), DEFAULT_PROFILE);
+  const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
+  // 2b. The PERSON KEY (rotating, per profile): the one moment this device has the root, so it is handed
+  //     the current version's seed and keeps it sealed. Version 1 until the rotation ceremony exists; a
+  //     later ceremony only ever raises it.
+  //     The link key's PUBLIC half rides with it (the seed is derived here, used for nothing, and dropped): this
+  //     device builds cards and answers chain pulls with the pub; only a ceremony can vouch for a rotation.
+  try {
+    const profileSeed = root.deriveAgentSeed(DEFAULT_PROFILE);
+    await storePersonKey(sealedChat, { version: 1, seed: derivePersonKeySeed(profileSeed, 1), linkKeyPub: personKeyPubKeyB64(derivePersonLinkKeySeed(profileSeed)) });
+  }
+  catch (err) { console.warn(`[ceremony] the person key could not be stored — this device announces no key at joins: ${err?.message ?? err}`); }
+
+  // 3. The delegation blob (the label carrier + the enrolled-boot signal for root-custody
+  //    installs; under delegation custody the key door + marker are the boot authority).
+  const blob = { seed: _b64url(delegationSeed), deviceId, internalId };
+  if (label) blob.label = label;
+  // The ROOT-SIGNED delegation record, pre-signed HERE (the one moment the root exists) and
+  // carried in the blob — the boot's registry self-heal registers it without ever needing the
+  // root again. Non-secret: a statement + a signature.
+  blob.record = signDeviceDelegation(root.deriveProfileAuthority(DEFAULT_PROFILE), {
+    profileId: DEFAULT_PROFILE, deviceId, pubKey: deviceDelegationPubKey(delegationSeed),
+  });
+  if (blob.label) blob.record = { ...blob.record, label: blob.label };
+  await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+  return { identity };
 }
 
 /**

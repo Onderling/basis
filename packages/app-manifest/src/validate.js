@@ -125,6 +125,9 @@ const NAV_TARGET_KIND_SET = new Set(NAV_TARGET_KINDS);
 /** @param {string} verb */
 export function isCanonicalVerb(verb) { return VERB_SET.has(verb); }
 
+/** The facets a noun may declare in `presents`. */
+export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine']);
+
 /**
  * Validate a manifest.
  *
@@ -266,6 +269,27 @@ export function validateManifest(manifest, opts = {}) {
         if (!Array.isArray(decl.atoms)) {
           errors.push({ path: `${np}/atoms`, message: 'nouns[noun].atoms must be an array' });
           continue;
+        }
+        // How a merged view shows the noun (`presents`) and what it is called (`names`) — DECLARED here so a host builds
+        // its views from the declaration and never knows a noun by name. Plain field keys only: no code, no paths.
+        if (decl.presents !== undefined) {
+          const pr = decl.presents;
+          // never an object's own machinery: a facet names a field on ANOTHER app's rows
+          const plainKey = (v) => typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(v) && !['__proto__', 'constructor', 'prototype'].includes(v);
+          const bad = (msg) => errors.push({ path: `${np}/presents`, message: msg, code: 'bad-presents' });
+          if (!pr || typeof pr !== 'object' || Array.isArray(pr)) bad('presents must be an object');
+          else {
+            for (const k of Object.keys(pr)) if (!PRESENT_FACETS.includes(k)) bad(`presents.${k} is not a facet (one of ${PRESENT_FACETS.join(', ')})`);
+            for (const k of ['label', 'moment']) if (pr[k] !== undefined && !plainKey(pr[k])) bad(`presents.${k} must be a plain field key`);
+            if (pr.order !== undefined && !['asc', 'desc'].includes(pr.order)) bad('presents.order must be "asc" or "desc"');
+            if (pr.mine !== undefined && !(Array.isArray(pr.mine) && pr.mine.every(plainKey))) bad('presents.mine must be a list of plain field keys');
+          }
+        }
+        if (decl.names !== undefined) {
+          const nm = decl.names;
+          if (!nm || typeof nm !== 'object' || Array.isArray(nm) || !Object.values(nm).every((v) => typeof v === 'string' && v.trim())) {
+            errors.push({ path: `${np}/names`, message: 'names must map a language to a non-empty word', code: 'bad-names' });
+          }
         }
         if (decl.writtenBy !== undefined && !NOUN_WRITERS.includes(decl.writtenBy)) {
           errors.push({ path: `${np}/writtenBy`, message: `writtenBy must be one of ${NOUN_WRITERS.join(', ')} (got "${decl.writtenBy}")`, code: 'unknown-writer' });

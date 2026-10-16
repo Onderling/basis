@@ -1597,8 +1597,17 @@ let   _peerAgent           = null;   // captured at boot so a relay-setting chan
  * that reaches this address still lands, and the day a browser transport lands nothing here changes.
  */
 let   _nearbyRoom          = null;
+let   _nearbyIdentity      = null;   // what the room is told about me, and what it is weighed against (nearbyIdentity.js)
 function ensureNearbyRoom(agent = _peerAgent) {
   if (_nearbyRoom || !agent || typeof agent.sendPeerMessage !== 'function') return _nearbyRoom;
+  _nearbyIdentity = createNearbyIdentity({
+    readChoice: readNearbyFace,
+    callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
+    relayUrl: () => (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL ? CIRCLE_RELAY_URL : null),
+    shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
+    nknAddress: () => agent?.peer?.address ?? null,
+    roomSelf: () => nearbyRoomSelfNow().self,
+  });
   _nearbyRoom = createNearbyRoomBinding({
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => [],
@@ -1606,14 +1615,8 @@ function ensureNearbyRoom(agent = _peerAgent) {
     deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
     // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
     // shell hands in only where its face choice lives and how it reaches its relay and NKN address.
-    ...createNearbyIdentity({
-      readChoice: readNearbyFace,
-      callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
-      relayUrl: () => (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL ? CIRCLE_RELAY_URL : null),
-      shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
-      nknAddress: () => agent?.peer?.address ?? null,
-      roomSelf: () => nearbyRoomSelfNow().self,
-    }),
+    myFace: () => _nearbyIdentity.myFace(),
+    myAddresses: () => _nearbyIdentity.myAddresses(),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
   // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
@@ -3890,6 +3893,9 @@ function showNearby() {
   const mesh = null;
   nearbyScreen = createNearbyScreen({
     ...(ensureNearbyRoom()?.screenDeps() ?? {}),
+    // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
+    getDrivers: () => (_nearbyIdentity ? _nearbyIdentity.getDrivers() : Promise.resolve({})),
+    mySkills:   () => _nearbyIdentity?.mySkills() ?? [],
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
@@ -3914,7 +3920,10 @@ function showNearby() {
     // who this device enters the room as — and, when several selves are ticked and none chosen, the one question
     roomSelf: {
       view: nearbyRoomSelfNow().view,
-      onPick: (id) => { writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model()); },
+      onPick: (id) => {
+        writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model());
+        _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});   // weighed as the new self
+      },
     },
     onBack: () => { closeNearby(); showLauncher(); },
     onAction: handleNearbyAction,
@@ -3983,6 +3992,8 @@ function showNearby() {
 
   nearbyScreen.subscribe(draw);
   nearbyScreen.open();
+  // the room self's offerings, read once on open, so the shared-skills line has them before any ask arrives
+  _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});
   draw(nearbyScreen.model());
 }
 

@@ -7529,6 +7529,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     profileIdOf,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
+    /** The own lanes this device serves and carries — one per self it RUNS (a paused or removed persona's is absent). Read-only. */
+    servedOwnLanes: () => ownLanes(),
     /** The devices a self's own traffic is carried to — its siblings (the general persona's for 'default'). Read-only. */
     siblingDevicesOf: async (selfId = 'default') => (selfId === 'default' ? ownDeviceSiblings() : personaSiblings(selfId)),
 

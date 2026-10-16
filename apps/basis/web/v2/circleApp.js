@@ -5305,10 +5305,10 @@ async function showReceivePersonas() {
   const h = document.createElement('h3');
   h.textContent = t('circle.receive_personas.title');
   card.appendChild(h);
-  const done = (key, reload = false) => {
+  const done = (key, reload = false, vars = {}) => {
     card.innerHTML = '';
     const p = document.createElement('p');
-    p.textContent = t(key);
+    p.textContent = t(key, vars);
     card.appendChild(p);
     const b = document.createElement('button');
     b.type = 'button';
@@ -5342,7 +5342,8 @@ async function showReceivePersonas() {
         b.addEventListener('click', async () => {
           b.disabled = true;
           const res = await rawCallSkill('household', r.act.op, { personaId: r.id }).catch(() => null);
-          if (res?.ok) done(r.act.op === 'pausePersona' ? 'circle.receive_personas.done_pause_reload' : 'circle.receive_personas.done_resume_reload', true);
+          // the line says what still holds until the restart, and carries the restart button
+          if (res?.ok) done(r.act.op === 'pausePersona' ? 'circle.receive_personas.done_pause_reload' : 'circle.receive_personas.done_resume_reload', true, { name: r.nameKey ? t(r.nameKey) : r.name });
           else done('circle.receive_personas.failed');
         });
         row.appendChild(b);

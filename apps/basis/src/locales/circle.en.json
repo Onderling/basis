@@ -7366,7 +7366,7 @@
     "paused": "paused on this device",
     "pause": "Pause",
     "resume": "Resume",
-    "done_pause_reload": "Done. Restart the app; after that this persona no longer runs here — its keys and data stay where they are.",
+    "done_pause_reload": "Done. Until you restart the app, {{name}} still runs here; after that it no longer does — its keys and data stay where they are.",
     "done_resume_reload": "Done. Restart the app; after that this persona runs here again.",
     "receive_title": "Bring here too",
     "title": "Personas on this device",

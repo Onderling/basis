@@ -23,6 +23,7 @@ describe('pause a persona on this device', () => {
     expect((await phone.callSkill('agents', 'setProfileCircleMembership', { id: w, circleId: 'werkoverleg', handle: 'w', address: phone.persona(w).circleAddressFor('werkoverleg') }))?.ok).toBe(true);
     expect(phone.persona(w), 'Werk runs').toBeTruthy();
     expect((await phone.reopenMemberCircles()).reopened, 'control: while Werk runs, its circle is reopened').toContain('werkoverleg');
+    expect(phone.servedOwnLanes(), 'control: while Werk runs, its own lane is served').toContain(`own-devices:${w}`);
 
     const paused = await phone.callSkill('household', 'pausePersona', { personaId: w });
     expect(paused, JSON.stringify(paused)).toMatchObject({ ok: true, reloadRequired: true });
@@ -36,6 +37,8 @@ describe('pause a persona on this device', () => {
     expect((await again.personasHere()).map((p) => p.id), 'it left the switcher').not.toContain(w);
     const { reopened } = await again.reopenMemberCircles();
     expect(reopened, 'its circle is not reopened').not.toContain('werkoverleg');
+    expect(again.servedOwnLanes(), 'its own lane is not served either').not.toContain(`own-devices:${w}`);
+    expect(await again.siblingDevicesOf(w), 'nor carried to its devices').toEqual([]);
     expect(((await again.callSkill('agents', 'listAgents', {}))?.items ?? []).map((r) => r.agentId), 'its registry row stays').toContain(w);
 
     expect((await again.callSkill('household', 'resumePersona', { personaId: w }))).toMatchObject({ ok: true, reloadRequired: true });

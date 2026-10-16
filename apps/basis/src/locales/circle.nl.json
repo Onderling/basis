@@ -7366,7 +7366,7 @@
     "paused": "gepauzeerd op dit apparaat",
     "pause": "Pauzeren",
     "resume": "Hervatten",
-    "done_pause_reload": "Klaar. Herstart de app; daarna draait deze persona hier niet meer — zijn sleutels en gegevens blijven waar ze zijn.",
+    "done_pause_reload": "Klaar. Tot je de app opnieuw start, loopt {{name}} hier nog; daarna niet meer — de sleutels en gegevens blijven waar ze zijn.",
     "done_resume_reload": "Klaar. Herstart de app; daarna draait deze persona hier weer.",
     "receive_title": "Ook hierheen halen",
     "title": "Persona's op dit apparaat",

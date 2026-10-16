@@ -1119,14 +1119,6 @@ Returns a `{ key → driverValue }` map, keeping only well-formed driver values 
 
 **Returns:** `Record<string, {kind:string,text:string,tags:string[]}>`
 
-### `OFFERINGS_INHERIT_KEY`
-
-**Kind:** constant · **Import:** `OFFERINGS_INHERIT_KEY` from `'@onderling/agent-registry'`
-
-The persona's own marker for its OFFERINGS: does it take the general persona's offerings as its own? A new persona
-is asked ("what you offer — also as <name>?", default no) and the answer is kept here; a persona from before has no
-marker and inherits as every property does. A key no charter or editor renders (the leading underscore).
-
 ### `effectiveDrivers`
 
 **Kind:** function · **Import:** `effectiveDrivers` from `'@onderling/agent-registry'`
@@ -1135,9 +1127,8 @@ marker and inherits as every property does. A key no charter or editor renders (
 effectiveDrivers(getProfile, profileId, opts = {})
 ```
 
-A profile's effective DRIVER values: what it inherits and what it has of its own (`effectiveProperties`), with one
-stop — a persona whose own marker says no does not take the general persona's offering drivers (its own offerings,
-and every other kind, stay). The one place a persona's drivers are read for matching and for the editor.
+A profile's effective DRIVER values: what it inherits and what it has of its own. The stop on the general offerings
+(`OFFERINGS_INHERIT_KEY`) lives where inheritance is resolved (`resolveProperty`), so this is a thin read over it.
 
 **Parameters**
 
@@ -1728,6 +1719,14 @@ normaliseProperties(raw)
 ```
 
 Strict-allowlist normalise a properties map (used by the registry resource + callers). Frozen.
+
+### `OFFERINGS_INHERIT_KEY`
+
+**Kind:** constant · **Import:** `OFFERINGS_INHERIT_KEY` from `'@onderling/agent-registry'`
+
+The persona's own marker for its OFFERINGS: does it take the general persona's offerings as its own? A new persona
+is asked ("what you offer — also as <name>?", default no) and the answer is kept here; a persona from before has no
+marker and inherits as every property does. A marker, never a value: no release or match carries it.
 
 ### `resolveProperty`
 

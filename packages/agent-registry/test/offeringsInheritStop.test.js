@@ -34,3 +34,19 @@ describe('a persona\'s offerings, inherited or not', () => {
     expect(Object.keys(effectiveDrivers(lookup(persona({})), 'default', { defaultProfileId: 'default' })).sort()).toEqual(['muziek', 'tuin']);
   });
 });
+
+describe('the stop holds where inheritance is resolved — releases and matching too', () => {
+  it('a no-persona releases and offers for matching nothing of the general offering, even when enabled; a yes-persona does; the marker never travels', async () => {
+    const { releasedValues, releasedForMatching, createDisclosurePolicy, setDisclosure } = await import('../index.js');
+    let policy = createDisclosurePolicy();
+    for (const key of ['tuin', OFFERINGS_INHERIT_KEY]) policy = setDisclosure(policy, 'kring', key, { enabled: true, matchable: true });
+    const ask = { items: [{ key: 'tuin' }, { key: OFFERINGS_INHERIT_KEY }] };
+    const ctx = (p) => ({ getProfile: lookup(p), profileId: 'p-werk', defaultProfileId: 'default' });
+    const no = persona({ [OFFERINGS_INHERIT_KEY]: own(false) });
+    const yes = persona({ [OFFERINGS_INHERIT_KEY]: own(true) });
+    expect(releasedValues(ctx(no), ask, policy, 'kring')).toEqual({});
+    expect(releasedForMatching(ctx(no), ask, policy, 'kring')).toEqual({});
+    expect(Object.keys(releasedValues(ctx(yes), ask, policy, 'kring'))).toEqual(['tuin']);
+    expect(Object.keys(releasedForMatching(ctx(yes), ask, policy, 'kring'))).toEqual(['tuin']);
+  });
+});

@@ -56,7 +56,7 @@ export { PROPERTY_TYPES, isPropertyType, descriptor, createVocabulary } from './
 // personal drivers (#3) — the `driver` property type: an open { kind, text, tags[] } value, governed
 // by the same disclosure policy as any property. The matcher (#4) builds on this shape.
 export { DRIVER_KINDS, isDriverKind, normalizeDriverKind, normalizeTag, normalizeTags, createDriver, isDriverValue, driverDescriptor, driversFromProperties,
-  effectiveDrivers, OFFERINGS_INHERIT_KEY } from './src/drivers.js';
+  effectiveDrivers } from './src/drivers.js';
 // offering fold-in (NOTE-skills-properties-audit; rename NOTE-offering-rename-inventory.md)
 // an offering is the human-profile "I can do X" DATA: a driver-like open item (kind `offering`,
 // legacy `skill` read-accepted); the fixed taxonomy is DEMOTED to its coarse disclosure rung
@@ -129,3 +129,4 @@ export { createWellKnownCardResolver } from './src/wellKnownCardResolver.js';
 // already enforced by verifyEndorsement (G1) — the walk drops lapsed edges.
 export { createCommunityCatalogue, communityCatalogueUri } from './src/communityCatalogue.js';
 export { createCommunitySubscriptions } from './src/subscriptions.js';
+export { OFFERINGS_INHERIT_KEY } from './src/profileProperties.js';

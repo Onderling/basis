@@ -27,7 +27,7 @@
  */
 
 import { acrossCircles } from './acrossCircles.js';
-import { ITEM_PRESENTERS } from './itemPresenters.js';
+import { presenterFor } from './declaredPresenters.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
 import { carriesLabels, normLabel } from './itemLabels.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -214,7 +214,7 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
 /** My own appointments (no circle) in the coming month, as items-block rows. */
 async function ownAppointments(callSkill) {
   if (typeof callSkill !== 'function') return [];
-  const presenter = ITEM_PRESENTERS['calendar-event'];
+  const presenter = presenterFor('calendar-event');
   const own = await callSkill('calendar', 'listEvents', { days: 30 }).catch(() => null);
   return (Array.isArray(own?.items) ? own.items : [])
     .map((e) => ({ label: presenter.label(e), when: presenter.when(e) || null, circleName: '' }))
@@ -295,7 +295,7 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
   // circle hides that circle, never me) and a block not narrowed to some circles
   const withOwn = OWN_NOUNS.has(noun) && pageIsAll && !(Array.isArray(block.config?.circleIds) && block.config.circleIds.length);
   if (typeof callSkill !== 'function' || (activeCircleIds.length === 0 && !withOwn)) return empty;
-  const presenter = ITEM_PRESENTERS[noun];
+  const presenter = presenterFor(noun);
   if (!presenter) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: 'no presenter' };
   const names = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
   const isAgenda = noun === 'calendar-event';

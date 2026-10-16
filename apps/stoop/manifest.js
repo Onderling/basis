@@ -132,9 +132,10 @@ export const stoopManifest = {
   nouns: {
     post:          { atoms: ['add', 'list', 'claim', 'remove'] },
     ask:           { atoms: ['remove'] },
-    offer:         { atoms: ['remove'] },
+    // an offer or a request in a merged view: newest first; mine when I placed it (still open is the read's own filter)
+    offer:         { atoms: ['remove'], presents: { label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] } },
     lend:          { atoms: ['complete', 'reassign', 'remove'] },
-    request:       { atoms: ['remove'] },
+    request:       { atoms: ['remove'], presents: { label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] } },
     'group-leave': { atoms: ['remove'] },
     // No `remove` (retired 2026-09-22): dropping the book row is not deleting a contact — the row is the MemberMap
     // entry every kring roster reads for that person, and the pair roster and its keys stay. Hiding is the act on

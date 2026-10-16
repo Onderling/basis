@@ -274,7 +274,8 @@ export function validateManifest(manifest, opts = {}) {
         // its views from the declaration and never knows a noun by name. Plain field keys only: no code, no paths.
         if (decl.presents !== undefined) {
           const pr = decl.presents;
-          const plainKey = (v) => typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(v);
+          // never an object's own machinery: a facet names a field on ANOTHER app's rows
+          const plainKey = (v) => typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(v) && !['__proto__', 'constructor', 'prototype'].includes(v);
           const bad = (msg) => errors.push({ path: `${np}/presents`, message: msg, code: 'bad-presents' });
           if (!pr || typeof pr !== 'object' || Array.isArray(pr)) bad('presents must be an object');
           else {

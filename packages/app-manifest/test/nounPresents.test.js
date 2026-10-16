@@ -20,5 +20,10 @@ describe('a noun\'s presents and names', () => {
     expect(codes({ presents: { mine: 'createdBy' } })).toContain('bad-presents');   // a list of keys
     expect(codes({ presents: { colour: 'red' } })).toContain('bad-presents');   // only the known facets
     expect(codes({ names: { nl: 3 } })).toContain('bad-names');
+    // a facet names a field on another app's rows: never an object's own machinery
+    for (const k of ['__proto__', 'constructor', 'prototype']) {
+      expect(codes({ presents: { label: k } }), k).toContain('bad-presents');
+      expect(codes({ presents: { mine: [k] } }), k).toContain('bad-presents');
+    }
   });
 });

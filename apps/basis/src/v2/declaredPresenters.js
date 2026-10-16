@@ -33,15 +33,14 @@ export function presenterFromFacets(presents = {}) {
 }
 
 /**
- * The presenter for a noun: its first declaring manifest's facets (the catalogue's order — the dispatch order), else
- * the fallback table, else null.
+ * The presenter for a noun: its declaring manifest's facets, else the fallback table, else null. Two manifests
+ * declaring facets for one noun is ambiguous and refused (null) — never resolved by catalogue order.
  * @param {string} noun
  * @param {{manifests?: object[]}} [o]
  */
 export function presenterFor(noun, { manifests = allManifests() } = {}) {
-  for (const m of manifests ?? []) {
-    const d = m?.nouns?.[noun];
-    if (d?.presents) return presenterFromFacets(d.presents);
-  }
+  const declared = (manifests ?? []).map((m) => m?.nouns?.[noun]?.presents).filter(Boolean);
+  if (declared.length > 1) return null;
+  if (declared.length === 1) return presenterFromFacets(declared[0]);
   return ITEM_PRESENTERS[noun] ?? null;
 }

@@ -21,6 +21,18 @@ describe('presenters from the declaration', () => {
     expect(p.isMine(row, 'you')).toBe(false);
   });
 
+  it('two manifests declaring facets for one noun is ambiguous: refused, never resolved by catalogue order', () => {
+    const decl = (label) => ({ atoms: ['list'], presents: { label, order: 'asc' } });
+    const manifests = [{ app: 'a', nouns: { repair: decl('what') } }, { app: 'b', nouns: { repair: decl('title') } }];
+    expect(presenterFor('repair', { manifests })).toBe(null);
+  });
+
+  it('no noun the app runs is declared by two manifests', () => {
+    const by = new Map();
+    for (const m of allManifests()) for (const [noun, d] of Object.entries(m.nouns ?? {})) if (d?.presents) by.set(noun, [...(by.get(noun) ?? []), m.app]);
+    expect([...by].filter(([, apps]) => apps.length > 1)).toEqual([]);
+  });
+
   it('mine reads a field that is a list, or a list of people', () => {
     const p = presenterFromFacets({ mine: ['attendees'] });
     expect(p.isMine({ attendees: ['a', 'me'] }, 'me')).toBe(true);

@@ -58,4 +58,38 @@ describe('the wire id has a generation', () => {
     expect(after[gen0]?.revoked, 'the old tombstone stays').toBe(true);
     await phone.shutdown?.(); await laptop.shutdown?.();
   }, 150_000);
+
+  it('the revoke walks the generations ON THE ROW: with no device-map row at all it still tombstones the live one', async () => {
+    const phone = await boot({ ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
+    const phrase = (await phone.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const w = (await phone.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
+    const ownerRootVault = new VaultMemory(); const rootKeyStore = new RootKeyStoreVault({ vault: ownerRootVault }); const chatVault = new VaultMemory();
+    const lap = { ownerRootVault, rootKeyStore, chatVault, registryBackend: createMemoryBackend() };
+    const pre = await boot(lap);
+    expect((await pre.callSkill('household', 'enrollDevice', { mnemonic: phrase, personas: [w] })).ok).toBe(true);
+    await pre.shutdown?.();
+    let laptop = await boot(lap);
+    const gen0 = laptop.persona(w).enrolledDevice.deviceId;
+    expect((await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: w })).ok).toBe(true);
+    await laptop.shutdown?.();
+    laptop = await boot(lap);
+    expect((await laptop.callSkill('household', 'receivePersonas', { mnemonic: phrase, personas: [w] })).ok).toBe(true);
+    await laptop.shutdown?.();
+    laptop = await boot(lap);
+    const gen1 = laptop.persona(w).enrolledDevice.deviceId;
+    const generalWire = laptop.persona('default').enrolledDevice.deviceId;
+    const internal = laptop.persona('default').internalDeviceId;
+    // the device map holds ONLY the general persona's row for this device (as a revoker that never saw Werk's would)
+    const st = await laptop.ownStore();
+    for (let i = 0; i < 40 && !((await st.list?.()) ?? []).some((it) => it?.type === 'device-link' && it.wireId === generalWire); i++) await new Promise((r) => setTimeout(r, 100));
+    for (const it of ((await st.list?.()) ?? []).filter((x) => x?.type === 'device-link' && x.wireId !== generalWire)) await st.delete(it.id);
+    expect(((await st.list?.()) ?? []).filter((x) => x?.type === 'device-link').map((x) => x.wireId), 'only the general row is left').toEqual([generalWire]);
+    expect(internal).toBeTruthy();
+    const rv = await laptop.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId: generalWire });
+    expect(rv?.ok, JSON.stringify(rv)).toBe(true);
+    const after = await laptop.deviceRecordsOf(w);
+    expect(after[gen1]?.revoked, 'the live generation is tombstoned, found on the row').toBe(true);
+    expect(after[gen0]?.revoked, 'the old tombstone stays').toBe(true);
+    await phone.shutdown?.(); await laptop.shutdown?.();
+  }, 150_000);
 });

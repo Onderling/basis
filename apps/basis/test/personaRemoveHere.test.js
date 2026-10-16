@@ -37,8 +37,12 @@ describe('remove a persona from this device', () => {
     expect(werkBefore, 'on Werk\'s record').toBeTruthy();
     expect(werkBefore.revoked === true, 'live').toBe(false);
     expect((await delegationsOf(laptop, 'default'))?.[generalWire], 'on the general persona\'s record').toBeTruthy();
+    const links = async () => ((await (await laptop.ownStore()).list?.()) ?? []).filter((it) => it?.type === 'device-link').map((it) => it.wireId);
+    for (let i = 0; i < 40 && !(await links()).includes(werkWire); i++) await new Promise((res) => setTimeout(res, 100));   // written just after boot
+    expect(await links(), 'Werk\'s device-map row before').toContain(werkWire);
     const r = await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: w });
     expect(r, JSON.stringify(r)).toMatchObject({ ok: true, reloadRequired: true, personaId: w, deviceId: werkWire });
+    expect(await links(), 'Werk\'s device-map row is gone').not.toContain(werkWire);
     const werkRecs = await delegationsOf(laptop, w);
     const generalRecs = await delegationsOf(laptop, 'default');
     expect(werkRecs?.[werkWire]?.revoked, 'this device, under Werk: tombstoned').toBe(true);

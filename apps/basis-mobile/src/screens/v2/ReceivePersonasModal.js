@@ -2,13 +2,15 @@
  * PERSONAS ON THIS DEVICE — the restore picker (and any time): the person's personas this device does not run yet
  * (`listReceivablePersonas`), ticked, then handed over with the phrase typed here (`receivePersonas`, the one moment
  * the root is in hand). A restart runs them. Nothing ticked hands over only the recovery seal (a device enrolled before it
- * existed gets it this way). Web parity: `showReceivePersonas` in circleApp.js — the same two ops,
- * the same words; this file only paints.
+ * existed gets it this way). Above it, the selves this device HOLDS, each with its one act (pause / resume —
+ * `personasHere.js`'s rows). Web parity: `showReceivePersonas` in circleApp.js — the same ops, the same words; this file
+ * only paints.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { personasHereRows } from '../../../../basis/src/v2/personasHere.js';
 
 export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   const theme = useTheme();
@@ -17,11 +19,16 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   const [needsSeal, setNeedsSeal] = useState(false);   // no recovery seal here yet: the step runs with nothing to tick
   const [picked, setPicked] = useState(() => new Set());
   const [phrase, setPhrase] = useState('');
-  const [result, setResult] = useState(null);   // null | 'done' | 'wrong' | 'failed'
+  const [result, setResult] = useState(null);   // null | 'done' | 'done-seal' | 'paused' | 'resumed' | 'wrong' | 'failed'
+  const [here, setHere] = useState([]);   // the selves this device holds (`listPersonasHere`), as the shared rows
+  const [actedName, setActedName] = useState('');   // the persona the last pause/resume was for (its done line names it)
   useEffect(() => {
     if (!visible || typeof callSkill !== 'function') return;
     let alive = true;
     setListed(null); setPicked(new Set()); setPhrase(''); setResult(null); setNeedsSeal(false);
+    callSkill('household', 'listPersonasHere', {})
+      .then((r) => { if (alive) setHere(personasHereRows(r?.personas ?? [])); })
+      .catch(() => { if (alive) setHere([]); });
     callSkill('household', 'listReceivablePersonas', {})
       .then((r) => { if (alive) { setListed(r?.personas ?? []); setNeedsSeal(r?.hasRecoverySeal === false); } })
       .catch(() => { if (alive) setListed([]); });
@@ -36,7 +43,16 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
     setResult(r?.ok ? (picked.size ? 'done' : 'done-seal') : (r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase') ? 'wrong' : 'failed');
   };
 
+  // a row's one act — pause a running persona, resume a paused one (a device op, no phrase; the next boot takes it)
+  const act = async (row) => {
+    const r = await callSkill('household', row.act.op, { personaId: row.id }).catch(() => null);
+    setActedName(row.nameKey ? t(row.nameKey) : row.name);
+    setResult(r?.ok ? (row.act.op === 'pausePersona' ? 'paused' : 'resumed') : 'failed');
+  };
   const message = result === 'done' ? t('circle.receive_personas.done_reload')
+    // what still holds until the restart (the restart hint is the line itself on a phone)
+    : result === 'paused' ? t('circle.receive_personas.done_pause_reload', { name: actedName })
+    : result === 'resumed' ? t('circle.receive_personas.done_resume_reload')
     : result === 'done-seal' ? t('circle.receive_personas.done_seal_reload')
     : result === 'wrong' ? t('circle.receive_personas.wrong_phrase')
       : result === 'failed' ? t('circle.receive_personas.failed')
@@ -47,6 +63,21 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>{t('circle.receive_personas.title')}</Text>
+          {!result && here.length ? (
+            <View testID="personas-here">
+              <Text style={styles.body}>{t('circle.receive_personas.here_title')}</Text>
+              {here.map((row) => (
+                <View key={row.id} style={styles.row} testID={`personas-here-${row.id}`}>
+                  <Text style={styles.body}>{row.nameKey ? t(row.nameKey) : row.name}{row.stateKey ? ` — ${t(row.stateKey)}` : ''}</Text>
+                  {row.act ? (
+                    <Pressable style={styles.button} onPress={() => act(row)} testID={`personas-here-${row.id}-${row.act.op}`}>
+                      <Text style={styles.buttonText}>{t(row.act.labelKey)}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
           {message ? (
             <View>
               <Text style={styles.body}>{message}</Text>
@@ -56,6 +87,7 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
             </View>
           ) : listed ? (
             <View>
+              <Text style={styles.body}>{t('circle.receive_personas.receive_title')}</Text>
               <Text style={styles.body}>{t(listed.length ? 'circle.receive_personas.body' : 'circle.receive_personas.needs_seal')}</Text>
               {listed.map((p) => (
                 <Pressable key={p.id} onPress={() => toggle(p.id)} accessibilityRole="checkbox" accessibilityState={{ checked: picked.has(p.id) }} testID={`receive-persona-${p.id}`}>

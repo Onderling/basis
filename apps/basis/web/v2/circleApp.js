@@ -128,6 +128,7 @@ import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
 import { ceremonyOutcomeText, ceremonyFinished } from '../../src/v2/ceremonyOutcome.js';
+import { personasHereRows } from '../../src/v2/personasHere.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
@@ -5304,10 +5305,10 @@ async function showReceivePersonas() {
   const h = document.createElement('h3');
   h.textContent = t('circle.receive_personas.title');
   card.appendChild(h);
-  const done = (key, reload = false) => {
+  const done = (key, reload = false, vars = {}) => {
     card.innerHTML = '';
     const p = document.createElement('p');
-    p.textContent = t(key);
+    p.textContent = t(key, vars);
     card.appendChild(p);
     const b = document.createElement('button');
     b.type = 'button';
@@ -5316,7 +5317,54 @@ async function showReceivePersonas() {
     b.addEventListener('click', () => (reload ? window.location.reload() : close()));
     card.appendChild(b);
   };
-  if (listed.length === 0 && !needsSeal) { done('circle.receive_personas.none'); return; }
+  // THE SELVES THIS DEVICE HOLDS, each with its one act (pause a running persona, resume a paused one; the primary none) —
+  // the shared rows (personasHere.js); a pause or resume takes effect at the next boot
+  const here = await rawCallSkill('household', 'listPersonasHere', {}).catch(() => null);
+  const hereRows = personasHereRows(here?.personas ?? []);
+  if (hereRows.length) {
+    const hh = document.createElement('h4');
+    hh.textContent = t('circle.receive_personas.here_title');
+    card.appendChild(hh);
+    for (const r of hereRows) {
+      const row = document.createElement('div');
+      row.className = 'cc-personas-here__row';
+      row.dataset.personaId = r.id;
+      row.style.cssText = 'display:flex;gap:.6rem;align-items:center;justify-content:space-between;margin:.2rem 0;';
+      const label = document.createElement('span');
+      label.textContent = (r.nameKey ? t(r.nameKey) : r.name) + (r.stateKey ? ` — ${t(r.stateKey)}` : '');
+      row.appendChild(label);
+      if (r.act) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-btn cc-btn--quiet cc-personas-here__act';
+        b.dataset.op = r.act.op;
+        b.textContent = t(r.act.labelKey);
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          const res = await rawCallSkill('household', r.act.op, { personaId: r.id }).catch(() => null);
+          // the line says what still holds until the restart, and carries the restart button
+          if (res?.ok) done(r.act.op === 'pausePersona' ? 'circle.receive_personas.done_pause_reload' : 'circle.receive_personas.done_resume_reload', true, { name: r.nameKey ? t(r.nameKey) : r.name });
+          else done('circle.receive_personas.failed');
+        });
+        row.appendChild(b);
+      }
+      card.appendChild(row);
+    }
+  }
+  if (listed.length === 0 && !needsSeal) {
+    const none = document.createElement('p');
+    none.textContent = t('circle.receive_personas.none');
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'cc-btn cc-btn--primary';
+    closeBtn.textContent = t('circle.receive_personas.close');
+    closeBtn.addEventListener('click', () => close());
+    card.append(none, closeBtn);
+    return;
+  }
+  const rh = document.createElement('h4');
+  rh.textContent = t('circle.receive_personas.receive_title');
+  card.appendChild(rh);
   const body = document.createElement('p');
   body.textContent = t(listed.length ? 'circle.receive_personas.body' : 'circle.receive_personas.needs_seal');
   card.appendChild(body);

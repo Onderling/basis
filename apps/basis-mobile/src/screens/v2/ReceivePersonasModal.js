@@ -57,6 +57,8 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
     const r = await callSkill('household', row.remove.op, { mnemonic: removePhrase, personaId: row.id }).catch(() => null);
     setRemovePhrase(''); setRemoving(null);
     setActedName(row.nameKey ? t(row.nameKey) : row.name);
+    if (r?.ok && r.rekeyedTo) { setActedName(here.find((h) => h.id === r.rekeyedTo)?.name ?? r.rekeyedTo); setResult('rekeyed'); return; }
+    if (r?.rekeyFailed) { setResult('rekey-failed'); return; }
     setResult(r?.ok ? 'removed' : (r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase') ? 'wrong'
       : r?.error === 'key-holder' ? 'key-holder' : r?.error === 'paused' ? 'remove-paused' : 'failed');
   };
@@ -65,6 +67,9 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
     : result === 'paused' ? t('circle.receive_personas.done_pause_reload', { name: actedName })
     : result === 'resumed' ? t('circle.receive_personas.done_resume_reload')
     : result === 'removed' ? t('circle.receive_personas.done_remove_reload', { name: actedName })
+    // re-keyed: every wrapper in memory holds the old key — the phone must be closed and opened again (no way out but that)
+    : result === 'rekeyed' ? t('circle.receive_personas.done_rekey_restart', { name: actedName })
+    : result === 'rekey-failed' ? t('circle.receive_personas.remove_rekey_failed')
     : result === 'key-holder' ? t('circle.receive_personas.remove_key_holder')
     : result === 'remove-paused' ? t('circle.receive_personas.remove_paused')
     : result === 'done-seal' ? t('circle.receive_personas.done_seal_reload')
@@ -73,7 +78,7 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
         : (listed && listed.length === 0 && !needsSeal) ? t('circle.receive_personas.none') : null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={result === 'rekeyed' ? () => {} : onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>{t('circle.receive_personas.title')}</Text>
@@ -121,9 +126,11 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
           {removing ? null : message ? (
             <View>
               <Text style={styles.body}>{message}</Text>
-              <Pressable style={styles.cancel} onPress={onClose} testID="receive-personas-close">
-                <Text style={styles.cancelText}>{t('circle.receive_personas.close')}</Text>
-              </Pressable>
+              {result !== 'rekeyed' ? (
+                <Pressable style={styles.cancel} onPress={onClose} testID="receive-personas-close">
+                  <Text style={styles.cancelText}>{t('circle.receive_personas.close')}</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : listed ? (
             <View>

@@ -22,6 +22,8 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   const [result, setResult] = useState(null);   // null | 'done' | 'done-seal' | 'paused' | 'resumed' | 'wrong' | 'failed'
   const [here, setHere] = useState([]);   // the selves this device holds (`listPersonasHere`), as the shared rows
   const [actedName, setActedName] = useState('');   // the persona the last pause/resume was for (its done line names it)
+  const [removing, setRemoving] = useState(null);   // the row being removed (its warning + the phrase), or null
+  const [removePhrase, setRemovePhrase] = useState('');
   useEffect(() => {
     if (!visible || typeof callSkill !== 'function') return;
     let alive = true;
@@ -49,10 +51,22 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
     setActedName(row.nameKey ? t(row.nameKey) : row.name);
     setResult(r?.ok ? (row.act.op === 'pausePersona' ? 'paused' : 'resumed') : 'failed');
   };
+  // REMOVE — a ceremony: the warning, the phrase, then the act (the shared row names the op)
+  const remove = async () => {
+    const row = removing;
+    const r = await callSkill('household', row.remove.op, { mnemonic: removePhrase, personaId: row.id }).catch(() => null);
+    setRemovePhrase(''); setRemoving(null);
+    setActedName(row.nameKey ? t(row.nameKey) : row.name);
+    setResult(r?.ok ? 'removed' : (r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase') ? 'wrong'
+      : r?.error === 'key-holder' ? 'key-holder' : r?.error === 'paused' ? 'remove-paused' : 'failed');
+  };
   const message = result === 'done' ? t('circle.receive_personas.done_reload')
     // what still holds until the restart (the restart hint is the line itself on a phone)
     : result === 'paused' ? t('circle.receive_personas.done_pause_reload', { name: actedName })
     : result === 'resumed' ? t('circle.receive_personas.done_resume_reload')
+    : result === 'removed' ? t('circle.receive_personas.done_remove_reload', { name: actedName })
+    : result === 'key-holder' ? t('circle.receive_personas.remove_key_holder')
+    : result === 'remove-paused' ? t('circle.receive_personas.remove_paused')
     : result === 'done-seal' ? t('circle.receive_personas.done_seal_reload')
     : result === 'wrong' ? t('circle.receive_personas.wrong_phrase')
       : result === 'failed' ? t('circle.receive_personas.failed')
@@ -63,7 +77,28 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.title}>{t('circle.receive_personas.title')}</Text>
-          {!result && here.length ? (
+          {removing ? (
+            <View testID="personas-here-removing">
+              <Text style={styles.body}>{t(removing.remove.warnKey, { name: removing.nameKey ? t(removing.nameKey) : removing.name })}</Text>
+              <TextInput
+                style={[styles.input, styles.secret]}
+                placeholder={t('circle.receive_personas.phrase_placeholder')}
+                placeholderTextColor={theme.color.inkSoft}
+                multiline autoCapitalize="none" autoCorrect={false} autoComplete="off"
+                value={removePhrase} onChangeText={setRemovePhrase}
+                testID="personas-here-remove-phrase"
+              />
+              <View style={styles.row}>
+                <Pressable style={styles.button} onPress={remove} testID="personas-here-remove-go">
+                  <Text style={styles.buttonText}>{t('circle.receive_personas.remove_submit')}</Text>
+                </Pressable>
+                <Pressable style={styles.cancel} onPress={() => { setRemoving(null); setRemovePhrase(''); }}>
+                  <Text style={styles.cancelText}>{t('circle.receive_personas.close')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+          {!removing && !result && here.length ? (
             <View testID="personas-here">
               <Text style={styles.body}>{t('circle.receive_personas.here_title')}</Text>
               {here.map((row) => (
@@ -74,11 +109,16 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
                       <Text style={styles.buttonText}>{t(row.act.labelKey)}</Text>
                     </Pressable>
                   ) : null}
+                  {row.remove ? (
+                    <Pressable style={styles.button} onPress={() => setRemoving(row)} testID={`personas-here-${row.id}-remove`}>
+                      <Text style={styles.buttonText}>{t(row.remove.labelKey)}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ))}
             </View>
           ) : null}
-          {message ? (
+          {removing ? null : message ? (
             <View>
               <Text style={styles.body}>{message}</Text>
               <Pressable style={styles.cancel} onPress={onClose} testID="receive-personas-close">

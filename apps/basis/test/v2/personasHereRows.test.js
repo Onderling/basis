@@ -18,4 +18,14 @@ describe('the personas-here rows', () => {
     expect(rows[1]).toMatchObject({ name: 'Werk', act: { op: 'pausePersona', labelKey: 'circle.receive_personas.pause' } });
     expect(rows[2]).toMatchObject({ stateKey: 'circle.receive_personas.paused', act: { op: 'resumePersona', labelKey: 'circle.receive_personas.resume' } });
   });
+
+  it('a removable persona (held here, running, not the primary, a delegated device) also offers removal — with the phrase', () => {
+    const [, werk, buurt] = personasHereRows([
+      { id: 'default', primary: true, running: true },
+      { id: 'p-aaaaaaaaaaaa', name: 'Werk', running: true, removable: true },
+      { id: 'p-bbbbbbbbbbbb', name: 'Buurt', paused: true, removable: false },
+    ]);
+    expect(werk.remove).toEqual({ op: 'removePersonaHere', labelKey: 'circle.receive_personas.remove', needsPhrase: true, warnKey: 'circle.receive_personas.remove_warn' });
+    expect(buurt.remove).toBe(null);
+  });
 });

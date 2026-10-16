@@ -69,6 +69,7 @@ export const householdManifest = {
     'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
     'pause-persona':    'write',   // a device entry: which held personas do not run here
     'resume-persona':   'write',
+    'remove-persona':   'write',   // this device's delegation under one persona, tombstoned; its keys here wiped
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
@@ -471,6 +472,19 @@ export const householdManifest = {
       // THE RESTORE PICKER's list: the person's personas (their registry, as a restore brought it back) that THIS device
       // does not run yet — names and ids only. Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
       params: [],
+      surfaces: {},
+    },
+    {
+      id:   'removePersonaHere', group: 'device',
+      verb: 'remove-persona',
+      writes: { scope: 'person' },   // this device's delegation under that persona, tombstoned on its record
+      // REMOVE A PERSONA FROM THIS DEVICE — a ceremony with the phrase, scoped to one persona: this device tombstoned
+      // under it alone, its addresses in its circles retired, its device-map row removed, its keys and local content
+      // wiped. Not undoable here. Refused: root custody, the primary (`key-holder`), a paused persona (resume first).
+      params: [
+        { name: 'mnemonic',  kind: 'secret', required: true },
+        { name: 'personaId', kind: 'string', required: true },
+      ],
       surfaces: {},
     },
     {

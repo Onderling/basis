@@ -14,7 +14,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
-import { openOfferPersonas, ENROL_PERSONAS_PARAM } from '../../../../basis/src/v2/enrollOffer.js';
+import { openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../../../basis/src/v2/enrollOffer.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -29,6 +29,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
   // the phrase never rides it.
   const [offerDraft, setOfferDraft] = useState('');
   const [offerInvalid, setOfferInvalid] = useState(false);
+  const [pickRefused, setPickRefused] = useState(false);   // the last self was asked to be unticked
   const [offerView, setOfferView] = useState(null);   // null | {uri} | {error}
   const runnerRef = useRef(null);
   useEffect(() => {
@@ -46,15 +47,19 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
   if (!visible) return null;
   const view = inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
   // THE PERSONA PICKER: the offer's sealed list, opened ON THIS DEVICE with the phrase being typed (nothing leaves it);
-  // the person ticks which personas this device gets. Nothing ticked = the default only.
+  // the person ticks which selves this device gets — the general persona a row like the rest, ticked by default. The
+  // model, the last-self rule and the primary are the shared ones (enrollOffer.js); this only paints.
   const pickerOffer = offerDraft.trim() || needs?.offer || '';
   const listedPersonas = pickerOffer && drafts.mnemonic ? openOfferPersonas(pickerOffer, drafts.mnemonic) : [];
-  const picked = new Set(Array.isArray(drafts[ENROL_PERSONAS_PARAM]) ? drafts[ENROL_PERSONAS_PARAM] : []);
-  const togglePersona = (id) => setDrafts((d) => {
-    const next = new Set(Array.isArray(d[ENROL_PERSONAS_PARAM]) ? d[ENROL_PERSONAS_PARAM] : []);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return { ...d, [ENROL_PERSONAS_PARAM]: [...next] };
-  });
+  const pickState = enrolPickState(drafts);
+  const pickRows = pickerRows(listedPersonas, pickState);
+  const primary = pickPrimary(pickState);
+  const primaryName = primary === 'default' ? t('circle.switcher.you') : (listedPersonas.find((p) => p.id === primary)?.name ?? primary);
+  const togglePersona = (id) => {
+    const r = togglePick(pickState, id);
+    setPickRefused(Boolean(r.refused));
+    setDrafts((d) => ({ ...d, ...enrolPickArgs(r.state) }));
+  };
   const outcome = inst?.steps?.ceremony?.outcome;
 
   const submit = async () => {
@@ -135,7 +140,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
                 testID="enroll-offer-paste"
               />
               {offerInvalid ? <Text style={styles.offerErr}>{t('circle.enroll.offer_paste_invalid')}</Text> : null}
-              {view.form.params.filter((param) => param.name !== ENROL_PERSONAS_PARAM).map((param) => (
+              {view.form.params.filter((param) => param.name !== ENROL_PERSONAS_PARAM && param.name !== ENROL_GENERAL_PARAM).map((param) => (
                 <TextInput
                   key={param.name}
                   style={[styles.input, param.kind === 'secret' && styles.secret]}
@@ -154,11 +159,13 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
                 <View testID="enroll-personas">
                   <Text style={styles.body}>{t('circle.enroll.personas_title')}</Text>
                   <Text style={styles.cancelText}>{t('circle.enroll.personas_hint')}</Text>
-                  {listedPersonas.map((p) => (
-                    <Pressable key={p.id} onPress={() => togglePersona(p.id)} accessibilityRole="checkbox" accessibilityState={{ checked: picked.has(p.id) }} testID={`enroll-persona-${p.id}`}>
-                      <Text style={styles.body}>{picked.has(p.id) ? '☑' : '☐'} {p.name ?? p.id}</Text>
+                  {pickRows.map((row) => (
+                    <Pressable key={row.id} onPress={() => togglePersona(row.id)} accessibilityRole="checkbox" accessibilityState={{ checked: row.checked }} testID={`enroll-persona-${row.id}`}>
+                      <Text style={styles.body}>{row.checked ? '☑' : '☐'} {row.nameKey ? t(row.nameKey) : row.name}</Text>
                     </Pressable>
                   ))}
+                  <Text style={styles.cancelText} testID="enroll-speaks-as">{t('circle.enroll.speaks_as', { name: primaryName })}</Text>
+                  {pickRefused ? <Text style={styles.offerErr}>{t('circle.enroll.last_self')}</Text> : null}
                 </View>
               ) : null}
               <View style={styles.row}>

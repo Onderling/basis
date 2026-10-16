@@ -750,7 +750,7 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
-import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES, nearbyRoomSelf, nearbyRoomSelfView } from '../../src/v2/nearbyIdentity.js';
+import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
@@ -4022,7 +4022,7 @@ function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStor
 function nearbyRoomSelfNow() {
   const r = nearbyRoomSelf({ active: _selfSet.on, held: _selfSet.held, remembered: readNearbySelf() });
   const view = nearbyRoomSelfView(r, _selfSet.held);
-  return { r, view, self: r.self ? (_selfSet.held.find((p) => p.id === r.self) ?? { id: r.self }) : null };
+  return { r, view, self: roomSelfFor(r, _selfSet.held) };
 }
 function readNearbyFace() { try { return nearbyFaceChoice(localStorage.getItem('basis.nearbyFace')); } catch { return 'name'; } }
 function writeNearbyFace(v) { try { if (NEARBY_FACES.includes(v)) localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }

@@ -4,7 +4,7 @@
  * self. Until the room has an address per self, this is a label — the screen says so.
  */
 import { describe, it, expect } from 'vitest';
-import { nearbyRoomSelf, createNearbyIdentity } from '../../src/v2/nearbyIdentity.js';
+import { nearbyRoomSelf, createNearbyIdentity, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 
 const held = [{ id: 'default', name: null }, { id: 'p-aaaaaaaaaaaa', name: 'Werk' }];
 
@@ -25,5 +25,15 @@ describe('who enters the room', () => {
     expect(await as({ id: 'default' })).toEqual({ label: 'Frits' });
     expect(await as(null)).toEqual({ label: 'Frits' });
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }, 'none')).toBe(null);
+  });
+  it('what the shells hand the face: the chosen self, or ASKING while the room asks — never an absence', () => {
+    expect(roomSelfFor(nearbyRoomSelf({ active: ['default', 'p-aaaaaaaaaaaa'], held }), held)).toEqual({ asking: true });
+    expect(roomSelfFor(nearbyRoomSelf({ active: ['p-aaaaaaaaaaaa'], held }), held)).toEqual({ id: 'p-aaaaaaaaaaaa', name: 'Werk' });
+  });
+
+  it('while the room ASKS, no face is broadcast — never the general persona by default', async () => {
+    const callSkill = async (app, op) => (op === 'getMyProfile' ? { entry: { displayName: 'Frits', handle: 'frits' } } : null);
+    const face = await createNearbyIdentity({ readChoice: () => 'name', callSkill, roomSelf: () => ({ asking: true }) }).myFace();
+    expect(face, 'the question first; the room is entered as nobody').toBe(null);
   });
 });

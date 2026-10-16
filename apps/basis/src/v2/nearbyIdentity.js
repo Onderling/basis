@@ -29,8 +29,10 @@ export function createNearbyIdentity({ readChoice, callSkill, relayUrl = () => n
       try {
         const choice = nearbyFaceChoice(readChoice?.());
         if (choice === 'none') return null;
-        // a PERSONA in the room shows its own name (it has no handle of the general persona's); the general persona as before
+        // while the room ASKS who enters (several selves ticked, none chosen), no face: the question first — never the
+        // general persona's name by default. A PERSONA shows its own name (it has no handle of the general persona's).
         const self = roomSelf?.() ?? null;
+        if (self?.asking === true) return null;
         if (self && self.id !== 'default') return self.name ? { label: String(self.name) } : null;
         const e = (await callSkill?.('stoop', 'getMyProfile', {}))?.entry ?? {};
         const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
@@ -73,4 +75,18 @@ export function nearbyRoomSelf({ active = [], held = [], remembered = null } = {
 export function nearbyRoomSelfView(r, held = []) {
   const named = (id) => (id === 'default' ? { id, nameKey: 'circle.switcher.you' } : { id, name: (held ?? []).find((h) => h?.id === id)?.name ?? id });
   return { ask: r?.ask === true, self: r?.self ? named(r.self) : null, choices: (r?.choices ?? []).map(named) };
+}
+
+/**
+ * What a shell hands the face as its room self: the chosen self (`{id, name}`), `{asking: true}` while the room asks — an
+ * explicit state, so the face says nothing rather than falling back to the general persona — or null (one self: the
+ * general persona as before).
+ * @param {{self: string|null, ask: boolean}} r  `nearbyRoomSelf`'s answer
+ * @param {Array<{id: string, name?: string|null}>} held
+ */
+export function roomSelfFor(r, held = []) {
+  if (r?.ask) return { asking: true };
+  if (!r?.self) return null;
+  const h = (held ?? []).find((p) => p?.id === r.self);
+  return h ? { id: h.id, name: h.name ?? null } : { id: r.self };
 }

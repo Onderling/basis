@@ -20,6 +20,9 @@ describe('the Nearby room self — parity', () => {
       expect(src, 'asking is handed as a state').toContain('roomSelfFor(');
       expect(src).toMatch(/roomSelf: \(\) =>/);
       for (const k of ['as_self', 'as_self_pick', 'as_self_caveat']) expect(src, k).toContain(`circle.nearbyScreen.${k}`);
+      // an ask is weighed against the room self's drivers, and the shared-skills line shows its offerings — from the identity
+      expect(src, 'getDrivers from the identity').toMatch(/getDrivers:\s*\(\)\s*=>\s*\(?[\w?.]*[Nn]earbyIdentity/);
+      expect(src, 'mySkills from the identity').toMatch(/mySkills:\s*\(\)\s*=>\s*[\w?.]*[Nn]earbyIdentity/);
     }
   });
 });

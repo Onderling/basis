@@ -24,7 +24,25 @@ export function nearbyFaceChoice(raw) { return NEARBY_FACES.includes(raw) ? raw 
  * @returns {{ myFace: () => Promise<{label: string}|null>, myAddresses: () => Promise<object> }}
  */
 export function createNearbyIdentity({ readChoice, callSkill, relayUrl = () => null, shareNkn = () => false, nknAddress = () => null, roomSelf = () => null } = {}) {
+  // the room self's offerings as last read (the screen's shared-skills line reads them synchronously)
+  let offeringsNow = [];
   return {
+    /**
+     * THE ROOM SELF's drivers, read on this device and never sent — what an ask arriving in the room is weighed against:
+     * its EFFECTIVE drivers (its own and what it inherits; never the general persona's offerings when it said no —
+     * `getProfileDrivers` resolves that). While the room asks who enters: none.
+     * @returns {Promise<Record<string, object>>}
+     */
+    async getDrivers() {
+      const self = roomSelf?.() ?? null;
+      if (self?.asking === true) { offeringsNow = []; return {}; }
+      let drivers = {};
+      try { drivers = (await callSkill?.('agents', 'getProfileDrivers', { id: self?.id ?? 'default' }))?.drivers ?? {}; } catch { drivers = {}; }
+      offeringsNow = Object.values(drivers).filter((d) => d && typeof d === 'object' && d.kind === 'offering');
+      return drivers;
+    },
+    /** The room self's offerings, as the shared-skills line shows them (from the last `getDrivers`). */
+    mySkills() { return offeringsNow; },
     async myFace() {
       try {
         const choice = nearbyFaceChoice(readChoice?.());

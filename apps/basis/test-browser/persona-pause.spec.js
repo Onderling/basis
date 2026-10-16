@@ -18,12 +18,19 @@ test('a paused persona leaves this device, a resumed one comes back — no phras
   await page.goto('/'); await ready(page);
   const made = await call(page, 'agents', 'createProfile', { name: 'Werk' });
   expect(made?.created, JSON.stringify(made)).toBe(true);
+  // a second persona, so the switcher (not the one-self editor) is what the avatar opens after Werk is paused
+  expect((await call(page, 'agents', 'createProfile', { name: 'Buurt' }))?.created).toBe(true);
   await page.reload(); await ready(page);
   await expect.poll(() => running(page), { timeout: 20_000, message: 'Werk runs here' }).toContain(made.id);
 
   expect(await call(page, 'household', 'pausePersona', { personaId: made.id })).toMatchObject({ ok: true, reloadRequired: true });
   await page.reload(); await ready(page);
   await expect.poll(() => running(page), { timeout: 20_000, message: 'paused: Werk does not run here now' }).not.toContain(made.id);
+  // …and it is gone from the SWITCHER (whose rows are what the host passes as held): both checks poll the paint
+  await page.locator('.cc-header-avatar__button').click();
+  await expect(page.locator('.cc-persona-switcher__row[data-self="default"]'), 'the switcher is painted').toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(`.cc-persona-switcher__row[data-self="${made.id}"]`), 'no row for the paused Werk').toHaveCount(0);
+  await page.locator('.cc-persona-switcher__close').click();
   const here = await call(page, 'household', 'listPersonasHere', {});
   expect(here.personas.find((p) => p.id === made.id)).toMatchObject({ paused: true, running: false });
 

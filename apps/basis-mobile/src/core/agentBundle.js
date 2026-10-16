@@ -487,6 +487,8 @@ export async function bootAgentBundle(opts = {}) {
   // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
   // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
   // agent, like everything else here built before the agent lands.
+  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none: the general persona's face
+  const nearbyRoomSelfRef = { current: () => null };
   const nearbyRoom = createNearbyRoomBinding({
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => nearbyPeers.list(),
@@ -500,6 +502,7 @@ export async function bootAgentBundle(opts = {}) {
       relayUrl: () => resolveMobileRelayUrl(),
       shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
       nknAddress: () => agent?.peer?.address ?? null,
+      roomSelf: () => nearbyRoomSelfRef.current(),   // set by the Nearby screen (it holds the switcher's set)
     }),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
@@ -1023,6 +1026,8 @@ export async function bootAgentBundle(opts = {}) {
     discoverability,
     nearbyPeers,
     nearbyRoom,
+    /** The Nearby screen hands in who this device enters the room as (`() => ({id, name}|null)`). */
+    setNearbyRoomSelf: (fn) => { nearbyRoomSelfRef.current = typeof fn === 'function' ? fn : () => null; },
     attachPeerWiring,
     dispose: async () => {
       try { contactSkills.dispose(); } catch { /* defensive */ }

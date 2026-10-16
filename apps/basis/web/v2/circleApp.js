@@ -750,7 +750,7 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
-import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES } from '../../src/v2/nearbyIdentity.js';
+import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
@@ -1612,6 +1612,7 @@ function ensureNearbyRoom(agent = _peerAgent) {
       relayUrl: () => (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL ? CIRCLE_RELAY_URL : null),
       shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
       nknAddress: () => agent?.peer?.address ?? null,
+      roomSelf: () => nearbyRoomSelfNow().self,
     }),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
@@ -3910,6 +3911,11 @@ function showNearby() {
 
   const draw = (model) => renderCircleNearby(rootEl, {
     model, t, composing, notice,
+    // who this device enters the room as — and, when several selves are ticked and none chosen, the one question
+    roomSelf: {
+      view: nearbyRoomSelfNow().view,
+      onPick: (id) => { writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model()); },
+    },
     onBack: () => { closeNearby(); showLauncher(); },
     onAction: handleNearbyAction,
     onCompose: () => { composing = true; notice = null; draw(nearbyScreen.model()); },
@@ -4009,6 +4015,15 @@ function openNearbyThread(thread, seed = []) {
 }
 
 // The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.
+// WHO THIS DEVICE ENTERS THE NEARBY ROOM AS: the switcher's set decides (nearbyIdentity.js); with several ticked, the last
+// answer here is the default — kept per device, nothing more durable
+function readNearbySelf() { try { return localStorage.getItem('basis.nearbySelf'); } catch { return null; } }
+function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem('basis.nearbySelf', id); } catch { /* best-effort */ } }
+function nearbyRoomSelfNow() {
+  const r = nearbyRoomSelf({ active: _selfSet.on, held: _selfSet.held, remembered: readNearbySelf() });
+  const view = nearbyRoomSelfView(r, _selfSet.held);
+  return { r, view, self: roomSelfFor(r, _selfSet.held) };
+}
 function readNearbyFace() { try { return nearbyFaceChoice(localStorage.getItem('basis.nearbyFace')); } catch { return 'name'; } }
 function writeNearbyFace(v) { try { if (NEARBY_FACES.includes(v)) localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.

@@ -18,7 +18,8 @@ import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
-import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio } from '../../core/nearbyAllowsStore.js';
+import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
+import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor, NEARBY_FACES } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -2149,6 +2150,8 @@ export default function CircleLauncherScreen({
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="nearby" onSelect={onTab} badges={tabBadges}>
         <NearbyScreenHost
           bundle={bundle}
+          heldSelves={heldSelves}
+          selvesOn={selvesOn}
           onBack={() => setView('list')}
           onAction={handleNearbyAction}
           onOpenThread={openNearbyThread}
@@ -5298,8 +5301,17 @@ function AddRelayForm({ styles, onAdd, addError }) {
 // it is deliberately tied to the React lifecycle rather than to a button, because the failure mode is a
 // user who *thinks* they left. Navigating away, backgrounding, or a crash mid-render all unmount, and all
 // must stop the announcement.
-function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite }) {
+function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onBack, onAction, onOpenThread, onJoinInvite }) {
   const [model, setModel] = useState(null);
+  // WHO THIS DEVICE ENTERS THE ROOM AS — the switcher's set decides (nearbyIdentity.js); several ticked: the last answer
+  // here, else the one question. The bundle's face reads it through the getter handed in here.
+  const [roomPick, setRoomPick] = useState(() => readNearbySelf());
+  const roomR = useMemo(() => nearbyRoomSelf({ active: selvesOn, held: heldSelves, remembered: roomPick }), [selvesOn, heldSelves, roomPick]);
+  const roomView = useMemo(() => nearbyRoomSelfView(roomR, heldSelves), [roomR, heldSelves]);
+  useEffect(() => {
+    bundle?.setNearbyRoomSelf?.(() => roomSelfFor(roomR, heldSelves));   // asking is a state: no face until the answer
+  }, [bundle, roomR, heldSelves]);
+  const pickRoomSelf = useCallback((id) => { writeNearbySelf(id); setRoomPick(id); Promise.resolve(bundle?.nearbyRoom?.announceFace?.()).catch(() => {}); }, [bundle]);
   // View state, not model state: whether THIS device currently has a text box open says nothing about
   // the room. `answering` holds the ask id being replied to.
   const [composing, setComposing] = useState(false);
@@ -5401,6 +5413,8 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
   return (
     <NearbyScreen
       model={model}
+      roomView={roomView}
+      onPickRoomSelf={pickRoomSelf}
       onBack={onBack}
       onAction={onAction}
       onAskAction={askAction}
@@ -5440,7 +5454,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
 // `NEARBY_ACTION_LABELS` + `nearbyVisibilityKey` are imported from the basis app above — one definition,
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
-  model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
+  model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
   answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onFaceChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
@@ -5671,9 +5685,28 @@ function NearbyScreen({
       {mineOpen ? (<>
       {/* The room face: the SAME faces a circle offers — name, handle, or nobody. */}
       <View style={styles.nearbyAsks} testID="nearby-face">
+        {roomView ? (
+          <View testID="nearby-as-self">
+            {roomView.ask ? (
+              <View>
+                <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.as_self_pick')}</Text>
+                <View style={styles.nearbyActions}>
+                  {roomView.choices.map((c) => (
+                    <Pressable key={c.id} accessibilityRole="button" testID={`nearby-as-self-${c.id}`} style={styles.nearbyAction} onPress={() => onPickRoomSelf?.(c.id)}>
+                      <Text style={styles.nearbyActionText}>{c.nameKey ? t(c.nameKey) : c.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : roomView.self ? (
+              <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.as_self', { name: roomView.self.nameKey ? t(roomView.self.nameKey) : roomView.self.name })}</Text>
+            ) : null}
+            <Text style={styles.muted}>{t('circle.nearbyScreen.as_self_caveat')}</Text>
+          </View>
+        ) : null}
         <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.face_row')}</Text>
         <View style={styles.nearbyActions}>
-          {['name', 'handle', 'none'].map((v) => (
+          {NEARBY_FACES.map((v) => (
             <Pressable
               key={v}
               accessibilityRole="button"

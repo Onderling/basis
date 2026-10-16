@@ -7361,6 +7361,12 @@
   },
   "receive_personas": {
     "close": "Close",
+    "remove": "Remove from this device",
+    "remove_warn": "This takes {{name}} off this device: its keys and what it keeps here are wiped, and this device no longer counts in its circles. It cannot be undone. Type your recovery phrase to go on.",
+    "remove_submit": "Remove",
+    "done_remove_reload": "Done. {{name}} was taken off this device. Restart the app.",
+    "remove_key_holder": "This device speaks as this persona; it cannot be taken off.",
+    "remove_paused": "Resume this persona first: to retire its addresses it must still be able to speak.",
     "here_title": "On this device",
     "primary": "this device speaks as this persona",
     "paused": "paused on this device",

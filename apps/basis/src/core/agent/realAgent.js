@@ -221,7 +221,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, handPersonasInto, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
-import { personaVault, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
+import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -3695,6 +3695,58 @@ export async function createRealHouseholdAgent(opts = {}) {
     return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];
   }, { visibility: 'private' });
   hostAgent.register('resumePersona', async ({ parts }) => [DataPart(await setPaused(parts?.[0]?.data?.personaId, false))], { visibility: 'private' });
+  // REMOVE A PERSONA FROM THIS DEVICE — a ceremony with the phrase (the same proof the revoke asks), scoped to ONE
+  // persona: (1) this device's delegation under THAT persona tombstoned — every other self's records untouched; (2) its
+  // addresses in that persona's circles retired, as that persona; (3) its row on the private device map removed; (4) then
+  // wiped here: its three slots, its circles' local content, its place in the held and paused lists. Not undoable here.
+  // Refused: a root-custody device (the root derives every persona — nothing to tombstone), the primary (the key-holder:
+  // its seed is this device's at-rest key), a paused persona (it must speak to retire its addresses — resume it first).
+  hostAgent.register('removePersonaHere', async ({ parts }) => {
+    const proof = verifyOwnerPhrase(String(parts?.[0]?.data?.mnemonic ?? ''));
+    if (!proof.ok) return [DataPart({ ok: false, outcome: proof.outcome, error: proof.outcome })];
+    const pid = parts?.[0]?.data?.personaId;
+    if (ownerRoot) return [DataPart({ ok: false, error: 'root-custody' })];
+    if (pid === primaryId) return [DataPart({ ok: false, error: 'key-holder' })];
+    if (typeof pid !== 'string' || !/^p-[0-9a-f]{12}$/.test(pid) || !(await heldHere(pid))) return [DataPart({ ok: false, error: 'not-held' })];
+    if ((await readIdList(PAUSED_PERSONAS_VAULT_KEY)).includes(pid)) return [DataPart({ ok: false, error: 'paused' })];
+    const rt = personas.get(pid);
+    const wire = rt?.enrolledDevice?.deviceId ?? null;
+    if (!rt || !wire) return [DataPart({ ok: false, error: 'not-running' })];
+    const { root } = proof;
+    const pSeed = root.deriveAgentSeed(pid);
+    const pDeviceSeed = deriveDeviceSeed(pSeed, wire);
+    const bounded = (p, ms = 3000) => Promise.race([p, new Promise((res) => { setTimeout(res, ms); })]);
+    // 1 — the tombstone, under this persona alone
+    let entry = null;
+    try { entry = await bounded(agentsRegistryRef?.lookup?.(pid)); } catch { entry = null; }
+    try {
+      if (entry) {
+        const rec = deviceDelegationOf(entry, wire);
+        let props = entry.properties ?? {};
+        if (!rec) {
+          const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
+          props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true });
+        } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true });
+        if (props !== (entry.properties ?? {})) await bounded(agentsRegistryRef.register({ ...entry, properties: props }));
+      }
+    } catch (err) { console.warn(`[remove-persona] the tombstone was not written: ${err?.message ?? err}`); }
+    // 2 — its addresses in its circles, retired as it (this device is leaving them: its own address included)
+    const circleIds = Object.keys(circleMembershipsOf(entry ?? {}));
+    const retiredIn = circleIds.length ? await retireAddresses({ root, circleIds, includeOwn: true, addressFor: (cid) => deriveCircleAddress(pDeviceSeed, cid) }) : [];
+    // 3 — its row on the private device map (rides its own lane to its other devices)
+    try { const st = await getOwnStore(); await st.remove?.(`device-link:${wire}`); } catch (err) { console.warn(`[remove-persona] the device-map row stays: ${err?.message ?? err}`); }
+    // 4 — wiped here: its circles' local content, its slots, its place in the lists
+    for (const cid of circleIds) { try { await selfAgent?.forgetCircleContent?.(cid); } catch { /* best-effort */ } }
+    const slots = personaVault(chatVault, pid);
+    for (const k of PERSONA_SLOT_KEYS) { try { await slots.delete(k); } catch { /* gone already */ } }
+    await chatVault.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify((await readIdList(HELD_PERSONAS_VAULT_KEY)).filter((x) => x !== pid)));
+    await chatVault.set(PAUSED_PERSONAS_VAULT_KEY, JSON.stringify((await readIdList(PAUSED_PERSONAS_VAULT_KEY)).filter((x) => x !== pid)));
+    if (opts.deviceLog) {
+      const e = makeAgentTrailEntry({ actor: chatId?.pubKey ?? 'owner', op: 'remove-persona', kind: 'settings-change', target: { kind: 'persona', ref: pid }, via: 'owner', outcome: 'ok' });
+      if (e) opts.deviceLog.append(e);
+    }
+    return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true })];
+  }, { visibility: 'private' });
   // THE PERSONAS ON THIS DEVICE, as the "Persona's op dit apparaat" screen lists them: every self it holds — running or
   // paused — with whether it is the primary (which cannot be paused).
   hostAgent.register('listPersonasHere', async () => {
@@ -3707,7 +3759,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       for (const id of ids) {
         let name = null;
         try { name = (await agentsRegistryRef?.lookup?.(id))?.name ?? null; } catch { /* nameless */ }
-        out.push({ id, name, primary: id === primaryId, paused: paused.has(id), running: personas.has(id) });
+        // removable here: held and running, not the primary (the key-holder), on a delegated device (root custody derives
+        // every persona — there is nothing of this device to tombstone)
+        const removable = !ownerRoot && id !== primaryId && personas.has(id) && !paused.has(id);
+        out.push({ id, name, primary: id === primaryId, paused: paused.has(id), running: personas.has(id), removable });
       }
       return [DataPart({ ok: true, personas: out })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
@@ -7529,6 +7584,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     profileIdOf,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
+    /** A self's device records as this device's registry holds them (`{[wireId]: record}`, a tombstone `revoked: true`). Read-only. */
+    deviceRecordsOf: async (selfId) => { try { return deviceDelegationsOf(await agentsRegistryRef?.lookup?.(selfId)); } catch { return {}; } },
     /** The own lanes this device serves and carries — one per self it RUNS (a paused or removed persona's is absent). Read-only. */
     servedOwnLanes: () => ownLanes(),
     /** The devices a self's own traffic is carried to — its siblings (the general persona's for 'default'). Read-only. */

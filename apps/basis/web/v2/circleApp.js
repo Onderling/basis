@@ -5348,6 +5348,45 @@ async function showReceivePersonas() {
         });
         row.appendChild(b);
       }
+      // REMOVE — a ceremony: the warning first, then the phrase (the one moment the root is in hand), then the act
+      if (r.remove) {
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'cc-btn cc-btn--quiet cc-personas-here__remove';
+        rm.textContent = t(r.remove.labelKey);
+        rm.addEventListener('click', () => {
+          const name = r.nameKey ? t(r.nameKey) : r.name;
+          card.innerHTML = '';
+          const warn = document.createElement('p');
+          warn.textContent = t(r.remove.warnKey, { name });
+          const ph = document.createElement('textarea');
+          ph.rows = 3; ph.autocomplete = 'off'; ph.spellcheck = false;
+          ph.className = 'cc-personas-here__phrase';
+          ph.placeholder = t('circle.receive_personas.phrase_placeholder');
+          ph.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+          const go = document.createElement('button');
+          go.type = 'button';
+          go.className = 'cc-btn cc-btn--primary cc-personas-here__remove-go';
+          go.textContent = t('circle.receive_personas.remove_submit');
+          go.addEventListener('click', async () => {
+            go.disabled = true;
+            const res = await rawCallSkill('household', r.remove.op, { mnemonic: ph.value, personaId: r.id }).catch(() => null);
+            ph.value = '';
+            if (res?.ok) done('circle.receive_personas.done_remove_reload', true, { name });
+            else if (res?.outcome === 'wrong-phrase' || res?.outcome === 'invalid-phrase') done('circle.receive_personas.wrong_phrase');
+            else if (res?.error === 'key-holder') done('circle.receive_personas.remove_key_holder');
+            else if (res?.error === 'paused') done('circle.receive_personas.remove_paused');
+            else done('circle.receive_personas.failed');
+          });
+          const back = document.createElement('button');
+          back.type = 'button';
+          back.className = 'cc-btn cc-btn--quiet';
+          back.textContent = t('circle.receive_personas.close');
+          back.addEventListener('click', () => close());
+          card.append(warn, ph, go, back);
+        });
+        row.appendChild(rm);
+      }
       card.appendChild(row);
     }
   }

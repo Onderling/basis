@@ -31,8 +31,11 @@ export const listsManifest = {
   // creating/listing lists, and adding/completing their entries. `board` is stored structure the list
   // ops manage — no op names it directly, so it carries no atoms yet.
   nouns: {
-    list:        { atoms: ['add', 'list'], presents: { label: 'title', moment: 'createdAt', order: 'asc', mine: ['createdBy', 'author', 'actor', 'by'] } },
-    'list-item': { atoms: ['add', 'complete', 'remove', 'update'], presents: { label: 'title', moment: 'addedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] } },
+    list:        { atoms: ['add', 'list'], presents: { label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
+      names: { nl: { one: 'lijst', other: 'lijsten' }, en: { one: 'list', other: 'lists' } } },
+    'list-item': { atoms: ['add', 'complete', 'remove', 'update'],
+      presents: { label: 'title', moment: 'addedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'], done: { field: 'completedAt' } },
+      names: { nl: { one: 'ding op de lijst', other: 'op de lijsten' }, en: { one: 'list item', other: 'on the lists' } } },
   },
   verbs:     [],
   operations: [

@@ -7,7 +7,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
-import { PLUS_ACTS } from '../../../../basis/src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 
 export default function VandaagPlusModal({ visible, onSave, onClose,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
@@ -44,7 +44,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose,
             </View>
           ) : !act ? PLUS_ACTS.map((a) => (
             <Pressable key={a.id} style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
-              <Text style={styles.btnText}>{t(a.labelKey)}</Text>
+              <Text style={styles.btnText}>{plusLabel(t, a)}</Text>
             </Pressable>
           )) : (
             <View>

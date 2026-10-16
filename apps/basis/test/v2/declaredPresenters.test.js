@@ -5,7 +5,7 @@
  * manifest declares.
  */
 import { describe, it, expect } from 'vitest';
-import { presenterFor, presenterFromFacets } from '../../src/v2/declaredPresenters.js';
+import { presenterFor, presenterFromFacets, nounsDeclaring } from '../../src/v2/declaredPresenters.js';
 import { ITEM_PRESENTERS } from '../../src/v2/itemPresenters.js';
 import { allManifests } from '../../src/v2/manifestSources.js';
 
@@ -31,6 +31,23 @@ describe('presenters from the declaration', () => {
     const by = new Map();
     for (const m of allManifests()) for (const [noun, d] of Object.entries(m.nouns ?? {})) if (d?.presents) by.set(noun, [...(by.get(noun) ?? []), m.app]);
     expect([...by].filter(([, apps]) => apps.length > 1)).toEqual([]);
+  });
+
+  it('done reads one declared field: truthy, or one of the declared values', () => {
+    const byState = presenterFromFacets({ done: { field: 'state', values: ['done', 'cancelled'] } });
+    expect(byState.isDone({ state: 'done' })).toBe(true);
+    expect(byState.isDone({ state: 'open' })).toBe(false);
+    const byStamp = presenterFromFacets({ done: { field: 'completedAt' } });
+    expect(byStamp.isDone({ completedAt: 5 })).toBe(true);
+    expect(byStamp.isDone({})).toBe(false);
+    expect(presenterFromFacets({}).isDone({ state: 'done' })).toBe(false);   // nothing declared: never done
+  });
+
+  it('the nouns a reading covers come from what they declare, never from their names', () => {
+    const manifests = [{ app: 'repairbot', nouns: { repair: { atoms: ['list'], presents: { moment: 'due', order: 'asc', mine: ['fixer'], done: { field: 'fixedAt' } } } } }];
+    expect(nounsDeclaring((p) => p.order === 'asc', { manifests })).toEqual(['repair']);
+    expect(nounsDeclaring((p) => Boolean(p.mine && p.done), { manifests })).toEqual(['repair']);
+    expect(nounsDeclaring((p) => p.order === 'desc', { manifests })).toEqual([]);
   });
 
   it('mine reads a field that is a list, or a list of people', () => {

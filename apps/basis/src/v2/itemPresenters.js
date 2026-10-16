@@ -11,9 +11,9 @@ const text = (r) => String(r?.title ?? r?.text ?? r?.label ?? r?.name ?? '').tri
 const ms = (v) => { const n = typeof v === 'number' ? v : Date.parse(v ?? ''); return Number.isFinite(n) ? n : 0; };
 const byAuthor = (r, me) => Boolean(me) && [r?.createdBy, r?.author, r?.actor, r?.by].includes(me);
 
-/** @type {Record<string, {label: (row: object) => string, when: (row: object) => number, order: 'asc'|'desc', isMine: (row: object, me: string|null) => boolean}>} */
+/** @type {Record<string, {label: (row: object) => string, when: (row: object) => number, order: 'asc'|'desc', isMine: (row: object, me: string|null) => boolean, isDone: (row: object) => boolean}>} */
 export const ITEM_PRESENTERS = Object.freeze({
-  announcement: { label: text, when: (r) => ms(r.createdAt ?? r.ts), order: 'desc', isMine: byAuthor },
+  announcement: { label: text, when: (r) => ms(r.createdAt ?? r.ts), order: 'desc', isMine: byAuthor, isDone: () => false },
 });
 
 /** Shown from the device log, not merged from stores: a message's entry IS its render event (architecture §3). */

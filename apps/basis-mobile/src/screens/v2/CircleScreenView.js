@@ -31,6 +31,7 @@ import { t } from '../../core/localisation.js';
 import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
+import { nounHeading } from '../../../../basis/src/v2/nounNames.js';
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
 // carries only the local id (T2).  Match the raw ref OR its local-id tail so a
@@ -311,7 +312,7 @@ function renderItems(block, styles) {
   const items = block.content?.items ?? [];
   return (
     <View>
-      <Text style={styles.blockTitle}>{t(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`)}</Text>
+      <Text style={styles.blockTitle}>{block.titleKey ? t(block.titleKey) : nounHeading(t, block.content?.noun ?? '')}</Text>
       {items.map((it) => (
         <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
           <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>

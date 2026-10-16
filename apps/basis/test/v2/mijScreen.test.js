@@ -64,7 +64,7 @@ describe('Mij — the declared screen', () => {
     expect(byKey.availability).toMatchObject({ state: 'away', until: nextWeek });
     expect(byKey.online).toMatchObject({ on: true });
     expect(byKey.unread).toMatchObject({ count: 2 });
-    expect(byKey.nextAppointment).toMatchObject({ title: 'tandarts' });
+    expect(byKey.next).toMatchObject({ title: 'tandarts' });
   });
 
   it('a reading with no source says nothing rather than a guess', async () => {
@@ -72,7 +72,7 @@ describe('Mij — the declared screen', () => {
     const keys = line.content.readings.map((r) => r.key);
     expect(keys).not.toContain('online');
     expect(keys).not.toContain('availability');
-    expect(keys).not.toContain('nextAppointment');
+    expect(keys).not.toContain('next');
   });
 
   it('the agents block: live devices (this one marked), companions, linked bots — no revoked device, no person', async () => {

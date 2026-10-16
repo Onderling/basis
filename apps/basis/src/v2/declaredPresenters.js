@@ -13,13 +13,15 @@ const ms = (v) => { const n = typeof v === 'number' ? v : Date.parse(v ?? ''); r
 
 /**
  * A presenter from declared facets.
- * @param {{label?: string, moment?: string, order?: 'asc'|'desc', mine?: string[]}} presents
- * @returns {{label: (row: object) => string, when: (row: object) => number, order: 'asc'|'desc', isMine: (row: object, me: string|null) => boolean}}
+ * @param {{label?: string, moment?: string, order?: 'asc'|'desc', mine?: string[], done?: {field: string, values?: string[]}}} presents
+ * @returns {{label: (row: object) => string, when: (row: object) => number, order: 'asc'|'desc', isMine: (row: object, me: string|null) => boolean, isDone: (row: object) => boolean}}
  */
 export function presenterFromFacets(presents = {}) {
   const labelKey = typeof presents.label === 'string' ? presents.label : null;
   const momentKey = typeof presents.moment === 'string' ? presents.moment : null;
   const mine = Array.isArray(presents.mine) ? presents.mine.filter((k) => typeof k === 'string') : [];
+  const doneKey = typeof presents.done?.field === 'string' ? presents.done.field : null;
+  const doneValues = Array.isArray(presents.done?.values) ? new Set(presents.done.values) : null;
   return {
     label: (r) => String((labelKey ? r?.[labelKey] : '') ?? '').trim() || words(r),
     when: (r) => ms(momentKey ? r?.[momentKey] : undefined) || ms(r?.createdAt ?? r?.ts),
@@ -29,6 +31,12 @@ export function presenterFromFacets(presents = {}) {
       const v = r?.[k];
       return Array.isArray(v) ? v.some((x) => (x?.webid ?? x) === me) : v === me;
     }),
+    // no longer open: the declared field is set (or holds one of the declared values); nothing declared, never done
+    isDone: (r) => {
+      if (!doneKey) return false;
+      const v = r?.[doneKey];
+      return doneValues ? doneValues.has(v) : Boolean(v);
+    },
   };
 }
 
@@ -43,4 +51,17 @@ export function presenterFor(noun, { manifests = allManifests() } = {}) {
   if (declared.length > 1) return null;
   if (declared.length === 1) return presenterFromFacets(declared[0]);
   return ITEM_PRESENTERS[noun] ?? null;
+}
+
+/**
+ * The nouns whose declared facets satisfy `pred` — how a reading picks what it covers ("scheduled": `order: 'asc'`;
+ * "open and mine": `mine` + `done`) without naming one. A noun two manifests declare is ambiguous and left out.
+ * @param {(presents: object) => boolean} pred
+ * @param {{manifests?: object[]}} [o]
+ * @returns {string[]}
+ */
+export function nounsDeclaring(pred, { manifests = allManifests() } = {}) {
+  const count = new Map();
+  for (const m of manifests ?? []) for (const [noun, d] of Object.entries(m?.nouns ?? {})) if (d?.presents) count.set(noun, [...(count.get(noun) ?? []), d.presents]);
+  return [...count].filter(([, ps]) => ps.length === 1 && pred(ps[0])).map(([noun]) => noun);
 }

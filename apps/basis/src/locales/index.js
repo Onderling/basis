@@ -21,6 +21,9 @@ import roleEn from './role.en.json' with { type: 'json' };
 import roleNl from './role.nl.json' with { type: 'json' };
 import hostEn from './host.en.json' with { type: 'json' };
 import hostNl from './host.nl.json' with { type: 'json' };
+import nounFallbackEn from './noun-fallback.en.json' with { type: 'json' };
+import nounFallbackNl from './noun-fallback.nl.json' with { type: 'json' };
+import { nounWords } from '../v2/nounNames.js';
 
 /** The canonical `circle` block per language (union of the former web + mobile copies; 0 value conflicts). */
 export const sharedCircleLocale = { en: circleEn, nl: circleNl };
@@ -87,7 +90,17 @@ export function mergeShared(app, shared) {
  * The three named exports above stay: tests and callers already import them, and they are the honest
  * way to reach one block when that is what you mean.
  */
+/**
+ * The `noun` block — what a shown noun is called: the declaring manifests' `names` (`noun.<noun>_one|_other`), over the few words basis
+ * keeps for a canonical noun no manifest declares yet (that fallback only shrinks).
+ */
+const declaredNouns = nounWords();
+export const sharedNounLocale = {
+  en: { ...nounFallbackEn, ...declaredNouns.en },
+  nl: { ...nounFallbackNl, ...declaredNouns.nl },
+};
+
 export const sharedLocale = {
-  en: { circle: circleEn, consequence: consequenceEn, role: roleEn, ...hostEn },
-  nl: { circle: circleNl, consequence: consequenceNl, role: roleNl, ...hostNl },
+  en: { circle: circleEn, consequence: consequenceEn, role: roleEn, ...hostEn, noun: sharedNounLocale.en },
+  nl: { circle: circleNl, consequence: consequenceNl, role: roleNl, ...hostNl, noun: sharedNounLocale.nl },
 };

@@ -1123,7 +1123,7 @@ export const basisManifest = {
    *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens My data)
    */
   meBlocks: [
-    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'openChores', 'nextAppointment'] } },
+    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'open', 'next'] } },
     { type: 'agents',       config: {} },
   ],
 

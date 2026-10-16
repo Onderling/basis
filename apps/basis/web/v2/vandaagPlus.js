@@ -3,7 +3,7 @@
  * from the shared model (`PLUS_ACTS`); what a save does is the host's (`onSave(actId, values)` → null, or the line to
  * show). Pure render.
  */
-import { PLUS_ACTS } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderVandaagPlus(container, { t, actId = null, error = null, onPick, onSave, onClose,
@@ -36,7 +36,7 @@ export function renderVandaagPlus(container, { t, actId = null, error = null, on
       b.type = 'button';
       b.className = 'circle-vandaag-plus__act';
       b.dataset.act = a.id;
-      b.textContent = tr(a.labelKey);
+      b.textContent = plusLabel(tr, a);
       b.addEventListener('click', () => onPick?.(a.id));
       container.appendChild(b);
     }

@@ -125,8 +125,12 @@ const NAV_TARGET_KIND_SET = new Set(NAV_TARGET_KINDS);
 /** @param {string} verb */
 export function isCanonicalVerb(verb) { return VERB_SET.has(verb); }
 
-/** The facets a noun may declare in `presents`. */
-export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine']);
+/**
+ * The facets a noun may declare in `presents`. `order` says what the moment IS: 'asc' declares a scheduled time
+ * (soonest first — the noun is something that is going to happen), 'desc' when the row was made (newest first).
+ * `done` says when a row is no longer open: `{ field }` (truthy = closed) or `{ field, values }` (one of these = closed).
+ */
+export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine', 'done']);
 
 /**
  * Validate a manifest.
@@ -283,12 +287,23 @@ export function validateManifest(manifest, opts = {}) {
             for (const k of ['label', 'moment']) if (pr[k] !== undefined && !plainKey(pr[k])) bad(`presents.${k} must be a plain field key`);
             if (pr.order !== undefined && !['asc', 'desc'].includes(pr.order)) bad('presents.order must be "asc" or "desc"');
             if (pr.mine !== undefined && !(Array.isArray(pr.mine) && pr.mine.every(plainKey))) bad('presents.mine must be a list of plain field keys');
+            const dn = pr.done;
+            const word = (v) => typeof v === 'string' && v.trim() !== '';
+            if (dn !== undefined && !(dn && typeof dn === 'object' && !Array.isArray(dn) && plainKey(dn.field)
+              && Object.keys(dn).every((k) => k === 'field' || k === 'values')
+              && (dn.values === undefined || (Array.isArray(dn.values) && dn.values.every(word))))) {
+              bad('presents.done must be { field: <plain key>, values?: [non-empty strings] }');
+            }
           }
         }
         if (decl.names !== undefined) {
           const nm = decl.names;
-          if (!nm || typeof nm !== 'object' || Array.isArray(nm) || !Object.values(nm).every((v) => typeof v === 'string' && v.trim())) {
-            errors.push({ path: `${np}/names`, message: 'names must map a language to a non-empty word', code: 'bad-names' });
+          // per language its plural forms (Intl.PluralRules categories): `other` required, `one` optional
+          const word = (v) => typeof v === 'string' && v.trim() !== '';
+          const forms = (f) => f && typeof f === 'object' && !Array.isArray(f) && word(f.other)
+            && Object.keys(f).every((k) => k === 'one' || k === 'other') && (f.one === undefined || word(f.one));
+          if (!nm || typeof nm !== 'object' || Array.isArray(nm) || !Object.values(nm).every(forms)) {
+            errors.push({ path: `${np}/names`, message: 'names must map a language to its forms { one?, other }', code: 'bad-names' });
           }
         }
         if (decl.writtenBy !== undefined && !NOUN_WRITERS.includes(decl.writtenBy)) {

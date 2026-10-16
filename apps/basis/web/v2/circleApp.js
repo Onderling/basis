@@ -5359,6 +5359,9 @@ async function showReceivePersonas() {
             go.disabled = true;
             const res = await rawCallSkill('household', r.remove.op, { mnemonic: ph.value, personaId: r.id }).catch(() => null);
             ph.value = '';
+            // re-keyed: every wrapper in memory holds the old key — reload at once, nothing else runs on it
+            if (res?.ok && res.rekeyedTo) { window.location.reload(); return; }
+            if (res?.rekeyFailed) { done('circle.receive_personas.remove_rekey_failed'); return; }
             if (res?.ok) done('circle.receive_personas.done_remove_reload', true, { name });
             else if (res?.outcome === 'wrong-phrase' || res?.outcome === 'invalid-phrase') done('circle.receive_personas.wrong_phrase');
             else if (res?.error === 'key-holder') done('circle.receive_personas.remove_key_holder');

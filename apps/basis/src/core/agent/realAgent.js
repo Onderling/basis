@@ -3729,29 +3729,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     // delegation-derived key, then the key door and the custody marker moved to it (a failed move reseals back). The last
     // self is refused — removing it is retiring the device (the revoke ceremony). Every write after the re-key goes
     // through the NEW key (the running wrappers still hold the old one).
-    let vaultNow = chatVault;
-    let rekeyedTo = null;
+    // THE KEY-HOLDER: the primary's delegation seed is this device's at-rest key. It can go only if another self this
+    // device RUNS (not paused) can take the keys — else `last-self` (removing the last self is retiring the device: the
+    // revoke ceremony). Everything that writes through the live wrappers runs FIRST (2a's steps below); the re-key is the
+    // LAST act, with no write after the cutover (every wrapper in memory still holds the old key).
+    let next = null;
     if (isKeyHolder) {
-      const next = [...personas.keys()].find((id) => id !== pid && !pausedNow.includes(id)) ?? null;
-      const nextRt = next ? personas.get(next) : null;
-      const nextSeed = nextRt?.deviceDerivationSeed ?? null;
-      const nextWire = nextRt?.enrolledDevice?.deviceId ?? null;
-      if (!next || !(nextSeed instanceof Uint8Array) || !nextWire) return [DataPart({ ok: false, error: 'last-self' })];
-      const newKey = deriveVaultAtRestKeyFrom(nextSeed);
-      const resealed = [];
-      try {
-        await freezePeerBindings();
-        for (const backing of sealedBackings) { await resealVault({ backing, oldKey: atRestKey, newKey }); resealed.push(backing); }
-        const moved = await cutoverToDelegation({ rootKeyStore, markerVault: ownerRootVault, delegationSeed: nextSeed, deviceId: nextWire, profileId: next, fingerprint: custody.fingerprint ?? undefined });
-        if (!moved) throw new Error('the key door did not take the next self\'s seed');
-      } catch (err) {
-        // put back what was resealed: the device stays as it was, keyed under its primary
-        for (const backing of resealed) { try { await resealVault({ backing, oldKey: newKey, newKey: atRestKey }); } catch { /* reported below */ } }
-        console.warn(`[remove-persona] the re-key failed — nothing else was done: ${err?.message ?? err}`);
-        return [DataPart({ ok: false, error: 'storage' })];
-      }
-      vaultNow = new VaultEncrypted({ backing: chatVaultBacking, key: newKey });
-      rekeyedTo = next;
+      next = [...personas.keys()].find((id) => id !== pid && !pausedNow.includes(id)) ?? null;
+      const nrt = next ? personas.get(next) : null;
+      if (!next || !(nrt?.deviceDerivationSeed instanceof Uint8Array) || !nrt?.enrolledDevice?.deviceId) return [DataPart({ ok: false, error: 'last-self' })];
     }
     const pSeed = root.deriveAgentSeed(pid);
     const pDeviceSeed = deriveDeviceSeed(pSeed, wire);
@@ -3783,16 +3769,35 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { const st = await getOwnStore(); await st.delete(`device-link:${wire}`); } catch (err) { console.warn(`[remove-persona] the device-map row stays: ${err?.message ?? err}`); }
     // 4 — wiped here: its circles' local content, its slots, its place in the lists
     for (const cid of circleIds) { try { await selfAgent?.forgetCircleContent?.(cid); } catch { /* best-effort */ } }
-    const slots = personaVault(vaultNow, pid);
+    const slots = personaVault(chatVault, pid);
     for (const k of PERSONA_SLOT_KEYS) { try { await slots.delete(k); } catch { /* gone already */ } }
-    const listIn = async (key) => { try { const l = JSON.parse((await vaultNow.get(key)) ?? '[]'); return Array.isArray(l) ? l : []; } catch { return []; } };
-    await vaultNow.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify((await listIn(HELD_PERSONAS_VAULT_KEY)).filter((x) => x !== pid)));
-    await vaultNow.set(PAUSED_PERSONAS_VAULT_KEY, JSON.stringify((await listIn(PAUSED_PERSONAS_VAULT_KEY)).filter((x) => x !== pid)));
+    await chatVault.set(HELD_PERSONAS_VAULT_KEY, JSON.stringify((await readIdList(HELD_PERSONAS_VAULT_KEY)).filter((x) => x !== pid)));
+    await chatVault.set(PAUSED_PERSONAS_VAULT_KEY, JSON.stringify((await readIdList(PAUSED_PERSONAS_VAULT_KEY)).filter((x) => x !== pid)));
     if (opts.deviceLog) {
       const e = makeAgentTrailEntry({ actor: chatId?.pubKey ?? 'owner', op: 'remove-persona', kind: 'settings-change', target: { kind: 'persona', ref: pid }, via: 'owner', outcome: 'ok' });
       if (e) opts.deviceLog.append(e);
     }
-    return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true, ...(rekeyedTo ? { rekeyedTo } : {}) })];
+    // 5 — THE RE-KEY, LAST (the key-holder only): every sealed backing resealed under the next self's delegation-derived
+    // key, then the key door + marker moved to it. Nothing is written after the cutover. A failed move reseals back and
+    // says `storage`: the old primary is already gone here, so the next start asks for the recovery phrase.
+    if (isKeyHolder) {
+      const nrt = personas.get(next);
+      const nextSeed = nrt.deviceDerivationSeed;
+      const newKey = deriveVaultAtRestKeyFrom(nextSeed);
+      const resealed = [];
+      try {
+        await freezePeerBindings();
+        for (const backing of sealedBackings) { await resealVault({ backing, oldKey: atRestKey, newKey }); resealed.push(backing); }
+        const moved = await cutoverToDelegation({ rootKeyStore, markerVault: ownerRootVault, delegationSeed: nextSeed, deviceId: nrt.enrolledDevice.deviceId, profileId: next, fingerprint: custody.fingerprint ?? undefined });
+        if (!moved) throw new Error('the key door did not take the next self\'s seed');
+      } catch (err) {
+        for (const backing of resealed) { try { await resealVault({ backing, oldKey: newKey, newKey: atRestKey }); } catch { /* the phrase restores */ } }
+        console.warn(`[remove-persona] the re-key failed — the next start asks for the recovery phrase: ${err?.message ?? err}`);
+        return [DataPart({ ok: false, error: 'storage', rekeyFailed: true })];
+      }
+      return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true, rekeyedTo: next })];
+    }
+    return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true })];
   }, { visibility: 'private' });
   // THE PERSONAS ON THIS DEVICE, as the "Persona's op dit apparaat" screen lists them: every self it holds — running or
   // paused — with whether it is the primary (which cannot be paused).

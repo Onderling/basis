@@ -7361,6 +7361,8 @@
   },
   "receive_personas": {
     "close": "Close",
+    "remove_rekey_failed": "That did not fully work: the persona was taken off this device, but the device's key could not move over. The next start asks for your recovery phrase.",
+    "done_rekey_restart": "Done. Close the app completely now and open it again — after that this device speaks as {{name}}.",
     "remove": "Remove from this device",
     "remove_warn": "This takes {{name}} off this device: its keys and what it keeps here are wiped, and this device no longer counts in its circles. It cannot be undone here — with your recovery phrase you can bring it here again later. Type your recovery phrase to go on.",
     "remove_submit": "Remove",

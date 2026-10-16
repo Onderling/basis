@@ -5311,7 +5311,11 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   useEffect(() => {
     bundle?.setNearbyRoomSelf?.(() => roomSelfFor(roomR, heldSelves));   // asking is a state: no face until the answer
   }, [bundle, roomR, heldSelves]);
-  const pickRoomSelf = useCallback((id) => { writeNearbySelf(id); setRoomPick(id); Promise.resolve(bundle?.nearbyRoom?.announceFace?.()).catch(() => {}); }, [bundle]);
+  const pickRoomSelf = useCallback((id) => {
+    writeNearbySelf(id); setRoomPick(id);
+    Promise.resolve(bundle?.nearbyRoom?.announceFace?.()).catch(() => {});
+    Promise.resolve(bundle?.nearbyIdentity?.getDrivers?.()).catch(() => {});   // weighed as the new self
+  }, [bundle]);
   // View state, not model state: whether THIS device currently has a text box open says nothing about
   // the room. `answering` holds the ask id being replied to.
   const [composing, setComposing] = useState(false);
@@ -5325,7 +5329,9 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     radio:              { get: readNearbyRadio, set: writeNearbyRadio },   // the persisted radio switch
     subscribeToPeers:   bundle?.nearbyPeers ? (fn) => bundle.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
-    mySkills:           () => [],
+    // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
+    getDrivers:         () => (bundle?.nearbyIdentity ? bundle.nearbyIdentity.getDrivers() : Promise.resolve({})),
+    mySkills:           () => bundle?.nearbyIdentity?.mySkills?.() ?? [],
     t,
     // Only what this host can actually carry out today. `request-join` needs the ask/invite exchange
     // (Nearby steps F + H) and is deliberately NOT offered until it works.
@@ -5336,6 +5342,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   useEffect(() => {
     const off = screen.subscribe(setModel);
     screen.open();
+    // the room self's offerings, read on open, so the shared-skills line has them before any ask arrives
+    bundle?.nearbyIdentity?.getDrivers?.().then(() => setModel(screen.model())).catch(() => {});
     return () => { off(); screen.close(); };
   }, [screen]);
   // Backgrounding stops advertising. The screen stays mounted when the app goes to the background,

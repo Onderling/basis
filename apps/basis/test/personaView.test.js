@@ -450,7 +450,7 @@ describe('renderMij', () => {
     const form = el.querySelector('.cc-mij__grid .cc-mij__form');
     form.querySelector('.cc-mij__input').value = 'spel';
     form.querySelector('.cc-btn--primary').click();
-    expect(onCreatePersona).toHaveBeenCalledWith('spel');
+    expect(onCreatePersona).toHaveBeenCalledWith('spel', { takeOfferings: false });   // the offerings question, unticked by default
     const el2 = renderMij(document.createElement('div'), { model: build(), t });
     expect(el2.querySelector('.cc-mij__add-card').disabled).toBe(true);
   });
@@ -496,5 +496,46 @@ describe('buildMijViewModel — taking a disclosure back (2026-09-23)', () => {
     const c = model({ released: { place: 'Groningen' }, onLane: { place: 'Groningen' } });
     expect(c.rows.length).toBeGreaterThan(0);
     expect(c.canWithdraw).toBe(false);
+  });
+});
+
+describe('a persona that did not take the general offerings', () => {
+  it('the general offering shows as not its own (absent), its own offering as own, other kinds still inherit; the marker is no row', async () => {
+    const own = (value) => ({ mode: 'own', value });
+    const personas = [
+      { id: 'default', name: 'Frits', properties: {
+        tuin: own({ kind: 'offering', text: 'Tuinieren', tags: ['tuin'] }),
+        muziek: own({ kind: 'interest', text: 'Muziek', tags: ['muziek'] }),
+      } },
+      { id: 'p-werk', name: 'Werk', properties: {
+        '_inherit.offering': own(false),
+        fiets: own({ kind: 'offering', text: 'Fietsen', tags: ['fiets'] }),
+      } },
+    ];
+    const m = buildMijViewModel({ personas, circles: [] });
+    const werk = m.personas.find((c) => c.id === 'p-werk');
+    const state = (k) => werk.entries.find((e) => e.key === k)?.state;
+    expect(state('tuin')).toBe('absent');
+    expect(state('fiets')).toBe('own');
+    expect(state('muziek')).toBe('inherit');
+    expect(werk.entries.some((e) => e.key.startsWith('_'))).toBe(false);
+  });
+});
+
+describe('the new-persona form asks about offerings', () => {
+  it('unticked by default; ticked, the answer travels with the name; the args say yes only when yes', async () => {
+    const { newPersonaArgs } = await import('../src/v2/newPersona.js');
+    const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
+    const onCreatePersona = vi.fn();
+    const root = renderMij(document.createElement('div'), { model: buildMijViewModel({ personas: [{ id: 'default', properties: {} }], circles: [] }), t, onCreatePersona });
+    root.querySelector('.cc-mij__add-card').click();
+    const tick = root.querySelector('.cc-mij__new-offerings-tick');
+    expect(tick.checked).toBe(false);
+    root.querySelector('.cc-mij__form input.cc-mij__input').value = 'Werk';
+    tick.checked = true;
+    root.querySelector('.cc-mij__form .cc-btn--primary').click();
+    expect(onCreatePersona).toHaveBeenCalledWith('Werk', { takeOfferings: true });
+    expect(newPersonaArgs('Werk')).toEqual({ name: 'Werk' });
+    expect(JSON.parse(newPersonaArgs('Werk', { takeOfferings: true }).properties)['_inherit.offering']).toEqual({ mode: 'own', value: true });
   });
 });

@@ -167,6 +167,7 @@ import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBac
 import { renderContactsRoster } from './contactsRoster.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
+import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
@@ -6127,8 +6128,8 @@ async function openAboutMePanel(personaId) {
         try { await rawCallSkill('agents', 'setProfileDriver', { id: model.defaultId ?? 'default', key, kind: 'offering', text, tags }); } catch { /* */ }
         await draw();
       },
-      onCreatePersona: async (name) => {
-        try { await rawCallSkill('agents', 'createProfile', { name }); } catch { /* */ }
+      onCreatePersona: async (name, answers) => {
+        try { await rawCallSkill('agents', 'createProfile', newPersonaArgs(name, answers)); } catch { /* */ }
         await draw();
       },
       onToggleDisclosure: async (contextId, key, enabled, forPersonaId) => {

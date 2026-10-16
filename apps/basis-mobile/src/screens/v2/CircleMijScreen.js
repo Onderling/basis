@@ -122,7 +122,7 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
   const onCreatePersona = useCallback(async () => {
     const name = (personaForm?.name ?? '').trim();
     if (!name) return;
-    await createPersona({ callSkill, name });
+    await createPersona({ callSkill, name, takeOfferings: personaForm?.takeOfferings === true });
     setPersonaForm(null);
     await load();
   }, [callSkill, personaForm, load]);
@@ -361,8 +361,14 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
               value={personaForm.name}
               placeholder={t('circle.mij.new_persona_ph')}
               placeholderTextColor={theme.color.inkSoft}
-              onChangeText={(v) => setPersonaForm({ name: v })}
+              onChangeText={(v) => setPersonaForm((f) => ({ ...(f ?? {}), name: v }))}
             />
+            {/* what you offer — also as this persona? Off by default: a work persona must not silently 'offer' your gardening */}
+            <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: personaForm.takeOfferings === true }}
+              onPress={() => setPersonaForm((f) => ({ ...(f ?? {}), takeOfferings: !(f?.takeOfferings === true) }))}
+              testID="mij-new-persona-offerings">
+              <Text style={styles.value}>{`${personaForm.takeOfferings === true ? '☑' : '☐'} ${t('circle.mij.new_persona_offerings', { name: (personaForm.name ?? '').trim() || t('circle.mij.new_persona_offerings_unnamed') })}`}</Text>
+            </Pressable>
             <View style={styles.formActions}>
               <Pressable style={styles.btnPrimary} accessibilityRole="button" onPress={onCreatePersona}>
                 <Text style={styles.btnPrimaryText}>{t('circle.mij.new_persona_create')}</Text>

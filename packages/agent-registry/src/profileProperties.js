@@ -29,6 +29,22 @@ export function normaliseProperties(raw) {
 }
 
 /**
+ * The persona's own marker for its OFFERINGS: does it take the general persona's offerings as its own? A new persona
+ * is asked ("what you offer — also as <name>?", default no) and the answer is kept here; a persona from before has no
+ * marker and inherits as every property does. A marker, never a value: no release or match carries it.
+ */
+export const OFFERINGS_INHERIT_KEY = '_inherit.offering';
+
+/** A key that is a marker (a leading underscore): read by the registry itself, never released, matched or shown. */
+export const isMarkerKey = (key) => typeof key === 'string' && key.startsWith('_');
+
+const isOfferingValue = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v) && v.kind === 'offering';
+const offeringsStopped = (self) => {
+  const m = self?.properties?.[OFFERINGS_INHERIT_KEY];
+  return Boolean(m) && m.mode === 'own' && m.value === false;
+};
+
+/**
  * Resolve the EFFECTIVE value of `key` for `profileId`, following inherit pointers up the
  * chain (an entry's `from`, or the default profile; an UNDECLARED key implicitly inherits
  * from the default) until an OWN value is found. Cycle- and dead-end-safe → `undefined`.
@@ -44,7 +60,12 @@ export function resolveProperty(getProfile, profileId, key, { defaultProfileId =
   while (id && !seen.has(id)) {
     seen.add(id);
     const entry = getProfile(id)?.properties?.[key];
-    if (entry?.mode === 'own') return entry.value;
+    if (entry?.mode === 'own') {
+      // THE one stop on inheritance: a persona that said no to the general offerings does not take one by inheriting —
+      // so its drivers, its releases and its matching all give the same answer
+      if (id !== profileId && isOfferingValue(entry.value) && offeringsStopped(getProfile(profileId))) return undefined;
+      return entry.value;
+    }
     // declared-inherit → follow `from`/default; undeclared → implicit inherit from the default
     const parent = entry?.from || (id === defaultProfileId ? null : defaultProfileId);
     if (!parent || parent === id) return undefined;

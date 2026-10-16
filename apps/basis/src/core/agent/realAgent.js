@@ -164,6 +164,7 @@ import {
   releasedValues as releaseFromPolicy,
   createDriver,
   driversFromProperties,
+  effectiveDrivers,
   setCircleMembership as registrySetCircleMembership,
   removeCircleMembership as registryRemoveCircleMembership,
   circleMembershipsOf,
@@ -1568,7 +1569,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         const self = byId.get(profileId) ?? null;
         if (!self) return {};
         const getProfile = (id) => byId.get(id) ?? null;
-        return driversFromProperties(effectiveProperties(getProfile, self.agentId, { defaultProfileId: 'default' }));
+        // what it inherits and what is its own — a persona that said no to the general offerings does not take them
+        return effectiveDrivers(getProfile, self.agentId, { defaultProfileId: 'default' });
       },
       // Circle membership (registry restore-data) — carry a per-circle { handle, address, … } record on the
       // profile so a restored device knows its circles + the handle it used. Merge via the pure setter (keeps

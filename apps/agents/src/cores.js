@@ -43,6 +43,7 @@
 
 import {
   setSkillExposure, setCircleSkillExposure, isSkillExposed, normalizeExposure,
+  OFFERINGS_INHERIT_KEY,
 } from '@onderling/agent-registry';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -543,6 +544,10 @@ export async function createProfile(store, args = {}) {
   else if (typeof args?.properties === 'string' && args.properties.trim()) {
     try { properties = JSON.parse(args.properties); } catch { properties = {}; }
   }
+  // A NEW persona does not take the general persona's offerings unless asked to (the new-persona wizard asks, default
+  // no): the answer is kept on it as its own marker; a caller that says nothing gets the no.
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) properties = {};
+  if (!(OFFERINGS_INHERIT_KEY in properties)) properties = { ...properties, [OFFERINGS_INHERIT_KEY]: { mode: 'own', value: false } };
   const result = await s.profiles.create({ ...(given ? { profileId: given } : {}), name, properties });
   if (result?.ok === false) return { created: false, reason: result.reason ?? 'refused', agent: null };
   const id = result?.profileId ?? given;

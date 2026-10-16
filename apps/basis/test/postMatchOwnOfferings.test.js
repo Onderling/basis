@@ -20,17 +20,27 @@ describe('a post matched against my own offerings', () => {
     expect((await score(a, { categoryId: 'vervoer' }))?.layer1?.matched).toBe(false);
   }, 60_000);
 
-  it('the matcher never sees a driver the circle\'s self does not hold (a persona holds its own and what it inherits; the default never holds a persona\'s)', async () => {
+  it('the matcher never sees a driver the circle\'s self does not hold (a new persona holds its own offerings only; the default never holds a persona\'s)', async () => {
     const a = await boot();
     const { id } = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
     await a.callSkill('agents', 'setProfileCircleMembership', { id, circleId: 'kantoor', handle: 'w', address: a.persona(id).circleAddressFor('kantoor') });
     await a.callSkill('agents', 'setProfileDriver', { id: 'default', key: 'tuin', kind: 'offering', text: 'Tuinieren', tags: 'tuin', categoryId: 'tuin' });
     await a.callSkill('agents', 'setProfileDriver', { id, key: 'fiets', kind: 'offering', text: 'Fietsen maken', tags: 'fiets', categoryId: 'vervoer' });
     expect((await score(a, { circleId: 'kantoor', categoryId: 'vervoer' }))?.layer1?.matched, 'Werk\'s own offering, in Werk\'s circle').toBe(true);
-    // a persona follows the general persona unless it says otherwise (the persona arc: copy = inherit) — so Werk holds
-    // the general offering too, as ITS OWN inherited one; what never happens is the reverse
-    expect((await score(a, { circleId: 'kantoor', categoryId: 'tuin' }))?.layer1?.matched, 'Werk inherits the general offering').toBe(true);
+    // a NEW persona does not take the general offerings unless it was asked and said yes (the new-persona wizard, default
+    // no) — so the general 'tuin' is not Werk's; and what never happens either way is the reverse
+    expect((await score(a, { circleId: 'kantoor', categoryId: 'tuin' }))?.layer1?.matched, 'a new persona does not inherit the general offering').toBe(false);
     expect((await score(a, { categoryId: 'vervoer' }))?.layer1?.matched, 'Werk\'s offering is not the default\'s').toBe(false);
+  }, 60_000);
+
+  it('a persona created with "yes, my offerings too" holds the general offering as its own inherited one', async () => {
+    const a = await boot();
+    const { id } = await a.callSkill('agents', 'createProfile', { name: 'Buurt', properties: JSON.stringify({ '_inherit.offering': { mode: 'own', value: true } }) });
+    await a.callSkill('agents', 'setProfileCircleMembership', { id, circleId: 'straat', handle: 'b', address: a.persona(id).circleAddressFor('straat') });
+    await a.callSkill('agents', 'setProfileDriver', { id: 'default', key: 'tuin', kind: 'offering', text: 'Tuinieren', tags: 'tuin', categoryId: 'tuin' });
+    expect((await score(a, { circleId: 'straat', categoryId: 'tuin' }))?.layer1?.matched).toBe(true);
+    const drivers = (await a.callSkill('agents', 'getProfileDrivers', { id }))?.drivers ?? {};
+    expect(Object.keys(drivers)).toContain('tuin');
   }, 60_000);
 
   it('away (the person\'s one availability record) matches nothing; back, it matches again', async () => {

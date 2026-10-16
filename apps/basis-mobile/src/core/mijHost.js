@@ -31,6 +31,7 @@ export async function setGeneralProperty({ callSkill, defaultId, key, value }) {
 
 /** The shared offering key derivation — keyed by the phrase; re-using it edits. */
 export { offeringKeyFor } from '../../../basis/src/core/offeringsMigration.js';
+import { newPersonaArgs } from '../../../basis/src/v2/newPersona.js';
 import { pictureRefOf } from '../../../basis/src/v2/personaAvatar.js';
 import { offeringKeyFor as sharedOfferingKeyFor } from '../../../basis/src/core/offeringsMigration.js';
 
@@ -41,8 +42,9 @@ export async function addGeneralOffering({ callSkill, defaultId, text, tags }) {
 }
 
 /** Section-2 add-affordance — create a new persona (createProfile). */
-export async function createPersona({ callSkill, name }) {
-  try { await callSkill('agents', 'createProfile', { name }); } catch { /* */ }
+export async function createPersona({ callSkill, name, takeOfferings = false }) {
+  // the answer to "what you offer — also as <name>?" rides along (shared `newPersonaArgs`; no = the core's default)
+  try { await callSkill('agents', 'createProfile', newPersonaArgs(name, { takeOfferings })); } catch { /* */ }
 }
 
 /** Section-3 toggle — enable/withdraw one key's disclosure for a circle. */

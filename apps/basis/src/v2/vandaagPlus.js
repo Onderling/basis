@@ -7,17 +7,25 @@ import { encodeGenericOpId } from '@onderling/app-manifest';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { getActiveScreen } from './userScreens.js';
 import { readDayAndTime } from '../forms/parseDate.js';
+import { nounWord } from './nounNames.js';
 
-/** The acts the "+" offers, in order; each field names its input kind and its words. */
+/** The acts the "+" offers, in order: what each makes (its noun — named by the manifest that declares it); each field
+ *  names its input kind and its words. */
 export const PLUS_ACTS = Object.freeze([
-  Object.freeze({ id: 'own-note', labelKey: 'circle.vandaag.plus_note',
+  Object.freeze({ id: 'own-note', noun: 'note',
     fields: Object.freeze([Object.freeze({ name: 'body', kind: 'text', labelKey: 'circle.vandaag.plus_note_ph' })]) }),
-  Object.freeze({ id: 'own-appointment', labelKey: 'circle.vandaag.plus_appointment',
+  Object.freeze({ id: 'own-appointment', noun: 'calendar-event',
     fields: Object.freeze([
       Object.freeze({ name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' }),
       Object.freeze({ name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' }),
     ]) }),
 ]);
+
+/**
+ * An act's words ("Eigen afspraak"): basis's frame around the word the declaring manifest names its noun with.
+ * @param {Function} t @param {{noun: string}} act
+ */
+export function plusLabel(t, act) { return t('circle.vandaag.plus_own', { noun: nounWord(t, act.noun) }); }
 
 const EMPTY = { error: 'circle.vandaag.plus_empty' };
 

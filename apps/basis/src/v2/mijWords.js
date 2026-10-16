@@ -10,8 +10,8 @@ const READING_WORDS = {
     : r.state === 'quiet' ? tr('circle.profile.reading_quiet', { until: r.until }) : tr('circle.profile.reading_available')),
   online: (r, tr) => tr(r.on ? 'circle.profile.reading_online' : 'circle.profile.reading_offline'),
   unread: (r, tr) => tr('circle.profile.reading_unread', { count: r.count }),
-  openChores: (r, tr) => tr('circle.profile.reading_open_chores', { count: r.count }),
-  nextAppointment: (r, tr, o) => tr('circle.profile.reading_next', { title: r.title, when: whenWords(r.when, o) }),
+  open: (r, tr) => tr('circle.profile.reading_open', { count: r.count }),
+  next: (r, tr, o) => tr('circle.profile.reading_next', { title: r.title, when: whenWords(r.when, o) }),
 };
 
 /**

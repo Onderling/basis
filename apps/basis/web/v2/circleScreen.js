@@ -30,6 +30,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
 import { dateLocaleOf } from '../../src/v2/whenWords.js';
 import { whereTag } from '../../src/v2/rowWhere.js';
+import { nounHeading } from '../../src/v2/nounNames.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -373,7 +374,7 @@ function renderAgenda(section, block, tr, highlightRef) {
 function renderItems(section, block, tr) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`);
+  title.textContent = block.titleKey ? tr(block.titleKey) : nounHeading(tr, block.content?.noun ?? '');
   section.appendChild(title);
   const list = document.createElement('ul');
   list.className = 'circle-screen__items-list';

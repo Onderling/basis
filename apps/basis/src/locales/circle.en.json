@@ -1152,16 +1152,6 @@
       "text": "{{count}} new",
       "doc": "Vandaag, circles-with-news block: how many lines are new in that circle since this device last looked. count = how many."
     },
-    "items_title": {
-      "task": "My things",
-      "calendar-event": "Agenda",
-      "note": "Notes",
-      "announcement": "Announcements",
-      "offer": "Offers",
-      "request": "Requests",
-      "list": "Lists",
-      "list-item": "On the lists"
-    },
     "filter_placeholder": {
       "text": "Filter…",
       "doc": "B/S3 list-screen search box placeholder."
@@ -1338,13 +1328,9 @@
       "text": "Add",
       "doc": "Vandaag → the '+' beside 'Pas aan': add an own note or an own appointment (the person's own store; never a circle)."
     },
-    "plus_note": {
-      "text": "Own note",
-      "doc": "Vandaag → '+': a note of your own, on your own devices only."
-    },
-    "plus_appointment": {
-      "text": "Own appointment",
-      "doc": "Vandaag → '+': an appointment of your own, on your own devices only."
+    "plus_own": {
+      "text": "Own {{noun}}",
+      "doc": "Vandaag → '+': an item of your own, on your own devices only. noun = what it makes, in the word the declaring manifest names it."
     },
     "plus_note_ph": {
       "text": "Note",
@@ -6025,13 +6011,13 @@
       "text": "{{count}} unread",
       "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
     },
-    "reading_open_chores": {
+    "reading_open": {
       "text": "{{count}} open",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The person's open chores, across circles."
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
     },
     "reading_next": {
       "text": "next: {{title}} {{when}}",
-      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The next appointment."
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
     },
     "agent_here": {
       "text": "this device",

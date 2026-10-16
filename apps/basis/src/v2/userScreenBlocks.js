@@ -27,7 +27,7 @@
  */
 
 import { acrossCircles } from './acrossCircles.js';
-import { presenterFor } from './declaredPresenters.js';
+import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
 import { carriesLabels, normLabel } from './itemLabels.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -158,11 +158,11 @@ function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, s
   return { ...base, status: items.length > 0 ? 'ok' : 'empty', content: { items } };
 }
 
-/** The readings an identity line may show, each answering one thing about now. */
-export const MIJ_READINGS = Object.freeze(['availability', 'online', 'unread', 'openChores', 'nextAppointment']);
-
-/** A chore in one of these states is no longer open. */
-const CLOSED_TASK_STATES = new Set(['done', 'approved', 'completed', 'cancelled', 'archived']);
+/**
+ * The readings an identity line may show, each answering one thing about now. `open` and `next` name no noun: they
+ * cover whatever nouns DECLARE the facets they read (`mine` + `done`; a scheduled moment, `order: 'asc'`).
+ */
+export const MIJ_READINGS = Object.freeze(['availability', 'online', 'unread', 'open', 'next']);
 
 /**
  * The identity line: the person's name and the readings the block's config names, in that order. A reading whose
@@ -196,29 +196,26 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
     } else if (key === 'unread') {
       const r = materializeCirclesUnread({ id: block.id, config: { limit: 50 } }, activeCircleIds, hostOps);
       readings.push({ key, count: (r.content?.items ?? []).reduce((n, row) => n + (row.unread ?? 0), 0) });
-    } else if (key === 'openChores') {
-      const r = await materializeItems({ id: block.id, config: { noun: 'task', scope: 'mine', limit: 200 } }, activeCircleIds, hostOps);
-      if (r.status !== 'error') readings.push({ key, count: (r.content?.items ?? []).filter((row) => !CLOSED_TASK_STATES.has(row.state)).length });
-    } else if (key === 'nextAppointment') {
-      // the circles' appointments and my own; with no circle, only my own (the items block reads none without one)
-      const r = activeCircleIds.length
-        ? await materializeItems({ id: block.id, config: { noun: 'calendar-event', scope: 'all', horizonDays: 30, limit: 20 } }, activeCircleIds, hostOps)
-        : { content: { items: await ownAppointments(callSkill) } };
-      const next = (r.content?.items ?? []).find((row) => row.when && row.when >= now);
+    } else if (key === 'open') {
+      // what is mine and not done, over every noun declaring both
+      let count = 0; let answered = false;
+      for (const noun of nounsDeclaring((p) => Boolean(p.mine && p.done))) {
+        const r = await materializeItems({ id: block.id, config: { noun, scope: 'mine', limit: 200, openOnly: true } }, activeCircleIds, hostOps);
+        if (r.status !== 'error') { answered = true; count += (r.content?.items ?? []).length; }
+      }
+      if (answered) readings.push({ key, count });
+    } else if (key === 'next') {
+      // the soonest thing still to come, over every noun whose moment is scheduled — the circles' and my own
+      let next = null;
+      for (const noun of nounsDeclaring((p) => p.order === 'asc')) {
+        const r = await materializeItems({ id: block.id, config: { noun, scope: 'all', horizonDays: 30, limit: 20 } }, activeCircleIds, hostOps);
+        const row = (r.content?.items ?? []).find((x) => x.when && x.when >= now);
+        if (row && (!next || row.when < next.when)) next = row;
+      }
       if (next) readings.push({ key, title: next.label, when: next.when, circleName: next.circleName ?? '' });
     }
   }
   return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name, readings } };
-}
-
-/** My own appointments (no circle) in the coming month, as items-block rows. */
-async function ownAppointments(callSkill) {
-  if (typeof callSkill !== 'function') return [];
-  const presenter = presenterFor('calendar-event');
-  const own = await callSkill('calendar', 'listEvents', { days: 30 }).catch(() => null);
-  return (Array.isArray(own?.items) ? own.items : [])
-    .map((e) => ({ label: presenter.label(e), when: presenter.when(e) || null, circleName: '' }))
-    .sort((a, b) => (a.when ?? 0) - (b.when ?? 0));
 }
 
 /**
@@ -331,6 +328,8 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
   // date, "within N days" (an agenda's is its horizon above), by the type's own moment (`presenter.when`)
   const labels = Array.isArray(block.config?.labels) ? block.config.labels.map(normLabel).filter(Boolean) : [];
   if (labels.length && carriesLabels(noun)) rows = rows.filter((row) => Array.isArray(row.tags) && row.tags.some((tg) => labels.includes(normLabel(tg))));
+  // a reading's "open": rows its noun declares done are left out (a block shows them, as it always has)
+  if (block.config?.openOnly === true) rows = rows.filter((row) => !presenter.isDone?.(row));
   const withinDays = Number(block.config?.withinDays);
   if (!isAgenda && Number.isFinite(withinDays) && withinDays > 0) {
     const now = Date.now();

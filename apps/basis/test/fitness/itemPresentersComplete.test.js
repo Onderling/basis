@@ -8,8 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { CANONICAL_TYPES } from '@onderling/item-types';
 import { LOG_PROJECTED, NOT_MERGED, NOT_YET } from '../../src/v2/itemPresenters.js';
 import { presenterFor } from '../../src/v2/declaredPresenters.js';
-import nl from '../../src/locales/circle.nl.json' with { type: 'json' };
-import en from '../../src/locales/circle.en.json' with { type: 'json' };
+import { sharedLocale } from '../../src/locales/index.js';
 
 describe('every canonical noun has a presenter, or a reason', () => {
   const nouns = Object.keys(CANONICAL_TYPES);
@@ -32,10 +31,10 @@ describe('every canonical noun has a presenter, or a reason', () => {
       expect(['asc', 'desc'], n).toContain(p.order);
     }
   });
-  it('each presented noun has a title in both languages (the items block\'s heading)', () => {
+  it('each presented noun says its name in both languages (the items block\'s heading) — its manifest\'s, or the fallback\'s', () => {
     for (const n of presented) {
-      expect(nl.screen.items_title[n], `nl ${n}`).toBeTruthy();
-      expect(en.screen.items_title[n], `en ${n}`).toBeTruthy();
+      expect(sharedLocale.nl.noun[`${n}_other`]?.text, `nl ${n}`).toBeTruthy();
+      expect(sharedLocale.en.noun[`${n}_other`]?.text, `en ${n}`).toBeTruthy();
     }
   });
 });

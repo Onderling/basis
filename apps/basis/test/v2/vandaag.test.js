@@ -103,11 +103,11 @@ describe('Vandaag — "mine" is the circle\'s own self', () => {
     const [tasks, line] = await materializeScreen({
       screen: { id: 's', name: 'Vandaag', circleFilter: null, blocks: [
         { id: 't', type: 'tasks', config: { scope: 'assigned-to-me' } },
-        { id: 'i', type: 'identityLine', config: { readings: ['openChores'] } },
+        { id: 'i', type: 'identityLine', config: { readings: ['open'] } },
       ] },
       hostOps: { callSkill, selfIn, circles: [{ id: 'home', name: 'Thuis' }, { id: 'work', name: 'Werk' }] },
     });
     expect(tasks.content.items.map((r) => r.id).sort()).toEqual(['h1', 'w1']);
-    expect(line.content.readings.find((r) => r.key === 'openChores')?.count).toBe(2);
+    expect(line.content.readings.find((r) => r.key === 'open')?.count).toBe(2);
   });
 });

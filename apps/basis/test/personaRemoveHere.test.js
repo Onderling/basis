@@ -78,9 +78,9 @@ describe('remove a persona from this device', () => {
     await phone.shutdown?.(); await laptop.shutdown?.();
   }, 120_000);
 
-  it('refuses the primary, a wrong phrase, a paused persona, and a root-custody device', async () => {
+  it('refuses a wrong phrase, a paused persona, and a root-custody device', async () => {
     const { phone, laptop, phrase, w } = await laptopWithWerk();
-    expect(await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: 'default' })).toMatchObject({ ok: false, error: 'key-holder' });
+    // (the primary — the key-holder — is removable since part 2b: personaRemoveKeyHolder.test.js)
     expect((await laptop.callSkill('household', 'removePersonaHere', { mnemonic: 'x y z', personaId: w })).ok).toBe(false);
     expect(await laptop.callSkill('household', 'pausePersona', { personaId: w })).toMatchObject({ ok: true });
     // still running this boot (a pause takes the next) — but marked paused: removal asks for a resume first

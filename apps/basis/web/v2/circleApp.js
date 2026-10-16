@@ -218,7 +218,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -5459,39 +5459,54 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
       card.appendChild(offerErr);
       const values = {};
       // THE PERSONA PICKER: once an offer and the phrase are both here, the offer's sealed list opens ON THIS DEVICE
-      // (nothing leaves it) and the person ticks which personas this device gets. Nothing ticked = the default only.
+      // (nothing leaves it) and the person ticks which selves this device gets — the general persona a row like the rest
+      // (ticked by default). The model, the last-self rule and the primary are the shared ones (enrollOffer.js).
       const picker = document.createElement('div');
       picker.style.cssText = 'margin:.6rem 0;';
+      let pickState = enrolPickState(values);
+      let pickNote = null;
       const paintPicker = () => {
         picker.innerHTML = '';
         const offerUri = offerInput.value.trim() || needs?.offer || '';
         const listed = offerUri && values.mnemonic ? openOfferPersonas(offerUri, values.mnemonic) : [];
-        if (listed.length === 0) { delete values[ENROL_PERSONAS_PARAM]; return; }
+        if (listed.length === 0) { delete values[ENROL_PERSONAS_PARAM]; delete values[ENROL_GENERAL_PARAM]; return; }
         const title = document.createElement('p');
         title.textContent = t('circle.enroll.personas_title');
         const hint = document.createElement('p');
         hint.className = 'cc-hint';
         hint.textContent = t('circle.enroll.personas_hint');
         picker.append(title, hint);
-        const picked = new Set(values[ENROL_PERSONAS_PARAM] ?? []);
-        for (const p of listed) {
-          const row = document.createElement('label');
-          row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
+        for (const row of pickerRows(listed, pickState)) {
+          const label = document.createElement('label');
+          label.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
           const box = document.createElement('input');
           box.type = 'checkbox';
-          box.checked = picked.has(p.id);
-          box.dataset.personaId = p.id;
-          box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); values[ENROL_PERSONAS_PARAM] = [...picked]; });
+          box.checked = row.checked;
+          box.dataset.personaId = row.id;
+          box.addEventListener('change', () => {
+            const r = togglePick(pickState, row.id);
+            pickState = r.state;
+            pickNote = r.refused ? t('circle.enroll.last_self') : null;
+            paintPicker();
+          });
           const name = document.createElement('span');
-          name.textContent = p.name ?? p.id;
-          row.append(box, name);
-          picker.appendChild(row);
+          name.textContent = row.nameKey ? t(row.nameKey) : row.name;
+          label.append(box, name);
+          picker.appendChild(label);
         }
-        values[ENROL_PERSONAS_PARAM] = [...picked];
+        // which self this device will speak as — the first ticked
+        const primary = pickPrimary(pickState);
+        const speaks = document.createElement('p');
+        speaks.className = 'cc-hint';
+        speaks.dataset.enrolSpeaksAs = primary ?? '';
+        speaks.textContent = t('circle.enroll.speaks_as', { name: primary === 'default' ? t('circle.switcher.you') : (listed.find((p) => p.id === primary)?.name ?? primary) });
+        picker.appendChild(speaks);
+        if (pickNote) { const note = document.createElement('p'); note.className = 'cc-hint'; note.textContent = pickNote; picker.appendChild(note); }
+        Object.assign(values, enrolPickArgs(pickState));
       };
       offerInput.addEventListener('input', paintPicker);
       for (const param of view.form.params) {
-        if (param.name === ENROL_PERSONAS_PARAM) continue;   // painted by the picker below
+        if (param.name === ENROL_PERSONAS_PARAM || param.name === ENROL_GENERAL_PARAM) continue;   // painted by the picker below
         const input = document.createElement(param.kind === 'secret' ? 'textarea' : 'input');
         if (param.kind !== 'secret') input.type = 'text';
         input.placeholder = t(`circle.enroll.${param.name}_placeholder`, { defaultValue: param.name });

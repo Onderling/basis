@@ -1354,12 +1354,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Expose the default profile's circle-membership map outward (see the outer `let`): the restore-and-open
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
     // that is where write-on-join records {handle,address} (id:'default').
-    readSelfCircleMemberships = async () => circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {});
+    // On a device WITHOUT the general persona there is no such map here: a pod-synced registry may show its row, but its
+    // circles are not this device's to reopen, retire or offer.
+    readSelfCircleMemberships = async () => (!personas.has('default') ? {} : circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {}));
     // every SELF's circles — the default's record and each persona's (a circle is on exactly one, its persona's). Only
     // for what is the PERSON's over all their selves (put away / brought back); the ceremonies and the restore heal
     // read the default's alone above, so nothing of the default is ever said in a persona's circle.
     readAllSelvesCircleMemberships = async () => {
-      const out = { ...circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {}) };
+      const out = { ...(await readSelfCircleMemberships()) };
       for (const pid of personas.keys()) {
         if (pid === 'default') continue;
         try { Object.assign(out, circleMembershipsOf((await agentsRegistry.lookup(pid)) ?? {})); } catch { /* that persona's record unreadable — its circles absent */ }
@@ -1375,7 +1377,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // pod-URI pointer + posture, and every key still re-derives from the recovery phrase.
     upsertCircleKeyRef = async (circleId, keyRef) => {
       if (!circleId || !keyRef?.ref) return false;
-      const cur = await agentsRegistry.lookup('default');
+      const cur = personas.has('default') ? await agentsRegistry.lookup('default') : null;
       if (!cur || !circleMembershipsOf(cur)[circleId]) return false;
       await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, { key: keyRef }) });
       return true;
@@ -2658,8 +2660,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // no phrase ride here; holding the offer lets you ask nothing (enrolling IS the phrase).
     const relayUrl = typeof parts?.[0]?.data?.relayUrl === 'string' && parts[0].data.relayUrl ? parts[0].data.relayUrl : null;
     try {
-      // the default's circles in the clear (never one a persona is joined as: that would tie the persona to the person)
-      const circles = (await myCircleEntries()).filter(({ id }) => !circlePersonas.has(id)).map(({ id, handle, address }) => ({ id, handle, address }));
+      // the general persona's circles in the clear (never one a persona is joined as: that would tie the persona to the
+      // person) — none on a device that does not hold it: whatever circles it is in are its personas'
+      const circles = !personas.has('default') ? [] : (await myCircleEntries()).filter(({ id }) => !circlePersonas.has(id)).map(({ id, handle, address }) => ({ id, handle, address }));
       // the person's personas, SEALED to the phrase (only the device it is typed into can read them, and pick) — each with
       // its circles, so a device given a persona rejoins them as it; with the root resident only (a delegated device runs
       // no persona to offer)
@@ -2834,6 +2837,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // question (broken or stolen) decides what the screen says, never what this ceremony does.
     const check = verifyOwnerPhrase(parts?.[0]?.data?.mnemonic);
     if (!check.ok) return [DataPart({ ok: false, outcome: check.outcome, error: check.outcome })];
+    // every step below is the GENERAL persona's (its devices, retired in its circles): a device without it does none
+    if (!personas.has('default')) return [DataPart({ ok: false, outcome: 'no-general-persona', error: 'no-general-persona' })];
     const { root } = check;
     const profileSeed = root.deriveAgentSeed('default');
     const myDeviceId = enrolledDevice?.deviceId ?? custody.deviceId ?? null;
@@ -2978,8 +2983,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Best-effort bookkeeping behind a hard timeout: the STATEMENTS below are the enforcement,
       // and a registry whose sync stalls must never stall the ceremony with it.
       const bounded = (p, ms = 3000) => Promise.race([p, new Promise((res) => { setTimeout(res, ms); })]);
+      // THE GENERAL PERSONA'S PART (its tombstone, its person key, its circles) — only on a device that holds it: a device
+      // without it acts in no part in its name (its personas' parts, below, still run as each persona).
+      const holdsGeneral = personas.has('default');
       try {
-        const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
+        const cur = holdsGeneral ? await bounded(agentsRegistryRef?.lookup?.('default')) : null;
         if (cur) {
           const rec = deviceDelegationOf(cur, deviceId);
           known = !!rec;
@@ -3002,7 +3010,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           }
         }
       } catch { /* tombstone is best-effort bookkeeping — the statements below are the enforcement */ }
-      const circleIds = new Set([
+      const circleIds = new Set(!holdsGeneral ? [] : [
         ...Object.keys(await readSelfCircleMemberships().catch(() => ({}))),
         ...(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []),
       ]);
@@ -3015,7 +3023,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // after the retire and was refused as "not a sibling"). The revoked device is kept out EXPLICITLY instead —
       // its addresses derive deterministically from the seed the ceremony is revoking.
       let personKeyVersion = null;
-      try {
+      if (holdsGeneral) try {
         const nextVersion = (persona.personKey?.version ?? 0) + 1;
         const profileSeedNow = root.deriveAgentSeed('default');
         const nextSeed = derivePersonKeySeed(profileSeedNow, nextVersion);
@@ -3063,7 +3071,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // `device-link` row in the own-devices scope, each device writes its own), so the ceremony — root in hand — derives
       // each persona's wire id for it, tombstones it on that persona's record (minted already revoked when absent, as the
       // default's is), and retires its addresses in that persona's circles as that persona.
-      const revokedUnder = { default: deviceId };
+      const revokedUnder = holdsGeneral ? { default: deviceId } : {};
       try {
         const internalId = linkedInternalId;
         const entries = internalId ? ((await bounded(agentsRegistryRef?.list?.())) ?? []) : [];

@@ -125,6 +125,46 @@ export function parseEnrollOffer(uri) {
 
 /** The enrol op's param the shells paint as the persona PICKER (checkboxes from `openOfferPersonas`), never a text field. */
 export const ENROL_PERSONAS_PARAM = 'personas';
+/** …and whether the general persona comes too (the picker's first row; off only when another self is ticked). */
+export const ENROL_GENERAL_PARAM = 'withDefault';
+
+/**
+ * THE PICKER, one model both shells paint. The general persona is a row like any persona, ticked by default; a device
+ * holds at least one self, so the LAST ticked self cannot be unticked. The device speaks as the first ticked (the
+ * general persona whenever it is ticked) — its PRIMARY.
+ * @param {Record<string, any>} values  the flow's drafts
+ * @returns {{withDefault: boolean, personas: string[]}}
+ */
+export function enrolPickState(values = {}) {
+  const personas = Array.isArray(values?.[ENROL_PERSONAS_PARAM]) ? values[ENROL_PERSONAS_PARAM].filter((id) => typeof id === 'string') : [];
+  return { withDefault: values?.[ENROL_GENERAL_PARAM] !== false, personas };
+}
+
+/**
+ * Tick or untick one self ('default' = the general persona). Unticking the last ticked self is refused.
+ * @returns {{state: {withDefault: boolean, personas: string[]}, refused?: 'last-self'}}
+ */
+export function togglePick(state, id) {
+  const on = id === 'default' ? state.withDefault : state.personas.includes(id);
+  const count = (state.withDefault ? 1 : 0) + state.personas.length;
+  if (on && count <= 1) return { state, refused: 'last-self' };
+  if (id === 'default') return { state: { ...state, withDefault: !on } };
+  return { state: { ...state, personas: on ? state.personas.filter((p) => p !== id) : [...state.personas, id] } };
+}
+
+/** The rows to paint: the general persona first (its name is the switcher's), then the offer's personas. */
+export function pickerRows(listed = [], state) {
+  return [
+    { id: 'default', nameKey: 'circle.switcher.you', checked: state.withDefault },
+    ...listed.map((p) => ({ id: p.id, name: p.name ?? p.id, checked: state.personas.includes(p.id) })),
+  ];
+}
+
+/** The self this device will speak as: the general persona when ticked, else the first ticked persona. */
+export function pickPrimary(state) { return state.withDefault ? 'default' : (state.personas[0] ?? null); }
+
+/** What the picker hands the enrol ceremony. */
+export function enrolPickArgs(state) { return { [ENROL_PERSONAS_PARAM]: [...state.personas], [ENROL_GENERAL_PARAM]: state.withDefault }; }
 
 /* ── The personas, sealed to the phrase ────────────────────────────────────────────────────────
  * The offer is public by design, so the person's personas never ride it in the clear — a list of them in one offer
@@ -318,6 +358,9 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
   // first — the same device op as joining as one — when this device runs it; one it does not run is skipped, never
   // rejoined as the default.
   let boundHere = false;
+  // …and a circle it names in the clear is the GENERAL persona's: a device that does not hold it steps into none of them
+  // (never its primary standing in for it, never a registry row written for it) — refused like a persona not run here
+  if (!c.persona && typeof agent.persona === 'function' && !agent.persona('default')) return { ...row, ok: false, error: 'general-not-held' };
   if (c.persona) {
     if (!agent.persona?.(c.persona)) return { ...row, ok: false, error: 'persona-not-held' };
     if (agent.circleSelf?.(c.id)?.sendAs !== agent.persona(c.persona)?.chatId?.pubKey) {

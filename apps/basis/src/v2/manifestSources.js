@@ -32,6 +32,7 @@ import { grantsManifest } from './grantsManifest.js';
 import { taskManifest } from './taskManifest.js';
 import { chatManifest } from './chatManifest.js';
 import { assistantManifest } from './assistantManifest.js';
+import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
 
 /**
  * The catalogue manifests, in dispatch order.
@@ -70,4 +71,30 @@ export const DOOR_MANIFESTS = Object.freeze([assistantManifest]);
 /** Every manifest the app runs — the set the manifest guards read. */
 export function allManifests() {
   return [...catalogueManifests(), ...PLUMBING_MANIFESTS, ...DOOR_MANIFESTS];
+}
+
+/**
+ * Does a manifest the app runs declare this op? `qualified` names the app (`stoop.listOpen`); a bare id counts only
+ * when exactly ONE app declares it (as the bot's door map reads it — two declarers is ambiguous, refused); a generic op
+ * (`__generic__:app:atom:noun`) counts when its app declares the noun. A door reaches declared ops only — its role
+ * widens which of them a person reaches, never the set itself.
+ * It reads the DEFAULT household manifest (`allManifests()`), not one a shell may inject: should a shell ever inject
+ * a wider one, a door there refuses more, never less — it fails closed.
+ * @param {string} qualified
+ * @returns {boolean}
+ */
+export function opDeclared(qualified) {
+  const s = String(qualified ?? '');
+  const manifests = allManifests();
+  const dot = s.indexOf('.');
+  const app = dot > 0 ? s.slice(0, dot) : null;
+  const known = app && manifests.some((m) => m.app === app);
+  if (!known) return manifests.filter((m) => declares(m, m.app, s)).length === 1;
+  return manifests.some((m) => m.app === app && declares(m, app, s.slice(dot + 1)));
+}
+
+function declares(m, app, opId) {
+  if ((m.operations ?? []).some((o) => o?.id === opId)) return true;
+  const generic = isGenericOpId(opId) ? decodeGenericOpId(opId) : null;
+  return Boolean(generic && generic.app === app && (m.nouns?.[generic.noun] || (m.itemTypes ?? []).includes(generic.noun)));
 }

@@ -263,7 +263,8 @@ import { makeCircleLists }                 from '@onderling/kring-host/circleLis
 import { calendarManifest }                from '../../../../calendar/manifest.js';                  // a household bot's calendar, over the circle's store
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
-import { botDoorChecks } from '../../v2/botRungs.js';                                            // the bot door's checks, declared once
+import { botDoorChecks } from '../../v2/botRungs.js';
+import { opDeclared } from '../../v2/manifestSources.js';                                            // the bot door's checks, declared once
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
@@ -4767,6 +4768,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // what a role reaches follows the bot's one roles preset (`assistant.roles`), the same the menus read
       roleAllows: typeof opts.doorRoleAllows === 'function' ? (role, op) => opts.doorRoleAllows(role, op, rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY))) : null,
       roleOf: (c) => doorRoles.get(c) ?? null,
+      // a door reaches declared ops only (an admin at a door is a person at a door, not the owner)
+      isDeclared: (q) => opDeclared(q),
     });
     return firstRefusal(checks, { opId, caller, visibility });
   };

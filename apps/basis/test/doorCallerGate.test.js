@@ -108,9 +108,9 @@ describe('the door caller gate', () => {
     nodes.push(node);
     const { agent } = node;
     await agent.setDoorCaller('telegram:111', 'member');
-    expect(await agent.doorRefusal('listOpen', 'telegram:111')).toBeNull();
+    expect(await agent.doorRefusal('tasks.listOpen', 'telegram:111')).toBeNull();
     await agent.clearDoorCaller('telegram:111');
-    expect(await agent.doorRefusal('listOpen', 'telegram:111')).toBeTruthy();
+    expect(await agent.doorRefusal('tasks.listOpen', 'telegram:111')).toBeTruthy();
     const r = await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:111' });
     expect(r).toMatchObject({ ok: false });
   }, 90_000);

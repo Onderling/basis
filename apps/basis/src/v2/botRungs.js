@@ -18,10 +18,12 @@ export const BOT_DOOR_RUNGS = Object.freeze(['tier', 'door-map', 'door-role']);
  *        null when it is not on this door; absent → every op is on it
  * @param {(role: string|null, opId: string) => boolean} [a.roleAllows]  the door's narrowing of a role (an observer reads)
  * @param {(caller: string) => (string|null)} [a.roleOf]  the role the door gave this caller
+ * @param {(opId: string) => boolean} [a.isDeclared]  does a manifest declare this (qualified) op? An undeclared op is
+ *        refused at the door's map whatever the role — absent → no such check
  * @returns {Array<(input: {opId: string, caller: string, visibility?: string}) => Promise<object|null>>}  `opId` qualified
  *          with its app (`tasks.listOpen`): the map and the role decide on the op the call reaches, never its bare id
  */
-export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, roleOf = () => null }) {
+export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, roleOf = () => null, isDeclared = null }) {
   const levelOf = (opId) => (typeof opLevel === 'function' ? opLevel(opId) : undefined);
   const byLayer = {
     tier: async ({ opId, caller, visibility }) => {
@@ -37,7 +39,11 @@ export function botDoorChecks({ checkCaller, opLevel = null, roleAllows = null, 
       } catch (e) { return refuse('tier', e?.code ?? 'refused'); }
     },
     // an op off the door's map is refused however it is asked for (an op declaring its own level is on the map)
-    'door-map': async ({ opId, visibility }) => (levelOf(opId) === null && visibility === undefined ? refuse('door-map', 'not-on-this-door') : null),
+    // an op no manifest declares is on no door: a role widens which declared ops a person reaches, never the set itself
+    'door-map': async ({ opId, visibility }) => {
+      if (typeof isDeclared === 'function' && !isDeclared(opId)) return refuse('door-map', 'undeclared-op');
+      return levelOf(opId) === null && visibility === undefined ? refuse('door-map', 'not-on-this-door') : null;
+    },
     'door-role': async ({ opId, caller }) => {
       if (typeof roleAllows === 'function') return roleAllows(roleOf(caller), opId) ? null : refuse('door-role', 'role');
       // no role rule handed in: an op the role decides is the admin's alone (fail closed — never wider than the default)

@@ -567,7 +567,26 @@ export async function createRealHouseholdAgent(opts = {}) {
   // THE PERSONA RUNTIME (personaRuntime.js): the keys this device runs for the default persona — its profile seed, the
   // device seed its per-circle keys derive from, its delegation record, its per-circle identities, the authority its
   // commitments name, and its person key's starting point. Named once there; the agent reads it. Only 'default' runs.
-  const personas = new Map([['default', await createPersonaRuntime({ profileId: 'default', ownerRoot, custody, custodySeed, chatVault })]]);
+  // THE PRIMARY: the self this device speaks as — its first held self, which the custody marker names ('default', the
+  // general persona, whenever the device holds it; a device the person left it off names the first persona it was
+  // handed). The two never substitute for each other: 'default' means the person's general persona, never "this device".
+  // A marker naming a self this device does not hold is a broken install — refused, never a fallback to anything.
+  const primaryId = custody.mode === 'delegation' ? custody.profileId : 'default';
+  if (primaryId !== 'default') {
+    let held = [];
+    try { const list = JSON.parse((await chatVault.get(HELD_PERSONAS_VAULT_KEY)) ?? '[]'); held = Array.isArray(list) ? list : []; } catch { held = []; }
+    if (!held.includes(primaryId)) throw new Error(`the custody marker names "${primaryId}", which this device does not hold — restore with the recovery phrase`);
+  }
+  const personas = new Map([[primaryId, await createPersonaRuntime({ profileId: primaryId, ownerRoot, custody, custodySeed, chatVault })]]);
+  // …and the marker must AGREE with the door: the door's seed is the primary's delegation, so its public key is the one
+  // the primary's handed record names. A marker rewritten at rest to name another held self would otherwise run that
+  // self while every phrase check silently failed — a broken install, refused like an unheld one.
+  if (custodySeed) {
+    const handedPub = personas.get(primaryId)?.enrolledDevice?.record?.pubKey ?? null;
+    if (handedPub && handedPub !== deviceDelegationPubKey(custodySeed)) {
+      throw new Error(`the custody marker names "${primaryId}", but the key door holds another self's delegation — restore with the recovery phrase`);
+    }
+  }
   /** A persona's chat key and person key, registered as identities of ours that the persona owns (the secure agent then
    *  signs a send as it, on its own sockets). Idempotent; late-bound to the secure agent (`secureAgentRef`). */
   const registerPersonaIdentities = async (personaId, rt) => {
@@ -580,7 +599,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (rt.personIdentity) sa2.registerSelfIdentity?.(rt.personIdentity.pubKey, rt.personIdentity, { owner });
     } catch (err) { console.warn(`[persona] ${personaId} could not register its identities: ${err?.message ?? err}`); }
   };
-  const persona = personas.get('default');
+  const persona = personas.get(primaryId);   // the primary's runtime: "this device speaks as"
   persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
   const currentPersonKey = () => (persona.personKey ? { version: persona.personKey.version, pubKey: personKeyPubKeyB64(persona.personKey.seed) } : null);
@@ -1642,8 +1661,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Property layer — REGISTER the default profile (the pseudonym) ONCE so a coarse property curated at consent
     // (setProfileProperty) has a profile to land on → cross-app reuse works for the no-login participant too.
     // Guarded on lookup so a later boot never re-registers (which would wipe accumulated properties). Best-effort.
+    // Only on a device that holds the general persona: one that does not has nothing of it to register (its primary's
+    // row self-heals under its own id, with the held personas).
     try {
-      if (!(await agentsRegistry.lookup('default'))) {
+      if (personas.has('default') && !(await agentsRegistry.lookup('default'))) {
         if (ownerRoot) {
           await agentsProfiles.create({ profileId: 'default', name: 'default' });
         } else {
@@ -1666,7 +1687,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // had to write a registry it could not yet see (pre-reload it was still the old install's).
     // Best-effort: a failed write retries on the next boot; circles never DEPEND on the record
     // (every address still proves itself at the roster).
-    if (enrolledDevice) {
+    if (enrolledDevice && primaryId === 'default') {
       try {
         const cur = await agentsRegistry.lookup('default');
         if (cur && !deviceDelegationOf(cur, enrolledDevice.deviceId)) {
@@ -1902,7 +1923,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // not one of Werk's, and nothing a persona's siblings exchange names the default).
   const personaKits = new Map();
   const deviceKitOf = (pid) => {
-    if (!pid || pid === 'default') return { signer: grantsSignerPromise, record: enrolledDevice?.record ?? null, verify: deviceSetVerifier, selfPubKey: chatId.pubKey, sendAs: personAddress() };
+    // the general persona's kit is this device's own only where it holds it — never the primary standing in for it
+    if (!pid || pid === 'default') return personas.has('default') ? { signer: grantsSignerPromise, record: enrolledDevice?.record ?? null, verify: deviceSetVerifier, selfPubKey: chatId.pubKey, sendAs: personAddress() } : null;
     const rt = personas.get(pid);
     if (!rt?.chatId?.pubKey) return null;
     let kit = personaKits.get(pid);
@@ -1953,7 +1975,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // and the contact-thread fan today. Two lookups would be two places for "who am I, elsewhere" to
   // drift apart, and they must answer the same set or a revoke and a message would disagree about
   // which devices are mine.
-  const ownDeviceSiblingRows = () => siblingDevices({
+  // The GENERAL persona's siblings: none on a device that does not hold it — never backed by the primary (this device's
+  // first held self speaks for the device, it does not stand in for the general persona).
+  const ownDeviceSiblingRows = async () => (!personas.has('default') ? [] : siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
     circleAddressFor,
@@ -1969,7 +1993,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       } catch { /* the registry's list alone still serves */ }
       return [...ids].filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId);
     },
-  });
+  }));
   const ownDeviceSiblings = async () => (await ownDeviceSiblingRows()).map((d) => d.address);
   // EVERY ADDRESS THIS PERSON'S DEVICES SPEAK AS — the person-key address (shared by all my devices), the static
   // profile key, this device's per-circle addresses, my siblings' per-circle addresses. What a roster reads to
@@ -2694,6 +2718,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     const label = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
     // the personas the person PICKED for this device (ids from the offer's sealed list) — none: the default only
     const pickedPersonas = (Array.isArray(parts?.[0]?.data?.personas) ? parts[0].data.personas : []).filter((id) => typeof id === 'string' && /^p-[0-9a-f]{12}$/.test(id));
+    // the general persona too, unless the person left it off this device (then the first picked is its primary)
+    const withDefault = parts?.[0]?.data?.withDefault !== false;
     try {
       // The THROWAWAY self's circle ids, read while its registry is still this device's. The clear that
       // follows on the next boot is named after them, and by then there is no agent to ask.
@@ -2702,9 +2728,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       catch { /* a registry that cannot be read leaves the named stores to the list's own constants */ }
       const r = await restoreOwnerRoot({
         mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,
-        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds, personas: pickedPersonas,
+        enrollDevice: { ...(label ? { label } : {}) }, throwawayCircleIds, personas: pickedPersonas, withDefault,
       });
       if (!r.ok) {
+        if (r.code === 'no-persona') return [DataPart({ ok: false, outcome: 'no-persona', error: 'no-persona' })];
         const outcome = (r.code === 'invalid' || r.code === 'empty') ? 'invalid-phrase' : 'error';
         return [DataPart({ ok: false, outcome, error: r.detail ?? r.code })];
       }
@@ -2744,7 +2771,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (ownerRoot) {
       if (root.fingerprint() !== ownerRoot.fingerprint()) return { ok: false, outcome: 'wrong-phrase' };
     } else {
-      const rederived = deriveDeviceSeed(root.deriveAgentSeed('default'), custody.deviceId);
+      const rederived = deriveDeviceSeed(root.deriveAgentSeed(custody.profileId), custody.deviceId);
       const held = custodySeed;
       const same = held instanceof Uint8Array && rederived.length === held.length && rederived.every((v, i) => v === held[i]);
       if (!same) return { ok: false, outcome: 'wrong-phrase' };
@@ -2923,7 +2950,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     } else {
       // Delegation custody: no resident root to compare — the typed phrase must REPRODUCE this
       // very device's delegation seed (deterministic derivation), which only the owner's phrase can.
-      const rederived = deriveDeviceSeed(root.deriveAgentSeed('default'), custody.deviceId);
+      const rederived = deriveDeviceSeed(root.deriveAgentSeed(custody.profileId), custody.deviceId);
       const held = custodySeed;
       const same = held instanceof Uint8Array && rederived.length === held.length
         && rederived.every((v, i) => v === held[i]);
@@ -7443,6 +7470,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     profileIdOf,
     /** Every address this person's devices speak as — what keeps me out of my own Contacten. */
     ownAddresses,
+    /** The devices a self's own traffic is carried to — its siblings (the general persona's for 'default'). Read-only. */
+    siblingDevicesOf: async (selfId = 'default') => (selfId === 'default' ? ownDeviceSiblings() : personaSiblings(selfId)),
 
     /**
      * Presence hook for the delivery guarantee — call when a peer becomes

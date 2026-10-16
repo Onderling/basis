@@ -86,7 +86,7 @@ export const CUSTODY_MODE_KEY = 'custody-mode';
 
 /**
  * Which custody mode this install runs. `{mode:'root'}` (the default — every pre-cutover install)
- * or `{mode:'delegation', deviceId}` after the cutover.
+ * or `{mode:'delegation', deviceId, profileId}` after the cutover (`profileId`: the primary self).
  */
 export async function readCustodyMode(vault) {
   try {
@@ -98,6 +98,9 @@ export async function readCustodyMode(vault) {
       // to recompute it from.
       return {
         mode: 'delegation', deviceId: m.deviceId,
+        // the PRIMARY: the self the door's seed is the delegation of — the device's first held self ('default', the
+        // general persona, when it holds it). A marker from before it was written names the general persona.
+        profileId: typeof m.profileId === 'string' && m.profileId ? m.profileId : 'default',
         fingerprint: typeof m.fingerprint === 'string' ? m.fingerprint : null,
       };
     }
@@ -114,16 +117,17 @@ export async function readCustodyMode(vault) {
  * @param {import('@onderling/vault').Vault} o.markerVault  the UNSEALED owner-root vault.
  * @param {Uint8Array} o.delegationSeed
  * @param {string} o.deviceId
+ * @param {string} [o.profileId='default']  the primary self: whose delegation the seed is
  * @returns {Promise<boolean>} true when the device now runs delegation custody.
  */
-export async function cutoverToDelegation({ rootKeyStore, markerVault, delegationSeed, deviceId, fingerprint } = {}) {
+export async function cutoverToDelegation({ rootKeyStore, markerVault, delegationSeed, deviceId, profileId = 'default', fingerprint } = {}) {
   if (!(delegationSeed instanceof Uint8Array) || delegationSeed.length !== 32 || !deviceId) return false;
   try {
     await rootKeyStore.setSeed(delegationSeed);
     const readback = await rootKeyStore.getSeed();
     if (!sameBytes(readback, delegationSeed)) return false;
     await markerVault.set(CUSTODY_MODE_KEY, JSON.stringify({
-      mode: 'delegation', deviceId, ...(fingerprint ? { fingerprint } : {}),
+      mode: 'delegation', deviceId, profileId, ...(fingerprint ? { fingerprint } : {}),
     }));
     return true;
   } catch { return false; }

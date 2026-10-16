@@ -3715,21 +3715,27 @@ export async function createRealHouseholdAgent(opts = {}) {
     const { root } = proof;
     const pSeed = root.deriveAgentSeed(pid);
     const pDeviceSeed = deriveDeviceSeed(pSeed, wire);
-    const bounded = (p, ms = 3000) => Promise.race([p, new Promise((res) => { setTimeout(res, ms); })]);
-    // 1 — the tombstone, under this persona alone
+    // 1 — the tombstone, under this persona alone. It is the GATE: nothing after it runs unless it is READ BACK revoked —
+    // a device wiped while its delegation is still live on the row (and its device-map row gone) is the worst outcome.
+    const strict = (p, ms = 5000) => Promise.race([p, new Promise((_, rej) => { setTimeout(() => rej(new Error('timeout')), ms); })]);
     let entry = null;
-    try { entry = await bounded(agentsRegistryRef?.lookup?.(pid)); } catch { entry = null; }
+    try { entry = await strict(agentsRegistryRef?.lookup?.(pid)); } catch { entry = null; }
+    // a ceremony needs the row it tombstones (a persona's row here may be missing or stale — never mint over nothing)
+    if (!entry) return [DataPart({ ok: false, error: 'no-record' })];
     try {
-      if (entry) {
-        const rec = deviceDelegationOf(entry, wire);
-        let props = entry.properties ?? {};
-        if (!rec) {
-          const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
-          props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true });
-        } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true });
-        if (props !== (entry.properties ?? {})) await bounded(agentsRegistryRef.register({ ...entry, properties: props }));
-      }
-    } catch (err) { console.warn(`[remove-persona] the tombstone was not written: ${err?.message ?? err}`); }
+      const rec = deviceDelegationOf(entry, wire);
+      let props = entry.properties ?? {};
+      if (!rec) {
+        const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
+        props = registrySetDeviceDelegation(props, wire, { ...minted, revoked: true });
+      } else if (rec.revoked !== true) props = registrySetDeviceDelegation(props, wire, { revoked: true });
+      if (props !== (entry.properties ?? {})) await strict(agentsRegistryRef.register({ ...entry, properties: props }));
+      const back = await strict(agentsRegistryRef.lookup(pid));
+      if (deviceDelegationOf(back, wire)?.revoked !== true) throw new Error('the tombstone did not read back');
+    } catch (err) {
+      console.warn(`[remove-persona] the tombstone was not written — nothing else was done: ${err?.message ?? err}`);
+      return [DataPart({ ok: false, error: 'storage' })];
+    }
     // 2 — its addresses in its circles, retired as it (this device is leaving them: its own address included)
     const circleIds = Object.keys(circleMembershipsOf(entry ?? {}));
     const retiredIn = circleIds.length ? await retireAddresses({ root, circleIds, includeOwn: true, addressFor: (cid) => deriveCircleAddress(pDeviceSeed, cid) }) : [];

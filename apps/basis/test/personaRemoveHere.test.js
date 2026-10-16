@@ -55,6 +55,25 @@ describe('remove a persona from this device', () => {
     await phone.shutdown?.(); await again.shutdown?.();
   }, 120_000);
 
+  it('FAILS CLOSED: a tombstone that cannot be written stops the ceremony — nothing retired, nothing wiped, a retry possible', async () => {
+    const { phone, laptop, lap, phrase, w } = await laptopWithWerk();
+    const werkWire = laptop.persona(w).enrolledDevice.deviceId;
+    const linkRows = async (a) => ((await (await a.ownStore()).list?.()) ?? []).filter((it) => it?.type === 'device-link').map((it) => it.wireId).sort();
+    let own = [];
+    for (let i = 0; i < 40 && !own.includes(werkWire); i++) { own = await linkRows(laptop); if (!own.includes(werkWire)) await new Promise((r) => setTimeout(r, 100)); }   // written just after boot
+    expect(own, 'Werk\'s device-map row is there before').toContain(werkWire);
+    // the registry's medium refuses every write from here on
+    lap.registryBackend.put = async () => { throw new Error('the medium is gone'); };
+    const r = await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: w });
+    expect(r).toMatchObject({ ok: false, error: 'storage' });
+    const keys = (await lap.chatVault.list?.()) ?? [];
+    for (const slot of ['agent-privkey', 'person-key', 'device-delegation-seed']) expect(keys, `Werk's ${slot} kept`).toContain(`${slot}:${w}`);
+    expect(((await laptop.callSkill('household', 'listPersonasHere', {}))?.personas ?? []).map((p) => p.id), 'still held').toContain(w);
+    expect(laptop.persona(w)?.enrolledDevice?.deviceId, 'Werk still runs here, as before').toBe(werkWire);
+    expect(await linkRows(laptop), 'the device-map row stays').toEqual(own);
+    await phone.shutdown?.(); await laptop.shutdown?.();
+  }, 120_000);
+
   it('refuses the primary, a wrong phrase, a paused persona, and a root-custody device', async () => {
     const { phone, laptop, phrase, w } = await laptopWithWerk();
     expect(await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: 'default' })).toMatchObject({ ok: false, error: 'key-holder' });

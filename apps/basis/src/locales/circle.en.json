@@ -7392,7 +7392,9 @@
     "offer_error": "Could not build the code (this device is not in any circle yet).",
     "offer_paste_label": "Code from your current device (optional)",
     "personas_title": "Which personas does this device get?",
-    "personas_hint": "Only what you tick comes to this device. Nothing ticked: just you, as always. Give a device you trust less fewer of them.",
+    "personas_hint": "Only what you tick comes to this device. A device you trust less is better given less.",
+    "speaks_as": "This device speaks as {{name}}.",
+    "last_self": "A device keeps at least one persona.",
     "offer_paste_invalid": "That is not a valid add-device code.",
     "offer_back": "Back",
     "offer_code_label": "Code:",
@@ -7441,7 +7443,8 @@
     "body": "Type the recovery phrase to remove this device everywhere. Its keys stop being accepted in all your circles; the device itself becomes an island.",
     "submit": "Remove this device",
     "done": "Device removed. Every circle now refuses its keys.",
-    "failed": "Removing failed."
+    "failed": "Removing failed.",
+    "outcome_partial": "Revoked in the circles of the personas on this device. Repeat this on a device with your general persona — there the device is also taken out of your general circles."
   },
   "companionClaim": {
     "title": "Claim a companion",

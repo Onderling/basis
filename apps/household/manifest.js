@@ -558,6 +558,9 @@ export const householdManifest = {
         // WHICH PERSONAS this device is handed (a list of persona ids, picked from the offer's sealed list — opened with
         // the phrase on this device); absent or empty = the default only, the low-trust device's set
         { name: 'personas', kind: 'object' },
+        // …and whether the GENERAL persona comes too (absent = yes). Off only beside a picked persona: the first picked is
+        // then the device's primary — the self it speaks as.
+        { name: 'withDefault', kind: 'boolean' },
       ],
       // CEREMONY-ONLY: reached through the enroll-device flow (the first-run/settings shells
       // start it); no chat/slash surface — a phrase does not belong in a chat box.

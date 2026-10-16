@@ -1,4 +1,11 @@
 /**
+ * Whether a ceremony ENDED (done — close, no retry): `ok`, and `partial` — it did what this device can, and its line
+ * says what is left to do elsewhere (retrying here would do the same part again and nothing more).
+ * @param {string|null} outcome
+ */
+export function ceremonyFinished(outcome) { return outcome === 'ok' || outcome === 'partial'; }
+
+/**
  * The line a device ceremony ends on (revoke, replace, claim a companion), as both shells paint it: done, a phrase
  * that is not the owner's, an outcome the ceremony words itself (`circle.<prefix>.outcome_<outcome>` — a clock that
  * is off, a code that ran out), the op's own error, or the ceremony's "failed".

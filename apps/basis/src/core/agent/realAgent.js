@@ -219,7 +219,7 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot, handPersonasInto, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
@@ -3084,19 +3084,29 @@ export async function createRealHouseholdAgent(opts = {}) {
           const pid = entry?.agentId;
           if (typeof pid !== 'string' || !pid.startsWith('p-')) continue;
           const pSeed = root.deriveAgentSeed(pid);
-          const pWire = wireDeviceId(pSeed, internalId);
-          const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
+          // THE PERSONA'S ROW IS THE TRUTH of which of its ids for this device are live: walk the generations on it — 0, 1,
+          // 2 … up to the first ABSENT record — and tombstone every one not yet a tombstone (a device-map row that never
+          // reached this device must not leave a live id behind). Generation 0 is minted already revoked when absent, as
+          // before; the device-map row is a hint for nothing here.
+          let pWire = personaWireAt(pSeed, internalId, 0);
           try {
-            const rec = deviceDelegationOf(entry, pWire);
             let props = entry.properties ?? {};
-            if (!rec) {
-              const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
-              props = registrySetDeviceDelegation(props, pWire, { ...minted, revoked: true });
-            } else if (rec.revoked !== true) {
-              props = registrySetDeviceDelegation(props, pWire, { revoked: true });
+            for (let gen = 0; gen < 64; gen++) {
+              const wireAt = personaWireAt(pSeed, internalId, gen);
+              const rec = deviceDelegationOf({ ...entry, properties: props }, wireAt);
+              if (!rec && gen > 0) break;   // the first absent generation ends the walk
+              const seedAt = deriveDeviceSeed(pSeed, wireAt);
+              if (!rec) {
+                const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wireAt, pubKey: deviceDelegationPubKey(seedAt) });
+                props = registrySetDeviceDelegation(props, wireAt, { ...minted, revoked: true });
+              } else if (rec.revoked !== true) {
+                props = registrySetDeviceDelegation(props, wireAt, { revoked: true });
+              }
+              pWire = wireAt;   // the last one the device had under this persona — the one its circles know
             }
             if (props !== (entry.properties ?? {})) await bounded(agentsRegistryRef.register({ ...entry, properties: props }));
           } catch (err) { console.warn(`[ceremony] the device's record under a persona was not tombstoned: ${err?.message ?? err}`); }
+          const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
           revokedUnder[pid] = pWire;
           const pCircles = Object.keys(circleMembershipsOf(entry));
           if (pCircles.length) {
@@ -3740,7 +3750,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const circleIds = Object.keys(circleMembershipsOf(entry ?? {}));
     const retiredIn = circleIds.length ? await retireAddresses({ root, circleIds, includeOwn: true, addressFor: (cid) => deriveCircleAddress(pDeviceSeed, cid) }) : [];
     // 3 — its row on the private device map (rides its own lane to its other devices)
-    try { const st = await getOwnStore(); await st.remove?.(`device-link:${wire}`); } catch (err) { console.warn(`[remove-persona] the device-map row stays: ${err?.message ?? err}`); }
+    try { const st = await getOwnStore(); await st.delete(`device-link:${wire}`); } catch (err) { console.warn(`[remove-persona] the device-map row stays: ${err?.message ?? err}`); }
     // 4 — wiped here: its circles' local content, its slots, its place in the lists
     for (const cid of circleIds) { try { await selfAgent?.forgetCircleContent?.(cid); } catch { /* best-effort */ } }
     const slots = personaVault(chatVault, pid);
@@ -3799,6 +3809,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       const held = await handPersonasInto({
         root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
         label: persona.enrolledDevice?.label ?? null, personas: picked,
+        // a persona removed here before is handed under its next generation: the old id's record is a tombstone
+        isTombstoned: async (pid, wire) => { try { return deviceDelegationOf(await agentsRegistryRef?.lookup?.(pid), wire)?.revoked === true; } catch { return false; } },
       });
       // ...and each received persona REJOINS its circles at the next boot, as a restored device rejoins the default's:
       // the members it knows (the rosters the recovery file landed here) become a bootstrap offer — announce this

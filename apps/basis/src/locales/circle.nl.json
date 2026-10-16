@@ -7362,7 +7362,7 @@
   "receive_personas": {
     "close": "Sluiten",
     "remove": "Verwijderen van dit apparaat",
-    "remove_warn": "Dit haalt {{name}} van dit apparaat: zijn sleutels en wat het hier bewaart worden gewist, en dit apparaat telt in zijn kringen niet meer mee. Dat kan niet ongedaan worden. Typ je herstelzin om door te gaan.",
+    "remove_warn": "Dit haalt {{name}} van dit apparaat: zijn sleutels en wat het hier bewaart worden gewist, en dit apparaat telt in zijn kringen niet meer mee. Dat kan hier niet ongedaan worden — met je herstelzin kun je hem later opnieuw hierheen halen. Typ je herstelzin om door te gaan.",
     "remove_submit": "Verwijderen",
     "done_remove_reload": "Klaar. {{name}} is van dit apparaat gehaald. Herstart de app.",
     "remove_key_holder": "Dit apparaat spreekt als deze persona; die kan er niet af.",

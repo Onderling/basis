@@ -219,7 +219,7 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot, handPersonasInto, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
+import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
@@ -3080,11 +3080,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       try {
         const internalId = linkedInternalId;
         const entries = internalId ? ((await bounded(agentsRegistryRef?.list?.())) ?? []) : [];
+        let linkRows = [];
+        try { linkRows = ((await (await getOwnStore()).list?.()) ?? []).filter((it) => it?.type === 'device-link'); } catch { linkRows = []; }
         for (const entry of entries) {
           const pid = entry?.agentId;
           if (typeof pid !== 'string' || !pid.startsWith('p-')) continue;
           const pSeed = root.deriveAgentSeed(pid);
-          const pWire = wireDeviceId(pSeed, internalId);
+          // the persona's wire id of the device: from ITS row on the device map (written as that persona — a persona
+          // handed again after a removal shows a later generation), else generation 0 (rows from before)
+          const pWire = linkRows.find((it) => it.internalId === internalId && it.createdBy && it.createdBy === entry?.pubKey)?.wireId
+            ?? personaWireAt(pSeed, internalId, 0);
           const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
           try {
             const rec = deviceDelegationOf(entry, pWire);
@@ -3799,6 +3804,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       const held = await handPersonasInto({
         root: proof.root, chatVault: chatVaultBacking, atRestKey, internalId: persona.internalDeviceId,
         label: persona.enrolledDevice?.label ?? null, personas: picked,
+        // a persona removed here before is handed under its next generation: the old id's record is a tombstone
+        isTombstoned: async (pid, wire) => { try { return deviceDelegationOf(await agentsRegistryRef?.lookup?.(pid), wire)?.revoked === true; } catch { return false; } },
       });
       // ...and each received persona REJOINS its circles at the next boot, as a restored device rejoins the default's:
       // the members it knows (the rosters the recovery file landed here) become a bootstrap offer — announce this

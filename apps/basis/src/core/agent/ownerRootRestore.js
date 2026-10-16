@@ -228,10 +228,20 @@ async function handGeneralPersona({ root, chatVault, atRestKey, deviceId, delega
  * "these personas here too" step (`receivePersonas`). A persona not handed is never run on a device without the root.
  * Every call also leaves the person's recovery seal (`RECOVERY_SEAL_VAULT_KEY`) on the device.
  *
- * @param {{ root: object, chatVault: object, atRestKey: Uint8Array, internalId: string, label?: string|null, personas: string[] }} a
+ * @param {{ root: object, chatVault: object, atRestKey: Uint8Array, internalId: string, label?: string|null, personas: string[], isTombstoned?: (pid: string, wireId: string) => Promise<boolean> }} a
+ *   `isTombstoned`: whether that wire id's record on the persona's row is a tombstone — the hand then takes the next
+ *   generation (a persona removed here and handed again); absent, every hand is generation 0 (a new device).
  * @returns {Promise<string[]>} the device's held list after the hand-over
  */
-export async function handPersonasInto({ root, chatVault, atRestKey, internalId, label = null, personas = [] } = {}) {
+/**
+ * A persona's WIRE ID of this device, at a generation: generation 0 is the persona's seed over the device's internal id
+ * (every device that never had the persona removed); generation n is over `${internalId}/n` — what a persona handed
+ * again after its removal here shows, since generation 0's record is tombstoned on its row.
+ * @param {Uint8Array} profileSeed @param {string} internalId @param {number} [gen]
+ */
+export function personaWireAt(profileSeed, internalId, gen = 0) { return wireDeviceId(profileSeed, gen ? `${internalId}/${gen}` : internalId); }
+
+export async function handPersonasInto({ root, chatVault, atRestKey, internalId, label = null, personas = [], isTombstoned = async () => false } = {}) {
   const sealed = new VaultEncrypted({ backing: chatVault, key: atRestKey });
   const defaultSlots = personaVault(sealed, DEFAULT_PROFILE);
   let held = [];
@@ -242,7 +252,10 @@ export async function handPersonasInto({ root, chatVault, atRestKey, internalId,
     const pVault = personaVault(sealed, pid);
     await loadProfile({ ownerRoot: root, profileId: pid, vault: pVault });
     await storePersonKey(pVault, { version: 1, seed: derivePersonKeySeed(pSeed, 1), linkKeyPub: personKeyPubKeyB64(derivePersonLinkKeySeed(pSeed)) });
-    const pWire = wireDeviceId(pSeed, internalId);
+    // the first generation whose record on the persona's row is not tombstoned (generation 0 unless it was removed here)
+    let gen = 0;
+    while (gen < 64 && await isTombstoned(pid, personaWireAt(pSeed, internalId, gen))) gen += 1;
+    const pWire = personaWireAt(pSeed, internalId, gen);
     const pDeviceSeed = deriveDeviceSeed(pSeed, pWire);
     let pRecord = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: pWire, pubKey: deviceDelegationPubKey(pDeviceSeed) });
     if (label) pRecord = { ...pRecord, label };

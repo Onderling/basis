@@ -61,6 +61,10 @@ describe('a device without the general persona, at the person-sites', () => {
     expect(after.version, 'Werk\'s key did not move (the lost device was never Werk\'s here)').toBe(before.version);
     expect(Buffer.from(after.seed).toString('hex')).toBe(Buffer.from(before.seed).toString('hex'));
     expect(r.personKeyVersion, 'no general-persona rotation reported').toBeUndefined();
+    // …and it SAYS it is partial: the lost device most likely held the general persona, whose part this device cannot do
+    expect(r.ok, 'what it could do, it did').toBe(true);
+    expect(r.outcome).toBe('partial');
+    expect(r.undone).toEqual(['general']);
     expect(((await laptop.callSkill('agents', 'listAgents', {}))?.items ?? []).map((x) => x.agentId), 'no general-persona row minted for the tombstone').not.toContain('default');
     await phone.shutdown?.(); await laptop.shutdown?.();
   }, 120_000);

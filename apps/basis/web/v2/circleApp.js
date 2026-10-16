@@ -127,7 +127,7 @@ import {
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
-import { ceremonyOutcomeText } from '../../src/v2/ceremonyOutcome.js';
+import { ceremonyOutcomeText, ceremonyFinished } from '../../src/v2/ceremonyOutcome.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
@@ -5654,19 +5654,20 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     }
 
     const outcome = inst?.steps?.ceremony?.outcome;
+    const finished = ceremonyFinished(outcome);   // ok, or partial: it said what is left — no retry
     const msg = document.createElement('p');
     msg.textContent = ceremonyOutcomeText({ keyPrefix, outcome, out: inst?.steps?.ceremony?.out, t });
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'cc-btn cc-btn--primary';
-    btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
+    btn.textContent = finished ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
-      if (outcome === 'ok') return done();
+      if (finished) return done();
       close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
     });
     card.appendChild(btn);
-    if (outcome !== 'ok') {
+    if (!finished) {
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'cc-btn cc-btn--quiet';

@@ -7443,7 +7443,8 @@
     "body": "Typ de herstelzin om dit apparaat overal in te trekken. Zijn sleutels worden in al je kringen geweigerd; het apparaat zelf wordt een eiland.",
     "submit": "Dit apparaat intrekken",
     "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
-    "failed": "Intrekken is mislukt."
+    "failed": "Intrekken is mislukt.",
+    "outcome_partial": "Ingetrokken in de kringen van de persona's op dit apparaat. Herhaal dit op een apparaat met je algemene persona — daar wordt het apparaat ook uit je algemene kringen gezet."
   },
   "companionClaim": {
     "title": "Een companion claimen",

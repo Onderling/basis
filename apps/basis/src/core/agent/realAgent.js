@@ -3189,6 +3189,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       const botsTold = await tellLinkedBotsRevoked(root, deviceId);
       return [DataPart({
         ok: true, deviceId, known, revokedIn, revokedUnder, circles: revokedIn.length, nodesTold, botsTold,
+        // a device without the general persona did only its personas' parts — the lost device most likely held the
+        // general persona too, and that part has to be done on a device that holds it (it is a member of those circles)
+        ...(holdsGeneral ? {} : { outcome: 'partial', undone: ['general'] }),
         ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];

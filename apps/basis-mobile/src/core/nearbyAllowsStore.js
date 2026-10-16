@@ -67,3 +67,17 @@ export function writeNearbyAllows(next) {
   cached = { card: next.card === true, chat: next.chat === true };
   AsyncStorage.setItem(KEY, JSON.stringify(cached)).catch(() => {});
 }
+
+/**
+ * Who this device enters the Nearby room as, when several selves are ticked in the header: the last answer, kept per
+ * device as the question's default (nothing more durable). The rule is the shared `nearbyRoomSelf`.
+ */
+const SELF_KEY = 'cc.nearbySelf';
+let roomSelf = null;
+AsyncStorage.getItem(SELF_KEY).then((raw) => { if (typeof raw === 'string' && raw) roomSelf = raw; }).catch(() => {});
+export function readNearbySelf() { return roomSelf; }
+export function writeNearbySelf(id) {
+  if (typeof id !== 'string' || !id) return;
+  roomSelf = id;
+  AsyncStorage.setItem(SELF_KEY, id).catch(() => {});
+}

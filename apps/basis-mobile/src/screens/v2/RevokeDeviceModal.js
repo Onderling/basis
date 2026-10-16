@@ -10,7 +10,7 @@ import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
-import { ceremonyOutcomeText } from '../../../../basis/src/v2/ceremonyOutcome.js';
+import { ceremonyOutcomeText, ceremonyFinished } from '../../../../basis/src/v2/ceremonyOutcome.js';
 
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
@@ -83,7 +83,7 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
                 {ceremonyOutcomeText({ keyPrefix, outcome, out: inst?.steps?.ceremony?.out, t })}
               </Text>
               <View style={styles.row}>
-                {outcome !== 'ok' ? (
+                {!ceremonyFinished(outcome) ? (
                   <Pressable
                     style={styles.button}
                     onPress={() => {

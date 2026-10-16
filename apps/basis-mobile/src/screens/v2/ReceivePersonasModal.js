@@ -21,6 +21,7 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   const [phrase, setPhrase] = useState('');
   const [result, setResult] = useState(null);   // null | 'done' | 'done-seal' | 'paused' | 'resumed' | 'wrong' | 'failed'
   const [here, setHere] = useState([]);   // the selves this device holds (`listPersonasHere`), as the shared rows
+  const [actedName, setActedName] = useState('');   // the persona the last pause/resume was for (its done line names it)
   useEffect(() => {
     if (!visible || typeof callSkill !== 'function') return;
     let alive = true;
@@ -45,10 +46,12 @@ export default function ReceivePersonasModal({ visible, callSkill, onClose }) {
   // a row's one act — pause a running persona, resume a paused one (a device op, no phrase; the next boot takes it)
   const act = async (row) => {
     const r = await callSkill('household', row.act.op, { personaId: row.id }).catch(() => null);
+    setActedName(row.nameKey ? t(row.nameKey) : row.name);
     setResult(r?.ok ? (row.act.op === 'pausePersona' ? 'paused' : 'resumed') : 'failed');
   };
   const message = result === 'done' ? t('circle.receive_personas.done_reload')
-    : result === 'paused' ? t('circle.receive_personas.done_pause_reload')
+    // what still holds until the restart (the restart hint is the line itself on a phone)
+    : result === 'paused' ? t('circle.receive_personas.done_pause_reload', { name: actedName })
     : result === 'resumed' ? t('circle.receive_personas.done_resume_reload')
     : result === 'done-seal' ? t('circle.receive_personas.done_seal_reload')
     : result === 'wrong' ? t('circle.receive_personas.wrong_phrase')

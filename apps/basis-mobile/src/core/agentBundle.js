@@ -58,6 +58,7 @@ import { sendA2ATask } from '@onderling/core';
 // mDNS-only and blind to BLE.
 import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
+import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
 import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
@@ -491,31 +492,15 @@ export async function bootAgentBundle(opts = {}) {
     listPeers: () => nearbyPeers.list(),
     subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),   // a newcomer is told the room as it stands
     myAddress: () => agent?.sa?.agent?.identity?.pubKey ?? null,
-    // Rung 4 — what "share how to reach me" shares: the relay this device rides, and the NKN address
-    // only if the publication lock allows (the same lock the invite QR honours). All-or-nothing by
-    // Frits' call; deciding WHAT "all" is happens here, not in the room code.
-    myAddresses: async () => {
-      const out = {};
-      try { const url = await resolveMobileRelayUrl(); if (url) out.relay = { url }; } catch { /* no relay is honest */ }
-      try {
-        const allow = agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY);
-        const addr = agent?.peer?.address ?? null;
-        if (allow === true && typeof addr === 'string' && addr) out.nkn = { address: addr };
-      } catch { /* the lock stays closed on a broken read */ }
-      return out;
-    },
-    // The face this device presents in the room: the SAME faces a circle offers — displayName,
-    // handle, or nobody — chosen per device in "You here" (nearbyAllowsStore), a label only.
-    myFace: async () => {
-      try {
-        const choice = readNearbyFace();
-        if (choice === 'none') return null;
-        const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
-        const e = r?.entry ?? {};
-        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
-        return label ? { label: String(label) } : null;
-      } catch { return null; }
-    },
+    // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
+    // shell hands in only where its face choice lives (nearbyAllowsStore) and how it reaches its relay and NKN address.
+    ...createNearbyIdentity({
+      readChoice: readNearbyFace,
+      callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
+      relayUrl: () => resolveMobileRelayUrl(),
+      shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
+      nknAddress: () => agent?.peer?.address ?? null,
+    }),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
 

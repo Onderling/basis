@@ -7,6 +7,7 @@
  * sees the choice. Never fanned, never shared — it decides what THIS device shows and joins.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NEARBY_FACES } from '../../../basis/src/v2/nearbyIdentity.js';
 
 const KEY = 'cc.nearbyAllows';
 let cached = null;
@@ -38,10 +39,10 @@ export function firstNearbyMineOpen() {
  */
 const FACE_KEY = 'cc.nearbyFace';
 let face = 'name';
-AsyncStorage.getItem(FACE_KEY).then((raw) => { if (raw === 'handle' || raw === 'none' || raw === 'name') face = raw; }).catch(() => {});
+AsyncStorage.getItem(FACE_KEY).then((raw) => { if (NEARBY_FACES.includes(raw)) face = raw; }).catch(() => {});
 export function readNearbyFace() { return face; }
 export function writeNearbyFace(next) {
-  if (next !== 'name' && next !== 'handle' && next !== 'none') return;
+  if (!NEARBY_FACES.includes(next)) return;
   face = next;
   AsyncStorage.setItem(FACE_KEY, next).catch(() => {});
 }

@@ -750,6 +750,7 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
+import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES } from '../../src/v2/nearbyIdentity.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
@@ -1603,29 +1604,15 @@ function ensureNearbyRoom(agent = _peerAgent) {
     listPeers: () => [],
     myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
     deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
-    // Rung 4 — what "share how to reach me" shares (all-or-nothing; the NKN address only if the
-    // publication lock allows).
-    myAddresses: async () => {
-      const out = {};
-      if (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL) out.relay = { url: CIRCLE_RELAY_URL };
-      try {
-        const allow = agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY);
-        const addr = agent?.peer?.address ?? null;
-        if (allow === true && typeof addr === 'string' && addr) out.nkn = { address: addr };
-      } catch { /* the lock stays closed on a broken read */ }
-      return out;
-    },
-    // The SAME faces a circle offers — displayName, handle, or nobody — chosen per device.
-    myFace: async () => {
-      try {
-        const choice = readNearbyFace();
-        if (choice === 'none') return null;
-        const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
-        const e = r?.entry ?? {};
-        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
-        return label ? { label: String(label) } : null;
-      } catch { return null; }
-    },
+    // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
+    // shell hands in only where its face choice lives and how it reaches its relay and NKN address.
+    ...createNearbyIdentity({
+      readChoice: readNearbyFace,
+      callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
+      relayUrl: () => (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL ? CIRCLE_RELAY_URL : null),
+      shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
+      nknAddress: () => agent?.peer?.address ?? null,
+    }),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
   // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
@@ -4022,8 +4009,8 @@ function openNearbyThread(thread, seed = []) {
 }
 
 // The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.
-function readNearbyFace() { try { const v = localStorage.getItem('basis.nearbyFace'); return (v === 'handle' || v === 'none') ? v : 'name'; } catch { return 'name'; } }
-function writeNearbyFace(v) { try { if (v === 'name' || v === 'handle' || v === 'none') localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
+function readNearbyFace() { try { return nearbyFaceChoice(localStorage.getItem('basis.nearbyFace')); } catch { return 'name'; } }
+function writeNearbyFace(v) { try { if (NEARBY_FACES.includes(v)) localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
 function readNearbyAllows() { try { const raw = localStorage.getItem('basis.nearbyAllows'); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeNearbyAllows(next) {

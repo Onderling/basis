@@ -52,6 +52,10 @@ export const SEAMS = Object.freeze([
   // There is no default relay: a person's device that knows none ASKS at the first action that needs one (an invite).
   // The box is left out on purpose — it has no person to ask; its relay is its operator's argument.
   { id: 'relay-question', pattern: /await askRelayIfNone\(\)/, shells: ['web', 'mobile'], why: 'a device with no relay asks for one before it makes an invite that would carry none' },
+  // WHAT THE NEARBY ROOM IS TOLD ABOUT YOU — the face (name · handle · nobody) and "share how to reach me" (the relay; the
+  // NKN address behind the publication lock): decided once (`src/v2/nearbyIdentity.js`). Both person shells carried the
+  // same two functions by copy until 2026-10-16. The box has no room.
+  { id: 'nearby-identity', pattern: /createNearbyIdentity\(/, shells: ['web', 'mobile'], why: 'the room learns the same face and addresses from every shell, under the same lock' },
   // JOINING AS A PERSONA: the redeem names WHO joins — the circle's persona (`agent.circleSelf`), so it leaves as that
   // persona on its own socket and announces its person key. A shell that built the redeem without it would join every
   // circle as the default, whatever the person picked (2026-10-10).

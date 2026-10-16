@@ -19,7 +19,7 @@ import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
 import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
-import { nearbyRoomSelf, nearbyRoomSelfView, NEARBY_FACES } from '../../../../basis/src/v2/nearbyIdentity.js';
+import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor, NEARBY_FACES } from '../../../../basis/src/v2/nearbyIdentity.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -5309,7 +5309,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   const roomR = useMemo(() => nearbyRoomSelf({ active: selvesOn, held: heldSelves, remembered: roomPick }), [selvesOn, heldSelves, roomPick]);
   const roomView = useMemo(() => nearbyRoomSelfView(roomR, heldSelves), [roomR, heldSelves]);
   useEffect(() => {
-    bundle?.setNearbyRoomSelf?.(() => (roomR.self ? (heldSelves.find((p) => p.id === roomR.self) ?? { id: roomR.self }) : null));
+    bundle?.setNearbyRoomSelf?.(() => roomSelfFor(roomR, heldSelves));   // asking is a state: no face until the answer
   }, [bundle, roomR, heldSelves]);
   const pickRoomSelf = useCallback((id) => { writeNearbySelf(id); setRoomPick(id); Promise.resolve(bundle?.nearbyRoom?.announceFace?.()).catch(() => {}); }, [bundle]);
   // View state, not model state: whether THIS device currently has a text box open says nothing about

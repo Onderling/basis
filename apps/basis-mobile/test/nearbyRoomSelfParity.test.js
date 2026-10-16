@@ -17,6 +17,7 @@ describe('the Nearby room self — parity', () => {
     for (const src of [web, mobile]) {
       expect(src).toContain('nearbyRoomSelf(');
       expect(src).toContain('nearbyRoomSelfView(');
+      expect(src, 'asking is handed as a state').toContain('roomSelfFor(');
       expect(src).toMatch(/roomSelf: \(\) =>/);
       for (const k of ['as_self', 'as_self_pick', 'as_self_caveat']) expect(src, k).toContain(`circle.nearbyScreen.${k}`);
     }

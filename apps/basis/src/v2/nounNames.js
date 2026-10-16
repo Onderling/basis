@@ -19,7 +19,11 @@ export function nounWords({ manifests = allManifests() } = {}) {
     if (all.length !== 1) continue;
     for (const [lang, forms] of Object.entries(all[0])) {
       out[lang] ??= {};
-      for (const form of ['one', 'other']) if (typeof forms?.[form] === 'string') out[lang][`${noun}_${form}`] = { text: forms[form] };
+      // `one` is optional: a language that declares none says its `other` for one too ("aanbod"), in its own words —
+      // left absent, both shells' fallback language would answer in English before any default was read
+      if (typeof forms?.other !== 'string') continue;
+      out[lang][`${noun}_one`] = { text: typeof forms.one === 'string' ? forms.one : forms.other };
+      out[lang][`${noun}_other`] = { text: forms.other };
     }
   }
   return out;
@@ -28,7 +32,7 @@ export function nounWords({ manifests = allManifests() } = {}) {
 const capital = (s) => (s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s);
 
 /** A heading over a noun's rows: its plural form, capitalised ("Afspraken"). @param {Function} t @param {string} noun */
-export function nounHeading(t, noun) { return capital(t(`noun.${noun}`, { count: 2 })); }
+export function nounHeading(t, noun) { return capital(nounWord(t, noun, 2)); }
 
 /** A noun's word inside a sentence, as declared ("afspraak"). @param {Function} t @param {string} noun @param {number} [count] */
 export function nounWord(t, noun, count = 1) { return t(`noun.${noun}`, { count }); }

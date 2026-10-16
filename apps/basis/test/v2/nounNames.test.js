@@ -25,13 +25,25 @@ describe('a noun is named by its manifest', () => {
     expect(w.nl.repair_one.text).toBe('reparatie');
     expect(w.nl.repair_other.text).toBe('reparaties');
     expect(w.en.repair_other.text).toBe('repairs');
-    expect(w.en.repair_one).toBeUndefined();   // `one` is optional: the shells fall back to `other`
+    expect(w.en.repair_one.text).toBe('repairs');   // `one` is optional: a language without it says `other` for one too
   });
 
   it('a heading is the plural form, capitalised; a word in a sentence is as declared', () => {
     const t = tFrom(nounWords().nl);
     expect(nounHeading(t, 'calendar-event')).toBe('Afspraken');
     expect(nounWord(t, 'calendar-event')).toBe('afspraak');
+  });
+
+  it('a language that declares only the plural says the plural for one too — in its own words, never the raw key or English', () => {
+    // as i18next does it: `_one` asked, absent → the key itself, unless a default is handed
+    const block = nounWords().nl;
+    const t = (key, o = {}) => {
+      const k = key.replace(/^noun\./, '');
+      const leaf = block[k] ?? block[`${k}_${o.count === 1 ? 'one' : 'other'}`];
+      return leaf?.text ?? o.defaultValue ?? key;
+    };
+    expect(nounWord(t, 'offer')).toBe('aanbod');
+    expect(nounHeading(t, 'offer')).toBe('Aanbod');
   });
 
   it('every noun a merged view shows says its name in both languages', () => {

@@ -7263,6 +7263,14 @@
     "charter_max": {
       "text": "≤ {{rung}}",
       "doc": "mij#personas — charter-cel: de circle vraagt deze eigenschap tot maximaal deze sport."
+    },
+    "new_persona_offerings": {
+      "text": "Wat je aanbiedt — ook als {{name}}?",
+      "doc": "The new-persona form: does this persona take the general persona's offerings too? Unticked by default (a work persona that silently 'offers' your gardening would surprise you); {{name}} is the name being typed."
+    },
+    "new_persona_offerings_unnamed": {
+      "text": "deze persona",
+      "doc": "The new-persona form: the name in the offerings question while none is typed yet."
     }
   },
   "attach": {

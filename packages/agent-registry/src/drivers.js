@@ -13,6 +13,7 @@
 // that knows a driver's internal shape.
 
 import { descriptor } from './propertyVocabulary.js';
+import { effectiveProperties } from './profileProperties.js';
 
 /**
  * The kinds of personal driver. `driver` is the generic catch-all; the rest are finer intents.
@@ -139,4 +140,29 @@ export function driversFromProperties(properties) {
     if (isDriverValue(value)) out[key] = value;
   }
   return out;
+}
+
+/**
+ * The persona's own marker for its OFFERINGS: does it take the general persona's offerings as its own? A new persona
+ * is asked ("what you offer — also as <name>?", default no) and the answer is kept here; a persona from before has no
+ * marker and inherits as every property does. A key no charter or editor renders (the leading underscore).
+ */
+export const OFFERINGS_INHERIT_KEY = '_inherit.offering';
+
+/**
+ * A profile's effective DRIVER values: what it inherits and what it has of its own (`effectiveProperties`), with one
+ * stop — a persona whose own marker says no does not take the general persona's offering drivers (its own offerings,
+ * and every other kind, stay). The one place a persona's drivers are read for matching and for the editor.
+ * @param {(id: string) => object|null} getProfile
+ * @param {string} profileId
+ * @param {{defaultProfileId?: string}} [opts]
+ * @returns {Record<string, object>}
+ */
+export function effectiveDrivers(getProfile, profileId, opts = {}) {
+  const all = driversFromProperties(effectiveProperties(getProfile, profileId, opts));
+  const self = getProfile(profileId);
+  const marker = self?.properties?.[OFFERINGS_INHERIT_KEY];
+  if (!(marker && marker.mode === 'own' && marker.value === false)) return all;
+  const ownKeys = new Set(Object.entries(self?.properties ?? {}).filter(([, p]) => p?.mode === 'own').map(([k]) => k));
+  return Object.fromEntries(Object.entries(all).filter(([key, d]) => d?.kind !== 'offering' || ownKeys.has(key)));
 }

@@ -14,7 +14,7 @@
  * Pure render — the host (`circleApp.js`) owns the op calls:
  *   onSetProperty(key, value)                        → setProfileProperty (default profile)
  *   onAddOffering({text, tags})                         → setProfileDriver   (kind 'offering')
- *   onCreatePersona(name)                            → createProfile
+ *   onCreatePersona(name, { takeOfferings })         → createProfile (newPersonaArgs)
  *   onToggleDisclosure(circleId, key, on, personaId) → setProfileDisclosure
  *   onShareToCircle(circleId, personaId)             → push the release to the roster
  */
@@ -278,13 +278,23 @@ function renderPersonas(tr, model, { onCreatePersona }) {
       const name = el('input', 'cc-mij__input');
       name.type = 'text';
       name.placeholder = tr('circle.mij.new_persona_ph');
+      // what you offer — also as this persona? Unticked: a work persona must not silently 'offer' your gardening
+      const offerRow = el('label', 'cc-mij__new-offerings');
+      const offer = el('input', 'cc-mij__new-offerings-tick');
+      offer.type = 'checkbox';
+      offer.checked = false;
+      const offerText = el('span', null, '');
+      const wordOffer = () => { offerText.textContent = tr('circle.mij.new_persona_offerings', { name: name.value.trim() || tr('circle.mij.new_persona_offerings_unnamed') }); };
+      wordOffer();
+      name.addEventListener('input', wordOffer);
+      offerRow.append(offer, offerText);
       const create = el('button', 'cc-btn cc-btn--primary', tr('circle.mij.new_persona_create'));
       create.type = 'button';
-      create.addEventListener('click', () => { const v = name.value.trim(); if (v) onCreatePersona(v); });
+      create.addEventListener('click', () => { const v = name.value.trim(); if (v) onCreatePersona(v, { takeOfferings: offer.checked }); });
       const cancel = el('button', 'cc-btn cc-btn--ghost', tr('circle.mij.new_persona_cancel'));
       cancel.type = 'button';
       cancel.addEventListener('click', () => form.remove());
-      form.append(name, create, cancel);
+      form.append(name, offerRow, create, cancel);
       grid.appendChild(form);
       name.focus();
     });

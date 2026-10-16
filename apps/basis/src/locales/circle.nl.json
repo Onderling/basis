@@ -3402,6 +3402,18 @@
       "text": "Jouw vraag · door {{heard}} gehoord · nog {{min}} min",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
     },
+    "as_self": {
+      "text": "Je verschijnt hier als {{name}}.",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
+    "as_self_pick": {
+      "text": "Als wie verschijn je hier?",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
+    "as_self_caveat": {
+      "text": "Dat is een naam die je laat zien, geen apart adres: wie hier meekijkt, kan zien dat het van hetzelfde apparaat komt.",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
     "face_row": {
       "text": "Toon hier als",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."

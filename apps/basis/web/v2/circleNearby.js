@@ -23,6 +23,7 @@
  *     web and mobile cannot drift on what proximity entitles a stranger to.
  */
 
+import { NEARBY_FACES } from '../../src/v2/nearbyIdentity.js';
 import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
 } from '../../src/v2/nearbyScreen.js';
@@ -32,6 +33,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderCircleNearby(container, {
   model = null,
+  roomSelf = null,   // { view: nearbyRoomSelfView(...), onPick(selfId) } — who this device enters the room as
   t,
   onBack,
   onAction = null,
@@ -419,6 +421,37 @@ export function renderCircleNearby(container, {
   const mineChips = [allows.card ? tr('circle.nearbyScreen.mine_card_on') : null, allows.chat ? tr('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean);
   mineSummary.textContent = `${tr('circle.nearbyScreen.mine_title')} · ${mineChips.length ? mineChips.join(' · ') : tr('circle.nearbyScreen.mine_none')}`;
   mine.appendChild(mineSummary);
+  // WHO ENTERS THE ROOM: the switcher's self (or the one question when several are ticked) — a label, said as one
+  if (roomSelf?.view) {
+    const rs = document.createElement('div');
+    rs.className = 'circle-nearby__as-self';
+    const v = roomSelf.view;
+    const nameOf = (c) => (c.nameKey ? tr(c.nameKey) : c.name);
+    if (v.ask) {
+      const q = document.createElement('div');
+      q.textContent = tr('circle.nearbyScreen.as_self_pick');
+      rs.appendChild(q);
+      for (const c of v.choices) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-btn cc-btn--quiet circle-nearby__as-self-choice';
+        b.dataset.self = c.id;
+        b.textContent = nameOf(c);
+        b.addEventListener('click', () => roomSelf.onPick?.(c.id));
+        rs.appendChild(b);
+      }
+    } else if (v.self) {
+      const line = document.createElement('div');
+      line.className = 'circle-nearby__as-self-line';
+      line.textContent = tr('circle.nearbyScreen.as_self', { name: nameOf(v.self) });
+      rs.appendChild(line);
+    }
+    const cav = document.createElement('div');
+    cav.className = 'circle-nearby__face-caveat';
+    cav.textContent = tr('circle.nearbyScreen.as_self_caveat');
+    rs.appendChild(cav);
+    mine.appendChild(rs);
+  }
   // The room face: the SAME faces a circle offers — name, handle, or nobody.
   if (typeof onFaceChange === 'function') {
     const faceBlock = document.createElement('div');
@@ -427,7 +460,7 @@ export function renderCircleNearby(container, {
     faceTitle.className = 'circle-nearby__face-title';
     faceTitle.textContent = tr('circle.nearbyScreen.face_row');
     faceBlock.appendChild(faceTitle);
-    for (const v of ['name', 'handle', 'none']) {
+    for (const v of NEARBY_FACES) {
       const lbl = document.createElement('label');
       lbl.className = `circle-nearby__face-option circle-nearby__face-option--${v}`;
       const radio = document.createElement('input');

@@ -67,6 +67,8 @@ export const householdManifest = {
     register: 'write',
     'enroll-device': 'write',
     'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
+    'pause-persona':    'write',   // a device entry: which held personas do not run here
+    'resume-persona':   'write',
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
@@ -469,6 +471,32 @@ export const householdManifest = {
       // THE RESTORE PICKER's list: the person's personas (their registry, as a restore brought it back) that THIS device
       // does not run yet — names and ids only. Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
       params: [],
+      surfaces: {},
+    },
+    {
+      id:   'listPersonasHere', group: 'device',
+      verb: 'list',
+      // THE PERSONAS ON THIS DEVICE — every self it holds, running or paused, and which is its primary (the self it
+      // speaks as). Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'pausePersona', group: 'device',
+      verb: 'pause-persona',
+      writes: { scope: 'device' },   // a device entry: which held personas do not run here
+      // PAUSE A PERSONA ON THIS DEVICE — local and reversible, no phrase: from the next boot it does not run here (its
+      // circles not reopened or served, out of the switcher); its keys and data stay, nothing reaches the registry or a
+      // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`).
+      params: [ { name: 'personaId', kind: 'string', required: true } ],
+      surfaces: {},
+    },
+    {
+      id:   'resumePersona', group: 'device',
+      verb: 'resume-persona',
+      writes: { scope: 'device' },
+      // The inverse: from the next boot the persona runs here again.
+      params: [ { name: 'personaId', kind: 'string', required: true } ],
       surfaces: {},
     },
     {

@@ -221,7 +221,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, handPersonasInto, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
-import { personaVault, HELD_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
+import { personaVault, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
 import { circleIdsFrom } from '../../v2/enrolForgets.js';
 import { createRegistryCarrier, registryPodName, sealRecoveryFile, openRecoveryFile } from '../../v2/registryCarrier.js'; // the registry survives the device
 import { rosterSnapshot, bodyWithRosters, rostersOf, bootstrapOfferFromRosters } from '../../v2/recoveryBootstrap.js';
@@ -577,6 +577,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { const list = JSON.parse((await chatVault.get(HELD_PERSONAS_VAULT_KEY)) ?? '[]'); held = Array.isArray(list) ? list : []; } catch { held = []; }
     if (!held.includes(primaryId)) throw new Error(`the custody marker names "${primaryId}", which this device does not hold — restore with the recovery phrase`);
   }
+  // THE PERSONAS PAUSED HERE (a device entry): read once at boot — a paused persona does not run on this boot, in either
+  // custody mode; pausing or resuming takes effect at the next one.
+  const readIdList = async (key) => { try { const l = JSON.parse((await chatVault.get(key)) ?? '[]'); return Array.isArray(l) ? l.filter((x) => typeof x === 'string') : []; } catch { return []; } };
+  const pausedAtBoot = new Set(await readIdList(PAUSED_PERSONAS_VAULT_KEY));
   const personas = new Map([[primaryId, await createPersonaRuntime({ profileId: primaryId, ownerRoot, custody, custodySeed, chatVault })]]);
   // …and the marker must AGREE with the door: the door's seed is the primary's delegation, so its public key is the one
   // the primary's handed record names. A marker rewritten at rest to name another held self would otherwise run that
@@ -1503,6 +1507,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { const list = JSON.parse((await persona.vault.get(HELD_PERSONAS_VAULT_KEY)) ?? '[]'); heldPersonas = Array.isArray(list) ? list : []; } catch { heldPersonas = []; }
     const runPersona = async (id) => {
       if (id === 'default' || personas.has(id)) return personas.get(id) ?? null;
+      if (pausedAtBoot.has(id)) return null;   // paused on this device: it does not run here until resumed
       if (!ownerRoot && !heldPersonas.includes(id)) return null;   // not derivable here, and not handed
       try {
         const rt = await createPersonaRuntime({ profileId: id, ownerRoot, chatVault, internalDeviceId: persona.internalDeviceId });
@@ -3665,12 +3670,55 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // WHICH PERSONAS THIS DEVICE MAY STILL RECEIVE — the person's personas (the registry, as a restore brought it back)
   // that this device does not run; the picker's list after a restore. Names only, from the person's own registry.
+  // PAUSE / RESUME A PERSONA ON THIS DEVICE — local and reversible, no phrase: the device entry `paused-personas` (read at
+  // boot by `runPersona`, so the next boot runs it or not). Nothing reaches the registry or any peer; its keys and data
+  // stay sealed where they are. The primary (the self this device speaks as) cannot be paused, nor a self not held here.
+  const heldHere = async (pid) => {
+    if (personas.has(pid)) return true;
+    if (!ownerRoot) return (await readIdList(HELD_PERSONAS_VAULT_KEY)).includes(pid);
+    try { const e = await agentsRegistryRef?.lookup?.(pid); return e?.role === 'profile'; } catch { return false; }
+  };
+  const setPaused = async (pid, on) => {
+    if (typeof pid !== 'string' || !/^p-[0-9a-f]{12}$/.test(pid)) return pid === primaryId ? { ok: false, error: 'primary' } : { ok: false, error: 'not-held' };
+    if (pid === primaryId) return { ok: false, error: 'primary' };
+    if (!(await heldHere(pid))) return { ok: false, error: 'not-held' };
+    const cur = new Set(await readIdList(PAUSED_PERSONAS_VAULT_KEY));
+    if (on) cur.add(pid); else cur.delete(pid);
+    await chatVault.set(PAUSED_PERSONAS_VAULT_KEY, JSON.stringify([...cur]));
+    if (opts.deviceLog) {
+      const entry = makeAgentTrailEntry({ actor: chatId?.pubKey ?? 'owner', op: on ? 'pause-persona' : 'resume-persona', kind: 'settings-change', target: { kind: 'persona', ref: pid }, via: 'owner', outcome: 'ok' });
+      if (entry) opts.deviceLog.append(entry);
+    }
+    return { ok: true, paused: on, reloadRequired: true };
+  };
+  hostAgent.register('pausePersona', async ({ parts }) => {
+    return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];
+  }, { visibility: 'private' });
+  hostAgent.register('resumePersona', async ({ parts }) => [DataPart(await setPaused(parts?.[0]?.data?.personaId, false))], { visibility: 'private' });
+  // THE PERSONAS ON THIS DEVICE, as the "Persona's op dit apparaat" screen lists them: every self it holds — running or
+  // paused — with whether it is the primary (which cannot be paused).
+  hostAgent.register('listPersonasHere', async () => {
+    try {
+      const paused = new Set(await readIdList(PAUSED_PERSONAS_VAULT_KEY));
+      const ids = new Set([...personas.keys()]);
+      if (!ownerRoot) for (const id of await readIdList(HELD_PERSONAS_VAULT_KEY)) ids.add(id);
+      else for (const e of (await agentsRegistryRef?.list?.()) ?? []) if (e?.role === 'profile' && /^p-[0-9a-f]{12}$/.test(String(e.agentId))) ids.add(e.agentId);
+      const out = [];
+      for (const id of ids) {
+        let name = null;
+        try { name = (await agentsRegistryRef?.lookup?.(id))?.name ?? null; } catch { /* nameless */ }
+        out.push({ id, name, primary: id === primaryId, paused: paused.has(id), running: personas.has(id) });
+      }
+      return [DataPart({ ok: true, personas: out })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'list-failed' })]; }
+  }, { visibility: 'private' });
   hostAgent.register('listReceivablePersonas', async () => {
     try {
       const out = [];
       for (const entry of (await agentsRegistryRef?.list?.()) ?? []) {
         const id = entry?.agentId;
         if (entry?.role !== 'profile' || typeof id !== 'string' || !/^p-[0-9a-f]{12}$/.test(id) || personas.has(id)) continue;
+        if (pausedAtBoot.has(id) || (await readIdList(PAUSED_PERSONAS_VAULT_KEY)).includes(id)) continue;   // held here, only paused
         out.push({ id, name: entry.name ?? null });
       }
       // …and whether this device holds the recovery seal: one enrolled before the seal existed takes this step with

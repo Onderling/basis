@@ -36,7 +36,7 @@ describe('createProfile core (step 4)', () => {
 
   it('accepts an object properties map directly', async () => {
     await createProfile({ registry, profiles }, { id: 'home', properties: { name: { mode: 'inherit' } } });
-    expect(created[0].properties).toEqual({ name: { mode: 'inherit' } });
+    expect(created[0].properties).toEqual({ name: { mode: 'inherit' }, '_inherit.offering': { mode: 'own', value: false } });   // a new persona: the general offerings are not its own unless asked
   });
 
   it('degraded (created:false) without a profiles collaborator — no derivation substrate', async () => {

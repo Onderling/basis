@@ -49,6 +49,16 @@ export function mergeAvailability(base, patch = {}) {
  * Is a push currently suppressed for this availability? Pure helper for the
  * notifier hookup (1.5b). `now` injectable for testing.
  */
+/**
+ * Is the person away (holiday mode, until its end date)? Quiet hours are not "away": they defer pushes, they do not
+ * take the person out of reach. A post that meets what they offer is not notify-worthy while they are away.
+ */
+export function isAwayNow(availability, now = new Date()) {
+  const a = normalizeAvailability(availability);
+  if (!a.holiday.active) return false;
+  return !a.holiday.until || now <= new Date(`${a.holiday.until}T23:59:59`);
+}
+
 export function isPushSuppressed(availability, now = new Date()) {
   const a = normalizeAvailability(availability);
   if (a.holiday.active) {

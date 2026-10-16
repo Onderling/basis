@@ -36,8 +36,17 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // Ownership of a node: claiming a companion makes the person's root its owner — a peer must not be able to make
   // someone the owner of a node of the peer's choosing (2026-10-09).
   'household.claimCompanion',
+  // Which persona a circle is joined as: a peer must not re-file one of the person's circles under another identity.
+  'household.bindCirclePersona',
   'household.stashEnrollOffer',
   'household.pairCirclePeer',
+  // The recovery file, restore, and which personas this device runs: the rest of the household's `device` group
+  // (connectionSurfaceAgreement pins that every op of that group is here).
+  'household.buildEnrollOffer', 'household.replaceDevice',
+  'household.exportRecoveryFile', 'household.importRecoveryFile', 'household.listRecoveryCircles',
+  'household.restoreStatus', 'household.restoreSource', 'household.restoreIntent',
+  'household.listReceivablePersonas', 'household.receivePersonas',
+  'household.listPersonasHere', 'household.pausePersona', 'household.resumePersona', 'household.removePersonaHere',
   // …and what that node lets another agent do there: granting it, or reading its choices, has THIS device sign a
   // statement for the person's node — a peer must not get the person's device to sign for it.
   'household.grantCompanion',
@@ -48,6 +57,17 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'household.grantSurface',
   'household.revokeSurface',
   'household.listSurfaceGrants',
+  // The person's registry (2026-10-10). Every WRITE changes who they are (a persona — an identity of theirs, with its
+  // own keys under their root), what they disclose, or who acts for them; every raw READ returns their own record, not
+  // a release — getPersonaRelease too, since the caller picks the context. A connection may see what acts for them and
+  // what exists (listAgents · viewAgent · listCatalogue · listDataVersions), nothing more.
+  'agents.createProfile', 'agents.purgeAgent',
+  'agents.setProfileProperty', 'agents.setProfileDriver', 'agents.setProfileCircleMembership',
+  'agents.removeProfileCircleMembership', 'agents.setProfileDisclosure', 'agents.setAgentSkillExposure',
+  'agents.grantAgent', 'agents.grantRole', 'agents.revokeGrant', 'agents.revokeAgent', 'agents.installAgent',
+  'agents.restoreDataVersion',
+  'agents.getProfileProperties', 'agents.getProfileDisclosure', 'agents.getProfileDrivers', 'agents.getPersonaView',
+  'agents.getAgentSkillExposure', 'agents.getPersonaRelease',
   // The pod session (2026-09-01). Signing in navigates a browser to an identity provider and signing out
   // ends the session every other grant is read under — neither is a thing to do TO someone from
   // somewhere else. Withheld here rather than merely omitted from the connection manifest list, because
@@ -56,6 +76,18 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'basis.signin',
   'basis.signout',
 ]));
+
+/**
+ * An op of a manifest's `device` group is THIS device's own business (its custody, its recovery, the person's pages
+ * on it): never delegable, in whatever manifest it is declared — the group is the rule, so a new device op cannot be
+ * forgotten off a list. `NEVER_DELEGABLE` below names the rest by id.
+ * @param {{group?: string}} op
+ * @returns {boolean}
+ */
+export function isDeviceOp(op) {
+  return op?.group === 'device';
+}
+
 
 /**
  * Project manifests into A2A skill definitions for peers — the never-delegable ops withheld, each call run as the
@@ -99,7 +131,7 @@ export function renderA2A(manifestOrList, args, opts = {}) {
         id,
         // `requires-token` for everything reachable: an external caller must PRESENT authority, it is
         // never inferred from being able to reach us. `never` short-circuits before any token is even read.
-        policy:      isNever(id) ? 'never' : 'requires-token',
+        policy:      (isNever(id) || isDeviceOp(op)) ? 'never' : 'requires-token',
         visibility:  'authenticated',
         description: op.surfaces?.chat?.hint ?? `${op.verb ?? 'call'} ${op.id}`,
         handler:     async (hctx) => {

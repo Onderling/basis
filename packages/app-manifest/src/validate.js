@@ -126,6 +126,13 @@ const NAV_TARGET_KIND_SET = new Set(NAV_TARGET_KINDS);
 export function isCanonicalVerb(verb) { return VERB_SET.has(verb); }
 
 /**
+ * The facets a noun may declare in `presents`. `order` says what the moment IS: 'asc' declares a scheduled time
+ * (soonest first — the noun is something that is going to happen), 'desc' when the row was made (newest first).
+ * `done` says when a row is no longer open: `{ field }` (truthy = closed) or `{ field, values }` (one of these = closed).
+ */
+export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine', 'done']);
+
+/**
  * Validate a manifest.
  *
  * @param {import('./schema.js').Manifest} manifest
@@ -267,6 +274,38 @@ export function validateManifest(manifest, opts = {}) {
           errors.push({ path: `${np}/atoms`, message: 'nouns[noun].atoms must be an array' });
           continue;
         }
+        // How a merged view shows the noun (`presents`) and what it is called (`names`) — DECLARED here so a host builds
+        // its views from the declaration and never knows a noun by name. Plain field keys only: no code, no paths.
+        if (decl.presents !== undefined) {
+          const pr = decl.presents;
+          // never an object's own machinery: a facet names a field on ANOTHER app's rows
+          const plainKey = (v) => typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(v) && !['__proto__', 'constructor', 'prototype'].includes(v);
+          const bad = (msg) => errors.push({ path: `${np}/presents`, message: msg, code: 'bad-presents' });
+          if (!pr || typeof pr !== 'object' || Array.isArray(pr)) bad('presents must be an object');
+          else {
+            for (const k of Object.keys(pr)) if (!PRESENT_FACETS.includes(k)) bad(`presents.${k} is not a facet (one of ${PRESENT_FACETS.join(', ')})`);
+            for (const k of ['label', 'moment']) if (pr[k] !== undefined && !plainKey(pr[k])) bad(`presents.${k} must be a plain field key`);
+            if (pr.order !== undefined && !['asc', 'desc'].includes(pr.order)) bad('presents.order must be "asc" or "desc"');
+            if (pr.mine !== undefined && !(Array.isArray(pr.mine) && pr.mine.every(plainKey))) bad('presents.mine must be a list of plain field keys');
+            const dn = pr.done;
+            const word = (v) => typeof v === 'string' && v.trim() !== '';
+            if (dn !== undefined && !(dn && typeof dn === 'object' && !Array.isArray(dn) && plainKey(dn.field)
+              && Object.keys(dn).every((k) => k === 'field' || k === 'values')
+              && (dn.values === undefined || (Array.isArray(dn.values) && dn.values.every(word))))) {
+              bad('presents.done must be { field: <plain key>, values?: [non-empty strings] }');
+            }
+          }
+        }
+        if (decl.names !== undefined) {
+          const nm = decl.names;
+          // per language its plural forms (Intl.PluralRules categories): `other` required, `one` optional
+          const word = (v) => typeof v === 'string' && v.trim() !== '';
+          const forms = (f) => f && typeof f === 'object' && !Array.isArray(f) && word(f.other)
+            && Object.keys(f).every((k) => k === 'one' || k === 'other') && (f.one === undefined || word(f.one));
+          if (!nm || typeof nm !== 'object' || Array.isArray(nm) || !Object.values(nm).every(forms)) {
+            errors.push({ path: `${np}/names`, message: 'names must map a language to its forms { one?, other }', code: 'bad-names' });
+          }
+        }
         if (decl.writtenBy !== undefined && !NOUN_WRITERS.includes(decl.writtenBy)) {
           errors.push({ path: `${np}/writtenBy`, message: `writtenBy must be one of ${NOUN_WRITERS.join(', ')} (got "${decl.writtenBy}")`, code: 'unknown-writer' });
         }
@@ -317,15 +356,17 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // Nav-chrome (Me) — `manifest.meActions` declares the ordered actions at the top of the person's own page (Me):
-  // "Share my card" and "Scan" (2026-10-09). The SAME NavItem shape and helper as `tabs`, so both shells paint them
-  // from the declaration, never from a screen file's list. Forward-additive: absent → no Me actions.
-  if (manifest.meActions !== undefined) {
-    if (!Array.isArray(manifest.meActions)) {
-      errors.push({ path: '/meActions', message: 'meActions must be an array if present' });
+  // "Share my card" and "Scan" (2026-10-09); `manifest.myDataActions` the doors at the top of My data (the views Me
+  // gave up, 2026-10-15). The SAME NavItem shape and helper as `tabs`, so both shells paint them from the declaration,
+  // never from a screen file's list. Forward-additive: absent → none.
+  for (const key of ['meActions', 'myDataActions']) {
+    if (manifest[key] === undefined) continue;
+    if (!Array.isArray(manifest[key])) {
+      errors.push({ path: `/${key}`, message: `${key} must be an array if present` });
     } else {
-      const meIds = new Set();
-      manifest.meActions.forEach((item, i) => {
-        validateNavItem(item, `/meActions/${i}`, manifest, errors, meIds, strict);
+      const ids = new Set();
+      manifest[key].forEach((item, i) => {
+        validateNavItem(item, `/${key}/${i}`, manifest, errors, ids, strict);
       });
     }
   }

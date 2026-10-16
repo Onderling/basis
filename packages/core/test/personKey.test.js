@@ -46,8 +46,8 @@ describe('the sealed-vault entry', () => {
     expect(await storePersonKey(vault, { version: 1, seed: v1 })).toBe(true);
     expect(await loadPersonKey(vault)).toMatchObject({ version: 1, seed: v1, reveals: {} });
     expect(await storePersonKey(vault, { version: 1, seed: v2 }), 'same version: kept').toBe(false);
-    expect(await storePersonKey(vault, { version: 2, seed: v2, reveals: { c1: { rootPubKey: 'r', sig: 's' } } })).toBe(true);
-    expect((await loadPersonKey(vault)).reveals, 'the reveals ride beside the key').toEqual({ c1: { rootPubKey: 'r', sig: 's' } });
+    expect(await storePersonKey(vault, { version: 2, seed: v2, reveals: { c1: { authorityPubKey: 'r', sig: 's' } } })).toBe(true);
+    expect((await loadPersonKey(vault)).reveals, 'the reveals ride beside the key').toEqual({ c1: { authorityPubKey: 'r', sig: 's' } });
     expect(await storePersonKey(vault, { version: 1, seed: v1 }), 'a lower version never lands').toBe(false);
     expect((await loadPersonKey(vault)).version).toBe(2);
     await vault.set('person-key', '{"version":3}');

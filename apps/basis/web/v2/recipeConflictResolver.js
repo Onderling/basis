@@ -26,7 +26,7 @@
  * while every other locale key stays under `circle.recipe.conflict.*`
  * — the picker copy is identical across the three flows.
  */
-import { BLOCK_REGISTRY } from '../../src/v2/circleRecipeBlocks.js';
+import { BLOCK_DESCRIPTORS } from '../../src/v2/circleRecipe.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
@@ -198,7 +198,7 @@ function renderBlockRow(bc, { tr, local, incoming, onPick }) {
   // Pick a label from either side — incoming wins if the local side
   // deleted the block (yours undefined); otherwise mirror local.
   const refBlock = local ?? incoming;
-  const meta = refBlock?.type ? BLOCK_REGISTRY[refBlock.type] : null;
+  const meta = refBlock?.type ? BLOCK_DESCRIPTORS[refBlock.type] : null;
   const typeKey = refBlock?.type ?? 'unknown';
 
   const labelRow = document.createElement('div');

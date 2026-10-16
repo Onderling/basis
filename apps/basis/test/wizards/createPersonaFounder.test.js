@@ -15,7 +15,8 @@ import {
 } from '../../src/core/wizards/createGroupState.js';
 
 const created = { groupId: 'c-1', code: 'X', expiresAt: 1 };
-const okCall = async (app, op) => (op === 'createGroupV2' ? created : {});
+// a persona founds after the bind (the wizard binds the circle to it before the create)
+const okCall = async (app, op) => (op === 'createGroupV2' ? created : op === 'bindCirclePersona' ? { ok: true } : {});
 
 function ready(persona) {
   const s = initialState();

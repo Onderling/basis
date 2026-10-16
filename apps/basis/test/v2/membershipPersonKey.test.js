@@ -4,11 +4,11 @@
  * device that holds the current person key (a stolen one included) can therefore neither rotate nor substitute.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { Bootstrap, ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, PERSON_KEY_KIND, personKeyFacts } from '@onderling/core';
+import { Bootstrap, ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, PERSON_KEY_KIND, personKeyFacts } from '@onderling/core';
 import { membershipBindingVerifier, MEMBERSHIP_RAIL_KINDS } from '../../src/v2/membershipRail.js';
 
 const root = Bootstrap.create().bootstrap;
-const pub = rootPubKeyB64Of(root.secret);
+const pub = authorityPubKeyB64Of(root.secret);
 const CIRCLE = 'k1';
 const ADA = 'w:ada';
 const commitment = ceremonyCommitment(pub, CIRCLE);

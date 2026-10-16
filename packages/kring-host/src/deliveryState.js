@@ -117,6 +117,10 @@ export function advanceDelivery(current, next) {
 export function createDeliveryStateMap() {
   /** @type {Map<string, Exclude<DeliveryState, null>>} */
   const map = new Map();
+  // WHY a send failed, when the fan knew (`fanOutReason`) — beside the state, never a state of its own, and only beside
+  // a failure: a state that moves on (a retry's `pending`, a later receipt) drops it.
+  /** @type {Map<string, string>} */
+  const reasons = new Map();
   /** @type {Set<(msgId: string, state: DeliveryState) => void>} */
   const subs = new Set();
 
@@ -131,9 +135,10 @@ export function createDeliveryStateMap() {
       if (typeof msgId !== 'string' || msgId === '') return null;
       return map.has(msgId) ? map.get(msgId) : null;
     },
-    set(msgId, state) {
+    set(msgId, state, { reason = null } = {}) {
       if (typeof msgId !== 'string' || msgId === '') return;
       if (state == null) {
+        reasons.delete(msgId);
         if (!map.has(msgId)) return;
         map.delete(msgId);
         notify(msgId, null);
@@ -144,12 +149,19 @@ export function createDeliveryStateMap() {
       // the ladder, so it cannot drift from the vocabulary again.
       const current = map.get(msgId);
       const next = advanceDelivery(current, state);
+      if (DELIVERY_TERMINAL.includes(next) && typeof reason === 'string' && reason) reasons.set(msgId, reason);
+      else if (next !== current) reasons.delete(msgId);
       if (next === current) return;
       map.set(msgId, next);
       notify(msgId, next);
     },
+    /** The reason beside a failed/undeliverable state, or null. */
+    reasonOf(msgId) {
+      return (typeof msgId === 'string' && reasons.get(msgId)) || null;
+    },
     clear(msgId) {
       if (typeof msgId !== 'string' || msgId === '') return false;
+      reasons.delete(msgId);
       if (!map.has(msgId)) return false;
       map.delete(msgId);
       notify(msgId, null);

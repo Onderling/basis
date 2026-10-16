@@ -753,7 +753,7 @@ Construct via `Bootstrap.create()`, `Bootstrap.fromSeed(bytes)`, or
 `Bootstrap.fromMnemonic(phrase)`.  Direct `new Bootstrap(...)` is
 possible but the static factories validate inputs.
 
-**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
+**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveProfileAuthority()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
 
 ### `deriveVaultAtRestKeyFrom`
 
@@ -1029,20 +1029,20 @@ malformed or unparseable is `false`, never a throw the caller might treat as "un
 **Kind:** function · **Import:** `ceremonyCommitment` from `'@onderling/core'`
 
 ```js
-ceremonyCommitment(rootPubKeyB64, circleId)
+ceremonyCommitment(authorityPubKeyB64, circleId)
 ```
 
-The per-circle commitment to an owner root. `rootPubKeyB64` is the root's Ed25519 pubkey as b64 (the delegation record's `by`).
+The per-circle commitment to an owner root. `authorityPubKeyB64` is the root's Ed25519 pubkey as b64 (the delegation record's `by`).
 
-### `rootPubKeyB64Of`
+### `authorityPubKeyB64Of`
 
-**Kind:** function · **Import:** `rootPubKeyB64Of` from `'@onderling/core'`
+**Kind:** function · **Import:** `authorityPubKeyB64Of` from `'@onderling/core'`
 
 ```js
-rootPubKeyB64Of(rootSecret)
+authorityPubKeyB64Of(authoritySecret)
 ```
 
-The root's pubkey in the encoding every commitment and reveal uses.
+The signer's pubkey in the encoding every commitment and reveal uses — a persona's authority (`deriveProfileAuthority`).
 
 ### `ceremonyRevealMessage`
 
@@ -1062,12 +1062,13 @@ absent for kinds whose subject is the whole fact (address-revoke).
 **Kind:** function · **Import:** `signCeremonyReveal` from `'@onderling/core'`
 
 ```js
-signCeremonyReveal(rootSecret, { circleId, kind, subject, authorRef, facts = null } = {})
+signCeremonyReveal(authoritySecret, { circleId, kind, subject, authorRef, facts = null } = {})
 ```
 
-Mint the reveal for a ceremony statement. Called where the root is transiently in hand.
+Mint the reveal for a ceremony statement. Called where the root is transiently in hand; signed by the persona's
+authority derived from it, never by the root itself.
 
-**Returns:** `{ rootPubKey: string, sig: string }`
+**Returns:** `{ authorityPubKey: string, sig: string }`
 
 ### `verifyCeremonyReveal`
 
@@ -1405,6 +1406,27 @@ revocation ceremony reason about an absent device's keys without the device).
 
 **Returns:** `Uint8Array` — 32-byte seed.
 
+### `wireDeviceId`
+
+**Kind:** function · **Import:** `wireDeviceId` from `'@onderling/core'`
+
+```js
+wireDeviceId(profileSeed, internalId)
+```
+
+The id a device shows ON THE WIRE for one persona — in its delegation record, and so in every device statement
+that carries it — and the id its device seed derives from (`deriveDeviceSeed(profileSeed, wireDeviceId(...))`).
+Keyed by the persona's own SEED, which the phrase rebuilds: the internal id never appears, two personas' records of
+one device are unrelated, an old record plus a persona id give nothing without that persona's seed, and a
+revocation works from the record alone plus the phrase (the seed derives from the id the record names).
+
+**Parameters**
+
+- `profileSeed` `Uint8Array` — the persona's 32-byte seed (`Bootstrap.deriveAgentSeed(profileId)`).
+- `internalId` `string` — the device's own id (random at enrolment; root-derived for the first device).
+
+**Returns:** `string` — `d-<32 hex>`
+
 ### `deviceDelegationPubKey`
 
 **Kind:** function · **Import:** `deviceDelegationPubKey` from `'@onderling/core'`
@@ -1430,7 +1452,7 @@ The canonical statement the owner root signs. Deterministic; binds profile + dev
 **Kind:** function · **Import:** `signDeviceDelegation` from `'@onderling/core'`
 
 ```js
-signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey } = {})
+signDeviceDelegation(authoritySecret, { profileId, deviceId, pubKey } = {})
 ```
 
 Mint the root-signed delegation record for a device. Called at the enrollment ceremony, where
@@ -1438,10 +1460,10 @@ the phrase (and so the root secret) is transiently present.
 
 **Parameters**
 
-- `rootSecret` `Uint8Array` — the owner root's 32-byte secret (Bootstrap#secret).
+- `authoritySecret` `Uint8Array` — the signing persona's 32-byte authority (`Bootstrap.deriveProfileAuthority`) — never the owner root, whose key must not appear on the wire.
 - `a` `{profileId: string, deviceId: string, pubKey: string}` — pubKey = deviceDelegationPubKey(seed).
 
-**Returns:** `{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}` — `by` = the root's derived pubKey (b64), `sig` = base64url Ed25519 over the statement.
+**Returns:** `{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}` — `by` = the authority's pubKey (b64), `sig` = base64url Ed25519 over the statement.
 
 ### `firstDeviceIdFor`
 
@@ -1471,14 +1493,18 @@ the first device is special; a device enrolled by a ceremony carries a random id
 ownerRootFingerprint(pubKeyB64)
 ```
 
-A short fingerprint of an owner root's public key: the first 16 hex characters of its SHA-256. Compares a
-delegation record's signer with a known root without carrying the whole key.
+The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
+`Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
+from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
+record to "the same owner as me" without the owner's registry: both custodies hold the root's
+fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
+whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
 
 **Parameters**
 
-- `pubKeyB64` `string` — the root's 32-byte Ed25519 public key, base64
+- `pubKeyB64` `string` — a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
 
-**Returns:** `string|null` — null when the key is not 32 bytes or does not decode
+**Returns:** `string|null` — the 16 hex-character fingerprint, or null.
 
 ### `verifyDeviceDelegation`
 
@@ -1514,7 +1540,7 @@ The canonical statement the owner root signs to retire a device. Deterministic; 
 **Kind:** function · **Import:** `signDeviceRevocation` from `'@onderling/core'`
 
 ```js
-signDeviceRevocation(rootSecret, { profileId, deviceId } = {})
+signDeviceRevocation(authoritySecret, { profileId, deviceId } = {})
 ```
 
 Mint the root-signed REVOCATION of a device — the tombstone a party outside the person's own devices can check
@@ -1523,7 +1549,7 @@ nothing. Minted at the revoke ceremony, where the phrase (and so the root secret
 
 **Parameters**
 
-- `rootSecret` `Uint8Array`
+- `authoritySecret` `Uint8Array` — the persona's authority (as for `signDeviceDelegation`)
 - `a` `{profileId: string, deviceId: string}`
 
 **Returns:** `{profileId:string, deviceId:string, by:string, sig:string}`
@@ -1818,6 +1844,50 @@ Write the vault entry — only ever a HIGHER version than what is there (a cerem
 one exception: the SAME version may fill in the link key's public half when the entry has none (an entry from
 before link keys, on a device that then hears it from a sibling). A pub once there is never replaced. Returns
 true when the entry changed.
+
+## `src/identity/profileIds.js`
+
+### `RESERVED_PROFILE_LABELS`
+
+**Kind:** constant · **Import:** `RESERVED_PROFILE_LABELS` from `'@onderling/core'`
+
+Labels the platform already derives other keys from (`first-device` from the owner root; `household-export` on the export's own root; `recovery-seal` for the recovery file and the registry mirror) — never a persona's id, so no persona ever shares a key label with them.
+
+### `isReservedProfileLabel`
+
+**Kind:** function · **Import:** `isReservedProfileLabel` from `'@onderling/core'`
+
+```js
+isReservedProfileLabel(label)
+```
+
+Is this label one the root uses for something other than a persona?
+
+### `assertProfileId`
+
+**Kind:** function · **Import:** `assertProfileId` from `'@onderling/core'`
+
+```js
+assertProfileId(id)
+```
+
+Throw unless `id` is a persona id: `'default'` or a minted `p-<12 hex>`, and not a reserved label.
+
+**Parameters**
+
+- `id` `string`
+
+**Returns:** `string` — the id
+
+### `mintProfileId`
+
+**Kind:** function · **Import:** `mintProfileId` from `'@onderling/core'`
+
+```js
+mintProfileId()
+```
+
+Mint a fresh persona id, `p-<12 hex>` (48 random bits: unique within one person's handful of personas).
 
 ## `src/permissions/ActorResolver.js`
 

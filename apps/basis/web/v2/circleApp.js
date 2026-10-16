@@ -24,8 +24,7 @@ import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, c
 import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
-import { plannedForMe, plannedLines } from '../../src/v2/plannedForMe.js';
-import { mijOverviewBlocks } from '../../src/v2/mijOverview.js';
+import { mijScreenBlocks } from '../../src/v2/mijScreen.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -128,7 +127,8 @@ import {
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
-import { ceremonyOutcomeText } from '../../src/v2/ceremonyOutcome.js';
+import { ceremonyOutcomeText, ceremonyFinished } from '../../src/v2/ceremonyOutcome.js';
+import { personasHereRows } from '../../src/v2/personasHere.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
@@ -167,6 +167,14 @@ import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
 import { renderCircleProfile } from './circleProfile.js';
+import { renderProfileBasics } from './profileBasics.js';
+import { newPersonaArgs } from '../../src/v2/newPersona.js';
+import { renderVandaagPlus } from './vandaagPlus.js';
+import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
+import { renderHeaderAvatar } from './headerAvatar.js';
+import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
+import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
+import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
@@ -211,7 +219,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../../src/v2/policyUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry, enrollOfferLink, enrollOfferFromLink, pendingEnrollOffer, restoreFinishApplies, openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../src/v2/enrollOffer.js';
 import { createVersionWatch } from '../../src/v2/appVersion.js';
 import { renderUpdateBar } from './updateBar.js';
 import { renderHostFrame } from './hostFrameBar.js';
@@ -381,12 +389,12 @@ import {
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
-// α.2 — user-owned cross-circle screens (the Screens tab) + α.3 picker.
-import {
-  createUserScreenStore, localStorageScreenIo,
-  addScreen as addUserScreen, renameScreen as renameUserScreen,
-  removeScreen as removeUserScreen, setActiveScreen, getActiveScreen, updateScreen,
-} from '../../src/v2/userScreens.js';
+// The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
+// this shell to change the book).
+import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
+import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../src/v2/vandaag.js';
+import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
+import { renderVandaagCustomise } from './vandaagCustomise.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
 import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
@@ -733,7 +741,6 @@ import { renderCircleScreen } from './circleScreen.js';
 import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
-import { renderScreensPicker } from './circleScreensPicker.js';
 import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
 import { normalizeHopMode } from '@onderling/kring-host/circleHop';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
@@ -743,6 +750,7 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
+import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
@@ -878,6 +886,8 @@ function mountBasisOpsOnAgent(agent) {
     callSkill: rawCallSkill,
     localActor: LOCAL_ACTOR,
     eventLog,
+    // the person's pages: the screen ops edit this book (kept as versions, logged, undoable)
+    screenStore: userScreenStore,
     podAuth,
     openFilePicker: webFilePicker,
     // /send-file resizes a photo the way a circle photo is resized (the one encoder, the one cap).
@@ -1003,6 +1013,9 @@ async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
       // refused here and only here: the invariant-2 half of a change that landed on one shell.
       circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+      relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+      alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
       circlesForPoint,
       // The relay this device connects to IS the deployment default — unmapped circles land here alone.
       defaultRelayUrl: CIRCLE_RELAY_URL,
@@ -1189,7 +1202,7 @@ const circleRulesPendingStore = createCircleRulesPendingStoreLocal();
 const screenBlocksCache = createScreenBlocksCacheLocal();
 // α.3 — per-user screens store.  One book per user (not per-circle); the
 // active screen drives the new Screens tab.
-const userScreenStore = createUserScreenStore({ io: localStorageScreenIo() });
+const userScreenStore = localUserScreenStore();
 const overrideStore = createMemberOverrideStore(localStorageOverrideIo());
 // The mute membrane's circle↔person index — fed by every roster read (householdRosterPairing), consumed
 // by the receive path (circleEnforcement). One per agent; attached to the agent post-boot below.
@@ -1584,36 +1597,26 @@ let   _peerAgent           = null;   // captured at boot so a relay-setting chan
  * that reaches this address still lands, and the day a browser transport lands nothing here changes.
  */
 let   _nearbyRoom          = null;
+let   _nearbyIdentity      = null;   // what the room is told about me, and what it is weighed against (nearbyIdentity.js)
 function ensureNearbyRoom(agent = _peerAgent) {
   if (_nearbyRoom || !agent || typeof agent.sendPeerMessage !== 'function') return _nearbyRoom;
+  _nearbyIdentity = createNearbyIdentity({
+    readChoice: readNearbyFace,
+    callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
+    relayUrl: () => (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL ? CIRCLE_RELAY_URL : null),
+    shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
+    nknAddress: () => agent?.peer?.address ?? null,
+    roomSelf: () => nearbyRoomSelfNow().self,
+  });
   _nearbyRoom = createNearbyRoomBinding({
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => [],
     myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
     deliveryMap: deliveryStateMap,   // the SAME map chat's receipts advance
-    // Rung 4 — what "share how to reach me" shares (all-or-nothing; the NKN address only if the
-    // publication lock allows).
-    myAddresses: async () => {
-      const out = {};
-      if (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL) out.relay = { url: CIRCLE_RELAY_URL };
-      try {
-        const allow = agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY);
-        const addr = agent?.peer?.address ?? null;
-        if (allow === true && typeof addr === 'string' && addr) out.nkn = { address: addr };
-      } catch { /* the lock stays closed on a broken read */ }
-      return out;
-    },
-    // The SAME faces a circle offers — displayName, handle, or nobody — chosen per device.
-    myFace: async () => {
-      try {
-        const choice = readNearbyFace();
-        if (choice === 'none') return null;
-        const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
-        const e = r?.entry ?? {};
-        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
-        return label ? { label: String(label) } : null;
-      } catch { return null; }
-    },
+    // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
+    // shell hands in only where its face choice lives and how it reaches its relay and NKN address.
+    myFace: () => _nearbyIdentity.myFace(),
+    myAddresses: () => _nearbyIdentity.myAddresses(),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
   // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
@@ -2309,6 +2312,8 @@ function buildCircleBot(agent) {
   // THE PAIR ROSTER (L105): the roster a contact lacks, made automatically on the first exchange from the circle
   // mechanics — the invite rides the turn, the join is the shared path, the founder is the webid that sorts first.
   circlePairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => rawCallSkill ? rawCallSkill(app, op, args) : agent.callSkill(app, op, args),
     sendPeerRedeem: (...a) => (circleSendPeerRedeem ? circleSendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -2324,6 +2329,8 @@ function buildCircleBot(agent) {
     shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   circleContactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     blobStore: circleAttachmentBlobs,
     pair: circlePairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included
@@ -2336,7 +2343,7 @@ function buildCircleBot(agent) {
     onReturned: contactReturned,
     // the first message to a contact carries MY card, and a card that arrives (naming its sender) goes into the book —
     // so whoever writes to me is a NAMED row, on every device (the book carry), not a key (2026-09-21)
-    myCard: async () => { try { return (await rawCallSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await rawCallSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: contactCardArrived,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits
@@ -2877,6 +2884,74 @@ function showTabBar(active) {
     onMij: showMij,
     badges: { contacten: totalUnread(_contactUnread) },
   });
+  // the last tab used on this device, for the start-screen setting's "last used" (a convenience, not a setting)
+  try { window.localStorage.setItem(LAST_TAB_STORAGE_KEY, active); } catch { /* private window: the default stands */ }
+  paintHeaderAvatar();
+  if (!_headerAvatar) refreshHeaderAvatar();
+}
+
+// THE HEADER AVATAR — top-right on every tab: the persona's picture or initials; a tap opens the person's own editor.
+// Loaded once (and again after the editor closes); every tab repaints the one element.
+let _headerAvatar = null;          // { name, initials, picture } from the shared loader
+let _headerAvatarUrl = null;       // the picture, opened with this device's own opener
+let _headerAvatarEl = null;
+// THE SWITCHER'S SET: this device's selves (`personasHere`) and which of them the app shows (the screens book's
+// `personaSet`, changed only through `screen-set-personas`). With one self there is nothing to switch.
+let _selfSet = { on: ['default'], held: [] };
+const profileIdOfCircle = (circleId) => { try { return circleHouseholdAgent?.profileIdOf?.(circleId) ?? 'default'; } catch { return 'default'; } };
+/** The circles of the selves ticked in the header (all of them with one self). */
+function circlesShown() {
+  return _selfSet.held.length > 1 ? circlesInSet(circlesCache ?? [], _selfSet.on, profileIdOfCircle) : (circlesCache ?? []);
+}
+async function refreshSelfSet() {
+  let held = [];
+  try { held = (await circleHouseholdAgent?.personasHere?.()) ?? []; } catch { held = []; }
+  let book = _screensBook;
+  try { book = await userScreenStore.get(); _screensBook = book; } catch { /* the book as held stands */ }
+  _selfSet = { held, on: held.length ? activeSelves(book ?? {}, held) : ['default'] };
+}
+function paintHeaderAvatar() {
+  if (!_headerAvatarEl) {
+    _headerAvatarEl = document.createElement('div');
+    _headerAvatarEl.style.cssText = 'position:fixed;top:.5rem;right:.75rem;z-index:50;';
+    document.body.appendChild(_headerAvatarEl);
+  }
+  // with one self the avatar is the person's editor; with several it is the switcher
+  const onOpen = _selfSet.held.length > 1 ? () => showPersonaSwitcher() : () => openAboutMePanel('default');
+  renderHeaderAvatar(_headerAvatarEl, { avatar: _headerAvatar, pictureUrl: _headerAvatarUrl, t, onOpen });
+}
+async function refreshHeaderAvatar() {
+  try {
+    await refreshSelfSet();
+    // the avatar of the one self ticked; with several on (or one self here), the person's own
+    const selfId = writeAs(_selfSet.on) ?? 'default';
+    const named = _selfSet.held.find((p) => p.id === selfId);
+    _headerAvatar = await loadPersonaAvatar({ callSkill: rawCallSkill, profileId: selfId, name: named?.name ?? null });
+    const opener = (await Promise.resolve().then(() => getSelfMediaComposition()).catch(() => null))?.mediaGateway?.opener;
+    const resolve = makeCirclePictureResolver(opener);
+    _headerAvatarUrl = _headerAvatar.picture && resolve ? (await Promise.resolve(resolve(_headerAvatar.picture)).catch(() => null)) : null;
+  } catch { /* the initials stand */ }
+  paintHeaderAvatar();
+}
+// the switcher: tick selves (an op on the book: logged, undoable), "alle", or open a self's own editor
+function showPersonaSwitcher() {
+  const { card, close } = _restoreOverlay();
+  const paint = () => renderPersonaSwitcher(card, {
+    model: switcherModel({ book: _screensBook ?? {}, held: _selfSet.held }), t,
+    onAct: async ({ opId, args }) => {
+      await rawCallSkill('basis', opId, args).catch(() => null);
+      await refreshHeaderAvatar();
+      paint();
+    },
+    onEdit: (id) => { close(); openAboutMePanel(id); },
+    onClose: () => { close(); repaintActiveTab(); },
+  });
+  paint();
+}
+/** Repaint whichever top-level tab is showing (after the switcher changed what it shows). */
+function repaintActiveTab() {
+  const show = { screens: showScreens, circles: showLauncher, contacten: showContacts, mij: showMij }[_activeTab];
+  if (typeof show === 'function') show();
 }
 
 // WHAT IS NEW IN CONTACTEN (2026-09-21): the seen-marks on this device, the unread map from the channel's durable
@@ -2911,6 +2986,8 @@ async function showContacts() {
   showTabBar('contacten');
   let contacts = [];
   try { contacts = await loadAllContacts(); } catch { contacts = []; }
+  // the contacts of the selves ticked in the header (a contact is its pair circle's self)
+  if (_selfSet.held.length > 1) contacts = contactsInSet(contacts, _selfSet.on, profileIdOfCircle);
   const unread = await refreshContactUnread();
   showTabBar('contacten');   // the sum may have changed
   renderContactsRoster(rootEl, {
@@ -3032,7 +3109,8 @@ async function openMandatePicker({ taskId, circleId } = {}) {
   // WHAT — only offerings I hold appear; that IS the attenuation, made visible.
   let offerings = [];
   try {
-    const drivers = (await rawCallSkill('agents', 'getProfileDrivers', { id: 'default' }))?.drivers ?? {};
+    // the offerings of the self this device is in this circle (a persona's circle is the persona's)
+    const drivers = (await rawCallSkill('agents', 'getProfileDrivers', { id: profileIdOfCircle(circleId) }))?.drivers ?? {};
     offerings = Object.entries(drivers)
       .filter(([, v]) => v && v.kind === 'offering')
       .map(([key, v]) => ({ key, text: v.text || key }));
@@ -3155,11 +3233,11 @@ async function deleteContactWithConfirm(contactId, name) {
     opId: 'deleteContact',
   });
   if (!ok) return;
-  const pairCircleId = circlePairRoster?.pairCircleIdFor?.(contactId) ?? null;
+  const pairCircleId = (await circlePairRoster?.pairCircleIdFor?.(contactId)) ?? null;
   const r = await deleteContact({
     agent: _peerAgent, callSkill: rawCallSkill, contactWebid: contactId, pairCircleId,
     unregister: pairCircleId ? () => unregisterCircleAddressesOnRelays({
-      relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [pairCircleId],
+      relays: _peerAgent?.relays?.list?.() ?? [], relaysOf: (cid) => _peerAgent?.relaysFor?.(cid) ?? null, circleIds: [pairCircleId],
       circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
     }) : null,
   });
@@ -3562,7 +3640,8 @@ let _bootFailure = null;   // the agent boot's error, if it died — painted on 
  */
 async function circlesChangedUnderneath() {
   try { circlesCache = await loadCircles(sources); } catch { return; }
-  if (getActiveCircle() == null) { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
+  // repaint only the circles list it changes, and only when it is the tab showing (not over Vandaag, Contacten, Mij)
+  if (getActiveCircle() == null && _activeTab === 'circles') { try { await refreshLauncherSights(); paintLauncher(); } catch { /* the next visit paints it */ } }
 }
 
 function paintLauncher() {
@@ -3576,7 +3655,7 @@ function paintLauncher() {
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
-    circles: circlesCache,
+    circles: circlesShown(),   // the circles of the selves ticked in the header
     previews,
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,
@@ -3619,7 +3698,7 @@ function showLauncher() {
   const before = launcherPinMuteSignature();
   Promise.all([refreshLauncherPins(), refreshLauncherMutes(), refreshLauncherSights()])
     .then(() => {
-      if (getActiveCircle() != null) return;
+      if (getActiveCircle() != null || _activeTab !== 'circles') return;   // the person moved on: paint nothing over it
       if (launcherPinMuteSignature() === before) return;   // nothing changed → do not rebuild under a press
       paintLauncher();
     })
@@ -3666,7 +3745,7 @@ async function onLeaveCircle(id, circle) {
       agent: _peerAgent, callSkill: rawCallSkill,
       circleId: id,
       unregister: () => unregisterCircleAddressesOnRelays({
-        relays: _peerAgent?.relays?.list?.() ?? [], circleIds: [id],
+        relays: _peerAgent?.relays?.list?.() ?? [], relaysOf: (cid) => _peerAgent?.relaysFor?.(cid) ?? null, circleIds: [id],
         circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
       }),
     });
@@ -3708,7 +3787,8 @@ async function refreshLauncherProposals() {
   const sameKeys = Object.keys(next).length === Object.keys(launcherProposals).length
     && Object.keys(next).every((k) => next[k] === launcherProposals[k]);
   launcherProposals = next;
-  if (!sameKeys && getActiveCircle() == null) showLauncher();
+  // a background count: repaint the circles list only when it is the tab showing
+  if (!sameKeys && getActiveCircle() == null && _activeTab === 'circles') showLauncher();
 }
 
 // Nearby screen on web. mDNS isn't live in the browser
@@ -3774,7 +3854,7 @@ function showConnectionPoints() {
     // them have a socket right now, and since 2026-09-08 that is several at once.
     relays: _peerAgent?.relays?.list?.() ?? [],
     agentUp: !!_peerAgent,
-    onBack: showLauncher,
+    onBack: showMyData,
     onAdopt: (url) => { store.adopt(url); draw(); },
     // Ask before removing: the impact report is the point of this screen.
     onRemove: (url) => { removing = { url, ...store.impactOfRemoving(url) }; draw(); },
@@ -3813,6 +3893,9 @@ function showNearby() {
   const mesh = null;
   nearbyScreen = createNearbyScreen({
     ...(ensureNearbyRoom()?.screenDeps() ?? {}),
+    // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
+    getDrivers: () => (_nearbyIdentity ? _nearbyIdentity.getDrivers() : Promise.resolve({})),
+    mySkills:   () => _nearbyIdentity?.mySkills() ?? [],
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
@@ -3834,6 +3917,14 @@ function showNearby() {
 
   const draw = (model) => renderCircleNearby(rootEl, {
     model, t, composing, notice,
+    // who this device enters the room as — and, when several selves are ticked and none chosen, the one question
+    roomSelf: {
+      view: nearbyRoomSelfNow().view,
+      onPick: (id) => {
+        writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model());
+        _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});   // weighed as the new self
+      },
+    },
     onBack: () => { closeNearby(); showLauncher(); },
     onAction: handleNearbyAction,
     onCompose: () => { composing = true; notice = null; draw(nearbyScreen.model()); },
@@ -3901,6 +3992,8 @@ function showNearby() {
 
   nearbyScreen.subscribe(draw);
   nearbyScreen.open();
+  // the room self's offerings, read once on open, so the shared-skills line has them before any ask arrives
+  _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});
   draw(nearbyScreen.model());
 }
 
@@ -3933,8 +4026,17 @@ function openNearbyThread(thread, seed = []) {
 }
 
 // The room face: 'name' (default) · 'handle' · 'none' — per device, like the allows.
-function readNearbyFace() { try { const v = localStorage.getItem('basis.nearbyFace'); return (v === 'handle' || v === 'none') ? v : 'name'; } catch { return 'name'; } }
-function writeNearbyFace(v) { try { if (v === 'name' || v === 'handle' || v === 'none') localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
+// WHO THIS DEVICE ENTERS THE NEARBY ROOM AS: the switcher's set decides (nearbyIdentity.js); with several ticked, the last
+// answer here is the default — kept per device, nothing more durable
+function readNearbySelf() { try { return localStorage.getItem('basis.nearbySelf'); } catch { return null; } }
+function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem('basis.nearbySelf', id); } catch { /* best-effort */ } }
+function nearbyRoomSelfNow() {
+  const r = nearbyRoomSelf({ active: _selfSet.on, held: _selfSet.held, remembered: readNearbySelf() });
+  const view = nearbyRoomSelfView(r, _selfSet.held);
+  return { r, view, self: roomSelfFor(r, _selfSet.held) };
+}
+function readNearbyFace() { try { return nearbyFaceChoice(localStorage.getItem('basis.nearbyFace')); } catch { return 'name'; } }
+function writeNearbyFace(v) { try { if (NEARBY_FACES.includes(v)) localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
 function readNearbyAllows() { try { const raw = localStorage.getItem('basis.nearbyAllows'); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeNearbyAllows(next) {
@@ -4029,267 +4131,217 @@ async function showHop() {
 // (circleFilter=null + noticeboard block) so the tab is useful right away.
 //
 // (mute) honoured: materializeScreen drops muted circles entirely.
-let _screenSubMode = 'picker';
-let _viewingScreenId = null;
 let _screensBook = null;
 let _screenViewBlocks = null;
-// δ.1 — monotonically-increasing token for each `_showActiveScreen` call.
-// The async materialize compares its captured token against the latest
-// before mutating the DOM, so a slow materialize from screen-A can't
-// stomp the body once the user has navigated to screen-B (or back to
-// the picker).
+let _expandedBlockId = null;   // a block of the page opened whole ("meer"), or null for the page
+// δ.1 — monotonically-increasing token for each paint of Vandaag. The async materialize compares its captured token
+// against the latest before touching the DOM, so a slow materialize from one page cannot stomp another.
 let _showActiveScreenToken = 0;
 
 async function showScreens() {
   if (!isAlphaTab('screens')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
   showTabBar('screens');
-  let book;
-  try { book = await userScreenStore.get(); }
-  catch { book = { screens: [], activeId: null }; }
-  // First-run seed: three default screens so the Screens tab is
-  // immediately useful — Stream (noticeboard across all circles),
-  // My things (tasks assigned to me, α.4), My calendar (agenda
-  // events, α.4).  Once at least one screen exists we never
-  // re-seed; the user can delete or rename any of them freely.
-  if (book.screens.length === 0) {
-    book = await userScreenStore.update((cur) => {
-      let next = addUserScreen(cur, t('circle.screens.seed_name'));
-      let id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'noticeboard'));
-      next = addUserScreen(next, t('circle.screens.seed_my_things'));
-      id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'tasks'));
-      next = addUserScreen(next, t('circle.screens.seed_my_calendar'));
-      id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'calendar'));
-      return next;
-    });
-  }
-  _screensBook = book;
-  _screensRerender();
+  _expandedBlockId = null;
+  // First run: the one Vandaag page (the coming week, my tasks, the circles with news), seeded once — shared with mobile
+  try { _screensBook = await ensureVandaagBook({ store: userScreenStore, t }); }
+  catch { _screensBook = { screens: [], activeId: null }; }
+  _showVandaag();
 }
 
-function _screensRerender() {
-  if (_screenSubMode === 'view') {
-    _showActiveScreen();
-    return;
-  }
-  // Picker mode: list of screens with CRUD.
-  renderScreensPicker(rootEl, {
-    book: _screensBook,
-    t,
-    onOpenScreen:   (sid) => {
-      _viewingScreenId = sid;
-      _screenSubMode = 'view';
-      _showActiveScreen();
-    },
-    onAddScreen: async (name) => {
-      _screensBook = await userScreenStore.update((cur) => {
-        const next = addUserScreen(cur, name);
-        const newId = next.screens[next.screens.length - 1].id;
-        // Seed every new screen with a default noticeboard block so
-        // it's not empty on first open.
-        return updateScreen(next, newId, (s) => addBlock(s, 'noticeboard'));
-      });
-      _screensRerender();
-    },
-    onRenameScreen: async (sid, name) => {
-      _screensBook = await userScreenStore.update((cur) => renameUserScreen(cur, sid, name));
-      _screensRerender();
-    },
-    onRemoveScreen: async (sid) => {
-      _screensBook = await userScreenStore.update((cur) => removeUserScreen(cur, sid));
-      _screensRerender();
-    },
-    onSetActive: async (sid) => {
-      _screensBook = await userScreenStore.update((cur) => setActiveScreen(cur, sid));
-      _screensRerender();
-    },
-  });
+// The page change goes through the screen op, as every edit of the person's pages does (kept, logged, undoable)
+async function _setActivePage(pageId) {
+  await rawCallSkill('basis', 'screen-set-active', { pageId }).catch(() => null);
+  _screensBook = await userScreenStore.get();
+  _expandedBlockId = null;
+  _showVandaag();
 }
 
-async function _showActiveScreen() {
-  // View-mode: render the materialized screen + a back link to picker.
-  const screen = _screensBook?.screens?.find((s) => s.id === _viewingScreenId)
-              ?? getActiveScreen(_screensBook);
-  if (!screen) {
-    _screenSubMode = 'picker'; _viewingScreenId = null;
-    _screensRerender();
-    return;
-  }
+/**
+ * VANDAAG: the active page of the person's own pages, its blocks capped, each with "meer"; the pages as sub-tabs only
+ * when there is more than one (no page manager of its own — adding, renaming and removing pages is in "Pas aan").
+ */
+/** Who "mine" is in a circle: the self this device speaks as there (a persona's circle is the persona's; no circle = the default). */
+function mySelfIn(circleId) {
+  try { return circleHouseholdAgent?.circleSelf?.(circleId ?? null)?.webid ?? null; } catch { return null; }
+}
+
+async function _showVandaag() {
+  const book = _screensBook ?? { screens: [], activeId: null };
+  const screen = getActiveScreen(book);
   rootEl.innerHTML = '';
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.className = 'circle-screens-view__back';
-  back.textContent = `← ${t('circle.screens.picker_title')}`;
-  back.addEventListener('click', () => {
-    _screenSubMode = 'picker';
-    _viewingScreenId = null;
-    _screensRerender();
-  });
-  rootEl.appendChild(back);
-  const title = document.createElement('h2');
-  title.className = 'circle-screens-view__title';
-  title.textContent = screen.name || t('circle.screens.untitled');
-  rootEl.appendChild(title);
+  const head = document.createElement('div');
+  head.className = 'circle-vandaag__head';
+  if (book.screens.length > 1 && !_expandedBlockId) {
+    const tabs = document.createElement('div');
+    tabs.className = 'circle-vandaag__pages';
+    tabs.setAttribute('role', 'tablist');
+    for (const page of book.screens) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'circle-vandaag__page';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(page.id === screen?.id));
+      b.dataset.pageId = page.id;
+      b.textContent = page.name || t('circle.screens.untitled');
+      b.addEventListener('click', () => { if (page.id !== screen?.id) _setActivePage(page.id); });
+      tabs.appendChild(b);
+    }
+    head.appendChild(tabs);
+  }
+  if (_expandedBlockId) {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'circle-vandaag__back';
+    back.textContent = `← ${t('circle.screen.more_back')}`;
+    back.addEventListener('click', () => { _expandedBlockId = null; _showVandaag(); });
+    head.appendChild(back);
+  } else {
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'circle-vandaag__customise';
+    edit.textContent = t('circle.vandaag.customise');
+    edit.addEventListener('click', () => showVandaagCustomise());
+    head.appendChild(edit);
+    // the "+": an own note or an own appointment, into the person's own store (never a circle)
+    const plus = document.createElement('button');
+    plus.type = 'button';
+    plus.className = 'circle-vandaag__plus';
+    plus.textContent = `+ ${t('circle.vandaag.plus')}`;
+    plus.addEventListener('click', () => showVandaagPlus());
+    head.appendChild(plus);
+  }
+  rootEl.appendChild(head);
+  if (!screen) return;
+  const shown = _expandedBlockId ? (expandedPage(screen, _expandedBlockId) ?? screen) : screen;
+  const onMore = _expandedBlockId ? undefined : (blockId) => { _expandedBlockId = blockId; _showVandaag(); };
 
-  // δ.1 — cache-first render: read the LAST materialized payload for this
-  // screen and paint immediately so the press feels instant.  On a cache
-  // miss we fall through to the existing Loading→fresh flow (null sentinel
-  // → renderCircleScreen shows the loading hint).  Either way the fresh
-  // materialize runs in the background; on result we swap in the result
-  // and re-save the cache.  Race-token guards against a stale materialize
-  // from a previously-open screen stomping the body once the user has
-  // navigated away.
+  // δ.1 — cache-first render (the page only; a block opened whole is fetched fresh): paint the last materialized
+  // payload at once, then the fresh one when it is in. The token drops a stale result once the person moved on.
   const body = document.createElement('div');
   rootEl.appendChild(body);
   const token = ++_showActiveScreenToken;
+  const cacheKey = _expandedBlockId ? null : screen.id;
   let cached = null;
-  try { cached = await screenBlocksCache.get(screen.id); } catch { /* ignore */ }
-  if (token !== _showActiveScreenToken || _viewingScreenId !== screen.id) return;
+  if (cacheKey) { try { cached = await screenBlocksCache.get(cacheKey); } catch { /* ignore */ } }
+  if (token !== _showActiveScreenToken) return;
   if (Array.isArray(cached)) {
     _screenViewBlocks = cached;
-    renderCircleScreen(body, { blocks: cached, t, refreshing: true });
+    renderCircleScreen(body, { blocks: cached, t, refreshing: true, onAction: onScreenAction, onMore });
   } else {
     renderCircleScreen(body, { blocks: null, t });
   }
-
-  // Materialize blocks (with muted-circle filter when available later).
   let blocks = [];
   try {
     blocks = await materializeScreen({
-      screen,
+      screen: shown,
       hostOps: {
         // The TARGETED 3-arg waist — materializers call `callSkill('calendar', 'listEvents', …)`.
-        // This read `resolveSkill ?? rawCallSkill`, i.e. it PREFERRED the 2-arg resolver whenever the
-        // bot had booted (always): 'calendar' arg-shifted into the opId and the agenda materialised
-        // empty. The same bug sat in mobile's sibling; both found by the §3 rename.
         callSkill: rawCallSkill,
-        eventLog, circles: circlesCache,
+        eventLog, circles: circlesShown(),
+        // the switcher's set: own items show when the self that made them is ticked
+        ...(_selfSet.held.length > 1 ? { selfSet: _selfSet } : {}),
+        // the circles-with-news block counts what the circle tiles count
+        seenAt: readSeenAt(), myRefs: unreadMyRefs,
+        // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
+        selfIn: mySelfIn,
       },
-      // mutedCircleIds wires in α.5 (per-user mute UI).
     });
   } catch (err) {
-    console.warn('[showScreens] materializeScreen failed', err);
+    console.warn('[vandaag] materializeScreen failed', err);
   }
-  // Drop the result if the user navigated away (or to a different screen)
-  // while materialize was in flight — otherwise the body could be
-  // overwritten with stale content from a previously-open screen.
-  if (token !== _showActiveScreenToken || _viewingScreenId !== screen.id) return;
+  if (token !== _showActiveScreenToken) return;
   _screenViewBlocks = blocks;
-  renderCircleScreen(body, { blocks, t, refreshing: false });
-  // Save the fresh blocks back to the cache so the next open is also
-  // instant.  Best-effort: a quota / serialization failure is silent.
-  screenBlocksCache.set(screen.id, blocks).catch(() => { /* ignore */ });
+  renderCircleScreen(body, { blocks, t, refreshing: false, onAction: onScreenAction, onMore });
+  if (cacheKey) screenBlocksCache.set(cacheKey, blocks).catch(() => { /* ignore */ });
+}
+
+// "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
+// "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
+function showVandaagPlus() {
+  const { card, close } = _restoreOverlay();
+  let actId = null;
+  let error = null;
+  // written as the one self ticked in the header; with several ticked, the sheet asks which
+  let asSelf = writeAs(_selfSet.on);
+  const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
+  const paint = () => renderVandaagPlus(card, {
+    t, actId, error, selves, asSelf,
+    onPickSelf: (id) => { asSelf = id; paint(); },
+    onPick: (id) => { actId = id; error = null; paint(); },
+    onSave: async (id, values) => {
+      const op = plusOp(id, values);
+      if (op.error) { error = t(op.error); paint(); return; }
+      // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
+      const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
+      const r = await Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+        .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+      if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
+      const follow = plusFollowUp(_screensBook, id);
+      if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
+      close(); _showVandaag();
+    },
+    onClose: () => close(),
+  });
+  paint();
+}
+
+function showVandaagCustomise() {
+  const { card, close } = _restoreOverlay();
+  // the edits run one after another, and closing waits for the last one — so the page never paints a book from
+  // before an edit still in flight
+  let pending = Promise.resolve();
+  const paint = () => renderVandaagCustomise(card, {
+    model: customiseModel(_screensBook ?? { screens: [], activeId: null }, { circles: circlesCache ?? [] }),
+    t,
+    onAct: (act, args) => {
+      pending = pending.then(async () => {
+        const { opId, args: opArgs } = customiseOp(act, args ?? {});
+        await rawCallSkill('basis', opId, opArgs).catch(() => null);
+        _screensBook = await userScreenStore.get();
+        paint();
+      });
+    },
+    onClose: async () => {
+      close();
+      await pending;
+      _screensBook = await userScreenStore.get();
+      _showVandaag();
+    },
+  });
+  paint();
+}
+
+// what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
+function onScreenAction(action) {
+  if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
 }
 
 // (Batch 5) `showStream` is GONE — the cross-circle Stream VIEW retired (α.3 already removed its tab;
 // the function sat unreachable since). The LOG is untouched: `allCircleRows`/`projectEntries` remain the
 // projectors every surface uses — the Stream was only ever a view over them.
 
-// "Mij" tab — personal availability (holiday quiet hours) plus
-// the device-global Hopping stance.
-// the Mij tab is now your PROFILE (handle + display name + location),
-// backed by stoop's profile ops. Availability/quiet-hours moves to a
-// sub-screen reached from here.
-// Offering→property fold-in phase C (2026-07-17): the personal-offering editor
-// (stoop addMyOffering/removeMyOffering + listOfferingCategories) left this screen —
-// offerings are persona drivers now, edited on "Mij → persona's" (openAboutMePanel
-// → circleMij.js). The stoop offering ops themselves STAY: the roster projection
-// still uses the roster shape, and mobile CircleProfileScreen still calls them
-// until the mobile mirror lands.
+// "Mij" tab — identity, ONE declared screen (manifest `meActions` + `meBlocks`): the name with its readings, the
+// person's agents and devices, one door to My data, Advanced behind the developer switch. The identity fields and
+// the location are in the person's own editor (the identity line's "Edit" → openAboutMePanel); the overview is on
+// Vandaag; the other doors are behind My data.
 async function showMij() {
   showTabBar('mij');
   // The Advanced screen is a developer tool (raw parameter keys): offered only when the developer switch is on.
   let developer = false;
   try { developer = (await circleHouseholdAgent?.callSkill?.('params', 'get-param', { key: DEVELOPER_PARAM_KEY }))?.value === true; } catch { /* off */ }
-  let profile = {};
-  let geocodeResult = null;
-  let busy = false;
-  // Gepland: what is coming for me, wherever it lives — read here, on this device (no bot); null while it loads
-  let planned = null;
-  let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
-  // Mijn overzicht, below Gepland: my chores across every circle (the shared block); null while it loads
-  let overview = null;
-
-  async function load() {
-    try {
-      const prof = await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null);
-      profile = prof?.entry ?? {};
-    } catch { /* keep defaults */ }
-    rerender();
-    try {
-      const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
-      // the overview beside Gepland, not waiting on it (a block that fails says so under its own title)
-      mijOverviewBlocks({ callSkill: rawCallSkill, me }).then((blocks) => { overview = blocks; rerender(); });
-      const r = await plannedForMe({ callSkill: rawCallSkill, me });
-      planned = plannedLines(r.items, { t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: currentLang() });
-      // the person's own week overview: a row in their own store, switched here
-      const clock = await personClock;
-      if (clock && me) {
-        weekOverview = {
-          on: personWeekOn(clock.book, me),
-          onToggle: async () => {
-            weekOverview = { ...weekOverview, on: null }; rerender();
-            try { await switchPersonWeek(clock.book, me, !personWeekOn(clock.book, me)); } catch (e) { console.warn('[person-clock] switch failed:', e?.message ?? e); }
-            weekOverview = { ...weekOverview, on: personWeekOn(clock.book, me) }; rerender();
-          },
-        };
-      }
-    } catch { planned = []; }
-    rerender();
-  }
-
-  // D / consumer-switch (second live surface) — the "Mij" profile header
-  // is sourced from the manifest PAGE projection.  renderWeb(basisManifest)
-  // projects the `me` op's `surfaces.page` into pages[]; pageForOp selects it and
-  // its labelKey → t() drives the header label (invariant #4 — the manifest is
-  // the source of truth for surfaces; no more hardcoded tr('circle.profile.title')).
+  let blocks = null;
+  // the manifest PAGE projection for the `me` op: the title while the name is not known
   const profilePage = pageForOp(basisManifest, 'me');
-
   const rerender = () => renderCircleProfile(rootEl, {
-    profile, geocodeResult, busy, t,
-    plannedLines: planned,
-    overviewBlocks: overview,
-    weekOverview,
-    // the projected PAGE surface drives the header label (labelKey via t).
-    profilePage,
-    onSaveProfile: async ({ handle, displayName }) => {
-      busy = true; rerender();
-      try {
-        if (handle && handle !== profile.handle) await rawCallSkill('stoop', 'setMyHandle', { handle });
-        if (displayName !== (profile.displayName ?? '')) await rawCallSkill('stoop', 'setMyDisplayName', { displayName });
-      } catch { /* surfaced on reload */ }
-      busy = false; await load();
+    t, blocks, profilePage,
+    onBlockAction: (a) => {
+      if (a?.kind === 'edit-me') openAboutMePanel('default');
+      else if (a?.kind === 'open-my-data') showMyData();
     },
-    // Fold-in phase C — the quiet skills pointer opens the persona surface.
-    onOpenMij: () => openAboutMePanel('default'),
-    onGeocode: async (query) => {
-      try { const r = await rawCallSkill('stoop', 'geocode', { query }); geocodeResult = r?.error ? null : r; }
-      catch { geocodeResult = null; }
-      rerender();
-    },
-    onSaveLocation: async () => {
-      if (!geocodeResult) return;
-      try { await rawCallSkill('stoop', 'setMyLocation', { cell: geocodeResult.cell, label: geocodeResult.label, source: 'geocode' }); } catch { /* */ }
-      geocodeResult = null; await load();
-    },
-    onClearLocation: async () => {
-      try { await rawCallSkill('stoop', 'clearMyLocation', {}); } catch { /* */ }
-      await load();
-    },
-    onAvailability: showAvailability,
     onMyData: showMyData,
-    // Nearby step I — the connection-point LIST, beside the single-relay field in My data.
-    onConnectionPoints: showConnectionPoints,
-    // SILENT out-of-circle delivery — the personal, cross-circle "shared with me" inbox.
-    onSharedWithMe: showSharedWithMe,
-    // The way back from a block. Blocking is one tap on a post; without this the only undo was
-    // `/unblock <key>`, typed from memory.
-    onBlocked: showBlocked,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
-    version: APP_VERSION,
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
     // The Me actions are DECLARED (manifest `meActions`); this is what each id does here.
     onMeAction: (id) => {
@@ -4298,7 +4350,22 @@ async function showMij() {
     },
   });
   rerender();
-  load();
+  const relays = (() => { try { return _peerAgent?.relays?.list?.() ?? []; } catch { return []; } })();
+  // Mij follows the switcher: with one persona ticked, that persona's name and devices; otherwise the person's
+  await refreshSelfSet();
+  const oneSelf = writeAs(_selfSet.on);
+  const mijSelf = oneSelf && oneSelf !== 'default'
+    ? { id: oneSelf, name: _selfSet.held.find((p) => p.id === oneSelf)?.name ?? null, deviceId: circleHouseholdAgent?.persona?.(oneSelf)?.enrolledDevice?.deviceId ?? null }
+    : null;
+  blocks = await mijScreenBlocks({ hostOps: {
+    callSkill: rawCallSkill, eventLog, circles: circlesShown(), ...(mijSelf ? { mijSelf } : {}),
+    seenAt: readSeenAt(), myRefs: unreadMyRefs, selfIn: mySelfIn,
+    availability: await Promise.resolve().then(() => availabilityStore.get()).catch(() => null),
+    // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
+    online: relays.length ? relays.some((r) => r.connected) : undefined,
+    deviceId: circleHouseholdAgent?.myDeviceId?.() ?? null,
+  } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
+  if (_activeTab === 'mij') rerender();
 }
 
 // Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card stoop makes
@@ -4333,7 +4400,7 @@ async function showSharedWithMe() {
   const opener = openerForIdentity(circleCoreAgent?.identity);   // network-derived; null → deny-safe no-op
   renderSharedWithMe(rootEl, {
     entries, t,
-    onBack: showMij,
+    onBack: showMyData,
     onOpen: async (entry) => {
       if (typeof opener !== 'function') return;   // deny-safe: no opener → no-op (no leak)
       try { await openSharedCopy(entry, opener); } catch { /* wrong key / not a recipient — deny-safe */ }
@@ -4362,7 +4429,7 @@ async function showBlocked() {
     }
     renderBlockedList(rootEl, {
       rows: buildBlockedList({ peers, members }),
-      t, loading, onBack: showMij,
+      t, loading, onBack: showMyData,
       onUnblock: async (key) => {
         try { await rawCallSkill('basis', 'unmute', { peer: key }); } catch { /* re-read tells the truth */ }
         await paint(false);
@@ -4530,6 +4597,7 @@ async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
+  let weekOverview = undefined;   // the person's own week overview switch (once their clock is up)
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   // Through the waist, like every other affordance: the panel asks the OP, and the op is the only thing
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
@@ -4545,6 +4613,7 @@ async function showMyData() {
   const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
+  const onReceivePersonas = () => showReceivePersonas();
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
   const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
@@ -4639,7 +4708,11 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
+    // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
+    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
+    weekOverview, version: APP_VERSION,
+    onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -4714,6 +4787,12 @@ async function showMyData() {
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel,
     // The personal history mirror — live health from the agent + the switch through the one
     // kind-gated write (the agent starts/stops the sink LIVE on the flip).
+    // where the app opens on this device (a user param; the same write as every setting)
+    startScreen: { value: circleHouseholdAgent?.getParamValue?.('home.startScreen') ?? 'vandaag', choices: START_SCREEN_CHOICES },
+    onSetStartScreen: async (value) => {
+      try { await circleHouseholdAgent.callSkill('params', 'set-param', { key: 'home.startScreen', value }); } catch { /* the row re-reads the truth */ }
+      rerender();
+    },
     historyMirror: {
       enabled: circleHouseholdAgent?.getParamValue?.('history.mirror') === true,
       status:  circleHouseholdAgent?.historyMirrorStatus?.() ?? null,
@@ -4736,6 +4815,18 @@ async function showMyData() {
       } catch (err) { console.warn('[history-export]', err?.message ?? err); }
     } });
   getWebPushState().then((s) => { notifications = s; rerender(); }).catch(() => {});
+  // the person's own week overview: a row in their own store, switched here
+  (async () => {
+    const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+    const clock = await personClock;
+    if (!clock || !me) return;
+    const toggle = async () => {
+      weekOverview = { on: null, onToggle: toggle }; rerender();
+      try { await switchPersonWeek(clock.book, me, !personWeekOn(clock.book, me)); } catch (e) { console.warn('[person-clock] switch failed:', e?.message ?? e); }
+      weekOverview = { on: personWeekOn(clock.book, me), onToggle: toggle }; rerender();
+    };
+    weekOverview = { on: personWeekOn(clock.book, me), onToggle: toggle }; rerender();
+  })().catch(() => {});
   rerender();
   const [loc, status, priv, met, profProps] = await Promise.all([
     rawCallSkill('stoop', 'getDataLocation', {}).catch(() => null),
@@ -4906,7 +4997,9 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
-  const adminPeerAddr = circleHouseholdAgent?.householdSelfAddr ?? null;
+  // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
+  // address in a persona's circle, which the joiner's trail would record as its confirming admin
+  const adminPeerAddr = _peerAgent?.circleSelf?.(circleId)?.webid ?? circleHouseholdAgent?.householdSelfAddr ?? null;
   // the admin's NKN native address (distinct from the pubKey), so a pure-NKN
   // joiner can route the redeem handshake. Best-effort: null when NKN isn't up.
   // …gated: with sharing off the invite simply carries no NKN address, and a joiner falls back to the
@@ -5213,6 +5306,160 @@ function _restoreOverlay() {
   return { wrap, card, close: () => wrap.remove() };
 }
 
+// PERSONAS ON THIS DEVICE — the restore picker (and any time): the person's personas this device does not run yet,
+// ticked, then handed over with the phrase typed here (the one moment the root is in hand). A reload runs them.
+async function showReceivePersonas() {
+  const { card, close } = _restoreOverlay();
+  const answer = await rawCallSkill('household', 'listReceivablePersonas', {}).catch(() => null);
+  const listed = answer?.personas ?? [];
+  // a device without the recovery seal takes this step even with nothing to tick: the phrase hands it the seal
+  const needsSeal = answer?.hasRecoverySeal === false;
+  card.innerHTML = '';
+  const h = document.createElement('h3');
+  h.textContent = t('circle.receive_personas.title');
+  card.appendChild(h);
+  const done = (key, reload = false, vars = {}) => {
+    card.innerHTML = '';
+    const p = document.createElement('p');
+    p.textContent = t(key, vars);
+    card.appendChild(p);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cc-btn cc-btn--primary';
+    b.textContent = t(reload ? 'circle.receive_personas.reload' : 'circle.receive_personas.close');
+    b.addEventListener('click', () => (reload ? window.location.reload() : close()));
+    card.appendChild(b);
+  };
+  // THE SELVES THIS DEVICE HOLDS, each with its one act (pause a running persona, resume a paused one; the primary none) —
+  // the shared rows (personasHere.js); a pause or resume takes effect at the next boot
+  const here = await rawCallSkill('household', 'listPersonasHere', {}).catch(() => null);
+  const hereRows = personasHereRows(here?.personas ?? []);
+  if (hereRows.length) {
+    const hh = document.createElement('h4');
+    hh.textContent = t('circle.receive_personas.here_title');
+    card.appendChild(hh);
+    for (const r of hereRows) {
+      const row = document.createElement('div');
+      row.className = 'cc-personas-here__row';
+      row.dataset.personaId = r.id;
+      row.style.cssText = 'display:flex;gap:.6rem;align-items:center;justify-content:space-between;margin:.2rem 0;';
+      const label = document.createElement('span');
+      label.textContent = (r.nameKey ? t(r.nameKey) : r.name) + (r.stateKey ? ` — ${t(r.stateKey)}` : '');
+      row.appendChild(label);
+      if (r.act) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-btn cc-btn--quiet cc-personas-here__act';
+        b.dataset.op = r.act.op;
+        b.textContent = t(r.act.labelKey);
+        b.addEventListener('click', async () => {
+          b.disabled = true;
+          const res = await rawCallSkill('household', r.act.op, { personaId: r.id }).catch(() => null);
+          // the line says what still holds until the restart, and carries the restart button
+          if (res?.ok) done(r.act.op === 'pausePersona' ? 'circle.receive_personas.done_pause_reload' : 'circle.receive_personas.done_resume_reload', true, { name: r.nameKey ? t(r.nameKey) : r.name });
+          else done('circle.receive_personas.failed');
+        });
+        row.appendChild(b);
+      }
+      // REMOVE — a ceremony: the warning first, then the phrase (the one moment the root is in hand), then the act
+      if (r.remove) {
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'cc-btn cc-btn--quiet cc-personas-here__remove';
+        rm.textContent = t(r.remove.labelKey);
+        rm.addEventListener('click', () => {
+          const name = r.nameKey ? t(r.nameKey) : r.name;
+          card.innerHTML = '';
+          const warn = document.createElement('p');
+          warn.textContent = t(r.remove.warnKey, { name });
+          const ph = document.createElement('textarea');
+          ph.rows = 3; ph.autocomplete = 'off'; ph.spellcheck = false;
+          ph.className = 'cc-personas-here__phrase';
+          ph.placeholder = t('circle.receive_personas.phrase_placeholder');
+          ph.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+          const go = document.createElement('button');
+          go.type = 'button';
+          go.className = 'cc-btn cc-btn--primary cc-personas-here__remove-go';
+          go.textContent = t('circle.receive_personas.remove_submit');
+          go.addEventListener('click', async () => {
+            go.disabled = true;
+            const res = await rawCallSkill('household', r.remove.op, { mnemonic: ph.value, personaId: r.id }).catch(() => null);
+            ph.value = '';
+            // re-keyed: every wrapper in memory holds the old key — reload at once, nothing else runs on it
+            if (res?.ok && res.rekeyedTo) { window.location.reload(); return; }
+            if (res?.rekeyFailed) { done('circle.receive_personas.remove_rekey_failed'); return; }
+            if (res?.ok) done('circle.receive_personas.done_remove_reload', true, { name });
+            else if (res?.outcome === 'wrong-phrase' || res?.outcome === 'invalid-phrase') done('circle.receive_personas.wrong_phrase');
+            else if (res?.error === 'key-holder') done('circle.receive_personas.remove_key_holder');
+            else if (res?.error === 'paused') done('circle.receive_personas.remove_paused');
+            else done('circle.receive_personas.failed');
+          });
+          const back = document.createElement('button');
+          back.type = 'button';
+          back.className = 'cc-btn cc-btn--quiet';
+          back.textContent = t('circle.receive_personas.close');
+          back.addEventListener('click', () => close());
+          card.append(warn, ph, go, back);
+        });
+        row.appendChild(rm);
+      }
+      card.appendChild(row);
+    }
+  }
+  if (listed.length === 0 && !needsSeal) {
+    const none = document.createElement('p');
+    none.textContent = t('circle.receive_personas.none');
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'cc-btn cc-btn--primary';
+    closeBtn.textContent = t('circle.receive_personas.close');
+    closeBtn.addEventListener('click', () => close());
+    card.append(none, closeBtn);
+    return;
+  }
+  const rh = document.createElement('h4');
+  rh.textContent = t('circle.receive_personas.receive_title');
+  card.appendChild(rh);
+  const body = document.createElement('p');
+  body.textContent = t(listed.length ? 'circle.receive_personas.body' : 'circle.receive_personas.needs_seal');
+  card.appendChild(body);
+  const picked = new Set();
+  for (const p of listed) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.dataset.personaId = p.id;
+    box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); });
+    const name = document.createElement('span');
+    name.textContent = p.name ?? p.id;
+    row.append(box, name);
+    card.appendChild(row);
+  }
+  if (listed.length) {
+    const sealOnly = document.createElement('p');
+    sealOnly.textContent = t('circle.receive_personas.seal_only');
+    card.appendChild(sealOnly);
+  }
+  const phrase = document.createElement('textarea');
+  phrase.rows = 3; phrase.autocomplete = 'off'; phrase.spellcheck = false;
+  phrase.placeholder = t('circle.receive_personas.phrase_placeholder');
+  phrase.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+  card.appendChild(phrase);
+  const go = document.createElement('button');
+  go.type = 'button';
+  go.className = 'cc-btn cc-btn--primary';
+  go.textContent = t('circle.receive_personas.submit');
+  go.addEventListener('click', async () => {
+    go.disabled = true;
+    const r = await rawCallSkill('household', 'receivePersonas', { mnemonic: phrase.value, personas: [...picked] }).catch(() => null);
+    phrase.value = '';
+    if (r?.ok) done(picked.size ? 'circle.receive_personas.done_reload' : 'circle.receive_personas.done_seal_reload', true);
+    else done(r?.outcome === 'wrong-phrase' || r?.outcome === 'invalid-phrase' ? 'circle.receive_personas.wrong_phrase' : 'circle.receive_personas.failed');
+  });
+  card.appendChild(go);
+}
+
 function showEnrollDeviceFlow({ needs = null } = {}) {
   // ADD-A-DEVICE (the enroll ceremony, as its declared flow): the phrase is typed on THIS — the
   // NEW — device. One pause (the secret-kind phrase + an optional device label), then the
@@ -5314,15 +5561,64 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
       offerErr.textContent = t('circle.enroll.offer_paste_invalid');
       card.appendChild(offerErr);
       const values = {};
+      // THE PERSONA PICKER: once an offer and the phrase are both here, the offer's sealed list opens ON THIS DEVICE
+      // (nothing leaves it) and the person ticks which selves this device gets — the general persona a row like the rest
+      // (ticked by default). The model, the last-self rule and the primary are the shared ones (enrollOffer.js).
+      const picker = document.createElement('div');
+      picker.style.cssText = 'margin:.6rem 0;';
+      let pickState = enrolPickState(values);
+      let pickNote = null;
+      const paintPicker = () => {
+        picker.innerHTML = '';
+        const offerUri = offerInput.value.trim() || needs?.offer || '';
+        const listed = offerUri && values.mnemonic ? openOfferPersonas(offerUri, values.mnemonic) : [];
+        if (listed.length === 0) { delete values[ENROL_PERSONAS_PARAM]; delete values[ENROL_GENERAL_PARAM]; return; }
+        const title = document.createElement('p');
+        title.textContent = t('circle.enroll.personas_title');
+        const hint = document.createElement('p');
+        hint.className = 'cc-hint';
+        hint.textContent = t('circle.enroll.personas_hint');
+        picker.append(title, hint);
+        for (const row of pickerRows(listed, pickState)) {
+          const label = document.createElement('label');
+          label.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
+          const box = document.createElement('input');
+          box.type = 'checkbox';
+          box.checked = row.checked;
+          box.dataset.personaId = row.id;
+          box.addEventListener('change', () => {
+            const r = togglePick(pickState, row.id);
+            pickState = r.state;
+            pickNote = r.refused ? t('circle.enroll.last_self') : null;
+            paintPicker();
+          });
+          const name = document.createElement('span');
+          name.textContent = row.nameKey ? t(row.nameKey) : row.name;
+          label.append(box, name);
+          picker.appendChild(label);
+        }
+        // which self this device will speak as — the first ticked
+        const primary = pickPrimary(pickState);
+        const speaks = document.createElement('p');
+        speaks.className = 'cc-hint';
+        speaks.dataset.enrolSpeaksAs = primary ?? '';
+        speaks.textContent = t('circle.enroll.speaks_as', { name: primary === 'default' ? t('circle.switcher.you') : (listed.find((p) => p.id === primary)?.name ?? primary) });
+        picker.appendChild(speaks);
+        if (pickNote) { const note = document.createElement('p'); note.className = 'cc-hint'; note.textContent = pickNote; picker.appendChild(note); }
+        Object.assign(values, enrolPickArgs(pickState));
+      };
+      offerInput.addEventListener('input', paintPicker);
       for (const param of view.form.params) {
+        if (param.name === ENROL_PERSONAS_PARAM || param.name === ENROL_GENERAL_PARAM) continue;   // painted by the picker below
         const input = document.createElement(param.kind === 'secret' ? 'textarea' : 'input');
         if (param.kind !== 'secret') input.type = 'text';
         input.placeholder = t(`circle.enroll.${param.name}_placeholder`, { defaultValue: param.name });
         input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
         if (param.kind === 'secret') { input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false; }
-        input.addEventListener('input', () => { values[param.name] = input.value; });
+        input.addEventListener('input', () => { values[param.name] = input.value; if (param.name === 'mnemonic') paintPicker(); });
         card.appendChild(input);
       }
+      card.appendChild(picker);
       const go = document.createElement('button');
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';
@@ -5461,19 +5757,20 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     }
 
     const outcome = inst?.steps?.ceremony?.outcome;
+    const finished = ceremonyFinished(outcome);   // ok, or partial: it said what is left — no retry
     const msg = document.createElement('p');
     msg.textContent = ceremonyOutcomeText({ keyPrefix, outcome, out: inst?.steps?.ceremony?.out, t });
     card.appendChild(msg);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'cc-btn cc-btn--primary';
-    btn.textContent = outcome === 'ok' ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
+    btn.textContent = finished ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
-      if (outcome === 'ok') return done();
+      if (finished) return done();
       close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
     });
     card.appendChild(btn);
-    if (outcome !== 'ok') {
+    if (!finished) {
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'cc-btn cc-btn--quiet';
@@ -5848,13 +6145,50 @@ async function openAboutMePanel(personaId) {
   close.className = 'cc-screen-panel__close';
   close.setAttribute('aria-label', t('common.close'));
   close.textContent = '✕';
-  close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
+  // closing the editor repaints the header avatar (a new picture or name shows at once)
+  close.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } refreshHeaderAvatar(); });
   head.appendChild(title); head.appendChild(close);
   card.appendChild(head);
+  // the person's own basics on top (handle, name, location) — Mij's "Edit" leads here; the persona layer below
+  const basicsEl = document.createElement('div');
+  if (id === 'default' || id === '') card.appendChild(basicsEl);
   const body = document.createElement('div');
   card.appendChild(body);
   overlay.appendChild(card);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  let profile = {};
+  let geocodeResult = null;
+  let busy = false;
+  const loadBasics = async () => {
+    try { profile = (await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null))?.entry ?? {}; } catch { /* keep */ }
+    drawBasics();
+  };
+  const drawBasics = () => renderProfileBasics(basicsEl, {
+    profile, geocodeResult, busy, t,
+    onSaveProfile: async ({ handle, displayName }) => {
+      busy = true; drawBasics();
+      try {
+        if (handle && handle !== profile.handle) await rawCallSkill('stoop', 'setMyHandle', { handle });
+        if (displayName !== (profile.displayName ?? '')) await rawCallSkill('stoop', 'setMyDisplayName', { displayName });
+      } catch { /* surfaced on reload */ }
+      busy = false; await loadBasics();
+    },
+    onGeocode: async (query) => {
+      try { const r = await rawCallSkill('stoop', 'geocode', { query }); geocodeResult = r?.error ? null : r; }
+      catch { geocodeResult = null; }
+      drawBasics();
+    },
+    onSaveLocation: async () => {
+      if (!geocodeResult) return;
+      try { await rawCallSkill('stoop', 'setMyLocation', { cell: geocodeResult.cell, label: geocodeResult.label, source: 'geocode' }); } catch { /* */ }
+      geocodeResult = null; await loadBasics();
+    },
+    onClearLocation: async () => {
+      try { await rawCallSkill('stoop', 'clearMyLocation', {}); } catch { /* */ }
+      await loadBasics();
+    },
+  });
+  if (basicsEl.parentNode) { drawBasics(); loadBasics(); }
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) { overlay.remove(); refreshHeaderAvatar(); } });
   document.body.appendChild(overlay);
 
   // Load → build model → render; re-run after each edit so the surface always
@@ -5876,9 +6210,7 @@ async function openAboutMePanel(personaId) {
     const _selfComp = await getSelfMediaComposition();
     let currentPicture = null;
     try {
-      const _props = (await rawCallSkill('agents', 'getProfileProperties', { id: model.defaultId ?? 'default' }))?.properties ?? {};
-      const _entry = _props.profilePicture;
-      currentPicture = (_entry && typeof _entry === 'object' && _entry.value !== undefined) ? _entry.value : (_entry ?? null);
+      currentPicture = pictureRefOf((await rawCallSkill('agents', 'getProfileProperties', { id: model.defaultId ?? 'default' }))?.properties);
     } catch { /* no picture set */ }
     // Which circles can carry a picture right now (a seal strategy for their media) — Mij does not offer the
     // picture where a share would have to drop it, and says why.
@@ -5915,8 +6247,8 @@ async function openAboutMePanel(personaId) {
         try { await rawCallSkill('agents', 'setProfileDriver', { id: model.defaultId ?? 'default', key, kind: 'offering', text, tags }); } catch { /* */ }
         await draw();
       },
-      onCreatePersona: async (name) => {
-        try { await rawCallSkill('agents', 'createProfile', { id: name }); } catch { /* */ }
+      onCreatePersona: async (name, answers) => {
+        try { await rawCallSkill('agents', 'createProfile', newPersonaArgs(name, answers)); } catch { /* */ }
         await draw();
       },
       onToggleDisclosure: async (contextId, key, enabled, forPersonaId) => {
@@ -5994,7 +6326,7 @@ async function showAvailability() {
     availability: working,
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
-    onSave: async () => { await availabilityStore.update(working); showMij(); },
+    onSave: async () => { await availabilityStore.update(working); showMyData(); },
     onHop: showHop,
   });
   rerender();
@@ -6477,7 +6809,8 @@ function showCircle(id, circle, policy) {
       try {
         noticeboardPosts = await annotateResonantPosts({
           posts:      noticeboardPosts,
-          getDrivers: async () => (await rawCallSkill('agents', 'getProfileDrivers', { id: 'default' }))?.drivers ?? {},
+          // the drivers of the self this device is in this circle (a persona's circle is the persona's)
+          getDrivers: async () => (await rawCallSkill('agents', 'getProfileDrivers', { id: profileIdOfCircle(id) }))?.drivers ?? {},
         });
       } catch { /* resonance is a nicety; never block the board */ }
     } catch { noticeboardPosts = []; }
@@ -6980,6 +7313,7 @@ function showCircle(id, circle, policy) {
       // without us having to pass a fresh snapshot through every prop.
       // Locally-sent bubbles read this to decide which icon to render.
       deliveryStateFor: (msgId) => deliveryStateMap.get(msgId),
+      deliveryReasonFor: (msgId) => deliveryStateMap.reasonOf(msgId),
       localActor: LOCAL_ACTOR,
       // δ.2 — retry on the failed icon tap.  Re-fires the SAME msgId
       // (idempotent receiver-side dedup).  Looks up the original text
@@ -7267,6 +7601,7 @@ function showCircle(id, circle, policy) {
     // container, the translator and the retry handler all live in this scope.
     paintDelivery: (msgId, state) => paintDeliveryChip(rootEl, msgId, state, {
       tr: t,
+      reason: deliveryStateMap.reasonOf(msgId),
       onRetryDelivery: (retryId) => {
         const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
         const text = evt?.payload?.text;
@@ -8317,6 +8652,8 @@ async function boot() {
 
   try {
     const agent = await createRealHouseholdAgent({
+      // the person's one availability record: away matches no offering (the post matcher, on this device)
+      availability: () => availabilityStore.get(),
       // the agent's own lines (list and calendar defaults, task confirmations, a paused circle) in the person's language
       t,
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
@@ -8506,6 +8843,7 @@ async function boot() {
     circleSendPeerRedeem = makeSendGroupRedeemRequest({
       sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
       currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (2026-09-16)
+      circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.
@@ -8876,7 +9214,8 @@ async function boot() {
       // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
       // the shell bridges it into stoop's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
-        handleCirclePost: makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
+        // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
+        handleCirclePost: makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog, profileIdOf: (cid) => agent.profileIdOf?.(cid) ?? 'default' }),
         self: agent.identity?.pubKey ?? null,
       }));
       // Rebuild the delivery ladder from the ONE log (the outbox-as-projection): my recent sends seed
@@ -9058,11 +9397,15 @@ async function boot() {
   // In-app onboarding (task #13) — provision the default help circle + the Onderling-bot once (idempotent),
   // then refresh the launcher list so its tile appears. Best-effort; a failure never blocks the app.
   await maybeProvisionHelpCircle();
-  // The landing tab is CIRCLES for now (Frits, 2026-08-31): a fresh person should meet the social
-  // front door, not the screen manager. The landing choice is to become a SETTING later — with
-  // "last used" among its options — so this stays a default, not a rule. (Screens' first-run seed
-  // still happens on the first visit to that tab.)
-  showLauncher();
+  // WHERE THE APP OPENS — the person's setting on this device (startScreen.js): Vandaag by default, the circles list,
+  // or the tab last used. (The landing was the circles list until Vandaag became the home, 2026-10-15.)
+  let lastTab = null;
+  try { lastTab = window.localStorage.getItem(LAST_TAB_STORAGE_KEY); } catch { /* none */ }
+  const start = startTabFor(circleHouseholdAgent?.getParamValue?.('home.startScreen'), lastTab);
+  if (start === 'screens') showScreens();
+  else if (start === 'contacten') showContacts();
+  else if (start === 'mij') showMij();
+  else showLauncher();
 }
 
 // A `/scherm` link (or the bot's "Open het scherm" button inside Telegram) opens the web app as a SCREEN for a household

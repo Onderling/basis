@@ -6,10 +6,9 @@
  * header can change either later. A card arriving with a message still records the default: nobody is there to ask.
  * This module is the whole of the logic; the shells paint a sheet and a control over it.
  *
- * The lens, not a second you (see `contactPersona.js`): the contact talks to the same identity whatever is picked —
- * a persona as its own person on the wire is ledger L123. What the choice changes is the RELEASE on the pair circle:
- * the LEVEL sets the persona's disclosure for that circle's context, the PERSONA picks whose release the pair roster
- * says there. Say it that way on every surface: "dit contact ziet je als …".
+ * A second you (see `contactPersona.js`): the PERSONA picks WHO this contact talks to — its own key, card, seal and
+ * pair circle — and the LEVEL sets that persona's disclosure for the pair circle's context. Say it that way on every
+ * surface: "dit contact kent een andere jij".
  *
  * The pair circle's id is computable before the circle exists (`pairCircleIdFor`), so the level can be set at add
  * time for a circle that is founded only at the first exchange — and the founding then says a release that

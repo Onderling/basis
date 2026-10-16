@@ -21,7 +21,7 @@
  */
 import { CHAT_KIND } from './conversationKinds.js';
 import {
-  DELIVERY, DELIVERY_LABELS, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
+  DELIVERY, DELIVERY_LABELS, DELIVERY_REASON_LABELS, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
 } from './deliveryState.js';
 
 /** Both settings, with their defaults. Only an explicit boolean changes one. */
@@ -156,13 +156,15 @@ export const DELIVERY_PRESENTATION = Object.freeze({
 });
 
 /** How to draw one state, or null when it should not appear. Pairs with `deliveryLabelFor`. */
-export function deliveryPresentation(state, { mine = true } = {}) {
+export function deliveryPresentation(state, { mine = true, reason = null } = {}) {
   if (!mine || !isDeliveryState(state)) return null;
   const p = DELIVERY_PRESENTATION[state];
   if (!p?.show) return null;
+  // why it failed, in its own words, when the delivery map knows (`reasonOf`); the shape stays the state's
+  const reasonKey = typeof reason === 'string' ? (DELIVERY_REASON_LABELS[reason] ?? null) : null;
   // `tone` is a NAME, not a colour value: the shells map it to their own palette, so web and mobile cannot
   // drift on which states are coloured even if their hues differ.
-  return { state, glyph: p.glyph, tone: p.tone, retryable: p.retryable, labelKey: DELIVERY_LABELS[state] };
+  return { state, glyph: p.glyph, tone: p.tone, retryable: p.retryable, labelKey: reasonKey ?? DELIVERY_LABELS[state] };
 }
 
 /**

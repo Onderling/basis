@@ -18,15 +18,17 @@ export const basisManifest = {
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).
   // Every other op maps to an SDK atom.
-  domainVerbs: { help: 'read' },
+  domainVerbs: { help: 'read', undo: 'write' },
 
   // §1a (declared-authoritative capability surface): INTENTIONALLY no `nouns` block.
   // This is the shell/unifier manifest — every op is an app-level command (help/settings/
   // mute/newthread/…) that names NO item noun, so it has ZERO (atom × noun) capabilities to
-  // curate. Adding `nouns:{}` would flip it to declared-authoritative and silently DROP any
-  // future chat-thread/chat-message capability. The `noun-declaration discipline` fitness guard
-  // (test/atom-discipline.test.js) enforces exactly this: a `nouns` block is required the moment
-  // an op here starts naming a noun (via appliesTo.type or a `type`-enum param), not before.
+  // curate. The person's pages (the screen ops) are a device setting kept as versions, not
+  // items in a store, so they name no noun either. Adding `nouns:{}` would flip it to
+  // declared-authoritative and silently DROP any future chat-thread/chat-message capability.
+  // The `noun-declaration discipline` fitness guard (test/atom-discipline.test.js) enforces
+  // exactly this: a `nouns` block is required the moment an op here starts naming a noun (via
+  // appliesTo.type or a `type`-enum param), not before.
 
   operations: [
     /**
@@ -824,6 +826,225 @@ export const basisManifest = {
       },
     },
 
+    /**
+     * `/page-add` — a new page of the person's own (Vandaag), optionally showing only some circles.
+     */
+    {
+      id:    'screen-add-page',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'add',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'name', kind: 'string' },
+        { name: 'circleIds', kind: 'object' },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-add', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-remove` — remove one of the person's pages.
+     */
+    {
+      id:    'screen-remove-page',
+      group: 'device',
+      verb:  'remove',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-remove', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-rename` — rename a page.
+     */
+    {
+      id:    'screen-rename-page',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'name', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-rename', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-show` — the page the home opens on.
+     */
+    {
+      id:    'screen-set-active',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-show', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/personas` — which of this device's selves the app shows now (the header switcher; none named = all). Kept on
+     * the screens book, so it is a page change like the others: logged, undoable.
+     */
+    {
+      id:    'screen-set-personas',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'ids', kind: 'object' },
+      ],
+      surfaces: {
+        slash: { command: '/personas', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-circles` — which circles a page shows (none named = all).
+     */
+    {
+      id:    'screen-set-circles',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'circleIds', kind: 'object' },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-circles', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-add` — add a block from the block table (only those the person's pages may hold).
+     */
+    {
+      id:    'screen-add-block',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'add',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'type', kind: 'string', required: true },
+        { name: 'config', kind: 'object' },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-add', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-remove` — remove a block from a page.
+     */
+    {
+      id:    'screen-remove-block',
+      group: 'device',
+      verb:  'remove',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'blockId', kind: 'string', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-remove', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-move` — move a block to another place on its page.
+     */
+    {
+      id:    'screen-move-block',
+      group: 'device',
+      verb:  'move',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'blockId', kind: 'string', required: true },
+        { name: 'index', kind: 'number', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-move', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-block-set` — change a block's settings (its circles, mine/all, horizon, limit…).
+     */
+    {
+      id:    'screen-set-block-config',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'update',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'pageId', kind: 'string', required: true },
+        { name: 'blockId', kind: 'string', required: true },
+        { name: 'config', kind: 'object', required: true },
+      
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-block-set', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/page-undo` — undo the newest change to the person's pages (each change is kept as a version and logged).
+     */
+    {
+      id:    'screen-undo',
+      group: 'device',
+      verb:  'undo',
+      writes: { scope: 'device' },
+      params: [
+      ],
+      surfaces: {
+        // the person's own pages — no chat surface yet (a model reordering a page comes later, through these ops)
+        slash: { command: '/page-undo', body: 'none' },
+      },
+    },
+
 
     /**
      * `/send-to <peer> <itemId>` — v0.5.6 simulated cross-peer demo.
@@ -859,8 +1080,9 @@ export const basisManifest = {
   // back); an act an op performs targets the OP — never a nav row with the same meaning. That is what makes a button, a
   // slash command and a chat line one door (strict validation refuses a nav `to` that names an op: `nav-shadows-op`).
   tabs: [
+    // Vandaag — the person's own pages (the screen book), the home: first, so the bar reads Vandaag · Kringen · Contacten · Mij
+    { id: 'screens',   labelKey: 'circle.tab.vandaag',   target: { kind: 'nav', to: 'screens' } },
     { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
-    { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
     // Nearby — the room this device is in (mDNS / BLE). The screen existed on both shells with no door
     // (found 2026-08-30, story 8); a tab for now, declared here so both shells get it from one line.
     { id: 'nearby',    labelKey: 'circle.tab.nearby',    target: { kind: 'nav', to: 'nearby' } },
@@ -880,6 +1102,29 @@ export const basisManifest = {
     { id: 'share-contact', labelKey: 'circle.profile.share_contact', target: { kind: 'nav', to: 'shareContact' } },
     // Scan IS the scanQr op — one door with `/scan-qr` (its openQrScanner seam: mobile the camera, web the paste prompt).
     { id: 'scan',          labelKey: 'circle.profile.scan',          target: { kind: 'op',  opId: 'scanQr' } },
+  ],
+
+  /**
+   * Nav-chrome (My data) — the doors at the top of My data: the views Me gave up when it became one declared screen
+   * (2026-10-15). Views no op backs, so `nav` rows (strict validation refuses one that names an op). Both shells paint
+   * them from this declaration (`myDataActionsFor`), each `to` mapped to the view it opens there.
+   */
+  myDataActions: [
+    { id: 'availability',      labelKey: 'circle.profile.availability',     target: { kind: 'nav', to: 'availability' } },
+    { id: 'connection-points', labelKey: 'circle.nearbyScreen.points_open', target: { kind: 'nav', to: 'points' } },
+    { id: 'shared-with-me',    labelKey: 'circle.profile.sharedWithMe',     target: { kind: 'nav', to: 'sharedWithMe' } },
+    { id: 'blocked',           labelKey: 'circle.profile.blocked',          target: { kind: 'nav', to: 'blocked' } },
+  ],
+
+  /**
+   * Me is ONE declared screen: below the actions above, these blocks, in order — filled by the one screen materializer
+   * (`mijScreenBlocks`) and painted by each shell's block painter. No shell lists a section of Me by hand.
+   *   identityLine — the person's name, and the readings named here (each answers one thing about now)
+   *   agents       — this person's devices, companions and linked bots, one row each (read-only; a tap opens My data)
+   */
+  meBlocks: [
+    { type: 'identityLine', config: { readings: ['availability', 'online', 'unread', 'open', 'next'] } },
+    { type: 'agents',       config: {} },
   ],
 
   /**

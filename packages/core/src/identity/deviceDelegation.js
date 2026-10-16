@@ -50,6 +50,28 @@ export function deriveDeviceSeed(profileSeed, deviceId) {
   return hkdf(sha256, profileSeed, _DEVICE_SEED_SALT, info, 32);
 }
 
+const _WIRE_ID_SALT = new TextEncoder().encode('onderling-device-wire-id-v1');
+
+/**
+ * The id a device shows ON THE WIRE for one persona — in its delegation record, and so in every device statement
+ * that carries it — and the id its device seed derives from (`deriveDeviceSeed(profileSeed, wireDeviceId(...))`).
+ * Keyed by the persona's own SEED, which the phrase rebuilds: the internal id never appears, two personas' records of
+ * one device are unrelated, an old record plus a persona id give nothing without that persona's seed, and a
+ * revocation works from the record alone plus the phrase (the seed derives from the id the record names).
+ * @param {Uint8Array} profileSeed  the persona's 32-byte seed (`Bootstrap.deriveAgentSeed(profileId)`).
+ * @param {string} internalId       the device's own id (random at enrolment; root-derived for the first device).
+ * @returns {string} `d-<32 hex>`
+ */
+export function wireDeviceId(profileSeed, internalId) {
+  if (!(profileSeed instanceof Uint8Array) || profileSeed.length !== 32) {
+    throw new Error('wireDeviceId: the persona seed must be a 32-byte Uint8Array');
+  }
+  if (typeof internalId !== 'string' || !internalId) throw new Error('wireDeviceId: an internal device id is required');
+  const out = hkdf(sha256, profileSeed, _WIRE_ID_SALT, new TextEncoder().encode(`${HKDF_INFO_NS}wire-device-id:${internalId}`), 16);
+  let hex = ''; for (const b of out) hex += b.toString(16).padStart(2, '0');
+  return `d-${hex}`;
+}
+
 /** The delegation pubKey a device seed presents (same encoding as every identity pubKey). */
 export function deviceDelegationPubKey(deviceSeed) {
   return AgentIdentity.pubKeyFromSeed(deviceSeed);
@@ -63,19 +85,20 @@ export function deviceDelegationMessage(profileId, deviceId, pubKey) {
 /**
  * Mint the root-signed delegation record for a device. Called at the enrollment ceremony, where
  * the phrase (and so the root secret) is transiently present.
- * @param {Uint8Array} rootSecret   the owner root's 32-byte secret (Bootstrap#secret).
+ * @param {Uint8Array} authoritySecret  the signing persona's 32-byte authority (`Bootstrap.deriveProfileAuthority`) —
+ *                                  never the owner root, whose key must not appear on the wire.
  * @param {{profileId: string, deviceId: string, pubKey: string}} a  pubKey = deviceDelegationPubKey(seed).
  * @returns {{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}}
- *          `by` = the root's derived pubKey (b64), `sig` = base64url Ed25519 over the statement.
+ *          `by` = the authority's pubKey (b64), `sig` = base64url Ed25519 over the statement.
  */
-export function signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey } = {}) {
-  if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) {
-    throw new Error('signDeviceDelegation: rootSecret must be a 32-byte Uint8Array');
+export function signDeviceDelegation(authoritySecret, { profileId, deviceId, pubKey } = {}) {
+  if (!(authoritySecret instanceof Uint8Array) || authoritySecret.length !== 32) {
+    throw new Error('signDeviceDelegation: authoritySecret must be a 32-byte Uint8Array');
   }
   if (!profileId || !deviceId || !pubKey) {
     throw new Error('signDeviceDelegation: profileId, deviceId and pubKey are required');
   }
-  const kp = nacl.sign.keyPair.fromSeed(rootSecret);
+  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
   const msg = new TextEncoder().encode(deviceDelegationMessage(profileId, deviceId, pubKey));
   return {
     profileId: String(profileId),
@@ -86,16 +109,6 @@ export function signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey }
   };
 }
 
-/**
- * The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
- * `Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
- * from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
- * record to "the same owner as me" without the owner's registry: both custodies hold the root's
- * fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
- * whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
- * @param {string} pubKeyB64  a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
- * @returns {string|null} the 16 hex-character fingerprint, or null.
- */
 /**
  * The FIRST device's id, derived from the root. A person's first device mints its own delegation at first boot
  * (2026-09-16) instead of deriving from the profile seed; giving it a root-derived id — rather than a random one —
@@ -112,10 +125,14 @@ export function firstDeviceIdFor(root) {
 }
 
 /**
- * A short fingerprint of an owner root's public key: the first 16 hex characters of its SHA-256. Compares a
- * delegation record's signer with a known root without carrying the whole key.
- * @param {string} pubKeyB64  the root's 32-byte Ed25519 public key, base64
- * @returns {string|null}  null when the key is not 32 bytes or does not decode
+ * The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
+ * `Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
+ * from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
+ * record to "the same owner as me" without the owner's registry: both custodies hold the root's
+ * fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
+ * whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
+ * @param {string} pubKeyB64  a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
+ * @returns {string|null} the 16 hex-character fingerprint, or null.
  */
 export function ownerRootFingerprint(pubKeyB64) {
   try {
@@ -156,16 +173,16 @@ export function deviceRevocationMessage(profileId, deviceId) {
  * Mint the root-signed REVOCATION of a device — the tombstone a party outside the person's own devices can check
  * (a companion the person owns): the registry's `{revoked: true}` mark is the person's own bookkeeping and signs
  * nothing. Minted at the revoke ceremony, where the phrase (and so the root secret) is transiently present.
- * @param {Uint8Array} rootSecret
+ * @param {Uint8Array} authoritySecret  the persona's authority (as for `signDeviceDelegation`)
  * @param {{profileId: string, deviceId: string}} a
  * @returns {{profileId:string, deviceId:string, by:string, sig:string}}
  */
-export function signDeviceRevocation(rootSecret, { profileId, deviceId } = {}) {
-  if (!(rootSecret instanceof Uint8Array) || rootSecret.length !== 32) {
-    throw new Error('signDeviceRevocation: rootSecret must be a 32-byte Uint8Array');
+export function signDeviceRevocation(authoritySecret, { profileId, deviceId } = {}) {
+  if (!(authoritySecret instanceof Uint8Array) || authoritySecret.length !== 32) {
+    throw new Error('signDeviceRevocation: authoritySecret must be a 32-byte Uint8Array');
   }
   if (!profileId || !deviceId) throw new Error('signDeviceRevocation: profileId and deviceId are required');
-  const kp = nacl.sign.keyPair.fromSeed(rootSecret);
+  const kp = nacl.sign.keyPair.fromSeed(authoritySecret);
   const msg = new TextEncoder().encode(deviceRevocationMessage(profileId, deviceId));
   return {
     profileId: String(profileId),

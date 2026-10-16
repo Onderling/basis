@@ -1091,12 +1091,13 @@ first, third and fourth are in the code; the second's identity half is not:
   identity, so a persona is the same on all your devices; a device is never a persona (see the paragraph
   above). Infrastructure attaches to a profile-in-the-registry, never to a loaded instance.
 
-**Contacts carry a persona as a lens, not as an identity** (2026-09-24). Every contact row records which
-persona that contact sees you as (`contactPersona.js`), and that persona's release founds and joins the pair
-circle with them; the add sheet chooses the persona and the disclosure level, with the default prefilled, and the
-thread header changes it afterwards. What it does not change is who they talk to: the contact book is still one list for the whole agent and every
-contact holds the default profile's address and pair id. So the honest sentence is "this contact sees you
-as …", never "this contact knows a different you"; the second waits on a persona running as its own person.
+**A contact knows one of you — the persona it is filed under** (2026-10-12; a lens over one identity from
+2026-09-24 until then). Every contact row records its persona (`contactPersona.js`), and that persona is WHO the
+contact talks to: turns are authored by and sent as it, carry its own card, are sealed from its person key, and the
+pair circle is the persona's with them (`pairCircleIdFor(persona.webid, them)`, founded AS it). Nothing of the default
+rides along. The add sheet chooses the persona and the disclosure level, with the default prefilled; the thread header
+changes it afterwards — which gives the contact a NEW contact on their side, while what they knew of the old one stays.
+The contact book is still one list with a persona column. The honest sentence is "this contact knows a different you".
 
 **Out of sight is a mark that follows the person, never a statement to anyone else.** Hiding a contact is a
 mark on the book row, carried between the person's own devices newest-wins; their next message brings them
@@ -1157,6 +1158,15 @@ seed's own ingest and the announcement through the announce's own receive door (
 then runs the add-a-device consume: announce the fresh address to every member, pull every lane from
 them. The snapshot is as old as the file; what happened since folds on top as signed statements as
 soon as one member is online. No new trust admission anywhere.
+
+**A device added with a persona rejoins that persona's circles, as it** (2026-10-15). The add-a-device offer is
+public, so it lists only the default's circles in the clear; the person's personas — each with its circles — ride
+sealed to the phrase and padded, so the offer does not say whether there are personas or how many. On the new
+device the phrase opens them at the ceremony; the picked personas' circles go into that device's own stashed
+offer, each tagged with its persona, and the boot's consume binds each circle to its persona before it records,
+announces or asks for anything. The roster seed between siblings runs per circle self: a persona's circle is asked
+of, verified against and answered by that persona's devices only, with that persona's device key and record. A
+persona the device was handed writes its own registry entry at boot, so its circles reopen from it.
 
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
@@ -1274,8 +1284,22 @@ under an **opaque name** only a holder of the owner's key can compute, so the ho
 exists and not what it is. It carries the settings mirror's restore gate too: before the first write-through
 it probes the pod copy, and a copy sealed under another key (a fresh install without the phrase) holds rather
 than being overwritten by a one-device list. Without a pod, the pod-less carrier of the same fact is the
-**recovery file** — the registry and the owner root sealed into a passphrase-protected file, exported and
+**recovery file** — the registry (and each circle's roster) sealed to the recovery seal, never the root itself, exported and
 imported from My data on both shells. A person with neither loses the list, not the identity.
+
+**Sealed to the recovery seal, not to a persona.** The registry's pod mirror (every persona's profile and circles in
+one body) and the recovery file are sealed to a key derived from the root under its own label (`recovery-seal`), and
+the mirror's opaque pod name derives from it too. A device may hold a chosen set of personas, the default among them or
+not, so no persona's key could open them on every device; every phrase ceremony leaves the seal on the device instead
+(a device with the root resident derives it). The settings mirror and the history mirror (and its exported archive) use the same seal: one
+key for everything the person seals to themselves, so one thing to hand over at a ceremony. A device enrolled before
+the seal existed has none until its next phrase ceremony — My data → "Persona's op dit apparaat" with nothing ticked
+hands over only the seal; until then its mirrors stay local, and the export and the history status say how to get it.
+The person's OWN scope (their device map, their own appointments, the planned book) rides one lane per self the device
+holds — each row the lane of the self that wrote it, carried as that self to that self's devices only, sealed to the
+recovery seal; the device map's row is on every held self's lane, so a device that shares only one persona with a lost
+one can still revoke it under every self (the ceremony reads the lost device's internal id there). What stays per SELF is what the file is REPLAYED into: a circle's own address announcement
+names the circle's self, and the restore bootstrap announces a device only in the circles of a self it runs.
 
 **Where a resource lives is resolved, not hard-coded — and that indirection is the hook for hiding
 structure.** Apps address a **storage function** ("this circle's items", "my notes"), and a routing layer

@@ -50,7 +50,7 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
 
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-blocked-screen">
-      <Pressable onPress={onBack} testID="blocked-back"><Text style={styles.back}>{t('circle.back_me')}</Text></Pressable>
+      <Pressable onPress={onBack} testID="blocked-back"><Text style={styles.back}>{t('circle.back_mydata')}</Text></Pressable>
       <Text style={styles.title}>{t('circle.blocked.title')}</Text>
       <Text style={styles.note}>{t('circle.blocked.note')}</Text>
       {rows === null ? (

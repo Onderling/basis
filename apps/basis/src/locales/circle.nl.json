@@ -4,9 +4,9 @@
     "doc": "Heading of the circle launcher (board 1B)."
   },
   "tab": {
-    "screens": {
-      "text": "Schermen",
-      "doc": "α.3 — primary tab."
+    "vandaag": {
+      "text": "Vandaag",
+      "doc": "The home tab: the person's own pages (the screen book) — a few capped blocks of what matters today."
     },
     "circles": {
       "text": "Kringen",
@@ -501,6 +501,10 @@
     "text": "← Mij",
     "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
   },
+  "back_mydata": {
+    "text": "← Mijn gegevens",
+    "doc": "Back link from a screen behind My data (availability, shared with me, blocked) to My data — one key for all of them."
+  },
   "back": {
     "text": "← kringen",
     "doc": "Back link from a circle detail view to the launcher."
@@ -576,6 +580,10 @@
       "undeliverable": {
         "text": "Kon sommige leden niet bereiken",
         "doc": "δ.2 — permanent fan-out failure (e.g. a member has no published key); shown but NOT retryable (retry can't help)."
+      },
+      "persona_no_connection": {
+        "text": "Niet verstuurd: deze persona heeft geen verbinding met de kring (tik om opnieuw te proberen)",
+        "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."
       }
     },
     "unknown_sender": {
@@ -1132,15 +1140,17 @@
     }
   },
   "screen": {
-    "items_title": {
-      "task": "Mijn dingen",
-      "calendar-event": "Agenda",
-      "note": "Notities",
-      "announcement": "Aankondigingen",
-      "offer": "Aanbod",
-      "request": "Vragen",
-      "list": "Lijsten",
-      "list-item": "Op de lijsten"
+    "more": {
+      "text": "meer",
+      "doc": "Under a capped block on Vandaag: open the whole block on its own."
+    },
+    "more_back": {
+      "text": "terug",
+      "doc": "Back from one block shown whole, to the page."
+    },
+    "unread_count": {
+      "text": "{{count}} nieuw",
+      "doc": "Vandaag, circles-with-news block: how many lines are new in that circle since this device last looked. count = how many."
     },
     "filter_placeholder": {
       "text": "Filteren…",
@@ -1197,7 +1207,173 @@
       "doc": "α.1c — forward-compat fallback."
     }
   },
+  "vandaag": {
+    "circles_all": {
+      "text": "Alle kringen",
+      "doc": "A block filter: the page's circles, all of them."
+    },
+    "circles_title": {
+      "text": "Kringen",
+      "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "labels_title": {
+      "text": "Labels",
+      "doc": "A block filter on a type that carries labels: only rows with one of these (comma-separated)."
+    },
+    "labels_placeholder": {
+      "text": "bijv. werk, thuis",
+      "doc": "Placeholder of the labels filter field."
+    },
+    "within_any": {
+      "text": "Altijd",
+      "doc": "Relative-date filter: no limit."
+    },
+    "within_1": {
+      "text": "Vandaag",
+      "doc": "Relative-date filter: within a day."
+    },
+    "within_7": {
+      "text": "Deze week",
+      "doc": "Relative-date filter: within 7 days."
+    },
+    "within_30": {
+      "text": "Deze maand",
+      "doc": "Relative-date filter: within 30 days."
+    },
+    "customise": {
+      "text": "Pas aan",
+      "doc": "The button on Vandaag that opens the customise sheet."
+    },
+    "customise_title": {
+      "text": "Deze pagina aanpassen",
+      "doc": "Title of the customise sheet."
+    },
+    "blocks_title": {
+      "text": "Op deze pagina",
+      "doc": "Heading over the page's blocks in the customise sheet."
+    },
+    "add_block_title": {
+      "text": "Blok toevoegen",
+      "doc": "Heading over the blocks that can be added."
+    },
+    "page_title": {
+      "text": "Pagina",
+      "doc": "Heading over the page acts (rename, add, remove)."
+    },
+    "rename_page": {
+      "text": "Naam wijzigen",
+      "doc": "Rename the active page."
+    },
+    "add_page": {
+      "text": "Nieuwe pagina",
+      "doc": "Add a page to the person's pages."
+    },
+    "new_page_name": {
+      "text": "Nieuwe pagina",
+      "doc": "The name a new page starts with."
+    },
+    "remove_page": {
+      "text": "Pagina weghalen",
+      "doc": "Remove the active page (not the last one)."
+    },
+    "undo": {
+      "text": "Ongedaan maken",
+      "doc": "Undo the newest change to the person's pages."
+    },
+    "up": {
+      "text": "Omhoog",
+      "doc": "Move a block up."
+    },
+    "down": {
+      "text": "Omlaag",
+      "doc": "Move a block down."
+    },
+    "remove": {
+      "text": "Weghalen",
+      "doc": "Remove a block from the page."
+    },
+    "done": {
+      "text": "Klaar",
+      "doc": "Close the customise sheet."
+    },
+    "horizon_today": {
+      "text": "Vandaag",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_3days": {
+      "text": "3 dagen",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_week": {
+      "text": "Week",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_month": {
+      "text": "Maand",
+      "doc": "Calendar block horizon preset."
+    },
+    "scope_mine": {
+      "text": "Van mij",
+      "doc": "Tasks block: only my tasks."
+    },
+    "scope_all": {
+      "text": "Alles",
+      "doc": "Tasks block: every open task."
+    },
+    "limit_n": {
+      "text": "{{n}} regels",
+      "doc": "A block's cap. n = how many rows."
+    },
+    "plus": {
+      "text": "Toevoegen",
+      "doc": "Vandaag → the '+' beside 'Pas aan': add an own note or an own appointment (the person's own store; never a circle)."
+    },
+    "plus_own": {
+      "text": "Eigen {{noun}}",
+      "doc": "Vandaag → '+': an item of your own, on your own devices only. noun = what it makes, in the word the declaring manifest names it."
+    },
+    "plus_note_ph": {
+      "text": "Notitie",
+      "doc": "Vandaag → '+' → own note: the text."
+    },
+    "plus_title_ph": {
+      "text": "Wat",
+      "doc": "Vandaag → '+' → own appointment: what it is."
+    },
+    "plus_when": {
+      "text": "Wanneer (bijv. morgen om 14:00)",
+      "doc": "Vandaag → '+' → own appointment: the moment."
+    },
+    "plus_save": {
+      "text": "Bewaren",
+      "doc": "Vandaag → '+': save the own note or appointment."
+    },
+    "plus_empty": {
+      "text": "Vul dit eerst in.",
+      "doc": "Vandaag → '+': something needed is empty."
+    },
+    "plus_failed": {
+      "text": "Niet bewaard: {{error}}",
+      "doc": "Vandaag → '+': the save failed; the reason follows."
+    },
+    "own_tag": {
+      "text": "jij",
+      "doc": "Vandaag: the tag on one of the person's own items (no circle), where a circle's items name their circle."
+    },
+    "plus_when_unread": {
+      "text": "Zeg de dag en de tijd, bijv. \"morgen om 14:00\".",
+      "doc": "Vandaag → '+' → own appointment: the moment typed could not be read (the bounded day-and-time reader)."
+    },
+    "plus_as": {
+      "text": "Als wie?",
+      "doc": "Vandaag → '+': several selves are ticked in the header — which one this is written as."
+    }
+  },
   "screens": {
+    "vandaag_page": {
+      "text": "Vandaag",
+      "doc": "The name of the first page of the person's own pages (Vandaag), seeded once."
+    },
     "picker_title": {
       "text": "Schermen",
       "doc": "α.3 — picker heading."
@@ -1254,17 +1430,9 @@
       "text": "{{count}} kringen",
       "doc": "α.3 — filter summary."
     },
-    "seed_name": {
-      "text": "Stroom",
-      "doc": "α.3 — name of the auto-seeded default screen."
-    },
     "seed_my_things": {
       "text": "Mijn dingen",
       "doc": "α.4 — seeded screen aggregating tasks."
-    },
-    "seed_my_calendar": {
-      "text": "Mijn agenda",
-      "doc": "α.4 — seeded screen aggregating events."
     }
   },
   "recipe": {
@@ -1300,6 +1468,72 @@
       "text": {
         "text": "Tekst",
         "doc": "α.1b — block palette label."
+      },
+      "circlesUnread": {
+        "text": "Kringen met nieuws",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "identityLine": {
+        "text": "Over mij",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "agents": {
+        "text": "Mijn apparaten en helpers",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "notes": {
+        "text": "Notities",
+        "doc": "Block palette label (Mij / Vandaag)."
+      }
+    },
+    "block_desc": {
+      "quickActions": {
+        "text": "De handelingen die je in deze kring het vaakst doet, als knoppen.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "announcement": {
+        "text": "Een vaste mededeling van de beheerder bovenaan de kring.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "noticeboard": {
+        "text": "De nieuwste berichten op het prikbord: vragen en aanbod.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "calendar": {
+        "text": "Komende afspraken, voor de periode die je kiest.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "tasks": {
+        "text": "Openstaande taken, die van jou of alle.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "rules": {
+        "text": "De huisregels van de kring.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "photo": {
+        "text": "Een foto met een onderschrift.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "text": {
+        "text": "Een eigen stuk tekst.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "circlesUnread": {
+        "text": "De kringen waar iets nieuws is, met het aantal ongelezen berichten.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "identityLine": {
+        "text": "Je naam en een paar dingen in één regel: bereikbaar, ongelezen, open taken, je volgende afspraak.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "agents": {
+        "text": "Je apparaten, je hulpdiensten en de bots die je hebt toegelaten, elk in één zin.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "notes": {
+        "text": "De notities in je kringen, eventueel alleen die met bepaalde labels.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       }
     },
     "editor": {
@@ -3168,6 +3402,18 @@
       "text": "Jouw vraag · door {{heard}} gehoord · nog {{min}} min",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
     },
+    "as_self": {
+      "text": "Je verschijnt hier als {{name}}.",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
+    "as_self_pick": {
+      "text": "Als wie verschijn je hier?",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
+    "as_self_caveat": {
+      "text": "Dat is een naam die je laat zien, geen apart adres: wie hier meekijkt, kan zien dat het van hetzelfde apparaat komt.",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
     "face_row": {
       "text": "Toon hier als",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
@@ -3941,6 +4187,18 @@
     "reminders_usual": {
       "text": "Voor {{text}} gelden weer de gewone herinneringen.",
       "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "added_many": {
+      "text": "{{count}} toegevoegd aan {{name}}: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "removed_many": {
+      "text": "{{count}} van {{name}} gehaald: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "done_named_many": {
+      "text": "{{count}} afgevinkt: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
     }
   },
   "share": {
@@ -5307,11 +5565,11 @@
     },
     "lens": {
       "title": {
-        "text": "Wat ziet {{name}} van jou?",
+        "text": "Wie ben jij voor {{name}}?",
         "doc": "Thread header — the lens control's heading (L125). Says 'see', never 'know a different you': one identity runs (L123)."
       },
       "persona": {
-        "text": "Ziet je als",
+        "text": "Als",
         "doc": "Lens control — the persona a contact sees you as."
       },
       "level": {
@@ -5319,7 +5577,7 @@
         "doc": "Lens control — the reveal level that persona discloses to this contact."
       },
       "hint": {
-        "text": "Dezelfde jij, een ander beeld: dit kiest welke gegevens dit contact krijgt. Het praat nog steeds met jou.",
+        "text": "Dit contact kent een andere jij: elke persona heeft een eigen sleutel en een eigen gesprek. Wissel je later van persona, dan krijgt dit contact er een nieuw contact bij; wat het al van je wist, houdt het.",
         "doc": "Lens control — the honest sentence: a different VIEW of the same person, not a second identity (L123)."
       },
       "save": {
@@ -5331,7 +5589,7 @@
         "doc": "Lens control / add sheet — cancel."
       },
       "saved": {
-        "text": "Opgeslagen — {{name}} ziet je nu als {{persona}}.",
+        "text": "Opgeslagen — {{name}} praat nu met {{persona}}.",
         "doc": "Lens control — confirmation after a change."
       },
       "failed": {
@@ -5339,7 +5597,7 @@
         "doc": "Lens control — a change that did not save."
       },
       "open": {
-        "text": "Wat ziet dit contact",
+        "text": "Wie ben jij voor dit contact",
         "doc": "Thread header — the button that opens the lens control."
       }
     },
@@ -5634,8 +5892,8 @@
       "doc": "S2 — no location yet."
     },
     "loc_disclosure_hint": {
-      "text": "Wie je locatie ziet, regel je bij Mij → persona's",
-      "doc": "location-fold-in (audit §4) — quiet pointer: location is now a disclosure-controlled property on the Mij persona layer; the geo-editor here stays for setting the coarse place."
+      "text": "Wie je locatie ziet, stel je hieronder in, per kring.",
+      "doc": "The person's own editor → under the location: who SEES it is a disclosure per circle, set further down in the same editor (the persona layer)."
     },
     "geo_placeholder": {
       "text": "Zoek een plaats…",
@@ -5678,10 +5936,10 @@
       "doc": "What the version line says for a build with no tag (a dev server)."
     },
     "scan": {
-        "text": "Scan",
-        "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
-      },
-      "share_contact": {
+      "text": "Scan",
+      "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "share_contact": {
       "text": "Deel mijn kaart",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     },
@@ -5736,6 +5994,70 @@
     "planned_where": {
       "text": " · {{circle}}",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "reading_available": {
+      "text": "beschikbaar",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_away": {
+      "text": "weg tot {{until}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_away_open": {
+      "text": "weg",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_quiet": {
+      "text": "stil tot {{until}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_online": {
+      "text": "online",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
+    },
+    "reading_offline": {
+      "text": "offline",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
+    },
+    "reading_unread": {
+      "text": "{{count}} ongelezen",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_open": {
+      "text": "{{count}} open",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
+    },
+    "reading_next": {
+      "text": "straks: {{title}} {{when}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
+    },
+    "agent_here": {
+      "text": "dit apparaat",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_device": {
+      "text": "apparaat: {{label}}",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_device_unnamed": {
+      "text": "een ander apparaat",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_companion": {
+      "text": "companion: {{label}}",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_bot": {
+      "text": "bot: {{label}}, aan jou gekoppeld",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "mydata_more": {
+      "text": "Meer",
+      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
+    },
+    "edit": {
+      "text": "Aanpassen",
+      "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
     }
   },
   "blocked": {
@@ -5897,6 +6219,30 @@
       "text": "Aan — {{count}} berichten gespiegeld, verzegeld, naar je eigen opslag.",
       "doc": "spiegel-statusregel als hij loopt."
     },
+    "start_title": {
+      "text": "Openen op",
+      "doc": "My data, the start-screen setting: its heading (where the app opens on this device)."
+    },
+    "start_vandaag": {
+      "text": "Vandaag",
+      "doc": "Start-screen choice: Vandaag (the default)."
+    },
+    "start_circles": {
+      "text": "Kringen",
+      "doc": "Start-screen choice: the circles list."
+    },
+    "start_last": {
+      "text": "Laatst gebruikt",
+      "doc": "Start-screen choice: the tab used last on this device."
+    },
+    "devices_needs_phrase": {
+      "text": "Dit apparaat deelt je eigen gegevens nog niet met je andere apparaten: typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken).",
+      "doc": "My data, devices section, on a device without the recovery seal: its own lanes carry nothing until the phrase is typed once."
+    },
+    "history_needs_phrase": {
+      "text": "Nog niet: typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken).",
+      "doc": "history mirror state line on a device that has no recovery seal yet."
+    },
     "history_waiting": {
       "text": "Aanzetten…",
       "doc": "spiegel-statusregel tussen de flip en de eerste status."
@@ -6057,6 +6403,7 @@
       "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een back-upbestand, om hier ergens anders mee verder te kunnen.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
+    "receive_personas": "Persona's op dit apparaat",
     "enroll_device": "Apparaat toevoegen",
     "recovery_export": "Herstelbestand opslaan",
     "recovery_import": "Herstelbestand laden",
@@ -6914,6 +7261,14 @@
     "charter_max": {
       "text": "≤ {{rung}}",
       "doc": "mij#personas — charter-cel: de circle vraagt deze eigenschap tot maximaal deze sport."
+    },
+    "new_persona_offerings": {
+      "text": "Wat je aanbiedt — ook als {{name}}?",
+      "doc": "The new-persona form: does this persona take the general persona's offerings too? Unticked by default (a work persona that silently 'offers' your gardening would surprise you); {{name}} is the name being typed."
+    },
+    "new_persona_offerings_unnamed": {
+      "text": "deze persona",
+      "doc": "The new-persona form: the name in the offerings question while none is typed yet."
     }
   },
   "attach": {
@@ -7016,6 +7371,37 @@
       "doc": "Fallback-melding tekst."
     }
   },
+  "receive_personas": {
+    "close": "Sluiten",
+    "remove_rekey_failed": "Dat lukte niet helemaal: de persona is van dit apparaat gehaald, maar de sleutel van het apparaat kon niet over. De volgende start vraagt je herstelzin.",
+    "done_rekey_restart": "Klaar. Sluit de app nu helemaal af en open hem opnieuw — dit apparaat spreekt daarna als {{name}}.",
+    "remove": "Verwijderen van dit apparaat",
+    "remove_warn": "Dit haalt {{name}} van dit apparaat: zijn sleutels en wat het hier bewaart worden gewist, en dit apparaat telt in zijn kringen niet meer mee. Dat kan hier niet ongedaan worden — met je herstelzin kun je hem later opnieuw hierheen halen. Typ je herstelzin om door te gaan.",
+    "remove_submit": "Verwijderen",
+    "done_remove_reload": "Klaar. {{name}} is van dit apparaat gehaald. Herstart de app.",
+    "remove_key_holder": "Dit apparaat spreekt als deze persona; die kan er niet af.",
+    "remove_paused": "Hervat deze persona eerst: om zijn adressen in te trekken moet hij nog kunnen spreken.",
+    "here_title": "Op dit apparaat",
+    "primary": "dit apparaat spreekt als deze persona",
+    "paused": "gepauzeerd op dit apparaat",
+    "pause": "Pauzeren",
+    "resume": "Hervatten",
+    "done_pause_reload": "Klaar. Tot je de app opnieuw start, loopt {{name}} hier nog; daarna niet meer — de sleutels en gegevens blijven waar ze zijn.",
+    "done_resume_reload": "Klaar. Herstart de app; daarna draait deze persona hier weer.",
+    "receive_title": "Ook hierheen halen",
+    "title": "Persona's op dit apparaat",
+    "body": "Kies welke van je persona's dit apparaat ook krijgt. Dat vraagt je herstelzin: alleen daarmee kunnen hun sleutels hierheen.",
+    "none": "Er zijn geen andere persona's om hierheen te halen.",
+    "phrase_placeholder": "Je herstelzin (12 woorden)",
+    "submit": "Op dit apparaat zetten",
+    "done_reload": "Klaar. Herstart de app; daarna draait dit apparaat ook als deze persona's.",
+    "wrong_phrase": "Dat is niet de herstelzin van dit account. Er is niets veranderd.",
+    "failed": "Dat lukte niet. Er is niets veranderd.",
+    "reload": "Herstarten",
+    "seal_only": "Niets aangevinkt: alleen de sleutel voor je back-ups.",
+    "needs_seal": "Dit apparaat heeft de sleutel voor je back-ups nog niet. Typ je herstelzin om hem hierheen te halen.",
+    "done_seal_reload": "Klaar. Herstart de app; daarna maakt dit apparaat weer back-ups."
+  },
   "enroll": {
     "title": "Dit apparaat toevoegen",
     "ceremony": "Dit apparaat wordt toegevoegd",
@@ -7033,6 +7419,10 @@
     "offer_hint": "Scan of plak deze code op het nieuwe apparaat en typ daar de herstelzin. De code is geen geheim — de herstelzin blijft de enige sleutel.",
     "offer_error": "Code maken lukte niet (dit apparaat zit nog in geen enkele kring).",
     "offer_paste_label": "Code van je huidige apparaat (optioneel)",
+    "personas_title": "Welke persona's krijgt dit apparaat?",
+    "personas_hint": "Alleen wat je aanvinkt komt op dit apparaat. Een apparaat dat minder vertrouwd is, geef je er beter minder.",
+    "speaks_as": "Dit apparaat spreekt als {{name}}.",
+    "last_self": "Een apparaat houdt minstens één persona.",
     "offer_paste_invalid": "Dat is geen geldige toevoeg-code.",
     "offer_back": "Terug",
     "offer_code_label": "Code:",
@@ -7081,7 +7471,8 @@
     "body": "Typ de herstelzin om dit apparaat overal in te trekken. Zijn sleutels worden in al je kringen geweigerd; het apparaat zelf wordt een eiland.",
     "submit": "Dit apparaat intrekken",
     "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
-    "failed": "Intrekken is mislukt."
+    "failed": "Intrekken is mislukt.",
+    "outcome_partial": "Ingetrokken in de kringen van de persona's op dit apparaat. Herhaal dit op een apparaat met je algemene persona — daar wordt het apparaat ook uit je algemene kringen gezet."
   },
   "companionClaim": {
     "title": "Een companion claimen",
@@ -7215,6 +7606,10 @@
       "err_failed": {
         "text": "Het laden is niet gelukt. Probeer het opnieuw.",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_needs_phrase": {
+        "text": "Typ je herstelzin één keer op dit apparaat (Mijn gegevens → Persona's op dit apparaat, niets aanvinken); daarna maakt het weer back-ups.",
+        "doc": "export refused on a device that has no recovery seal yet (enrolled before it existed): how to get it."
       }
     },
     "create": {
@@ -7833,7 +8228,7 @@
         "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
       },
       "setContactPersona": {
-        "text": "Wat dit contact ziet",
+        "text": "Wie je bent voor dit contact",
         "doc": "Row-action / page button for stoop:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
       },
       "conflictDisputeWizard": {
@@ -8732,6 +9127,24 @@
     "removed": {
       "text": "Vergeten: {{text}}",
       "doc": "A note was removed."
+    }
+  },
+  "switcher": {
+    "title": {
+      "text": "Laat zien als",
+      "doc": "The header switcher: which of this device's selves (personas) the app shows now."
+    },
+    "all": {
+      "text": "Alle",
+      "doc": "The header switcher: tick every self."
+    },
+    "you": {
+      "text": "Jij",
+      "doc": "The header switcher: the default self (the person themselves), beside their personas."
+    },
+    "edit": {
+      "text": "Aanpassen",
+      "doc": "The header switcher: open that self's own editor."
     }
   }
 }

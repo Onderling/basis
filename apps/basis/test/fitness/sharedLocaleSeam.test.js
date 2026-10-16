@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  sharedLocale, sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale,
+  sharedLocale, sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale,
 } from '../../src/locales/index.js';
 
 const ROOT = new URL('../../../../', import.meta.url);
@@ -32,6 +32,8 @@ describe('the shared locale seam', () => {
         // `host.*` spreads at the TOP level — its blocks keep their own names (`sync`, `me`, `mute`…),
         // so only the file holding them changed, not a single call site.
         ...sharedHostLocale[lng],
+        // what a shown noun is called — built from the declaring manifests' `names`
+        noun: sharedNounLocale[lng],
       });
     }
   });

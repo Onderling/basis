@@ -530,7 +530,17 @@ export function encodeInviteUri(payload) {
 export async function finalSubmit({ state, callSkill, shareRelease = null, releaseTimeoutMs = RELEASE_TIMEOUT_MS }) {
   state.submitting  = true;
   state.submitError = null;
+  // FOUNDING AS A PERSONA: the circle is bound to the persona before the create, as a join binds before its redeem —
+  // so the founding statements, the address and the circle's "me" are the persona's from the first byte.
+  const asPersona = typeof state.persona === 'string' && state.persona && state.persona !== DEFAULT_PERSONA ? state.persona : null;
+  let bound = false;
   try {
+    if (asPersona && state.groupId) {
+      const b = await callSkill('household', 'bindCirclePersona', { circleId: state.groupId, personaId: asPersona })
+        .catch((err) => ({ ok: false, reason: err?.message ?? 'bind-failed' }));
+      if (!b?.ok) throw new Error(`persona-not-bound: ${b?.reason ?? 'unknown'}`);
+      bound = true;
+    }
     const rules  = { ...buildRulesObjectFromState(state), ...(state.rulesExtra && typeof state.rulesExtra === 'object' ? state.rulesExtra : {}) };
     const result = await callSkill('stoop', 'createGroupV2', {
       groupId:              state.groupId,
@@ -573,6 +583,8 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
     }
     return { result, state, released, named };
   } catch (err) {
+    // a create that did not happen gives the circle back to the default
+    if (bound) await callSkill('household', 'bindCirclePersona', { circleId: state.groupId, personaId: null }).catch(() => {});
     state.submitError = err?.message ?? String(err);
     state.submitting  = false;
     return { state, released: Promise.resolve(false), named: Promise.resolve(false) };

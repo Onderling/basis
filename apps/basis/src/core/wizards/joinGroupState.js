@@ -770,6 +770,7 @@ export async function finalSubmit({
   // repaint mid-submit. Cosmetic by contract: the stage is on `state` either way.
   onStage = null,
 }) {
+  let asPersona = null;   // the persona this circle is being joined AS (bound before the redeem), if any
   state.submitting    = true;
   state.submitStage   = 'redeeming';
   state.submitError   = null;
@@ -780,6 +781,17 @@ export async function finalSubmit({
     // Best-effort: a join that would have worked over a shared transport must not start failing
     // because a relay was unreachable, so a dial failure is logged and the chain continues.
     await dialInviteEndpoint({ invite: state.invite, dialEndpoint, activeEndpointUrl });
+    // JOINING AS A PERSONA: bind the circle to the persona the joiner picked BEFORE the redeem — the address, the link
+    // proof and the redeem's sender computed below are then the persona's, and the persona is on the invite's relay on
+    // its own socket. (A join without a persona, or as the default, is exactly as before.)
+    asPersona = typeof state.persona === 'string' && state.persona && state.persona !== 'default' ? state.persona : null;
+    if (asPersona && state.invite?.groupId) {
+      const bound = await callSkill('household', 'bindCirclePersona', {
+        circleId: state.invite.groupId, personaId: asPersona,
+        ...(typeof state.invite.relayUrl === 'string' && state.invite.relayUrl ? { relayUrl: state.invite.relayUrl } : {}),
+      }).catch((err) => ({ ok: false, reason: err?.message ?? 'bind-failed' }));
+      if (!bound?.ok) throw Object.assign(new Error(`persona-not-bound: ${bound?.reason ?? 'unknown'}`), { reason: 'persona-not-bound' });
+    }
     const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
     // carry the joiner's declined caps out with the success envelope so the host records
     // them into the member's prefs (`override.capabilityOptOuts`), feeding the gate's admin ∩ user set.
@@ -830,22 +842,20 @@ export async function finalSubmit({
       try {
         const address = circleAddressFor(result.groupId);
         if (address) {
-          // `'default'` is CORRECT here, not an oversight — and it looks like one, so: today exactly one
-          // identity runs. Every `deriveAgentSeed(` in the agent says `'default'`, and `circleAddressFor`
-          // derives from that seed, so the address just computed IS the default profile's however
-          // `state.persona` was set. The persona chose which RELEASE rides (`getPersonaRelease` above); it
-          // did not choose whose key joined. Recording the membership under the persona would file this
-          // circle under a profile that owns no address in it — a record contradicting the wire.
-          // When a persona becomes its own person on the wire (ledger L123) this line becomes
-          // `id: state.persona ?? 'default'`, and not before.
+          // Under the persona it was joined AS: the circle was bound to it before the redeem, so the address just
+          // computed IS that persona's (a join without a persona is the default's, as before).
           await callSkill('agents', 'setProfileCircleMembership', {
-            id: 'default', circleId: result.groupId, handle: state.handle, address,
+            id: asPersona ?? 'default', circleId: result.groupId, handle: state.handle, address,
           });
         }
       } catch { /* best-effort restore-data — never fails a completed join */ }
     }
     return { result, state };
   } catch (err) {
+    // The join did not happen: a circle bound to a persona for it goes back to the default.
+    if (asPersona && state.invite?.groupId) {
+      await callSkill('household', 'bindCirclePersona', { circleId: state.invite.groupId, personaId: null }).catch(() => {});
+    }
     // Handle-uniqueness rejection (Decision C): surface it as a localisable prompt to
     // pick another handle, and keep the joiner on the handle step. Any other error is
     // reported verbatim (raw substrate string) as before.

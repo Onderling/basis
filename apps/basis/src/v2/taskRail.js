@@ -13,6 +13,7 @@
  * This lane replaces the unsigned peer-mirror carry for task items (per-type one-path): the store's publish
  * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
  */
+import { selfRefIn } from './selfRef.js';
 import { isRosterTrailItem } from '@onderling/circles';
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
@@ -58,27 +59,32 @@ export const OWN_TASK_CATCHUP_SUBTYPES = Object.freeze({
  * @param {(circleId:string)=>({put:Function, delete:Function}|null)} a.storeFor  the circle's CircleItemStore
  * @param {Function} [a.verifyBinding]   override the roster binding verifier (tests)
  * @param {object} [a.own]   THE PERSON'S OWN SCOPE (the own-devices store): rides the same lane between the person's
- *   own devices only. `scope` names it; `signer()` is this device's delegation key (`{identity, ref}`, or null when the
- *   device is not enrolled — then nothing is sent); `verifyBinding` is the device-set binding (never a roster: there is
- *   none); `seal()` is the person's seal-to-self strategy (null → nothing is sent: own items never ride in the clear);
- *   `delegation()` the record carried so a sibling verifies the chain without the registry.
+ *   own devices only — one lane per SELF the device holds (the default's and each persona's). `isOwn(scope)` says
+ *   whether a scope is one of them (or `scope` names the only one); `signer(scope)` is this device's delegation key for
+ *   that lane's self (`{identity, ref}`, or null when the device is not enrolled — then nothing is sent);
+ *   `verifyBinding` is that self's device-set binding (never a roster: there is none); `seal()` is the person's
+ *   seal-to-self strategy (null → nothing is sent: own items never ride in the clear); `delegation(scope)` the record
+ *   carried so a sibling verifies the chain without the registry. `belongs(scope, item)` says which lane an item of the
+ *   one shared own store rides: a lane serves and applies only its own items (none of another self's).
  */
 export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, own = null }) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
-  const isOwn = (circleId) => Boolean(own?.scope) && circleId === own.scope;
+  const isOwn = (circleId) => (typeof own?.isOwn === 'function' ? own.isOwn(circleId) === true : (Boolean(own?.scope) && circleId === own.scope));
   const rosterBinding = verifyBinding ?? rosterBindingVerifier(callSkill);
-  const ownSigner = async () => { try { return (await own?.signer?.()) ?? null; } catch { return null; } };
+  const ownSigner = async (scope) => { try { return (await own?.signer?.(scope)) ?? null; } catch { return null; } };
+  const ownBelongs = (scope, item) => { try { return typeof own?.belongs === 'function' ? own.belongs(scope, item) === true : true; } catch { return false; } };
   const ownSeal = () => { try { return own?.seal?.() ?? null; } catch { return null; } };
-  const ownDelegation = () => { try { const d = own?.delegation?.(); return d ? { delegation: d } : {}; } catch { return {}; } };
-  /** An own item as it rides: sealed to the person, with the device's delegation; null when it cannot be sealed. */
-  const ownSnapshotPayload = (item) => {
+  const ownDelegation = (scope) => { try { const d = own?.delegation?.(scope); return d ? { delegation: d } : {}; } catch { return {}; } };
+  /** An own item as it rides: sealed to the person, with the device's delegation for that lane; null when it cannot be sealed. */
+  const ownSnapshotPayload = (scope, item) => {
     const strategy = ownSeal();
     if (!strategy || !item) return null;
-    return { sealed: strategy.seal(JSON.stringify(item)), ...ownDelegation() };
+    return { sealed: strategy.seal(JSON.stringify(item)), ...ownDelegation(scope) };
   };
   const base = makeCircleEntryRail({
     eventLog,
-    signerFor: async (circleId) => (isOwn(circleId) ? ownSigner() : { identity: await circleIdentityFor(circleId), ref: myRef }),
+    signerFor: async (circleId) => (isOwn(circleId) ? ownSigner(circleId) : { identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: TASK_LANE,
     declaredKinds: TASK_RAIL_KINDS,
     verifyBinding: (a) => (isOwn(a?.circleId) ? (own.verifyBinding?.(a) ?? false) : rosterBinding(a)),
@@ -100,6 +106,8 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     if (body.kind === 'snapshot') {
       const item = itemOf(circleId, body);
       if (!item || typeof item.id !== 'string' || !item.id) return;
+      // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
+      if (isOwn(circleId) && !ownBelongs(circleId, item)) return;
       // A roster row never lands through this lane: its addresses are proven facts patched in place,
       // and a peer's snapshot of "the person's row" is that peer's view, not this device's. Refused
       // here whatever served it (`rosterTrail.js` says why).
@@ -134,12 +142,13 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     }
     let rows = [];
     try { rows = (await store.list()) ?? []; } catch { return stored; }
-    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isRosterTrailItem(it));
+    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isRosterTrailItem(it)
+      && (!isOwn(circleId) || ownBelongs(circleId, it)));
     if (uncovered.length === 0) return stored;
     let resolved = null;
-    let ref = myRef;
+    let ref = refIn(circleId);
     try {
-      if (isOwn(circleId)) { const s = await ownSigner(); resolved = s?.identity ?? null; ref = s?.ref ?? null; }
+      if (isOwn(circleId)) { const s = await ownSigner(circleId); resolved = s?.identity ?? null; ref = s?.ref ?? null; }
       else resolved = await circleIdentityFor(circleId);
     } catch { return stored; }
     if (!resolved?.pubKey || typeof resolved.sign !== 'function') return stored;
@@ -149,7 +158,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       const parent = authorHead(bodies, resolved.pubKey);
       const deps = frontier(bodies).filter((h) => h !== parent);
       // the own scope serves what it sends: sealed to the person, or not at all
-      const carried = isOwn(circleId) ? ownSnapshotPayload(item) : { item };
+      const carried = isOwn(circleId) ? ownSnapshotPayload(circleId, item) : { item };
       if (!carried) return stored;
       const statement = signSpine(resolved, {
         kind: 'snapshot', circleId, subject: item.id,
@@ -195,12 +204,12 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     async append(circleId, opts = {}) {
       if (!isOwn(circleId)) return base.append(circleId, opts);
       if (opts.kind === 'snapshot') {
-        const payload = ownSnapshotPayload(opts.payload?.item);
+        const payload = ownSnapshotPayload(circleId, opts.payload?.item);
         if (!payload) return null;
         return base.append(circleId, { ...opts, payload });
       }
       if (!ownSeal()) return null;
-      return base.append(circleId, { ...opts, payload: { ...(opts.payload ?? {}), ...ownDelegation() } });
+      return base.append(circleId, { ...opts, payload: { ...(opts.payload ?? {}), ...ownDelegation(circleId) } });
     },
     catchUpStatements,
     rebuildHead,

@@ -45,8 +45,10 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `appendOnlyEventLog` | function | [`core.md`](core.md#appendonlyeventlog) |
 | `argsHashOf` | function | [`core.md`](core.md#argshashof) |
 | `askSenderAuthorizer` | function | [`core.md`](core.md#asksenderauthorizer) |
+| `assertProfileId` | function | [`core.md`](core.md#assertprofileid) |
 | `audienceFromHumanInTheLoop` | function | [`core.md`](core.md#audiencefromhumanintheloop) |
 | `authorHead` | function | [`core.md`](core.md#authorhead) |
+| `authorityPubKeyB64Of` | function | [`core.md`](core.md#authoritypubkeyb64of) |
 | `b64decode` | function | [`core.md`](core.md#b64decode) |
 | `b64encode` | function | [`core.md`](core.md#b64encode) |
 | `Bootstrap` | class | [`core.md`](core.md#bootstrap) |
@@ -149,6 +151,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `isEd25519PubKey` | function | [`core.md`](core.md#ised25519pubkey) |
 | `isEnvelope` | function | [`core.md`](core.md#isenvelope) |
 | `isKnownRole` | function | [`core.md`](core.md#isknownrole) |
+| `isReservedProfileLabel` | function | [`core.md`](core.md#isreservedprofilelabel) |
 | `isSelfPersonKeyStatement` | function | [`core.md`](core.md#isselfpersonkeystatement) |
 | `isStandardRole` | function | [`core.md`](core.md#isstandardrole) |
 | `KeyRotation` | class | [`core.md`](core.md#keyrotation) |
@@ -169,6 +172,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |
 | `MergeContracts` | constant | [`core.md`](core.md#mergecontracts) |
+| `mintProfileId` | function | [`core.md`](core.md#mintprofileid) |
 | `mkEnvelope` | function | [`core.md`](core.md#mkenvelope) |
 | `mnemonicToSeed` | function | [`core.md`](core.md#mnemonictoseed) |
 | `newAddressChallenge` | function | [`core.md`](core.md#newaddresschallenge) |
@@ -221,12 +225,12 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `registerTunnelReceiveSealed` | function | [`core.md`](core.md#registertunnelreceivesealed) |
 | `REPLY_CODES` | constant | [`core.md`](core.md#reply_codes) |
 | `requestSkills` | function | [`core.md`](core.md#requestskills) |
+| `RESERVED_PROFILE_LABELS` | constant | [`core.md`](core.md#reserved_profile_labels) |
 | `resetRoleBundles` | function | [`core.md`](core.md#resetrolebundles) |
 | `resolveSenderKey` | function | [`core.md`](core.md#resolvesenderkey) |
 | `RoleGrantManager` | class | [`core.md`](core.md#rolegrantmanager) |
 | `roleRank` | function | [`core.md`](core.md#rolerank) |
 | `ROLES` | constant | [`core.md`](core.md#roles) |
-| `rootPubKeyB64Of` | function | [`core.md`](core.md#rootpubkeyb64of) |
 | `RoutingStrategy` | class | [`core.md`](core.md#routingstrategy) |
 | `SEALED_VERSION` | constant | [`core.md`](core.md#sealed_version) |
 | `sealToPersonKey` | function | [`core.md`](core.md#sealtopersonkey) |
@@ -305,6 +309,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `verifyPersonKeyChain` | function | [`core.md`](core.md#verifypersonkeychain) |
 | `verifyReachabilityClaim` | function | [`core.md`](core.md#verifyreachabilityclaim) |
 | `verifySpine` | function | [`core.md`](core.md#verifyspine) |
+| `wireDeviceId` | function | [`core.md`](core.md#wiredeviceid) |
 
 ### From `@onderling/transports`
 

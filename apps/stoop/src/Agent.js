@@ -233,6 +233,13 @@ export async function createNeighbourhoodAgent({
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
+  // WHO this device is in a circle, `(circleId) => webid|null` — host-injected (basis: the circle's persona). The
+  // host's own calls about a persona's circle arrive AS it (`invoke(…, { actAs })`); the skills' local/foreign line
+  // follows it (`localActorIn`). Absent → the default throughout.
+  selfWebidFor = null,
+  // "a post matches what I offer" — the host's local closure over the drivers of the self it is in that circle
+  // (`(circleId, post) => Promise<boolean>`); reachable by no op and no wire. Absent = no offering match.
+  matchesMine = null,
   label = 'NeighbourhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
@@ -503,6 +510,7 @@ export async function createNeighbourhoodAgent({
     // peer is HELD + flushed on reconnect. Absent (standalone stoop / no secure-agent) → the bare
     // per-peer transport, unchanged.
     reliableSend:  (typeof reliableSend === 'function') ? reliableSend : null,
+    matchesMine:   (typeof matchesMine === 'function') ? matchesMine : null,
   });
 
   // Phase 20 (Stoop, 2026-05-06): the bundle object is built
@@ -511,6 +519,8 @@ export async function createNeighbourhoodAgent({
   // without circular construction.  We pass the same `bundle` ref
   // into `buildSkills` and finalise it just before returning.
   const bundle = {
+    /** The host's "a post matches what I offer" (see `matchesMine` above), for the relevance score's first layer. */
+    matchesMine: (typeof matchesMine === 'function') ? matchesMine : null,
     /** Write the local cache to its persistence now, ahead of the debounce. No-op without a persist. */
     flushLocal: async () => { if (persist && lastLocalMap && typeof persist.flush === 'function') await persist.flush(lastLocalMap); },
     agent,
@@ -613,6 +623,7 @@ export async function createNeighbourhoodAgent({
       controlAgent,   // household sealed-pod membership hooks (no-op when absent)
       muted,
       localActor: offeringMatchOpts.localActor,
+      selfWebidFor,   // who this device is per circle — the cores' local/foreign line follows it
       groupId:    offeringMatchOpts.group,
       dataLocationConfig,
       chat,           // Phase 14 — used by sendChatMessage / respondToItem

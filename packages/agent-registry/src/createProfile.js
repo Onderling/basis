@@ -4,7 +4,7 @@
 // so the same owner root + profileId reproduce the SAME pubKey on any device — the recovery
 // property. We record only the pubKey (via AgentIdentity.pubKeyFromSeed — no vault); the full
 // identity is re-derived on the device that actually runs the profile.
-import { AgentIdentity, deriveCircleAddress } from '@onderling/core';
+import { AgentIdentity, deriveCircleAddress, mintProfileId, assertProfileId } from '@onderling/core';
 
 /**
  * Create (register) a root-derived PROFILE entry in the registry (identity step 2). The profile's
@@ -15,21 +15,21 @@ import { AgentIdentity, deriveCircleAddress } from '@onderling/core';
  * @param {object} a
  * @param {object} a.registry     a createAgentRegistry handle
  * @param {object} a.ownerRoot    a core Bootstrap (deriveAgentSeed + fingerprint)
- * @param {string} a.profileId    stable per-profile label (also the registry agentId)
+ * @param {string} [a.profileId]  the persona's stable id (`'default'` or `p-<12 hex>`; also the registry agentId and the
+ *                                HKDF label). Absent → one is minted. Never a display name: renaming must not re-key.
+ * @param {string} [a.name]       the display name — a property, free to change
  * @param {string} [a.role]       default 'profile'
- * @param {string} [a.name]
  * @param {object} [a.properties] own/inherit property map
  * @param {string} [a.agentUri]   default `profile:<id>`
- * @returns {Promise<{ entry: object, pubKey: string }>}
+ * @returns {Promise<{ entry: object, pubKey: string, profileId: string }>}
  */
 export async function createProfile({ registry, ownerRoot, profileId, role = 'profile', name = null, properties = {}, agentUri } = {}) {
   if (!registry?.register) throw new Error('createProfile: a registry is required');
   if (!ownerRoot?.deriveAgentSeed || !ownerRoot?.fingerprint) {
     throw new Error('createProfile: ownerRoot (a core Bootstrap) is required');
   }
-  if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new Error('createProfile: profileId (string) is required');
-  }
+  if (profileId == null || profileId === '') profileId = mintProfileId();
+  assertProfileId(profileId);
   const pubKey = AgentIdentity.pubKeyFromSeed(ownerRoot.deriveAgentSeed(profileId));
   const entry = {
     agentId:          profileId,
@@ -41,7 +41,7 @@ export async function createProfile({ registry, ownerRoot, profileId, role = 'pr
     properties,
   };
   await registry.register(entry);
-  return { entry, pubKey };
+  return { entry, pubKey, profileId };
 }
 
 /** The deterministic pubKey a profile WOULD have (recovery / verification), without registering. */

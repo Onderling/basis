@@ -113,6 +113,8 @@ export function renderCircleView(container, {
   //   `onRetryDelivery(msgId)`  tap-to-retry callback for 'failed' icons
   // All three are optional; when missing the bubbles render exactly as before.
   deliveryStateFor = null,
+  // `deliveryReasonFor(msgId)` — why a failed send failed, when known (the delivery map's `reasonOf`); words only
+  deliveryReasonFor = null,
   localActor = null,
   onRetryDelivery = null,
   // Mandate ("entrust" / toevertrouwen) — the viewer's identity signals decide
@@ -379,7 +381,7 @@ export function renderCircleView(container, {
       }
       body.appendChild(renderBubble(row, {
         tr, onAction,
-        deliveryStateFor, localActor, onRetryDelivery,
+        deliveryStateFor, deliveryReasonFor, localActor, onRetryDelivery,
         onEmbedButton, onEmbedOpen,
         media,
         viewerWebid, viewerIsAdmin, availability,
@@ -835,8 +837,8 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
  *
  * @returns {HTMLElement|null} null when the state renders nothing (`show: false`, or no state yet).
  */
-function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null } = {}) {
-  const p = deliveryPresentation(state);
+function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null, reason = null } = {}) {
+  const p = deliveryPresentation(state, { reason });
   if (!p) return null;
   const label = tr(p.labelKey);
   const el = document.createElement(p.retryable ? 'button' : 'span');
@@ -877,12 +879,12 @@ function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null } =
  * @param {string|null} state     the new delivery state
  * @returns {boolean} whether a chip was found or placed
  */
-export function paintDeliveryChip(root, rowId, state, { tr, onRetryDelivery = null } = {}) {
+export function paintDeliveryChip(root, rowId, state, { tr, onRetryDelivery = null, reason = null } = {}) {
   if (!root || !rowId || typeof tr !== 'function') return false;
   const bubble = root.querySelector(`.circle-view__bubble[data-row-id="${CSS.escape(String(rowId))}"]`);
   if (!bubble) return false;
   const existing = bubble.querySelector('.circle-view__bubble-delivery');
-  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId });
+  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId, reason });
   if (!next) { existing?.remove(); return true; }   // a state that shows nothing must CLEAR the old chip
   if (existing) existing.replaceWith(next);
   else {
@@ -897,7 +899,7 @@ export function paintDeliveryChip(root, rowId, state, { tr, onRetryDelivery = nu
 function renderBubble(row, {
   tr, onAction,
   // δ.2 — delivery-icon plumbing; all three are optional.
-  deliveryStateFor = null, localActor = null, onRetryDelivery = null,
+  deliveryStateFor = null, deliveryReasonFor = null, localActor = null, onRetryDelivery = null,
   // S6.A — manifest-driven inline buttons carried on the bot event (payload.buttons).
   onEmbedButton = null,
   // tap a "See also" embed chip → open the referenced item's screen.
@@ -1153,7 +1155,10 @@ function renderBubble(row, {
   let deliveryEl = null;
   if (typeof deliveryStateFor === 'function' && isMine) {
     // States marked `show: false` render nothing — the happy path stays clean.
-    deliveryEl = buildDeliveryChip(deliveryStateFor(row.id), { tr, onRetryDelivery, rowId: row.id });
+    deliveryEl = buildDeliveryChip(deliveryStateFor(row.id), {
+      tr, onRetryDelivery, rowId: row.id,
+      reason: typeof deliveryReasonFor === 'function' ? deliveryReasonFor(row.id) : null,
+    });
   }
 
   // Bottom meta line (the site's `.msg .src` pattern): ONE small mono line with

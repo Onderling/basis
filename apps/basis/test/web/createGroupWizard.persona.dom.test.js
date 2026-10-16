@@ -26,6 +26,7 @@ function boot({ shareFounderRelease } = {}) {
   const callSkill = vi.fn(async (app, op, args) => {
     if (op === 'listAgents') return PERSONAS;
     if (op === 'createGroupV2') return { groupId: args.groupId, code: 'K', expiresAt: 1 };
+    if (op === 'bindCirclePersona') return { ok: true };   // the persona founds after the bind
     return {};
   });
   renderCreateGroupWizard({

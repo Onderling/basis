@@ -82,10 +82,14 @@ export async function buildRosterSeedRequest({ signer, delegationRecord = null, 
  * @param {string} a.selfPubKey   the profile's chat pubKey (the device set's ref)
  * @param {(to:string, payload:object) => Promise<*>|*} a.sendToPeer
  * @param {(circleId:string) => (object|null)} [a.ownAnnouncement]
+ * @param {(circleId:string) => Promise<{signer: object, delegationRecord: object|null, verifyDeviceSet: Function, selfPubKey: string, sendAs: string|null}|null>} [a.forCircle]
+ *   the circle's SELF on this device: a persona's circle is seeded between that persona's devices — its device key
+ *   signs, its device set verifies, its record rides, it answers as itself. null = this device has no self in the
+ *   circle, and answers nothing (never the default standing in). Absent: the fixed values above, for every circle.
  *   THIS device's own circle-address announcement ({circleId, memberWebid, circleAddress,
  *   circleAddressProof}) — sent back alongside the parcel; see the introduce-back note below.
  */
-export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecord = null, verifyDeviceSet, selfPubKey, sendToPeer, ownAnnouncement = null } = {}) {
+export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecord = null, verifyDeviceSet, selfPubKey, sendToPeer, ownAnnouncement = null, forCircle = null } = {}) {
   return async function onRosterSeedRequest(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== ROSTER_SEED_SUBTYPES.request) return;
     const { body, sig, by } = payload;
@@ -94,8 +98,15 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
     if (typeof body.circleId !== 'string' || !body.circleId) return;
     if (typeof body.replyTo !== 'string' || !body.replyTo) return;
     if (!verifySig(body, sig, by)) return;
+    let kit = {};
+    if (typeof forCircle === 'function') {
+      try { kit = await forCircle(body.circleId); } catch { kit = null; }
+      if (!kit) return;   // no self of this device in that circle: nothing to answer with
+    }
+    const verify = kit.verifyDeviceSet ?? verifyDeviceSet;
+    const ref = kit.selfPubKey ?? selfPubKey;
     try {
-      if (!(await verifyDeviceSet({ author: by, ref: selfPubKey, payload: { delegation: payload.delegation ?? null } }))) return;
+      if (!(await verify({ author: by, ref, payload: { delegation: payload.delegation ?? null } }))) return;
     } catch { return; }
     try {
       const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
@@ -121,7 +132,8 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
             ...(typeof m.ceremonyCommitment === 'string' && m.ceremonyCommitment ? { ceremonyCommitment: m.ceremonyCommitment } : {}),
           }));
       } catch { memberRows = []; }
-      const identity = (await signerPromise)?.identity ?? (await signerPromise);
+      const signer = kit.signer ?? signerPromise;
+      const identity = (await signer)?.identity ?? (await signer);
       if (!identity?.pubKey) return;
       // INTRODUCE THIS DEVICE, IN THE PARCEL. A device never records its OWN per-circle address into
       // the shared person-row — siblings learn it by ANNOUNCE, and this device announced long before
@@ -140,14 +152,15 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
         v: ROSTER_SEED_VERSION, kind: 'seed', circleId: body.circleId, replyTo: body.replyTo, rows, members: memberRows, at: Date.now(),
         ...(own ? { own } : {}),
       };
+      const record = kit.delegationRecord !== undefined ? kit.delegationRecord : delegationRecord;
       await sendToPeer(body.replyTo, {
         subtype: ROSTER_SEED_SUBTYPES.batch,
         circleId: body.circleId,
         body: parcelBody,
         sig: sign(identity, parcelBody),
         by: identity.pubKey,
-        ...(delegationRecord ? { delegation: delegationRecord } : {}),
-      });
+        ...(record ? { delegation: record } : {}),
+      }, kit.sendAs !== undefined ? { sendAs: kit.sendAs } : undefined);
       // (The 2026-08-21 key-chain REPLAY that briefly lived here is RETIRED: key events are now
       // signed statements on the key LANE, and the enrolled device pulls that lane through the
       // standing catch-up exactly like membership and governance — one route, no side-channel.)
@@ -167,8 +180,9 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
  * @param {(circleId:string, result:object) => void} [a.onApplied]
  * @param {(circleId:string) => Promise<any>} [a.refreshBindings]  re-read the seeded roster into the
  *   sealing binding + the sender gate (`bindCircleAddressKeysFor`) — the announce door's own refresh
+ * @param {(circleId:string) => Promise<{verifyDeviceSet: Function, selfPubKey: string}|null>} [a.forCircle]  as the serve half's
  */
-export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey, onApplied = null, refreshBindings = null } = {}) {
+export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey, onApplied = null, refreshBindings = null, forCircle = null } = {}) {
   return async function onRosterSeedBatch(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== ROSTER_SEED_SUBTYPES.batch) return;
     const { body, sig, by } = payload;
@@ -176,8 +190,13 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
     if (body.v !== ROSTER_SEED_VERSION || body.kind !== 'seed') return;
     if (typeof body.circleId !== 'string' || !body.circleId || !Array.isArray(body.rows)) return;
     if (!verifySig(body, sig, by)) return;
+    let kit = {};
+    if (typeof forCircle === 'function') {
+      try { kit = await forCircle(body.circleId); } catch { kit = null; }
+      if (!kit) return;   // a seed for a circle this device has no self in is dropped
+    }
     try {
-      if (!(await verifyDeviceSet({ author: by, ref: selfPubKey, payload: { delegation: payload.delegation ?? null } }))) return;
+      if (!(await (kit.verifyDeviceSet ?? verifyDeviceSet)({ author: by, ref: kit.selfPubKey ?? selfPubKey, payload: { delegation: payload.delegation ?? null } }))) return;
     } catch { return; }
     try {
       const r = await callSkill('stoop', 'recordRosterSeed', {

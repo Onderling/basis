@@ -66,9 +66,14 @@ export const householdManifest = {
     help: 'read',
     register: 'write',
     'enroll-device': 'write',
+    'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
+    'pause-persona':    'write',   // a device entry: which held personas do not run here
+    'resume-persona':   'write',
+    'remove-persona':   'write',   // this device's delegation under one persona, tombstoned; its keys here wiped
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
+    'bind-circle-persona': 'write',   // which persona a circle is joined as, on this device
     'pair-peer': 'write',            // adds a peer to a circle's item sync
     'list-companion-grants': 'read',
     'grant-companion': 'write',
@@ -107,7 +112,9 @@ export const householdManifest = {
     // added to a manifest becomes storable + gate-able at once (docs/architecture.md L84).
     // what the household's people want everyone to know, in their own words ("de vuilnis gaat dinsdag buiten"): written by
     // PEOPLE, never the model (no tool to write or remove one), changed or removed only by its maker or an admin
-    note:     { atoms: ['add', 'list', 'get', 'remove'], writtenBy: 'people' },
+    note:     { atoms: ['add', 'list', 'get', 'remove'], writtenBy: 'people',
+      presents: { label: 'text', moment: 'updatedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
+      names: { nl: { one: 'notitie', other: 'notities' }, en: { one: 'note', other: 'notes' } } },
   },
 
   // F-SP1-d: verbatim, sourced from the same module classifyAndExtract reads.
@@ -366,6 +373,20 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'bindCirclePersona', group: 'device',
+      verb: 'bind-circle-persona',
+      writes: { scope: 'device' },   // this device's own map of which persona a circle is joined as
+      // JOINING AS A PERSONA: before the redeem goes out, the circle is the persona's — its address, its link proof, its
+      // "me" — and the persona is on the circle's relay on a socket of its own. `personaId` null gives the circle back to
+      // the default (a join that did not happen). A persona this device does not run → 'no-such-persona'.
+      params: [
+        { name: 'circleId',  kind: 'string', required: true },
+        { name: 'personaId', kind: 'string', required: false },
+        { name: 'relayUrl',  kind: 'string', required: false },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'claimCompanion', group: 'device',
       verb: 'claim-companion',
       writes: { scope: 'device' },   // the person's own list of the nodes they own; the node records its owner itself
@@ -446,6 +467,67 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'listReceivablePersonas', group: 'device',
+      verb: 'list',
+      // THE RESTORE PICKER's list: the person's personas (their registry, as a restore brought it back) that THIS device
+      // does not run yet — names and ids only. Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'removePersonaHere', group: 'device',
+      verb: 'remove-persona',
+      writes: { scope: 'person' },   // this device's delegation under that persona, tombstoned on its record
+      // REMOVE A PERSONA FROM THIS DEVICE — a ceremony with the phrase, scoped to one persona: this device tombstoned
+      // under it alone, its addresses in its circles retired, its device-map row removed, its keys and local content
+      // wiped. Not undoable here. Refused: root custody, the primary (`key-holder`), a paused persona (resume first).
+      params: [
+        { name: 'mnemonic',  kind: 'secret', required: true },
+        { name: 'personaId', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'listPersonasHere', group: 'device',
+      verb: 'list',
+      // THE PERSONAS ON THIS DEVICE — every self it holds, running or paused, and which is its primary (the self it
+      // speaks as). Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'pausePersona', group: 'device',
+      verb: 'pause-persona',
+      writes: { scope: 'device' },   // a device entry: which held personas do not run here
+      // PAUSE A PERSONA ON THIS DEVICE — local and reversible, no phrase: from the next boot it does not run here (its
+      // circles not reopened or served, out of the switcher); its keys and data stay, nothing reaches the registry or a
+      // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`).
+      params: [ { name: 'personaId', kind: 'string', required: true } ],
+      surfaces: {},
+    },
+    {
+      id:   'resumePersona', group: 'device',
+      verb: 'resume-persona',
+      writes: { scope: 'device' },
+      // The inverse: from the next boot the persona runs here again.
+      params: [ { name: 'personaId', kind: 'string', required: true } ],
+      surfaces: {},
+    },
+    {
+      id:   'receivePersonas', group: 'device',
+      verb: 'receive-personas',
+      writes: { scope: 'person' },   // the picked personas' keys, into this install's sealed slots
+      // THESE PERSONAS HERE TOO — a phrase ceremony (the root is in hand only now): the picked personas are handed to
+      // this device (their chat identity, person key and their own delegation of it); the next boot runs them. The
+      // phrase is SECRET-kind; the runner never persists it. CEREMONY-ONLY: no chat/slash surface.
+      params: [
+        { name: 'mnemonic', kind: 'secret', required: true },
+        // the picked persona ids (from `listReceivablePersonas`); none picked hands over only the recovery seal
+        { name: 'personas', kind: 'object', required: true },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'importRecoveryFile', group: 'device',
       verb: 'import-recovery-file',
       writes: { scope: 'circle' },   // widest of what it writes: the registry on this device, and the rosters the file carries into each circle
@@ -515,6 +597,12 @@ export const householdManifest = {
       params: [
         { name: 'mnemonic', kind: 'secret', required: true },
         { name: 'label',    kind: 'string' },
+        // WHICH PERSONAS this device is handed (a list of persona ids, picked from the offer's sealed list — opened with
+        // the phrase on this device); absent or empty = the default only, the low-trust device's set
+        { name: 'personas', kind: 'object' },
+        // …and whether the GENERAL persona comes too (absent = yes). Off only beside a picked persona: the first picked is
+        // then the device's primary — the self it speaks as.
+        { name: 'withDefault', kind: 'boolean' },
       ],
       // CEREMONY-ONLY: reached through the enroll-device flow (the first-run/settings shells
       // start it); no chat/slash surface — a phrase does not belong in a chat box.

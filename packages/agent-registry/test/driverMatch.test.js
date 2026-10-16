@@ -193,3 +193,13 @@ describe('reading drivers back from a profile — the stored shape is mode-wrapp
     expect(Object.keys(driversFromProperties(resolved))).toEqual(['tuinhulp']);        // resolved: the driver
   });
 });
+
+describe('the taxonomy category is one tag on both sides', () => {
+  it('a post with a category and no tags matches an offering of that category; another category does not', async () => {
+    const { matchProfileDrivers } = await import('../src/driverMatch.js');
+    const properties = { fiets: { kind: 'offering', text: 'Fietsen maken', tags: ['fiets'], categoryId: 'vervoer' } };
+    expect((await matchProfileDrivers({ properties, item: { text: 'iemand?', categoryId: 'vervoer' } })).length).toBe(1);
+    expect((await matchProfileDrivers({ properties, item: { text: 'iemand?', source: { categoryId: 'vervoer' } } })).length).toBe(1);
+    expect((await matchProfileDrivers({ properties, item: { text: 'iemand?', categoryId: 'tuin' } })).length).toBe(0);
+  });
+});

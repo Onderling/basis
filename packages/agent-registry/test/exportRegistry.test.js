@@ -1,6 +1,6 @@
 // Identity step 5A — export/import the profile set as an encrypted, storage-agnostic artifact.
 import { describe, it, expect } from 'vitest';
-import { Bootstrap } from '@onderling/core';
+import { Bootstrap, mintProfileId } from '@onderling/core';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createAgentRegistry } from '../src/AgentRegistry.js';
 import {
@@ -14,12 +14,15 @@ const mkReg = () => createAgentRegistry({
   deviceId: 'd',
 });
 
+// a second persona: its id is minted, never a name
+const WORK = mintProfileId();
+
 describe('profile registry export (step 5A)', () => {
   it('round-trips the owner root + profile set through an encrypted artifact (pod-less recovery)', async () => {
     const root = Bootstrap.create().bootstrap;
     const reg = mkReg();
     await createProfile({ registry: reg, ownerRoot: root, profileId: 'default', properties: { relay: own('wss://home') } });
-    await createProfile({ registry: reg, ownerRoot: root, profileId: 'work' });
+    await createProfile({ registry: reg, ownerRoot: root, profileId: WORK });
 
     const sealed = await exportProfileRegistry({ ownerRoot: root, registry: reg, passphrase: 'export-pw', argonOpts: LIGHT });
     expect(sealed).toBeInstanceOf(Uint8Array);
@@ -29,9 +32,9 @@ describe('profile registry export (step 5A)', () => {
     const { ownerRoot: restoredRoot, registry: snapshot } = await importProfileRegistry({ sealed, passphrase: 'export-pw', argonOpts: LIGHT });
     // the recovered owner root re-derives the SAME profile keys
     expect(profilePubKey(restoredRoot, 'default')).toBe(profilePubKey(root, 'default'));
-    expect(profilePubKey(restoredRoot, 'work')).toBe(profilePubKey(root, 'work'));
+    expect(profilePubKey(restoredRoot, WORK)).toBe(profilePubKey(root, WORK));
     // the snapshot carries the profiles + their (non-derivable) properties
-    expect(snapshot.agents.map((a) => a.agentId).sort()).toEqual(['default', 'work']);
+    expect(snapshot.agents.map((a) => a.agentId).sort()).toEqual(['default', WORK].sort());
     expect(snapshot.agents.find((a) => a.agentId === 'default').properties.relay).toEqual({ mode: 'own', value: 'wss://home' });
 
     // restore into a FRESH registry (new device, no pod)

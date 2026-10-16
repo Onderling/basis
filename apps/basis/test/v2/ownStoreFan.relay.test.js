@@ -12,6 +12,7 @@ import { bootAnnaTwoDevices, SEND } from '../support/annaTwoDevices.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 import { OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../src/v2/taskRail.js';
 import { TASK_LANE } from '../../src/v2/taskManifest.js';
+import { encodeGenericOpId } from '@onderling/app-manifest';
 
 // the task lane's entries on the own scope (the grants lane shares the scope's id; the rails differ by entry kind)
 const ownTaskEntries = (log) => log.query({}).filter((e) => e?.circleId === OWN_DEVICES_SCOPE && e?.type === TASK_LANE);
@@ -35,6 +36,21 @@ describe('the own store between a person\'s devices', () => {
     expect(onLog).not.toContain('tandarts-eigen');
     await new Promise((r) => setTimeout(r, 1500));
     expect(await bea.get(made.id), 'Bea never holds Anna\'s own store').toBe(null);
+  });
+
+  it('an own NOTE made through the op (Vandaag\'s "+") reaches Anna\'s other device — never Bea\'s, never a circle', async () => {
+    const made = await w.A.agent.callSkill('household', encodeGenericOpId('household', 'add', 'note'), { circleId: OWN_DEVICES_SCOPE, body: 'sleutel bij de buren' });
+    expect(made?.ok, JSON.stringify(made)).not.toBe(false);
+    const box = await w.A2.agent.ownStore();
+    const there = await until(async () => (await box.listByType('note')).find((n) => n.body === 'sleutel bij de buren') ?? null, { timeout: 15_000, step: 200 });
+    expect(there, 'the always-on device holds the note').toBeTruthy();
+    expect(JSON.stringify(ownTaskEntries(w.logs.A2))).not.toContain('sleutel bij de buren');
+    // no circle lane carries it: nothing on any log names it outside the own scope
+    for (const log of [w.logs.A, w.logs.A2, w.logs.B]) {
+      expect(log.query({}).filter((e) => e?.circleId && e.circleId !== OWN_DEVICES_SCOPE && JSON.stringify(e).includes(there.id))).toEqual([]);
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    expect((await (await w.B.agent.ownStore()).listByType('note')).length, 'Bea never holds it').toBe(0);
   });
 
   it('a stranger asking for Anna\'s own store is served nothing', async () => {

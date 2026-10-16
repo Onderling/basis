@@ -4,9 +4,9 @@
     "doc": "Heading of the circle launcher (board 1B)."
   },
   "tab": {
-    "screens": {
-      "text": "Screens",
-      "doc": "α.3 — primary tab: user's screens (default landing)."
+    "vandaag": {
+      "text": "Today",
+      "doc": "The home tab: the person's own pages (the screen book) — a few capped blocks of what matters today."
     },
     "circles": {
       "text": "Circles",
@@ -501,6 +501,10 @@
     "text": "← Me",
     "doc": "Back link from any screen under Me (Mij) to the Me screen — one key for all of them."
   },
+  "back_mydata": {
+    "text": "← My data",
+    "doc": "Back link from a screen behind My data (availability, shared with me, blocked) to My data — one key for all of them."
+  },
   "back": {
     "text": "← circles",
     "doc": "Back link from a circle detail view to the launcher."
@@ -576,6 +580,10 @@
       "undeliverable": {
         "text": "Couldn't reach some members",
         "doc": "δ.2 — permanent fan-out failure (e.g. a member has no published key); shown but NOT retryable (retry can't help)."
+      },
+      "persona_no_connection": {
+        "text": "Not sent: this persona has no connection to the circle (tap to retry)",
+        "doc": "The circle belongs to one of your personas and that persona has no connection of its own to the circle's relay right now, so the message did not leave (it is never sent under another identity). Retryable once the connection is back."
       }
     },
     "unknown_sender": {
@@ -1132,15 +1140,17 @@
     }
   },
   "screen": {
-    "items_title": {
-      "task": "My things",
-      "calendar-event": "Agenda",
-      "note": "Notes",
-      "announcement": "Announcements",
-      "offer": "Offers",
-      "request": "Requests",
-      "list": "Lists",
-      "list-item": "On the lists"
+    "more": {
+      "text": "more",
+      "doc": "Under a capped block on Vandaag: open the whole block on its own."
+    },
+    "more_back": {
+      "text": "back",
+      "doc": "Back from one block shown whole, to the page."
+    },
+    "unread_count": {
+      "text": "{{count}} new",
+      "doc": "Vandaag, circles-with-news block: how many lines are new in that circle since this device last looked. count = how many."
     },
     "filter_placeholder": {
       "text": "Filter…",
@@ -1197,7 +1207,173 @@
       "doc": "α.1c — defensive label for a block type the renderer doesn't recognize (forward-compat)."
     }
   },
+  "vandaag": {
+    "circles_all": {
+      "text": "All circles",
+      "doc": "A block filter: the page's circles, all of them."
+    },
+    "circles_title": {
+      "text": "Circles",
+      "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "labels_title": {
+      "text": "Labels",
+      "doc": "A block filter on a type that carries labels: only rows with one of these (comma-separated)."
+    },
+    "labels_placeholder": {
+      "text": "e.g. work, home",
+      "doc": "Placeholder of the labels filter field."
+    },
+    "within_any": {
+      "text": "Any time",
+      "doc": "Relative-date filter: no limit."
+    },
+    "within_1": {
+      "text": "Today",
+      "doc": "Relative-date filter: within a day."
+    },
+    "within_7": {
+      "text": "This week",
+      "doc": "Relative-date filter: within 7 days."
+    },
+    "within_30": {
+      "text": "This month",
+      "doc": "Relative-date filter: within 30 days."
+    },
+    "customise": {
+      "text": "Customise",
+      "doc": "The button on Vandaag that opens the customise sheet."
+    },
+    "customise_title": {
+      "text": "Customise this page",
+      "doc": "Title of the customise sheet."
+    },
+    "blocks_title": {
+      "text": "On this page",
+      "doc": "Heading over the page's blocks in the customise sheet."
+    },
+    "add_block_title": {
+      "text": "Add a block",
+      "doc": "Heading over the blocks that can be added."
+    },
+    "page_title": {
+      "text": "Page",
+      "doc": "Heading over the page acts (rename, add, remove)."
+    },
+    "rename_page": {
+      "text": "Rename",
+      "doc": "Rename the active page."
+    },
+    "add_page": {
+      "text": "New page",
+      "doc": "Add a page to the person's pages."
+    },
+    "new_page_name": {
+      "text": "New page",
+      "doc": "The name a new page starts with."
+    },
+    "remove_page": {
+      "text": "Remove page",
+      "doc": "Remove the active page (not the last one)."
+    },
+    "undo": {
+      "text": "Undo",
+      "doc": "Undo the newest change to the person's pages."
+    },
+    "up": {
+      "text": "Move up",
+      "doc": "Move a block up."
+    },
+    "down": {
+      "text": "Move down",
+      "doc": "Move a block down."
+    },
+    "remove": {
+      "text": "Remove",
+      "doc": "Remove a block from the page."
+    },
+    "done": {
+      "text": "Done",
+      "doc": "Close the customise sheet."
+    },
+    "horizon_today": {
+      "text": "Today",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_3days": {
+      "text": "3 days",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_week": {
+      "text": "Week",
+      "doc": "Calendar block horizon preset."
+    },
+    "horizon_month": {
+      "text": "Month",
+      "doc": "Calendar block horizon preset."
+    },
+    "scope_mine": {
+      "text": "Mine",
+      "doc": "Tasks block: only my tasks."
+    },
+    "scope_all": {
+      "text": "All",
+      "doc": "Tasks block: every open task."
+    },
+    "limit_n": {
+      "text": "{{n}} rows",
+      "doc": "A block's cap. n = how many rows."
+    },
+    "plus": {
+      "text": "Add",
+      "doc": "Vandaag → the '+' beside 'Pas aan': add an own note or an own appointment (the person's own store; never a circle)."
+    },
+    "plus_own": {
+      "text": "Own {{noun}}",
+      "doc": "Vandaag → '+': an item of your own, on your own devices only. noun = what it makes, in the word the declaring manifest names it."
+    },
+    "plus_note_ph": {
+      "text": "Note",
+      "doc": "Vandaag → '+' → own note: the text."
+    },
+    "plus_title_ph": {
+      "text": "What",
+      "doc": "Vandaag → '+' → own appointment: what it is."
+    },
+    "plus_when": {
+      "text": "When (e.g. tomorrow at 2pm)",
+      "doc": "Vandaag → '+' → own appointment: the moment."
+    },
+    "plus_save": {
+      "text": "Save",
+      "doc": "Vandaag → '+': save the own note or appointment."
+    },
+    "plus_empty": {
+      "text": "Fill this in first.",
+      "doc": "Vandaag → '+': something needed is empty."
+    },
+    "plus_failed": {
+      "text": "Could not save: {{error}}",
+      "doc": "Vandaag → '+': the save failed; the reason follows."
+    },
+    "own_tag": {
+      "text": "you",
+      "doc": "Vandaag: the tag on one of the person's own items (no circle), where a circle's items name their circle."
+    },
+    "plus_when_unread": {
+      "text": "Say the day and the time, e.g. \"tomorrow at 2pm\".",
+      "doc": "Vandaag → '+' → own appointment: the moment typed could not be read (the bounded day-and-time reader)."
+    },
+    "plus_as": {
+      "text": "As whom?",
+      "doc": "Vandaag → '+': several selves are ticked in the header — which one this is written as."
+    }
+  },
   "screens": {
+    "vandaag_page": {
+      "text": "Today",
+      "doc": "The name of the first page of the person's own pages (Vandaag), seeded once."
+    },
     "picker_title": {
       "text": "Screens",
       "doc": "α.3 — picker heading."
@@ -1254,17 +1430,9 @@
       "text": "{{count}} circles",
       "doc": "α.3 — filter summary for many."
     },
-    "seed_name": {
-      "text": "Stream",
-      "doc": "α.3 — name of the auto-seeded default screen."
-    },
     "seed_my_things": {
       "text": "My things",
       "doc": "α.4 — seeded screen aggregating tasks assigned to me across circles."
-    },
-    "seed_my_calendar": {
-      "text": "My calendar",
-      "doc": "α.4 — seeded screen aggregating upcoming events across circles."
     }
   },
   "recipe": {
@@ -1300,6 +1468,72 @@
       "text": {
         "text": "Text",
         "doc": "α.1b — block palette label."
+      },
+      "circlesUnread": {
+        "text": "Circles with news",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "identityLine": {
+        "text": "About me",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "agents": {
+        "text": "My devices and helpers",
+        "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "notes": {
+        "text": "Notes",
+        "doc": "Block palette label (Mij / Vandaag)."
+      }
+    },
+    "block_desc": {
+      "quickActions": {
+        "text": "The actions you use most in this circle, as buttons.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "announcement": {
+        "text": "A standing notice from the admin at the top of the circle.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "noticeboard": {
+        "text": "The newest noticeboard posts: asks and offers.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "calendar": {
+        "text": "Coming appointments, for the period you choose.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "tasks": {
+        "text": "Open tasks, yours or all of them.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "rules": {
+        "text": "The circle's house rules.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "photo": {
+        "text": "A photo with a caption.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "text": {
+        "text": "A piece of text of your own.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "circlesUnread": {
+        "text": "The circles where something is new, with how many unread messages.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "identityLine": {
+        "text": "Your name and a few things in one line: available, unread, open tasks, your next appointment.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "agents": {
+        "text": "Your devices, your helper services and the bots you admitted, one sentence each.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "notes": {
+        "text": "The notes in your circles, optionally only those with certain labels.",
+        "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       }
     },
     "editor": {
@@ -3168,6 +3402,18 @@
       "text": "Your ask · heard by {{heard}} · {{min}} min left",
       "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
     },
+    "as_self": {
+      "text": "You appear here as {{name}}.",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
+    "as_self_pick": {
+      "text": "Who do you appear as here?",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
+    "as_self_caveat": {
+      "text": "That is a name you show, not a separate address: whoever is looking here can tell it comes from the same device.",
+      "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
+    },
     "face_row": {
       "text": "Show here as",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
@@ -3941,6 +4187,18 @@
     "reminders_usual": {
       "text": "For {{text}} the usual reminders apply again.",
       "doc": "The reminders everyone gets for one entry (entryReminders): the household's statement about the item."
+    },
+    "added_many": {
+      "text": "{{count}} added to {{name}}: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "removed_many": {
+      "text": "{{count}} taken off {{name}}: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "done_named_many": {
+      "text": "{{count}} ticked off: {{text}}.",
+      "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
     }
   },
   "share": {
@@ -5307,11 +5565,11 @@
     },
     "lens": {
       "title": {
-        "text": "What does {{name}} see of you?",
+        "text": "Who are you to {{name}}?",
         "doc": "Thread header — the lens control's heading (L125). Says 'see', never 'know a different you': one identity runs (L123)."
       },
       "persona": {
-        "text": "They see you as",
+        "text": "As",
         "doc": "Lens control — the persona a contact sees you as."
       },
       "level": {
@@ -5319,7 +5577,7 @@
         "doc": "Lens control — the reveal level that persona discloses to this contact."
       },
       "hint": {
-        "text": "Same you, a different view: this chooses whose details they receive. They still talk to you.",
+        "text": "This contact knows a different you: each persona has its own key and its own conversation. If you switch persona later, this contact gets a new contact on their side; what they already knew of you, they keep.",
         "doc": "Lens control — the honest sentence: a different VIEW of the same person, not a second identity (L123)."
       },
       "save": {
@@ -5331,7 +5589,7 @@
         "doc": "Lens control / add sheet — cancel."
       },
       "saved": {
-        "text": "Saved — {{name}} now sees you as {{persona}}.",
+        "text": "Saved — {{name}} now talks to {{persona}}.",
         "doc": "Lens control — confirmation after a change."
       },
       "failed": {
@@ -5339,7 +5597,7 @@
         "doc": "Lens control — a change that did not save."
       },
       "open": {
-        "text": "What they see",
+        "text": "Who you are to this contact",
         "doc": "Thread header — the button that opens the lens control."
       }
     },
@@ -5634,8 +5892,8 @@
       "doc": "S2 — no location yet."
     },
     "loc_disclosure_hint": {
-      "text": "Who sees your location is set at Me → personas",
-      "doc": "location-fold-in (audit §4) — quiet pointer: location is now a disclosure-controlled property on the Mij persona layer; the geo-editor here stays for setting the coarse place."
+      "text": "Who sees your location is set below, per circle.",
+      "doc": "The person's own editor → under the location: who SEES it is a disclosure per circle, set further down in the same editor (the persona layer)."
     },
     "geo_placeholder": {
       "text": "Search a place…",
@@ -5678,10 +5936,10 @@
       "doc": "What the version line says for a build with no tag (a dev server)."
     },
     "scan": {
-        "text": "Scan",
-        "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
-      },
-      "share_contact": {
+      "text": "Scan",
+      "doc": "Me: the scanQr op — ONE scanner (web: the paste prompt), routed by what it reads to its declared flow or op."
+    },
+    "share_contact": {
       "text": "Share my card",
       "doc": "Mij → the panel that shows this person's contact card as a QR, a code and a link (Frits 2026-09-19: sharing your contact on web; 'kaart' avoided — testers do not know the word)."
     },
@@ -5736,6 +5994,70 @@
     "planned_where": {
       "text": " · {{circle}}",
       "doc": "Mij → Gepland: what is coming for me in the coming week, wherever it lives (my circles' appointments, my own, my dated chores) — a local projection, no bot."
+    },
+    "reading_available": {
+      "text": "available",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_away": {
+      "text": "away until {{until}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_away_open": {
+      "text": "away",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_quiet": {
+      "text": "quiet until {{until}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_online": {
+      "text": "online",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is connected at its relays."
+    },
+    "reading_offline": {
+      "text": "offline",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. This device is not connected at its relays."
+    },
+    "reading_unread": {
+      "text": "{{count}} unread",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings."
+    },
+    "reading_open": {
+      "text": "{{count}} open",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. What is the person's and still open, across circles — over every noun that declares whose it is and when it is done."
+    },
+    "reading_next": {
+      "text": "next: {{title}} {{when}}",
+      "doc": "Mij → the identity line under the name: one reading about now, from the line's declared readings. The soonest thing still to come, over every noun whose moment is scheduled."
+    },
+    "agent_here": {
+      "text": "this device",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_device": {
+      "text": "device: {{label}}",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_device_unnamed": {
+      "text": "another device",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_companion": {
+      "text": "companion: {{label}}",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "agent_bot": {
+      "text": "bot: {{label}}, linked to you",
+      "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
+    },
+    "mydata_more": {
+      "text": "More",
+      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
+    },
+    "edit": {
+      "text": "Edit",
+      "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
     }
   },
   "blocked": {
@@ -5897,6 +6219,30 @@
       "text": "On — {{count}} entries mirrored, sealed, to your own storage.",
       "doc": "history mirror state line when running."
     },
+    "start_title": {
+      "text": "Open on",
+      "doc": "My data, the start-screen setting: its heading (where the app opens on this device)."
+    },
+    "start_vandaag": {
+      "text": "Today",
+      "doc": "Start-screen choice: Vandaag (the default)."
+    },
+    "start_circles": {
+      "text": "Circles",
+      "doc": "Start-screen choice: the circles list."
+    },
+    "start_last": {
+      "text": "Last used",
+      "doc": "Start-screen choice: the tab used last on this device."
+    },
+    "devices_needs_phrase": {
+      "text": "This device does not share your own data with your other devices yet: type your recovery phrase once on this device (My data → Personas on this device, tick nothing).",
+      "doc": "My data, devices section, on a device without the recovery seal: its own lanes carry nothing until the phrase is typed once."
+    },
+    "history_needs_phrase": {
+      "text": "Not yet: type your recovery phrase once on this device (My data → Personas on this device, tick nothing).",
+      "doc": "history mirror state line on a device that has no recovery seal yet."
+    },
     "history_waiting": {
       "text": "Turning on…",
       "doc": "history mirror state line between the flip and the first status."
@@ -6057,6 +6403,7 @@
       "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a backup file, to be able to pick this up somewhere else.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
+    "receive_personas": "Personas on this device",
     "enroll_device": "Add a device",
     "recovery_export": "Save a recovery file",
     "recovery_import": "Load a recovery file",
@@ -6914,6 +7261,14 @@
     "charter_max": {
       "text": "≤ {{rung}}",
       "doc": "mij#personas — charter cell: the circle requests this property up to this rung at most."
+    },
+    "new_persona_offerings": {
+      "text": "What you offer — also as {{name}}?",
+      "doc": "The new-persona form: does this persona take the general persona's offerings too? Unticked by default (a work persona that silently 'offers' your gardening would surprise you); {{name}} is the name being typed."
+    },
+    "new_persona_offerings_unnamed": {
+      "text": "this persona",
+      "doc": "The new-persona form: the name in the offerings question while none is typed yet."
     }
   },
   "attach": {
@@ -7016,6 +7371,37 @@
       "doc": "Fallback notice body."
     }
   },
+  "receive_personas": {
+    "close": "Close",
+    "remove_rekey_failed": "That did not fully work: the persona was taken off this device, but the device's key could not move over. The next start asks for your recovery phrase.",
+    "done_rekey_restart": "Done. Close the app completely now and open it again — after that this device speaks as {{name}}.",
+    "remove": "Remove from this device",
+    "remove_warn": "This takes {{name}} off this device: its keys and what it keeps here are wiped, and this device no longer counts in its circles. It cannot be undone here — with your recovery phrase you can bring it here again later. Type your recovery phrase to go on.",
+    "remove_submit": "Remove",
+    "done_remove_reload": "Done. {{name}} was taken off this device. Restart the app.",
+    "remove_key_holder": "This device speaks as this persona; it cannot be taken off.",
+    "remove_paused": "Resume this persona first: to retire its addresses it must still be able to speak.",
+    "here_title": "On this device",
+    "primary": "this device speaks as this persona",
+    "paused": "paused on this device",
+    "pause": "Pause",
+    "resume": "Resume",
+    "done_pause_reload": "Done. Until you restart the app, {{name}} still runs here; after that it no longer does — its keys and data stay where they are.",
+    "done_resume_reload": "Done. Restart the app; after that this persona runs here again.",
+    "receive_title": "Bring here too",
+    "title": "Personas on this device",
+    "body": "Choose which of your personas this device also gets. It takes your recovery phrase: only with it can their keys come here.",
+    "none": "There are no other personas to bring here.",
+    "phrase_placeholder": "Your recovery phrase (12 words)",
+    "submit": "Put them on this device",
+    "done_reload": "Done. Restart the app; after that this device also runs these personas.",
+    "wrong_phrase": "That is not this account's recovery phrase. Nothing changed.",
+    "failed": "That did not work. Nothing changed.",
+    "reload": "Restart",
+    "seal_only": "Nothing ticked: only the key for your backups.",
+    "needs_seal": "This device does not have the key for your backups yet. Type your recovery phrase to bring it here.",
+    "done_seal_reload": "Done. Restart the app; after that this device makes backups again."
+  },
   "enroll": {
     "title": "Add this device",
     "ceremony": "Enrolling this device",
@@ -7033,6 +7419,10 @@
     "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
     "offer_error": "Could not build the code (this device is not in any circle yet).",
     "offer_paste_label": "Code from your current device (optional)",
+    "personas_title": "Which personas does this device get?",
+    "personas_hint": "Only what you tick comes to this device. A device you trust less is better given less.",
+    "speaks_as": "This device speaks as {{name}}.",
+    "last_self": "A device keeps at least one persona.",
     "offer_paste_invalid": "That is not a valid add-device code.",
     "offer_back": "Back",
     "offer_code_label": "Code:",
@@ -7081,7 +7471,8 @@
     "body": "Type the recovery phrase to remove this device everywhere. Its keys stop being accepted in all your circles; the device itself becomes an island.",
     "submit": "Remove this device",
     "done": "Device removed. Every circle now refuses its keys.",
-    "failed": "Removing failed."
+    "failed": "Removing failed.",
+    "outcome_partial": "Revoked in the circles of the personas on this device. Repeat this on a device with your general persona — there the device is also taken out of your general circles."
   },
   "companionClaim": {
     "title": "Claim a companion",
@@ -7215,6 +7606,10 @@
       "err_failed": {
         "text": "Loading the file did not work. Try again.",
         "doc": "Recovery file (plan A2, 2026-09-04) — the pod-less carrier of the circle list, sealed to the phrase."
+      },
+      "err_needs_phrase": {
+        "text": "Type your recovery phrase once on this device (My data → Personas on this device, tick nothing); after that it makes backups again.",
+        "doc": "export refused on a device that has no recovery seal yet (enrolled before it existed): how to get it."
       }
     },
     "create": {
@@ -7833,7 +8228,7 @@
         "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
       },
       "setContactPersona": {
-        "text": "What they see",
+        "text": "Who you are to this contact",
         "doc": "Row-action / page button for stoop:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
       },
       "conflictDisputeWizard": {
@@ -8732,6 +9127,24 @@
     "removed": {
       "text": "Forgotten: {{text}}",
       "doc": "A note was removed."
+    }
+  },
+  "switcher": {
+    "title": {
+      "text": "Show as",
+      "doc": "The header switcher: which of this device's selves (personas) the app shows now."
+    },
+    "all": {
+      "text": "All",
+      "doc": "The header switcher: tick every self."
+    },
+    "you": {
+      "text": "You",
+      "doc": "The header switcher: the default self (the person themselves), beside their personas."
+    },
+    "edit": {
+      "text": "Edit",
+      "doc": "The header switcher: open that self's own editor."
     }
   }
 }

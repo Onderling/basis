@@ -20,6 +20,5 @@ export {
   TAXONOMY,
   normaliseTag,
   categoryFor,
-  matchesProfile,
   isKnownCategory,
 } from '@onderling/identity-resolver';

@@ -42,9 +42,11 @@ export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircle
 // owner root → profile seed → DEVICE seed → per-circle seed; each device presents distinct addresses.
 export {
   deriveDeviceSeed, deviceDelegationPubKey, deviceDelegationMessage,
-  signDeviceDelegation, verifyDeviceDelegation, ownerRootFingerprint, firstDeviceIdFor,
+  signDeviceDelegation, verifyDeviceDelegation, ownerRootFingerprint, firstDeviceIdFor, wireDeviceId,
   deviceRevocationMessage, signDeviceRevocation, verifyDeviceRevocation,
 } from './identity/deviceDelegation.js';
+// A persona's id is a stable label, never its name (the HKDF label every key of the persona derives from).
+export { mintProfileId, assertProfileId, isReservedProfileLabel, RESERVED_PROFILE_LABELS } from './identity/profileIds.js';
 export {
   signDeviceStatement, verifyDeviceStatement, deviceStatementMessage, argsHashOf, createNonceWindow,
   DEVICE_STATEMENT_WINDOW_MS, STATEMENT_DOMAINS,
@@ -186,7 +188,7 @@ export { generateTunnelKey,
          sealTunnelOW,
          openTunnelOW }                from './security/tunnelSeal.js';
 export {
-  ceremonyCommitment, rootPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
+  ceremonyCommitment, authorityPubKeyB64Of, signCeremonyReveal, verifyCeremonyReveal, ceremonyRevealMessage,
   signCeremonyCommitmentFromSeed, verifyCeremonyCommitmentDeclaration,
 } from './identity/ceremonyCommitment.js';   // who may retire a device address: the owner root, at a ceremony
 export { CEREMONY_KINDS, ADDRESS_REVOKE_KIND, isCeremonyKind, ceremonyRevealFacts } from './security/ceremonyKinds.js';   // the kinds only the root may make, and what each reveal covers

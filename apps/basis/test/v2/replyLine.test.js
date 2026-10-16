@@ -132,11 +132,21 @@ describe('replyLines — one line per family in a turn', () => {
       replyFact({ ok: true, entry: 'kaas', list: 'Boodschappen' }, { opId: 'markListItemDone' }),
       replyFact({ ok: true, task: { text: 'ramen' } }, { opId: 'completeTask' }),
     ];
+    // several on one line say HOW MANY and are joined as separate ones ("melk en brood"), so two items never read as one
+    // (the tablet, 2026-10-10: "balkondeur isoleren, gangdeur isoleren" read as one, and the member corrected the bot)
     expect(replyLines(facts, { t })).toEqual([
-      'circle.lists.added:{"text":"melk, brood","name":"Boodschappen"}',
+      'circle.lists.added_many:{"text":"melk en brood","count":2,"name":"Boodschappen"}',
       'circle.lists.added:{"text":"lamp","name":"Klusjes"}',
-      'circle.lists.done_named:{"text":"kaas, ramen"}',
+      'circle.lists.done_named_many:{"text":"kaas en ramen","count":2}',
     ]);
+  });
+
+  it('every family that folds has its several-items line in both languages, naming the count', async () => {
+    const { readFileSync } = await import('node:fs');
+    const read = (l) => JSON.parse(readFileSync(new URL(`../../src/locales/circle.${l}.json`, import.meta.url), 'utf8'));
+    for (const loc of [read('nl'), read('en')]) {
+      for (const k of ['added_many', 'removed_many', 'done_named_many']) expect(loc.lists[k]?.text, k).toMatch(/\{\{count\}\}/);
+    }
   });
 });
 

@@ -24,7 +24,7 @@
 // ONE policy on the profile, reused across every app/bot. The policy is a plain serialisable
 // object (persist it wherever); all functions are pure transforms.
 
-import { resolveProperty } from './profileProperties.js';
+import { resolveProperty, isMarkerKey } from './profileProperties.js';
 
 /** A fresh, share-nothing policy. */
 export function createDisclosurePolicy() {
@@ -117,7 +117,7 @@ export function releasedValues({ getProfile, profileId, defaultProfileId = null 
   const items = Array.isArray(request?.items) ? request.items : [];
   for (const item of items) {
     const key = item?.key;
-    if (typeof key !== 'string' || !key) continue;
+    if (typeof key !== 'string' || !key || isMarkerKey(key)) continue;   // a marker is never released
     // ONLY the disclosed axis (enabled/rung) releases a VALUE. matchable/requestable are
     // deliberately NOT consulted here — a matchable-but-not-disclosed property never leaks.
     const { enabled, rung } = getDisclosure(policy, contextId, key);
@@ -204,6 +204,7 @@ export function releasedForMatching({ getProfile, profileId, defaultProfileId = 
     ? request.items.map((it) => it?.key).filter((k) => typeof k === 'string' && k)
     : Object.keys(policy?.perContext?.[contextId] || {});
   for (const key of keys) {
+    if (isMarkerKey(key)) continue;   // a marker is never matched on
     // ONLY the matchable axis gates here — enabled/requestable are deliberately NOT consulted, so this
     // fires for a matchable-but-not-disclosed property (the whole point) and never depends on disclosure.
     const { matchable, rung } = getDisclosure(policy, contextId, key);

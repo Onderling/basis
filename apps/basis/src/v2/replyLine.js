@@ -231,9 +231,13 @@ function peopleWords(who, t) {
 function word(fact, t) {
   if (fact.message) return fact.message;
   if (Array.isArray(fact.lines)) return fact.lines.map((l) => word(l, t)).join('\n');
+  // several folded into one line: say HOW MANY and join them as separate ones ("melk en brood") — a comma-joined pair
+  // read as one item, and a member corrected the bot for it (the tablet, 2026-10-10)
+  const several = Array.isArray(fact.items) && fact.items.length > 1;
   const vars = {
     ...(Array.isArray(fact.rows) ? { chores: fact.rows.map((r) => word(r, t)).join('; ') } : {}),
-    ...(fact.item != null ? { text: (fact.items ?? [fact.item]).join(', ') } : {}),
+    ...(fact.item != null ? { text: several ? listWords(fact.items, t) : (fact.items ?? [fact.item]).join(', ') } : {}),
+    ...(several ? { count: fact.items.length } : {}),
     ...fact.vars,
   };
   if (fact.who !== undefined) vars.who = Array.isArray(fact.who) && !fact.who.length && fact.nobody ? t('circle.reply.who_nobody') : peopleWords(fact.who, t);
@@ -242,7 +246,12 @@ function word(fact, t) {
     const w = whenWords(fact.when.at, { locale: dateLocaleOf(t), dayOnly: fact.when.dayOnly });
     vars.when = fact.when.suffix ? (w ? `, ${w}` : '') : w;
   }
-  return t(fact.key, vars);
+  return t(several ? `${fact.key}_many` : fact.key, vars);
+}
+
+/** Separate items in the person's language: "melk en brood", "melk, brood en kaas". */
+function listWords(items, t) {
+  try { return new Intl.ListFormat(dateLocaleOf(t), { type: 'conjunction' }).format(items.map(String)); } catch { return items.join(', '); }
 }
 
 /**

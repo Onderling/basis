@@ -14,6 +14,9 @@ import { renderUserLlmSettings } from './userLlmSettings.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { historyStatusLine } from '../../src/v2/historyMirror.js';
+import { myDataActionsFor } from '../../src/v2/meActionProjection.js';
+import { basisManifest } from '../../src/index.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -26,7 +29,7 @@ export function renderCircleMyData(container, {
   onBackup,
   onViewMnemonic,
   onRestore,
-  onEnroll,
+  onEnroll, onReceivePersonas,
   onExportRecovery,
   onImportRecovery,
   onReplaceDevice,
@@ -34,6 +37,9 @@ export function renderCircleMyData(container, {
   onClaimCompanion,
   devices = [],
   onRevokeDevice,
+  devicesNeedPhrase = false,
+  startScreen = null,
+  onSetStartScreen,
   // The nodes this person owns (a companion they claimed): `[{node, short}]`. `onOpenCompanionGrant(node)` reads what
   // the picker shows (`loadCompanionGrantPicker`: `{ok, targets, choices}` or `{ok: false, message}`);
   // `onGrantCompanion({node, to, families})` grants and resolves to the line to show. Absent ⇒ the section is omitted.
@@ -98,6 +104,16 @@ export function renderCircleMyData(container, {
   onOpenRelayPanel,       // Objective D / Surface 4:  => void — open the set-relay op in the docked
                           // side-panel (openPagePanel). When provided, the relay row is an entry button that
                           // routes through the generic panel instead of the bespoke inline form below.
+  // The doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here.
+  // A door without one is omitted.
+  doors = {},
+  // the person's own week overview (a card of the coming week on Saturday morning): `{ on, onToggle }`; on null while
+  // it loads or switches; absent = no switch (no clock here)
+  weekOverview = undefined,
+  // The build this tab runs (the tag the publish baked in; '' on a dev server). Absent ⇒ no line; given ⇒ the last
+  // line, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's build looked
+  // like a laptop that receives nothing).
+  version,
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleMyData.js');
@@ -119,6 +135,22 @@ export function renderCircleMyData(container, {
   title.textContent = tr('circle.mydata.title');
   header.appendChild(title);
   container.appendChild(header);
+
+  // ── the doors Mij gave up: availability · connection points · shared with me · blocked ──
+  const doorRow = myDataActionsFor(basisManifest, doors);
+  if (doorRow.length) {
+    const sec = section(tr('circle.profile.mydata_more'));
+    sec.classList.add('cc-mydata__doors');
+    for (const d of doorRow) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `cc-profile__${d.id}`;
+      b.textContent = tr(d.labelKey);
+      b.addEventListener('click', () => d.open());
+      sec.appendChild(b);
+    }
+    container.appendChild(sec);
+  }
 
   // ── where your data lives ─────────────────────────────────────────────────
   const storage = section(tr('circle.mydata.storage'));
@@ -214,6 +246,8 @@ export function renderCircleMyData(container, {
     // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
     // never on a device that already has authority).
     ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
+    // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
+    ['cc-mydata__receive-personas', 'circle.mydata.receive_personas', onReceivePersonas],
     // The recovery file: the circle list sealed to the phrase — the pod-less way back.
     ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
     ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
@@ -242,6 +276,13 @@ export function renderCircleMyData(container, {
   // ceremony) acts on the live rows — gated on the callback like every identity act above.
   if (typeof onRevokeDevice === 'function' && Array.isArray(devices) && devices.length) {
     const sec = section(tr('circle.mydata.devices'));
+    // without the recovery seal this device carries nothing of the person's own scope to the others: say how to fix it
+    if (devicesNeedPhrase) {
+      const note = document.createElement('p');
+      note.dataset.role = 'devices-needs-phrase';
+      note.textContent = tr('circle.mydata.devices_needs_phrase');
+      sec.appendChild(note);
+    }
     for (const d of devices) {
       const row = document.createElement('div');
       row.className = 'cc-mydata__device';
@@ -533,16 +574,45 @@ export function renderCircleMyData(container, {
   }
 
   // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
+  // where the app opens on this device: Vandaag · the circles list · the tab last used
+  if (startScreen && typeof onSetStartScreen === 'function') {
+    const sec0 = section(tr('circle.mydata.start_title'));
+    const sel = document.createElement('select');
+    sel.dataset.role = 'start-screen';
+    for (const c of startScreen.choices ?? []) {
+      const o = document.createElement('option');
+      o.value = c.value;
+      o.textContent = tr(c.labelKey);
+      if (c.value === startScreen.value) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => onSetStartScreen(sel.value));
+    sec0.appendChild(sel);
+    container.appendChild(sec0);
+  }
+
+  // the person's own week overview: a card of their coming week, switched here
+  if (weekOverview) {
+    const sec = section(tr('circle.profile.week_switch'));
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cc-profile__week-toggle cc-btn';
+    btn.dataset.on = weekOverview.on ? 'true' : 'false';
+    btn.disabled = weekOverview.on === null;
+    btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
+    btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
+    sec.appendChild(btn);
+    container.appendChild(sec);
+  }
+
   if (historyMirror && typeof onToggleHistoryMirror === 'function') {
     const h = historyMirror;
     const sec2 = section(tr('circle.mydata.history'));
     const state = document.createElement('p');
     state.className = 'cc-mydata__history-status';
     state.dataset.role = 'history-status';
-    if (!h.enabled) state.textContent = tr('circle.mydata.history_off');
-    else if (h.status?.lastError) state.textContent = tr('circle.mydata.history_error', { error: h.status.lastError });
-    else if (h.status) state.textContent = tr('circle.mydata.history_on', { count: h.status.mirrored + (h.status.pending ?? 0) });
-    else state.textContent = tr('circle.mydata.history_waiting');
+    const line = historyStatusLine({ enabled: h.enabled, status: h.status });
+    state.textContent = tr(line.key, line.vars);
     sec2.appendChild(state);
     const what = document.createElement('p');
     what.className = 'cc-mydata__history-what';
@@ -874,6 +944,12 @@ export function renderCircleMyData(container, {
       usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
     }
     container.appendChild(usage);
+  }
+  if (typeof version === 'string') {
+    const v = document.createElement('div');
+    v.className = 'cc-profile__version';
+    v.textContent = tr('circle.profile.version', { tag: version || tr('circle.profile.version_dev') });
+    container.appendChild(v);
   }
   return container;
 

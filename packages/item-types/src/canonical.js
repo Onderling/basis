@@ -25,6 +25,7 @@ import { REMOVED_LIST_SCHEMA }      from './types/removed-list.js';
 import { MEDIA_SCHEMA }             from './types/media.js';
 import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
 import { INTENTION_SCHEMA }         from './types/intention.js';
+import { DEVICE_LINK_SCHEMA }       from './types/deviceLink.js';
 
 /**
  * Map of canonical name → schema. Useful for `Object.entries(...)`
@@ -93,6 +94,7 @@ export const CANONICAL_TYPES = Object.freeze({
   // Pending work (2026-10-07): a waist call to run as a person when a trigger fires — its own type, sharing the
   // task lifecycle's verbs, so no chore list ever shows a machine row.
   'intention':          INTENTION_SCHEMA,
+  'device-link':        DEVICE_LINK_SCHEMA,
   // The composable CONTAINERS (2026-09-01). They were registered privately by `circleLists.js` on a
   // registry of its own, which is what put lists in a SECOND store per circle — and the architecture is
   // explicit that "two stores for one circle is a defect, not a design", and that a type reaching a peer

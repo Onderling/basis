@@ -28,6 +28,10 @@ import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
+import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
+import { whereTag } from '../../../../basis/src/v2/rowWhere.js';
+import { nounHeading } from '../../../../basis/src/v2/nounNames.js';
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
 // carries only the local id (T2).  Match the raw ref OR its local-id tail so a
@@ -37,7 +41,7 @@ function matchesHighlight(rowId, highlightRef) {
   return rowId === highlightRef || String(highlightRef).endsWith(String(rowId));
 }
 
-export default function CircleScreenView({ blocks = null, refreshing = false, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
+export default function CircleScreenView({ blocks = null, refreshing = false, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, onMore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   // null = still materializing (host hasn't resolved yet).  Distinguish
@@ -73,7 +77,7 @@ export default function CircleScreenView({ blocks = null, refreshing = false, on
         </Text>
       ) : null}
       {blocks.map((block) => (
-        <BlockSection key={block.blockId} block={block} onAction={onAction} onEmbedOpen={onEmbedOpen}
+        <BlockSection key={block.blockId} block={block} onAction={onAction} onEmbedOpen={onEmbedOpen} onMore={onMore}
           highlightRef={highlightRef} highlightRowRef={highlightRowRef} onHighlightLayout={onHighlightLayout} />
       ))}
     </View>
@@ -86,7 +90,7 @@ function blockName(block) {
   return block.titleKey ? t(block.titleKey) : block.type;
 }
 
-function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null }) {
+function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, onMore = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const baseStyle = [styles.block, styles[`block_${block.type}`] ?? null];
@@ -124,10 +128,23 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       else body = renderItems(block, styles);
       break;
     case 'rules':        body = renderRules(block, styles); break;
+    case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
+    case 'identityLine': body = renderIdentityLine(block, onAction, styles); break;
+    case 'agents':       body = renderAgents(block, onAction, styles); break;
     default:
       body = <Text style={styles.blockEmptyText}>{t('circle.screen.block_unknown', { type: block.type })}</Text>;
   }
-  return <View style={baseStyle} testID={`screen-block-${block.blockId}`}>{body}</View>;
+  return (
+    <View style={baseStyle} testID={`screen-block-${block.blockId}`}>
+      {body}
+      {/* a capped block on the person's pages: "meer" opens it whole (the host's `onMore(blockId)`) */}
+      {typeof onMore === 'function' && block.status === 'ok' ? (
+        <Pressable onPress={() => onMore(block.blockId)} testID={`screen-more-${block.blockId}`}>
+          <Text style={styles.blockEmptyText}>{t('circle.screen.more')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
@@ -182,6 +199,60 @@ function renderPhoto(block, styles) {
   );
 }
 
+// The circles with news: each a row with its name and how many unread; a tap opens the circle
+// (`onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does). Web parity: circleScreen.js.
+function renderCirclesUnread(block, onAction, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t('circle.recipe.block.circlesUnread')}</Text>
+      {items.map((row) => (
+        <Pressable key={row.circleId} style={styles.noticeRow} testID={`circles-unread-${row.circleId}`}
+          disabled={typeof onAction !== 'function'}
+          onPress={() => onAction?.({ kind: 'open-circle', circleId: row.circleId })}>
+          <Text style={styles.noticeText}>{row.name ?? row.circleId} · {t('circle.screen.unread_count', { count: row.unread })}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// Me's identity line: the name as the page's title, "Edit" beside it (`onAction({ kind: 'edit-me' })`, the person's
+// own editor), the readings below in one line, worded by the shared helper. Web parity: circleScreen.js.
+function renderIdentityLine(block, onAction, styles) {
+  const words = identityLineWords(block.content, { t, locale: dateLocaleOf(t) });
+  return (
+    <View>
+      <View style={styles.identityHead}>
+        <Text style={styles.identityName} testID="mij-name">{block.content?.name || t('circle.profile.title')}</Text>
+        {typeof onAction === 'function' ? (
+          <Pressable onPress={() => onAction({ kind: 'edit-me' })} accessibilityRole="button" testID="mij-edit">
+            <Text style={styles.identityEdit}>{t('circle.profile.edit')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {words.length ? <Text style={styles.noticeText} testID="mij-readings">{words.join(' · ')}</Text> : null}
+    </View>
+  );
+}
+
+// Me's agents and devices: one sentence a row, read-only; a tap opens My data (`onAction({ kind: 'open-my-data' })`).
+function renderAgents(block, onAction, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t('circle.recipe.block.agents')}</Text>
+      {items.map((row, i) => (
+        <Pressable key={`${row.kind}-${i}`} style={styles.noticeRow} testID={`mij-agent-${row.kind}`}
+          disabled={typeof onAction !== 'function'}
+          onPress={() => onAction?.({ kind: 'open-my-data' })}>
+          <Text style={styles.noticeText}>{agentRowWords(row, t)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 function renderNoticeboard(block, styles) {
   const items = block.content?.items ?? [];
   const isCompact = block.config?.compact === true;
@@ -228,7 +299,7 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
             onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
-            <Text style={labelStyle}>{ev.circleName ? `${ev.circleName} · ` : ''}{ev.label ?? ''}</Text>
+            <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{ev.label ?? ''}</Text>
           </View>
         );
       })}
@@ -241,10 +312,10 @@ function renderItems(block, styles) {
   const items = block.content?.items ?? [];
   return (
     <View>
-      <Text style={styles.blockTitle}>{t(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`)}</Text>
+      <Text style={styles.blockTitle}>{block.titleKey ? t(block.titleKey) : nounHeading(t, block.content?.noun ?? '')}</Text>
       {items.map((it) => (
         <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
-          <Text style={styles.agendaLabel}>{it.circleName ? `${it.circleName} · ` : ''}{it.label ?? ''}</Text>
+          <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>
         </View>
       ))}
     </View>
@@ -273,7 +344,7 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
             onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
-            {task.circleName ? <Text style={circleStyle}>{task.circleName}</Text> : null}
+            {whereTag(task, t) ? <Text style={circleStyle}>{whereTag(task, t)}</Text> : null}
             <Text style={textStyle}>{task.text ?? ''}</Text>
             {embeds.length > 0 && (
               <View style={styles.embeds}>
@@ -347,6 +418,9 @@ const makeStyles = (theme) => StyleSheet.create({
   blockEmptyText:  { color: theme.color.inkSoft, fontStyle: 'italic', fontSize: 13 },
   blockError:      { borderColor: theme.color.accent, backgroundColor: theme.color.paper2 },
   blockErrorText:  { color: theme.color.accentInk, fontSize: 13 },
+  identityHead:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 },
+  identityName:   { flex: 1, fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
+  identityEdit:   { fontSize: 14, fontWeight: '600', color: theme.color.accent },
   blockTitle:     { fontSize: 11, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 1.4, marginBottom: 8 },
 
   announcement:    { fontFamily: theme.font.serif, fontSize: 18, color: theme.color.ink, lineHeight: 24 },

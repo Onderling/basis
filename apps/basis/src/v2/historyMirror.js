@@ -337,3 +337,16 @@ export function archiveSource(json, strategy) {
   const backing = archiveBacking(new Map(Object.entries(doc.entries)));
   return strategy ? createSealedPodDataSource({ podSource: backing, podUrl: 'mem://', strategy }) : backing;
 }
+
+/**
+ * The my-data state line for the history mirror, as a translation key and its values — one choice both shells paint.
+ * @param {{ enabled: boolean, status: object|null }} a  the switch, and the agent's `historyMirrorStatus()`
+ * @returns {{ key: string, vars?: object }}
+ */
+export function historyStatusLine({ enabled, status } = {}) {
+  if (!enabled) return { key: 'circle.mydata.history_off' };
+  if (status?.needsPhrase) return { key: 'circle.mydata.history_needs_phrase' };
+  if (status?.lastError) return { key: 'circle.mydata.history_error', vars: { error: status.lastError } };
+  if (status) return { key: 'circle.mydata.history_on', vars: { count: (status.mirrored ?? 0) + (status.pending ?? 0) } };
+  return { key: 'circle.mydata.history_waiting' };
+}

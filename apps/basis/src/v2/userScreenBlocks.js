@@ -27,8 +27,9 @@
  */
 
 import { acrossCircles } from './acrossCircles.js';
-import { ITEM_PRESENTERS } from './itemPresenters.js';
+import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
+import { carriesLabels, normLabel } from './itemLabels.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { tasksManifest } from '../../../tasks-v0/manifest.js';
 import { householdManifest } from '../../../household/manifest.js';
@@ -36,6 +37,12 @@ import { effectiveCircleIds, isAllCircles } from './userScreens.js';
 import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
+import { buildTilePreviews } from './circleTilePreviews.js';
+import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
+import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
+import { linkedBotsOf } from './identityLink.js';
+import { bookRowsOf } from './contactsSource.js';
+import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 
 /**
  * Materialize a Screen.  Returns Promise<Array<MaterializedBlock>>
@@ -61,15 +68,30 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   // When the user has muted EVERY circle in the filter, an empty active
   // list means circle-aware blocks render empty ("hide entirely").
 
+  // whose rows are "mine": in each circle, the self this device speaks as there (a persona's circle is the persona's) —
+  // the host hands `selfIn(circleId)`; a host without personas may name one person (`myWebid`), else it is asked once
+  const needsMe = (b) => b?.type === 'tasks' || b?.type === 'identityLine' || (['items', 'notes'].includes(b?.type) && b?.config?.scope === 'mine');
+  let ops = hostOps;
+  if (typeof hostOps.selfIn !== 'function') {
+    let me = hostOps.myWebid ?? null;
+    if (!me && typeof hostOps.callSkill === 'function' && screen.blocks.some(needsMe)) {
+      me = await hostOps.callSkill('stoop', 'whoAmI', {}).then((r) => r?.webid ?? null).catch(() => null);
+    }
+    ops = { ...hostOps, selfIn: () => me };
+  }
+
   return Promise.all(screen.blocks.map((block) => materializeOneBlock({
-    block, activeCircleIds, allCircleIds, hostOps,
+    block, activeCircleIds, allCircleIds, hostOps: ops,
     screenIsAll: isAllCircles(screen),
   })));
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
 
-async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAll }) {
+async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, hostOps, screenIsAll }) {
+  // THE BLOCK'S OWN CIRCLES: a block may narrow the page's circles to some of them (`config.circleIds`); never widen
+  const want = Array.isArray(block?.config?.circleIds) ? block.config.circleIds.filter((c) => typeof c === 'string' && c) : [];
+  const activeCircleIds = want.length ? pageCircleIds.filter((id) => want.includes(id)) : pageCircleIds;
   try {
     switch (block?.type) {
       // Circle-agnostic: identical to per-circle materializer's behaviour.
@@ -84,14 +106,27 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
       // ONE block for any item type over the one cross-circle projection; a screen that still holds the older
       // `tasks` / `calendar` block is read as the items block it is (no second path to keep in step)
       case 'items':
-        return await materializeItems(block, activeCircleIds, hostOps);
+        return await materializeItems(block, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
       case 'calendar':
-        return await materializeItems({ ...block, config: { noun: 'calendar-event', scope: 'all', ...(block.config ?? {}) } }, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { noun: 'calendar-event', scope: 'all', ...(block.config ?? {}) } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
       case 'tasks':
-        return await materializeItems({ ...block, config: { noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine', limit: block.config?.limit } }, activeCircleIds, hostOps);
+        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
+      // the notes across circles — the block a labels filter means something on (notes carry tags)
+      case 'notes':
+        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'note', scope: block.config?.scope === 'mine' ? 'mine' : 'all' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
 
       case 'rules':
         return await materializeRules(block, activeCircleIds, hostOps, screenIsAll);
+
+      // the circles with news: each circle's unread lines (another person's, since this device last looked), newest first
+      case 'circlesUnread':
+        return materializeCirclesUnread(block, activeCircleIds, hostOps);
+
+      // Me's own blocks: the name with the readings its config names, and the person's agents and devices
+      case 'identityLine':
+        return await materializeIdentityLine(block, activeCircleIds, hostOps);
+      case 'agents':
+        return await materializeAgents(block, hostOps);
 
       default:
         return { blockId: block?.id, type: block?.type, status: 'error',
@@ -101,6 +136,115 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
     return { blockId: block?.id, type: block?.type, status: 'error',
              content: {}, error: String(err?.message ?? err) };
   }
+}
+
+/**
+ * The circles where something is new: the circle tiles' own count (`buildTilePreviews` — another person's line on the
+ * human lane, since this device last looked), for the page's circles, newest first, capped by the block's limit.
+ * `hostOps.seenAt` and `hostOps.myRefs` are what the tiles use; without them every line counts as new once.
+ */
+function materializeCirclesUnread(block, activeCircleIds, { eventLog, circles, seenAt = {}, myRefs = [] } = {}) {
+  const limit = clampInt(block.config?.limit, 1, 50, 5);
+  const base = { blockId: block.id, type: 'circlesUnread', titleKey: 'circle.recipe.block.circlesUnread' };
+  if (!eventLog?.query || activeCircleIds.length === 0) return { ...base, status: 'empty', content: { items: [] } };
+  const wanted = new Set(activeCircleIds);
+  const inPage = (circles ?? []).filter((c) => c?.id && wanted.has(c.id));
+  const previews = buildTilePreviews({ events: eventLog.query({ excludeMuted: true }), circles: inPage, seenAt: seenAt ?? {}, myRefs: myRefs ?? [] });
+  const items = inPage
+    .map((c) => ({ circleId: c.id, name: c.name ?? null, unread: previews[c.id]?.unread ?? 0, subtitle: previews[c.id]?.subtitle ?? null, ts: previews[c.id]?.ts ?? 0 }))
+    .filter((r) => r.unread > 0)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, limit);
+  return { ...base, status: items.length > 0 ? 'ok' : 'empty', content: { items } };
+}
+
+/**
+ * The readings an identity line may show, each answering one thing about now. `open` and `next` name no noun: they
+ * cover whatever nouns DECLARE the facets they read (`mine` + `done`; a scheduled moment, `order: 'asc'`).
+ */
+export const MIJ_READINGS = Object.freeze(['availability', 'online', 'unread', 'open', 'next']);
+
+/**
+ * The identity line: the person's name and the readings the block's config names, in that order. A reading whose
+ * source the shell did not hand (availability, online) or that has nothing to say (no appointment coming) is left out
+ * — never a guess.
+ */
+async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
+  const { callSkill } = hostOps;
+  const want = (Array.isArray(block.config?.readings) ? block.config.readings : []).filter((r) => MIJ_READINGS.includes(r));
+  // the self Mij shows (the switcher's one ticked persona): its own name; the default is the person's profile name
+  const self = hostOps.mijSelf && hostOps.mijSelf.id && hostOps.mijSelf.id !== 'default' ? hostOps.mijSelf : null;
+  let name = self ? (self.name ?? null) : null;
+  if (!self) {
+    try {
+      const prof = typeof callSkill === 'function' ? await callSkill('stoop', 'getMyProfile', {}) : null;
+      name = prof?.entry?.displayName || prof?.entry?.handle || null;
+    } catch { /* nameless: the painter says "Mij" */ }
+  }
+  const now = typeof hostOps.now === 'function' ? hostOps.now() : Date.now();
+  const readings = [];
+  for (const key of want) {
+    if (key === 'availability') {
+      if (!hostOps.availability) continue;
+      const a = normalizeAvailability(hostOps.availability);
+      if (a.holiday.active && isPushSuppressed({ ...a, quietHours: { ...a.quietHours, enabled: false } }, new Date(now))) readings.push({ key, state: 'away', until: a.holiday.until });
+      else if (isPushSuppressed(a, new Date(now))) readings.push({ key, state: 'quiet', until: a.quietHours.to });
+      else readings.push({ key, state: 'available' });
+    } else if (key === 'online') {
+      const on = typeof hostOps.online === 'function' ? hostOps.online() : hostOps.online;
+      if (typeof on === 'boolean') readings.push({ key, on });
+    } else if (key === 'unread') {
+      const r = materializeCirclesUnread({ id: block.id, config: { limit: 50 } }, activeCircleIds, hostOps);
+      readings.push({ key, count: (r.content?.items ?? []).reduce((n, row) => n + (row.unread ?? 0), 0) });
+    } else if (key === 'open') {
+      // what is mine and not done, over every noun declaring both
+      let count = 0; let answered = false;
+      for (const noun of nounsDeclaring((p) => Boolean(p.mine && p.done))) {
+        const r = await materializeItems({ id: block.id, config: { noun, scope: 'mine', limit: 200, openOnly: true } }, activeCircleIds, hostOps);
+        if (r.status !== 'error') { answered = true; count += (r.content?.items ?? []).length; }
+      }
+      if (answered) readings.push({ key, count });
+    } else if (key === 'next') {
+      // the soonest thing still to come, over every noun whose moment is scheduled — the circles' and my own
+      let next = null;
+      for (const noun of nounsDeclaring((p) => p.order === 'asc')) {
+        const r = await materializeItems({ id: block.id, config: { noun, scope: 'all', horizonDays: 30, limit: 20 } }, activeCircleIds, hostOps);
+        const row = (r.content?.items ?? []).find((x) => x.when && x.when >= now);
+        if (row && (!next || row.when < next.when)) next = row;
+      }
+      if (next) readings.push({ key, title: next.label, when: next.when, circleName: next.circleName ?? '' });
+    }
+  }
+  return { blockId: block.id, type: 'identityLine', status: 'ok', content: { name, readings } };
+}
+
+/**
+ * The person's agents and devices: the live devices on their registry entry (this one marked — and listed even when
+ * it is not among the delegations, as a first device is not), the nodes they claimed, the bots linked to them. One
+ * row each; read-only — what may be done with one lives in My data.
+ */
+async function materializeAgents(block, { callSkill, deviceId: personDeviceId = null, mijSelf = null } = {}) {
+  // the self Mij shows: a persona's own registry entry and its own device id here; the bots are the person's (default)
+  const self = mijSelf && mijSelf.id && mijSelf.id !== 'default' ? mijSelf : null;
+  const deviceId = self ? (self.deviceId ?? null) : personDeviceId;
+  const base = { blockId: block.id, type: 'agents', titleKey: 'circle.recipe.block.agents' };
+  if (typeof callSkill !== 'function') return { ...base, status: 'empty', content: { items: [] } };
+  const entry = await callSkill('agents', 'getProfileProperties', { id: self ? self.id : 'default' }).catch(() => null);
+  const props = { properties: entry?.properties ?? {} };
+  const items = Object.values(deviceDelegationsOf(props))
+    .filter((d) => d && !d.revoked)
+    .map((d) => ({ kind: 'device', label: d.label || null, here: Boolean(deviceId) && d.deviceId === deviceId }));
+  if (!items.some((d) => d.here)) items.unshift({ kind: 'device', label: null, here: true });
+  for (const n of Object.values(ownedNodesOf(props))) {
+    const addr = typeof n?.address === 'string' ? n.address : '';
+    items.push({ kind: 'companion', label: n?.label || (addr ? `${addr.slice(0, 8)}…` : null), here: false });
+  }
+  const contacts = self ? [] : await callSkill('stoop', 'listContacts', {}).then((r) => r?.contacts ?? []).catch(() => []);
+  const bots = new Set(linkedBotsOf(contacts));
+  const names = new Map();
+  for (const c of bookRowsOf({ contacts })) for (const a of [c?.peerAddr, c?.webid]) if (a) names.set(a, c.displayName || c.handle || null);
+  for (const addr of bots) items.push({ kind: 'bot', label: names.get(addr) || `${addr.slice(0, 8)}…`, here: false });
+  return { ...base, status: 'ok', content: { items } };
 }
 
 function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = {}) {
@@ -123,6 +267,9 @@ function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = 
   };
 }
 
+/** The item types a person also keeps of their own (no circle, the own-devices store): an items block shows those beside the circles'. */
+const OWN_NOUNS = new Set(['calendar-event', 'note']);
+
 /** The apps whose `list` a cross-circle items block may resolve (first that answers the noun). */
 export const ITEM_MANIFESTS = Object.freeze([
   { appOrigin: 'calendar', manifest: calendarManifest },
@@ -135,38 +282,65 @@ export const ITEM_MANIFESTS = Object.freeze([
  * `acrossCircles` (the type's own list per circle, its presenter for mine / order). Appointments also take the person's
  * own calendar (no circle) — the fold keeps those on the person's store.
  */
-async function materializeItems(block, activeCircleIds, { callSkill, myWebid, circles } = {}) {
+async function materializeItems(block, activeCircleIds, { callSkill, selfIn = () => null, circles, selfSet = null } = {}, { pageIsAll = true } = {}) {
   const noun = String(block.config?.noun ?? '');
   const scope = block.config?.scope === 'mine' ? 'mine' : 'all';
   const limit = clampInt(block.config?.limit, 1, 200, 10);
   const horizonDays = clampInt(block.config?.horizonDays, 1, 365, 14);
   const empty = { blockId: block.id, type: 'items', status: 'empty', content: { noun, scope, items: [] } };
-  if (typeof callSkill !== 'function' || activeCircleIds.length === 0) return empty;
-  const presenter = ITEM_PRESENTERS[noun];
+  // a person's OWN items of this type (no circle) show beside the circles' — on a page over every circle (muting a
+  // circle hides that circle, never me) and a block not narrowed to some circles
+  const withOwn = OWN_NOUNS.has(noun) && pageIsAll && !(Array.isArray(block.config?.circleIds) && block.config.circleIds.length);
+  if (typeof callSkill !== 'function' || (activeCircleIds.length === 0 && !withOwn)) return empty;
+  const presenter = presenterFor(noun);
   if (!presenter) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: 'no presenter' };
   const names = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
   const isAgenda = noun === 'calendar-event';
   const until = Date.now() + horizonDays * 86_400_000;
-  const r = await acrossCircles({
-    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: myWebid ?? null, limit: 500,
+  const r = activeCircleIds.length ? await acrossCircles({
+    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
     manifests: ITEM_MANIFESTS,
     callSkill: (app, op, args) => callSkill(app, op, isAgenda ? { ...args, days: horizonDays } : args),
     genericFor: (circleId) => ({ list: async (n) => (await callSkill('household', encodeGenericOpId('household', 'list', n), { circleId }))?.result ?? [] }),
-  });
+  }) : { ok: true, items: [] };
   let rows = r.ok ? r.items : [];
   let ownError = null;
-  if (isAgenda) {
-    // my own appointments (no circle), beside the circles'
-    const own = await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; });
-    const mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '' }));
-    rows = [...rows, ...mine].filter((e) => !presenter.when(e) || presenter.when(e) <= until)
-      .sort((a, b) => presenter.when(a) - presenter.when(b));
+  if (withOwn) {
+    // my own (no circle), beside the circles': appointments from my own agenda, notes from my own store
+    const own = isAgenda
+      ? await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; })
+      : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE }).catch((err) => { ownError = String(err?.message ?? err); return null; });
+    let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true }));
+    if (scope === 'mine') mine = mine.filter((e) => presenter.isMine(e, selfIn(null)));
+    // the switcher's set: an own item shows when the self that made it is on — its maker's webid among this device's
+    // selves; any other maker (an own appointment is made as 'me') is the default's
+    if (selfSet && Array.isArray(selfSet.on) && selfSet.on.length) {
+      const byWebid = new Map((selfSet.held ?? []).filter((x) => x?.webid).map((x) => [x.webid, x.id]));
+      const on = new Set(selfSet.on);
+      mine = mine.filter((e) => on.has(byWebid.get(e.createdBy) ?? 'default'));
+    }
+    const sign = presenter.order === 'asc' ? 1 : -1;
+    rows = [...rows, ...mine].filter((e) => !isAgenda || !presenter.when(e) || presenter.when(e) <= until)
+      .sort((a, b) => sign * ((presenter.when(a) || 0) - (presenter.when(b) || 0)));
+  }
+  // THE BLOCK'S FILTERS (Vandaag's "Pas aan"): labels — on a type that carries them (its schema has `tags`), a row
+  // shows when one of its tags is among the block's labels; a type without labels ignores the filter — and a relative
+  // date, "within N days" (an agenda's is its horizon above), by the type's own moment (`presenter.when`)
+  const labels = Array.isArray(block.config?.labels) ? block.config.labels.map(normLabel).filter(Boolean) : [];
+  if (labels.length && carriesLabels(noun)) rows = rows.filter((row) => Array.isArray(row.tags) && row.tags.some((tg) => labels.includes(normLabel(tg))));
+  // a reading's "open": rows its noun declares done are left out (a block shows them, as it always has)
+  if (block.config?.openOnly === true) rows = rows.filter((row) => !presenter.isDone?.(row));
+  const withinDays = Number(block.config?.withinDays);
+  if (!isAgenda && Number.isFinite(withinDays) && withinDays > 0) {
+    const now = Date.now();
+    const span = withinDays * 86_400_000;
+    rows = rows.filter((row) => { const w = presenter.when(row); return !w || Math.abs(w - now) <= span; });
   }
   // nothing answered (every circle, and my own calendar when it is asked): a failure, said as one
-  if (!r.ok && r.reason === 'unreachable' && (!isAgenda || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };
+  if (!r.ok && r.reason === 'unreachable' && (!withOwn || ownError)) return { blockId: block.id, type: 'items', status: 'error', content: { noun }, error: r.error };
   const items = rows.slice(0, limit).map((row) => ({
     id: row.id, label: row.label ?? presenter.label(row), when: presenter.when(row) || null,
-    circleId: row.circleId ?? null, circleName: row.circleName ?? '', mine: presenter.isMine(row, myWebid ?? null),
+    circleId: row.circleId ?? null, circleName: row.circleName ?? '', ...(row.own ? { own: true } : {}), mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
     // what a chore row also shows: its words, its state, its "see also" links
     text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
   }));

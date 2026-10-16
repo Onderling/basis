@@ -95,7 +95,11 @@ export const tasksManifest = {
   // longer mint phantom capabilities. Equals the current derived set (inert), now explicit + owned here.
   // Keys ∈ itemTypes; atoms are CANONICAL SDK atoms.
   nouns: {
-    task:            { atoms: ['add', 'list', 'update', 'remove', 'complete', 'claim', 'reassign', 'submit', 'approve', 'reject', 'revoke'] },
+    // shown in a merged view: newest first; mine when I hold it
+    task:            { atoms: ['add', 'list', 'update', 'remove', 'complete', 'claim', 'reassign', 'submit', 'approve', 'reject', 'revoke'],
+      presents: { label: 'title', moment: 'addedAt', order: 'desc', mine: ['assignee', 'holders', 'assignees'],
+        done: { field: 'state', values: ['done', 'approved', 'completed', 'cancelled', 'archived'] } },
+      names: { nl: { one: 'taak', other: 'taken' }, en: { one: 'task', other: 'tasks' } } },
     'inbox-item':    { atoms: ['list', 'approve', 'reject', 'remove'] },
     'schedule-slot': { atoms: ['add', 'list'] },
     circle:            { atoms: ['list', 'archive', 'unarchive'] },

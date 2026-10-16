@@ -450,7 +450,9 @@ export async function getInvite(page, tag = 'invite') {
  * Phase-1 acceptance.
  */
 export async function joinFromInvite(page, inviteUri, { handle = 'joiner', tag = 'join' } = {}) {
-  const joinBtn = page.locator('.circle-launcher__join');
+  // The join button lives on the circles launcher; the app opens on Vandaag since 2026-10-15 — go there first
+  let joinBtn = page.locator('.circle-launcher__join');
+  if (!(await joinBtn.count())) { await gotoCircles(page); joinBtn = page.locator('.circle-launcher__join'); }
   if (!(await joinBtn.count())) return { joined: false, outcome: 'no join button' };
   page.once('dialog', (d) => d.accept(inviteUri));   // paste-prompt
   await joinBtn.first().click();

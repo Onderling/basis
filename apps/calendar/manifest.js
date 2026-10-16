@@ -39,7 +39,10 @@ export const calendarManifest = {
   // PLAN-capability-arc §1a). This declaration IS the member-facing capability set. Equals the current derived
   // set (inert), now explicit + owned here.
   nouns: {
-    'calendar-event': { atoms: ['add', 'list', 'remove', 'claim', 'submit', 'reject'] },
+    // shown in a merged view: soonest first; mine when I made it or am asked to it
+    'calendar-event': { atoms: ['add', 'list', 'remove', 'claim', 'submit', 'reject'],
+      presents: { label: 'title', moment: 'startsAt', order: 'asc', mine: ['createdBy', 'author', 'actor', 'by', 'attendees'] },
+      names: { nl: { one: 'afspraak', other: 'afspraken' }, en: { one: 'appointment', other: 'appointments' } } },
   },
 
   operations: [

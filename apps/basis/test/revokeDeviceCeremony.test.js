@@ -121,6 +121,9 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     // ── THE CEREMONY, on the surviving device. ──
     const r = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
     expect(r.ok).toBe(true);
+    // THE LOSS-TAKEOVER CASE, pinned: A never saw the enrolled device's record (its registry is local; the record healed
+    // onto A2's) — it revokes from the wire id alone, deriving that device's seed and so its per-circle address.
+    expect(r.known, 'A never held the revoked device\'s record').toBe(false);
     expect(r.circles).toBeGreaterThanOrEqual(1);
     expect(r.revokedIn.map((x) => x.circleId)).toContain(GROUP);
     expect(r.revokedIn.find((x) => x.circleId === GROUP).address).toBe(addrA2);

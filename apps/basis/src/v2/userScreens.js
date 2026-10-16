@@ -38,6 +38,8 @@
 /* ─────────────────────────────────────────────────────────────────────── */
 
 /** Empty book — what a fresh user starts with (host can seed defaults). */
+import { BLOCK_TYPES } from './circleRecipe.js';
+import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 export const EMPTY_SCREEN_BOOK = Object.freeze({ screens: [], activeId: null });
 
 /** Sentinel for "all circles" in circleFilter (vs `[circleId, …]`). */
@@ -117,6 +119,12 @@ export function setAllCircles(screen) {
 /* ScreenBook helpers                                                     */
 /* ─────────────────────────────────────────────────────────────────────── */
 
+/** The book's persona set (the header switcher's ticks), carried as is: a non-empty list of self ids, or absent (= all). */
+function personaSetOf(book) {
+  const ids = Array.isArray(book?.personaSet) ? book.personaSet.filter((id) => typeof id === 'string' && id) : [];
+  return ids.length ? { personaSet: ids } : {};
+}
+
 export function normalizeScreenBook(raw) {
   if (!raw || typeof raw !== 'object') return { screens: [], activeId: null };
   const arr = Array.isArray(raw.screens) ? raw.screens : [];
@@ -124,14 +132,34 @@ export function normalizeScreenBook(raw) {
   let activeId = typeof raw.activeId === 'string' ? raw.activeId : null;
   if (activeId && !screens.some((s) => s.id === activeId)) activeId = null;
   if (!activeId && screens.length > 0) activeId = screens[0].id;
-  return { screens, activeId };
+  const history = normalizeHistory(raw.history);
+  return { screens, activeId, ...personaSetOf(raw), ...(history ? { history } : {}) };
 }
+
+/** How many parent links the book keeps (the version store keeps 50 per series). */
+const HISTORY_CAP = 50;
+/**
+ * The book's undo history: which kept version it stands at (`at`) and each version's parent — what an undo steps back
+ * to. Carried in the book (not the versions: a version is a book without it), so an undo never depends on the device
+ * log having been saved.
+ */
+function normalizeHistory(h) {
+  if (!h || typeof h !== 'object') return null;
+  const at = Number.isFinite(h.at) ? h.at : null;
+  const parents = {};
+  if (h.parents && typeof h.parents === 'object') {
+    for (const [k, v] of Object.entries(h.parents)) if (Number.isFinite(Number(k)) && Number.isFinite(v)) parents[k] = v;
+  }
+  return { at, parents };
+}
+const withoutHistory = (book) => { const { history: _h, ...rest } = book ?? {}; return rest; };   // eslint-disable-line no-unused-vars
+const capParents = (parents) => Object.fromEntries(Object.entries(parents).sort((a, b) => Number(b[0]) - Number(a[0])).slice(0, HISTORY_CAP));
 
 export function addScreen(book, name = '', circleFilter = ALL_CIRCLES) {
   const cur = normalizeScreenBook(book);
   const screen = emptyScreen(name, circleFilter);
   const screens = [...cur.screens, screen];
-  return { screens, activeId: cur.activeId ?? screen.id };
+  return { screens, activeId: cur.activeId ?? screen.id, ...personaSetOf(cur) };
 }
 
 export function renameScreen(book, screenId, newName) {
@@ -145,7 +173,7 @@ export function removeScreen(book, screenId) {
   const screens = cur.screens.filter((s) => s.id !== screenId);
   let activeId = cur.activeId;
   if (activeId === screenId) activeId = screens.length > 0 ? screens[0].id : null;
-  return { screens, activeId };
+  return { screens, activeId, ...personaSetOf(cur) };
 }
 
 export function setActiveScreen(book, screenId) {
@@ -188,8 +216,10 @@ export function updateScreen(book, screenId, mutator) {
  *   const book = await store.get();
  *   await store.update((cur) => addScreen(cur, 'Stream'));
  */
-export function createUserScreenStore({ io = {} } = {}) {
+export function createUserScreenStore({ io = {}, versions = null } = {}) {
   const { load, save } = io;
+  const hasVersions = Boolean(versions && typeof versions.capture === 'function' && typeof versions.list === 'function');
+  const newestTs = async () => (hasVersions ? ((await versions.list(SCREEN_VERSIONS_KEY))[0]?.ts ?? null) : null);
   return {
     async get() {
       let raw = null;
@@ -208,7 +238,59 @@ export function createUserScreenStore({ io = {} } = {}) {
       if (typeof save === 'function') await save(next);
       return next;
     },
+    /**
+     * The same change, kept as a VERSION (the `versions` adapter the circle recipe, policy and rules stores take): the
+     * book before is captured when it is not the newest yet, then the book after. Returns both versions' timestamps so
+     * the change can be logged with what it replaced, and undone by restoring `previous`.
+     * @returns {Promise<{book: object, previous: number|null, current: number|null}>}
+     */
+    async updateVersioned(mutator) {
+      const cur = await this.get();
+      const parents = { ...(cur.history?.parents ?? {}) };
+      // where the book stands now: the version it was put at (by a change or an undo), else the book as it is, kept now
+      let previous = cur.history?.at ?? null;
+      if (previous == null && hasVersions) { await versions.capture(SCREEN_VERSIONS_KEY, withoutHistory(cur)); previous = await newestTs(); }
+      const next = normalizeScreenBook(typeof mutator === 'function' ? mutator(withoutHistory(cur)) : mutator);
+      let current = null;
+      if (hasVersions) { await versions.capture(SCREEN_VERSIONS_KEY, withoutHistory(next)); current = await newestTs(); }
+      if (current != null && current !== previous && previous != null) parents[current] = previous;
+      const book = await this.set({ ...withoutHistory(next), history: { at: current, parents: capParents(parents) } });
+      return { book, previous, current };
+    },
+    /**
+     * UNDO: step back to the parent of the version the book stands at — the versions are the mechanism (a restore is
+     * not a new version, so repeated undos walk back instead of toggling). Null when there is nothing before.
+     * @returns {Promise<{book: object, previous: number, current: number}|null>}
+     */
+    async undo() {
+      if (!hasVersions || typeof versions.restore !== 'function') return null;
+      const cur = await this.get();
+      const at = cur.history?.at ?? null;
+      const parent = at != null ? cur.history.parents?.[at] : null;
+      if (!Number.isFinite(parent)) return null;
+      const value = await versions.restore(SCREEN_VERSIONS_KEY, parent);
+      if (!value) return null;
+      const book = await this.set({ ...withoutHistory(normalizeScreenBook(value)), history: { at: parent, parents: cur.history.parents } });
+      return { book, previous: at, current: parent };
+    },
+    /** Put the book back as it was at version `ts` (itself kept as a new version, so a restore is undoable too). */
+    async restoreVersion(ts) {
+      if (!hasVersions || typeof versions.restore !== 'function') return null;
+      const value = await versions.restore(SCREEN_VERSIONS_KEY, ts);
+      if (!value) return null;
+      const book = await this.set(value);
+      await versions.capture(SCREEN_VERSIONS_KEY, book);
+      return { book, current: await newestTs() };
+    },
   };
+}
+
+/** The one series the person's screen book is versioned under (it is the device's: there is one book per device). */
+export const SCREEN_VERSIONS_KEY = 'device';
+
+/** A device's own screen book with its versions (each change kept, so it can be undone) — what the web shell composes. */
+export function localUserScreenStore(storage = globalThis.localStorage) {
+  return createUserScreenStore({ io: localStorageScreenIo(storage), versions: localStorageObjectVersions('screens', storage) });
 }
 
 /**
@@ -245,11 +327,8 @@ function normalizeCircleFilter(raw) {
   return out.length > 0 ? out : ALL_CIRCLES;
 }
 
-// Lifted from circleRecipe.js (same shape, same predicate).  Kept
-// inline rather than importing to avoid a circular dependency if
-// circleRecipe ever wants a Screen reference later.  Keep in sync
-// with circleRecipe.BLOCK_TYPES — α.4 added 'tasks'.
-const BLOCK_TYPES = ['announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text'];
+// The one block table (circleRecipe.js): a page keeps any block type the table knows; which ones an editor OFFERS is
+// the table's `places` (a copy of the list lived here and had already drifted from it).
 
 function normalizeBlocks(raw) {
   const arr = Array.isArray(raw) ? raw : [];

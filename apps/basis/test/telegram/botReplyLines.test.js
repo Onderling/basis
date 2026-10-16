@@ -85,7 +85,7 @@ describe('the household bot says one line per op family', () => {
   };
 
   it('the gate: three things added are one line, naming the list and the things', async () => {
-    expect(await say('zet melk, brood en kaas op de boodschappen')).toEqual(['Op de lijst Boodschappen: melk, brood, kaas.']);
+    expect(await say('zet melk, brood en kaas op de boodschappen')).toEqual(['3 toegevoegd aan Boodschappen: melk, brood en kaas.']);
   });
 
   it('the model: two adds it picked are one line too', async () => {
@@ -93,7 +93,7 @@ describe('the household bot says one line per op family', () => {
       { id: 'addToList', args: { list: 'boodschappen', text: 'eieren' } },
       { id: 'addToList', args: { list: 'boodschappen', text: 'boter' } },
     ]);
-    expect(await say('doe eieren en boter erbij')).toEqual(['Op de lijst Boodschappen: eieren, boter.']);
+    expect(await say('doe eieren en boter erbij')).toEqual(['2 toegevoegd aan Boodschappen: eieren en boter.']);
   });
 
   it('ticks: the gate names what it ticked; two ticks the model picked are one line', async () => {
@@ -102,7 +102,7 @@ describe('the household bot says one line per op family', () => {
       { id: 'markListItemDone', args: { item: 'brood' } },
       { id: 'markListItemDone', args: { item: 'kaas' } },
     ]);
-    expect(await say('brood en kaas zijn op')).toEqual(['Afgevinkt: brood, kaas.']);
+    expect(await say('brood en kaas zijn op')).toEqual(['2 afgevinkt: brood en kaas.']);
   });
 
   it('a line taken off a list names the list and the thing', async () => {

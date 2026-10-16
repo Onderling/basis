@@ -33,6 +33,15 @@ export const DELIVERY_LABELS = Object.freeze({
 });
 
 /**
+ * A failure's reason → its own words, when the fan knew why (`fanOutReason`, kept beside the state by the delivery map).
+ * Wins over the state's label; an unknown reason falls back to it. The STATE keeps its shape (glyph, retry).
+ */
+export const DELIVERY_REASON_LABELS = Object.freeze({
+  // the circle's persona has no connection of its own to send on — retrying helps once it has one again
+  'persona-no-connection': 'circle.chat.delivery.persona_no_connection',
+});
+
+/**
  * What the state becomes after an attempt to send.
  *
  * Always the same answer, and that is the decision rather than a simplification.

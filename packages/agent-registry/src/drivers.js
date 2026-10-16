@@ -13,6 +13,7 @@
 // that knows a driver's internal shape.
 
 import { descriptor } from './propertyVocabulary.js';
+import { effectiveProperties } from './profileProperties.js';
 
 /**
  * The kinds of personal driver. `driver` is the generic catch-all; the rest are finer intents.
@@ -140,3 +141,16 @@ export function driversFromProperties(properties) {
   }
   return out;
 }
+
+/**
+ * A profile's effective DRIVER values: what it inherits and what it has of its own. The stop on the general offerings
+ * (`OFFERINGS_INHERIT_KEY`) lives where inheritance is resolved (`resolveProperty`), so this is a thin read over it.
+ * @param {(id: string) => object|null} getProfile
+ * @param {string} profileId
+ * @param {{defaultProfileId?: string}} [opts]
+ * @returns {Record<string, object>}
+ */
+export function effectiveDrivers(getProfile, profileId, opts = {}) {
+  return driversFromProperties(effectiveProperties(getProfile, profileId, opts));
+}
+

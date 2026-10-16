@@ -58,6 +58,7 @@ import { sendA2ATask } from '@onderling/core';
 // mDNS-only and blind to BLE.
 import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
+import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
 import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
@@ -72,7 +73,7 @@ import { createConnectionPoints, bootRelayUrl, bootRelayUrls, asyncStorageConnec
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
 // into the ENCAPSULATED identity secret (only the closure escapes).
-import { makeSharedWithMeStoreRN } from './circleStoresRN.js';
+import { makeSharedWithMeStoreRN, makeAvailabilityStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../../basis/src/v2/circleSecurityPriming.js';
 
@@ -307,6 +308,8 @@ export async function bootAgentBundle(opts = {}) {
     agent = await createRealHouseholdAgent({
       // the shell's translator (App.js hands it): the agent's own lines follow the person's language
       t: opts.t,
+      // the person's one availability record (read here; the launcher's store writes it): away matches no offering
+      availability: () => makeAvailabilityStoreRN(AsyncStorage).get(),
       // a circle's appointments are that circle's store's items (read and written with its id); no circle → my own calendar
       ...PERSON_NODE_STORE_OPTS,
       // …which is my OWN store (the own-devices scope): sealed, in AsyncStorage, back after a restart
@@ -484,36 +487,26 @@ export async function bootAgentBundle(opts = {}) {
   // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
   // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
   // agent, like everything else here built before the agent lands.
+  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none: the general persona's face
+  const nearbyRoomSelfRef = { current: () => null };
+  // what the room is told about me, and what an ask in it is weighed against (nearbyIdentity.js) — one per bundle
+  const nearbyIdentity = createNearbyIdentity({
+    readChoice: readNearbyFace,
+    callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
+    relayUrl: () => resolveMobileRelayUrl(),
+    shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
+    nknAddress: () => agent?.peer?.address ?? null,
+    roomSelf: () => nearbyRoomSelfRef.current(),   // set by the Nearby screen (it holds the switcher's set)
+  });
   const nearbyRoom = createNearbyRoomBinding({
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => nearbyPeers.list(),
     subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),   // a newcomer is told the room as it stands
     myAddress: () => agent?.sa?.agent?.identity?.pubKey ?? null,
-    // Rung 4 — what "share how to reach me" shares: the relay this device rides, and the NKN address
-    // only if the publication lock allows (the same lock the invite QR honours). All-or-nothing by
-    // Frits' call; deciding WHAT "all" is happens here, not in the room code.
-    myAddresses: async () => {
-      const out = {};
-      try { const url = await resolveMobileRelayUrl(); if (url) out.relay = { url }; } catch { /* no relay is honest */ }
-      try {
-        const allow = agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY);
-        const addr = agent?.peer?.address ?? null;
-        if (allow === true && typeof addr === 'string' && addr) out.nkn = { address: addr };
-      } catch { /* the lock stays closed on a broken read */ }
-      return out;
-    },
-    // The face this device presents in the room: the SAME faces a circle offers — displayName,
-    // handle, or nobody — chosen per device in "You here" (nearbyAllowsStore), a label only.
-    myFace: async () => {
-      try {
-        const choice = readNearbyFace();
-        if (choice === 'none') return null;
-        const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
-        const e = r?.entry ?? {};
-        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
-        return label ? { label: String(label) } : null;
-      } catch { return null; }
-    },
+    // What the room is told about me — the face and "share how to reach me" — decided once (nearbyIdentity.js); this
+    // shell hands in only where its face choice lives (nearbyAllowsStore) and how it reaches its relay and NKN address.
+    myFace: () => nearbyIdentity.myFace(),
+    myAddresses: () => nearbyIdentity.myAddresses(),
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
 
@@ -628,6 +621,12 @@ export async function bootAgentBundle(opts = {}) {
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
         alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+        // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+        relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+        alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
+      // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+      relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+      alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
         circlesForPoint,
         // The relay this device connects to IS the deployment default — unmapped circles land here alone.
         defaultRelayUrl: relayUrl,
@@ -766,6 +765,8 @@ export async function bootAgentBundle(opts = {}) {
     circleId, personaId, lastShared: disclosureShareMemo, resealMediaForCircle,
   });
   const pairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill: (app, op, args) => agent.callSkill(app, op, args),
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -782,6 +783,8 @@ export async function bootAgentBundle(opts = {}) {
     shareRelease: (cid, personaId) => shareCircleRelease(cid, personaId),
   });
   const contactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     blobStore: contactAttachmentBlobs,
     pair: pairRoster,
     // whoever writes to me becomes a row in Contacten — a turn the box took and carried here included (web parity)
@@ -800,7 +803,7 @@ export async function bootAgentBundle(opts = {}) {
     onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); },
     // the first message to a contact carries MY card; a card that arrives (naming its sender) goes into the book, so
     // whoever writes to me is a named row on every device (web parity, 2026-09-21)
-    myCard: async () => { try { return (await agent.callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await agent.callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     // web parity (circleApp's contactCardArrived): a card riding a message has no moment to choose in, so
     // the default is recorded EXPLICITLY rather than left absent — "not recorded" is a different fact.
     onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); },
@@ -894,6 +897,7 @@ export async function bootAgentBundle(opts = {}) {
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (web parity)
+    circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).
@@ -1025,6 +1029,9 @@ export async function bootAgentBundle(opts = {}) {
     discoverability,
     nearbyPeers,
     nearbyRoom,
+    nearbyIdentity,
+    /** The Nearby screen hands in who this device enters the room as (`() => ({id, name}|null)`). */
+    setNearbyRoomSelf: (fn) => { nearbyRoomSelfRef.current = typeof fn === 'function' ? fn : () => null; },
     attachPeerWiring,
     dispose: async () => {
       try { contactSkills.dispose(); } catch { /* defensive */ }

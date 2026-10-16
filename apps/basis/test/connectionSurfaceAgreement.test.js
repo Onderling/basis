@@ -18,6 +18,7 @@ import { renderA2A, NEVER_DELEGABLE } from '@onderling/app-manifest';
 import { connectionOpChoices } from '../src/v2/connections.js';
 import { paramsManifest } from '../src/v2/paramsManifest.js';
 import { householdManifest } from '../../household/manifest.js';
+import basisManifest from '../manifest.js';
 import { mockTasksManifest } from '../src/core/manifests/mockManifests.js';
 import { calendarManifest } from '@onderling-app/calendar/manifest';
 import { agentsManifest } from '@onderling-app/agents/manifest';
@@ -58,5 +59,48 @@ describe('the connection surface agrees with the connection menu', () => {
       // the menu's discretion. A menu is a convention; `never` is the gate.
       if (byId.has(id)) expect(byId.get(id).policy, `${id} is reachable over A2A`).toBe('never');
     }
+  });
+});
+
+describe('the person\'s registry is theirs — a connection may see what acts for them, nothing more', () => {
+  // Every registry WRITE changes who the person is, what they disclose, or who acts for them; every raw registry READ
+  // returns their own record, not a release (and getPersonaRelease lets the caller pick the context, so it is a raw
+  // read too). A connection may only see what acts for them and what exists — a view screen of their own shows that.
+  const MAY_OFFER = ['agents.listAgents', 'agents.viewAgent', 'agents.listCatalogue', 'agents.listDataVersions'];
+  it('of the agents ops, the menu offers exactly the four views; every other one is refused at the door', () => {
+    const all = agentsManifest.operations.map((o) => `agents.${o.id}`);
+    const offered = new Set(connectionOpChoices({ manifests: MANIFESTS }).map((c) => c.opId ?? c.id));
+    const skills = renderA2A(MANIFESTS, { callSkill: async () => ({}) });
+    expect(all.filter((id) => offered.has(id)).sort()).toEqual([...MAY_OFFER].sort());
+    for (const id of all.filter((x) => !MAY_OFFER.includes(x))) {
+      expect(NEVER_DELEGABLE.has(id), `${id} on the withhold list`).toBe(true);
+      expect(skills.find((sk) => sk.id === id)?.policy, `${id} refused at the door`).toBe('never');
+    }
+  });
+});
+
+describe('this device\'s custody is never a connection\'s to act on', () => {
+  it('every DEVICE op in ANY manifest is refused at the door and absent from the menu — basis\'s pages too', () => {
+    // whatever manifests a door composes (a connection's list, a bot's door): the group is the rule, not a list of ids
+    const ALL = [...MANIFESTS, basisManifest];
+    const deviceOps = ALL.flatMap((m) => (m.operations ?? []).filter((o) => o.group === 'device').map((o) => `${m.appId ?? m.app}.${o.id}`));
+    expect(deviceOps).toContain('basis.screen-add-page');
+    const surface = renderA2A(ALL, { callSkill: async () => ({}) });
+    const reachable = new Set(surface.filter((x) => x.policy !== 'never').map((x) => x.id));
+    expect(deviceOps.filter((id) => reachable.has(id)), 'device ops a connection could reach').toEqual([]);
+    const offered = new Set(connectionOpChoices({ manifests: ALL }).map((c) => c.id));
+    expect(deviceOps.filter((id) => offered.has(id)), 'device ops the menu offers').toEqual([]);
+  });
+
+  // The household's `device` group is the device's own custody: enrolling and revoking devices, the recovery
+  // file, restore, which persona a circle is joined as, which personas this device runs. A connection acts as
+  // the person SOMEWHERE ELSE; none of these is a thing to do to this device from there. Marking an op
+  // `group: 'device'` is what puts it out of reach — a new device op cannot be forgotten off the list.
+  it('every household device op is refused at the door and absent from the menu', () => {
+    const deviceOps = householdManifest.operations.filter((o) => o.group === 'device').map((o) => `household.${o.id}`);
+    expect(deviceOps.length).toBeGreaterThan(0);
+    expect(deviceOps.filter((id) => !NEVER_DELEGABLE.has(id)), 'device ops a connection could reach').toEqual([]);
+    const offered = new Set(connectionOpChoices({ manifests: MANIFESTS }).map((c) => c.id));
+    expect(deviceOps.filter((id) => offered.has(id))).toEqual([]);
   });
 });

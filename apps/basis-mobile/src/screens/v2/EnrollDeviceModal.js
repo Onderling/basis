@@ -14,6 +14,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { currentRelayUrl } from './RelayQuestionModal.js';
 import { t } from '../../core/localisation.js';
+import { openOfferPersonas, ENROL_PERSONAS_PARAM, ENROL_GENERAL_PARAM, enrolPickState, togglePick, pickerRows, pickPrimary, enrolPickArgs } from '../../../../basis/src/v2/enrollOffer.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
@@ -28,6 +29,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
   // the phrase never rides it.
   const [offerDraft, setOfferDraft] = useState('');
   const [offerInvalid, setOfferInvalid] = useState(false);
+  const [pickRefused, setPickRefused] = useState(false);   // the last self was asked to be unticked
   const [offerView, setOfferView] = useState(null);   // null | {uri} | {error}
   const runnerRef = useRef(null);
   useEffect(() => {
@@ -44,6 +46,20 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
 
   if (!visible) return null;
   const view = inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
+  // THE PERSONA PICKER: the offer's sealed list, opened ON THIS DEVICE with the phrase being typed (nothing leaves it);
+  // the person ticks which selves this device gets — the general persona a row like the rest, ticked by default. The
+  // model, the last-self rule and the primary are the shared ones (enrollOffer.js); this only paints.
+  const pickerOffer = offerDraft.trim() || needs?.offer || '';
+  const listedPersonas = pickerOffer && drafts.mnemonic ? openOfferPersonas(pickerOffer, drafts.mnemonic) : [];
+  const pickState = enrolPickState(drafts);
+  const pickRows = pickerRows(listedPersonas, pickState);
+  const primary = pickPrimary(pickState);
+  const primaryName = primary === 'default' ? t('circle.switcher.you') : (listedPersonas.find((p) => p.id === primary)?.name ?? primary);
+  const togglePersona = (id) => {
+    const r = togglePick(pickState, id);
+    setPickRefused(Boolean(r.refused));
+    setDrafts((d) => ({ ...d, ...enrolPickArgs(r.state) }));
+  };
   const outcome = inst?.steps?.ceremony?.outcome;
 
   const submit = async () => {
@@ -124,7 +140,7 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
                 testID="enroll-offer-paste"
               />
               {offerInvalid ? <Text style={styles.offerErr}>{t('circle.enroll.offer_paste_invalid')}</Text> : null}
-              {view.form.params.map((param) => (
+              {view.form.params.filter((param) => param.name !== ENROL_PERSONAS_PARAM && param.name !== ENROL_GENERAL_PARAM).map((param) => (
                 <TextInput
                   key={param.name}
                   style={[styles.input, param.kind === 'secret' && styles.secret]}
@@ -139,6 +155,19 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose, beforeO
                   testID={`enroll-${param.name}`}
                 />
               ))}
+              {listedPersonas.length ? (
+                <View testID="enroll-personas">
+                  <Text style={styles.body}>{t('circle.enroll.personas_title')}</Text>
+                  <Text style={styles.cancelText}>{t('circle.enroll.personas_hint')}</Text>
+                  {pickRows.map((row) => (
+                    <Pressable key={row.id} onPress={() => togglePersona(row.id)} accessibilityRole="checkbox" accessibilityState={{ checked: row.checked }} testID={`enroll-persona-${row.id}`}>
+                      <Text style={styles.body}>{row.checked ? '☑' : '☐'} {row.nameKey ? t(row.nameKey) : row.name}</Text>
+                    </Pressable>
+                  ))}
+                  <Text style={styles.cancelText} testID="enroll-speaks-as">{t('circle.enroll.speaks_as', { name: primaryName })}</Text>
+                  {pickRefused ? <Text style={styles.offerErr}>{t('circle.enroll.last_self')}</Text> : null}
+                </View>
+              ) : null}
               <View style={styles.row}>
                 <Pressable style={styles.button} onPress={submit} testID="enroll-submit">
                   <Text style={styles.buttonText}>{t('circle.enroll.submit')}</Text>

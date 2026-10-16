@@ -101,19 +101,23 @@ export function rostersOf(body) {
  * @param {object} [a.memberships]   the owner's `{ [circleId]: record }` map, for handles and relays
  * @returns {{offer: string, circles: number}|null}
  */
-export function bootstrapOfferFromRosters({ body, selfPubKey, memberships = {} } = {}) {
+export function bootstrapOfferFromRosters({ body, selfPubKey, memberships = {}, persona = null } = {}) {
   const circles = [];
   const relays = [];
   for (const [id, snap] of Object.entries(rostersOf(body))) {
+    // only the circles of the SELF this bootstrap is for (its memberships): the file carries every self's rosters, and
+    // announcing this device in a circle of a persona it does not run would put the wrong self on that roster
+    if (!memberships || !Object.hasOwn(memberships, id)) continue;
     const rows = (Array.isArray(snap?.members) ? snap.members : [])
       .filter((m) => m && typeof m.webid === 'string' && m.webid && m.webid !== selfPubKey);
     const ordered = [...rows.filter((m) => m.role === 'admin'), ...rows.filter((m) => m.role !== 'admin')];
     const addresses = [...new Set(ordered.map((m) => m.webid))];
     if (addresses.length === 0) continue;
     const rec = memberships?.[id] ?? null;
-    circles.push({ id, handle: rec?.handle ?? null, address: addresses[0], others: addresses.slice(1), member: true });
+    // `persona`: the self this bootstrap is for, when not the default — the consume binds the circle to it first
+    circles.push({ id, handle: rec?.handle ?? null, address: addresses[0], others: addresses.slice(1), member: true, ...(persona ? { persona } : {}) });
     for (const url of (Array.isArray(rec?.relays) ? rec.relays : [])) if (url && !relays.includes(url)) relays.push(url);
   }
   if (circles.length === 0) return null;
-  return { offer: encodeEnrollOffer({ relays, circles }), circles: circles.length };
+  return { offer: encodeEnrollOffer({ relays, circles }), circles: circles.length, entries: circles, relays };
 }

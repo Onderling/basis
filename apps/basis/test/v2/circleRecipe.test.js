@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
 import {
+  BLOCK_DESCRIPTORS, blockTypesFor,
   BLOCK_TYPES, EMPTY_RECIPE_BOOK,
   emptyRecipe, normalizeRecipe, defaultConfigForBlock,
   addBlock, removeBlock, moveBlock, updateBlock,
@@ -18,9 +19,24 @@ describe('circleRecipe · α.1a — single Recipe', () => {
   it('exposes the v2 §2 block palette in editor order', () => {
     // α.4 added 'tasks' between agenda and rules.
     // D1 (§5A) prepended 'quickActions' as the top "Veel-gebruikt" rail.
-    expect(BLOCK_TYPES).toEqual([
+    // a circle's editor offers exactly the circle's blocks, in that order
+    expect(blockTypesFor('circle')).toEqual([
       'quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text',
     ]);
+  });
+
+  it('the one block table: every type says where it lives, with a label and one plain sentence', () => {
+    expect(blockTypesFor('mij')).toEqual(['noticeboard', 'calendar', 'tasks', 'photo', 'text', 'circlesUnread', 'identityLine', 'agents', 'notes']);
+    for (const t of BLOCK_TYPES) {
+      const d = BLOCK_DESCRIPTORS[t];
+      expect(d.labelKey).toBe(`circle.recipe.block.${t}`);
+      expect(d.descriptionKey).toBe(`circle.recipe.block_desc.${t}`);
+      expect(d.places.length, t).toBeGreaterThan(0);
+      expect(typeof d.config(), t).toBe('object');
+    }
+    // nothing about the person on a circle, nothing an admin curates on the person's pages
+    for (const t of ['circlesUnread', 'identityLine']) expect(blockTypesFor('circle')).not.toContain(t);
+    for (const t of ['announcement', 'rules', 'quickActions']) expect(blockTypesFor('mij')).not.toContain(t);
   });
 
   it('emptyRecipe() mints a fresh id + carries the name', () => {

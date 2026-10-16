@@ -27,6 +27,10 @@ import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { identityLineWords, agentRowWords } from '../../src/v2/mijWords.js';
+import { dateLocaleOf } from '../../src/v2/whenWords.js';
+import { whereTag } from '../../src/v2/rowWhere.js';
+import { nounHeading } from '../../src/v2/nounNames.js';
 
 /**
  * Render an array of materialized blocks into a container.
@@ -42,9 +46,11 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
  * @param {(actionKey: string) => void} [args.onAction] invoked when a
  *        quickActions pill is tapped (host routes the feature to a tab /
  *        action).  Omitted → pills render disabled.
+ * @param {(blockId: string) => void} [args.onMore] when given, each shown block gets a "meer" that calls it (the
+ *        person's pages: a capped block opened whole)
  * @returns {HTMLElement}
  */
-export function renderCircleScreen(container, { blocks = [], t, refreshing = false, onAction, onEmbedOpen, highlightRef } = {}) {
+export function renderCircleScreen(container, { blocks = [], t, refreshing = false, onAction, onEmbedOpen, highlightRef, onMore } = {}) {
   const tr = translatorOr(t, 'circleScreen.js');
   container.innerHTML = '';
   container.classList.add('circle-screen');
@@ -68,7 +74,18 @@ export function renderCircleScreen(container, { blocks = [], t, refreshing = fal
   }
 
   for (const block of blocks) {
-    container.appendChild(renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }));
+    const section = renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef });
+    // a capped block on the person's pages: "meer" opens it whole (`onMore(blockId)`, given by the host)
+    if (typeof onMore === 'function' && block.status === 'ok') {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'circle-screen__more';
+      more.dataset.blockId = block.blockId ?? '';
+      more.textContent = tr('circle.screen.more');
+      more.addEventListener('click', () => onMore(block.blockId));
+      section.appendChild(more);
+    }
+    container.appendChild(section);
   }
   // δ.1 — subtle refresh pip when rendering cached blocks while a fresh
   // materialize is in flight.  Static glyph (⟳) is enough; no animation
@@ -149,6 +166,9 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       else renderItems(section, block, tr);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
+    case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
+    case 'identityLine': renderIdentityLine(section, block, tr, onAction); break;
+    case 'agents':       renderAgents(section, block, tr, onAction);       break;
     default:
       section.textContent = tr('circle.screen.block_unknown', { type: block.type });
   }
@@ -208,6 +228,84 @@ function renderPhoto(section, block, _tr) {
   }
 }
 
+// The circles with news: each a row with its name and how many unread; a tap opens the circle (the screen's
+// `onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does).
+function renderCirclesUnread(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.recipe.block.circlesUnread');
+  section.appendChild(title);
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__circles-unread';
+  for (const row of block.content?.items ?? []) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__circles-unread-row';
+    li.dataset.circleId = row.circleId ?? '';
+    const name = document.createElement('span');
+    name.textContent = row.name ?? row.circleId;
+    const n = document.createElement('span');
+    n.className = 'circle-screen__circles-unread-count';
+    n.textContent = tr('circle.screen.unread_count', { count: row.unread });
+    li.append(name, n);
+    if (typeof onAction === 'function') {
+      li.tabIndex = 0;
+      li.addEventListener('click', () => onAction({ kind: 'open-circle', circleId: row.circleId }));
+    }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
+}
+
+// Me's identity line: the name as the page's title, the door to the person's own editor beside it
+// (`onAction({ kind: 'edit-me' })`), and the readings below it in one line, worded by the shared helper.
+function renderIdentityLine(section, block, tr, onAction) {
+  const head = document.createElement('div');
+  head.className = 'circle-screen__identity-head';
+  const name = document.createElement('h2');
+  name.className = 'cc-profile__title';
+  name.textContent = block.content?.name || tr('circle.profile.title');
+  head.appendChild(name);
+  if (typeof onAction === 'function') {
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'circle-screen__identity-edit';
+    edit.textContent = tr('circle.profile.edit');
+    edit.addEventListener('click', () => onAction({ kind: 'edit-me' }));
+    head.appendChild(edit);
+  }
+  section.appendChild(head);
+  const words = identityLineWords(block.content, { t: tr, locale: dateLocaleOf(tr) });
+  if (words.length) {
+    const line = document.createElement('p');
+    line.className = 'circle-screen__identity-readings';
+    line.textContent = words.join(' · ');
+    section.appendChild(line);
+  }
+}
+
+// Me's agents and devices: one sentence a row, read-only; a tap opens My data (`onAction({ kind: 'open-my-data' })`),
+// where what may be done with each lives.
+function renderAgents(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.recipe.block.agents');
+  section.appendChild(title);
+  const list = document.createElement('ul');
+  list.className = 'circle-screen__agents';
+  for (const row of block.content?.items ?? []) {
+    const li = document.createElement('li');
+    li.className = 'circle-screen__agents-row';
+    li.dataset.kind = row.kind ?? '';
+    li.textContent = agentRowWords(row, tr);
+    if (typeof onAction === 'function') {
+      li.tabIndex = 0;
+      li.addEventListener('click', () => onAction({ kind: 'open-my-data' }));
+    }
+    list.appendChild(li);
+  }
+  section.appendChild(list);
+}
+
 function renderNoticeboard(section, block, tr) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
@@ -252,10 +350,10 @@ function renderAgenda(section, block, tr, highlightRef) {
     li.className = 'circle-screen__agenda-row';
     li.dataset.eventId = ev.id ?? '';
     // merged across circles: which circle it is in (a circle's own agenda has none to say)
-    if (ev.circleName) {
+    if (whereTag(ev, tr)) {
       const tag = document.createElement('span');
       tag.className = 'circle-screen__tasks-circle';
-      tag.textContent = ev.circleName;
+      tag.textContent = whereTag(ev, tr);
       li.appendChild(tag);
     }
     const lbl = document.createElement('span');
@@ -276,7 +374,7 @@ function renderAgenda(section, block, tr, highlightRef) {
 function renderItems(section, block, tr) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr(block.titleKey ?? `circle.screen.items_title.${block.content?.noun ?? ''}`);
+  title.textContent = block.titleKey ? tr(block.titleKey) : nounHeading(tr, block.content?.noun ?? '');
   section.appendChild(title);
   const list = document.createElement('ul');
   list.className = 'circle-screen__items-list';
@@ -284,10 +382,10 @@ function renderItems(section, block, tr) {
     const li = document.createElement('li');
     li.className = 'circle-screen__items-row';
     li.dataset.itemId = it.id ?? '';
-    if (it.circleName) {
+    if (whereTag(it, tr)) {
       const tag = document.createElement('span');
       tag.className = 'circle-screen__tasks-circle';
-      tag.textContent = it.circleName;
+      tag.textContent = whereTag(it, tr);
       li.appendChild(tag);
     }
     const text = document.createElement('span');
@@ -316,10 +414,10 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
       li.classList.add('circle-screen__tasks-row--highlight');
       scrollRowIntoView(li);
     }
-    if (task.circleName) {
+    if (whereTag(task, tr)) {
       const tag = document.createElement('span');
       tag.className = 'circle-screen__tasks-circle';
-      tag.textContent = task.circleName;
+      tag.textContent = whereTag(task, tr);
       li.appendChild(tag);
     }
     const text = document.createElement('span');

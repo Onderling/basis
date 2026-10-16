@@ -614,6 +614,24 @@ cf. internal/order.js).
 
 Ops that may never be reached by an external caller, whatever token it presents.
 
+### `isDeviceOp`
+
+**Kind:** function · **Import:** `isDeviceOp` from `'@onderling/app-manifest'`
+
+```js
+isDeviceOp(op)
+```
+
+An op of a manifest's `device` group is THIS device's own business (its custody, its recovery, the person's pages
+on it): never delegable, in whatever manifest it is declared — the group is the rule, so a new device op cannot be
+forgotten off a list. `NEVER_DELEGABLE` below names the rest by id.
+
+**Parameters**
+
+- `op` `{group?: string}`
+
+**Returns:** `boolean`
+
 ### `renderA2A`
 
 **Kind:** function · **Import:** `renderA2A` from `'@onderling/app-manifest'`

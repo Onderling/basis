@@ -93,6 +93,11 @@ export function createContactThreadChannel({
   // `onRequest(fromAddr)` land the other side's. Inside the seal when the turn is sealed; a turn with only the
   // roster material and no text is consumed here and never shown.
   pair = null,
+  // WHO I AM TO THIS CONTACT: `selfFor(peerAddr)` → `{ webid, displayName?, sendAs, personaId }` for a contact filed
+  // under a PERSONA — the turn is authored by and sent as that persona, carries the PERSONA's card (`myCard(personaId)`),
+  // is sealed from the persona's person key, and nothing of the default rides along (no linked-bot statement, no fan to
+  // the default's devices). Null → the default.
+  selfFor = null,
   // THE SENDER BECOMES A CONTACT ROW: `(address) => void`, the shell's peer-graph upsert — what Contacten lists.
   // Called for every inbound turn that lands, whether it arrived directly or CARRIED by one of my own devices.
   // Until 2026-09-18 only the direct handlers did this, so a turn the box took and carried to the web app was
@@ -250,6 +255,13 @@ export function createContactThreadChannel({
     // sibling is never shown a message that this device failed to send. What it carries is the
     // redacted text, the same bytes the contact received and the same bytes stored here.
     const sent = (async () => {
+      let self = null;
+      if (typeof selfFor === 'function') { try { self = (await selfFor(peerAddr)) ?? null; } catch { self = null; } }
+      if (self?.webid) {
+        envelope.author = self.webid;
+        envelope.extras.webid = self.webid;
+        if (self.displayName) envelope.extras.displayName = self.displayName; else delete envelope.extras.displayName;
+      }
       // The pair roster: what THIS turn carries to make it (the founder's invite, or the other side's request).
       if (pair && typeof pair.prepare === 'function') {
         try {
@@ -268,15 +280,17 @@ export function createContactThreadChannel({
       // card is not re-sent for it (it was, 2026-09-21, for one release, before the lane carried names).
       // A bot my identity is linked to: this device's statement over exactly this turn (after the floor: the words
       // that leave are the words it covers).
-      if (typeof authFor === 'function') {
+      if (typeof authFor === 'function' && !self) {
         try { const a = await authFor(peerAddr, { text: floored.text, messageId: id }); if (a && typeof a === 'object') envelope.extras.auth = a; } catch { /* the turn goes without it: a stranger's there */ }
       }
       let cardOnBoard = null;
-      if (typeof myCard === 'function' && !cardSentTo.has(peerAddr)) {
-        try { const c = await myCard(); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
+      // the card of the self I am to this contact: a persona's own card (`myCard(personaId)`), never the default's
+      if (typeof myCard === 'function' && (!self || self.personaId) && !cardSentTo.has(peerAddr)) {
+        try { const c = await myCard(self?.personaId ?? null); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
       }
       // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
       // pair roster's material with it: an invite is a join secret).
+      // (the seal is the self's: a persona's contact is sealed from the persona's person key — `sealFor` resolves it)
       if (typeof sealFor === 'function') {
         try {
           const content = { text: floored.text, ...(envelope.extras.pairInvite ? { pairInvite: envelope.extras.pairInvite } : {}), ...(envelope.extras.pairRequest ? { pairRequest: true } : {}), ...(envelope.extras.card ? { card: envelope.extras.card } : {}), ...(envelope.extras.admission ? { admission: envelope.extras.admission } : {}), ...(envelope.extras.auth ? { auth: envelope.extras.auth } : {}) };
@@ -285,11 +299,16 @@ export function createContactThreadChannel({
           if (s) { envelope.extras.sealed = s; delete envelope.extras.admission; delete envelope.extras.auth; }
         } catch { /* unsealed, as before */ }
       }
-      const res = await core.deliver(envelope, { to: peerAddr, ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } } : {}) });
+      const res = await core.deliver(envelope, {
+        to: peerAddr,
+        ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } }
+          : (self?.sendAs ? { sendOpts: { sendAs: self.sendAs } } : {})),
+      });
       if (cardOnBoard) cardSentTo.add(peerAddr);   // it left (delivered or held): they have it
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
-      if (!res?.deduped) {
+      // a persona's contact is not the default's devices' business (no person-level lane on the wire)
+      if (!res?.deduped && !self) {
         await fanOwn({
           direction: 'out', contactId: threadId, peerAddr, replyTo,
           text: floored.text, messageId: id, ts: envelope.ts,
@@ -500,8 +519,13 @@ export function createContactThreadChannel({
     if (!prepared?.pairInvite) return;
     const envelope = { id: mkId(), kind: subtypes.out, ts: now(), author: localActor, body: '', extras: { threadKey: peerAddr, threadId: threadId ?? peerAddr, peerAddr, pairInvite: prepared.pairInvite } };
     try {
+      // to a contact filed under a persona: as that persona, without the default's seal (as `sendTurn`)
+      let self = null;
+      if (typeof selfFor === 'function') { try { self = (await selfFor(peerAddr)) ?? null; } catch { self = null; } }
+      if (self?.webid) envelope.author = self.webid;
       if (typeof sealFor === 'function') { const s = await sealFor(peerAddr, { text: '', pairInvite: prepared.pairInvite }); if (s) envelope.extras.sealed = s; }
-      await sendToPeer(peerAddr, buildContactWire(envelope));
+      if (self?.sendAs) await sendToPeer(peerAddr, buildContactWire(envelope), { sendAs: self.sendAs });
+      else await sendToPeer(peerAddr, buildContactWire(envelope));
     } catch { /* the next turn carries it again */ }
   }
 

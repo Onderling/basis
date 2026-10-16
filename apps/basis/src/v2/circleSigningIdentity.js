@@ -52,7 +52,8 @@ export async function useCircleSigningIdentity({
   let identity = null;
   try { identity = await circleIdentityFor(circleId); } catch { identity = null; }
   if (!identity || typeof identity.pubKey !== 'string') return null;
-  return registerSelfIdentity(address, identity) ? address : null;
+  // the circle rides along, so the host can say which persona owns this identity (the secure agent routes by it)
+  return registerSelfIdentity(address, identity, { circleId }) ? address : null;
 }
 
 /**

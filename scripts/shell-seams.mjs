@@ -52,6 +52,23 @@ export const SEAMS = Object.freeze([
   // There is no default relay: a person's device that knows none ASKS at the first action that needs one (an invite).
   // The box is left out on purpose — it has no person to ask; its relay is its operator's argument.
   { id: 'relay-question', pattern: /await askRelayIfNone\(\)/, shells: ['web', 'mobile'], why: 'a device with no relay asks for one before it makes an invite that would carry none' },
+  // WHAT THE NEARBY ROOM IS TOLD ABOUT YOU — the face (name · handle · nobody) and "share how to reach me" (the relay; the
+  // NKN address behind the publication lock): decided once (`src/v2/nearbyIdentity.js`). Both person shells carried the
+  // same two functions by copy until 2026-10-16. The box has no room.
+  { id: 'nearby-identity', pattern: /createNearbyIdentity\(/, shells: ['web', 'mobile'], why: 'the room learns the same face and addresses from every shell, under the same lock' },
+  // JOINING AS A PERSONA: the redeem names WHO joins — the circle's persona (`agent.circleSelf`), so it leaves as that
+  // persona on its own socket and announces its person key. A shell that built the redeem without it would join every
+  // circle as the default, whatever the person picked (2026-10-10).
+  { id: 'redeem-as-circle-self', pattern: /circleSelfFor:\s*\(gid\)\s*=>\s*agent\.circleSelf/, why: 'a circle joined as a persona is joined AS it, from every shell' },
+  // Each self on its own sockets: a persona's circle registers its per-circle address (and the persona's person address)
+  // on the persona's OWN relay sockets, never the default's — or replies to it land on the default's socket and the
+  // relay sees two selves on one connection (2026-10-10).
+  // A contact filed under a persona talks to THAT persona: the contact channel sends as it (`selfFor`) and the pair roster
+  // founds the persona's pair circle with them (`selfWebidOf`). A shell without them would answer every persona's contact
+  // as the default — the very link a persona exists to prevent (2026-10-12).
+  { id: 'contact-self-per-persona', pattern: /selfFor:\s*\(peerAddr\)\s*=>\s*agent\.contactSelf/, why: 'a contact filed under a persona hears from that persona, never the default, from every shell' },
+  { id: 'pair-roster-per-persona', pattern: /selfWebidOf:\s*\(personaId\)\s*=>\s*agent\.personaWebid/, why: 'a persona\'s contact gets the persona\'s own pair circle, from every shell' },
+  { id: 'circle-address-per-self', pattern: /relaysOf:\s*\(cid\)\s*=>\s*agent\.relaysFor/, why: 'a persona\'s circle traffic crosses the wire on the persona\'s own socket, from every shell' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).
@@ -90,9 +107,9 @@ export const SEAMS = Object.freeze([
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.
   { id: 'announcer', pattern: /createAnnouncer\(/, shells: ['box'], why: 'the household hears of a shared appointment, a move or a cancel, and a chore given to them, when it happens' },
-  // What is coming for me, wherever it lives (my circles' appointments, my own, my dated chores) — read on the
-  // person's device, no bot (the household bot is optional). The box hosts no person, so it has no Mij.
-  { id: 'planned-for-me', pattern: /plannedForMe\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Mij, from every circle and their own calendar' },
+  // What is coming for me, wherever it lives (my circles' appointments, my own, my chores) — Vandaag's seeded page,
+  // read on the person's device, no bot (the household bot is optional). The box hosts no person, so it has no Vandaag.
+  { id: 'planned-for-me', pattern: /ensureVandaagBook\(/, shells: ['web', 'mobile'], why: 'a person sees what is coming for them on Vandaag, from every circle and their own calendar' },
   { id: 'bot-reminder-tick', pattern: /createReminderTick\(/, shells: ['box'], why: 'a hosted bot reminds its people of what they dated, on their own door; a person\'s device never writes first' },
   // The device log's retention windows come from the register (`retention.chatDays`), applied after boot on every
   // shell. The box composed none until 2026-10-08 and ran on the built-in defaults: the same numbers today, but a

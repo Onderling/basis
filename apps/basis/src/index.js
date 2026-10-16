@@ -188,7 +188,7 @@ export {
 // α.1a/b — screen "recipe book" model + per-block content materializer
 // (v2 §2 RECEPT · SCREEN-WEERGAVE INRICHTEN).
 export {
-  BLOCK_TYPES, EMPTY_RECIPE_BOOK,
+  BLOCK_TYPES, BLOCK_DESCRIPTORS, blockTypesFor, EMPTY_RECIPE_BOOK,
   emptyRecipe, normalizeRecipe, defaultConfigForBlock,
   addBlock, removeBlock, moveBlock, updateBlock,
   normalizeRecipeBook,
@@ -197,7 +197,7 @@ export {
   createCircleRecipeStore, localStorageRecipeIo,
 } from './v2/circleRecipe.js';
 export {
-  BLOCK_REGISTRY, materializeBlock, materializeRecipe,
+  materializeBlock, materializeRecipe,
 } from './v2/circleRecipeBlocks.js';
 // γ.3 — recipe conflict detection + resolution (Phase 9 sync absorption).
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';
@@ -217,7 +217,7 @@ export {
   addCircleToScreen, removeCircleFromScreen, setAllCircles,
   normalizeScreenBook,
   addScreen, renameScreen, removeScreen, setActiveScreen, getActiveScreen, updateScreen,
-  createUserScreenStore, localStorageScreenIo,
+  createUserScreenStore, localStorageScreenIo, localUserScreenStore, SCREEN_VERSIONS_KEY,
 } from './v2/userScreens.js';
 export { materializeScreen } from './v2/userScreenBlocks.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
@@ -424,4 +424,4 @@ export {
   detectDeviceLang, isInitialised,
 } from './localisation.js';
 // Shared locale blocks (`circle.*`, `consequence.*`, `role.*`) — both shells merge these so they can't drift.
-export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedLocale, mergeShared } from './locales/index.js';
+export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';

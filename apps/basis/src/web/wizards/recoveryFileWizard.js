@@ -7,7 +7,7 @@
  */
 import { mkBody, mkActions, mkError, mkSubmitting, mkCheck, refreshActions } from './_wizardKit.js';
 import {
-  initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey,
+  initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey, exportErrorKey,
   loadExportChoices, toggleRosterChoice,
 } from '../../core/wizards/recoveryFileState.js';
 import { t } from '../../localisation.js';
@@ -59,7 +59,7 @@ export function renderRecoveryExportWizard({ container, doc, callSkill, onClose,
       });
       body.appendChild(btn);
     }
-    mkError(body, doc, state.submitError);
+    mkError(body, doc, state.submitError ? t(exportErrorKey(state.submitError)) : null);
     mkSubmitting(body, doc, state.submitting, t('circle.wizard.recovery.sealing'));
     container.appendChild(body);
     mkActions(container, doc, state.file

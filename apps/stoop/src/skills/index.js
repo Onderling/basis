@@ -136,7 +136,6 @@ import {
   MAX_ATTACHMENTS_PER_POST,
 } from '../lib/Attachments.js';
 import { update as updateInterest, score as scoreInterest, combinedRelevance } from '../lib/InterestProfile.js';
-import { matchesProfile } from '../lib/offeringsMatch.js';
 import { encodeContactCard, decodeContactCard } from '../lib/contactCard.js';
 
 /**
@@ -677,7 +676,12 @@ async function _fanOutViaReliableSend({
         // held (offline → queued for hold-forward) AND delivered both count as sent; a send
         // that explicitly reports neither is the only genuine transient failure — try the member's
         // next proven address before giving up on them.
-        if (r && r.held === false && r.delivered === false) { failure = { webid, reason: 'not-delivered' }; last = { webid, addr, outcome: 'not-delivered' }; continue; }
+        if (r && r.held === false && r.delivered === false) {
+          // the send's own reason when it gave one (`persona-no-connection`: this circle's persona has no socket of
+          // its own) — the bubble says it; else the plain transient failure
+          const why = typeof r.reason === 'string' && r.reason ? r.reason : 'not-delivered';
+          failure = { webid, reason: why }; last = { webid, addr, outcome: why }; continue;
+        }
         sent += 1;
         failure = null;
         last = { webid, addr, outcome: r?.held ? `held${r.reason ? `:${r.reason}` : ''}` : 'delivered' };
@@ -832,7 +836,7 @@ async function listGroupMembersCore(scope, a, ctx) {
       store, members, reveals, projectCircleRoster: project, readCircleExits, isExited,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
-    { a, from: ctx?.from ?? null, localActor, groupId },
+    { a, from: ctx?.from ?? null, localActor: scope.localActorIn ? scope.localActorIn(a?.groupId ?? groupId) : localActor, groupId },
   );
 }
 
@@ -1266,6 +1270,7 @@ export function buildStoopScope(deps = {}) {
   const {
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
+    selfWebidFor = null,
   } = deps;
   // This device's own key paired with the webid it speaks for. Derived HERE so both routes into the
   // scope get it — the roster projection needs it to read back statements this same composition
@@ -1273,8 +1278,16 @@ export function buildStoopScope(deps = {}) {
   const selfSigner = deps.selfSigner ?? ((bundle?.agent?.identity?.pubKey && localActor)
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
+  // THIS DEVICE in a circle: its persona there (host-injected `selfWebidFor`), else `localActor`. The cores' "is
+  // this my own call?" compares against it — `withCircleSelf` hands a persona's circle's own calls the persona's
+  // webid as `from`, so the local/foreign line must be drawn at the same webid or the device's own call reads foreign.
+  const localActorIn = (gid) => {
+    let self = null;
+    try { self = (typeof gid === 'string' && gid && typeof selfWebidFor === 'function') ? selfWebidFor(gid) : null; } catch { self = null; }
+    return (typeof self === 'string' && self) ? self : localActor;
+  };
   return {
-    selfSigner,
+    selfSigner, localActorIn,
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
@@ -1304,6 +1317,9 @@ export function buildSkills({
   controlAgent,
   muted,
   localActor,
+  // WHO this device is per circle, `(circleId) => webid|null` (its persona there) — host-injected; the local/foreign
+  // line in the cores follows it (`localActorIn`). Absent → `localActor` for every circle.
+  selfWebidFor = null,
   groupId: explicitGroupId,
   dataLocationConfig,
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` (principle 5) — host-injected;
@@ -1385,8 +1401,9 @@ export function buildSkills({
   const scope = buildStoopScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfSigner,
+    selfSigner, selfWebidFor,
   });
+  const localActorIn = scope.localActorIn;
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
   // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
   // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
@@ -2168,93 +2185,6 @@ export function buildSkills({
     }),
 
     /**
-     * setMyOfferings({skills: [{categoryId, freeTags?, availability?, radius?, status?}, ...]})
-     *   — replace the calling actor's full offerings array.  Each item
-     *   picks a `categoryId` from the fixed taxonomy (Phase 12).
-     *   `status` defaults to `'active'`.
-     */
-    // B★ B3 NOT wired (conflict c): the op declares `skills` as `kind:'string'`,
-    // but the skill also accepts a raw array (web/mobile pass the array directly) —
-    // wireSkill's string check would reject the array form. Kept hand-written.
-    defineSkill('setMyOfferings', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      // 2026-05-27 slash audit close-out — the chat-shell's slash
-      // surface declares `skills` as `kind: 'string'` (consumer
-      // JSON-encodes the array).  Accept the JSON-string handoff:
-      // parse-then-validate so `/skills [{...}]` reaches the skill
-      // without the LLM-tool-call (`kind: 'json'` grammar extension is
-      // tracked as a separate follow-up — see slash-audit doc).
-      let skillsArr = a.skills;
-      if (typeof skillsArr === 'string') {
-        try { skillsArr = JSON.parse(skillsArr); }
-        catch { return { error: 'skills array required' }; }
-      }
-      if (!Array.isArray(skillsArr)) return { error: 'skills array required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, offerings: skillsArr });
-      const off = updated.offerings ?? updated.skills ?? [];
-      // Result blob writes the new `offerings` field + a transitional
-      // `skills` alias so un-migrated readers keep working (read-accept).
-      return { offerings: off, skills: off, _sync: simulateSync() };
-    }, {
-      description: 'Replace the calling actor\'s offerings array.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * addMyOffering({categoryId, freeTags?, availability?, radius?, status?})
-     *   — append (or update if same categoryId) one offering to the
-     *   calling actor's profile.
-     */
-    ...withLegacyIds(defineSkill('addMyOffering', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.categoryId !== 'string' || !a.categoryId) {
-        return { error: 'categoryId required' };
-      }
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const existing = Array.isArray(me.offerings) ? me.offerings
-        : (Array.isArray(me.skills) ? me.skills : []);
-      const filtered = existing.filter(s => s.categoryId !== a.categoryId);
-      filtered.push({
-        categoryId:   a.categoryId,
-        freeTags:     Array.isArray(a.freeTags) ? a.freeTags : [],
-        availability: a.availability ?? null,
-        radius:       a.radius ?? null,
-        status:       a.status ?? 'active',
-      });
-      const updated = await members.addMember({ ...me, offerings: filtered });
-      const off = updated.offerings ?? updated.skills ?? [];
-      return { offerings: off, skills: off, _sync: simulateSync() };
-    }, {
-      description: 'Add or update one offering on the calling actor\'s profile.',
-      visibility:  'authenticated',
-    }), 'addMySkill'),
-
-    /**
-     * removeMyOffering({categoryId})
-     *   — drop an offering from the calling actor's profile.
-     */
-    ...withLegacyIds(defineSkill('removeMyOffering', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.categoryId !== 'string' || !a.categoryId) {
-        return { error: 'categoryId required' };
-      }
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const existing = Array.isArray(me.offerings) ? me.offerings
-        : (Array.isArray(me.skills) ? me.skills : []);
-      const next = existing.filter(s => s.categoryId !== a.categoryId);
-      const updated = await members.addMember({ ...me, offerings: next });
-      const off = updated.offerings ?? updated.skills ?? [];
-      return { offerings: off, skills: off, _sync: simulateSync() };
-    }, {
-      description: 'Remove an offering from the calling actor\'s profile.',
-      visibility:  'authenticated',
-    }), 'removeMySkill'),
-
-    /**
      * listMyOfferings() — diagnostic / settings UI.
      */
     ...withLegacyIds(defineSkill('listMyOfferings', async ({ from }) => {
@@ -3018,7 +2948,7 @@ export function buildSkills({
       // and its `_sync` producer, and passes the parsed args + carrier context.
       return recordCircleAddress(
         { store, verifyCircleAddressAnnouncement, simulateSync },
-        { a: dataArgs(parts), from, localActor },
+        { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
       );
     }, {
       description: 'Record a member\'s PROVEN per-circle address for a circle (the receive half of address announcing).',
@@ -3240,7 +3170,7 @@ export function buildSkills({
             store, groupId: gid, memberMapList: [], circleSignerFor, membershipRead, selfSigner,
           }),
         },
-        { a: dataArgs(parts), from, localActor },
+        { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
       );
     }, {
       description: 'List addresses for the calling actor\'s circle peers (fan-out roster).',
@@ -3443,39 +3373,6 @@ export function buildSkills({
     // ── Stoop V1 Phase 10 (2026-05-06) — closed-beta hardening ────────────
 
     // ── Stoop V1 Phase 13 (2026-05-06) — UX completeness ─────────────────
-
-    /**
-     * setSkillsHolidayMode({on: bool})
-     *   — bulk-flip every active skill to `'paused'`; flipping
-     *   back restores them to `'active'`.  Net effect: OfferingMatch
-     *   and Layer-1 matching ignore my profile while paused.
-     *   Note: distinct from `setHolidayMode` (which sets a single
-     *   cross-device flag without touching per-skill status).  Apps
-     *   typically wire both: the flag for the UI banner + the bulk
-     *   flip for actual matching behaviour.
-     *
-     *   Status enum values (`actief` / `gepauzeerd` / `gearchiveerd`)
-     *   are intentional Dutch domain vocabulary — locked-in by V1.
-     */
-    defineSkill('setSkillsHolidayMode', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.on !== 'boolean') return { error: 'on (bool) required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const skills = Array.isArray(me.skills) ? me.skills : [];
-      const targetStatus = a.on ? 'paused' : 'active';
-      const updated = skills.map(s => ({
-        ...s,
-        // Only flip skills that are not 'archived' — leaving
-        // archived ones alone so holiday-mode isn't a re-archive event.
-        status: s.status === 'archived' ? 'archived' : targetStatus,
-      }));
-      await members.addMember({ ...me, offerings: updated });
-      return { holidayMode: a.on, skillCount: updated.length, _sync: simulateSync() };
-    }, {
-      description: 'Bulk-flip every active skill between paused (gepauzeerd) and active (actief); does not touch archived skills.',
-      visibility:  'authenticated',
-    }),
 
     /**
      * checkDuplicate({text})
@@ -4590,10 +4487,13 @@ export function buildSkills({
       const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
         ? a.trustOffer : 'bekend';
       const me = members ? await members.resolveByWebid(from) : null;
+      // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
+      // no fallback to this agent's identity, which every self of the device shares and so would link them.
+      const asPersona = !!localActor && from !== localActor;
       const card = {
         webid:        from,
-        pubKey:       me?.pubKey       ?? agent?.identity?.pubKey ?? null,
-        stableId:     me?.stableId     ?? agent?.identity?.stableId ?? null,
+        pubKey:       me?.pubKey       ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     me?.stableId     ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
         avatarUrl:    me?.avatarUrl    ?? null,
@@ -5681,23 +5581,23 @@ export function buildSkills({
     /* ── Phase 22: Layer-2 personal interest matching ──────────── */
 
     /**
-     * scorePostRelevance({ text, categoryId?, tags?, member? })
-     *   — Combines Layer 1 (deterministic skill match) with Layer 2
-     *   (TF-IDF over the user's response history).  Returns
-     *   `{matched, ...}` with `via: 'category'|'tags'|'interest'`
-     *   when matched, plus the raw `layer2Score` for inspection.
-     *
-     *   `member` defaults to the calling actor's MemberMap entry.
+     * scorePostRelevance({ text, categoryId?, tags?, circleId? })
+     *   — Combines Layer 1 (does it meet what I offer: the host's `matchesMine` over the drivers of the self I am in
+     *   that circle) with Layer 2 (TF-IDF over the user's response history).  Returns `{matched, ...}` with
+     *   `via: 'offering'|'interest'` when matched, plus the raw `layer2Score` for inspection.
      */
     defineSkill('scorePostRelevance', async ({ parts, from }) => {
       const a = dataArgs(parts);
+      // It answers over the person's PRIVATE offerings (the host's matchesMine): to anyone but this device it would be an
+      // oracle over them — per category, and per circle the caller names (linking one persona to another). Only this
+      // device's own call gets a verdict: its own actor, or its self in the named circle (`localActorIn`).
+      if (!from || (from !== localActor && from !== localActorIn(a.circleId ?? null))) return { error: 'not-yours' };
       if (typeof a.text !== 'string' || !a.text) return { error: 'text required' };
 
-      const member = a.member ?? (members ? await members.resolveByWebid(from) : null);
-      const layer1 = matchesProfile(
-        { categoryId: a.categoryId ?? null, tags: a.tags ?? [] },
-        member ?? {},
-      );
+      const mine = typeof bundle?.matchesMine === 'function'
+        ? await bundle.matchesMine(a.circleId ?? null, { text: a.text, categoryId: a.categoryId ?? null, skillTags: Array.isArray(a.tags) ? a.tags : [] }).catch(() => false)
+        : false;
+      const layer1 = mine ? { matched: true, via: 'offering' } : { matched: false, reason: 'no-offering-match' };
       const layer2 = bundle?.interestProfile
         ? scoreInterest(bundle.interestProfile, a.text)
         : 0;

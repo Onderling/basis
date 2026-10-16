@@ -7,7 +7,7 @@
  * Self-contained: loads + mutates via the injected stoop-capable `callSkill`.
  * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
@@ -43,21 +43,31 @@ import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
+import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
+import { START_SCREEN_CHOICES } from '../../../../basis/src/v2/startScreen.js';
 import { forgetCircleSealStrategies } from '../../core/circlePods.js';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
+import ReceivePersonasModal from './ReceivePersonasModal.js';
 import { useRelayQuestion } from './RelayQuestionModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
+import { myDataActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
+import { basisManifest } from '../../../../basis/src/index.js';
+import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
 export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
-  onOpenConnectionPoints, eventLog = null }) {
+  eventLog = null,
+  // the doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here
+  doors = {},
+  // the person's own week overview (a row in their own store, switched here): the clock, or null on a shell without one
+  personClock = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -90,7 +100,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [signInErr, setSignInErr] = useState('');
   const [privacy, setPrivacy] = useState([]);
   const [metrics, setMetrics] = useState({});
-  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
+  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | 'receive-personas' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
   const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
   const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
@@ -167,7 +177,27 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
 
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.
-  const openPoints = useCallback(() => { onOpenConnectionPoints?.(); }, [onOpenConnectionPoints]);
+  // the person's own week overview: on · off · null while it loads or switches (undefined: no clock here)
+  const [weekOn, setWeekOn] = useState(undefined);
+  const weekMe = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const clock = personClock ? await personClock : null;
+      const me = (await callSkill?.('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      weekMe.current = me;
+      if (alive && clock && me) setWeekOn(personWeekOn(clock.book, me));
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [personClock, callSkill]);
+  const toggleWeek = useCallback(async () => {
+    const clock = personClock ? await personClock : null;
+    if (!clock || !weekMe.current) return;
+    const next = !personWeekOn(clock.book, weekMe.current);
+    setWeekOn(null);
+    try { await switchPersonWeek(clock.book, weekMe.current, next); } catch { /* shown as it stands below */ }
+    setWeekOn(personWeekOn(clock.book, weekMe.current));
+  }, [personClock]);
 
   const deliveryStore = React.useMemo(
     () => createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage)), [],
@@ -345,6 +375,26 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Text style={styles.title}>{t('circle.mydata.title')}</Text>
       </View>
 
+      {/* the doors that sat on Mij: availability · connection points · shared with me · blocked (web: circleMyData.js) */}
+      {myDataActionsMobile(basisManifest, doors).length ? (
+        <Section title={t('circle.profile.mydata_more')}>
+          {myDataActionsMobile(basisManifest, doors).map((d) => (
+            <Pressable key={d.id} style={styles.relaySave} onPress={d.open} testID={`mydata-door-${d.id}`}>
+              <Text style={styles.relaySaveText}>{t(d.labelKey)}</Text>
+            </Pressable>
+          ))}
+        </Section>
+      ) : null}
+      {weekOn !== undefined ? (
+        <Section title={t('circle.profile.week_switch')}>
+          <Pressable testID="profile-week-toggle" accessibilityRole="switch"
+            accessibilityState={{ checked: weekOn === true, disabled: weekOn === null }}
+            disabled={weekOn === null} onPress={toggleWeek} style={styles.relaySave}>
+            <Text style={styles.relaySaveText}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
+          </Pressable>
+        </Section>
+      ) : null}
+
       <Section title={t('circle.mydata.storage')}>
         <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
         {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
@@ -374,11 +424,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         </View>
         {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
         <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
-        {/* The LIST behind the single field above — which points this device knows, what rides each, and
-            what removing one would cost (Nearby step I). */}
-        <Pressable style={styles.relaySave} onPress={openPoints} testID="open-connection-points">
-          <Text style={styles.relaySaveText}>{t('circle.nearbyScreen.points_open')}</Text>
-        </Pressable>
 
         {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
             tells you what others see about your receipt setting, because nothing in the model reveals it.
@@ -454,6 +499,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
+        </Pressable>
+        {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
         </Pressable>
         {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
         <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
@@ -534,6 +583,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           no door. The revoke button opens the phrase-proven ceremony for that device. */}
       {devices.length > 0 && (
         <Section title={t('circle.mydata.devices')}>
+          {/* without the recovery seal this device carries nothing of the person's own scope to the others */}
+          {agent?.hasRecoverySeal?.() === false ? (
+            <Text style={styles.privacyBody} testID="mydata-devices-needs-phrase">{t('circle.mydata.devices_needs_phrase')}</Text>
+          ) : null}
           {devices.map((d) => (
             <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
               <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
@@ -798,16 +851,36 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
       </Section>
 
+      {/* Where the app opens on this device — the start-screen setting (startScreen.js), written through set-param like
+          every setting. Web parity: circleMyData.js. Omitted without an agent. */}
+      {agent && typeof agent.getParamValue === 'function' ? (
+        <Section title={t('circle.mydata.start_title')}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {START_SCREEN_CHOICES.map((c) => {
+              const on = (agent.getParamValue('home.startScreen') ?? 'vandaag') === c.value;
+              return (
+                <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-start-${c.value}`}
+                  accessibilityState={{ selected: on }}
+                  onPress={async () => {
+                    try { await callSkill('params', 'set-param', { key: 'home.startScreen', value: c.value }); } catch { /* the row re-reads the truth */ }
+                    setHistoryTick((n) => n + 1);
+                  }}>
+                  <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Section>
+      ) : null}
+
       {/* The personal history mirror — live health from the agent; the toggle flips the
           history.mirror register param through the one kind-gated write (the agent starts/stops
           the sink LIVE). Web parity: circleMyData.js's history section. Omitted without an agent. */}
       {agent && typeof agent.historyMirrorStatus === 'function' ? (() => {
         const on = agent.getParamValue?.('history.mirror') === true;
         const hs = agent.historyMirrorStatus();
-        const stateLine = !on ? t('circle.mydata.history_off')
-          : hs?.lastError ? t('circle.mydata.history_error', { error: hs.lastError })
-          : hs ? t('circle.mydata.history_on', { count: (hs.mirrored ?? 0) + (hs.pending ?? 0) })
-          : t('circle.mydata.history_waiting');
+        const line = historyStatusLine({ enabled: on, status: hs });
+        const stateLine = t(line.key, line.vars);
         return (
           <Section title={t('circle.mydata.history')}>
             <Text style={styles.privacyBody} testID="mydata-history-status">{stateLine}</Text>
@@ -960,6 +1033,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         />
       )}
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
+      <ReceivePersonasModal visible={wizard === 'receive-personas'} callSkill={callSkill} onClose={() => setWizard(null)} />
       {relayQuestionModal}
       <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
       <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"

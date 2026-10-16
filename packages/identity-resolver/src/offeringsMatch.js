@@ -87,52 +87,6 @@ export function categoryFor(text) {
   return { categoryId: bestCategory, tags: [...tags] };
 }
 
-/**
- * Decide whether a post is relevant to a member's skills profile.
- *
- * Hit when EITHER (a) the post's `categoryId` matches one of the
- * member's `skills[].categoryId` (with status `'active'`); OR
- * (b) any of the post's `tags` overlaps with the member's
- * `skills[].freeTags`.
- *
- * Pure function — no I/O.  Returns `{matched, reason}` for
- * debuggability.
- *
- * @param {object} post  `{categoryId?, tags?}`
- * @param {{availability?: string, holidayMode?: boolean, skills?: Array<{categoryId: string, freeTags?: string[], status?: string}>}} member
- * @returns {{matched: boolean, reason?: string, viaCategory?: string, viaTags?: string[]}}
- */
-export function matchesProfile(post, member) {
-  // Availability unification (decision): 'away' IS holiday mode — the member
-  // is not reachable, so skill-match routes AROUND them. Reads the unified
-  // person-level `availability` property (projected onto the roster member); the
-  // legacy `holidayMode` flag is still honoured for un-migrated entries.
-  if (member?.availability === 'away' || member?.holidayMode === true) {
-    return { matched: false, reason: 'away' };
-  }
-
-  // Read-accept: prefer the canonical `offerings`; fall back to legacy `skills`.
-  const memberOfferings = ((member?.offerings ?? member?.skills) ?? []).filter((s) => (s.status ?? 'active') === 'active');
-  if (memberOfferings.length === 0) return { matched: false, reason: 'no-active-skills' };
-
-  if (post?.categoryId) {
-    const hit = memberOfferings.find((s) => s.categoryId === post.categoryId);
-    if (hit) return { matched: true, viaCategory: post.categoryId };
-  }
-
-  if (Array.isArray(post?.tags) && post.tags.length > 0) {
-    const overlap = [];
-    for (const skill of memberOfferings) {
-      const free = Array.isArray(skill.freeTags) ? skill.freeTags : [];
-      for (const tag of post.tags) {
-        if (free.includes(tag)) overlap.push(tag);
-      }
-    }
-    if (overlap.length > 0) return { matched: true, viaTags: overlap };
-  }
-
-  return { matched: false, reason: 'no-overlap' };
-}
 
 /**
  * Validate a category id against the taxonomy.  Apps use this to

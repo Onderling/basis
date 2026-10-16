@@ -7,6 +7,7 @@
  * `governance` (payload = the event); the full membership is assembled from the roster op
  * plus this device's own row (listGroupRoster excludes the caller).
  */
+import { selfRefIn } from './selfRef.js';
 import { makeCircleGovernance } from './governanceHost.js';
 import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
@@ -27,6 +28,7 @@ export const GOVERNANCE_RAIL_KINDS = entryKindRegistryFromManifests(governanceMa
  * for FOREIGN statements verifies against the roster's proof-checked circleAddress rows.
  */
 export function makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
+  const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function') return null;
   // The default binding is the SAME set-aware verifier the membership rail uses (the derived
   // roster's proven circleAddress SET, add-a-device aware). The old inline default read
@@ -37,7 +39,7 @@ export function makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSki
   // the binding explicitly, which is why node repros passed).
   return makeCircleEntryRail({
     eventLog,
-    signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: myRef }),
+    signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: GOVERNANCE_KIND,
     declaredKinds: GOVERNANCE_RAIL_KINDS,
     verifyBinding: verifyBinding ?? rosterBindingVerifier(callSkill),

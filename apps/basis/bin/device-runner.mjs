@@ -434,6 +434,8 @@ if (relayUrl) {
   const pairSeams = { sendPeerRedeem: null, onJoined: null };
   const pendingPeerRedeems = new Map();
   pairRoster = createPairRoster({
+    // who I am to a contact: its persona's webid when it is filed under one
+    selfWebidOf: (personaId) => agent.personaWebid?.(personaId) ?? null,
     selfWebid: agent.identity?.chat?.pubKey ?? agent.pubKey ?? agent.identity?.pubKey,
     callSkill,
     sendPeerRedeem: (...a) => (pairSeams.sendPeerRedeem ? pairSeams.sendPeerRedeem(...a) : Promise.reject(new Error('peer redeem not ready'))),
@@ -450,6 +452,8 @@ if (relayUrl) {
     }),
   });
   contactChannel = createContactThreadChannel({
+    // a contact filed under a persona talks to THAT persona — sent as it, nothing of the default along
+    selfFor: (peerAddr) => agent.contactSelf?.(peerAddr) ?? null,
     pair: pairRoster,
     // a turn to a bot this person's identity is linked to (`/koppel`) carries this device's statement over it
     authFor: agent.linkedTurnAuth ?? null,
@@ -470,7 +474,7 @@ if (relayUrl) {
     },
     // The first message to a contact carries the person's card; one that arrives (naming its sender) goes into the
     // book here — and the book carry names that person on the phone and the laptop (2026-09-21).
-    myCard: async () => { try { return (await callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: async ({ contactId, card }) => {
       const r = await callSkill('stoop', 'addContactFromQr', { payload: card });
       walkLog({ kind: 'contact-card', contactId: String(contactId).slice(0, 12), name: r?.contact?.displayName ?? r?.contact?.handle ?? null });
@@ -591,6 +595,7 @@ if (relayUrl) {
   pairSeams.sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
     currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join
+    circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // this device's per-circle address on the redeem path, proven with its own key (source circle == the circle joined)
@@ -627,7 +632,7 @@ if (relayUrl) {
   // …and leaves one: the leave statement, the members' keys unbound, the authorize snapshot dropped, the address off the relay
   circleSeams.leave = (circleId) => leaveCircleLocally({
     agent, callSkill, circleId,
-    unregister: () => unregisterCircleAddressesOnRelays({ relays: agent.relays?.list?.() ?? [], circleIds: [circleId], circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null }),
+    unregister: () => unregisterCircleAddressesOnRelays({ relays: agent.relays?.list?.() ?? [], relaysOf: (cid) => agent.relaysFor?.(cid) ?? null, circleIds: [circleId], circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null }),
   });
   // Still in it? Not when this device left it, and not when the circle's folded roster no longer carries this device's
   // per-circle address (an eviction the membership lane folded). A read that fails is not a removal.
@@ -707,6 +712,9 @@ if (relayUrl) {
       circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
       circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
       alsoAddresses: agent.ownAddressBindings?.() ?? [],   // the person address beside the per-circle ones
+      // each self on its own sockets: a persona's circle registers on the persona's, beside its own person address
+      relaysOf: (cid) => agent.relaysFor?.(cid) ?? null,
+      alsoAddressesOf: (cid) => agent.ownAddressBindingsFor?.(cid) ?? [],
       circlesForPoint,
       defaultRelayUrl: relayUrl,
       onError: (err, cid) => console.warn(`device-runner: circle-address register failed (${String(cid).slice(0, 12)}…):`, err?.message ?? err),

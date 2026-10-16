@@ -76,14 +76,14 @@ test('a rename on one device and a disclosure on the other, each its first state
     const newName = `Anna ${Date.now().toString(36).slice(-4)}`;
     await gotoCircles(A1.page);
     await A1.page.locator('[data-tab="mij"]').first().click(); await A1.page.waitForTimeout(1200);
-    await A1.page.locator('.cc-profile__display').fill(newName);
+    await A1.page.locator('.circle-screen__identity-edit').click(); await A1.page.locator('.cc-profile__display').fill(newName);
     const renamed = A1.page.locator('.cc-profile__save').click();
     const disclosed = (async () => {
       await call(A2.page, 'agents', 'setProfileProperty', { id: 'default', key: 'place', value: 'Groningen' });
       await call(A2.page, 'agents', 'setProfileDisclosure', { id: 'default', contextId: circle, key: 'place', enabled: true });
       await gotoCircles(A2.page);
       await A2.page.locator('[data-tab="mij"]').first().click(); await A2.page.waitForTimeout(1500);
-      await A2.page.locator('.cc-profile__offerings-moved-link').first().click(); await A2.page.waitForTimeout(2000);
+      await A2.page.locator('.circle-screen__identity-edit').first().click(); await A2.page.waitForTimeout(2000);
       const row = A2.page.locator(`.cc-mij__table tr[data-circle-id="${circle}"]`);
       const btn = row.locator('.cc-mij__cell-action button').first();
       if (!(await btn.count())) return { pressed: false, why: 'no share button on the circle row' };
@@ -95,6 +95,7 @@ test('a rename on one device and a disclosure on the other, each its first state
       return { pressed: true, status: text };
     })();
     const [, share] = await Promise.all([renamed, disclosed]);
+    await closePanel(A1.page);   // A1's own editor, where the name was saved
     expect(share.pressed, `A2 shared: ${share.why ?? ''}`).toBe(true);
     log('STEP1 two first statements', 'PASS', `A1 renamed to "${newName}" · A2 shared: ${share.status}`);
 

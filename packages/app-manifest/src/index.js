@@ -138,7 +138,7 @@ export { renderChat, matchesAppliesTo as chatMatchesAppliesTo,
 export { renderSlash } from './renderSlash.js';
 export { renderGate } from './renderGate.js';
 export { gateVerbsOf, gateDropTrailingOf } from './gateVerbs.js';
-export { renderA2A, NEVER_DELEGABLE } from './renderA2A.js';
+export { renderA2A, NEVER_DELEGABLE, isDeviceOp } from './renderA2A.js';
 export { renderAttachments } from './renderAttachments.js';
 
 // SHELL family (web + mobile surface projection).

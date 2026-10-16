@@ -17,7 +17,7 @@ export function renderBlockedList(container, { rows = [], t, onBack, onUnblock, 
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'cc-blocked__back';
-  back.textContent = tr('circle.back');
+  back.textContent = tr('circle.back_mydata');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
 

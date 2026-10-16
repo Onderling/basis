@@ -1,16 +1,15 @@
 /**
- * WHICH PERSONA A CONTACT SEES YOU AS — the lens, not a second you.
+ * WHICH OF YOU A CONTACT KNOWS — the persona a contact is filed under.
  *
- * Today ONE identity runs. Every `deriveAgentSeed(` in the running agent says `'default'`, the join records
- * its membership under `'default'` whatever persona was chosen, and a contact's pair circle is always
- * `pairCircleIdFor(default.webid, other)`. A persona is a named DISCLOSURE LENS over that one identity: which
- * name, face and properties a given circle or contact receives. Same key, same address, same pair id — only
- * the release differs.
+ * Until 2026-10-12 a persona was only a LENS over one identity (same key, same address, same pair id — only the
+ * release differed). It is a separate self now:
  *
- * Say it that way on every surface: *"dit contact ziet je als …"*, never *"dit contact kent een andere jij"*.
- * A persona as a separate person on the wire is designed and NOT built — that is ledger L123, after the
- * runtime arc, and it is key-sensitive work with its own sitting. Promising it in the UI before it exists
- * would be a privacy claim the code does not keep.
+ * ON THE WIRE (2026-10-12): a contact filed under a persona this device runs talks to THAT persona — its turns are
+ * authored by and sent as the persona, carry the persona's own card, are sealed from the persona's person key, and the
+ * pair circle is the persona's with them (`pairCircleIdFor(persona.webid, other)`, founded AS it). Nothing of the
+ * default rides along. So the surface says it as it is: *"dit contact kent een andere jij"*. Switching an existing
+ * contact to another persona later gives them a NEW contact on their side (the persona's card arrives with the next
+ * turn); what they already knew of the old one, they keep — the hint says that too.
  *
  * The persona lives on the CONTACT ROW because the founding needs it before the pair circle exists; once the
  * circle exists, the release on its roster is the derived truth. One input, one projection — not two facts.

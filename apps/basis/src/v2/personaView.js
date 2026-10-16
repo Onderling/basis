@@ -25,7 +25,7 @@
  */
 
 import { attributeKeys, bucketsFor } from '@onderling/attribute-charter';
-import { isDriverValue, normalizeDriverKind, deriveOfferingCategory, OFFERINGS_TAXONOMY, AVAILABILITY_STATES, availabilityState, locationLabel } from '@onderling/agent-registry';
+import { isDriverValue, OFFERINGS_INHERIT_KEY, normalizeDriverKind, deriveOfferingCategory, OFFERINGS_TAXONOMY, AVAILABILITY_STATES, availabilityState, locationLabel } from '@onderling/agent-registry';
 
 /** The free-text "when" note of a structured availability value ({ state, when }), or null. */
 function availabilityWhen(value) {
@@ -140,6 +140,10 @@ export function propertyStateFor(rawSelf, rawDefault, key) {
   const ownV = ownValueOf(entry);
   if (ownV !== undefined) return { state: 'own', value: ownV };
   const dfltV = ownValueOf((rawDefault && typeof rawDefault === 'object') ? rawDefault[key] : undefined);
+  // a persona that did not take the general offerings (its own marker, asked at creation) does not hold them
+  if (dfltV !== undefined && isDriverValue(dfltV) && dfltV.kind === 'offering' && ownValueOf(rawSelf?.[OFFERINGS_INHERIT_KEY]) === false) {
+    return { state: 'absent', value: undefined };
+  }
   if (dfltV !== undefined) return { state: 'inherit', value: dfltV };
   return { state: 'absent', value: undefined };
 }
@@ -344,7 +348,8 @@ export function buildMijViewModel({ personas, defaultId = 'default', circles, re
   // (drivers/offerings included), so an override never disappears from its card.
   const keyOrder = [...attributeKeys()];
   for (const p of list) {
-    for (const k of Object.keys(p.properties ?? {})) if (!keyOrder.includes(k)) keyOrder.push(k);
+    // a key with a leading underscore is a marker (no row): the offerings answer, a migration's note
+    for (const k of Object.keys(p.properties ?? {})) if (!k.startsWith('_') && !keyOrder.includes(k)) keyOrder.push(k);
   }
   const personaCards = list.map((p) => {
     const isDefault = p.id === defaultId;

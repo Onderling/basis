@@ -25,6 +25,7 @@ function normalizeList(r) {
     : Array.isArray(r?.posts)  ? r.posts
     : Array.isArray(r?.files)  ? r.files
     : Array.isArray(r?.events) ? r.events
+    : Array.isArray(r?.personas) ? r.personas   // listPersonasHere: the selves this device holds, by name
     : [];
 }
 

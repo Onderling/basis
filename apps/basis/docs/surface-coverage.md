@@ -116,9 +116,9 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `listReceivablePersonas` | list | · | · | · | · | · | · |  |
 |  | `removePersonaHere` | remove-persona | · | · | · | · | · | · |  |
 |  | `setNearbyLevel` | set-nearby-level | · | · | · | · | · | · |  |
-|  | `listPersonasHere` | list | · | · | · | · | · | · |  |
-|  | `pausePersona` | pause-persona | · | · | · | · | · | · |  |
-|  | `resumePersona` | resume-persona | · | · | · | · | · | · |  |
+|  | `listPersonasHere` | list | · | ✅ | · | · | · | · |  |
+|  | `pausePersona` | pause-persona | · | ✅ | · | · | · | · |  |
+|  | `resumePersona` | resume-persona | · | ✅ | · | · | · | · |  |
 |  | `receivePersonas` | receive-personas | · | · | · | · | · | · |  |
 |  | `importRecoveryFile` | import-recovery-file | · | · | · | · | · | · |  |
 |  | `restoreStatus` | restore-status | · | · | · | · | · | · |  |
@@ -335,7 +335,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 330 ops | | 242 | 178 | 33 | 5 | 152 | 70 | |
+| **totals** | 330 ops | | 242 | 181 | 33 | 5 | 152 | 70 | |
 
 ### Flows
 

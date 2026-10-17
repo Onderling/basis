@@ -504,9 +504,10 @@ export const householdManifest = {
       id:   'listPersonasHere', group: 'device',
       verb: 'list',
       // THE PERSONAS ON THIS DEVICE — every self it holds, running or paused, and which is its primary (the self it
-      // speaks as). Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
+      // speaks as). Reached from My data → "Persona's op dit apparaat", and typed as `/hier` (this device's own line —
+      // a device op is on no bot's door and never delegable).
       params: [],
-      surfaces: {},
+      surfaces: { slash: { command: '/hier' } },
     },
     {
       id:   'pausePersona', group: 'device',
@@ -514,17 +515,18 @@ export const householdManifest = {
       writes: { scope: 'device' },   // a device entry: which held personas do not run here
       // PAUSE A PERSONA ON THIS DEVICE — local and reversible, no phrase: from the next boot it does not run here (its
       // circles not reopened or served, out of the switcher); its keys and data stay, nothing reaches the registry or a
-      // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`).
-      params: [ { name: 'personaId', kind: 'string', required: true } ],
-      surfaces: {},
+      // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`). Typed by NAME (`/pauze Werk`):
+      // the name resolves over this device's own list; two selves with that name → the question, never a guess.
+      params: [ { name: 'personaId', kind: 'string', required: true, pickerSource: { listOp: 'listPersonasHere' } } ],
+      surfaces: { slash: { command: '/pauze' } },   // the positional body binds to personaId; no gate words (typed only)
     },
     {
       id:   'resumePersona', group: 'device',
       verb: 'resume-persona',
       writes: { scope: 'device' },
-      // The inverse: from the next boot the persona runs here again.
-      params: [ { name: 'personaId', kind: 'string', required: true } ],
-      surfaces: {},
+      // The inverse: from the next boot the persona runs here again. Typed by name too (`/hervat Werk`).
+      params: [ { name: 'personaId', kind: 'string', required: true, pickerSource: { listOp: 'listPersonasHere' } } ],
+      surfaces: { slash: { command: '/hervat' } },
     },
     {
       id:   'receivePersonas', group: 'device',

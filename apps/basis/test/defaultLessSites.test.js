@@ -64,7 +64,7 @@ describe('a device without the general persona, at the person-sites', () => {
     // …and it SAYS it is partial: the lost device most likely held the general persona, whose part this device cannot do
     expect(r.ok, 'what it could do, it did').toBe(true);
     expect(r.outcome).toBe('partial');
-    expect(r.undone).toEqual(['general']);
+    expect(r.undone).toEqual(['general-circles']);
     expect(((await laptop.callSkill('agents', 'listAgents', {}))?.items ?? []).map((x) => x.agentId), 'no general-persona row minted for the tombstone').not.toContain('default');
     await phone.shutdown?.(); await laptop.shutdown?.();
   }, 120_000);

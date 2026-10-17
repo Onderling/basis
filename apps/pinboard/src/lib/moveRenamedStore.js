@@ -55,9 +55,14 @@ export async function moveRenamedStoreOnce({ args, kind, persist, openLegacy }) 
   let legacy = null;
   try { legacy = await openLegacy(legacyArgs); } catch { legacy = null; }
   if (!legacy?.persist) return { moved: 0, reason: 'no-old-store' };
-  const old = await legacy.persist.load().catch(() => new Map());
+  // A store that cannot be READ is not an empty one: on either side, a read failure moves nothing and removes nothing —
+  // taking it for empty would delete the old store (the device's circles, for good) or flush the old copy over a new
+  // store that already holds this build's posts. The move simply runs again at the next boot.
+  let old;
+  try { old = await (legacy.persist.loadStrict ?? legacy.persist.load).call(legacy.persist); } catch { legacy.persist.close?.(); return { moved: 0, reason: 'unreadable' }; }
   if (!old || old.size === 0) { legacy.persist.close?.(); await removeStore(kind, { ...legacyArgs, prefix: legacyArgs.prefix ?? `${OLD}-cache:` }); return { moved: 0, reason: 'old-empty' }; }
-  const now = await persist.load().catch(() => new Map());
+  let now;
+  try { now = await (persist.loadStrict ?? persist.load).call(persist); } catch { legacy.persist.close?.(); return { moved: 0, reason: 'unreadable' }; }
   let moved = 0;
   if (!now || now.size === 0) {
     await (typeof persist.flush === 'function' ? persist.flush(old) : persist.save(old));

@@ -91,3 +91,54 @@ describe('an enrol\'s forget names the old-name twins too', () => {
     expect(dropped).toContain(`cc-${OLD}-cache`);
   });
 });
+
+describe('an unreadable store is never taken for an empty one', () => {
+  for (const kind of ['file', 'async', 'idb']) {
+    it(`${kind}: the OLD store cannot be read → nothing removed, nothing written, tried again next boot`, async () => {
+      const { moveRenamedStoreOnce } = await import('../../pinboard/src/lib/moveRenamedStore.js');
+      const dir = mkdtempSync(path.join(tmpdir(), 'move-'));
+      const oldFile = path.join(dir, `${OLD}-items.json`);
+      writeFileSync(oldFile, '{"k":1}');
+      const flushed = [];
+      const args = kind === 'file' ? { path: path.join(dir, 'pinboard-items.json') } : kind === 'async' ? { dbName: 'cc-pinboard-cache', asyncStorage: { removeItem: async () => { flushed.push('REMOVED'); } } } : { dbName: 'cc-pinboard-state' };
+      const r = await moveRenamedStoreOnce({
+        args, kind,
+        persist: { load: async () => new Map(), flush: async (m) => { flushed.push(m); } },
+        openLegacy: async () => ({ persist: { load: async () => { throw new Error('locked'); } } }),
+      });
+      expect(r).toEqual({ moved: 0, reason: 'unreadable' });
+      expect(flushed, 'nothing written, nothing removed').toEqual([]);
+      if (kind === 'file') expect(existsSync(oldFile), 'the old store is still there').toBe(true);
+      rmSync(dir, { recursive: true, force: true });
+    });
+    it(`${kind}: the NEW store cannot be read → the old copy is not flushed over it, the old store kept`, async () => {
+      const { moveRenamedStoreOnce } = await import('../../pinboard/src/lib/moveRenamedStore.js');
+      const dir = mkdtempSync(path.join(tmpdir(), 'move-'));
+      const oldFile = path.join(dir, `${OLD}-items.json`);
+      writeFileSync(oldFile, '{"k":1}');
+      const flushed = [];
+      const args = kind === 'file' ? { path: path.join(dir, 'pinboard-items.json') } : kind === 'async' ? { dbName: 'cc-pinboard-cache', asyncStorage: { removeItem: async () => { flushed.push('REMOVED'); } } } : { dbName: 'cc-pinboard-state' };
+      const r = await moveRenamedStoreOnce({
+        args, kind,
+        persist: { load: async () => { throw new Error('transient'); }, flush: async (m) => { flushed.push(m); } },
+        openLegacy: async () => ({ persist: { load: async () => new Map([['k', 1]]) } }),
+      });
+      expect(r).toEqual({ moved: 0, reason: 'unreadable' });
+      expect(flushed).toEqual([]);
+      if (kind === 'file') expect(existsSync(oldFile)).toBe(true);
+      rmSync(dir, { recursive: true, force: true });
+    });
+  }
+});
+
+describe('the real adapters read strictly for the move', () => {
+  it('a corrupt old file is not an empty one: it stays, and the new store is not written', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'move-'));
+    writeFileSync(path.join(dir, `${OLD}-items.json`), '{ not json');
+    const { persist } = await pickPersist({ path: path.join(dir, 'pinboard-items.json') });
+    expect((await persist.load()).size).toBe(0);
+    expect(existsSync(path.join(dir, `${OLD}-items.json`)), 'kept for the next boot to try').toBe(true);
+    expect(existsSync(path.join(dir, 'pinboard-items.json'))).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

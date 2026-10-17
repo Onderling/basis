@@ -87,16 +87,22 @@ export class AsyncStoragePersist {
    * @returns {Promise<Map<string, any>>}
    */
   async load() {
-    try {
-      const raw = await this.#storage.getItem(this.#key);
-      if (typeof raw !== 'string') return new Map();
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch {
-      return new Map();
-    }
+    try { return await this.loadStrict(); } catch { return new Map(); }   // corrupt blob or open failure → empty (silent recovery)
+  }
+
+  /**
+   * Like `load`, but only an ABSENT record is empty: an open failure or a corrupt blob throws. For the one-shot store
+   * move, which must never take a store it could not read for an empty one.
+   * @returns {Promise<Map<string, any>>}
+   */
+  async loadStrict() {
+    const raw = await this.#storage.getItem(this.#key);
+    if (raw == null) return new Map();
+    if (typeof raw !== 'string') throw new Error('not a store snapshot');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') throw new Error('not a store snapshot');
+    this.#lastSerialised = raw;
+    return new Map(Object.entries(parsed));
   }
 
   /**

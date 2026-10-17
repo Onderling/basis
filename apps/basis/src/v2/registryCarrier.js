@@ -31,7 +31,7 @@
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { hashHex } from '@onderling/core';
-import { registryResourceUri } from '@onderling/agent-registry';
+import { registryResourceUri, withRegistryWriteLock } from '@onderling/agent-registry';
 import { probeSettingsMediumDetailed } from './settingsRestoreGate.js';
 
 const NAME_DOMAIN = 'onderling-registry-name-v1';
@@ -150,22 +150,26 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
       warn?.('[registry-carrier] could not reach the pod to verify the registry — staying local this session.');
       return { ...state };
     }
-    const localRec = await pseudoPod.read(resourceUri);
-    if (status === 'openable') {
-      let podBody = null;
-      try { podBody = typeof value === 'string' ? JSON.parse(value) : value; } catch { podBody = null; }
-      // Resource-level last-write-wins: the pod copy is newer (another device wrote it, or this device
-      // was wiped) → it becomes the local copy. Otherwise the local copy is pushed up below.
-      if (podBody && (!localRec || updatedAtOf(podBody) >= updatedAtOf(localRec.bytes))) {
-        // the pulled copy keeps this device's tombstones too
-        await pseudoPod.write(resourceUri, unionTombstones(podBody, localRec?.bytes ?? null));
-        state.pulled = true;
-      } else if (podBody && localRec) {
-        // …and the copy pushed up below keeps the pod's
-        const merged = unionTombstones(localRec.bytes, podBody);
-        if (merged !== localRec.bytes) await pseudoPod.write(resourceUri, merged);
+    // the read-then-write runs in the registry's own mutation queue, so a register in flight cannot interleave with it
+    const localRec = await withRegistryWriteLock(pseudoPod, resourceUri, async () => {
+      const localRec = await pseudoPod.read(resourceUri);
+      if (status === 'openable') {
+        let podBody = null;
+        try { podBody = typeof value === 'string' ? JSON.parse(value) : value; } catch { podBody = null; }
+        // Resource-level last-write-wins: the pod copy is newer (another device wrote it, or this device
+        // was wiped) → it becomes the local copy. Otherwise the local copy is pushed up below.
+        if (podBody && (!localRec || updatedAtOf(podBody) >= updatedAtOf(localRec.bytes))) {
+          // the pulled copy keeps this device's tombstones too
+          await pseudoPod.write(resourceUri, unionTombstones(podBody, localRec?.bytes ?? null));
+          state.pulled = true;
+        } else if (podBody && localRec) {
+          // …and the copy pushed up below keeps the pod's
+          const merged = unionTombstones(localRec.bytes, podBody);
+          if (merged !== localRec.bytes) await pseudoPod.write(resourceUri, merged);
+        }
       }
-    }
+      return localRec;
+    });
     pseudoPod.setMode(resourceUri, 'cache');
     state.mode = 'cache';
     if (!state.pulled && localRec) {

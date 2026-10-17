@@ -22,6 +22,25 @@ README: [`packages/agent-registry/README.md`](../../packages/agent-registry/READ
 Whose a profile is: a PERSON's, or a FUNCTION's (a household bot on its own node — "a hosted function is a profile
 whose runners are its devices"). The bot's inbox door follows it; absent means a person.
 
+### `withRegistryWriteLock`
+
+**Kind:** function · **Import:** `withRegistryWriteLock` from `'@onderling/agent-registry'`
+
+```js
+withRegistryWriteLock(pseudoPod, uri, run)
+```
+
+Run `run` in the registry's mutation queue for this resource — for a writer OUTSIDE the registry handle (the carrier
+pulling the pod copy over the local one), so its read-then-write cannot interleave with a register.
+
+**Parameters**
+
+- `pseudoPod` `object`
+- `uri` `string`
+- `run` `() => Promise<T>`
+
+**Returns:** `Promise<T>`
+
 ### `createAgentRegistry`
 
 **Kind:** function · **Import:** `createAgentRegistry` from `'@onderling/agent-registry'`

@@ -5,7 +5,7 @@
  * `Project Files/Substrates/substrates-v2-coding-plan-2026-05-11.md`.
  */
 
-export { createAgentRegistry, PROFILE_KINDS }  from './src/AgentRegistry.js';
+export { createAgentRegistry, PROFILE_KINDS, withRegistryWriteLock }  from './src/AgentRegistry.js';
 export { makeActorResolver }    from './src/makeActorResolver.js';
 export {
   registryResourceUri,

@@ -23,7 +23,7 @@ import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
 
 const GROUP = 'circle-replace-walk';
 const rowFor = async (node, webid) => {
-  const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+  const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
   return (res?.members ?? []).find((m) => m.webid === webid) ?? null;
 };
 const logOpts = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
@@ -56,7 +56,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     const own = ownAnnouncementFor({ agent: A.agent, circleId: GROUP });
     expect(own.ceremonyCommitment, 'the announcement declares the commitment').toBeTruthy();
     const recordOwn = async (node) => {
-      const r = await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...own });
+      const r = await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...own });
       expect(r?.ok).toBe(true);
     };
     for (const node of [A, B]) await recordOwn(node);
@@ -76,7 +76,7 @@ describe('the replace ceremony — her phone is gone, the new one carries on', (
     expect(addrA2).not.toBe(addrA);
     const mine = ownAnnouncementFor({ agent: A2.agent, circleId: GROUP });
     for (const node of [A, B, A2]) {
-      await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });
+      await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...mine });
     }
     // The new phone knows its circle (the registry came back from the pod or the recovery file — modelled by the membership record).
     await A2.agent.callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId: GROUP, handle: 'anna', address: addrA2 });

@@ -42,7 +42,7 @@ describe('a follow-up after a read', () => {
       ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, t,
     });
     await ensureHouseholdLists({ callSkill: (a, o, x) => agent.callSkill(a, o, x), t });
-    await agent.callSkill('stoop', 'addContact', { webid: 'telegram:1', channel: 'telegram', role: 'member', displayName: 'Ann' });
+    await agent.callSkill('pinboard', 'addContact', { webid: 'telegram:1', channel: 'telegram', role: 'member', displayName: 'Ann' });
     await agent.setDoorCaller('telegram:1', 'member');
     const catalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps() });
     threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });

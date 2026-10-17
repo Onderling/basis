@@ -3,13 +3,13 @@
  *
  * Two mounted apps declare the SAME bare `/done` command. The merged catalogue
  * (`mergeManifests`) must, via `@onderling/manifest-host`'s `resolveSlash`:
- *   - expose the app-qualified forms (`/tasks:done`, `/stoop:done`) that always
+ *   - expose the app-qualified forms (`/tasks:done`, `/pinboard:done`) that always
  *     route to the right app;
  *   - surface the bare `/done` as AMBIGUOUS (offer the choices) with NO
  *     override, so the parser hands back kind:'ambiguous' instead of silently
  *     firing the first declarer;
  *   - resolve the bare `/done` to the pinned WINNER when a per-host override is
- *     set (`slashOverrides: { done: 'stoop' }`), while the other app stays
+ *     set (`slashOverrides: { done: 'pinboard' }`), while the other app stays
  *     reachable via its qualified form;
  *   - leave a NON-colliding command (`/mine`, `/addtask`) exactly as before.
  */
@@ -32,8 +32,8 @@ const tasksLite = {
   views: [{ id: 'open', title: 'Open', type: 'task' }],
 };
 
-const stoopLite = {
-  app:       'stoop',
+const pinboardLite = {
+  app:       'pinboard',
   itemTypes: ['request'],
   operations: [
     { id: 'markDone', verb: 'done', params: [],
@@ -44,14 +44,14 @@ const stoopLite = {
   views: [{ id: 'feed', title: 'Feed', type: 'request' }],
 };
 
-const sources = [{ manifest: tasksLite }, { manifest: stoopLite }];
+const sources = [{ manifest: tasksLite }, { manifest: pinboardLite }];
 
 describe('mergeManifests — slash-collision policy (prefix-all, no override)', () => {
   it('adds app-qualified forms for every declarer of the colliding command', () => {
     const cat = mergeManifests(sources);
     const byCmd = Object.fromEntries(cat.commandMenu.map((e) => [e.command, e]));
     expect(byCmd['/tasks:done']).toMatchObject({ command: '/tasks:done', opId: 'completeTask', appOrigin: 'tasks' });
-    expect(byCmd['/stoop:done']).toMatchObject({ command: '/stoop:done', opId: 'markDone', appOrigin: 'stoop' });
+    expect(byCmd['/pinboard:done']).toMatchObject({ command: '/pinboard:done', opId: 'markDone', appOrigin: 'pinboard' });
   });
 
   it('marks the BARE command ambiguous (no silent fire) and carries the choices', () => {
@@ -61,9 +61,9 @@ describe('mergeManifests — slash-collision policy (prefix-all, no override)', 
     expect(bare.opId).toBeUndefined();
     expect(bare.choices).toEqual([
       { command: '/tasks:done', appId: 'tasks' },
-      { command: '/stoop:done', appId: 'stoop' },
+      { command: '/pinboard:done', appId: 'pinboard' },
     ]);
-    expect(cat.slashPolicy.ambiguous).toEqual({ '/done': ['tasks', 'stoop'] });
+    expect(cat.slashPolicy.ambiguous).toEqual({ '/done': ['tasks', 'pinboard'] });
   });
 
   it('parseInput returns kind:ambiguous for the bare command, preserving the body', () => {
@@ -72,35 +72,35 @@ describe('mergeManifests — slash-collision policy (prefix-all, no override)', 
     expect(p.kind).toBe('ambiguous');
     expect(p.command).toBe('/done');
     expect(p.body).toBe('fix the fence');
-    expect(p.choices.map((c) => c.command)).toEqual(['/tasks:done', '/stoop:done']);
+    expect(p.choices.map((c) => c.command)).toEqual(['/tasks:done', '/pinboard:done']);
   });
 
   it('the qualified forms parse as normal slash and route to the right app', () => {
     const cat = mergeManifests(sources);
     const a = parseInput('/tasks:done t1', cat);
     expect(a).toMatchObject({ kind: 'slash', opId: 'completeTask', appOrigin: 'tasks' });
-    const b = parseInput('/stoop:done r1', cat);
-    expect(b).toMatchObject({ kind: 'slash', opId: 'markDone', appOrigin: 'stoop' });
+    const b = parseInput('/pinboard:done r1', cat);
+    expect(b).toMatchObject({ kind: 'slash', opId: 'markDone', appOrigin: 'pinboard' });
   });
 
   it('non-colliding commands are unchanged (bare, single owner)', () => {
     const cat = mergeManifests(sources);
     const mine = parseInput('/mine', cat);
-    expect(mine).toMatchObject({ kind: 'slash', opId: 'listFeed', appOrigin: 'stoop' });
+    expect(mine).toMatchObject({ kind: 'slash', opId: 'listFeed', appOrigin: 'pinboard' });
     const add = parseInput('/addtask paint', cat);
     expect(add).toMatchObject({ kind: 'slash', opId: 'addTask', appOrigin: 'tasks' });
     // No qualified forms were minted for the non-colliding commands.
-    expect(cat.commandMenu.some((e) => e.command === '/tasks:mine' || e.command === '/stoop:addtask')).toBe(false);
+    expect(cat.commandMenu.some((e) => e.command === '/tasks:mine' || e.command === '/pinboard:addtask')).toBe(false);
   });
 });
 
 describe('mergeManifests — slash-collision policy (per-host override)', () => {
   it('bare command resolves to the pinned WINNER; others stay qualified', () => {
-    const cat = mergeManifests(sources, { slashOverrides: { done: 'stoop' } });
-    // Bare /done → stoop (the winner), dispatched (no longer ambiguous).
+    const cat = mergeManifests(sources, { slashOverrides: { done: 'pinboard' } });
+    // Bare /done → pinboard (the winner), dispatched (no longer ambiguous).
     const bare = parseInput('/done r1', cat);
-    expect(bare).toMatchObject({ kind: 'slash', opId: 'markDone', appOrigin: 'stoop' });
-    expect(cat.slashPolicy.winners).toEqual({ '/done': 'stoop' });
+    expect(bare).toMatchObject({ kind: 'slash', opId: 'markDone', appOrigin: 'pinboard' });
+    expect(cat.slashPolicy.winners).toEqual({ '/done': 'pinboard' });
     // The loser (tasks) stays reachable via its qualified form.
     const q = parseInput('/tasks:done t1', cat);
     expect(q).toMatchObject({ kind: 'slash', opId: 'completeTask', appOrigin: 'tasks' });

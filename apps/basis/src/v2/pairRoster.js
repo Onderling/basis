@@ -67,7 +67,7 @@ export function createPairRoster({
   const personaOf = async (webid) => {
     if (typeof personaFor === 'function') { try { return (await personaFor(webid)) ?? null; } catch { return null; } }
     try {
-      const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
+      const rows = bookRowsOf(await callSkill('pinboard', 'listContacts', {}));
       return personaOfContact(rows.find((c) => c?.webid === webid));
     } catch { return null; }
   };
@@ -87,7 +87,7 @@ export function createPairRoster({
     if (typeof fromAddr !== 'string' || !fromAddr) return fromAddr;
     try { const r = typeof identityOf === 'function' ? identityOf(fromAddr) : null; if (typeof r === 'string' && r && r !== fromAddr) return r; } catch { /* next */ }
     try {
-      const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
+      const rows = bookRowsOf(await callSkill('pinboard', 'listContacts', {}));
       const hit = rows.find((c) => c?.webid === fromAddr || c?.personKey?.pubKey === fromAddr || c?.peerAddr === fromAddr);
       if (hit?.webid) return hit.webid;
     } catch { /* the address stands */ }
@@ -106,11 +106,11 @@ export function createPairRoster({
     return { handle: derivedHandle(), own: false };
   };
   const myCircles = async () => {
-    try { return new Set(((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).filter((c) => typeof c === 'string')); } catch { return new Set(); }
+    try { return new Set(((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).filter((c) => typeof c === 'string')); } catch { return new Set(); }
   };
   const memberOf = async (circleId, webid) => {
     try {
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
       return (r?.members ?? []).some((m) => m?.webid === webid);
     } catch { return false; }
   };
@@ -120,11 +120,11 @@ export function createPairRoster({
    */
   const keyless = async (webid) => {
     let row = null;
-    try { row = bookRowsOf(await callSkill('stoop', 'listContacts', {})).find((c) => c?.webid === webid) ?? null; } catch { row = null; }
+    try { row = bookRowsOf(await callSkill('pinboard', 'listContacts', {})).find((c) => c?.webid === webid) ?? null; } catch { row = null; }
     return isKeylessContact(row ?? { webid });   // the book row decides; an id it does not hold, by its shape
   };
   const recordOnContact = async (webid, circleId) => {
-    try { await callSkill('stoop', 'addContact', { webid, pairCircleId: circleId }); } catch { /* the row is a convenience; the roster is the fact */ }
+    try { await callSkill('pinboard', 'addContact', { webid, pairCircleId: circleId }); } catch { /* the row is a convenience; the roster is the fact */ }
   };
 
   /** The pair circle for `contactWebid`, created here when this side founds and it does not exist yet. */
@@ -217,7 +217,7 @@ export function createPairRoster({
       // code, so a forged claim admits nobody anywhere.
       if (webid === fromAddr && typeof invite?.adminPeerAddr === 'string' && invite.adminPeerAddr && invite.adminPeerAddr !== selfWebid) {
         try {
-          const rows = bookRowsOf(await callSkill('stoop', 'listContacts', {}));
+          const rows = bookRowsOf(await callSkill('pinboard', 'listContacts', {}));
           if (rows.some((c) => c?.webid === invite.adminPeerAddr)) webid = invite.adminPeerAddr;
         } catch { /* the address stands */ }
       }
@@ -249,7 +249,7 @@ export function createPairRoster({
       if (!isPairCircleId(circleId) || typeof newMemberWebid !== 'string' || !newMemberWebid) return null;
       if (circleId !== pairCircleIdFor(await meFor(newMemberWebid), newMemberWebid)) return null;
       let promoted = false;
-      try { promoted = !!(await callSkill('stoop', 'setMemberRole', { groupId: circleId, memberWebid: newMemberWebid, role: 'admin' }))?.ok; }
+      try { promoted = !!(await callSkill('pinboard', 'setMemberRole', { groupId: circleId, memberWebid: newMemberWebid, role: 'admin' }))?.ok; }
       catch (err) { logger?.warn?.(`[pair-roster] could not promote the co-member: ${err?.message ?? err}`); }
       await recordOnContact(newMemberWebid, circleId);
       // …and tell the co-member where I answer, with my commitment — the fan reaches them now that they are on the row.
@@ -272,9 +272,9 @@ export async function pairRouteFor({ callSkill, selfWebid, contactWebid } = {}) 
   let circleId;
   try { circleId = pairCircleIdFor(selfWebid, contactWebid); } catch { return null; }
   try {
-    const mine = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [];
+    const mine = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [];
     if (!mine.includes(circleId)) return null;
-    const row = ((await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === contactWebid);
+    const row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === contactWebid);
     const to = typeof row?.circleAddress === 'string' && row.circleAddress ? row.circleAddress : null;
     if (!to) return null;
     return { to, circleId, personKey: row.personKey ?? null };

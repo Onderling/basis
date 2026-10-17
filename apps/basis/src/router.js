@@ -248,7 +248,7 @@ const CREATE_VERBS = new Set(['add', 'post']);
 
 /**
  * Id-targeted MUTATION verbs that must ROUTE to the active circle's circle/group to FIND their target.
- * basis is multi-pod — each circle has its own tasks/stoop peer + item-store — so a mutation
+ * basis is multi-pod — each circle has its own tasks/pinboard peer + item-store — so a mutation
  * dispatched WITHOUT the scope keys lands on the wrong circle and the store reports "item not found".
  * (Device-verify 2026-06-11: `@assistant done <task>` resolved the right id via the circle-scoped
  * `listOpen`, but `completeTask` carried no scope → wrong circle → it silently completed nothing.) The
@@ -268,9 +268,9 @@ const SCOPE_KEYS = ['circleId', 'groupId', '_scope'];
  * F1 active-circle → app-scope sync (Phase 5.3).
  *
  * When a circle is open, item-creating dispatches should land inside
- * that circle.  The tasks / stoop resolvers already pick their circle /
+ * that circle.  The tasks / pinboard resolvers already pick their circle /
  * group from an explicit scope arg (`args.circleId → args._scope → topic`
- * for tasks; per-call `args.groupId` for stoop), so binding the active
+ * for tasks; per-call `args.groupId` for pinboard), so binding the active
  * circle is just: inject that id as the scope arg on a *create*
  * dispatch.  The created item then carries the circle tag, readable
  * back via `itemCircleId` (circleScope.js).
@@ -290,9 +290,9 @@ const SCOPE_KEYS = ['circleId', 'groupId', '_scope'];
  * here — are not mis-scoped to the locally-open circle.
  *
  * NB (corrected 2026-06-11): basis is MULTI-POD in practice — each circle has its own
- * tasks/stoop peer + item-store — so the scope arg is load-bearing for routing, not just a forward-
+ * tasks/pinboard peer + item-store — so the scope arg is load-bearing for routing, not just a forward-
  * compatible tag. A mutation dispatched without it lands on the wrong circle (device-verified
- * "item not found" on `done <task>`). stoop is per-call group-aware; tasks routes by circleId.
+ * "item not found" on `done <task>`). pinboard is per-call group-aware; tasks routes by circleId.
  *
  * Pure: the host reads `getActiveCircle()` and passes the id in.
  *

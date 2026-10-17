@@ -29,12 +29,12 @@ const rows = [
     event: { id: 'r3', type: 'chat-message', payload: { text: 'Bedankt!', senderDisplay: 'Pieter' } },
   },
   {
-    id: 'r2', ts: now - 60_000, app: 'stoop', type: 'circle-post',
+    id: 'r2', ts: now - 60_000, app: 'pinboard', type: 'circle-post',
     actor: 'Pieter', circleId: 'g1', senderLabel: 'Pieter',
     event: { id: 'r2', type: 'circle-post', payload: { kind: 'offer', text: 'Boekje te geef.', authorName: 'Pieter' } },
   },
   {
-    id: 'r1', ts: yest, app: 'stoop', type: 'circle-post',
+    id: 'r1', ts: yest, app: 'pinboard', type: 'circle-post',
     actor: 'Anne', circleId: 'g1', senderLabel: 'Anne',
     event: { id: 'r1', type: 'circle-post', payload: { kind: 'ask', text: 'Heeft iemand een ladder t/m vrijdag?', authorName: 'Anne' } },
   },
@@ -425,7 +425,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   it('non-chat-message local rows (e.g. circle-post mirror) get no delivery icon', () => {
     const el = mount();
     const localPost = {
-      id: 'mine-circle', ts: now + 1_000, app: 'stoop', type: 'circle-post',
+      id: 'mine-circle', ts: now + 1_000, app: 'pinboard', type: 'circle-post',
       actor: LOCAL, circleId: 'g1',
       event: { id: 'mine-circle', type: 'circle-post', payload: { kind: 'offer', text: 'Hi' } },
     };
@@ -598,7 +598,7 @@ describe('renderCircleView · multi-field inline form (mobile MultiFieldFormBubb
   const pendingForm = {
     kind: 'multi',
     opId: 'respondToItem',
-    appOrigin: 'stoop',
+    appOrigin: 'pinboard',
     threadId: null,
     replyShape: 'text',
     prefilledArgs: { itemId: 'i-7' },

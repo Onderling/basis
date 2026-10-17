@@ -2,7 +2,7 @@
  * postAudience — state-machine helpers lifted from
  * src/web/wizards/postAudienceWizard.js (2026-05-24).
  *
- * The wizard composes audience targeting on top of stoop's
+ * The wizard composes audience targeting on top of pinboard's
  * postRequest skill.  Zero DOM, zero RN here — pure value
  * transforms + the submit wrapper.
  */
@@ -75,12 +75,12 @@ export function buildPostRequestArgs(state) {
 }
 
 /**
- * Lazy-load the circle list via stoop.getCurrentGroup.  Mutates
+ * Lazy-load the circle list via pinboard.getCurrentGroup.  Mutates
  * state.availableCircles in place; returns the mutated state.
  */
 export async function loadAvailableCircles({ state, callSkill }) {
   try {
-    const reply  = await callSkill('stoop', 'getCurrentGroup', {});
+    const reply  = await callSkill('pinboard', 'getCurrentGroup', {});
     const groups = reply?.groupId
       ? [{ id: reply.groupId, label: reply.title ?? reply.groupId }]
       : [];
@@ -93,7 +93,7 @@ export async function loadAvailableCircles({ state, callSkill }) {
 }
 
 /**
- * Submit the post via callSkill('stoop', 'postRequest', composedArgs).
+ * Submit the post via callSkill('pinboard', 'postRequest', composedArgs).
  * Mutates state in place (submitting / submitError).  Returns
  * `{result?, state}` so the caller can react to success.
  */
@@ -101,7 +101,7 @@ export async function submitPost({ state, callSkill }) {
   state.submitting  = true;
   state.submitError = null;
   try {
-    const result = await callSkill('stoop', 'postRequest', buildPostRequestArgs(state));
+    const result = await callSkill('pinboard', 'postRequest', buildPostRequestArgs(state));
     if (result?.error) throw new Error(result.error);
     state.submitting = false;
     return { result, state };

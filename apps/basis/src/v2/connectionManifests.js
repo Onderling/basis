@@ -7,7 +7,7 @@
  *   3. both shells, which must offer the same thing (invariant 2, web ≡ mobile)
  *
  * (3) had already broken before this module existed. The web shell listed five manifests; the mobile
- * shell reused its full dispatch catalogue — a different seven, including stoop, whose manifest now
+ * shell reused its full dispatch catalogue — a different seven, including pinboard, whose manifest now
  * declares 92 ops. So the same person pairing the same screen was offered a materially different set
  * depending on which shell they paired from, and after the A2A surface landed that difference would
  * have become a difference in what a peer could actually invoke. Not a paint bug.

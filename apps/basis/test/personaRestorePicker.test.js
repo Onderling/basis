@@ -24,7 +24,7 @@ describe('restore with the picker', () => {
     expect((await phone.callSkill('household', 'bindCirclePersona', { circleId: Y, personaId: b })).ok).toBe(true);
     expect((await phone.callSkill('agents', 'setProfileCircleMembership', { id: b, circleId: Y, address: phone.persona(b).circleAddressFor(Y) }))?.ok).toBe(true);
     // ...with a co-member, Cor (his redemption on the circle's trail), so the file carries a roster to bootstrap from
-    const seeded = await phone.callSkill('stoop', 'recordRosterSeed', { groupId: Y, rows: [{ id: 'redeem-cor', text: 'cor', kind: 'membership-redemption', source: { groupId: Y, redeemedBy: 'cor-webid-0123456789' } }] });
+    const seeded = await phone.callSkill('pinboard', 'recordRosterSeed', { groupId: Y, rows: [{ id: 'redeem-cor', text: 'cor', kind: 'membership-redemption', source: { groupId: Y, redeemedBy: 'cor-webid-0123456789' } }] });
     expect(seeded?.error ?? null, JSON.stringify(seeded)).toBe(null);
     // the recovery file the person kept (it carries the registry — every profile)
     const file = (await phone.callSkill('household', 'exportRecoveryFile', {}))?.file;
@@ -43,7 +43,7 @@ describe('restore with the picker', () => {
     const imported = await restored.callSkill('household', 'importRecoveryFile', { file });
     expect(imported?.ok, 'the file came back').toBe(true);
     // the file's own address for Buurt's circle is Buurt's — the default's webid never appears on that roster
-    const yRows = (await restored.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? [];
+    const yRows = (await restored.callSkill('pinboard', 'listGroupMembers', { groupId: Y }))?.members ?? [];
     expect(yRows.some((m) => m.webid === phone.persona(b).chatId.pubKey), 'Buurt is on its circle\'s roster').toBe(true);
     expect(JSON.stringify(yRows).includes(phone.identity.chat.pubKey), 'the default is not').toBe(false);
     expect(restored.persona(b), 'nothing but the default until picked').toBeFalsy();

@@ -17,7 +17,7 @@
  *   (c) the catch-up strategy (which was already re-deriving the same posture),
  * so a circle's data posture is stated once and read by every consumer instead
  * of being re-derived independently in each. The seal/at-rest posture
- * (`storagePosture` p0–p3) and stoop's storage TIER are ORTHOGONAL axes and
+ * (`storagePosture` p0–p3) and pinboard's storage TIER are ORTHOGONAL axes and
  * are NOT folded in here (see circleStoragePolicy.js / resolveCircleStorage.js).
  *
  * Pure JS — no I/O, no clock, no random. Deterministic for tests.

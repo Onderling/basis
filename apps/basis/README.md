@@ -1,6 +1,6 @@
 # basis
 
-> **Direction (decided 2026-06-11):** the separate apps (stoop, tasks-v0, feedback, …) are to
+> **Direction (decided 2026-06-11):** the separate apps (pinboard, tasks-v0, feedback, …) are to
 > **dissolve INTO basis** — their `manifest.js` declarations stay (the source of truth every
 > projector reads), but the app names become **navigation/reference labels** for shared functionality
 > inside this one chat surface, not separate apps/builds/shells. New work = add manifests + projectors
@@ -28,7 +28,7 @@
 ## What this app does
 
 A single chat UI users open in a browser. Slash commands dispatch
-to whichever Onderling app owns the op (household, tasks-v0, stoop,
+to whichever Onderling app owns the op (household, tasks-v0, pinboard,
 folio's pod-doable subset). User can spawn multiple threads, each
 with its own event-filter + permission config.
 
@@ -85,7 +85,7 @@ Decisions documented after the v0.3.4 substrate-reuse audit (see
 | `@onderling/notifier` | Outbound scheduled push delivery + retry.  Our `EventRouter` is **inbound** event routing to threads.  Different concern.  When v0.5+ ships background notifications, notifier composes on top of EventRouter. |
 | `@onderling/local-store` | `CachingDataSource` is for pod-synced item caches.  Our `IndexedDBStore` persists UI state (thread workspaces) without a pod inner DataSource.  **Pod-sync compose path (v0.6.4 spec, real wiring deferred):** when basis gains OIDC sign-in (J6, v0.7+) and obtains a pod, `IndexedDBStore` swaps to `CachingDataSource({inner: podDataSource, paths: ['mem://basis/threads/*']})`.  Threads then sync per-thread to the pod alongside the local cache; offline edits queue via the substrate's write queue + flush on reconnect.  Until OIDC handoff is real, IndexedDB-only is the right shape — pure UI state with no pod dependency. |
 | `@onderling/chat-agent` | LLM-mediated chat with `MessagingBridge` + per-chat session manager + tool dispatcher.  basis is a **command-first** chat shell over manifest dispatch — different product.  May **compose** chat-agent in v0.5+ as an optional LLM-conversation sink alongside the slash path. |
-| `@onderling/chat-p2p` | P2P chat envelopes via `agent.transport.sendOneWay`.  **Re-audited 2026-05-23 (v0.5.3):** basis does NOT compose chat-p2p directly.  Real cross-peer embed delivery rides on each HOSTING app's chat surface (e.g. stoop's `sendChatMessage` extended with an `embed` envelope field — app-side work).  basis's role: produce the envelope (Q29 + `buildEmbed`) + render it (`embed-card` shape).  The substrate doesn't fit our role; composing it would force basis to take on itemStore + identity-resolver + members machinery that belongs to apps. |
+| `@onderling/chat-p2p` | P2P chat envelopes via `agent.transport.sendOneWay`.  **Re-audited 2026-05-23 (v0.5.3):** basis does NOT compose chat-p2p directly.  Real cross-peer embed delivery rides on each HOSTING app's chat surface (e.g. pinboard's `sendChatMessage` extended with an `embed` envelope field — app-side work).  basis's role: produce the envelope (Q29 + `buildEmbed`) + render it (`embed-card` shape).  The substrate doesn't fit our role; composing it would force basis to take on itemStore + identity-resolver + members machinery that belongs to apps. |
 | `@onderling/agent-ui` | Out-of-process agent ↔ UI via HTTP+SSE.  basis uses in-process `InternalBus` (simpler; matches the static-web deployment of OQ-1.A).  Revisit if relay-bound agents land. |
 | `@onderling/agent-provisioning` | Production-style facade (vault + OIDC + webid + transports).  `realAgent.js`'s manual wiring is intentionally minimal for the in-browser demo; the facade may replace it once OIDC handoff (J6, v0.6) is real. |
 
@@ -172,7 +172,7 @@ Tracking per `/Project Files/basis/coding-plan.md` § Phase v0.1:
 
 | Sub-slice | Scope | Status |
 |---|---|---|
-| 7.0 | Q30 `surfaces.chat.brief` substrate + `/brief` aggregator | shipped 2026-05-23 (household real; stoop/folio stubs in main.js) |
+| 7.0 | Q30 `surfaces.chat.brief` substrate + `/brief` aggregator | shipped 2026-05-23 (household real; pinboard/folio stubs in main.js) |
 | 7.1a | `EventLog` substrate (D.1) + 14-day retention | shipped 2026-05-23 |
 | 7.1b | `/logs` chat-shell builtin + filter/mute flags | shipped 2026-05-23 |
 | 7.1c | Dedicated `/logs` side-panel page UI | pending — chat-inline works today |
@@ -184,19 +184,19 @@ Tracking per `/Project Files/basis/coding-plan.md` § Phase v0.1:
 The phase tables above mark `✅ shipped` based on chat-shell
 primitives being complete + tests green.  This is technically
 correct but **misleading about end-to-end demoability** because
-several phases depend on real backing apps (folio / stoop /
+several phases depend on real backing apps (folio / pinboard /
 tasks-v0) that aren't wired into the browser-bundled real agent.
 
 Honest re-statement:
 
 - **Phase v0.4** primitives ✅ shipped; **real multi-app
   dispatch 🟡 partial** (only household runs as a real agent;
-  folio/stoop/tasks-v0 are stubs in `main.js`'s callSkill).
+  folio/pinboard/tasks-v0 are stubs in `main.js`'s callSkill).
 - **Phase v0.5** embeds primitive ✅ shipped; **cross-peer
   delivery 🟡 deferred to apps' chat surfaces** per the v0.5.3
   audit (intentional, not a gap).
 - **Phase v0.6** `_sync` rendering ✅ shipped; **real adopters
-  (stoop/tasks-v0 populating `_sync` from real sync state)
+  (pinboard/tasks-v0 populating `_sync` from real sync state)
   🟡 pending** per v0.6.5.
 - **Phase v0.7** brief + logs ✅ shipped with mocks; real
   per-app `briefSummary` skills land per-app.
@@ -213,7 +213,7 @@ the per-journey table + prioritised gap list.
 | 6.2 | External-flow primitive + deep-link callback (J6 framework) | pending — needs real OIDC consumer |
 | 6.3 | Reactive panel-stale refresh on matching item-changed events | shipped 2026-05-23 |
 | 6.4 | Pod-sync compose-path documentation (real wiring deferred to v0.7+) | shipped 2026-05-23 |
-| 6.5 | Adopter — stoop / tasks-v0 populate `_sync` from real sync state | pending (app-side work) |
+| 6.5 | Adopter — pinboard / tasks-v0 populate `_sync` from real sync state | pending (app-side work) |
 
 ## Running locally
 

@@ -37,7 +37,7 @@ import { createPeek } from '../../src/v2/circlePeek.js';
 import { readTestModel, testModelProviders } from '../../src/v2/testModel.js';
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
-  scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
+  scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
   noticeboardIntentOf,
@@ -74,7 +74,7 @@ import * as podAuth from '../../src/web/podAuth.js';
 import { discoverPodRoot, createPodWriter } from '../../src/web/podStorage.js';
 // Phase 5 — the bot in the circle composer (mirrors mobile CircleLauncherScreen, on the shared
 // engine). The circle bot stack:
-// The catalogue manifests (basis, tasks, household, stoop, folio, calendar, lists, agents), in dispatch
+// The catalogue manifests (basis, tasks, household, pinboard, folio, calendar, lists, agents), in dispatch
 // order — one list, shared with the mobile shell.
 import { catalogueManifests } from '../../src/v2/manifestSources.js';
 import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
@@ -183,7 +183,7 @@ import {
   createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer, fallbackOfferStateIo } from '../../src/v2/addressFallback.js';
-import { setAddressFallbackReportHook } from '@onderling-app/stoop';
+import { setAddressFallbackReportHook } from '@onderling-app/pinboard';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 // P1.7 — the VIEWER's own narrowing of the conversation (kinds × people/agents), device-local per
 // circle. The circle's conversationKinds stays the ceiling; this only narrows within it.
@@ -198,14 +198,14 @@ import { renderRecoveryExportWizard, renderRecoveryImportWizard } from '../../sr
 // OBJ-2 membership — reuse the classic join wizard renderer in v2 via the same overlay adapter.
 import { renderJoinGroupWizard } from '../../src/web/wizards/joinGroupWizard.js';
 // web-push subscription orchestration (client half; server delivery is a
-// Node-hosted stoop with VAPID keys). The SW receiver lives at web/sw.js.
+// Node-hosted pinboard with VAPID keys). The SW receiver lives at web/sw.js.
 import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/webPushClient.js';
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
 import { routeScan } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
 // client-side image-attachment encoder (Canvas resize + thumbnail → the
-// inbound shape stoop.postRequest expects).
+// inbound shape pinboard.postRequest expects).
 import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // media — the LIVE sealed-media composition for the active circle: the circle's own
 // seal strategy + a (dev-grade, in-memory) bucket + the deny-by-default gate feed
@@ -246,7 +246,7 @@ import { embedButtonsForReply, embedsFromReply } from '../../src/v2/replyEmbeds.
 import { selectSurfaceButtons, createSurfacePrefStore, registerSurfacePrefIo, SURFACE_PREFS } from '../../src/v2/surfacePref.js';
 // S6.D — is the conversational "chat" projection enriched by an LLM here? (user-loaded LLM + circle permits)
 import { resolveChatAi } from '../../src/v2/chatAi.js';
-// §4 storage-policy bridge — the circle `pod` axis drives stoop's authoritative
+// §4 storage-policy bridge — the circle `pod` axis drives pinboard's authoritative
 // four-tier circle storage policy (admin-gated, one-way) instead of going nowhere.
 import { pushCircleStoragePolicy } from '../../src/v2/circleStoragePolicy.js';
 // Real ACP `sharing` for sealed circles on a real pod — a member redeem grants pod
@@ -567,7 +567,7 @@ async function _circleServiceFor(circleId) {
 async function shareItemIntoCircle({ itemId, fromCircleId, toCircleId, by, recipient, recipients } = {}) {
   let who = recipients;
   if ((!Array.isArray(who) || who.length === 0) && !recipient) {
-    // Resolve the target circle's member WebIDs (reuses the existing stoop roster op).
+    // Resolve the target circle's member WebIDs (reuses the existing pinboard roster op).
     try {
       const members = normalizeCircleMembers(await resolveSkill('listGroupMembers', { groupId: toCircleId }));
       who = members.map((m) => m.webid ?? m.id).filter(Boolean);
@@ -665,7 +665,7 @@ async function _shareEnforcementFor(circleId) {
  * both circle-scoped:
  *   1. the circle's control-agent roster (`ensureCirclePod → controlAgent.members()` → {webId, publicKey}) —
  *      the exact keys the circle wraps its group key to, and
- *   2. stoop `listGroupMembers` ({webid, sealingPublicKey}), the authoritative redemption roster.
+ *   2. pinboard `listGroupMembers` ({webid, sealingPublicKey}), the authoritative redemption roster.
  * Returns null when the recipient isn't in the target roster ⇒ deny-by-default: no re-seal, their share is
  * refused (consistent with the existing `share-grant-failed`).
  *
@@ -681,8 +681,8 @@ async function recipientSealKeyFor(circleId, webId) {
     const members = typeof prod?.controlAgent?.members === 'function' ? prod.controlAgent.members() : [];
     const k = recipientSealKeyFromMembers(members, webId);
     if (k) return k;
-  } catch { /* fall through to the stoop roster */ }
-  // 2. stoop listGroupMembers — the redemption roster carries each joiner's sealingPublicKey.
+  } catch { /* fall through to the pinboard roster */ }
+  // 2. pinboard listGroupMembers — the redemption roster carries each joiner's sealingPublicKey.
   try {
     const res = await resolveSkill('listGroupMembers', { groupId: circleId });
     return recipientSealKeyFromMembers(res, webId);
@@ -983,7 +983,7 @@ async function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   // substrate has not caught up on yet (a just-joined one arrives as `extraCircleIds`).
   let held = [];
   try {
-    held = ((await agent?.callSkill?.('stoop', 'listMyCircles', {}))?.circles ?? [])
+    held = ((await agent?.callSkill?.('pinboard', 'listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
   } catch { held = []; }
   const circleIds = [...new Set([
@@ -1175,7 +1175,7 @@ function readActionFreqSnapshot() {
 // just the "Veel-gebruikt" row.  Never persisted.
 const DEFAULT_SCREEN_RECIPE = Object.freeze({
   // #16 — the default screen leads with quick-actions, then the noticeboard (the
-  // circle noticeboard via stoop listOpen), so a screen-landing circle still surfaces
+  // circle noticeboard via pinboard listOpen), so a screen-landing circle still surfaces
   // the open posts even though the noticeboard tab lives in the (hidden) chat view.
   id: '__default__', name: '', blocks: [
     { id: 'qa-default', type: 'quickActions', config: { limit: 4 } },
@@ -1389,7 +1389,7 @@ const applyIncomingReceipt = makeReceiptReceiver({
   eventLog,
   listCircleMembers: async (circleId) => {
     if (typeof rawCallSkill !== 'function') return [];
-    const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     return Array.isArray(r?.members) ? r.members : [];
   },
   // Receipt-keyed outbox removal: their app confirmed the message arrived, so the copy still held for
@@ -1471,7 +1471,7 @@ let podChatCatchUpShell = null;      // pod-only circles' statement read-back (t
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
 let circleAuthedFetch = null;
 let circleOwnerWebId = null;   // signed-in webid — owner of the ACP grants for sealed circles
-// S6.4 — the active circle's noticeboard reloader, so a stoop:attachment-fetched
+// S6.4 — the active circle's noticeboard reloader, so a pinboard:attachment-fetched
 // event (recipient's full bytes arrived) can refresh whatever board is on screen.
 let noticeboardRefreshHook = null;
 
@@ -1854,7 +1854,7 @@ let circleContactChannel = null; // contact-thread peer channel (conversational 
 const circlePendingRedeems = new Map();  // requestId → {resolve,reject,timer}
 let circleSendPeerRedeem = null;         // makeSendGroupRedeemRequest(...) bound to this agent
 // OBJ-2 S1c-shell — feed the household no-pod sync roster with a circle's MEMBERS
-// (people, from the stoop group roster — never bots). Assigned in the boot fn
+// (people, from the pinboard group roster — never bots). Assigned in the boot fn
 // (which owns `agent`); module-level so `showDetail` (open-circle) can call it.
 let feedHouseholdRosterForCircle = null;
 // a dedicated vault for per-circle sealing identities + controller keys + the
@@ -1893,10 +1893,10 @@ function recordCircleKeyEvent(circleId, event) {
   if (recorded) circleSealStrategies.delete(circleId);
   return recorded;
 }
-// routes stoop membership events (redeem/leave) to the joined circle's producer, so
+// routes pinboard membership events (redeem/leave) to the joined circle's producer, so
 // a new member's sealing key is wrapped into that circle's group key (multi-member sealing).
 // V0: routes to a LIVE producer (circle opened on this device); seeding from prior redemptions
-// is a follow-up. Passed to the single stoop agent as its `controlAgent`.
+// is a follow-up. Passed to the single pinboard agent as its `controlAgent`.
 const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
 
 /**
@@ -1961,7 +1961,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
       && typeof rawCallSkill === 'function') {
     let rawMembers = [];
     try {
-      const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circleId });
       rawMembers = Array.isArray(res?.members) ? res.members : [];
     } catch { rawMembers = []; }
     // The roster IS the MemberMap projection (rows carry webid → signing pubKey); a
@@ -1991,7 +1991,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
  */
 function webForgetAdapter() {
   return {
-    listCircleIds: async () => circleIdsFrom(await rawCallSkill?.('stoop', 'listMyCircles', {})),
+    listCircleIds: async () => circleIdsFrom(await rawCallSkill?.('pinboard', 'listMyCircles', {})),
     listKeys: async () => { try { return Object.keys(window.localStorage); } catch { return []; } },
     // A BLOCKED delete is a FAILURE, not a success. `deleteDatabase` fires `onblocked` when another tab still
     // holds a connection, and then simply waits — so resolving there would report the bytes as gone while they
@@ -2058,7 +2058,7 @@ async function ensureCirclePod(circleId, policy) {
     const keyFanRoster = async () => {
       if (typeof rawCallSkill !== 'function') return [];
       try {
-        const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circleId });
         return Array.isArray(r?.members) ? r.members : [];
       } catch { return []; }
     };
@@ -2076,7 +2076,7 @@ async function ensureCirclePod(circleId, policy) {
       // THE FAN — through the waist, like every other lane, so the statement leaves under this
       // member's per-circle address. A direct peer send is signed with the canonical identity and
       // is refused at every receiver inside a circle.
-      fanStatement: (gid, statement, only) => rawCallSkill('stoop', 'broadcastCircleKeyStatement', {
+      fanStatement: (gid, statement, only) => rawCallSkill('pinboard', 'broadcastCircleKeyStatement', {
         groupId: gid ?? circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`,
         ts: Date.now(), ...(only ? { only } : {}),
       }),
@@ -2270,7 +2270,7 @@ function buildCircleBot(agent) {
     return { parts };
   };
   // basis's secure-agent doesn't maintain a core PeerGraph (peers are
-  // tracked in stoop membership, not core discovery), so the contacts registry
+  // tracked in pinboard membership, not core discovery), so the contacts registry
   // is APP-OWNED: one PeerGraph the roster + the skill registry read, populated
   // as bots/peers are discovered (discoverA2A) or added. The agent stays the
   // transport (sendPeerMessage). (Ideally the secure-agent owns this so gossip/
@@ -2294,7 +2294,7 @@ function buildCircleBot(agent) {
     window.onderlingMakeCirclePod = (circleId, storagePosture = 'p2', roster = []) =>
       createCirclePodProducer({ circleId, storagePosture, vault: circleVault, roster,
         generateKeypair: podGenerateKeypair, makePodClient: makeCirclePodClient });
-    window.onderlingSealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopeStoopCallSkill };
+    window.onderlingSealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopePinboardCallSkill };
   }
   circleContactSkills = createContactSkillRegistry({ peerGraph: circlePeerGraph, sendTask: sendContactTask });
   circleContactSkills.start().catch(() => { /* discovery is best-effort — never blocks the circle */ });
@@ -2322,7 +2322,7 @@ function buildCircleBot(agent) {
     onJoined: circleOnJoined,
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
-    myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    myHandle: async () => { try { return (await agent.callSkill('pinboard', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => connectedRelayUrls()?.[0] ?? null,
     activeEndpointUrl: () => connectedRelayUrls(),
     // the lens: the founder says on the new pair circle what this contact's persona discloses (same road as Mij's share)
@@ -2343,7 +2343,7 @@ function buildCircleBot(agent) {
     onReturned: contactReturned,
     // the first message to a contact carries MY card, and a card that arrives (naming its sender) goes into the book —
     // so whoever writes to me is a NAMED row, on every device (the book carry), not a key (2026-09-21)
-    myCard: async (personaId = null) => { try { return (await rawCallSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await rawCallSkill('pinboard', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: contactCardArrived,
     // the route (a contact with a pair roster) rides as send options — the circle id makes the send leave as
     // this device's per-circle address there, which is the only key the pair roster admits
@@ -2591,7 +2591,7 @@ function buildCircleBot(agent) {
       // policy.features (the existing tab gate, now also covering the chat "open a
       // screen" affordance): a circle with tasks/calendar OFF offers no task/agenda
       // panel. Inline action buttons stay — they're a contextual response to an op
-      // the user explicitly invoked. Core apps (stoop/household) are ungated.
+      // the user explicitly invoked. Core apps (pinboard/household) are ungated.
       const appEnabled = await isOpAppEnabledForActiveCircle(entry?.appOrigin);
       const gatedScreen = appEnabled ? screenButton : [];
       // S6.C (per-user) — the user's preference picks the projection (inline / screen / minimal).
@@ -2784,7 +2784,7 @@ function buildCircleBot(agent) {
       if (typeof input === 'string') {
         const parsed = catalogue ? parseInput(input, catalogue) : null;
         // Objective D — a colliding bare slash (`/done`) with no per-host override is AMBIGUOUS: offer the
-        // app-qualified choices (`/tasks:done`, `/stoop:done`) instead of silently firing one app. The
+        // app-qualified choices (`/tasks:done`, `/pinboard:done`) instead of silently firing one app. The
         // qualified forms — and an overridden bare token — parse as normal `slash` and route below.
         if (parsed && parsed.kind === 'ambiguous') {
           const suffix = parsed.body ? ` ${parsed.body}` : '';
@@ -3003,18 +3003,18 @@ async function showContacts() {
 }
 
 // S1 #2 — the unified Contacten roster: PeerGraph bots/peers MERGED with the
-// stoop ContactBook (people the user added, with trust/tags). One directory.
-const loadStoopContacts = () => loadBookRows(rawCallSkill);
+// pinboard ContactBook (people the user added, with trust/tags). One directory.
+const loadPinboardContacts = () => loadBookRows(rawCallSkill);
 // Hiding a contact (L106): a mark on the BOOK row, never on the graph — so only the book can answer "is this
 // one hidden", and only the book's op changes it. Hiding is Contacten only: the thread, the pair roster, their
 // circles, roster rows and member cards are untouched. The mark rides the own-devices carry, so the act on any
 // device is the act on all of them.
 async function contactIsHidden(contactId) {
-  const rows = await loadStoopContacts();
+  const rows = await loadPinboardContacts();
   return rows.some((r) => r.contactId === contactId && r.hidden === true);
 }
 async function setContactHidden(contactId, hidden) {
-  const res = await rawCallSkill('stoop', 'setContactHidden', { webid: contactId, hidden: hidden === true });
+  const res = await rawCallSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: hidden === true });
   if (res?.error) throw new Error(res.error);
   if (_activeContactThread?.contactId === contactId) _activeContactThread.setHidden?.(hidden === true);
   return res;
@@ -3034,7 +3034,7 @@ async function contactCardArrived({ contactId, card }) {
   // The persona is recorded EXPLICITLY even here, where nobody was asked: a card arriving with a message has
   // no moment to choose in. Writing `default` says "they see your default self", which is true and checkable;
   // leaving it absent would mean "not recorded" and push the question onto every later reader.
-  try { await rawCallSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); } catch { return; }
+  try { await rawCallSkill('pinboard', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); } catch { return; }
   const thread = contactThreads.get(contactId);
   if (thread) {
     try { const row = (await loadAllContacts()).find((c) => c.contactId === contactId); if (row?.name && row.name !== contactId) thread.name = row.name; } catch { /* the next open names it */ }
@@ -3098,11 +3098,11 @@ async function openMandatePicker({ taskId, circleId } = {}) {
   // My WebID (the granter / actingAs), the roster (WHO), my offerings (WHAT), and
   // any mandates already on the task (legibility). All best-effort.
   let myWebid = '';
-  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
 
   let members = [];
   try {
-    const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     members = Array.isArray(res?.members) ? res.members : [];
   } catch { members = []; }
 
@@ -3197,8 +3197,8 @@ function openLensForm(extra) { mountMyDataWizard(renderContactLensPanel, { t, ..
 /** Add a card AFTER the sheet: the chosen lens, or `null` when the person closed it (nothing added). */
 async function addContactWithSheet(payload) {
   const model = await contactAddSheetModel({ payload, callSkill: rawCallSkill });
-  // not a card this decoder reads: hand it to stoop as before, which refuses it with its own reason
-  if (!model) return rawCallSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
+  // not a card this decoder reads: hand it to pinboard as before, which refuses it with its own reason
+  if (!model) return rawCallSkill('pinboard', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
   const choice = await new Promise((resolve) => openLensForm({
     mode: 'add', model, onSubmit: (c) => resolve(c), onCancel: () => resolve(null),
   }));
@@ -3208,7 +3208,7 @@ async function addContactWithSheet(payload) {
 /** The thread header's "what they see": the row's lens, changed in place, the release said on the pair circle. */
 async function openContactLens(contactId, name) {
   let row = null;
-  try { row = ((await rawCallSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c?.webid === contactId) ?? null; } catch { row = null; }
+  try { row = ((await rawCallSkill('pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c?.webid === contactId) ?? null; } catch { row = null; }
   const pairCircleIdOf = circlePairRoster?.pairCircleIdFor;
   const model = await contactLensModel({ callSkill: rawCallSkill, row: row ?? { webid: contactId }, pairCircleIdOf });
   openLensForm({
@@ -3254,7 +3254,7 @@ async function addBotFromInput(input) {
   try {
     const rec = await addBotToGraph({
       input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A,
-      // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one decoder);
+      // C13 fast rung — a onderling-contact:// card routes to pinboard's addContactFromQr (the one decoder);
       // the unified roster merges the ContactBook, so the person appears DM-ready right away.
       // …asking first what they will see of you (L125): the sheet, prefilled; a cancel adds nothing
       addContact: async (payload) => {
@@ -3312,7 +3312,7 @@ async function showContactThread(contactId) {
   if (typeof circleContactChannel?.rehydrate === 'function') {
     try {
       // BOTH keys: turns echo the contactId, but an unsolicited inbound (a peer-wire file, a first
-      // DM) persists under the sender's ADDRESS — for a saved stoop contact those differ, and reading
+      // DM) persists under the sender's ADDRESS — for a saved pinboard contact those differ, and reading
       // one key showed a thread that forgot its files.
       const durable = await circleContactChannel.rehydrate(contactId);
       const byAddr = (peerAddr && peerAddr !== contactId)
@@ -3726,7 +3726,7 @@ async function onMuteCircle(id) {
 }
 
 // β.5 — Leave circle: confirm, then dispatch `/leave-group` via the
-// raw callSkill seam (the stoop op `leaveGroup` already exists in the
+// raw callSkill seam (the pinboard op `leaveGroup` already exists in the
 // substrate; the slash-command name maps to that op in the chat shell).
 async function onLeaveCircle(id, circle) {
   const name = circle?.name ?? id;
@@ -4122,7 +4122,7 @@ async function showMyThings() {
   }
 }
 
-// Hopping is a DEVICE-global stance (Stoop getHopMode/setHopMode); it lives
+// Hopping is a DEVICE-global stance (Pinboard getHopMode/setHopMode); it lives
 // under the Mij tab (personal settings). Chain-card data lands later.
 async function showHop() {
   hideCircleTabBar(tabBarEl);
@@ -4392,7 +4392,7 @@ async function showMij() {
   if (_activeTab === 'mij') rerender();
 }
 
-// Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card stoop makes
+// Share my contact (2026-09-19, Frits: "simply link to the website, including the contact"): the card pinboard makes
 // (`getContactShareQr` — webid, key, name, the address I am written to, my relay), painted three ways. The LINK is
 // this app's own URL with the card in the fragment; opening it adds the contact (see the boot's `#contact=` hook).
 async function showShareMyContact() {
@@ -4447,7 +4447,7 @@ async function showBlocked() {
       // The roster is only here to put NAMES on keys — a screen that fails to load it still shows the
       // list (as keys), because a block you cannot see is worse than one you cannot read.
       try {
-        const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: getActiveCircle() });
+        const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: getActiveCircle() });
         members = normalizeCircleMembers(res);
       } catch { members = []; }
     }
@@ -4629,7 +4629,7 @@ async function showMyData() {
   const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
     .catch((e) => globalThis.alert?.(e?.message ?? 'sign-in failed'));
   // launch the existing backup/restore wizards in a modal overlay; reveal
-  // the recovery phrase via the stoop `getMnemonicOnce` skill (shown once).
+  // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
@@ -4652,7 +4652,7 @@ async function showMyData() {
   };
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
-  // reflects reality; toggling subscribes/unsubscribes + tells stoop.
+  // reflects reality; toggling subscribes/unsubscribes + tells pinboard.
   let notifications = { supported: false, permission: 'default', subscribed: false };
   const onToggleNotifications = async () => {
     const res = notifications.subscribed
@@ -4841,7 +4841,7 @@ async function showMyData() {
   getWebPushState().then((s) => { notifications = s; rerender(); }).catch(() => {});
   // the person's own week overview: a row in their own store, switched here
   (async () => {
-    const me = (await rawCallSkill('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+    const me = (await rawCallSkill('pinboard', 'whoAmI', {}).catch(() => null))?.webid ?? null;
     const clock = await personClock;
     if (!clock || !me) return;
     const toggle = async () => {
@@ -4853,10 +4853,10 @@ async function showMyData() {
   })().catch(() => {});
   rerender();
   const [loc, status, priv, met, profProps] = await Promise.all([
-    rawCallSkill('stoop', 'getDataLocation', {}).catch(() => null),
-    rawCallSkill('stoop', 'podSignInStatus', {}).catch(() => null),
-    rawCallSkill('stoop', 'getPrivacyNotice', { lang: currentLang() }).catch(() => null),
-    rawCallSkill('stoop', 'getMetrics', {}).catch(() => null),
+    rawCallSkill('pinboard', 'getDataLocation', {}).catch(() => null),
+    rawCallSkill('pinboard', 'podSignInStatus', {}).catch(() => null),
+    rawCallSkill('pinboard', 'getPrivacyNotice', { lang: currentLang() }).catch(() => null),
+    rawCallSkill('pinboard', 'getMetrics', {}).catch(() => null),
     rawCallSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
   ]);
   // The enrolled-devices list (add-a-device bookkeeping): one row per registry delegation,
@@ -4869,7 +4869,7 @@ async function showMyData() {
   companionsPending = pendingRevokeLine({ properties: profProps?.properties ?? {} }, t);
   dataLocation = loc ?? {};
   podStatus = status ?? {};
-  // Prefer the real Solid session over the (aspirational) stoop op — read through the waist, so the
+  // Prefer the real Solid session over the (aspirational) pinboard op — read through the waist, so the
   // panel and the `whoami` op can never disagree about whether you are signed in.
   const sess = await rawCallSkill('basis', 'whoami', {}).catch(() => null);
   if (sess?.signedIn && sess.webid) {
@@ -4883,7 +4883,7 @@ async function showMyData() {
 
 // mount one of the existing wizard renderers (encrypted-backup / restore)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
-// container + the shared `rawCallSkill` (the wizards call `callSkill('stoop', …)`).
+// container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
 function mountMyDataWizard(renderWizard, extra = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'cc-mydata-modal';
@@ -4969,7 +4969,7 @@ async function showJoinCircle(inviteArg) {
     if (decoded.invite) await populateAdminAddressesFromInvite({ peerGraph: circlePeerGraph, invite: decoded.invite });
   } catch { /* population must never block the join */ }
   // The join wizard mounts FROM its declared flow (batch 6): `flows: [{ id: 'joinGroup', … }]` on the
-  // stoop manifest is the admission that this wizard exists, and G-S3 pins that declaration to the
+  // pinboard manifest is the admission that this wizard exists, and G-S3 pins that declaration to the
   // state machine (`JOIN_FLOW_STEPS`). An undeclared flow refuses to mount — the reachability rule
   // made live, not a warning someone can scroll past.
   if (!flowForOp(circleBaseSources, 'joinGroupWizard')) {
@@ -5134,8 +5134,8 @@ async function showCircleInvite(circleId) {
 
 // reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —
 // the one phrase that re-derives every profile incl. the default profile's pseudonym. Shown in
-// the same modal overlay with a destructive warning. (Was the stoop `getMnemonicOnce`,
-// which revealed the unrelated stoop sub-agent seed — not the recovery phrase.)
+// the same modal overlay with a destructive warning. (Was the pinboard `getMnemonicOnce`,
+// which revealed the unrelated pinboard sub-agent seed — not the recovery phrase.)
 async function showMnemonicReveal() {
   let res = null;
   try { res = await rawCallSkill('household', 'revealOwnerPhrase', {}); } catch { res = null; }
@@ -6183,7 +6183,7 @@ async function openAboutMePanel(personaId) {
   let geocodeResult = null;
   let busy = false;
   const loadBasics = async () => {
-    try { profile = (await rawCallSkill('stoop', 'getMyProfile', {}).catch(() => null))?.entry ?? {}; } catch { /* keep */ }
+    try { profile = (await rawCallSkill('pinboard', 'getMyProfile', {}).catch(() => null))?.entry ?? {}; } catch { /* keep */ }
     drawBasics();
   };
   const drawBasics = () => renderProfileBasics(basicsEl, {
@@ -6191,23 +6191,23 @@ async function openAboutMePanel(personaId) {
     onSaveProfile: async ({ handle, displayName }) => {
       busy = true; drawBasics();
       try {
-        if (handle && handle !== profile.handle) await rawCallSkill('stoop', 'setMyHandle', { handle });
-        if (displayName !== (profile.displayName ?? '')) await rawCallSkill('stoop', 'setMyDisplayName', { displayName });
+        if (handle && handle !== profile.handle) await rawCallSkill('pinboard', 'setMyHandle', { handle });
+        if (displayName !== (profile.displayName ?? '')) await rawCallSkill('pinboard', 'setMyDisplayName', { displayName });
       } catch { /* surfaced on reload */ }
       busy = false; await loadBasics();
     },
     onGeocode: async (query) => {
-      try { const r = await rawCallSkill('stoop', 'geocode', { query }); geocodeResult = r?.error ? null : r; }
+      try { const r = await rawCallSkill('pinboard', 'geocode', { query }); geocodeResult = r?.error ? null : r; }
       catch { geocodeResult = null; }
       drawBasics();
     },
     onSaveLocation: async () => {
       if (!geocodeResult) return;
-      try { await rawCallSkill('stoop', 'setMyLocation', { cell: geocodeResult.cell, label: geocodeResult.label, source: 'geocode' }); } catch { /* */ }
+      try { await rawCallSkill('pinboard', 'setMyLocation', { cell: geocodeResult.cell, label: geocodeResult.label, source: 'geocode' }); } catch { /* */ }
       geocodeResult = null; await loadBasics();
     },
     onClearLocation: async () => {
-      try { await rawCallSkill('stoop', 'clearMyLocation', {}); } catch { /* */ }
+      try { await rawCallSkill('pinboard', 'clearMyLocation', {}); } catch { /* */ }
       await loadBasics();
     },
   });
@@ -6665,23 +6665,23 @@ function showCircle(id, circle, policy) {
   let seq = 0;
 
   // S1 #1 — noticeboard (noticeboard tab). Lazy-loaded when the tab opens. Backed by
-  // stoop's `listOpen`/`postRequest`, but SCOPED to THIS circle: `stoopCall` injects
-  // the circle id as the stoop scope key on writes and filters list reads to the
+  // pinboard's `listOpen`/`postRequest`, but SCOPED to THIS circle: `pinboardCall` injects
+  // the circle id as the pinboard scope key on writes and filters list reads to the
   // circle (S4 per-circle restructure — one shared agent, per-circle scope key).
-  // scope stoop ops to this circle AND, for a sealed (p2/p3) circle, transparently
+  // scope pinboard ops to this circle AND, for a sealed (p2/p3) circle, transparently
   // seal post bodies at rest / open them on read via the per-circle content strategy.
   // Sealed media (2026-07-11): thread THIS circle's media gateway into the wrapper so a
   // noticeboard image attachment seals + rides the SAME `{type:'media'}` blob pointer as
   // basis's own circle chat images (createCircleMediaComposition → the dev bucket for
   // now). One circle's gateway per wrapper ⇒ per-circle by construction (no cross-seal).
-  const getStoopMedia = async () => {
+  const getPinboardMedia = async () => {
     const comp = await getCircleMediaComposition(id, policy);
     return (comp && comp.mediaGateway)
       ? { mediaGateway: comp.mediaGateway, localActor: LOCAL_ACTOR, t }
       : null;
   };
-  const stoopCall = scopeStoopCallSkill(
-    rawCallSkill, id, () => getCircleSealStrategy(id, policy), getStoopMedia,
+  const pinboardCall = scopePinboardCallSkill(
+    rawCallSkill, id, () => getCircleSealStrategy(id, policy), getPinboardMedia,
   );
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.
@@ -6742,7 +6742,7 @@ function showCircle(id, circle, policy) {
   let circleRoster = null;
   let circleMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
   let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
-  let myWebid = null;   // fetched once, best-effort (whoAmI is a stoop skill, not chat-manifested)
+  let myWebid = null;   // fetched once, best-effort (whoAmI is a pinboard skill, not chat-manifested)
   let myCircleRole = null;   // my role in THIS circle ('admin' | …), for mandate owner-visibility
   // 1:1-bot chat gate — THIS circle's raw roster rows (each carrying `relation`/`webid`),
   // captured best-effort on open by ensureMyRole (same listGroupMembers call). Fed to the
@@ -6752,7 +6752,7 @@ function showCircle(id, circle, policy) {
 
   async function ensureMyWebid() {
     if (myWebid !== null) return myWebid;
-    try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; }
+    try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; }
     catch { myWebid = ''; }
     return myWebid;
   }
@@ -6773,7 +6773,7 @@ function showCircle(id, circle, policy) {
       return myCircleRole;
     }
     try {
-      const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id });
+      const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id });
       const members = Array.isArray(res?.members) ? res.members : [];
       circleMembers = members;   // 1:1-bot gate reads the raw rows (relation/webid) at render time
       const me = members.find((m) => (m?.webid ?? m?.id) === myWebid);
@@ -6790,7 +6790,7 @@ function showCircle(id, circle, policy) {
   async function loadNoticeboard() {
     try {
       await ensureMyWebid();
-      const res = await stoopCall('stoop', 'listOpen', {});
+      const res = await pinboardCall('pinboard', 'listOpen', {});
       // listOpen (no intent) also returns system items (rules / membership) — keep only
       // real asks/offers so the noticeboard isn't full of bookkeeping (and other circles').
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
@@ -6819,7 +6819,7 @@ function showCircle(id, circle, policy) {
         attachments:  Array.isArray(it.attachments) ? it.attachments
                       : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
         // embeds[] — the canonical cross-object references (a post → a task /
-        // event / other post). Top-level OR stoop-legacy source.embeds.
+        // event / other post). Top-level OR pinboard-legacy source.embeds.
         embeds:       Array.isArray(it.embeds) ? it.embeds
                       : (Array.isArray(it.source?.embeds) ? it.source.embeds : []),
         // Drivers #5 — carry the matching signal (explicit signature or the author's tags) so the
@@ -6865,7 +6865,7 @@ function showCircle(id, circle, policy) {
     // drops the acknowledgement flag, and this is the one reader that needs it.
     let rawRoster = [];
     try {
-      const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id });
+      const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id });
       rawRoster = Array.isArray(res?.members) ? res.members : [];
       circleRoster = normalizeCircleMembers(res);
     } catch { circleRoster = []; }
@@ -6876,7 +6876,7 @@ function showCircle(id, circle, policy) {
     // roster because the key→ref resolution needs it; refreshed by the mute/unmute actions.
     try {
       // ONE block set, read from the act that made it. There used to be two — the secure agent's
-      // (`basis:mute`, which refuses a person's envelopes) and stoop's (a local view filter) — so
+      // (`basis:mute`, which refuses a person's envelopes) and pinboard's (a local view filter) — so
       // "blocked" meant two different things depending on which button you had pressed, and neither
       // did what a person means by it. One act now does both halves: the transport refuses them and
       // the view hides them, off the same list.
@@ -6938,7 +6938,7 @@ function showCircle(id, circle, policy) {
   // appointment from this device's own fold (there is no seed to pass); the reload afterwards is
   // what makes the member list say the appointment is acknowledged.
   async function acknowledgeCaretakerNotice() {
-    try { await rawCallSkill('stoop', 'acknowledgeCaretaker', { groupId: id }); }
+    try { await rawCallSkill('pinboard', 'acknowledgeCaretaker', { groupId: id }); }
     catch { /* the reload reflects the real state; an unsigned notice returns on a later open */ }
     await loadRoster();
   }
@@ -6986,7 +6986,7 @@ function showCircle(id, circle, policy) {
     noticeboardBusy = true; rerender();
     const pending = noticeboardPendingAttachment;
     try {
-      await stoopCall('stoop', 'postRequest', {
+      await pinboardCall('pinboard', 'postRequest', {
         intent, text,
         ...(dueAt ? { dueAt } : {}),
         ...(pending ? { attachments: [pending.encoded] } : {}),
@@ -7081,7 +7081,7 @@ function showCircle(id, circle, policy) {
 
   // Sealed media (2026-07-11): open the full-size image by unsealing the blob through THIS
   // circle's media gateway (`openFullImage` → `openBlob`, gated + decrypted client-side) —
-  // the SAME read path basis's own circle images use. No stoop byte round-trip: stoop
+  // the SAME read path basis's own circle images use. No pinboard byte round-trip: pinboard
   // holds only the opaque pointer. The sealed thumbnail (already opened for the chip) stands
   // in while the full image resolves, and on a wrong key / denial we keep it.
   async function noticeboardViewAttachment({ att }) {
@@ -7108,20 +7108,20 @@ function showCircle(id, circle, policy) {
         // The reply starts a 1:1 conversation with the poster: it is persisted into their contact
         // thread and that thread opens, so the answer that comes back has a place to land.
         const r = await replyToPost({
-          callSkill: stoopCall, contactChannel: circleContactChannel, itemId: post.id, body,
+          callSkill: pinboardCall, contactChannel: circleContactChannel, itemId: post.id, body,
           notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() }),
           identityOf: (addr) => _peerAgent?.identityOfAddress?.(addr) ?? addr,
         });
         if (r.ok && r.toPubKey) openThreadWith = r.toPubKey;
       } else if (action === 'cancel') {
-        await stoopCall('stoop', 'cancelRequest', { requestId: post.id });
+        await pinboardCall('pinboard', 'cancelRequest', { requestId: post.id });
       } else if (action === 'report') {
         // §8 unification — a post report is now a governance report event (propagates +
         // shows in the governance Reports section + act→remove), not the older reportPost item.
         const reason = (globalThis.prompt?.(t('circle.governance.report_reason_prompt')) ?? '') || '';
         await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
-        await stoopCall('stoop', 'markReturned', { requestId: post.id });
+        await pinboardCall('pinboard', 'markReturned', { requestId: post.id });
       } else if (action === 'mute') {
         // BLOCK this person — both halves, one act: their envelopes are refused at this device's
         // boundary AND their posts stop showing here. Keyed on the WEBID, which is what makes it a
@@ -7135,7 +7135,7 @@ function showCircle(id, circle, policy) {
         // S3 #4 — lender assigns a borrower to a lend post.
         const borrowerWebid = (globalThis.prompt?.(t('circle.noticeboard.assign_prompt')) || '').trim();
         if (!borrowerWebid) return;
-        await stoopCall('stoop', 'assignLend', { itemId: post.id, borrowerWebid });
+        await pinboardCall('pinboard', 'assignLend', { itemId: post.id, borrowerWebid });
       }
     } catch { /* best-effort; the reload reflects the real state */ }
     await loadNoticeboard();
@@ -7248,7 +7248,7 @@ function showCircle(id, circle, policy) {
       // Stale-rules banner: re-accept the circle's CURRENT rules version (the member's own signed
       // rules-accept on the membership spine), then reload the roster so the line updates.
       onAcceptRules: async () => {
-        try { await rawCallSkill('stoop', 'acceptGroupRules', { groupId: id }); } catch { /* voluntary — banner stays */ }
+        try { await rawCallSkill('pinboard', 'acceptGroupRules', { groupId: id }); } catch { /* voluntary — banner stays */ }
         loadRoster();
       },
       // the circle's realName rule — the members list gates each label with it (never renders raw realName)
@@ -7302,7 +7302,7 @@ function showCircle(id, circle, policy) {
         // resolved media composition (`circleMedia` = getCircleMediaComposition(id, policy))
         // the circle composer's own attach uses (see `onAttachMedia` above): a p0/p1 circle
         // has no seal strategy → no media gateway → `circleMedia` stays null → NO 📎 button.
-        // This matches the sealed-only refusal in scopeStoopCallSkill (getStoopMedia resolves
+        // This matches the sealed-only refusal in scopePinboardCallSkill (getPinboardMedia resolves
         // the same composition) so a user never attaches an image only to hit the refusal.
         // Text posting stays unconditional. Same hide the circle's own media already does.
         attachment:       noticeboardPendingAttachment,
@@ -7674,11 +7674,11 @@ function showCircle(id, circle, policy) {
         // materializers call `callSkill(appOrigin, opId, args)` (3-arg), so this
         // MUST be the raw 3-arg dispatch — the 2-arg `resolveSkill` resolver
         // would mis-read the appOrigin as the opId (#16: this also un-breaks the
-        // tasks/agenda screen blocks, which had the same latent bug). `stoopCall`
+        // tasks/agenda screen blocks, which had the same latent bug). `pinboardCall`
         // keeps the 3-arg contract and scopes the noticeboard block to THIS circle
-        // (non-stoop ops pass through unchanged).
+        // (non-pinboard ops pass through unchanged).
         hostOps:  {
-          callSkill: stoopCall, eventLog, circles: circlesCache, policy, actionFrequency,
+          callSkill: pinboardCall, eventLog, circles: circlesCache, policy, actionFrequency,
           fetchImpl: circleAuthedFetch || undefined,
           // Sender labels through the reveal ladder (batch 4) — the noticeboard block stamps
           // `senderLabel` from the roster; `revealPolicy` (not `policy`, taken above) gates names.
@@ -7699,7 +7699,7 @@ function showCircle(id, circle, policy) {
 
 
 // Skill editor — draft persists locally per circle (cc.circleSkill.<id>);
-// "extend the Stoop skill item" is the later real-persistence path.
+// "extend the Pinboard skill item" is the later real-persistence path.
 const skillKey = (id) => `cc.circleSkill.${id}`;
 function showSkills(id) {
   let skill = normalizeOffering(null);
@@ -7792,7 +7792,7 @@ function showRecipeEditor(circleId) {
 
 /**
  * γ-next.recipe — fan the active recipe out to every other circle
- * member via stoop's `broadcastCircleRecipe` skill.  Fire-and-forget:
+ * member via pinboard's `broadcastCircleRecipe` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
  */
@@ -7802,7 +7802,7 @@ function broadcastActiveRecipe({ circleId, book }) {
   if (!active) return;
   const msgId = `circle-recipe-${circleId}-${Date.now()}`;
   const ts    = Date.now();
-  rawCallSkill('stoop', 'broadcastCircleRecipe', {
+  rawCallSkill('pinboard', 'broadcastCircleRecipe', {
     groupId: circleId,
     recipe:  active,
     msgId,
@@ -7971,7 +7971,7 @@ async function showRules(id) {
 
 /**
  * γ-next.rules — fan the rules document out to every other circle
- * member via stoop's `broadcastCircleRules` skill.  Fire-and-forget:
+ * member via pinboard's `broadcastCircleRules` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
  */
@@ -7980,7 +7980,7 @@ function broadcastRules({ circleId, doc }) {
   if (!doc || typeof doc !== 'object') return;
   const msgId = `circle-rules-${circleId}-${Date.now()}`;
   const ts    = Date.now();
-  rawCallSkill('stoop', 'broadcastCircleRules', {
+  rawCallSkill('pinboard', 'broadcastCircleRules', {
     groupId:  circleId,
     rulesDoc: doc,
     msgId,
@@ -8025,7 +8025,7 @@ async function showMemberPersona(id, member) {
   if (!member) { showDetail(id); return; }
   const policy = (await policyStore.get(id))?.revealPolicy ?? 'pairwise';
   let myWebid = '';
-  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* stranger view */ }
+  try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* stranger view */ }
   // circleId is the reveal-state context: the member's per-circle disclosure
   // (Peer.revealState) is derived/keyed under it, then the view-as gate layers on top.
   const split = memberPersonaView({ member, viewerWebid: myWebid || null, policy, circleId: id });
@@ -8108,15 +8108,15 @@ function govBroadcast(channel, circleId, event, opts) {
   // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
   // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
   const to = Array.isArray(opts?.to) ? opts.to : undefined;
-  rawCallSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
+  rawCallSkill('pinboard', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
 }
 
 // Remove a reported post/message when an admin ACTS on it (the §8 report host's `act` calls
 // this for non-member targets). Best-effort; a missing op just leaves the item (the report
 // still closes actioned). Members route through the governance removeMember class instead.
 function removeReportedItem(circleId, targetType, targetRef) {
-  return rawCallSkill('stoop', 'deleteCircleItem', { groupId: circleId, itemId: targetRef })
-    .catch(() => rawCallSkill('stoop', 'cancelRequest', { requestId: targetRef }).catch(() => ({ ok: false })));
+  return rawCallSkill('pinboard', 'deleteCircleItem', { groupId: circleId, itemId: targetRef })
+    .catch(() => rawCallSkill('pinboard', 'cancelRequest', { requestId: targetRef }).catch(() => ({ ok: false })));
 }
 
 // The ONE write path for reporting anything (member · post · message) — folds the older
@@ -8124,7 +8124,7 @@ function removeReportedItem(circleId, targetType, targetRef) {
 // report event and shows in the governance panel's Reports section (Frits: unify on §8).
 async function fileCircleReport(circleId, targetType, targetRef, targetLabel = null, reason = '') {
   let myWebid = '';
-  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
@@ -8139,7 +8139,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
 // (bindCircleGovernance): events ride the one EventLog, enactment routes to the real ops.
 async function showGovernance(id) {
   let myWebid = '';
-  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
@@ -8167,7 +8167,7 @@ async function showGovernance(id) {
     // context carries only {ref, role} (no names), so read handle/displayName from
     // listGroupMembers; unresolved falls back to the raw ref. (web ≡ mobile)
     let roster = [];
-    try { roster = (await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }))?.members ?? []; } catch { /* */ }
+    try { roster = (await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }))?.members ?? []; } catch { /* */ }
     const nameOf = buildSubjectLabeler(roster);
     const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
     let view = { open: [], closed: [] };
@@ -8212,9 +8212,9 @@ async function showGovernance(id) {
 async function showSelfView(id) {
   const policy = (await policyStore.get(id))?.revealPolicy ?? 'pairwise';
   let myWebid = '';
-  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   let roster = [];
-  try { roster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id })); } catch { /* */ }
+  try { roster = normalizeCircleMembers(await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id })); } catch { /* */ }
   const me = roster.find((m) => m.id === myWebid) ?? { id: myWebid || null, handle: null, realName: null, released: false };
   const others = roster.filter((m) => m.id && m.id !== myWebid);
   let viewer = { kind: 'stranger' };
@@ -8282,9 +8282,9 @@ async function showAdmin(id) {
 
   async function load() {
     const [mem, mut, who] = await Promise.all([
-      rawCallSkill('stoop', 'listGroupMembers', { groupId: id }).catch(() => null),
-      rawCallSkill('stoop', 'listMutedPeers', {}).catch(() => null),
-      rawCallSkill('stoop', 'whoAmI', {}).catch(() => null),
+      rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }).catch(() => null),
+      rawCallSkill('pinboard', 'listMutedPeers', {}).catch(() => null),
+      rawCallSkill('pinboard', 'whoAmI', {}).catch(() => null),
     ]);
     myWebid = who?.webid ?? who?.webId ?? '';
     members = Array.isArray(mem?.members) ? mem.members : [];
@@ -8324,7 +8324,7 @@ async function showAdmin(id) {
         execute: async () => {
           notice = null; busy = true; rerender();
           try {
-            const r = await rawCallSkill('stoop', 'setMemberRole', {
+            const r = await rawCallSkill('pinboard', 'setMemberRole', {
               groupId: id, memberWebid: m.webid, role: control.role,
             });
             notice = r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name });
@@ -8347,7 +8347,7 @@ async function showAdmin(id) {
       busy = false; await load();
     },
     onUnmute: async (key) => {
-      try { await rawCallSkill('stoop', 'unmutePeer', key.startsWith('webid:') ? { peerWebid: key.slice(6) } : { peerStableId: key }); } catch { /* */ }
+      try { await rawCallSkill('pinboard', 'unmutePeer', key.startsWith('webid:') ? { peerWebid: key.slice(6) } : { peerStableId: key }); } catch { /* */ }
       // (the circle view re-resolves its hide set at the next circle open — loadRoster does it)
       await load();
     },
@@ -8397,7 +8397,7 @@ async function showAdmin(id) {
     onAnnounce: async (text) => {
       notice = null; busy = true; rerender();
       try {
-        const r = await rawCallSkill('stoop', 'postAnnouncement', { groupId: id, text });
+        const r = await rawCallSkill('pinboard', 'postAnnouncement', { groupId: id, text });
         notice = r?.error ? t('circle.admin.refused') : t('circle.admin.announced');
       } catch { notice = t('circle.admin.refused'); }
       busy = false; rerender();
@@ -8413,10 +8413,10 @@ async function showSettings(id) {
   // proposal side-store is retired. One handle serves the pending list, the propose, and (via the
   // wired setPolicy enactor) the apply-on-approval; approvals cross devices because the events fan.
   let myWebid = '';
-  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   // The roster, for one question: may THIS viewer's Save count? (an admin's statement is folded, a member's dropped)
   let settingsRoster = [];
-  try { const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
+  try { const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
@@ -8427,7 +8427,7 @@ async function showSettings(id) {
     }),
   });
   // §4 storage-policy bridge — remember the pod tier at entry so Save only pushes
-  // to stoop when the admin actually changed it; a failed push (admin-only / the
+  // to pinboard when the admin actually changed it; a failed push (admin-only / the
   // one-way downgrade guard / a centralised tier missing its groupPodUri) is
   // surfaced as a note but never blocks the local policy save.
   const baselinePod = working?.pod;
@@ -8546,7 +8546,7 @@ async function showSettings(id) {
         // The just-saved policy goes on the governance lane as a signed statement — every member, and whoever
         // joins later, catches it up.
         circlePolicyLane.state(id).catch(() => { /* catch-up reconciles */ });
-        // §4 storage-policy bridge — when the pod tier changed, drive stoop's
+        // §4 storage-policy bridge — when the pod tier changed, drive pinboard's
         // authoritative circle storage policy. The skill owns admin-gating + the
         // one-way guard; on failure we keep the local save and show a note.
         if (working?.pod !== baselinePod && typeof rawCallSkill === 'function') {
@@ -8657,7 +8657,7 @@ async function boot() {
   circleSurfacePref.hydrate().catch(() => {});
 
   // S4 circle OIDC — complete an incoming Solid sign-in redirect / restore a saved session
-  // (reuses src/web/podAuth.js). When signed in, sealed circles + stoop's items route to the
+  // (reuses src/web/podAuth.js). When signed in, sealed circles + pinboard's items route to the
   // user's real pod (the pod root via the canonical discoverPodRoot).
   let podSession = null;
   try {
@@ -8735,9 +8735,9 @@ async function boot() {
       // sync silently dies after a refresh). localStorage-backed, same 'cc-chat-id:' prefix the
       // mobile bundle uses (VaultAsyncStorage) → stable address across reloads, web≡mobile.
       chatVault: new VaultLocalStorage({ prefix: 'cc-chat-id:' }),
-      stoopPersistDb: { dbName: 'cc-stoop-state', storeName: 'items' },
+      pinboardPersistDb: { dbName: 'cc-pinboard-state', storeName: 'items' },
       // OBJ-2 S1e (web) — persist the household store in IndexedDB so items survive
-      // a reload (mobile already threads its AsyncStorage descriptor). Parity with stoop.
+      // a reload (mobile already threads its AsyncStorage descriptor). Parity with pinboard.
       householdPersistDb: { dbName: 'cc-household-state', storeName: 'items' },
       // #36 — persist the PARAMETER REGISTER's settings (retention etc.) in IndexedDB so a set-param survives
       // a reload (cross-app-settings shared.json / devices/<id>.json layout, on this store).
@@ -8784,12 +8784,12 @@ async function boot() {
           });
         } catch { return null; }
       },
-      stoopControlAgent: circleControlAgentRouter,   // multi-member sealing on redeem/leave
+      pinboardControlAgent: circleControlAgentRouter,   // multi-member sealing on redeem/leave
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side; keyed by circleId). A
       // shared/hybrid circle WITH a pod + group key now really seals→writes the pod + fans a ref
       // (pod-signal), and catch-up range-queries→opens it; a no-pod circle keeps fan-out-full unchanged.
-      stoopCircleDataMove: circleSendDataMove,
-      stoopPodWrite:       circlePodWrite,
+      pinboardCircleDataMove: circleSendDataMove,
+      pinboardPodWrite:       circlePodWrite,
       // Cache-mode mirroring: provision a pod-backed circle's store MEDIUM (a cache-mode PseudoPod that
       // seals→write-throughs to the circle's pod, "pod is truth, local cache is reality"). realAgent calls
       // this once per circle at circle-open, BEFORE the store is built. A no-pod circle → null → the shared
@@ -8876,17 +8876,17 @@ async function boot() {
       // circle being joined), so the admin records it instead of dropping it as unproven.
       signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     });
-    // when signed in, route stoop's items to the user's REAL pod (parity with
-    // folio/calendar; reuses stoop's already-built pod-routing write-through). Best-effort.
-    if (podSession?.isLoggedIn && circleRealPodRouting?.podRoot && typeof agent.attachStoopPod === 'function') {
-      agent.attachStoopPod({ podRoot: circleRealPodRouting.podRoot, webid: podSession.webid, fetch: podSession.fetch })
-        .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachStoopPod:', r.error); })
+    // when signed in, route pinboard's items to the user's REAL pod (parity with
+    // folio/calendar; reuses pinboard's already-built pod-routing write-through). Best-effort.
+    if (podSession?.isLoggedIn && circleRealPodRouting?.podRoot && typeof agent.attachPinboardPod === 'function') {
+      agent.attachPinboardPod({ podRoot: circleRealPodRouting.podRoot, webid: podSession.webid, fetch: podSession.fetch })
+        .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachPinboardPod:', r.error); })
         .catch(() => { /* best-effort; stays local-first */ });
     }
     // S6.4 — refresh the on-screen noticeboard when a recipient's requested
-    // attachment bytes land (stoop:attachment-fetched). Subscribed once; the hook
+    // attachment bytes land (pinboard:attachment-fetched). Subscribed once; the hook
     // points at the active circle's loader.
-    try { agent.onStoopEvent?.('stoop:attachment-fetched', () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
+    try { agent.onPinboardEvent?.('pinboard:attachment-fetched', () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
     if (typeof agent?.callSkill === 'function') {
       // Calendar cross-peer fan-out — wrap the bare callSkill so a successful
       // calendar dispatch (schedule/RSVP) fans its invite/RSVP envelopes out
@@ -8921,7 +8921,7 @@ async function boot() {
       // + roster-binding rules) for the peer router's governance ingest below.
       circleIdentityForShell = agent.circleIdentityFor ?? null;
       try {
-        const _who = await rawCallSkill('stoop', 'whoAmI', {});
+        const _who = await rawCallSkill('pinboard', 'whoAmI', {});
         govShellRail = makeGovernanceRail({
           eventLog, circleIdentityFor: circleIdentityForShell,
           myRef: _who?.webid ?? _who?.webId ?? '', callSkill: rawCallSkill,
@@ -8959,13 +8959,13 @@ async function boot() {
       // register a peer-router with the circle-chat-message
       // handler + connect the NKN transport (best-effort; no-op when
       // nkn-sdk failed to load).  The ingest hook mirrors the envelope
-      // into stoop's itemStore so circle chat history is durable,
+      // into pinboard's itemStore so circle chat history is durable,
       // searchable, and mute/eviction-filtered (parity with /post
       // delivery via `ingestRemotePost`).  EventLog append still drives
       // the live bubble render.
       const ingestCircleMessage = async (payload, fromPeerAddr) => {
         try {
-          return await agent.callSkill('stoop', 'ingestCircleMessage', {
+          return await agent.callSkill('pinboard', 'ingestCircleMessage', {
             payload, fromPeerAddr,
           });
         } catch (err) {
@@ -9024,7 +9024,7 @@ async function boot() {
         // catch-up, pod replay) comes back as MINE (`LOCAL_ACTOR`) instead of as a stranger's.
         // Per-circle by construction; never consulted on the live receive path (chatSelfAuthor.js).
         isSelfAuthored: createSelfAuthorCheck({
-          whoAmI: () => agent.callSkill('stoop', 'whoAmI', {}),
+          whoAmI: () => agent.callSkill('pinboard', 'whoAmI', {}),
           circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         }),
         localActor: LOCAL_ACTOR,
@@ -9236,7 +9236,7 @@ async function boot() {
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       refreshUnreadMyRefs();
       // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
-      // the shell bridges it into stoop's index + the notification — the same handler the old envelope fed.
+      // the shell bridges it into pinboard's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
         // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
         handleCirclePost: makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog, profileIdOf: (cid) => agent.profileIdOf?.(cid) ?? 'default' }),
@@ -9251,7 +9251,7 @@ async function boot() {
       tryConnectPeerTransport(agent, peerMessageRouter).catch(() => { /* logged inside */ });
 
       // OBJ-2 S1c-shell — feed the household no-pod sync roster from a circle's
-      // MEMBERS (the stoop group roster = people with reachable peer addrs), NOT
+      // MEMBERS (the pinboard group roster = people with reachable peer addrs), NOT
       // the bot contacts: a bot must never receive household items. `addCirclePeer`
       // dedupes, so repeated calls (re-open, reconnect) are safe; the mirror only
       // fans out once peers are present. Reuses the exact member source the
@@ -9368,7 +9368,7 @@ async function boot() {
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {
-            const r = await rawCallSkill('stoop', 'listMyCircles', {});
+            const r = await rawCallSkill('pinboard', 'listMyCircles', {});
             const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
             await podChatCatchUpShell?.catchUpAll(ids);
           } catch { /* best-effort — the next reconnect retries */ }

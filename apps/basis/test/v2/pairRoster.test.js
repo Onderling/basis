@@ -29,7 +29,7 @@ describe('the id and the founder', () => {
   });
 });
 
-/** A stoop stand-in: circles I am in, their members, the invite code, the calls made. */
+/** A pinboard stand-in: circles I am in, their members, the invite code, the calls made. */
 function fakeSkills({ self, circles = {}, code = 'CODE1' } = {}) {
   const calls = [];
   const callSkill = vi.fn(async (app, op, args = {}) => {
@@ -259,7 +259,7 @@ describe('the lens — the pair circle carries the persona the contact row names
   });
 
   it('…read from the reply the WAIST really gives: full `contacts` beside the trimmed chat `items` (2026-09-24)', async () => {
-    // `adaptStoopReply` answers `listContacts` with BOTH: `contacts` (the book's rows, whole) and `items` (the chat
+    // `adaptPinboardReply` answers `listContacts` with BOTH: `contacts` (the book's rows, whole) and `items` (the chat
     // projection — id, label, handle, trust, peerAddr, personKey, pairCircleId, and NOT `persona`). Reading `items`
     // first found no persona on any row, so every pair circle founded with no release: the contact lens never took
     // effect in a running app. The test above faked a reply the waist never gives.

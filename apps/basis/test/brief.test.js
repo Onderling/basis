@@ -16,7 +16,7 @@ describe('runBrief — fan-out', () => {
   it("fans across declared apps + returns ordered sections", async () => {
     const catalogue = makeCatalogue([
       { opId: 'listOpen',  appOrigin: 'household', summarySkill: 'bs1', order: 10, label: 'Household' },
-      { opId: 'listFeed',  appOrigin: 'stoop',     summarySkill: 'bs2', order: 30, label: 'Circle' },
+      { opId: 'listFeed',  appOrigin: 'pinboard',     summarySkill: 'bs2', order: 30, label: 'Circle' },
       { opId: 'readNote',  appOrigin: 'folio',     summarySkill: 'bs3', order: 20, label: 'Folio' },
     ]);
     const calls = [];
@@ -25,7 +25,7 @@ describe('runBrief — fan-out', () => {
       return { items: [{ id: 'x', label: `${appOrigin}-x` }] };
     };
     const r = await runBrief({ catalogue, callSkill });
-    expect(r.sections.map((s) => s.appOrigin)).toEqual(['household', 'folio', 'stoop']);
+    expect(r.sections.map((s) => s.appOrigin)).toEqual(['household', 'folio', 'pinboard']);
     expect(r.sections.map((s) => s.label)).toEqual(['Household', 'Folio', 'Circle']);
     expect(calls.length).toBe(3);
   });

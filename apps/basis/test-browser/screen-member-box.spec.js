@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
-import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { addBoxCard } from '../test/support/addBoxCard.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';

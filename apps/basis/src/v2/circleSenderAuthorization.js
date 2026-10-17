@@ -141,7 +141,7 @@ export function createCircleSenderAuthorization({
    * @param {object} a
    * @param {string} a.circleId
    * @param {string} a.ownAddress          this device's per-circle address in that circle
-   * @param {Array<object>} a.members      roster rows (`stoop listGroupMembers`)
+   * @param {Array<object>} a.members      roster rows (`pinboard listGroupMembers`)
    * @param {string[]} [a.selfKeys]        keys of OURS that speak in this circle
    * @param {string|null} [a.selfWebid]     OUR webid on this roster — how our own row is recognised when
    *   its `pubKey` is a display-cache artefact rather than a key of ours (see the branch below).
@@ -171,7 +171,7 @@ export function createCircleSenderAuthorization({
       // OUR OWN ROW, IDENTIFIED BY WEBID — and its key is NOT admitted.
       //
       // A founder gets no keys of their own from `deriveRoster`, so their whole row comes from the
-      // display cache, and the `pubKey` that lands there is this device's STOOP agent identity: seeded
+      // display cache, and the `pubKey` that lands there is this device's PINBOARD agent identity: seeded
       // once per device, identical in every circle, and not one of `selfKeys`. Recognised only by key,
       // that row fell past the branch below and was ALLOWED — admitting a global, cross-circle constant
       // onto a per-circle allow-list, which is exactly the linkability this gate exists to prevent. It

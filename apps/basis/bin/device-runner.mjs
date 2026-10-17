@@ -199,7 +199,7 @@ const chatVault = new VaultNodeFs(path.join(dataDir, 'chat-vault.json'), vaultPa
 // content of a throwaway identity, and that content does not carry over.
 const contentPaths = {
   registry:  path.join(dataDir, 'registry'),
-  stoop:     path.join(dataDir, 'stoop-items.json'),
+  pinboard:     path.join(dataDir, 'pinboard-items.json'),
   household: path.join(dataDir, 'household-items.json'),
   tasks:     path.join(dataDir, 'tasks-items.json'),
   settings:  path.join(dataDir, 'settings.json'),
@@ -235,8 +235,8 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-outbox-cache': contentPaths.outbox,
     'cc-settings-state': contentPaths.settings,
     'cc-settings-cache': contentPaths.settings,
-    'cc-stoop-state': contentPaths.stoop,
-    'cc-stoop-cache': contentPaths.stoop,
+    'cc-pinboard-state': contentPaths.pinboard,
+    'cc-pinboard-cache': contentPaths.pinboard,
     'cc-household-state': contentPaths.household,
     'cc-household-cache': contentPaths.household,
     'cc-tasks-cache': contentPaths.tasks,
@@ -290,7 +290,7 @@ const agent = await createRealHouseholdAgent({
   ownerRootVault: vault,
   chatVault,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
-  stoopPersistDb:     { path: contentPaths.stoop },
+  pinboardPersistDb:     { path: contentPaths.pinboard },
   householdPersistDb: { path: contentPaths.household },
   tasksPersistDb:     { path: contentPaths.tasks },
   settingsPersistDb:  { path: contentPaths.settings },
@@ -444,7 +444,7 @@ if (relayUrl) {
     onJoined: (a) => pairSeams.onJoined?.(a),
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
-    myHandle: async () => { try { return (await callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    myHandle: async () => { try { return (await callSkill('pinboard', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => relayUrl,
     // the lens (shell parity): the box founds a pair circle as any shell does and says what the persona discloses there
     shareRelease: (cid, personaId) => shareDisclosureToCircle({
@@ -465,18 +465,18 @@ if (relayUrl) {
     // marker themselves when the turn reaches them. Hiding is Contacten only — the thread, the pair roster
     // and their circles never change, so this device stores the turn exactly as it would any other.
     isHidden: async (contactId) => {
-      const rows = (await callSkill('stoop', 'listContacts', {}))?.contacts ?? [];
+      const rows = (await callSkill('pinboard', 'listContacts', {}))?.contacts ?? [];
       return rows.some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true);
     },
     onReturned: async (contactId) => {
-      await callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false });
+      await callSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: false });
       walkLog({ kind: 'contact-returned', contactId: String(contactId).slice(0, 12) });
     },
     // The first message to a contact carries the person's card; one that arrives (naming its sender) goes into the
     // book here — and the book carry names that person on the phone and the laptop (2026-09-21).
-    myCard: async (personaId = null) => { try { return (await callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await callSkill('pinboard', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     onCard: async ({ contactId, card }) => {
-      const r = await callSkill('stoop', 'addContactFromQr', { payload: card });
+      const r = await callSkill('pinboard', 'addContactFromQr', { payload: card });
       walkLog({ kind: 'contact-card', contactId: String(contactId).slice(0, 12), name: r?.contact?.displayName ?? r?.contact?.handle ?? null });
     },
     localActor: 'me',
@@ -555,12 +555,12 @@ if (relayUrl) {
         // author's address is not on the row yet", and the row says whether that is so.
         let roster = null;
         try {
-          const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
           roster = (r?.members ?? []).map((m) => ({ webid: String(m.webid).slice(0, 8), primary: m.circleAddress ? String(m.circleAddress).slice(0, 8) : null, set: (m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)) }));
         } catch { roster = null; }
         let trail = null;
         try {
-          const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+          const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
           const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
           trail = items.filter((it) => it?.source?.groupId === circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? it.source?.confirmedBy ?? '').slice(0, 8), addr: it.source?.circleAddress ? String(it.source.circleAddress).slice(0, 8) : null, set: (it.source?.circleAddresses ?? []).map((p) => String(p?.address ?? p).slice(0, 8)), etag: it.etag ?? it._etag ?? null }));
         } catch { trail = null; }
@@ -637,10 +637,10 @@ if (relayUrl) {
   // Still in it? Not when this device left it, and not when the circle's folded roster no longer carries this device's
   // per-circle address (an eviction the membership lane folded). A read that fails is not a removal.
   circleSeams.stillIn = async (circleId) => {
-    const mine = await callSkill('stoop', 'listMyCircles', {}).catch(() => null);
+    const mine = await callSkill('pinboard', 'listMyCircles', {}).catch(() => null);
     if ((mine?.left ?? []).includes(circleId)) return false;
     const me = agent.circleAddressFor?.(circleId) ?? null;
-    const roster = await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
+    const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     const members = Array.isArray(roster?.members) ? roster.members : null;
     if (!me || !members?.length) return true;
     return members.some((m) => m?.circleAddress === me || (m?.circleAddresses ?? []).includes(me));
@@ -699,7 +699,7 @@ if (relayUrl) {
   // it, and "a full member of your circles" was true of the lanes and false of the wire.
   const registerCirclePresence = async (extraCircleIds = []) => {
     let ids = [];
-    try { ids = ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
+    try { ids = ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean); } catch { ids = []; }
     const circleIds = [...new Set([...ids, ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : [])])];
     if (circleIds.length === 0) return;
     await primeCircleSecurity({ agent, circleIds }).catch((err) => console.warn('device-runner: circle security priming failed:', err?.message ?? err));
@@ -725,7 +725,7 @@ if (relayUrl) {
     const rosters = {};
     for (const cid of circleIds) {
       try {
-        const r = await callSkill('stoop', 'listGroupMembers', { groupId: cid });
+        const r = await callSkill('pinboard', 'listGroupMembers', { groupId: cid });
         rosters[cid] = (r?.members ?? []).map((m) => ({ who: String(m.webid ?? '').slice(0, 8), set: (m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)) }));
       } catch { rosters[cid] = null; }
     }
@@ -1143,7 +1143,7 @@ if (tgToken || inboxDoor.bridge) {
   const botCircleRef = () => agent.identity?.chat?.pubKey ?? null;
   const doorCallRef = { fn: null };
   const circleDoors = isFunctionProfile && circleSeams.join ? createCircleDoors({
-    roster: async (circleId) => (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [],
+    roster: async (circleId) => (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [],
     botRef: () => botCircleRef(),
     botHandle: (circleId) => botCirclesRef.ref?.handleIn(circleId) ?? null,
     setDoorCaller: (id, role) => agent.setDoorCaller(id, role),
@@ -1454,7 +1454,7 @@ await hostTick.start();
 walkLog({ kind: 'host-tick', jobs: hostTick.names() });
 
 // ── What the operator needs to see ──────────────────────────────────────────────────────────────
-const card = await callSkill('stoop', 'getContactShareQr', {}).catch(() => null);
+const card = await callSkill('pinboard', 'getContactShareQr', {}).catch(() => null);
 // `clock`: the zone the household's times are read and shown in (the role's TZ; a bare container is UTC).
 walkLog({ kind: 'run', ts: new Date().toISOString(), shell: 'device', relay: relayUrl || null, telegram: !!tgToken, clock: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone });
 console.log(`\ndevice-runner: up — data in ${dataDir}`);

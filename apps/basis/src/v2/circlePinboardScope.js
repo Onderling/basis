@@ -1,34 +1,34 @@
 /**
- * basis v2 — scope the GUI's DIRECT stoop callSkill to the active circle
- * (shared web + mobile). The per-circle stoop restructure, GUI slice.
+ * basis v2 — scope the GUI's DIRECT pinboard callSkill to the active circle
+ * (shared web + mobile). The per-circle pinboard restructure, GUI slice.
  *
  * The dispatch path (slash / AI) already binds the active circle via
- * `scopeReadyDispatch` (router.js): it injects the circle id into the stoop scope
+ * `scopeReadyDispatch` (router.js): it injects the circle id into the pinboard scope
  * key so a post lands in — and a list reads from — the open circle. But the GUI
- * surfaces (the noticeboard noticeboard, etc.) call `callSkill('stoop', op, args)`
+ * surfaces (the noticeboard noticeboard, etc.) call `callSkill('pinboard', op, args)`
  * DIRECTLY, bypassing that binding — so without this wrapper every circle's
  * noticeboard hits the one shared `cc-default-circle` and they all see each other's
  * posts. This wrapper closes that gap the same way:
- *   • item-creating / mutating stoop ops get the circle id injected as `groupId`
- *     (stoop's per-call scope key — realAgent maps it to `source.targets[]`), so
+ *   • item-creating / mutating pinboard ops get the circle id injected as `groupId`
+ *     (pinboard's per-call scope key — realAgent maps it to `source.targets[]`), so
  *     the post is tagged to / routed to THIS circle (basis is multi-pod:
  *     the scope key is load-bearing for routing, not just a tag), and
  *   • list reads are filtered to the circle with the SAME lenient rule as
  *     `loadCircleItems` (`keepForCircle`): an item with no per-item circle hint is
  *     kept — the op already scoped it — so pre-existing unscoped posts don't vanish.
  *
- * This is the invariant-honouring shape: ONE stoop agent (service-context) with a
+ * This is the invariant-honouring shape: ONE pinboard agent (service-context) with a
  * per-circle scope key threaded through ops — NOT N agents for N circles
  * (CLAUDE.md invariant #6). Pure + transport-free, so mobile reuses it verbatim.
  */
 import { openThumbnail } from '@onderling/blob-gateway';
 import { itemCircleId } from './circleScope.js';
 import { createMediaEmbed } from '../core/handlers/mediaEmbed.js';
-import { stoopManifest } from '@onderling-app/stoop/manifest';
-import { STOOP_OP_ALIAS } from './stoopOpAliases.js';
+import { pinboardManifest } from '@onderling-app/pinboard/manifest';
+import { PINBOARD_OP_ALIAS } from './pinboardOpAliases.js';
 
 /**
- * Which stoop ops act on the ACTIVE circle's items — DERIVED from the manifest's `circleScoped`
+ * Which pinboard ops act on the ACTIVE circle's items — DERIVED from the manifest's `circleScoped`
  * declaration, never listed here. A write verb gets the circle injected into its args (and its `text`
  * sealed for a sealed circle); a `list` gets its items filtered to the circle. An alias of a scoped op
  * (`getBulletin` → `listOpen`) is scoped through the one alias table the dispatcher reads.
@@ -37,7 +37,7 @@ import { STOOP_OP_ALIAS } from './stoopOpAliases.js';
  * neither), and an op added without a list edit silently wrote to the wrong store. Now adding an op that
  * acts on an item means declaring `circleScoped` on it — and a guard fails when it does not.
  */
-export function circleScopedOps(manifest, aliases = STOOP_OP_ALIAS) {
+export function circleScopedOps(manifest, aliases = PINBOARD_OP_ALIAS) {
   const writes = new Set(); const lists = new Set();
   for (const op of manifest?.operations ?? []) {
     if (op?.circleScoped !== true) continue;
@@ -49,17 +49,17 @@ export function circleScopedOps(manifest, aliases = STOOP_OP_ALIAS) {
   }
   return { writes, lists };
 }
-const DERIVED = circleScopedOps(stoopManifest);
-/** stoop ops whose created/mutated item belongs to / routes to the active circle (derived, see above). */
+const DERIVED = circleScopedOps(pinboardManifest);
+/** pinboard ops whose created/mutated item belongs to / routes to the active circle (derived, see above). */
 export const SCOPED_WRITE_OPS = DERIVED.writes;
-/** stoop list ops whose `{ items }` are filtered to the active circle (derived, see above). */
+/** pinboard list ops whose `{ items }` are filtered to the active circle (derived, see above). */
 export const SCOPED_LIST_OPS = DERIVED.lists;
 
 // The "what is a noticeboard post" gate lives in `@onderling/item-types` now (its type-taxonomy
-// home) — stoop needed it too (`/brief` counted chat lines as circle requests for a month because
+// home) — pinboard needed it too (`/brief` counted chat lines as circle requests for a month because
 // it could not import an app) and both apps already depend on that package. Re-exported here so
 // every basis call site keeps its import path.
-export { SYSTEM_STOOP_TYPES, isNoticeboardPost, NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
+export { SYSTEM_PINBOARD_TYPES, isNoticeboardPost, NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 
 /**
  * Keep `item` for `circleId` — lenient: an item carrying NO circle hint is kept
@@ -101,7 +101,7 @@ function bytesToStdB64(bytes) {
  * `attachmentEncoder`); a pass-through `encodeImage` hands those bytes + thumbnail to
  * `createMediaEmbed`, which `uploadBlob`s the SEALED bytes + SEALED thumbnail into the
  * circle bucket and returns a canonical `media` item (`snapshot`) whose `source` IS the
- * blob manifest line. That opaque, sealed pointer is what stoop stores + carries — no
+ * blob manifest line. That opaque, sealed pointer is what pinboard stores + carries — no
  * plaintext bytes and no `data:image` thumbnail ever reach the pod / wire.
  */
 async function sealPostAttachment(att, media) {
@@ -153,8 +153,8 @@ function openItemAttachmentThumbs(it, opener) {
 }
 
 /**
- * Wrap a 3-arg host `callSkill(appOrigin, opId, args)` so stoop ops are scoped to
- * `circleId`. Non-stoop ops and a null circleId pass through untouched.
+ * Wrap a 3-arg host `callSkill(appOrigin, opId, args)` so pinboard ops are scoped to
+ * `circleId`. Non-pinboard ops and a null circleId pass through untouched.
  *
  * For a SEALED (p2/p3) circle, pass `getSealStrategy` — an async getter resolving the
  * circle's `{seal, open}` content strategy (cached by the caller). When present, a
@@ -180,10 +180,10 @@ function openItemAttachmentThumbs(it, opener) {
  * @param {(() => Promise<{mediaGateway:object, localActor:string, t?:Function}|null>)} [getMedia]
  * @returns {(appOrigin:string, opId:string, args?:object)=>Promise<any>}
  */
-export function scopeStoopCallSkill(callSkill, circleId, getSealStrategy, getMedia) {
+export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, getMedia) {
   if (typeof callSkill !== 'function' || !circleId) return callSkill;
   return async (appOrigin, opId, args = {}) => {
-    if (appOrigin !== 'stoop') return callSkill(appOrigin, opId, args);
+    if (appOrigin !== 'pinboard') return callSkill(appOrigin, opId, args);
     const strategy = (typeof getSealStrategy === 'function'
       && (SCOPED_WRITE_OPS.has(opId) || SCOPED_LIST_OPS.has(opId)))
       ? await getSealStrategy().catch(() => null) : null;

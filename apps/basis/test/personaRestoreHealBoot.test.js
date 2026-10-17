@@ -29,7 +29,7 @@ describe('a persona\'s restore record', () => {
     const registryBackend = createMemoryBackend();
     const boot = () => createRealHouseholdAgent({
       ...vaults, registryBackend, seedHousehold: false, seedDemoData: false,
-      stoopPersistDb: { path: path.join(dir, 'stoop-state.json') }, deviceLog: new EventLog({ initial: [], muted: [] }),
+      pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') }, deviceLog: new EventLog({ initial: [], muted: [] }),
     });
     const first = await boot();
     const { id } = await first.callSkill('agents', 'createProfile', { name: 'Buurt' });
@@ -42,7 +42,7 @@ describe('a persona\'s restore record', () => {
     expect(selfOf(first, Y)).toBe(B.chatId.pubKey);
     await first.callSkill('agents', 'removeProfileCircleMembership', { id, circleId: Y });   // the record goes missing
     expect(selfOf(first, Y), 'record gone → the circle reads as the default\'s').toBe(first.identity.chat.pubKey);
-    await new Promise((r) => setTimeout(r, 1200));   // the stoop state reaches disk
+    await new Promise((r) => setTimeout(r, 1200));   // the pinboard state reaches disk
     await first.shutdown?.();
 
     const second = await boot();
@@ -61,7 +61,7 @@ describe('a persona\'s restore record', () => {
     expect((await createSubmit({ state, callSkill: (a, o, x) => agent.callSkill(a, o, x) })).result).toBeTruthy();
     await new Promise((r) => setTimeout(r, 500));
     expect(selfOf(agent, Y)).toBe(agent.persona(id).chatId.pubKey);
-    const left = await agent.callSkill('stoop', 'leaveGroup', { groupId: Y, confirm: true });
+    const left = await agent.callSkill('pinboard', 'leaveGroup', { groupId: Y, confirm: true });
     expect(left?.error ?? null, JSON.stringify(left)).toBe(null);
     expect(await wait(async () => selfOf(agent, Y) === agent.identity.chat.pubKey), 'off B\'s record (its binding gone with it)').toBe(true);
     await agent.shutdown?.();
@@ -74,7 +74,7 @@ describe('a persona\'s restore record', () => {
       const registryBackend = createMemoryBackend();
       const boot = () => createRealHouseholdAgent({
         ...vaults, registryBackend, seedHousehold: false, seedDemoData: false,
-        stoopPersistDb: { path: path.join(d2, 'stoop-state.json') }, deviceLog: new EventLog({ initial: [], muted: [] }),
+        pinboardPersistDb: { path: path.join(d2, 'pinboard-state.json') }, deviceLog: new EventLog({ initial: [], muted: [] }),
       });
       const first = await boot();
       const state = createInitial();

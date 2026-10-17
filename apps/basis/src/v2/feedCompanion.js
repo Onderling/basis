@@ -51,7 +51,7 @@ export async function loadFeedCompanion({ callSkill }) {
  */
 export async function loadCompanions({ callSkill }) {
   try {
-    const r = await callSkill('stoop', 'listContacts', {});
+    const r = await callSkill('pinboard', 'listContacts', {});
     return companionsOf(Array.isArray(r?.contacts) ? r.contacts : (Array.isArray(r?.items) ? r.items : []));
   } catch { return []; }
 }

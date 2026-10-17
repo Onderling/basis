@@ -29,7 +29,7 @@ const DEFAULT_TTL_MS = param({ key: 'sharedPeerScope.ttlMs', scope: PARAM_SCOPE.
  * @param {object} deps
  * @param {() => (string[]|Promise<string[]>)} deps.myCircleIds   circles this device is a member of
  * @param {(circleId: string) => Promise<Array<{addr?:string, webid?:string, pubKey?:string}>>} deps.rosterOf
- *   read one circle's roster (basis wires this to stoop's `listGroupRoster`)
+ *   read one circle's roster (basis wires this to pinboard's `listGroupRoster`)
  * @param {() => number} [deps.now]
  * @param {number} [deps.ttlMs]
  * @returns {(callerPubKey: string|null, peers: string[]) => Promise<string[]>}

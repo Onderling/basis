@@ -10,12 +10,12 @@
  * hint (assume the op already scoped them).
  *
  * Wiring status (as of 5.3d, 2026-05-30):
- *   - getBulletin → stoop.listOpen (alias in realAgent.STOOP_OP_ALIAS).
+ *   - getBulletin → pinboard.listOpen (alias in realAgent.PINBOARD_OP_ALIAS).
  *     Posts created in basis carry the active circle id under
  *     `source.targets[]`; the listOpen adapter surfaces that as a
  *     top-level `groupId` so `keepForCircle` can separate circles.
  *   - getFeed — ASPIRATIONAL.  Deliberately NOT aliased — would route
- *     to the same stoop.listOpen as getBulletin and duplicate every
+ *     to the same pinboard.listOpen as getBulletin and duplicate every
  *     post in the flat result.  Kept in DEFAULT_SOURCES so a future
  *     dedicated feed substrate (separate from bulletin posts) can
  *     wire it without a contract change.

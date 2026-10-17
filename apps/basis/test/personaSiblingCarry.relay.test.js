@@ -50,7 +50,7 @@ describe('the sibling carry is per self', () => {
     expect(consumed.circles?.find((c) => c.circleId === X)?.ok, JSON.stringify(consumed)).toBe(true);
     const boxAddr = box.agent.circleAddressFor(X);
     expect(await until(async () => {
-      const r = await phone.agent.callSkill('stoop', 'listGroupMembers', { groupId: X });
+      const r = await phone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: X });
       return (r?.members ?? []).find((m) => m.webid === phone.pubKey)?.circleAddresses?.includes(boxAddr) ? true : null;
     }, { timeout: 20_000, step: 100 }), 'the phone knows its sibling').toBe(true);
     for (const n of [phone, box]) await bindCircleAddressKeysFor({ agent: n.agent, circleId: X });

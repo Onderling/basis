@@ -18,8 +18,8 @@ describe('the app signs only to agents the person admitted with', () => {
   it('a /start <code> to a bot-claiming contact is signed; nothing else is, until the bot\'s statement marks it', async () => {
     node = await bootRealAgentNode('bea', {});
     const a = node.agent;
-    await a.callSkill('stoop', 'addContact', { webid: BOT, pubKey: BOT, peerAddr: BOT, displayName: 'Huisbot', bot: true });
-    await a.callSkill('stoop', 'addContact', { webid: PERSON, pubKey: PERSON, peerAddr: PERSON, displayName: 'Ann' });
+    await a.callSkill('pinboard', 'addContact', { webid: BOT, pubKey: BOT, peerAddr: BOT, displayName: 'Huisbot', bot: true });
+    await a.callSkill('pinboard', 'addContact', { webid: PERSON, pubKey: PERSON, peerAddr: PERSON, displayName: 'Ann' });
 
     expect(await a.linkedTurnAuth(BOT, { text: 'hallo', messageId: 'm1' }), 'a claim alone earns nothing').toBeNull();
     expect(await a.linkedTurnAuth(PERSON, { text: '/start ABC123', messageId: 'm2' }), 'the same text to a person').toBeNull();

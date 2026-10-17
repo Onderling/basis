@@ -74,7 +74,7 @@ describe('the person key rotates in the revoke ceremony', () => {
     const anns = [A, A2, A3].map((n) => ownAnnouncementFor({ agent: n.agent, circleId: GROUP }));
     for (const node of [A, B, A2, A3]) {
       for (const ann of anns) {
-        expect((await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...ann }))?.ok).toBe(true);
+        expect((await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...ann }))?.ok).toBe(true);
       }
       await bindCircleAddressKeysFor({ agent: node.agent, circleId: GROUP });
     }

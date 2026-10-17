@@ -90,7 +90,7 @@ describe('a contact-thread turn reaches the person\'s other devices', () => {
     await announce(phone, alwaysOn);
 
     const knows = async (node, otherAddr) => until(async () => {
-      const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       const row = (res?.members ?? []).find((m) => m.webid === node.pubKey);
       return row?.circleAddresses?.includes(otherAddr) ? row : null;
     }, { timeout: 20000, step: 100 });

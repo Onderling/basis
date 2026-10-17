@@ -34,7 +34,7 @@ import { circleRows, stampSenderLabels } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { enabledFeatures } from './circlePolicy.js';
 import { enrichEmbedsWithTitles } from './embedResolve.js';
-import { isNoticeboardPost } from './circleStoopScope.js';
+import { isNoticeboardPost } from './circlePinboardScope.js';
 
 /**
  * Editor-side metadata per block type.  Drives the palette + the
@@ -169,14 +169,14 @@ function materializePhoto(block) {
 async function materializeNoticeboard(block, circleId, { callSkill, eventLog, circles, members, viewerId, revealPolicy } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   let rows = [];
-  // #16 — prefer the REAL open posts (stoop `listOpen`) so the screen noticeboard
+  // #16 — prefer the REAL open posts (pinboard `listOpen`) so the screen noticeboard
   // surfaces the noticeboard even when the chat tab (where the noticeboard lives) is
   // hidden. Map each post into the StreamRow shape the renderer's pickSender/
   // pickRowText read. Falls back to the eventLog stream when no callSkill.
   let listOpenSucceeded = false;
   if (typeof callSkill === 'function') {
     try {
-      const res = await callSkill('stoop', 'listOpen', {});
+      const res = await callSkill('pinboard', 'listOpen', {});
       // Keep only real asks/offers — drop system items (rules / membership lifecycle)
       // that listOpen returns alongside posts.
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
@@ -289,9 +289,9 @@ async function materializeRules(block, circleId, { callSkill } = {}) {
   if (typeof callSkill !== 'function' || !circleId) {
     return { blockId: block.id, type: 'rules', status: 'empty', content: { rules: null, doc: normalizeRulesDoc(null) } };
   }
-  const res = await callSkill('stoop', 'getGroupRules', { groupId: circleId });
+  const res = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
   const rules = res?.rules ?? null;
-  // Rules doc lives on the stoop item under source.doc (created by the
+  // Rules doc lives on the pinboard item under source.doc (created by the
   // rules wizard); fall through to a top-level `doc` for any legacy
   // shape and let normalizeRulesDoc fill in the canonical fields.
   const docRaw = rules?.source?.doc ?? rules?.doc ?? null;

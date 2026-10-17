@@ -3,7 +3,7 @@
  *
  * The "Per contact aanpassen" list lets the user set a 3-way
  * gate per contact: ALTIJD (always relay) / MET-OK (relay with my
- * approval) / UIT (never relay).  Stoop's contact model already
+ * approval) / UIT (never relay).  Pinboard's contact model already
  * carries a `hopThrough` flag per-contact (boolean); broadens
  * that to a 3-level enum and ships the pure mapping + a contact-list
  * projection the screen renders.

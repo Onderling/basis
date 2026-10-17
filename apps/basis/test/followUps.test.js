@@ -22,10 +22,10 @@ describe('collectFollowUps — per-op Q31 hints', () => {
     const out = collectFollowUps('addMember', 'household', { ok: true }, catalogue);
     expect(out).toEqual([
       // J3: cross-app chain also fires (DEFAULT_CROSS_APP_CHAINS has
-      // household.addMember → folio.shareFolder + stoop.postRequest)
+      // household.addMember → folio.shareFolder + pinboard.postRequest)
       { opId: 'listOpen', appOrigin: 'household', prefilledArgs: undefined, label: undefined },
       { opId: 'shareFolder', appOrigin: 'folio',  prefilledArgs: {}, label: 'Share folio folder' },
-      { opId: 'postRequest', appOrigin: 'stoop',  prefilledArgs: undefined, label: 'Post intro on circle' },
+      { opId: 'postRequest', appOrigin: 'pinboard',  prefilledArgs: undefined, label: 'Post intro on circle' },
     ]);
   });
 
@@ -48,13 +48,13 @@ describe('collectFollowUps — cross-app chains', () => {
     const catalogue = fakeCatalogue({});
     const out = collectFollowUps('addMember', 'household', { ok: true, memberName: 'Anne' }, catalogue);
     expect(out.some((e) => e.appOrigin === 'folio' && e.opId === 'shareFolder')).toBe(true);
-    expect(out.some((e) => e.appOrigin === 'stoop' && e.opId === 'postRequest')).toBe(true);
+    expect(out.some((e) => e.appOrigin === 'pinboard' && e.opId === 'postRequest')).toBe(true);
   });
 
-  it("fires stoop.postRequest → stoop.listFeed", () => {
+  it("fires pinboard.postRequest → pinboard.listFeed", () => {
     const catalogue = fakeCatalogue({});
-    const out = collectFollowUps('postRequest', 'stoop', { ok: true }, catalogue);
-    expect(out.some((e) => e.appOrigin === 'stoop' && e.opId === 'listFeed')).toBe(true);
+    const out = collectFollowUps('postRequest', 'pinboard', { ok: true }, catalogue);
+    expect(out.some((e) => e.appOrigin === 'pinboard' && e.opId === 'listFeed')).toBe(true);
   });
 
   it("no match when neither catalogue nor registry has a chain", () => {
@@ -109,6 +109,6 @@ describe('DEFAULT_CROSS_APP_CHAINS — sanity', () => {
   it('declares the J3 chains', () => {
     const triggers = DEFAULT_CROSS_APP_CHAINS.map((c) => `${c.trigger.appOrigin}.${c.trigger.opId}`);
     expect(triggers).toContain('household.addMember');
-    expect(triggers).toContain('stoop.postRequest');
+    expect(triggers).toContain('pinboard.postRequest');
   });
 });

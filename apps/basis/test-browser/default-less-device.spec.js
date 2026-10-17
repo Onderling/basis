@@ -20,9 +20,9 @@ test('enrolled with Werk only, a device runs Werk alone and speaks as it', async
     const made = await call(A, 'agents', 'createProfile', { name: 'Werk' });
     expect(made?.created, JSON.stringify(made)).toBe(true);
     const phrase = (await call(A, 'household', 'revealOwnerPhrase', {}))?.mnemonic;
-    const general = (await call(A, 'stoop', 'whoAmI'))?.webid;
+    const general = (await call(A, 'pinboard', 'whoAmI'))?.webid;
 
-    expect((await call(A, 'stoop', 'createGroupV2', { groupId: 'thuis-walk', name: 'Thuis', rules: { text: 't' } }))?.groupId).toBe('thuis-walk');
+    expect((await call(A, 'pinboard', 'createGroupV2', { groupId: 'thuis-walk', name: 'Thuis', rules: { text: 't' } }))?.groupId).toBe('thuis-walk');
     // an ADD from an offer (not a restore): the offer is stashed on B first, as the shells do when it is scanned
     const offer = await call(A, 'household', 'buildEnrollOffer', {});
     expect(offer?.ok, JSON.stringify(offer)).toBe(true);
@@ -37,9 +37,9 @@ test('enrolled with Werk only, a device runs Werk alone and speaks as it', async
     // (it would be Werk walking into the general persona's circles — the one thing a persona exists to keep apart)
     const generalCircles = ['thuis-walk'];   // made on A as the general persona, before the offer (cc-help is every device's own)
     await B.waitForTimeout(8000);   // the consume runs after boot; give it its turn
-    const onB = ((await call(B, 'stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id)));
+    const onB = ((await call(B, 'pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id)));
     for (const c of generalCircles) expect(onB, `B is not in the general persona's circle ${c}`).not.toContain(c);
-    const me = (await call(B, 'stoop', 'whoAmI'))?.webid;
+    const me = (await call(B, 'pinboard', 'whoAmI'))?.webid;
     expect(me, 'B speaks as someone').toBeTruthy();
     expect(me, 'not as the general persona').not.toBe(general);
     await B.locator('.cc-header-avatar__button').click();

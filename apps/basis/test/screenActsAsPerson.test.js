@@ -44,7 +44,7 @@ describe('a screen acts as its person on the bot', () => {
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
-    for (const [webid, role] of [[MEMBER, 'member'], [ADMIN, 'admin']]) { await own('stoop', 'addContact', { webid, channel: 'telegram', role }); await agent.setDoorCaller(webid, role); }
+    for (const [webid, role] of [[MEMBER, 'member'], [ADMIN, 'admin']]) { await own('pinboard', 'addContact', { webid, channel: 'telegram', role }); await agent.setDoorCaller(webid, role); }
     const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
     const doorCall = withAssistantOps({ callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), threads, t, refusal: agent.doorRefusal, admin: {} });

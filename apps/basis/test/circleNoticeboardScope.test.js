@@ -1,7 +1,7 @@
 /**
  * Regression: the circle noticeboard leaked other circles' items + showed internal
- * stoop bookkeeping. Two causes, both fixed here:
- *  1. itemCircleId read only TOP-LEVEL circle hints, but stoop nests the scope under
+ * pinboard bookkeeping. Two causes, both fixed here:
+ *  1. itemCircleId read only TOP-LEVEL circle hints, but pinboard nests the scope under
  *     source.targets[{kind:'group',groupId}] (posts) / source.groupId (system items) →
  *     every item looked unscoped → keepForCircle kept everything (cross-circle leak).
  *  2. listOpen returns system items (group-rules/membership-code/membership-redemption)
@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { itemCircleId, isInCircle } from '../src/v2/circleScope.js';
-import { keepForCircle, isNoticeboardPost } from '../src/v2/circleStoopScope.js';
+import { keepForCircle, isNoticeboardPost } from '../src/v2/circlePinboardScope.js';
 
 describe('itemCircleId — nested circle hints', () => {
   it('reads a post scope from source.targets[{kind:group}]', () => {
@@ -52,7 +52,7 @@ describe('isNoticeboardPost — hides system items', () => {
     expect(isNoticeboardPost({ type: 'membership-code' })).toBe(false);
     expect(isNoticeboardPost({ type: 'membership-redemption' })).toBe(false);
   });
-  // The local-first substrate flattens every stoop item to type:'post' — the semantic
+  // The local-first substrate flattens every pinboard item to type:'post' — the semantic
   // type is gone, but source shape survives. Recognise system items by source.
   it('drops substrate-collapsed (type:post) system items by source shape', () => {
     expect(isNoticeboardPost({ type: 'post', text: 'Miep', source: { groupId: 'miep', rules: { version: 1 } } })).toBe(false);
@@ -64,7 +64,7 @@ describe('isNoticeboardPost — hides system items', () => {
   });
 
   // A circle CHAT line is mirrored into the same itemStore so the conversation survives a
-  // reload (stoop `broadcastCircleMessage` / `ingestCircleMessage`). It is not a noticeboard
+  // reload (pinboard `broadcastCircleMessage` / `ingestCircleMessage`). It is not a noticeboard
   // post — but it was rendered as one, with a "Withdraw" action when it was yours.
   describe('circle chat lines are not noticeboard posts', () => {
     const chatItem = (over = {}) => ({
@@ -76,7 +76,7 @@ describe('isNoticeboardPost — hides system items', () => {
     it('drops a chat item by type', () => {
       expect(isNoticeboardPost(chatItem())).toBe(false);
     });
-    it('drops it on the LIVE path too, where adaptStoopReply has flattened it to type:post', () => {
+    it('drops it on the LIVE path too, where adaptPinboardReply has flattened it to type:post', () => {
       expect(isNoticeboardPost(chatItem({ type: 'post' }))).toBe(false);
     });
     it('a chat line carries no circle hint, so it leaked onto EVERY circle unfiltered', () => {

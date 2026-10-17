@@ -25,7 +25,7 @@ import { bookRowsOf } from '../../src/v2/contactsSource.js';
 const log = () => ({ deviceLog: new EventLog({ initial: [], muted: [] }) });
 const dm = (from, to, text, messageId) => from.contactThreadChannel.sendTurn({ peerAddr: to.pubKey, threadId: to.pubKey, text, messageId }).sent;
 const rowOf = (roster, webid) => (roster ?? []).find((m) => m.webid === webid);
-const contactOf = async (node, webid) => bookRowsOf(await node.agent.callSkill('stoop', 'listContacts', {})).find((c) => c.webid === webid) ?? null;
+const contactOf = async (node, webid) => bookRowsOf(await node.agent.callSkill('pinboard', 'listContacts', {})).find((c) => c.webid === webid) ?? null;
 const threadTexts = async (node, contactId) => ((await node.contactThreadChannel.rehydrate?.(contactId)) ?? []).map((t) => t.text);
 
 /** Two card contacts who have written once, so the pair roster exists; `{deleter, deleted, pairId}` by ROLE. */
@@ -36,8 +36,8 @@ async function pairWith(deleterIsFounder) {
   ]);
   await connectNodesOverBus([X, Y]);
   for (const [me, o] of [[X, Y], [Y, X]]) {
-    const card = await o.agent.callSkill('stoop', 'getContactShareQr', {});
-    expect((await me.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload })).error).toBeUndefined();
+    const card = await o.agent.callSkill('pinboard', 'getContactShareQr', {});
+    expect((await me.agent.callSkill('pinboard', 'addContactFromQr', { payload: card.payload })).error).toBeUndefined();
   }
   const pairId = pairCircleIdFor(X.pubKey, Y.pubKey);
   const founder = pairFounderOf(X.pubKey, Y.pubKey) === X.pubKey ? X : Y;

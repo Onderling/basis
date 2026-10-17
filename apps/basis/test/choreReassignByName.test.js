@@ -37,7 +37,7 @@ describe('a chore given by a name', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
     for (const [webid, role, displayName] of [[ADMIN, 'admin', 'Frits'], [BOB, 'member', 'Bob']]) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName });
       await agent.setDoorCaller(webid, role);
     }
     const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });

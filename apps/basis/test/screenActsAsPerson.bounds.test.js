@@ -69,8 +69,8 @@ describe('a screen acts as its person, and no further', () => {
     });
     own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
-    for (const [webid, role] of [[MEMBER, 'member'], [BERT, 'member'], [ADMIN, 'admin']]) { await own('stoop', 'addContact', { webid, channel: 'telegram', role }); await agent.setDoorCaller(webid, role); }
-    await own('stoop', 'setContactName', { webid: BERT, name: 'Bert' }).catch(() => {});
+    for (const [webid, role] of [[MEMBER, 'member'], [BERT, 'member'], [ADMIN, 'admin']]) { await own('pinboard', 'addContact', { webid, channel: 'telegram', role }); await agent.setDoorCaller(webid, role); }
+    await own('pinboard', 'setContactName', { webid: BERT, name: 'Bert' }).catch(() => {});
     threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });
     await threads.load();
     planned = createIntentionBook({ store: createOwnDevicesStore(), actor: 'bot' });
@@ -194,13 +194,13 @@ describe('a screen acts as its person, and no further', () => {
   });
 
   it('demoted: member → observer, an add token still verifies, the door-role check refuses; a read still works', async () => {
-    await own('stoop', 'setContactRole', { webid: MEMBER, role: 'observer' }).catch(() => {});
+    await own('pinboard', 'setContactRole', { webid: MEMBER, role: 'observer' }).catch(() => {});
     await agent.setDoorCaller(MEMBER, 'observer');
     const add = await asMember('lists.addToList', { list: 'Boodschappen', text: 'als-kijker' });
     expect(add.refusedAt, 'the token verified').toBeUndefined();
     expect(add.refusal).toEqual({ layer: 'door-role', code: 'role' });
     expect((await asMember('lists.listEntries', { list: 'Boodschappen' })).ok).not.toBe(false);
-    await own('stoop', 'setContactRole', { webid: MEMBER, role: 'member' }).catch(() => {});
+    await own('pinboard', 'setContactRole', { webid: MEMBER, role: 'member' }).catch(() => {});
     await agent.setDoorCaller(MEMBER, 'member');
   });
 

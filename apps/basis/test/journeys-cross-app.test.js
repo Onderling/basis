@@ -2,11 +2,11 @@
  * basis — cross-app journey integration tests.
  *
  * Verifies that every primary user flow from each backing app
- * (household, stoop, tasks-v0, folio, calendar) works through the
+ * (household, pinboard, tasks-v0, folio, calendar) works through the
  * basis slash-command pipeline.  Source-of-truth doc:
  * `Project Files/basis/cross-app-journey-coverage-2026-05-23.md`.
  *
- * Naming: **CC-<app>.<n>** — `HH` household, `ST` stoop, `TK` tasks,
+ * Naming: **CC-<app>.<n>** — `HH` household, `ST` pinboard, `TK` tasks,
  * `FO` folio, `CL` calendar, `XA` cross-app.
  *
  * Each test exercises the FULL slash pipeline:
@@ -35,7 +35,7 @@ import {
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { tEn } from './support/bundleTranslator.js';
 import {
-  mockTasksManifest, mockStoopManifest, mockFolioManifest,
+  mockTasksManifest, mockPinboardManifest, mockFolioManifest,
 } from '../src/core/manifests/mockManifests.js';
 import { calendarManifest } from '@onderling-app/calendar/manifest';
 import { createLocalBuiltins } from '../src/core/localBuiltins.js';
@@ -69,7 +69,7 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
-    { manifest: mockStoopManifest },
+    { manifest: mockPinboardManifest },
     { manifest: mockFolioManifest },
     { manifest: calendarManifest },
   ], { runtime: 'browser' });
@@ -96,10 +96,10 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
       // how to reach it + adapt the briefSummary/searchTasks ops.
       return agent.callSkill('tasks', opId, args);
     }
-    if (appOrigin === 'stoop') {
-      // Post-slice-2b: stoop is the real NeighbourhoodAgent composed
+    if (appOrigin === 'pinboard') {
+      // Post-slice-2b: pinboard is the real NeighbourhoodAgent composed
       // in realAgent.js (110 real skills).
-      return agent.callSkill('stoop', opId, args);
+      return agent.callSkill('pinboard', opId, args);
     }
     if (appOrigin === 'folio') {
       // Post-slice-4: folio is the dedicated browser folio agent
@@ -287,7 +287,7 @@ describe('CC-HH.7 — remove an item by keyword', () => {
 });
 
 /* ════════════════════════════════════════════════════════════
- * Stoop — CC-ST
+ * Pinboard — CC-ST
  * ══════════════════════════════════════════════════════════ */
 
 describe('CC-ST.1 — post a ask', () => {
@@ -336,7 +336,7 @@ describe('CC-ST.3 — event from another peer routes to its thread', () => {
   it('routing a notification event populates eventLog', async () => {
     const before = ws.eventLog.query({ limit: 100 }).length;
     ws.router.deliver({
-      app: 'stoop', type: 'notification',
+      app: 'pinboard', type: 'notification',
       actor: 'webid:anne',
       payload: { message: 'Nieuw bericht in jouw thread' },
     });
@@ -345,27 +345,27 @@ describe('CC-ST.3 — event from another peer routes to its thread', () => {
   });
 });
 
-describe('CC-ST.4 — stoop profile record', () => {
+describe('CC-ST.4 — pinboard profile record', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 
   it('a fresh profile carries NO name until the person gives one', async () => {
     // Until 2026-08-31 every agent was seeded with the handle `nieuwe-buur` and the display name
     // `Nieuwe buur`, so this journey passed on scaffolding rather than on anything a person did. The
-    // seed was there to give the chat-era `/stoop-profile` something to print, and it cost more than it
+    // seed was there to give the chat-era `/pinboard-profile` something to print, and it cost more than it
     // bought: one Dutch string as everybody's identity in a bilingual app, the SAME string for every
     // person in a room whose whole job is telling them apart, and no way for "not introduced yet" to
     // exist — which is the state the Nearby face picker and its retraction are about.
-    const r = await ws.userInput('/stoop-profile');
+    const r = await ws.userInput('/pinboard-profile');
     expect(r.shape).toBe('record');
     expect(r.payload.handle, 'nobody is named before they say so').toBeFalsy();
     expect(r.payload.displayName).toBeFalsy();
   });
 
   it('…and shows it once they do', async () => {
-    await ws.callSkill('stoop', 'setMyHandle', { handle: 'ada' });
-    await ws.callSkill('stoop', 'setMyDisplayName', { displayName: 'Ada Lovelace' });
-    const r = await ws.userInput('/stoop-profile');
+    await ws.callSkill('pinboard', 'setMyHandle', { handle: 'ada' });
+    await ws.callSkill('pinboard', 'setMyDisplayName', { displayName: 'Ada Lovelace' });
+    const r = await ws.userInput('/pinboard-profile');
     expect(r.shape).toBe('record');
     expect(r.payload.handle).toBe('ada');
     expect(r.payload.displayName).toBe('Ada Lovelace');
@@ -527,7 +527,7 @@ describe('CC-TK.F1 — active-circle → app-scope binding (5.3)', () => {
   });
 });
 
-describe('CC-ST.F1 — active-circle → stoop-scope binding (5.3d)', () => {
+describe('CC-ST.F1 — active-circle → pinboard-scope binding (5.3d)', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 
@@ -543,7 +543,7 @@ describe('CC-ST.F1 — active-circle → stoop-scope binding (5.3d)', () => {
   }
 
   it('a post created in circle A is listed for A and absent from B (real per-circle separation)', async () => {
-    // Stoop's browser bundle in basis runs single-group at the
+    // Pinboard's browser bundle in basis runs single-group at the
     // substrate; the realAgent adapter pre-builds `targets:
     // [{kind:'group', groupId: <circleId>}]` from the scoped args, so
     // the post item lands tagged with the active circle.  listOpen's
@@ -553,7 +553,7 @@ describe('CC-ST.F1 — active-circle → stoop-scope binding (5.3d)', () => {
     await dispatchInCircle('/post "beta post"',  'circle-b');
 
     // Read each circle the way the circle detail view does
-    // (loadCircleItems → getBulletin → stoop listOpen, scoped to the
+    // (loadCircleItems → getBulletin → pinboard listOpen, scoped to the
     // circle's groupId).  Mirrors the CC-TK.F1 read pattern.
     const resolving = makeResolvingCallSkill(ws.callSkill);
     const aItems = await loadCircleItems({ callSkill: resolving, circleId: 'circle-a' });
@@ -568,7 +568,7 @@ describe('CC-ST.F1 — active-circle → stoop-scope binding (5.3d)', () => {
   });
 
   it('seeded circle posts (no active circle at boot) do NOT leak into an arbitrary circle', async () => {
-    // The boot seeds 3 stoop posts (Anne/Karl/Maria) into the
+    // The boot seeds 3 pinboard posts (Anne/Karl/Maria) into the
     // bundle's default group (`cc-default-circle`); none of them
     // should appear for a fresh circle the user just opened.
     const resolving = makeResolvingCallSkill(ws.callSkill);
@@ -941,7 +941,7 @@ describe('CC-XA.7 — help discovery', () => {
     const r = await ws.userInput('/help');
     const msg = r.payload.message;
     // At least one of the new ops should be discoverable.
-    expect(msg).toMatch(/\/add-chore|\/nudge|\/stoop-profile|\/circle-new|\/submit|\/inbox|\/folio-status|\/help-with/);
+    expect(msg).toMatch(/\/add-chore|\/nudge|\/pinboard-profile|\/circle-new|\/submit|\/inbox|\/folio-status|\/help-with/);
   });
 });
 

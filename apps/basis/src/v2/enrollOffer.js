@@ -454,7 +454,7 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
           let derived = false;
           while (Date.now() < deadline) {
             try {
-              const r = await callSkill('stoop', 'listGroupMembers', { groupId: c.id });
+              const r = await callSkill('pinboard', 'listGroupMembers', { groupId: c.id });
               const rows = Array.isArray(r?.members) ? r.members : [];
               const mine = me ? rows.find((m) => m?.webid === me) : null;
               const siblingKnown = !!mine && (mine.circleAddress === c.address || (Array.isArray(mine.circleAddresses) && mine.circleAddresses.includes(c.address)));

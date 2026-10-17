@@ -8,7 +8,7 @@
  * and the bubble says why (`persona-no-connection`, retryable).
  *
  * Production here: the real factory (twice), the real relay transport, the create and join wizards' op paths (the join
- * AS a persona through `finalSubmit`'s bind), the circle chat fan through stoop, the delivery map the shells read.
+ * AS a persona through `finalSubmit`'s bind), the circle chat fan through pinboard, the delivery map the shells read.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
@@ -84,12 +84,12 @@ describe('two personas of one device, seen by a co-member of both circles', () =
 
   it('the default\'s name reaches the default\'s circle and never B\'s', async () => {
     const A = dev.agent.identity.chat.pubKey;
-    expect((await dev.agent.callSkill('stoop', 'setMyDisplayName', { displayName: 'Anne Standaard' }))?.error ?? null).toBe(null);
+    expect((await dev.agent.callSkill('pinboard', 'setMyDisplayName', { displayName: 'Anne Standaard' }))?.error ?? null).toBe(null);
     const told = await until(async () => (rowOf(await readRoster(cor, X), A)?.displayName === 'Anne Standaard' ? true : null), { timeout: 15_000 });
     expect(told, 'X hears the default\'s name').toBe(true);
     // given the same time X needed and more, Y still has not heard it — on Cor's roster or on the device's own
     const leaked = await until(async () => {
-      const there = JSON.stringify(await readRoster(cor, Y)) + JSON.stringify(await dev.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }));
+      const there = JSON.stringify(await readRoster(cor, Y)) + JSON.stringify(await dev.agent.callSkill('pinboard', 'listGroupMembers', { groupId: Y }));
       return there.includes('Anne Standaard') ? true : null;
     }, { timeout: 8_000, step: 250 });
     expect(leaked, 'Y never hears the default\'s name').toBe(null);
@@ -101,9 +101,9 @@ describe('two personas of one device, seen by a co-member of both circles', () =
     expect(sa.relays.list().map((r) => r.url)).toEqual([relay.url]);
   });
 
-  it('stoop\'s "me" in Y is B', async () => {
-    expect((await dev.agent.callSkill('stoop', 'whoAmI', { groupId: Y }))?.webid).toBe(B.chatId.pubKey);
-    expect((await dev.agent.callSkill('stoop', 'whoAmI', { groupId: X }))?.webid).toBe(dev.agent.identity.chat.pubKey);
+  it('pinboard\'s "me" in Y is B', async () => {
+    expect((await dev.agent.callSkill('pinboard', 'whoAmI', { groupId: Y }))?.webid).toBe(B.chatId.pubKey);
+    expect((await dev.agent.callSkill('pinboard', 'whoAmI', { groupId: X }))?.webid).toBe(dev.agent.identity.chat.pubKey);
   });
 
   it('what B says in Y crosses the relay and verifies at Cor AS B — the lane names the persona beside its circle key', async () => {
@@ -114,7 +114,7 @@ describe('two personas of one device, seen by a co-member of both circles', () =
     expect(JSON.stringify(res.statement).includes(dev.agent.identity.chat.pubKey), 'no byte of A').toBe(false);
     // ...and it CROSSES the relay: the device's own fan, B's per-circle address on B's own socket, landing in Cor's
     // rail by itself — verified there against Cor's roster (signature + the key↔ref binding) and kept.
-    await dev.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId: Y, event: res.statement, msgId: 'y-1', ts });
+    await dev.agent.callSkill('pinboard', 'broadcastCircleChatStatement', { groupId: Y, event: res.statement, msgId: 'y-1', ts });
     const landed = await until(async () => cor.chatRail.storedStatements(Y).find((st) => st?.body?.payload?.text === 'hallo buren') ?? null, { timeout: 20_000, step: 200 });
     expect(landed, 'it crossed the relay and Cor kept it').toBeTruthy();
     expect(landed.body.payload.authorRef).toBe(B.chatId.pubKey);

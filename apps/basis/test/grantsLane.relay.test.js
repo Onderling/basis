@@ -67,7 +67,7 @@ describe('grants lane over a real relay — paired on the phone, revoked for the
       msgId: 'relay-announce-l', ts: Date.now(), announcements: [mine],
     }, SEND);
     const row = await until(async () => {
-      const res = await P.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await P.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       const r = (res?.members ?? []).find((m) => m.webid === P.pubKey);
       return (r?.circleAddresses?.includes(addrL)) ? r : null;
     }, { timeout: 20000, step: 100 });

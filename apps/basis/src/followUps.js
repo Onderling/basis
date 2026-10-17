@@ -58,19 +58,19 @@ export const DEFAULT_CROSS_APP_CHAINS = [
       label:         'Share folio folder',
     },
   },
-  // J3 — after household.addMember, also suggest adding a stoop post.
+  // J3 — after household.addMember, also suggest adding a pinboard post.
   {
     trigger:    { appOrigin: 'household', opId: 'addMember' },
     suggestion: {
-      appOrigin: 'stoop', opId: 'postRequest',
+      appOrigin: 'pinboard', opId: 'postRequest',
       label:         'Post intro on circle',
     },
   },
-  // After stoop.postRequest, suggest checking the feed for replies.
+  // After pinboard.postRequest, suggest checking the feed for replies.
   {
-    trigger:    { appOrigin: 'stoop', opId: 'postRequest' },
+    trigger:    { appOrigin: 'pinboard', opId: 'postRequest' },
     suggestion: {
-      appOrigin: 'stoop', opId: 'listFeed',
+      appOrigin: 'pinboard', opId: 'listFeed',
       label:         'View feed',
     },
   },

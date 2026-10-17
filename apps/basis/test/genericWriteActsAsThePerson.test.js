@@ -29,7 +29,7 @@ describe('a generic write at a door', () => {
       householdPersistDb: { path: path.join(dir, 'household-items.json') }, seedDemoData: false, seedHousehold: false,
       ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows,
     });
-    await agent.callSkill('stoop', 'addContact', { webid: ANN, channel: 'telegram', role: 'member', displayName: 'Ann' });
+    await agent.callSkill('pinboard', 'addContact', { webid: ANN, channel: 'telegram', role: 'member', displayName: 'Ann' });
     await agent.setDoorCaller(ANN, 'member');
     const add = encodeGenericOpId('household', 'add', 'note');
     const made = await agent.callSkill('household', add, { body: 'de vuilnis gaat dinsdag buiten' }, { caller: ANN });

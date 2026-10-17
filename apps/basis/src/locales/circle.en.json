@@ -731,11 +731,11 @@
       },
       "request": {
         "text": "Request",
-        "doc": "embeds[] chip type label — stoop request."
+        "doc": "embeds[] chip type label — pinboard request."
       },
       "offer": {
         "text": "Offer",
-        "doc": "embeds[] chip type label — stoop offer."
+        "doc": "embeds[] chip type label — pinboard offer."
       },
       "note": {
         "text": "Note",
@@ -2197,9 +2197,9 @@
         "text": "Chat",
         "doc": "B/Q3 — app label (basis) for the capability freedom-matrix header."
       },
-      "stoop": {
+      "pinboard": {
         "text": "Neighbourhood",
-        "doc": "S6.C — app label (stoop)."
+        "doc": "S6.C — app label (pinboard)."
       },
       "tasks": {
         "text": "Tasks",
@@ -2229,15 +2229,15 @@
     "storage_err": {
       "generic": {
         "text": "Couldn't update the circle's storage location — your local settings were still saved.",
-        "doc": "§4 — storage-policy bridge: fallback when stoop rejects setCircleStoragePolicy."
+        "doc": "§4 — storage-policy bridge: fallback when pinboard rejects setCircleStoragePolicy."
       },
       "admin-only": {
         "text": "Only a circle admin can change the storage location.",
-        "doc": "§4 — storage-policy bridge: stoop admin-only rejection."
+        "doc": "§4 — storage-policy bridge: pinboard admin-only rejection."
       },
       "storage-policy-downgrade-not-supported": {
         "text": "Storage can't be turned back off once it's on (this is one-way by design).",
-        "doc": "§4 — storage-policy bridge: stoop one-way downgrade guard."
+        "doc": "§4 — storage-policy bridge: pinboard one-way downgrade guard."
       }
     },
     "feat": {
@@ -2642,7 +2642,7 @@
     },
     "global_label": {
       "text": "Let trusted contacts relay my requests one hop",
-      "doc": "Global hop-mode toggle (Stoop allowHopThrough)."
+      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
     },
     "explain": {
       "text": "When you ask for something no one nearby has, a contact who allows it can pass your request one step further — to their contacts. Max one hop, and the relay is anonymized.",
@@ -5839,7 +5839,7 @@
     },
     "profile_title": {
       "text": "Your noticeboard profile",
-      "doc": "Heading of the record /stoop-profile returns."
+      "doc": "Heading of the record /pinboard-profile returns."
     }
   },
   "profile": {
@@ -8216,38 +8216,38 @@
         "doc": "Row-action button for household:claim, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       }
     },
-    "stoop": {
+    "pinboard": {
       "respondToItem": {
         "text": "Respond",
-        "doc": "Row-action button for stoop:respondToItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:respondToItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "cancelRequest": {
         "text": "Withdraw",
-        "doc": "Row-action button for stoop:cancelRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:cancelRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "markReturned": {
         "text": "Returned",
-        "doc": "Row-action button for stoop:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "reportPost": {
         "text": "Report",
-        "doc": "Row-action button for stoop:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Message",
-        "doc": "Row-action button for stoop:startDm, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:startDm, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "setContactHidden": {
         "text": "Hide",
-        "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
+        "doc": "Row-action button for pinboard:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
       },
       "setContactPersona": {
         "text": "Who you are to this contact",
-        "doc": "Row-action / page button for stoop:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
+        "doc": "Row-action / page button for pinboard:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
       },
       "conflictDisputeWizard": {
         "text": "Dispute",
-        "doc": "Row-action button for stoop:conflictDisputeWizard, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:conflictDisputeWizard, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       }
     },
     "folio": {

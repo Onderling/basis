@@ -39,7 +39,7 @@ test('the identity link in the app: the bot named, the line with this app\'s key
     // — which also proves the offer carries THIS app's own identity (the relay delivers to the key it registered)
     await bot.agent.sendPeerMessage(offer.webid, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: bot.pubKey, row: 'telegram:42', root: offer.root, at: Date.now() } });
     await expect(sheet.locator('[data-identity-link="linked"]')).toBeVisible({ timeout: 60_000 });
-    const book = await page.evaluate(() => window.onderlingCall('stoop', 'listContacts', {}));
+    const book = await page.evaluate(() => window.onderlingCall('pinboard', 'listContacts', {}));
     expect((book?.contacts ?? []).find((c) => c.webid === bot.pubKey)).toMatchObject({ linkedRow: 'telegram:42', displayName: '@huisbot' });
     expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('onderling.identityLink')))).toEqual([]);
     await ctx.close();

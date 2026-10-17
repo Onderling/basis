@@ -56,7 +56,7 @@ describe('the household\'s notes through a bot\'s door', () => {
       ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows,
     });
     for (const [webid, role] of [[ANN, 'member'], [BOB, 'member'], [ADMIN, 'admin']]) {
-      await agent.callSkill('stoop', 'addContact', { webid, channel: 'telegram', role, displayName: webid });
+      await agent.callSkill('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName: webid });
       await agent.setDoorCaller(webid, role);
     }
     const as = (caller) => (atom, args) => agent.callSkill('household', op(atom), args, { caller });

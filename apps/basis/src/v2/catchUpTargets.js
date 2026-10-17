@@ -24,7 +24,7 @@
 export async function catchUpTargets({ callSkill, circleId, selfWebid = null, allowGlobal = null } = {}) {
   if (typeof callSkill !== 'function' || typeof circleId !== 'string' || !circleId) return [];
   let rows = [];
-  try { rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { return []; }
+  try { rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { return []; }
   let global = false;
   try { global = typeof allowGlobal === 'function' && allowGlobal() === true; } catch { global = false; }
   const out = []; const seen = new Set();

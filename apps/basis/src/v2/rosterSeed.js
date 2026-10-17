@@ -109,7 +109,7 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
       if (!(await verify({ author: by, ref, payload: { delegation: payload.delegation ?? null } }))) return;
     } catch { return; }
     try {
-      const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+      const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
       const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
       const rows = items.filter((it) => it?.source?.groupId === body.circleId);
       if (rows.length === 0) return;   // nothing to seed — silence, not an empty parcel
@@ -118,7 +118,7 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
       // receiver's member map (the same back-compat source the founder derivation already reads).
       let memberRows = [];
       try {
-        const r = await callSkill('stoop', 'listGroupMembers', { groupId: body.circleId });
+        const r = await callSkill('pinboard', 'listGroupMembers', { groupId: body.circleId });
         memberRows = (Array.isArray(r?.members) ? r.members : [])
           .filter((m) => m && typeof m.webid === 'string' && m.webid)
           .map((m) => ({
@@ -199,7 +199,7 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
       if (!(await (kit.verifyDeviceSet ?? verifyDeviceSet)({ author: by, ref: kit.selfPubKey ?? selfPubKey, payload: { delegation: payload.delegation ?? null } }))) return;
     } catch { return; }
     try {
-      const r = await callSkill('stoop', 'recordRosterSeed', {
+      const r = await callSkill('pinboard', 'recordRosterSeed', {
         groupId: body.circleId, rows: body.rows,
         ...(Array.isArray(body.members) ? { members: body.members } : {}),
       });
@@ -208,7 +208,7 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
       // patches exists, and BEFORE this device pulls anything the sibling signed.
       if (body.own && typeof body.own === 'object' && typeof body.own.circleAddress === 'string') {
         try {
-          const a = await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+          const a = await callSkill('pinboard', 'recordCircleAddressAnnouncement', {
             groupId: body.circleId, memberWebid: body.own.memberWebid, circleAddress: body.own.circleAddress,
             circleAddressProof: body.own.circleAddressProof,
             ...(body.own.ceremonyCommitment ? { ceremonyCommitment: body.own.ceremonyCommitment, ceremonyCommitmentProof: body.own.ceremonyCommitmentProof } : {}),
@@ -220,7 +220,7 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
           else if (typeof console !== 'undefined') {
             let rowsNow = null;
             try {
-              const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+              const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
               const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
               rowsNow = items.filter((it) => it?.source?.groupId === body.circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? '').slice(0, 6), addr: String(it.source?.circleAddress ?? '').slice(0, 6), proof: !!it.source?.circleAddressProof, set: (it.source?.circleAddresses ?? []).map((p) => `${String(p?.address).slice(0, 6)}${p?.proof ? '+p' : '-p'}`) }));
             } catch { rowsNow = null; }

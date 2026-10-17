@@ -1,7 +1,7 @@
 /**
- * basis — stoop slash-coverage tests (audit 2026-05-27).
+ * basis — pinboard slash-coverage tests (audit 2026-05-27).
  *
- * The slash-coverage audit flagged eight stoop slashes whose substrate
+ * The slash-coverage audit flagged eight pinboard slashes whose substrate
  * skills + manifest routes exist, but no automated vitest case
  * exercised the dispatch end-to-end:
  *
@@ -14,22 +14,22 @@
  *   /bulletin     → listOpen         (cross-app substrate — read noticeboard)
  *
  * SUBSTRATE GAP SURFACED — `apps/basis/src/core/manifests/
- * mockManifests.js`'s `mockStoopManifest` does NOT declare these eight
- * slash entries (it only has `/post`, `/feed`, `/stoop-profile`,
+ * mockManifests.js`'s `mockPinboardManifest` does NOT declare these eight
+ * slash entries (it only has `/post`, `/feed`, `/pinboard-profile`,
  * `/reveal`, `/holiday-*`, `/contacts*`, the wizard slashes and
  * `/leave-group`).  The real declarations live in
- * `apps/stoop/manifest.js` (the slash-only D.1 stoop manifest).
+ * `apps/pinboard/manifest.js` (the slash-only D.1 pinboard manifest).
  *
  * So `bootWorkspace` in `journeys-cross-app.test.js`, which merges
  * the mock catalogue, would return `unknown-op` for 7/8 of these.  This
- * file uses a sibling helper that merges the REAL stoop manifest
+ * file uses a sibling helper that merges the REAL pinboard manifest
  * INSTEAD of the mock — same realAgent backing (110 real skills), and
  * a substrate-truth slash surface.
  *
  * The audit is now closed: the slashes exist + dispatch through the
  * pipeline.  If the basis shell ever needs them in the mock
  * catalogue (e.g. for the chat-only demo without the real agent), the
- * fix is to mirror the 8 entries into `mockStoopManifest` — that's
+ * fix is to mirror the 8 entries into `mockPinboardManifest` — that's
  * tracked as a follow-up; not in scope here.
  *
  * Pipeline asserted: parseInput → resolveDispatch → runDispatch
@@ -52,22 +52,22 @@ import {
 import { calendarManifest } from '@onderling-app/calendar/manifest';
 import { createLocalBuiltins } from '../src/core/localBuiltins.js';
 
-// Real stoop manifest (D.1 slash-only declarations).  Imported via
-// relative path because @onderling-app/stoop has no `./manifest` subpath
+// Real pinboard manifest (D.1 slash-only declarations).  Imported via
+// relative path because @onderling-app/pinboard has no `./manifest` subpath
 // export today; this is a test-only import.  If the package's exports
 // map grows a `./manifest` entry later, the import can be updated
 // without changing the test bodies.
-import { stoopManifest } from '../../stoop/manifest.js';
+import { pinboardManifest } from '../../pinboard/manifest.js';
 
 const LOCAL_ACTOR = 'webid:local-demo-user';
 
 /**
  * Boot a workspace identical in shape to journeys-cross-app's
- * bootWorkspace EXCEPT it merges the REAL stoopManifest (D.1 slash-
- * only declarations) instead of mockStoopManifest, so the 8 audit
+ * bootWorkspace EXCEPT it merges the REAL pinboardManifest (D.1 slash-
+ * only declarations) instead of mockPinboardManifest, so the 8 audit
  * slashes resolve at the catalogue layer.
  */
-async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
+async function bootWorkspaceWithRealPinboard({ chatVault, secureAgentOpts } = {}) {
   let routerRef;
   const agent = await createRealHouseholdAgent({
     chatVault, secureAgentOpts,
@@ -77,7 +77,7 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
-    { manifest: stoopManifest },           // ← REAL stoop manifest
+    { manifest: pinboardManifest },           // ← REAL pinboard manifest
     { manifest: mockFolioManifest },
     { manifest: calendarManifest },
   ], { runtime: 'browser' });
@@ -99,10 +99,10 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
     if (appOrigin === 'basis') return localBuiltins[opId]?.(args ?? {});
     if (appOrigin === 'household')   return agent.callSkill(appOrigin, opId, args);
     if (appOrigin === 'tasks')    return agent.callSkill('tasks', opId, args);
-    if (appOrigin === 'stoop')       return agent.callSkill('stoop', opId, args);
+    if (appOrigin === 'pinboard')       return agent.callSkill('pinboard', opId, args);
     if (appOrigin === 'folio')       return agent.callSkill('folio', opId, args);
     if (appOrigin === 'calendar')    return agent.callSkill('household', `calendar_${opId}`, args);
-    return { ok: false, error: `${appOrigin}.${opId} not wired in stoop-slash tests` };
+    return { ok: false, error: `${appOrigin}.${opId} not wired in pinboard-slash tests` };
   };
 
   const localBuiltins = createLocalBuiltins({
@@ -167,12 +167,12 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
 /* ════════════════════════════════════════════════════════════
  * Catalogue-presence sanity — confirms the real-manifest merge
  * surfaces every audited slash in the commandMenu (catches any
- * future regression where stoopManifest drops one).
+ * future regression where pinboardManifest drops one).
  * ══════════════════════════════════════════════════════════ */
 
 describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('commandMenu declares /lend-assign /lend-return /leave-group /tree /sign-out /report /bulletin', () => {
     const cmds = new Set(ws.catalogue().commandMenu.map((e) => e.command));
@@ -185,7 +185,7 @@ describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
     }
   });
 
-  it('every audit slash is owned by stoop', () => {
+  it('every audit slash is owned by pinboard', () => {
     const menu = ws.catalogue().commandMenu;
     const audit = [
       '/lend-assign', '/lend-return', '/leave-group',
@@ -194,7 +194,7 @@ describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
     for (const cmd of audit) {
       const entry = menu.find((e) => e.command === cmd);
       expect(entry).toBeTruthy();
-      expect(entry.appOrigin).toBe('stoop');
+      expect(entry.appOrigin).toBe('pinboard');
     }
   });
 });
@@ -211,7 +211,7 @@ describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
 
 describe('CC-ST.A1 — /lend-assign wires assignLend', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('bare /lend-assign with no args → needsForm (itemId missing)', async () => {
     const r = await ws.userInput('/lend-assign');
@@ -232,7 +232,7 @@ describe('CC-ST.A1 — /lend-assign wires assignLend', () => {
     // form composer (per the manifest header — "shell-only" ops); the
     // substrate-dispatch proof bypasses the slash parser and asserts
     // the real substrate skill answers with a domain-shaped reply.
-    const r = await ws.callSkill('stoop', 'assignLend', {
+    const r = await ws.callSkill('pinboard', 'assignLend', {
       itemId:        'not-a-real-id',
       borrowerWebid: 'webid:borrower',
     });
@@ -252,7 +252,7 @@ describe('CC-ST.A1 — /lend-assign wires assignLend', () => {
 
 describe('CC-ST.A2 — /lend-return wires markReturned', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('/lend-return <id> dispatches; substrate returns shaped reply', async () => {
     const r = await ws.userInput('/lend-return not-a-real-id');
@@ -292,7 +292,7 @@ describe('CC-ST.A2 — /lend-return wires markReturned', () => {
 
 describe('CC-ST.A4 — /leave-group wires leaveGroup (irreversible guard)', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('/leave-group <gid> without --confirm hits the realAgent guard', async () => {
     const r = await ws.userInput('/leave-group some-group-id');
@@ -306,10 +306,10 @@ describe('CC-ST.A4 — /leave-group wires leaveGroup (irreversible guard)', () =
   it('/leave-group <gid> --confirm=true reaches the substrate', async () => {
     // With the realAgent's confirm-gate satisfied, the substrate
     // leaveGroup runs.  Note: `body: 'flags'` is NOT declared on this
-    // slash entry in the real stoopManifest, so the chat-layer
+    // slash entry in the real pinboardManifest, so the chat-layer
     // confirm flag would need a future grammar extension to surface
     // via slash; substrate-direct dispatch is the smoke-path here.
-    const r = await ws.callSkill('stoop', 'leaveGroup', {
+    const r = await ws.callSkill('pinboard', 'leaveGroup', {
       groupId: 'cc-default-circle',
       confirm: true,  // chat-layer guard
     });
@@ -334,7 +334,7 @@ describe('CC-ST.A4 — /leave-group wires leaveGroup (irreversible guard)', () =
 
 describe('CC-ST.A5 — /tree wires getItemTree', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('/tree <id> dispatches; substrate walks (or errors cleanly)', async () => {
     const r = await ws.userInput('/tree synthetic-root');
@@ -365,7 +365,7 @@ describe('CC-ST.A5 — /tree wires getItemTree', () => {
 
 describe('CC-ST.A6 — /sign-out wires signOutOfPod (Q27 confirm-gated)', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('/sign-out returns needsConfirm before dispatching (Q27)', async () => {
     const r = await ws.userInput('/sign-out');
@@ -400,7 +400,7 @@ describe('CC-ST.A6 — /sign-out wires signOutOfPod (Q27 confirm-gated)', () => 
 
 describe('CC-ST.A7 — /report wires reportPost', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('/report <itemId> dispatches; substrate returns {reportId}', async () => {
     const r = await ws.userInput('/report bad-post-id');
@@ -431,13 +431,13 @@ describe('CC-ST.A7 — /report wires reportPost', () => {
 
 describe('CC-ST.A8 — /bulletin wires listOpen', () => {
   let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
+  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
   it('/bulletin returns the open feed (items[])', async () => {
     const r = await ws.userInput('/bulletin');
     expect(r.payload).toBeDefined();
     const reply = r.payload;
-    // adaptStoopReply normalises listOpen items[] + adds _sync.
+    // adaptPinboardReply normalises listOpen items[] + adds _sync.
     expect(Array.isArray(reply.items)).toBe(true);
   });
 

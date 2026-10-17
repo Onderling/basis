@@ -1,11 +1,11 @@
-# PLAN — per-circle local-store scoping (household · tasks · stoop)
+# PLAN — per-circle local-store scoping (household · tasks · pinboard)
 
 ## The bug
 The household item store is built **once at agent boot**, scoped to the literal string
 `'household'` (`apps/basis/src/core/agent/realAgent.js:210` — `householdCircleId =
 opts.householdCircleId ?? 'household'`). Every v2 circle reads/writes **one global household
 dataset** → a new circle "takes on the same lists", and the no-pod sync is global, not
-per-circle. Same class of issue for tasks-v0 (already fixed) and stoop (partial).
+per-circle. Same class of issue for tasks-v0 (already fixed) and pinboard (partial).
 
 ## The constraint
 `CLAUDE.md` invariant #6: **one agent, per-scope state OUTSIDE it** — NOT one agent per circle.
@@ -42,11 +42,11 @@ The active `circleId` already arrives in `args` for create/mutate verbs (`scopeR
 
 - **Phase 5 (do early) — fitness test.** Boot one agent, drive real `callSkill`: add Milk to A →
   `listOpen` in B is empty, in A present; assert `getHouseholdScope('A') !== getHouseholdScope('B')`.
-  Repeat for tasks (`circleId`) + stoop (`groupId`). The drift guard (CLAUDE.md "prefer a fitness
+  Repeat for tasks (`circleId`) + pinboard (`groupId`). The drift guard (CLAUDE.md "prefer a fitness
   function").
 
-- **Phase 3 — tasks + stoop.** tasks-v0: verify (already per-circle); fix the chat `/mytasks` read-scope
-  gap. stoop: close the read-leak — ensure every per-circle read goes through the `groupId`-tag +
+- **Phase 3 — tasks + pinboard.** tasks-v0: verify (already per-circle); fix the chat `/mytasks` read-scope
+  gap. pinboard: close the read-leak — ensure every per-circle read goes through the `groupId`-tag +
   `keepForCircle` filter (full per-store parity via `createNeighbourhoodCluster` is a follow-up).
 
 - **Phase 4 — migration.** Zero-cost default: `getHouseholdScope('household')` (and no-active-circle)

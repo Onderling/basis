@@ -52,7 +52,7 @@ export function privacyNoticeFor(lang) {
  *
  * Wave B (NOTE-identity-and-linkability, Decision B): the PRIMARY source is the
  * joiner's OWN prior handles — the handles you've used in circles you're already
- * in (`loadPriorHandles` → `stoop.listMyHandles`). That is your own information,
+ * in (`loadPriorHandles` → `pinboard.listMyHandles`). That is your own information,
  * so surfacing it leaks nothing, and it lets you re-use a handle you like. Only
  * when you have no prior handles yet do we fall back to display-name-derived
  * candidates (the pre-Wave-B behaviour).
@@ -91,7 +91,7 @@ export function handleSuggestions(priorOrName, existingDisplayName) {
 
 /**
  * Load the joiner's OWN prior handles for the suggestion dropdown — the distinct
- * handles they've used across the circles they belong to (`stoop.listMyHandles`).
+ * handles they've used across the circles they belong to (`pinboard.listMyHandles`).
  * Pure read; on any failure returns `[]` so the field simply falls back to
  * display-name-derived candidates. Your own info only — nothing about anyone else.
  *
@@ -101,7 +101,7 @@ export function handleSuggestions(priorOrName, existingDisplayName) {
 export async function loadPriorHandles({ callSkill } = {}) {
   if (typeof callSkill !== 'function') return [];
   try {
-    const reply = await callSkill('stoop', 'listMyHandles', {});
+    const reply = await callSkill('pinboard', 'listMyHandles', {});
     const arr = Array.isArray(reply?.handles) ? reply.handles : [];
     return arr.filter((h) => typeof h === 'string' && h);
   } catch {
@@ -262,7 +262,7 @@ export async function fetchGroupRules({ state, callSkill }) {
     return state;
   }
   try {
-    const reply = await callSkill('stoop', 'getGroupRules', { groupId: state.invite.groupId });
+    const reply = await callSkill('pinboard', 'getGroupRules', { groupId: state.invite.groupId });
     state.rulesDoc  = extractRulesDoc(reply?.rules ?? reply ?? null);
     state.rulesText = reply?.rules ?? reply?.message ?? '(no rules set for this group)';
   } catch (err) {
@@ -644,7 +644,7 @@ export async function applyOfferingsDisclosureAtJoin({ state, callSkill, context
 /* ─── Initial state + final-submit chain ───────────────────── */
 
 /**
- * The join flow's DECLARED steps (batch 6) — the first flow to live on a manifest (`stoop`'s
+ * The join flow's DECLARED steps (batch 6) — the first flow to live on a manifest (`pinboard`'s
  * `flows: [{ id: 'joinGroup', … }]`), and this export is what keeps that declaration honest: the
  * flow-integrity guard (G-S3, `scripts/flowIntegrity.test.js`) asserts declared ids ≡ these ids and
  * that the `next` chain is acyclic and fully reachable. The wizard's own machine still runs on the
@@ -984,7 +984,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     // Path A — membershipCode. The join handle becomes the person's handle — unless the caller said it is for this
     // circle's row only (`profileHandle: false`: the pair roster's derived placeholder for a person without one).
     if (state.profileHandle !== false) {
-      const handle = await callSkill('stoop', 'setMyHandle', { handle: state.handle });
+      const handle = await callSkill('pinboard', 'setMyHandle', { handle: state.handle });
       if (handle?.reason === 'handle-taken') throw handleTakenError();
       if (handle?.ok === false || handle?.error) {
         throw new Error(handle.error ?? "Couldn't set handle.");
@@ -1018,7 +1018,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     const rulesArg = state.rulesAccepted === true
       ? { rulesAccepted: String(inv.rules?.version ?? 1) }
       : {};
-    const redeem = await callSkill('stoop', 'redeemMembershipCode', {
+    const redeem = await callSkill('pinboard', 'redeemMembershipCode', {
       groupId: inv.groupId, code: inv.code,
       ...(state.handle ? { peerDisplay: state.handle } : {}),
       ...personaArg, ...circleAddressArg, ...rulesArg,
@@ -1054,7 +1054,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         // A real REJECTION from a live admin device stays verbatim — that is not "offline".
         throw new Error(peerReply.error);
       }
-      await callSkill('stoop', 'recordRemoteRedemption', {
+      await callSkill('pinboard', 'recordRemoteRedemption', {
         groupId:     inv.groupId,
         code:        inv.code,
         codeId:      peerReply.codeId ?? null,

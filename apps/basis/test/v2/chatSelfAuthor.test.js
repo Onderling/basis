@@ -32,7 +32,7 @@ describe('createSelfAuthorCheck — "am I the author" is a PER-CIRCLE question',
 
   it('recognises the canonical identifiers too — webid, pubKey, stableId', async () => {
     const isSelf = check();
-    // The shipped local mirror stamps stoop\'s caller webid, so this is the case that repairs
+    // The shipped local mirror stamps pinboard\'s caller webid, so this is the case that repairs
     // history already on disk.
     expect(await isSelf(envelope({ fromActor: 'webid:me' }))).toBe(true);
     expect(await isSelf(envelope({ fromActor: 'pk-me' }))).toBe(true);

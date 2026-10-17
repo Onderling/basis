@@ -33,7 +33,7 @@ import { leaveCircleLocally } from './circleMembershipHygiene.js';
 export async function deleteContact({ agent, callSkill = null, contactWebid, pairCircleId = null, unregister = null } = {}) {
   const call = typeof callSkill === 'function' ? callSkill : (app, op, args) => agent.callSkill(app, op, args);
   if ((!agent && typeof callSkill !== 'function') || typeof contactWebid !== 'string' || !contactWebid) return { ok: false, left: false, error: 'missing-args' };
-  const hid = await call('stoop', 'setContactHidden', { webid: contactWebid, hidden: true, deleted: true }).catch((e) => ({ error: e?.message ?? String(e) }));
+  const hid = await call('pinboard', 'setContactHidden', { webid: contactWebid, hidden: true, deleted: true }).catch((e) => ({ error: e?.message ?? String(e) }));
   if (hid?.error) return { ok: false, left: false, error: hid.error };
   // fired, never waited on: the app keeps what a node away is owed and tells it when it is back
   revokeGrantsOf(call, contactWebid).catch(() => {});
@@ -65,7 +65,7 @@ const AGENT_KEY = /^[A-Za-z0-9_-]{43}$/;
 async function revokeGrantsOf(call, contactWebid) {
   let row = null;
   try {
-    const r = await call('stoop', 'listContacts', {});
+    const r = await call('pinboard', 'listContacts', {});
     const rows = Array.isArray(r?.contacts) ? r.contacts : (Array.isArray(r?.items) ? r.items : []);
     row = rows.find((c) => c?.webid === contactWebid) ?? null;
   } catch { row = null; }

@@ -13,30 +13,30 @@ describe('AppRegistry', () => {
 
   it("setEnabled persists + isEnabled reflects", () => {
     const r = new AppRegistry();
-    r.setEnabled('stoop', false);
-    expect(r.isEnabled('stoop')).toBe(false);
-    r.setEnabled('stoop', true);
-    expect(r.isEnabled('stoop')).toBe(true);
+    r.setEnabled('pinboard', false);
+    expect(r.isEnabled('pinboard')).toBe(false);
+    r.setEnabled('pinboard', true);
+    expect(r.isEnabled('pinboard')).toBe(true);
   });
 
   it("syncWithCatalogue drops unknown apps + adds new ones as enabled", () => {
     const r = new AppRegistry();
     r.setEnabled('oldApp', false);
-    r.syncWithCatalogue(['household', 'stoop', 'folio']);
+    r.syncWithCatalogue(['household', 'pinboard', 'folio']);
     // oldApp gone:
     expect(r.snapshot().find((e) => e.appOrigin === 'oldApp')).toBeUndefined();
     // new apps default to enabled:
     expect(r.isEnabled('household')).toBe(true);
-    expect(r.isEnabled('stoop')).toBe(true);
+    expect(r.isEnabled('pinboard')).toBe(true);
     expect(r.isEnabled('folio')).toBe(true);
   });
 
   it("syncWithCatalogue preserves existing toggle state", () => {
     const r = new AppRegistry();
-    r.syncWithCatalogue(['household', 'stoop']);
-    r.setEnabled('stoop', false);
-    r.syncWithCatalogue(['household', 'stoop', 'folio']);
-    expect(r.isEnabled('stoop')).toBe(false);
+    r.syncWithCatalogue(['household', 'pinboard']);
+    r.setEnabled('pinboard', false);
+    r.syncWithCatalogue(['household', 'pinboard', 'folio']);
+    expect(r.isEnabled('pinboard')).toBe(false);
     expect(r.isEnabled('folio')).toBe(true);
   });
 
@@ -70,15 +70,15 @@ describe('AppRegistry', () => {
 
 describe('filterCatalogue', () => {
   const baseCatalogue = () => ({
-    appOrigins:  ['household', 'stoop', 'folio'],
+    appOrigins:  ['household', 'pinboard', 'folio'],
     commandMenu: [
       { command: '/done',     opId: 'markComplete', appOrigin: 'household' },
-      { command: '/post',     opId: 'postRequest',  appOrigin: 'stoop'     },
+      { command: '/post',     opId: 'postRequest',  appOrigin: 'pinboard'     },
       { command: '/readnote', opId: 'readNote',     appOrigin: 'folio'     },
     ],
     opsById: new Map([
       ['markComplete', { op: {}, appOrigin: 'household' }],
-      ['postRequest',  { op: {}, appOrigin: 'stoop' }],
+      ['postRequest',  { op: {}, appOrigin: 'pinboard' }],
       ['readNote',     { op: {}, appOrigin: 'folio' }],
     ]),
     replyShapeFor:    () => undefined,
@@ -89,8 +89,8 @@ describe('filterCatalogue', () => {
 
   it("removes ops from disabled apps", () => {
     const r = new AppRegistry();
-    r.syncWithCatalogue(['household', 'stoop', 'folio']);
-    r.setEnabled('stoop', false);
+    r.syncWithCatalogue(['household', 'pinboard', 'folio']);
+    r.setEnabled('pinboard', false);
     const filtered = filterCatalogue(baseCatalogue(), r);
     expect(filtered.commandMenu.find((e) => e.command === '/post')).toBeUndefined();
     expect(filtered.opsById.has('postRequest')).toBe(false);
@@ -99,7 +99,7 @@ describe('filterCatalogue', () => {
 
   it("no-op when everything is enabled", () => {
     const r = new AppRegistry();
-    r.syncWithCatalogue(['household', 'stoop', 'folio']);
+    r.syncWithCatalogue(['household', 'pinboard', 'folio']);
     const filtered = filterCatalogue(baseCatalogue(), r);
     expect(filtered.commandMenu.length).toBe(3);
     expect(filtered.opsById.size).toBe(3);
@@ -107,9 +107,9 @@ describe('filterCatalogue', () => {
 
   it("disabling ALL apps yields an empty catalogue", () => {
     const r = new AppRegistry();
-    r.syncWithCatalogue(['household', 'stoop', 'folio']);
+    r.syncWithCatalogue(['household', 'pinboard', 'folio']);
     r.setEnabled('household', false);
-    r.setEnabled('stoop',     false);
+    r.setEnabled('pinboard',     false);
     r.setEnabled('folio',     false);
     const filtered = filterCatalogue(baseCatalogue(), r);
     expect(filtered.commandMenu).toEqual([]);

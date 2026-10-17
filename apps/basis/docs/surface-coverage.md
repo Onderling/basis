@@ -132,7 +132,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `grantSurface` | grant-surface | · | · | · | · | · | · |  |
 |  | `revokeSurface` | revoke-surface | · | · | · | · | · | · |  |
 |  | `listSurfaceGrants` | list-surface-grants | · | · | · | · | · | · |  |
-| **stoop** | `postRequest` | add | ✅ | ✅ | ✅ | · | ✅ | · | post, ask, borrow, vraag, plaats, leen, bied aan |
+| **pinboard** | `postRequest` | add | ✅ | ✅ | ✅ | · | ✅ | · | post, ask, borrow, vraag, plaats, leen, bied aan |
 |  | `listOpen` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listMyRequests` | list | ✅ | ✅ | ✅ | · | · | · | mine, mijn |
 |  | `respondToItem` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | help with, respond to, offer, ik help, help met, reageer op, bied hulp |
@@ -145,7 +145,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getItemTree` | tree | ✅ | ✅ | · | · | · | · |  |
 |  | `signOutOfPod` | remove | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `listFeed` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `getStoopProfile` | list | ✅ | ✅ | · | · | · | · |  |
+|  | `getPinboardProfile` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `startDm` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `setHolidayMode` | submit | ✅ | ✅ | · | · | · | · |  |
 |  | `getHolidayMode` | list | ✅ | ✅ | · | · | · | · |  |
@@ -346,7 +346,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `replace-device` | ceremony | device | 1 | write:registry, write:history-keys, send:circle-address-revoke, send:circle-key-rotate |
 |  | `claim-companion` | ceremony | device | 1 | send:companion-claim, write:registry |
 |  | `revoke-device` | ceremony | device | 1 | write:registry, send:circle-address-revoke |
-| **stoop** | `add-contact` | ceremony | device | 1 | write:contacts |
+| **pinboard** | `add-contact` | ceremony | device | 1 | write:contacts |
 |  | `joinGroup` | wizard | device | 3 |  |
 | **params** | `restore-settings` | ceremony | device | 3 | write:settings, overwrite:pod-settings |
 

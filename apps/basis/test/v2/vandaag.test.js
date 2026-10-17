@@ -75,7 +75,7 @@ describe('Vandaag — whose chores are "mine"', () => {
   it('a host that does not name the person: the materializer asks who I am, so "my tasks" are mine', async () => {
     const chores = [{ id: 't1', text: 'stoep vegen', assignee: 'me-webid', state: 'open' }, { id: 't2', text: 'afwas', assignee: 'bea', state: 'open' }];
     const callSkill = async (app, op) => {
-      if (app === 'stoop' && op === 'whoAmI') return { webid: 'me-webid' };
+      if (app === 'pinboard' && op === 'whoAmI') return { webid: 'me-webid' };
       if (app === 'tasks' || app === 'household') return { items: chores, result: chores };
       return null;
     };
@@ -94,8 +94,8 @@ describe('Vandaag — "mine" is the circle\'s own self', () => {
       work: [{ id: 'w1', text: 'rapport', assignee: 'me-werk', state: 'open' }, { id: 'w2', text: 'koffie', assignee: 'me-default', state: 'open' }],
     };
     const callSkill = async (app, op, args) => {
-      if (app === 'stoop' && op === 'whoAmI') return { webid: 'me-default' };
-      if (app === 'stoop' && op === 'getMyProfile') return { entry: { displayName: 'Frits' } };
+      if (app === 'pinboard' && op === 'whoAmI') return { webid: 'me-default' };
+      if (app === 'pinboard' && op === 'getMyProfile') return { entry: { displayName: 'Frits' } };
       if (app === 'tasks' || app === 'household') { const rows = byCircle[args?.circleId] ?? []; return { items: rows, result: rows }; }
       return null;
     };

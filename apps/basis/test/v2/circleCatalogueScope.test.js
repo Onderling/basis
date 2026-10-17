@@ -9,14 +9,14 @@ function makeCatalogue() {
     ['transportMode',{ op: { id: 'transportMode', surfaces: ch },        appOrigin: 'basis' }],
     ['addTask',      { op: { id: 'addTask', verb: 'add', surfaces: ch }, appOrigin: 'tasks' }],
     ['addItem',      { op: { id: 'addItem', verb: 'add', surfaces: ch }, appOrigin: 'household' }],
-    ['markReturned', { op: { id: 'markReturned', surfaces: ch },         appOrigin: 'stoop' }],
+    ['markReturned', { op: { id: 'markReturned', surfaces: ch },         appOrigin: 'pinboard' }],
   ]);
   const commandMenu = [
     { command: '/me',      opId: 'me',      appOrigin: 'basis' },
     { command: '/addtask', opId: 'addTask', appOrigin: 'tasks' },
     { command: '/add',     opId: 'addItem', appOrigin: 'household' },
   ];
-  return { opsById, commandMenu, replyShapeFor: () => null, appOrigins: ['basis', 'tasks', 'household', 'stoop'] };
+  return { opsById, commandMenu, replyShapeFor: () => null, appOrigins: ['basis', 'tasks', 'household', 'pinboard'] };
 }
 
 describe('scopeCatalogueToApps (Part D — catalogue scoping)', () => {

@@ -8,7 +8,7 @@
  * admin. It is the one a member most needs told, and it was the one nothing could say.
  *
  * Source-text guards, for the reason `shellsUseSharedMembershipHygiene` gives: the projection is
- * proven by its own suites (`apps/stoop/test/deriveRoster.test.js`,
+ * proven by its own suites (`apps/pinboard/test/deriveRoster.test.js`,
  * `packages/kring-host/test/circleMembers.test.js`) and the web paint by a DOM test
  * (`test/v2/circleViewMembers.dom.test.js`), but `src/screens/**` has no coverage at all, so for
  * mobile this file is the only thing between a deleted line and one platform going quiet.

@@ -98,7 +98,7 @@ describe('the agenda link, on a real box and a real companion', () => {
     const question = await ask(api, ADMIN, made.line, (m) => Array.isArray(m.buttons) || /code/i.test(m.text), { log });
     expect(question.all, 'the bot asks which code the app shows').toMatch(/code/i);
     await ask(api, ADMIN, `/koppel-code ${made.code}`, (m) => /[Gg]ekoppeld/.test(m.text), { log });
-    const linked = await until(async () => ((await owner.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === boxAddress && c.linkedRow) ?? null, { timeout: 30_000, step: 250 });
+    const linked = await until(async () => ((await owner.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === boxAddress && c.linkedRow) ?? null, { timeout: 30_000, step: 250 });
     expect(linked, 'the bot is a contact in the admin\'s app').toMatchObject({ webid: boxAddress, linkedRow: `telegram:${ADMIN}` });
 
     // 3 · step 0: the claim line pasted; under "Mijn agents" the bot picked from the contacts, the agenda files ticked —

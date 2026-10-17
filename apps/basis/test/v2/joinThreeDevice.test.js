@@ -27,10 +27,10 @@ import {
   until, teardown, goOffline, goOnline,
 } from '../support/pairRealAgents.js';
 import { joinCircleFromInvite, buildCircleInviteUri } from '../../src/v2/circleInvite.js';
-import { gateRosterReplyForPeer } from '../../../stoop/src/lib/rosterAccessGate.js';
+import { gateRosterReplyForPeer } from '../../../pinboard/src/lib/rosterAccessGate.js';
 
 const rosterOf = async (node, groupId) => {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId });
   return Array.isArray(r?.members) ? r.members : [];
 };
 const rowsFor = (roster, webid) => roster.filter((m) => m?.webid === webid);

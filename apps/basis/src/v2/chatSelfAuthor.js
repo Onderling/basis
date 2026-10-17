@@ -7,7 +7,7 @@
  * (`circleView.js` / `CircleLauncherScreen.js`, both `row.actor === localActor`).
  *
  * `'me'` is a purely local stamp: it never leaves the device, so nothing durable records it. What
- * IS stored is the author — stoop's `broadcastCircleMessage` mirrors your outgoing message with
+ * IS stored is the author — pinboard's `broadcastCircleMessage` mirrors your outgoing message with
  * `source.fromActor = <you>`, exactly as it stores a peer's with theirs. So on the next launch the
  * rehydrator read your own words back, saw an author instead of `'me'`, and rendered them as
  * somebody else's: left-aligned, with a sender label and a "report" affordance on your own
@@ -26,7 +26,7 @@
  *   2. is the author one of my canonical identifiers?         (webid / pubKey / stableId)
  *
  * Both are needed. (1) is what a circle-scoped send is authored as; (2) is what the
- * currently-shipped local mirror records, because stoop stamps the caller's webid. Anything
+ * currently-shipped local mirror records, because pinboard stamps the caller's webid. Anything
  * older, or written by a device that had not derived its per-circle address yet, is only
  * recoverable through (2).
  *
@@ -46,7 +46,7 @@
  *
  * @param {object} deps
  * @param {() => Promise<{webid?:string, webId?:string, pubKey?:string, stableId?:string}|null>} [deps.whoAmI]
- *        resolves this device's canonical identity tuple (stoop's `whoAmI` skill).
+ *        resolves this device's canonical identity tuple (pinboard's `whoAmI` skill).
  * @param {(circleId: string) => (string|null)} [deps.circleAddressFor]
  *        this device's per-circle address (the agent's `circleAddressFor`).
  * @returns {(envelope: object) => Promise<boolean>}

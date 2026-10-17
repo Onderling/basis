@@ -155,12 +155,12 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     }
 
     // B raises the rules to v2 — the rules-update rider fans the doc; A applies it live.
-    const edited = await B.agent.callSkill('stoop', 'editGroupRules', {
+    const edited = await B.agent.callSkill('pinboard', 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'v2: quiet hours', purpose: 'v2: quiet hours', agreements: 'be kind', version: 1 },
     });
     expect(edited.version).toBe(2);
     const aHasV2 = await until(async () => {
-      const rows = (await A.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+      const rows = (await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
       return rows.some((m) => m.rulesCurrentVersion === '2') ? true : null;
     }, { timeout: 15000, step: 100 });
     expect(aHasV2, 'the v2 doc never reached the sibling — the parity source would be stale').toBe(true);
@@ -213,7 +213,7 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     expect(report.steps).toContain('roster-derived');
 
     // ── The parity, as a person reads it ─────────────────────────────────────────────────────
-    const rowsOn = async (n) => (await n.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    const rowsOn = async (n) => (await n.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
 
     // Roles: the founder is the admin; the person's own row is there.
     const roleParity = await until(async () => {

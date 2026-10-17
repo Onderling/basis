@@ -59,7 +59,7 @@ describe('the gate follows the preset', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
     for (const [webid, role, displayName] of [[FRITS, 'member', 'Frits'], [BERT, 'coordinator', 'Bert'], [OLGA, 'observer', 'Olga'], [ADMIN, 'admin', 'Anne']]) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName });
       await agent.setDoorCaller(webid, role);
     }
     const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });

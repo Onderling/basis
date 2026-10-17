@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { seedContactCard, seededContactWebid } from '../../src/v2/seededContact.js';
-import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 
 const card = (obj) => 'onderling-contact://' + encodeContactCard(obj);
 const FRITS = card({ webid: 'frits-key', pubKey: 'frits-key', displayName: 'Frits', relays: ['wss://relay.test'] });
@@ -72,18 +72,18 @@ describe('the seeded contact', () => {
 describe('through the real waist', () => {
   it('a real card seeds a PERSON in the book — never a bot — and a second boot adds nothing', async () => {
     const { bootRealAgentNode, teardown } = await import('../support/pairRealAgents.js');
-    const { stoopContactToRow } = await import('../../src/v2/contactsSource.js');
+    const { pinboardContactToRow } = await import('../../src/v2/contactsSource.js');
     const [frits, fresh] = await Promise.all([bootRealAgentNode('frits'), bootRealAgentNode('fresh')]);
     try {
-      const card = await frits.agent.callSkill('stoop', 'getContactShareQr', {});
+      const card = await frits.agent.callSkill('pinboard', 'getContactShareQr', {});
       const callSkill = (app, op, args) => fresh.agent.callSkill(app, op, args);
       expect(await seedContactCard({ payload: card.payload, callSkill })).toEqual({ seeded: true, webid: frits.pubKey });
-      const rows = (await callSkill('stoop', 'listContacts', {})).items;
+      const rows = (await callSkill('pinboard', 'listContacts', {})).items;
       const row = rows.find((c) => c.webid === frits.pubKey);
       expect(row, 'the seeded person is in the book').toBeTruthy();
-      expect(stoopContactToRow(row).isBot, 'a shipped contact is a person, not a bot').toBe(false);
+      expect(pinboardContactToRow(row).isBot, 'a shipped contact is a person, not a bot').toBe(false);
       expect(await seedContactCard({ payload: card.payload, callSkill })).toEqual({ seeded: false, reason: 'already-known', webid: frits.pubKey });
-      expect((await callSkill('stoop', 'listContacts', {})).items.filter((c) => c.webid === frits.pubKey)).toHaveLength(1);
+      expect((await callSkill('pinboard', 'listContacts', {})).items.filter((c) => c.webid === frits.pubKey)).toHaveLength(1);
     } finally { await teardown(frits, fresh); }
   }, 60_000);
 });

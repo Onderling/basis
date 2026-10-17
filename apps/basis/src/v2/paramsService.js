@@ -8,7 +8,7 @@
  *
  * VALUE ROUTING (#36 decision C) — REUSE the existing homes, no new sync plumbing:
  *   • device + agent → `@onderling/local-store` `createSettingsModule` — the `shared.json` + `devices/<id>.json`
- *     split (cross-app-settings convention), already extracted rule-of-two (Stoop → Tasks V1). A param KEY is
+ *     split (cross-app-settings convention), already extracted rule-of-two (Pinboard → Tasks V1). A param KEY is
  *     a settings field; scope maps `device → 'device'`, `agent → 'shared'`.
  *   • circle → the circle policy's EXISTING `settings` map (per-circle setting values keyed by field), reached
  *     through the injected circle-policy store. No new `params` slot — a circle-scoped param IS a circle

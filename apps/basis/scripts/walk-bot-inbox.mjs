@@ -55,7 +55,7 @@ await node.agent.connectPeerTransport({
   onPeerMessage: (env) => { onReply(env.from, env.payload); onMessage(env.from, env.payload); node._routerRef?.fn?.(env); },
 });
 
-const card = decodeContactCard((await node.agent.callSkill('stoop', 'getContactShareQr', {}).catch(() => null))?.payload ?? '');
+const card = decodeContactCard((await node.agent.callSkill('pinboard', 'getContactShareQr', {}).catch(() => null))?.payload ?? '');
 console.log(`walker   ${card?.webid ?? '?'}`);
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

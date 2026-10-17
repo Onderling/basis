@@ -11,7 +11,7 @@
  * join over the real peer bridge, then the joiner's own roster read.
  *
  * The address ladder itself (`resolveMemberAddress` with `allowFallback:false`) is pinned in
- * `apps/stoop/test/adminCircleAddressOnJoin.test.js`, which is where that code lives; what this gate
+ * `apps/pinboard/test/adminCircleAddressOnJoin.test.js`, which is where that code lives; what this gate
  * adds is that a genuine join actually produces the two facts the ladder needs.
  */
 import { describe, it, expect, afterAll } from 'vitest';

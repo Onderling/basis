@@ -23,9 +23,9 @@ const registry = {
 
 function hostCall({ events = [], chores = [] } = {}) {
   return async (app, op) => {
-    if (app === 'stoop' && op === 'getMyProfile') return { entry: { handle: 'frits', displayName: 'Frits' } };
+    if (app === 'pinboard' && op === 'getMyProfile') return { entry: { handle: 'frits', displayName: 'Frits' } };
     if (app === 'agents' && op === 'getProfileProperties') return registry;
-    if (app === 'stoop' && op === 'listContacts') return { contacts: [
+    if (app === 'pinboard' && op === 'listContacts') return { contacts: [
       { contactId: 'bot', displayName: 'Huishoudbot', peerAddr: 'bot-addr', linkedRow: 'row-1' },
       { contactId: 'bea', displayName: 'Bea', peerAddr: 'bea-addr' },
     ] };
@@ -105,13 +105,13 @@ describe('Mij — the declared screen', () => {
 describe('Mij follows the switcher', () => {
   it('one persona ticked: its own name, its own devices (its device here marked), no bots of the person', async () => {
     const callSkill = async (app, op, args) => {
-      if (app === 'stoop' && op === 'getMyProfile') return { entry: { displayName: 'Frits' } };
+      if (app === 'pinboard' && op === 'getMyProfile') return { entry: { displayName: 'Frits' } };
       if (app === 'agents' && op === 'getProfileProperties') {
         return args?.id === 'p-werk'
           ? { properties: { deviceDelegations: { mode: 'own', value: { wd: { deviceId: 'wd', label: 'werklaptop' } } } } }
           : registry;
       }
-      if (app === 'stoop' && op === 'listContacts') return { contacts: [{ displayName: 'Huishoudbot', peerAddr: 'bot', linkedRow: 'r' }] };
+      if (app === 'pinboard' && op === 'listContacts') return { contacts: [{ displayName: 'Huishoudbot', peerAddr: 'bot', linkedRow: 'r' }] };
       return null;
     };
     const [line, agents] = await mijScreenBlocks({ hostOps: { callSkill, circles: [], mijSelf: { id: 'p-werk', name: 'Werk', deviceId: 'wd' } } });

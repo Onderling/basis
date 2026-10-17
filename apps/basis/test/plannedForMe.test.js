@@ -15,7 +15,7 @@ function world({ circles = [{ groupId: 'huis', name: 'Huis' }, 'werk'] } = {}) {
   const calls = [];
   const callSkill = async (app, op, args = {}) => {
     calls.push([app, op, args.circleId ?? null]);
-    if (app === 'stoop' && op === 'listMyCircles') return { ok: true, circles };
+    if (app === 'pinboard' && op === 'listMyCircles') return { ok: true, circles };
     if (app === 'calendar' && op === 'listEvents') {
       if (args.circleId === 'huis') return { ok: true, items: [{ id: 'e1', title: 'tandarts', startsAt: at(26) }, { id: 'e9', title: 'later', startsAt: at(24 * 30) }] };
       if (!args.circleId) return { ok: true, items: [{ id: 'o1', title: 'hardlopen', startsAt: at(2) }] };

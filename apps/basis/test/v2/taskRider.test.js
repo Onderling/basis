@@ -161,7 +161,7 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const ada = await device('webid:ada', rosterAll, wire);
     const bo  = await device('webid:bo',  rosterAll, wire);
 
-    const [task] = await addTasks(ada.store, [{ text: 'sweep stoop' }], { actor: 'webid:ada' });
+    const [task] = await addTasks(ada.store, [{ text: 'sweep pinboard' }], { actor: 'webid:ada' });
     await settle(); await pump(wire, [ada, bo]);
 
     // Partitioned: both claim what each still sees as unclaimed. Two snapshots, both claimSeq 1.

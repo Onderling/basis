@@ -30,7 +30,7 @@ export function createHouseholdInApp({ callSkill, circleId, selfWebid, name, rel
   /** The household's circle rules, made once (the bot its founder and admin). */
   async function ensureCircle() {
     // one of the bot's circles already (the question the pair roster asks; a rules read answers in words)
-    const mine = await callSkill('stoop', 'listMyCircles', {}).catch(() => null);
+    const mine = await callSkill('pinboard', 'listMyCircles', {}).catch(() => null);
     if ((mine?.circles ?? []).includes(circleId)) return { created: false };
     await quickCreateCircle({ callSkill, id: circleId, founderPubKey: selfWebid, name: (typeof name === 'function' ? name() : name) || 'Huishouden' });
     if (typeof onCreated === 'function') { try { await onCreated({ circleId }); } catch { /* the next boot registers */ } }
@@ -62,11 +62,11 @@ export function createHouseholdInApp({ callSkill, circleId, selfWebid, name, rel
    */
   async function evict(personKey) {
     if (typeof personKey !== 'string' || !personKey) return { removed: 0 };
-    const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
+    const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     const theirs = (r?.members ?? []).map((m) => m?.webid).filter((w) => typeof w === 'string' && w && w !== selfWebid && (w === personKey || identityOf(w) === personKey));
     let removed = 0;
     for (const memberWebid of theirs) {
-      const out = await callSkill('stoop', 'removeMember', { groupId: circleId, memberWebid, policy: 'graceful' }).catch(() => null);
+      const out = await callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid, policy: 'graceful' }).catch(() => null);
       if (out && !out.error && out.ok !== false) removed += 1;
     }
     return { removed };

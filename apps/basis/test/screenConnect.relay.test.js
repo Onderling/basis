@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
-import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 import { encodePairingOffer, acceptConnectionGrant, CONNECTION_GRANT_SUBTYPE } from '../src/v2/connectionPairing.js';
 import { parseScreenLink, screenCode } from '../src/v2/botScreens.js';
 import { DataPart } from '@onderling/core';

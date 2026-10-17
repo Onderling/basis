@@ -4,11 +4,11 @@
  * The circle noticeboard surface inside a circle's NOTICEBOARD tab: a post composer
  * (ask / offer / lend + text) and the open-post list with per-row actions. Pure
  * render — the host (`circleApp.js`) fetches `listOpen`, computes `mine`, and
- * dispatches the stoop ops (`postRequest` / `respondToItem` / `cancelRequest` /
+ * dispatches the pinboard ops (`postRequest` / `respondToItem` / `cancelRequest` /
  * `reportPost` / `markReturned`) behind `onPost` / `onAction`. Mirrors the other
  * `renderX(container, ctx)` components so it's happy-dom-testable.
  *
- * Scope note (S1): basis runs ONE shared stoop agent today (`cc-default-circle`),
+ * Scope note (S1): basis runs ONE shared pinboard agent today (`cc-default-circle`),
  * so this shows the shared circle's posts; per-circle scoping arrives with the pod
  * foundation (REMAINING-WORK §4 E2 / S4).
  */
@@ -16,7 +16,7 @@
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 import { buildAttachControl } from './attachControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
-import { NOTICEBOARD_INTENTS } from '../../src/v2/circleStoopScope.js';
+import { NOTICEBOARD_INTENTS } from '../../src/v2/circlePinboardScope.js';
 
 const INTENTS = NOTICEBOARD_INTENTS;
 

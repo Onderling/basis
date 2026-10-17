@@ -42,12 +42,12 @@ describe('circle chat · composer dispatches the unified send op', () => {
     // Optimistic bubble appended locally.
     expect(events).toHaveLength(1);
     expect(events[0].payload.text).toBe('Hoi circle!');
-    // The unified send op dispatched (basis wires this stoop op to the reliable sender).
+    // The unified send op dispatched (basis wires this pinboard op to the reliable sender).
     await Promise.resolve(); await Promise.resolve();
     await new Promise((r) => setTimeout(r, 0));   // the sign hook adds a microtask hop before the fan
     expect(rawCallSkill).toHaveBeenCalledTimes(1);
     const [app, op, args] = rawCallSkill.mock.calls[0];
-    expect([app, op]).toEqual(['stoop', 'broadcastCircleChatStatement']);
+    expect([app, op]).toEqual(['pinboard', 'broadcastCircleChatStatement']);
     expect(args).toMatchObject({ groupId: 'g1', event: { sig: 's1' } });   // the statement rides, not plain text
     expect(typeof args.msgId).toBe('string');
   });

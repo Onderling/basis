@@ -10,7 +10,7 @@
  *
  * Scope (deliberate): this constructs + drives the control agent and resolves the
  * content-sealing strategy; it does NOT yet restructure basis's single
- * shared stoop agent into per-circle agents, nor wire a real OIDC pod session —
+ * shared pinboard agent into per-circle agents, nor wire a real OIDC pod session —
  * those are the env-gated / restructuring phases that need a real pod to verify.
  * p0/p1 circles seal nothing → this returns `null` (the caller uses a plain client).
  */

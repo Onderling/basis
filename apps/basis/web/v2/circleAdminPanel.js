@@ -4,7 +4,7 @@
  * The per-circle admin surface off the `⋯` menu: the member roster (with role,
  * how that role was come by, a control that changes it, + a remove action) and a post-announcement
  * box. Pure render — the host (`circleApp.js` showAdmin) loads `listGroupMembers` and dispatches the
- * admin-gated stoop ops (`removeMember`, `setMemberRole`, `postAnnouncement`); a non-admin's
+ * admin-gated pinboard ops (`removeMember`, `setMemberRole`, `postAnnouncement`); a non-admin's
  * dispatch is refused server-side, surfaced as a notice.
  *
  * Reports are NOT here: moderation reports live on the ONE §8 surface — the

@@ -1,20 +1,20 @@
 /**
- * A stoop op that acts on an item — one that takes a groupId / itemId / requestId / postId — must SAY
+ * A pinboard op that acts on an item — one that takes a groupId / itemId / requestId / postId — must SAY
  * whether it acts on the active circle (`circleScoped: true | false`). The circle scope derives its
  * write/list sets from that flag; an op added without it used to land silently in the wrong store (W1,
  * the announcement that reached nobody). The guard makes the omission a red build, not a walk finding.
  */
 import { describe, it, expect } from 'vitest';
-import { stoopManifest } from '@onderling-app/stoop/manifest';
-import { circleScopedOps, SCOPED_WRITE_OPS, SCOPED_LIST_OPS } from '../../src/v2/circleStoopScope.js';
+import { pinboardManifest } from '@onderling-app/pinboard/manifest';
+import { circleScopedOps, SCOPED_WRITE_OPS, SCOPED_LIST_OPS } from '../../src/v2/circlePinboardScope.js';
 
 // Ops that act on an ITEM (a post, a request) or write a text body. Ops that take an explicit, required
 // `groupId` (membership, governance, the broadcasts) name their circle themselves — nothing to inject.
 const ITEM_PARAMS = new Set(['itemId', 'requestId', 'postId']);
 
 describe('circle scoping is declared on the op', () => {
-  it('every stoop op that names an item or a circle declares circleScoped', () => {
-    const silent = (stoopManifest.operations ?? [])
+  it('every pinboard op that names an item or a circle declares circleScoped', () => {
+    const silent = (pinboardManifest.operations ?? [])
       .filter((op) => (op.params ?? []).some((p) => ITEM_PARAMS.has(p.name)) || (['add', 'claim', 'remove', 'reassign', 'complete', 'report'].includes(op.verb) && (op.params ?? []).some((p) => p.name === 'text')))
       .filter((op) => typeof op.circleScoped !== 'boolean')
       .map((op) => op.id);

@@ -45,7 +45,7 @@ describe('trail emitters at the waist', () => {
   it('a REFUSED set-param (internal param) lands nothing', async () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);
-    const res = await a.callSkill('params', 'set-param', { key: 'stoop.inviteRedemptionSystemCap', value: 9 });
+    const res = await a.callSkill('params', 'set-param', { key: 'pinboard.inviteRedemptionSystemCap', value: 9 });
     expect(res.ok).toBe(false);
     expect(deviceLog.query().filter((e) => e.type === 'settings-change')).toHaveLength(0);
   });

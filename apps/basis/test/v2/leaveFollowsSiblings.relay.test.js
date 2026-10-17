@@ -25,7 +25,7 @@ import { EventLog } from '../../src/eventLog.js';
 
 const X = 'leave-follows-x'; const Y = 'leave-follows-y'; const Z = 'leave-follows-z';   // Z stays: the sibling carry rides a circle the devices share
 const memStorage = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); } }; };
-const myCircles = async (n) => (await n.agent.callSkill('stoop', 'listMyCircles', {}))?.circles ?? [];
+const myCircles = async (n) => (await n.agent.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [];
 const registryHas = async (n, cid) => {
   const props = await n.agent.callSkill('agents', 'getProfileProperties', { id: 'default' });
   const map = props?.properties?.circleMemberships?.value ?? props?.properties?.circleMemberships ?? {};
@@ -79,7 +79,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
     expect(await myCircles(A2)).toEqual(expect.arrayContaining([X, Y, Z]));
     // the siblings know each other (A's row holds A2's address) before the carry is asked to reach A2
     const known = await until(async () => {
-      const r = await A.agent.callSkill('stoop', 'listGroupMembers', { groupId: X });
+      const r = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: X });
       return (r?.members ?? []).find((m) => m.webid === A.pubKey)?.circleAddresses?.includes(A2.agent.circleAddressFor(X)) ? true : null;
     }, { timeout: 15000, step: 100 });
     expect(known).toBe(true);
@@ -102,7 +102,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
     await new Promise((r) => { setTimeout(r, 1500); });
     expect(leavesOnLane(B, X, A.pubKey), 'one leave, not two').toBe(1);
     expect(leavesOnLane(A2, X, A.pubKey) <= 1, 'the follower holds at most the sibling\'s statement').toBe(true);
-    const bRoster = (await B.agent.callSkill('stoop', 'listGroupMembers', { groupId: X }))?.members ?? [];
+    const bRoster = (await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: X }))?.members ?? [];
     expect(bRoster.map((m) => m.webid), 'B\'s roster no longer names A').not.toContain(A.pubKey);
   }, 300_000);   // the enrol corridor over three circles, then the leave + the follow — heavy, and heavier on a loaded runner
 

@@ -35,7 +35,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(code.startsWith('onderling-contact://'), `the code is the card: ${code.slice(0, 30)}`).toBe(true);
     const link = await A.page.locator('.cc-share__link input').inputValue();
     expect(link, 'the link is THIS app\'s url with the contact in the fragment').toMatch(/^http:\/\/localhost:\d+\/#contact=[A-Za-z0-9_-]+$/);
-    const aId = (await A.page.evaluate(async () => window.onderlingCall('stoop', 'whoAmI', {})))?.webid;
+    const aId = (await A.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
     await A.page.locator('.cc-share__back').click();   // back to Mij — the panel is a sub-screen without the tab bar
     await A.page.waitForTimeout(800);
     log('STEP1 A shares', 'PASS', `link ${link.slice(0, 40)}…`);
@@ -103,7 +103,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     log('STEP3a new on A', 'PASS', `tab badge 1, row ${unreadRows[0]}`);
     const seen = await waitForContactMessageDetailed(A.page, marker, { tries: 12, every: 3000 });
     if (!seen.found) {
-      const bWho = await B.page.evaluate(async () => { const w = await window.onderlingCall('stoop', 'whoAmI', {}); return { webid: String(w?.webid).slice(0, 12), pubKey: String(w?.pubKey).slice(0, 12), person: String(w?.personAddress ?? '').slice(0, 12) }; }).catch((e) => String(e));
+      const bWho = await B.page.evaluate(async () => { const w = await window.onderlingCall('pinboard', 'whoAmI', {}); return { webid: String(w?.webid).slice(0, 12), pubKey: String(w?.pubKey).slice(0, 12), person: String(w?.personAddress ?? '').slice(0, 12) }; }).catch((e) => String(e));
       const outcomes = await B.page.evaluate(() => window.__sendOutcomes ?? null).catch((e) => String(e));
       const aHolds = await A.page.evaluate(async (m) => {
         const rows = [...document.querySelectorAll('.cc-contacts__row')].map((r) => r.dataset.contactId);
@@ -172,9 +172,9 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     expect(pairRefusals, 'no envelope is refused inside the pair circle during the join').toEqual([]);
     // B holds the founder's per-circle address on the pair roster — the circle was learned, on the channel that works.
     const bRoster = await B.page.evaluate(async (a) => {
-      const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));
+      const ids = ((await window.onderlingCall('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));
       if (!ids.length) return { pair: null };
-      const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: ids[0] });
+      const r = await window.onderlingCall('pinboard', 'listGroupMembers', { groupId: ids[0] });
       const row = (r?.members ?? []).find((m) => m.webid === a);
       return { pair: ids[0], founderAddress: row?.circleAddress ?? null };
     }, aId);
@@ -185,7 +185,7 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
     // ── B renames under Mij; A's Contacten row for B renames — THE BOOK READS THE ROSTER (2026-09-21). ────
     // The name travels as B's `member-props` statement on the pair circle's membership lane, folded on A; the row's
     // name is what the roster says, the card (which named the row "Bea" at STEP3) the fallback. No message is sent.
-    const bId = (await B.page.evaluate(async () => window.onderlingCall('stoop', 'whoAmI', {})))?.webid;
+    const bId = (await B.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
     await gotoCircles(B.page);   // B sits in the thread after STEP4: back to the launcher, where Mij is
     await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
     await B.page.locator('.circle-screen__identity-edit').click(); await B.page.locator('.cc-profile__display').fill('Beatrix'); await B.page.locator('.cc-profile__save').click(); await B.page.waitForTimeout(1500); await B.page.locator('.cc-screen-panel__close').click();
@@ -201,9 +201,9 @@ test('A shares a link from Mij; B opens it, has A as a contact, writes; A sees i
       await expect.poll(aRowName, { timeout: 45_000 }).toBe('Beatrix');
     } catch {
       const aRoster = await A.page.evaluate(async (b) => {
-        const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));
+        const ids = ((await window.onderlingCall('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter((id) => String(id).startsWith('pair-'));
         const out = {};
-        for (const id of ids) { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: id }); out[id.slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}:${m.displayName ?? ''}:${JSON.stringify(m.said ?? null)}`); }
+        for (const id of ids) { const r = await window.onderlingCall('pinboard', 'listGroupMembers', { groupId: id }); out[id.slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}:${m.displayName ?? ''}:${JSON.stringify(m.said ?? null)}`); }
         return out;
       }, bId).catch((e) => String(e));
       throw new Error(`A's row for B did not take the roster's name — painted "${await aRowName()}"; A's pair rosters: ${JSON.stringify(aRoster)}`);

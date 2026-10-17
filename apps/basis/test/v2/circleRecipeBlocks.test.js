@@ -65,8 +65,8 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (pure types)', () => 
     expect(r.status).toBe('error');
   });
 
-  it('noticeboard block pulls stoop listOpen (#16 — screen shows the noticeboard)', async () => {
-    const callSkill = async (app, op) => (app === 'stoop' && op === 'listOpen'
+  it('noticeboard block pulls pinboard listOpen (#16 — screen shows the noticeboard)', async () => {
+    const callSkill = async (app, op) => (app === 'pinboard' && op === 'listOpen'
       ? { items: [{ id: 'p1', text: 'wie heeft een boormachine?', addedBy: 'https://alice.example/me' }] }
       : null);
     const r = await materializeBlock({ block: { id: 'b', type: 'noticeboard' }, circleId: 'c1', hostOps: { callSkill } });
@@ -191,7 +191,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
       circleId: 'g1',
       hostOps: { callSkill },
     });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'getGroupRules', { groupId: 'g1' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'getGroupRules', { groupId: 'g1' });
     expect(r.status).toBe('ok');
     expect(r.content.doc.purpose).toBe('Een fijne circle zijn');
     expect(r.content.doc.agreements).toBe('Geen herrie na 22u');

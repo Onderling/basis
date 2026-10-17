@@ -175,7 +175,7 @@ export function companionFamilyChoices(families, t) {
 export async function loadCompanionGrantPicker({ callSkill, node, t }) {
   const [choices, book] = await Promise.all([
     Promise.resolve(callSkill('household', 'companionGrantChoices', { node })).catch(() => null),
-    Promise.resolve(callSkill('stoop', 'listContacts', {})).catch(() => null),
+    Promise.resolve(callSkill('pinboard', 'listContacts', {})).catch(() => null),
   ]);
   if (choices?.ok !== true) return { ok: false, message: companionGrantText(choices, t) };
   const contacts = Array.isArray(book?.contacts) ? book.contacts : (Array.isArray(book?.items) ? book.items : []);
@@ -206,7 +206,7 @@ export function companionGrantText(r, t) {
 export async function loadCompanionGrantRows({ callSkill, node, t }) {
   const [list, book] = await Promise.all([
     Promise.resolve(callSkill('household', 'companionGrantList', { node })).catch(() => null),
-    Promise.resolve(callSkill('stoop', 'listContacts', {})).catch(() => null),
+    Promise.resolve(callSkill('pinboard', 'listContacts', {})).catch(() => null),
   ]);
   if (list?.ok !== true) return { ok: false, message: companionGrantText(list, t) };
   const contacts = Array.isArray(book?.contacts) ? book.contacts : (Array.isArray(book?.items) ? book.items : []);

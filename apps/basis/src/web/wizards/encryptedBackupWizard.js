@@ -4,16 +4,16 @@
  * basis — C6 encrypted-backup wizard (2026-05-24).
  *
  * 2-step backup flow: passphrase entry → download.  Real skill:
- * stoop.encryptedBackup({passphrase}) which returns {blob} — a
- * passphrase-protected JSON snapshot of the calling actor's stoop
- * state.  Per stoop Phase I5 / functional-design-v1 § I5.
+ * pinboard.encryptedBackup({passphrase}) which returns {blob} — a
+ * passphrase-protected JSON snapshot of the calling actor's pinboard
+ * state.  Per pinboard Phase I5 / functional-design-v1 § I5.
  *
  * UX: passphrase entered twice (confirmation), minimum 12 chars (we
  * advise but don't enforce — usability > paranoia at this size).
  * Download triggers via Blob → ObjectURL → invisible anchor click.
  *
  * Restore companion: the user uses the same blob + passphrase via a
- * future /restore-encrypted-backup wizard (when stoop ships
+ * future /restore-encrypted-backup wizard (when pinboard ships
  * decryptBackup / restoreEncryptedBackup).  For V0 the round-trip
  * isn't user-driven from chat — just the export.
  */

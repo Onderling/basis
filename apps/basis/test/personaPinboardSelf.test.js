@@ -1,5 +1,5 @@
 /**
- * STOOP'S "ME" IN A PERSONA'S CIRCLE (persona arc c3b2): once a circle is bound to a persona, the device's own stoop
+ * PINBOARD'S "ME" IN A PERSONA'S CIRCLE (persona arc c3b2): once a circle is bound to a persona, the device's own pinboard
  * calls about that circle are the persona's — whoAmI answers with the persona's webid — while a circle of the default
  * stays the default's. Calls that name no circle stay on the default identity.
  */
@@ -10,7 +10,7 @@ import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 
 const boot = () => createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
 
-describe('stoop\'s self follows the circle\'s persona', () => {
+describe('pinboard\'s self follows the circle\'s persona', () => {
   it('whoAmI in a persona\'s circle is the persona; in a default circle the default', async () => {
     const agent = await boot();
     const { id } = await agent.callSkill('agents', 'createProfile', { name: 'Buurt' });
@@ -18,11 +18,11 @@ describe('stoop\'s self follows the circle\'s persona', () => {
     const C = 'circle-of-buurt';
     expect((await agent.callSkill('household', 'bindCirclePersona', { circleId: C, personaId: id })).ok).toBe(true);
 
-    const inB = await agent.callSkill('stoop', 'whoAmI', { groupId: C });
+    const inB = await agent.callSkill('pinboard', 'whoAmI', { groupId: C });
     expect(inB?.webid).toBe(B.chatId.pubKey);
-    const inDefault = await agent.callSkill('stoop', 'whoAmI', { groupId: 'a-default-circle' });
+    const inDefault = await agent.callSkill('pinboard', 'whoAmI', { groupId: 'a-default-circle' });
     expect(inDefault?.webid).toBe(agent.identity.chat.pubKey);
-    const noCircle = await agent.callSkill('stoop', 'whoAmI', {});
+    const noCircle = await agent.callSkill('pinboard', 'whoAmI', {});
     expect(noCircle?.webid).toBe(agent.identity.chat.pubKey);
     await agent.shutdown?.();
   }, 60_000);

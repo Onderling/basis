@@ -32,7 +32,7 @@ describe('the person-mute view filter', () => {
   });
 });
 
-describe('mutedActorSet — the stoop mute-keys → actor-refs resolution', () => {
+describe('mutedActorSet — the pinboard mute-keys → actor-refs resolution', () => {
   const roster = [
     { webid: 'webid:ada', stableId: 'STABLE-ADA' },
     { webid: 'webid:bo',  stableId: 'STABLE-BO' },

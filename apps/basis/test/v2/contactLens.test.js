@@ -15,7 +15,7 @@ import {
 } from '../../src/v2/contactLens.js';
 import { pairCircleIdFor } from '../../src/v2/pairCircleId.js';
 import { personaPresetKeys } from '../../src/v2/memberCards.js';
-import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 
 const card = (o = {}) => {
   return `onderling-contact://${encodeContactCard({ webid: 'them', displayName: 'Anne', handle: 'anne', ...o })}`;

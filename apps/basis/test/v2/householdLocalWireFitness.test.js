@@ -1,10 +1,10 @@
 /**
  * household — `local ≡ wire` equivalence + route-parity fitness test
  * (Workstream B, decision #5).  Completes the uniform-invocation-route
- * coverage: tasks-v0 + stoop already drive the shared harness; this adds
+ * coverage: tasks-v0 + pinboard already drive the shared harness; this adds
  * the third real app, household.
  *
- * Household differs from tasks-v0 / stoop: it has NO standalone
+ * Household differs from tasks-v0 / pinboard: it has NO standalone
  * `createXService` that owns the wire adapters.  Its pure cores live in
  * `src/v2/householdApp.js` and are registered on the uniform wire path by
  * `realAgent.js`'s `wire(...)` block — which wraps each core with two small

@@ -1131,7 +1131,7 @@ function renderBubble(row, {
       if (b.itemId != null) btn.dataset.itemId = String(b.itemId);
       if (b.screen) btn.dataset.screen = b.screen;
       // A `labelKey` is resolved; a literal `label` is printed as given. An op that declares neither
-      // shows its id, which is honest and ugly enough to get noticed — the state 31 stoop buttons were
+      // shows its id, which is honest and ugly enough to get noticed — the state 31 pinboard buttons were
       // in while `labelKey` was validated and read by nothing.
       // A button whose op the circle greys (`embedButtonsForReply` → the one fold) is shown but cannot be pressed.
       if (b.disabled) btn.disabled = true;

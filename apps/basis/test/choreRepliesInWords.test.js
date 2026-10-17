@@ -35,7 +35,7 @@ describe('chore actions answer in words', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t: tr });
     for (const [webid, role, displayName] of [[ADMIN, 'admin', 'Frits'], [HENK, 'member', 'Henk']]) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName });
       await agent.setDoorCaller(webid, role);
     }
     const as = (a, o, x) => agent.callSkill(a, o, x, { caller: ADMIN });

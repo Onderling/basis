@@ -34,7 +34,7 @@ export function makePropagateMeshIntros({ callSkill, sendPeer, logger = console 
   return async function propagateMeshIntros({ groupId, newPeerAddr, newPeerDisplay, newPeerShared }) {
     let consenting = [];
     try {
-      const reply = await callSkill('stoop', 'listConsentingPeers', { groupId });
+      const reply = await callSkill('pinboard', 'listConsentingPeers', { groupId });
       consenting = reply?.peers ?? [];
     } catch (err) {
       logger.warn?.('[mesh-intro] listConsentingPeers failed', err);
@@ -94,7 +94,7 @@ export function makeHandleCirclePeerIntro({ callSkill, logger = console }) {
       return { ok: false, reason: 'missing-fields' };
     }
     try {
-      const result = await callSkill('stoop', 'recordPeerIntro', {
+      const result = await callSkill('pinboard', 'recordPeerIntro', {
         groupId, peerAddr, peerDisplay,
       });
       if (result?.error) {

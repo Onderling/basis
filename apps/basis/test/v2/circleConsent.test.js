@@ -19,31 +19,31 @@ const tasks = {
     { id: 'doneTask', verb: 'complete', appliesTo: { type: 'task' } },
   ],
 };
-const stoop = {
-  app: 'stoop', itemTypes: ['post'],
+const pinboard = {
+  app: 'pinboard', itemTypes: ['post'],
   nouns: { post: { atoms: ['add'] } },
   operations: [{ id: 'postRequest', verb: 'add', appliesTo: { type: 'post' } }],
 };
-const sources = [{ manifest: tasks }, { manifest: stoop }];
+const sources = [{ manifest: tasks }, { manifest: pinboard }];
 
 // Admin template: 'add task' REQUIRED (mandatory), 'complete task' OPTIONAL (opt-outable),
 // 'add post' has a PRIVACY FLOOR (always opt-outable, even though asked required).
 const policy = {
-  apps: ['tasks', 'stoop'],
+  apps: ['tasks', 'pinboard'],
   capabilities: {
     'tasks add task':      { freedom: 'required' },
     'tasks complete task': { freedom: 'optional' },
-    'stoop add post':      { freedom: 'required', privacyFloor: true },
+    'pinboard add post':      { freedom: 'required', privacyFloor: true },
   },
 };
 
 describe('buildJoinConsentModel', () => {
   it('lists only the OPT-OUTABLE caps (optional OR privacy floor), never the mandatory ones', () => {
     const model = buildJoinConsentModel(sources, policy);
-    expect(model.keys.sort()).toEqual(['stoop add post', 'tasks complete task']);
+    expect(model.keys.sort()).toEqual(['pinboard add post', 'tasks complete task']);
     // the required, un-floored cap is NOT offered
     expect(model.keys).not.toContain('tasks add task');
-    const post = model.items.find((i) => i.key === 'stoop add post');
+    const post = model.items.find((i) => i.key === 'pinboard add post');
     expect(post.privacyFloor).toBe(true);   // floor wins → opt-outable despite 'required'
   });
 
@@ -60,7 +60,7 @@ describe('buildJoinConsentModel', () => {
   it('pre-marks already-declined caps as optedOut', () => {
     const model = buildJoinConsentModel(sources, policy, { optOuts: ['tasks complete task'] });
     expect(model.items.find((i) => i.key === 'tasks complete task').optedOut).toBe(true);
-    expect(model.items.find((i) => i.key === 'stoop add post').optedOut).toBe(false);
+    expect(model.items.find((i) => i.key === 'pinboard add post').optedOut).toBe(false);
   });
 });
 
@@ -73,8 +73,8 @@ describe('optOutsFromDeclined', () => {
   });
 
   it('de-dupes and is order-stable', () => {
-    const out = optOutsFromDeclined(model, ['stoop add post', 'tasks complete task', 'stoop add post']);
-    expect(out).toEqual(['stoop add post', 'tasks complete task']);
+    const out = optOutsFromDeclined(model, ['pinboard add post', 'tasks complete task', 'pinboard add post']);
+    expect(out).toEqual(['pinboard add post', 'tasks complete task']);
   });
 
   it('accepts a Set and an empty/garbage input', () => {
@@ -113,7 +113,7 @@ describe('feeds the gate — effective = admin-template ∩ user-opt-outs', () =
     for (const cap of [
       { verb: 'add', type: 'task' }, { verb: 'complete', type: 'task' }, { verb: 'add', type: 'post' },
     ]) {
-      const app = cap.type === 'post' ? 'stoop' : 'tasks';
+      const app = cap.type === 'post' ? 'pinboard' : 'tasks';
       const r = checkCapability({ op: { verb: cap.verb, appliesTo: { type: cap.type } }, appOrigin: app }, eff);
       expect(r.allow).toBe(true);
     }

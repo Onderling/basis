@@ -1,7 +1,7 @@
 /**
  * attachmentEncoder — S5 client-side image attachment encoder (web).
  *
- * Turns a user-picked image File into the inbound-attachment shape stoop's
+ * Turns a user-picked image File into the inbound-attachment shape pinboard's
  * `postRequest` expects (and `validateInboundAttachment` checks):
  *
  *   { mime, dataB64, width, height, thumbnail }
@@ -15,7 +15,7 @@
  * The browser primitives (Image decode + Canvas) are injected (`loadImage`,
  * `makeCanvas`) so the geometry + plumbing are unit-testable with fakes; the
  * real Canvas round-trip is exercised in a browser. Mirrors the byte caps in
- * `apps/stoop/src/lib/Attachments.js` (kept in sync by value, not import, to
+ * `apps/pinboard/src/lib/Attachments.js` (kept in sync by value, not import, to
  * avoid an app→app dependency).
  */
 
@@ -23,7 +23,7 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 // Parameter register (#36) — attachment size/dimension caps (scope:device, kind:internal — safety bounds).
 // `param()` returns each existing default. NOTE the by-value mirror below is a known duplication with
-// stoop's Attachments.MAX_NOTICEBOARD_BYTES_PER_ATT (app→app import is forbidden); unifying both on the shared
+// pinboard's Attachments.MAX_NOTICEBOARD_BYTES_PER_ATT (app→app import is forbidden); unifying both on the shared
 // `attachment.maxNoticeboardBytesPerAtt` key is a follow-up once the register is read at runtime (L24).
 export const MAX_NOTICEBOARD_BYTES_PER_ATT = param({ key: 'attachment.maxNoticeboardBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });     // mirror Attachments.MAX_NOTICEBOARD_BYTES_PER_ATT
 export const ALLOWED_MIMES = Object.freeze(new Set(['image/jpeg', 'image/png', 'image/webp']));

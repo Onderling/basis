@@ -34,8 +34,8 @@ describe('a chore named in words matches among the right chores', () => {
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
-    await own('stoop', 'addContact', { webid: ANN, channel: 'telegram', role: 'member' });
-    await own('stoop', 'addContact', { webid: BERT, channel: 'telegram', role: 'member' });
+    await own('pinboard', 'addContact', { webid: ANN, channel: 'telegram', role: 'member' });
+    await own('pinboard', 'addContact', { webid: BERT, channel: 'telegram', role: 'member' });
     await agent.setDoorCaller(ANN, 'member');
     await agent.setDoorCaller(BERT, 'member');
     const as = (who) => (a, o, x) => agent.callSkill(a, o, x, { caller: who, threadId: who });

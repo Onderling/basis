@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
-import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { addBoxCard } from './support/addBoxCard.js';
 
 // the box's walk log (each turn's route), beside its data

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
 import { basisManifest } from '../../manifest.js';
-import stoopManifest from '../../../stoop/manifest.js';
+import pinboardManifest from '../../../pinboard/manifest.js';
 import { tasksManifest } from '../../../tasks-v0/manifest.js';
 import { folioManifest } from '../../../folio/manifest.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -35,7 +35,7 @@ describe('advancedOpRows', () => {
     // The 94-row sort (2026-09-02). `other` is where an op lands when nobody has decided about it —
     // the drawer of last resort must not open on the undecided, so the count is pinned at zero and
     // PRINTED on failure: the row names are the work list, not a mystery number.
-    const manifests = [stoopManifest, tasksManifest, folioManifest, calendarManifest,
+    const manifests = [pinboardManifest, tasksManifest, folioManifest, calendarManifest,
       householdManifest, listsManifest, agentsManifest];
     const rows = advancedOpRows({ manifests });
     const other = rows.filter((r) => r.group === 'other');
@@ -83,14 +83,14 @@ describe('advancedOpRows', () => {
 
 describe('advancedOpRows — the app an op belongs to', () => {
   it("reads the manifest's `app` field (what the real manifests declare), so two apps' `listOpen` are two rows with two keys", () => {
-    // Every real manifest says `app: 'stoop'`, not `appId`. Reading only `appId` made every row's app ''
-    // — stoop and household both declaring `listOpen` collided as the same React key (a redbox on the
+    // Every real manifest says `app: 'pinboard'`, not `appId`. Reading only `appId` made every row's app ''
+    // — pinboard and household both declaring `listOpen` collided as the same React key (a redbox on the
     // phone, W25) and Run dispatched to app ''.
     const rows = advancedOpRows({ manifests: [
-      { app: 'stoop', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
+      { app: 'pinboard', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
       { app: 'household', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
     ] });
-    expect(rows.map((r) => `${r.app}:${r.op}`).sort()).toEqual(['household:listOpen', 'stoop:listOpen']);
+    expect(rows.map((r) => `${r.app}:${r.op}`).sort()).toEqual(['household:listOpen', 'pinboard:listOpen']);
   });
 });
 

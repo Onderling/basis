@@ -25,11 +25,11 @@ describe('the agent answers in the person\'s language', () => {
     expect(archive.ok).toBe(false);
     expect(archive.error).toBe('Archiveren maakt de kring alleen-lezen. Doe het opnieuw met --confirm=true om door te gaan.');
 
-    const leave = await agent.callSkill('stoop', 'leaveGroup', {});
+    const leave = await agent.callSkill('pinboard', 'leaveGroup', {});
     expect(leave.ok).toBe(false);
     expect(leave.error).toBe('Een kring verlaten kun je niet terugdraaien. Doe het opnieuw met --confirm=true om door te gaan.');
 
-    const posted = await agent.callSkill('stoop', 'postRequest', { intent: 'ask', text: 'wie heeft er een ladder?' });
+    const posted = await agent.callSkill('pinboard', 'postRequest', { intent: 'ask', text: 'wie heeft er een ladder?' });
     expect(posted?.ok, JSON.stringify(posted)).toBe(true);
     expect(posted.message).toBe('✓ Geplaatst: wie heeft er een ladder?');
   }, 90_000);

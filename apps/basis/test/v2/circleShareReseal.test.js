@@ -240,7 +240,7 @@ describe('option 2 — trusted/registered ride the COPY re-seal mechanism (real 
 
 describe('slice 3a — recipientSealKeyFromMembers (roster lookup, deny-by-default)', () => {
   const bob = generateKeypair();
-  it('returns the sealing pubkey for a roster member (stoop listGroupMembers shape)', () => {
+  it('returns the sealing pubkey for a roster member (pinboard listGroupMembers shape)', () => {
     const roster = { members: [{ webid: 'webid:bob', sealingPublicKey: bob.publicKey }, { webid: 'webid:carol' }] };
     expect(recipientSealKeyFromMembers(roster, 'webid:bob')).toBe(bob.publicKey);
   });

@@ -90,7 +90,7 @@ describe('EventLog — query', () => {
   const seed = () => {
     const log = new EventLog(noPrune());
     log.append(ev({ id: '1', ts: 1000, app: 'household', type: 'item-changed', actor: 'webid:anne' }));
-    log.append(ev({ id: '2', ts: 2000, app: 'stoop',     type: 'notification', actor: 'webid:karl' }));
+    log.append(ev({ id: '2', ts: 2000, app: 'pinboard',     type: 'notification', actor: 'webid:karl' }));
     log.append(ev({ id: '3', ts: 3000, app: 'household', type: 'notification', actor: 'webid:anne' }));
     log.append(ev({ id: '4', ts: 4000, app: 'tasks',  type: 'item-changed', actor: 'webid:maria' }));
     return log;
@@ -109,7 +109,7 @@ describe('EventLog — query', () => {
 
   it("expression-tree filter — OR of apps", () => {
     const r = seed().query({
-      filter: { or: [{ apps: ['stoop'] }, { apps: ['tasks'] }] },
+      filter: { or: [{ apps: ['pinboard'] }, { apps: ['tasks'] }] },
     });
     expect(r.map((e) => e.id)).toEqual(['4', '2']);
   });
@@ -217,7 +217,7 @@ describe('EventLog.attachToRouter', () => {
     const log = new EventLog();
     log.attachToRouter(router);
     router.deliver({ id: 'e1', app: 'household', type: 'item-changed', payload: {} });
-    router.deliver({ id: 'e2', app: 'stoop',     type: 'notification', payload: {} });
+    router.deliver({ id: 'e2', app: 'pinboard',     type: 'notification', payload: {} });
     expect(log.query().map((e) => e.id)).toEqual(['e2', 'e1']);
   });
 

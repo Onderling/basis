@@ -30,9 +30,9 @@ importers:
       '@onderling-app/folio':
         specifier: workspace:*
         version: link:../folio
-      '@onderling-app/stoop':
+      '@onderling-app/pinboard':
         specifier: workspace:*
-        version: link:../stoop
+        version: link:../pinboard
       '@onderling-app/tasks':
         specifier: workspace:*
         version: link:../tasks-v0

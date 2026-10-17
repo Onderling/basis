@@ -5,7 +5,7 @@
  * Aliased via vite.config.js → resolve.alias.  Static imports of the form
  * `import { promises as fs } from 'node:fs'` (sync-engine fsNode adapter,
  * folio CLI/server) AND `import { readFile, writeFile, ... } from
- * 'node:fs/promises'` (stoop FilePersist, tasks-v0 FilePersist, pseudo-pod
+ * 'node:fs/promises'` (pinboard FilePersist, tasks-v0 FilePersist, pseudo-pod
  * NodeFsBackend) BOTH resolve here.  Two import shapes, one module.
  *
  * Browser code never executes these — the callers either:

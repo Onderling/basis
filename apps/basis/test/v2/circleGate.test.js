@@ -117,7 +117,7 @@ describe('circle gate — Part C: multi-app verbs, collisions, removed declarati
   });
 
   it('resolves each cross-app collision to its single owner', async () => {
-    expect(await op('share the deck')).toBe('shareFolder');      // not stoop.postRequest
+    expect(await op('share the deck')).toBe('shareFolder');      // not pinboard.postRequest
     expect(await opNl('deel de fotos')).toBe('shareFolder');
     expect(await op('accept the invite')).toBe('rsvpAccept');    // not tasks.approveTask
     expect(await op('reject the draft')).toBe('rejectTask');     // not calendar.rsvpDecline
@@ -134,7 +134,7 @@ describe('circle gate — Part C: multi-app verbs, collisions, removed declarati
   it('removed/invalid declarations do NOT route (fall to the LLM)', async () => {
     expect(await op('sign-out')).toBe(null);        // signOutOfPod: invalid body:'reject' removed
     expect(await op('tree the item')).toBe(null);   // getItemTree: debug op, match removed
-    expect(await op('bulletin ask')).toBe(null);    // stoop.listOpen: mis-wired type-only removed
+    expect(await op('bulletin ask')).toBe(null);    // pinboard.listOpen: mis-wired type-only removed
   });
 
   it('the gate never throws on any input (renderSlash body kinds all valid)', async () => {
@@ -182,12 +182,12 @@ describe('circle bot + manifest gate — routing precedence', () => {
 // paths are byte-for-byte equivalent over the REAL circle manifests, so the switch is behaviour-safe.
 import { renderGate } from '@onderling/app-manifest';
 import { createGate } from '@onderling/manifest-host';
-import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
+import { mockTasksManifest, mockPinboardManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { CIRCLE_GATE_TRAIL } from '../../src/v2/circleGateLexicon.js';
 
 describe('Part A — createGate parity with the old direct renderGate path', () => {
-  const CIRCLE = [mockTasksManifest, mockStoopManifest, mockFolioManifest, calendarManifest];
+  const CIRCLE = [mockTasksManifest, mockPinboardManifest, mockFolioManifest, calendarManifest];
   const probes = [
     'add buy milk', 'done sok', 'sok done', 'claim t1', 'post need a drill',
     'share notes', 'afwas klaar', 'noteer melk', 'random free text with no verb',

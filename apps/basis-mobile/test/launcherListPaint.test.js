@@ -1,7 +1,7 @@
 /**
  * The launcher says "No circles yet." only when that is TRUE.
  *
- * On a cold start the stoop store hydrates after the agent bundle, so the launcher retries its load a few
+ * On a cold start the pinboard store hydrates after the agent bundle, so the launcher retries its load a few
  * times while the answer is empty. Between two tries `loading` is false and the list is still empty — and
  * the screen painted "No circles yet." in every gap, for an account that had a circle (found 2026-10-08 on a
  * real phone: the circle appeared only after the store caught up, seconds later). Web never shows this: it
@@ -47,7 +47,7 @@ describe('launcherListPaint — the wiring', () => {
   });
 
   it('settles on the FIRST answer once the agent bundle exists — no boot retry', () => {
-    // Instrumented on a real phone (2026-10-08): stoop's store is loaded inside the agent's boot, which the bundle
+    // Instrumented on a real phone (2026-10-08): pinboard's store is loaded inside the agent's boot, which the bundle
     // awaits, so the first load WITH a bundle already answers; the only empty first answer is the bundle-not-yet one.
     expect(src).toMatch(/if \(resolveSkill\) \{ setLauncherSettled\(true\)/);
     expect(src).not.toMatch(/hydrates from AsyncStorage a beat AFTER the agent bundle/);

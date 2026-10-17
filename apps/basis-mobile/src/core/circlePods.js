@@ -1,9 +1,9 @@
 /**
  * basis-mobile — per-circle pod producers + content-seal strategies (RN parity
  * with web's `circleApp.js` S4 wiring). One producer per circle (sealing identity +
- * control agent over an in-memory pseudo-pod) lives OUTSIDE the single stoop agent;
+ * control agent over an in-memory pseudo-pod) lives OUTSIDE the single pinboard agent;
  * `getCircleSealStrategy` resolves the circle's `{seal,open}` content strategy so
- * `scopeStoopCallSkill` can transparently seal a p2/p3 circle's noticeboard posts.
+ * `scopePinboardCallSkill` can transparently seal a p2/p3 circle's noticeboard posts.
  *
  * The crypto is now pure-JS (tweetnacl + @noble/hashes — the RNG is polyfilled at app
  * entry via `react-native-get-random-values`), so this runs on Metro. The vault is
@@ -27,7 +27,7 @@ import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoste
 const keyFanRoster = async (circleId) => {
   if (typeof _keyEventWiring?.callSkill !== 'function') return [];
   try {
-    const r = await _keyEventWiring.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const r = await _keyEventWiring.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     return Array.isArray(r?.members) ? r.members : [];
   } catch { return []; }
 };
@@ -149,7 +149,7 @@ function makeCircleKeyEventLog(circleId) {
     // per-circle address. A direct peer send carries the canonical identity and is refused at
     // every receiver inside a circle.
     fanStatement: (gid, statement, only) => (typeof _keyEventWiring?.callSkill === 'function'
-      ? _keyEventWiring.callSkill('stoop', 'broadcastCircleKeyStatement', {
+      ? _keyEventWiring.callSkill('pinboard', 'broadcastCircleKeyStatement', {
         groupId: gid ?? circleId, event: statement,
         msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
         ...(only ? { only } : {}),
@@ -258,9 +258,9 @@ export async function ensureCirclePod(circleId, policy) {
   return producer;
 }
 
-// S4 — routes stoop membership events (redeem/leave) to the joined circle's producer for
+// S4 — routes pinboard membership events (redeem/leave) to the joined circle's producer for
 // multi-member sealing (the joiner's sealing key is wrapped into the group key). Pass to
-// bootAgentBundle as `stoopControlAgent`. V0: routes to a live (opened) circle's producer.
+// bootAgentBundle as `pinboardControlAgent`. V0: routes to a live (opened) circle's producer.
 export const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
 
 /** Ensure a circle's producer, then seed its group-key roster with prior members (web parity). */
@@ -563,7 +563,7 @@ export async function provisionCircleMedium(circleId) {
 }
 
 // ── Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId) ────────────
-// RN parity with web's circleApp, which threads `stoopCircleDataMove`/`stoopPodWrite`/`stoopPodReadSince`
+// RN parity with web's circleApp, which threads `pinboardCircleDataMove`/`pinboardPodWrite`/`pinboardPodReadSince`
 // into the agent + `resolveRef` into the chat inbox. Thin LAZY wrappers over the SAME shared custody the
 // cache medium already uses (`circlePodCustodyRN()` → `createCirclePodCustody`), so a shared/hybrid circle
 // WITH a pod + group key really seals→writes the pod + fans a ref (pod-signal), and catch-up range-

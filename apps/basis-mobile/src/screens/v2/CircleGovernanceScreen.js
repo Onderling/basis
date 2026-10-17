@@ -34,13 +34,13 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
 
   const load = useCallback(async () => {
     let myWebid = '';
-    try { const r = await callSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+    try { const r = await callSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
     const broadcast = (channel, circleId, event, opts) => {
       const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
       const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
       // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
       const to = Array.isArray(opts?.to) ? opts.to : undefined;
-      callSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
+      callSkill('pinboard', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
     };
     const gov = bindCircleGovernance({
       eventLog, callSkill, getPolicy, myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
@@ -54,7 +54,7 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     // context carries only {ref, role} (no names), so read handle/displayName from
     // listGroupMembers; unresolved falls back to the raw ref.
     let roster = [];
-    try { roster = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { /* */ }
+    try { roster = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { /* */ }
     const nameOf = buildSubjectLabeler(roster);
     const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
     let view = { open: [], closed: [] };

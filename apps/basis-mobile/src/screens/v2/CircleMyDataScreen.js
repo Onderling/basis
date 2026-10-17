@@ -4,7 +4,7 @@
  * RN mirror of web's circleMyData: where your data lives (getDataLocation +
  * podSignInStatus), the getPrivacyNotice disclosure, a getMetrics usage snapshot,
  * and the S5 key-management actions (back up · reveal recovery phrase · restore).
- * Self-contained: loads + mutates via the injected stoop-capable `callSkill`.
+ * Self-contained: loads + mutates via the injected pinboard-capable `callSkill`.
  * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -127,7 +127,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [pickedSections, setPickedSections] = useState([]); // what it may SEE
   const [circlesForConnections, setCirclesForConnections] = useState([]);
   // The SHARED list, not this shell's dispatch catalogue. Reusing the catalogue here made the mobile menu a
-  // different set from web's — including stoop, whose manifest declares 92 ops — so the same person
+  // different set from web's — including pinboard, whose manifest declares 92 ops — so the same person
   // pairing the same screen was offered materially different authority depending on which shell they
   // happened to use. Both shells and the A2A surface now read one list (invariant 2, by construction).
   const manifestsForConnections = CONNECTION_MANIFESTS;
@@ -184,7 +184,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     let alive = true;
     (async () => {
       const clock = personClock ? await personClock : null;
-      const me = (await callSkill?.('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      const me = (await callSkill?.('pinboard', 'whoAmI', {}).catch(() => null))?.webid ?? null;
       weekMe.current = me;
       if (alive && clock && me) setWeekOn(personWeekOn(clock.book, me));
     })().catch(() => {});
@@ -275,7 +275,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   }, [agent, callSkill]);
   const revealMnemonic = useCallback(async () => {
     // The OWNER-ROOT phrase (host `revealOwnerPhrase`, step 1b) — re-derives every
-    // profile incl. the feedback pseudonym. Was stoop `getMnemonicOnce` (wrong seed).
+    // profile incl. the feedback pseudonym. Was pinboard `getMnemonicOnce` (wrong seed).
     let words = '';
     try {
       const res = await callSkill('household', 'revealOwnerPhrase', {});
@@ -287,10 +287,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
     const [loc, status, priv, met, profProps, session] = await Promise.all([
-      callSkill('stoop', 'getDataLocation', {}).catch(() => null),
-      callSkill('stoop', 'podSignInStatus', {}).catch(() => null),
-      callSkill('stoop', 'getPrivacyNotice', { lang: lang() }).catch(() => null),
-      callSkill('stoop', 'getMetrics', {}).catch(() => null),
+      callSkill('pinboard', 'getDataLocation', {}).catch(() => null),
+      callSkill('pinboard', 'podSignInStatus', {}).catch(() => null),
+      callSkill('pinboard', 'getPrivacyNotice', { lang: lang() }).catch(() => null),
+      callSkill('pinboard', 'getMetrics', {}).catch(() => null),
       callSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
       // The live pod session, through the waist. `whoami` reports it from the same podAuth this screen
       // used to read directly — one implementation, and the op is the only thing that knows the
@@ -315,7 +315,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     const conns = await callSkill('household', 'listSurfaceGrants', {}).catch(() => null);
     setConnections(Array.isArray(conns?.surfaces) ? conns.surfaces : []);
     // The circles a connection can be granted sight of — through the SAME loader the launcher
-    // uses, not a hand-rolled skill call. (`stoop.listGroups` looks like the op for this and is
+    // uses, not a hand-rolled skill call. (`pinboard.listGroups` looks like the op for this and is
     // not one: the only listGroups is a core GroupManager method, so calling it would have left
     // this list silently empty forever — the exact `screens/**` trap the gotchas file names.)
     try {
@@ -359,7 +359,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     try { await callSkill('basis', 'signout', {}); await load(); } catch { /* best-effort */ }
   }, [callSkill, load]);
 
-  // Status from the actual session, not just the stoop skill: `whoami` reports a webid whenever a session
+  // Status from the actual session, not just the pinboard skill: `whoami` reports a webid whenever a session
   // whenever a session exists — including after the short access token expires (still refreshable) — so the
   // "Me" screen doesn't lag back to "Local only" the way isAuthenticated()-based podSignInStatus does.
   const podCapable = session?.ok !== false;
@@ -1045,7 +1045,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         onClose={() => { setRevokeTarget(null); load(); }}
       />
 
-      {/* S5 — one-time recovery-phrase reveal (stoop getMnemonicOnce). */}
+      {/* S5 — one-time recovery-phrase reveal (pinboard getMnemonicOnce). */}
       <Modal visible={!!mnemonic} animationType="fade" transparent onRequestClose={() => setMnemonic(null)}>
         <Pressable style={styles.mBackdrop} onPress={() => setMnemonic(null)}>
           <Pressable style={styles.mCard} onPress={(e) => e.stopPropagation()} testID="mydata-mnemonic-reveal">

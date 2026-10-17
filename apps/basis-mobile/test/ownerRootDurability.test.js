@@ -99,7 +99,7 @@ describe('a memory fallback for the owner root is at least AUDIBLE', () => {
  * round-trips. None of it boots. The 2026-07-30 bug lived in the seam BETWEEN those two facts: the vault
  * class worked, the prefix could have been anywhere, and the agent quietly used neither. So run the boot.
  *
- * Slow imports (the whole household/tasks/stoop chain) — hence the explicit timeouts the rest of this file
+ * Slow imports (the whole household/tasks/pinboard chain) — hence the explicit timeouts the rest of this file
  * deliberately avoids needing. The phrase→restore journey built on the same seam lives next door in
  * identityRecoveryJourney.test.js; this file keeps the DURABILITY half.
  * ────────────────────────────────────────────────────────────────────────────────────────────── */

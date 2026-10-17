@@ -23,7 +23,7 @@ describe('Bundle F P2 — createGroup state machine', () => {
     expect(createGroupState.isValidSlug('UPPERCASE')).toBe(false);
   });
 
-  it('finalSubmit calls stoop.createGroupV2 with assembled rules', async () => {
+  it('finalSubmit calls pinboard.createGroupV2 with assembled rules', async () => {
     const calls = [];
     const callSkill = async (o, op, args) => {
       calls.push({ o, op, args });
@@ -87,7 +87,7 @@ describe('Bundle F P2 — restoreFromMnemonic state machine', () => {
     )).toBe(false);
   });
 
-  it('submitRestore installs the owner root then calls stoop.restoreFromMnemonic', async () => {
+  it('submitRestore installs the owner root then calls pinboard.restoreFromMnemonic', async () => {
     const calls = [];
     const callSkill = async (o, op, args) => {
       calls.push({ o, op, args });
@@ -96,7 +96,7 @@ describe('Bundle F P2 — restoreFromMnemonic state machine', () => {
     const s = restoreFromMnemonicState.initialState();
     s.mnemonic = Array(12).fill('a').join(' ');
     const after = await restoreFromMnemonicState.submitRestore({ state: { ...s }, callSkill });
-    // step 1b — the owner root (household.restoreOwnerPhrase) is installed FIRST, then the legacy stoop restore
+    // step 1b — the owner root (household.restoreOwnerPhrase) is installed FIRST, then the legacy pinboard restore
     expect(calls).toHaveLength(2);
     expect(calls[0].op).toBe('restoreOwnerPhrase');
     expect(calls[1].op).toBe('restoreFromMnemonic');
@@ -116,7 +116,7 @@ describe('Bundle F P2 — postAudience state machine', () => {
     expect(a).toEqual({ minTrust: 'known', tags: ['ladder'], distanceKm: 5 });
   });
 
-  it('submitPost calls stoop.postRequest with audience', async () => {
+  it('submitPost calls pinboard.postRequest with audience', async () => {
     const calls = [];
     const callSkill = async (o, op, args) => {
       calls.push({ o, op, args });
@@ -155,9 +155,9 @@ describe('Bundle F P2 — encryptedBackup state machine', () => {
 });
 
 describe('Bundle F P2 — settings state machine', () => {
-  it('loadSettings hydrates profile + holiday from stoop', async () => {
+  it('loadSettings hydrates profile + holiday from pinboard', async () => {
     const callSkill = async (o, op) => {
-      if (op === 'getStoopProfile') return { handle: 'alice', displayName: 'Alice' };
+      if (op === 'getPinboardProfile') return { handle: 'alice', displayName: 'Alice' };
       if (op === 'getHolidayMode')  return { holidayMode: true };
       return null;
     };

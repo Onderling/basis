@@ -12,7 +12,7 @@
  * What this file pins:
  *   - initialState seeds args.id into aboutPostId
  *   - validators behave (matches what the RN modal disables Next on)
- *   - submitDispute fires stoop.postRequest with kind:'dispute'
+ *   - submitDispute fires pinboard.postRequest with kind:'dispute'
  *   - formatDisputeText embeds the postId when present
  *
  * The web wizard (apps/basis/src/web/wizards/) has its own
@@ -41,7 +41,7 @@ describe('Bundle F P2 — conflictDispute state-machine smoke (used by RN modal)
     expect(isProposalValid('hello')).toBe(true);
   });
 
-  it('submitDispute calls stoop.postRequest with kind:dispute', async () => {
+  it('submitDispute calls pinboard.postRequest with kind:dispute', async () => {
     const calls = [];
     const callSkill = async (origin, opId, args) => {
       calls.push({ origin, opId, args });
@@ -54,7 +54,7 @@ describe('Bundle F P2 — conflictDispute state-machine smoke (used by RN modal)
     const { result, state } = await submitDispute({ state: { ...s }, callSkill });
     expect(result?.ok).toBe(true);
     expect(calls).toHaveLength(1);
-    expect(calls[0].origin).toBe('stoop');
+    expect(calls[0].origin).toBe('pinboard');
     expect(calls[0].opId).toBe('postRequest');
     expect(calls[0].args.kind).toBe('dispute');
     expect(calls[0].args.text).toContain('A real summary');

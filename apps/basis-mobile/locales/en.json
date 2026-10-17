@@ -52,7 +52,7 @@
     },
     "followup_prompt_respond_to_item_body": {
       "text": "What help are you offering?",
-      "doc": "Friendlier prompt for [Help with] on a stoop post (respondToItem.body) — picked via pickPromptKey in src/core/followUp.js"
+      "doc": "Friendlier prompt for [Help with] on a pinboard post (respondToItem.body) — picked via pickPromptKey in src/core/followUp.js"
     },
     "download_not_wired": {
       "text": "This file has no inline bytes to save — file id: {{fileId}}",
@@ -391,7 +391,7 @@
         "doc": "Review row label"
       },
       "substrate_warn": {
-        "text": "⚠️ V0 substrate gap: this files as a stoop post with kind:dispute. Full mediation flow (raiseDispute → proposeResolution → acceptResolution) lands when stoop ships those skills.",
+        "text": "⚠️ V0 substrate gap: this files as a pinboard post with kind:dispute. Full mediation flow (raiseDispute → proposeResolution → acceptResolution) lands when pinboard ships those skills.",
         "doc": "Warning banner about the substrate gap"
       },
       "filing": {

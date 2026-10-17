@@ -1,17 +1,17 @@
 // Conflict-dispute wizard launch (D-3 test 1).
 //
 // Mirror of the original real-device gap: user tapped [Dispute] on
-// a stoop post + got the "not wired on mobile yet" bubble.  Now:
-//   1. /feed shows the circle feed (stoop list bubble with row buttons)
+// a pinboard post + got the "not wired on mobile yet" bubble.  Now:
+//   1. /feed shows the circle feed (pinboard list bubble with row buttons)
 //   2. Tap [Dispute] on the first post
 //   3. The wizard modal opens with the 3-step stepper
 //   4. We can advance through the steps (validators gate Next)
 //   5. Cancel returns to the chat without leaving an error bubble
 //
-// We don't actually FILE a dispute (would need a real stoop substrate
+// We don't actually FILE a dispute (would need a real pinboard substrate
 // state for the postRequest to land cleanly) — Detox V1 verifies the
 // launch + step transitions; vitest verifies submitDispute calls
-// stoop.postRequest with kind:'dispute' (see test/wizardRegistry.test.js).
+// pinboard.postRequest with kind:'dispute' (see test/wizardRegistry.test.js).
 
 const { gotoChat } = require('./support/nav.js');
 
@@ -23,8 +23,8 @@ describe.skip('conflict-dispute wizard launch', () => {
     await gotoChat();   // M2 — circle launcher is the default screen
   });
 
-  it('[Dispute] on a stoop post opens the wizard + Next is gated by the validator', async () => {
-    // Render the circle feed.  /feed is a stoop substrate slash that
+  it('[Dispute] on a pinboard post opens the wizard + Next is gated by the validator', async () => {
+    // Render the circle feed.  /feed is a pinboard substrate slash that
     // returns a list bubble with row buttons including [Dispute] for
     // open posts.  The seeded circle has at least one open post.
     await element(by.id('chat-input')).typeText('/feed');

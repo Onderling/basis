@@ -4,7 +4,7 @@
  * M1 (2026-05-29) — the agent bundle is booted ONCE here and shared
  * with BOTH the chat screen and the circle launcher, so the circle
  * screens can load/create over the same agent (one NKN identity, one
- * stoop cache).  ChatScreen attaches its peer-wiring after mount via
+ * pinboard cache).  ChatScreen attaches its peer-wiring after mount via
  * `bundle.attachPeerWiring` — the inbound router closes over ChatScreen's
  * thread state, which App can't see, so it can't be passed at boot time.
  *
@@ -155,7 +155,7 @@ export default function App() {
   // inbox owns msgId dedup + envelope validation + ingest mirror +
   // eventLog append.  Both the boot rehydrator (below) AND
   // ChatScreen's NKN peer-router route through this one instance, so
-  // a chat that's already in stoop's itemStore can't double-append
+  // a chat that's already in pinboard's itemStore can't double-append
   // mid-boot.  Built once per launch alongside `eventLogRef`.
   //
   // The `ingest` closure reads `bundleRef` lazily so we can construct
@@ -257,7 +257,7 @@ export default function App() {
         const callSkill = bundleRef.current?.callSkill;
         if (typeof callSkill !== 'function') return { ok: false };
         try {
-          return await callSkill('stoop', 'ingestCircleMessage', { payload, fromPeerAddr });
+          return await callSkill('pinboard', 'ingestCircleMessage', { payload, fromPeerAddr });
         } catch (err) {
           console.warn('[circle-chat] ingestCircleMessage failed:', err?.message ?? err);
           return { error: String(err?.message ?? err) };
@@ -279,7 +279,7 @@ export default function App() {
       // consulted on the live receive path (chatSelfAuthor.js). Reads `bundleRef` lazily like `ingest`.
       isSelfAuthored: createSelfAuthorCheck({
         whoAmI: () => (typeof bundleRef.current?.callSkill === 'function'
-          ? bundleRef.current.callSkill('stoop', 'whoAmI', {})
+          ? bundleRef.current.callSkill('pinboard', 'whoAmI', {})
           : Promise.resolve(null)),
         circleAddressFor: (cid) => bundleRef.current?.agent?.circleAddressFor?.(cid) ?? null,
       }),
@@ -359,23 +359,23 @@ export default function App() {
   // falls through to the local AsyncStorage side.  Refreshed on mount and
   // every time the SecureStore restore completes.
   const circlePodWriterRef = useRef(null);
-  // S4 — when signed in, route stoop's items to the user's REAL pod (web parity with
+  // S4 — when signed in, route pinboard's items to the user's REAL pod (web parity with
   // circleApp). Same attachPod seam; the RN authenticated fetch is the OidcSessionRN bearer.
   // Best-effort; fires on session restore + once the bundle is up (whichever lands later).
-  const maybeAttachStoopPod = useCallback(async () => {
+  const maybeAttachPinboardPod = useCallback(async () => {
     const session = sessionRef.current;
     const agent = bundleRef.current?.agent;
-    if (!agent?.attachStoopPod || !session?.isAuthenticated?.() || !session.webid) return;
+    if (!agent?.attachPinboardPod || !session?.isAuthenticated?.() || !session.webid) return;
     const sessionShim = { fetch: session.getAuthenticatedFetch(), webid: session.webid };
     const podRoot = await discoverPodRoot(sessionShim).catch(() => null);
-    if (podRoot) agent.attachStoopPod({ podRoot, webid: session.webid, fetch: sessionShim.fetch }).catch(() => {});
+    if (podRoot) agent.attachPinboardPod({ podRoot, webid: session.webid, fetch: sessionShim.fetch }).catch(() => {});
   }, []);
   const refreshCirclePodWriter = useCallback(async () => {
     const w = await buildCirclePodWriter(sessionRef.current).catch(() => null);
     circlePodWriterRef.current = w;
     if (w) dlog.boot('circle pod writer ready @', w.podRoot);
-    maybeAttachStoopPod();   // restore completed → attach stoop's item store too
-  }, [maybeAttachStoopPod]);
+    maybeAttachPinboardPod();   // restore completed → attach pinboard's item store too
+  }, [maybeAttachPinboardPod]);
   const getCirclePodWriter = useCallback(() => circlePodWriterRef.current, []);
 
   useEffect(() => {
@@ -455,7 +455,7 @@ export default function App() {
         // Perf — first-boot seed flag.  tasks-v0's CachingDataSource
         // is not persistent on mobile, so the listOpen probe inside
         // realAgent always sees an empty circle and re-seeds 4 addTasks
-        // (+ setMyHandle + setMyDisplayName for stoop profile).  Cost:
+        // (+ setMyHandle + setMyDisplayName for pinboard profile).  Cost:
         // ~2.5s of the cold-boot wall clock on every launch.  This
         // flag flips after the first successful boot so subsequent
         // boots skip the seed regardless of circle persistence.  When
@@ -528,7 +528,7 @@ export default function App() {
           // a DM, a receipt — can ride a relay they are actually on instead of only my own. The same
           // index the membrane above enforces with; the roster feed keeps it live.
           circlesForPeer: (addr) => circleGroupsIndexRef.current.groupsFor(addr),
-          // Persist the agent identity (chat + host vaults + stoop
+          // Persist the agent identity (chat + host vaults + pinboard
           // cache) to AsyncStorage so the NKN address — derived from the
           // identity keypair — stays stable across reboots (otherwise a
           // peer's cached peerAddr from a /share-my-contact QR breaks).
@@ -546,8 +546,8 @@ export default function App() {
           // (received sealed copies mirror to the user's pod once signed in; local-only while null). Same
           // thunk the launcher's other tiered stores read (getCirclePodWriter → circlePodWriterRef.current).
           getSharedWithMePodWriter: getCirclePodWriter,
-          // S4 — multi-member sealing: route stoop redeem/leave to the circle's producer.
-          stoopControlAgent: circleControlAgentRouter,
+          // S4 — multi-member sealing: route pinboard redeem/leave to the circle's producer.
+          pinboardControlAgent: circleControlAgentRouter,
           // Cache-mode mirroring (RN parity): a pod-backed circle's store rides a cache-mode PseudoPod.
           provisionCircleMedium,
           // Settings pod-sync (RN parity with web circleApp): seal the parameter register's agent/circle params
@@ -583,8 +583,8 @@ export default function App() {
           // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side), RN parity with web
           // circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod + fans a ref
           // (pod-signal); catch-up range-queries→opens it. A no-pod circle keeps fan-out-full unchanged.
-          stoopCircleDataMove: circleSendDataMove,
-          stoopPodWrite:       circlePodWrite,
+          pinboardCircleDataMove: circleSendDataMove,
+          pinboardPodWrite:       circlePodWrite,
           // G11 — the no-pod key-event fan's transport (a REMOVE → rotation fans the new key to the
           // remaining members). The bundle injects its peer sender + skill dispatch at boot.
           setKeyEventWiring: setCircleKeyEventWiring,
@@ -594,8 +594,8 @@ export default function App() {
           mappingsDeviceId: MAPPINGS_DEVICE,
           // Skip the demo seed on warm boot.  Saves ~2.5s of boot time.
           seedTasks:        !alreadySeeded,
-          seedStoopProfile: !alreadySeeded,
-          seedStoopPosts:   !alreadySeeded,
+          seedPinboardProfile: !alreadySeeded,
+          seedPinboardPosts:   !alreadySeeded,
           publishEvent: (e) => {
             if (!e || typeof e !== 'object') return;
             const evt = {
@@ -658,7 +658,7 @@ export default function App() {
             else b.agent.dismissRestorePending?.().catch?.(() => {});
           });
         }
-        maybeAttachStoopPod();   // S4 — bundle up → attach stoop's item store if already signed in
+        maybeAttachPinboardPod();   // S4 — bundle up → attach pinboard's item store if already signed in
         // Mark the first-boot seed as done so the next launch skips it.
         // Fire-and-forget; failures are non-fatal (next launch re-seeds,
         // which is harmless because realAgent's listOpen probe is the
@@ -697,7 +697,7 @@ export default function App() {
           // phrase. Writing them down and typing them back installed them as a brand-new root: a
           // different person, at addresses nobody had ever seen.
           // Same defensive read as CircleMyDataScreen, the consumer that already had this right — whose
-          // own comment records that it too once read the wrong seed ("was stoop getMnemonicOnce").
+          // own comment records that it too once read the wrong seed ("was pinboard getMnemonicOnce").
           let phrase = null;
           try {
             const res = await b.callSkill?.('household', 'revealOwnerPhrase', {});

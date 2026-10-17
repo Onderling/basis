@@ -29,7 +29,7 @@ import RecipeConsentCard from './RecipeConsentCard.js';
 // basis model (web wires the identical pair); this screen only injects fetch/sources/policyStore/
 // recordOptOuts + presents the native consent card. No recipe/consent logic is reimplemented here.
 import { loadRecipeForReview, applyReviewedRecipe } from '../../core/recipeConsentWiring.js';
-// §4 storage-policy bridge — the circle `pod` axis drives stoop's authoritative
+// §4 storage-policy bridge — the circle `pod` axis drives pinboard's authoritative
 // four-tier circle storage policy (shared with web; pure mapping + call).
 import { pushCircleStoragePolicy } from '../../../../basis/src/v2/circleStoragePolicy.js';
 import { multiControlRows } from '../../../../basis/src/v2/settingsMultiRows.js';
@@ -73,7 +73,7 @@ const SETTINGS_PAGE = pageForOpMobile(basisManifest, 'settings');
 export default function CircleSettingsScreen({
   store, onProposePolicy, circleId, onBack,
   // §4 storage-policy bridge — the host injects the agent's raw callSkill so a
-  // pod-tier change drives stoop.setCircleStoragePolicy (web parity).
+  // pod-tier change drives pinboard.setCircleStoragePolicy (web parity).
   callSkill,
   // B · consent-card — the member-override store (records the declined optional caps as
   // `capabilityOptOuts`, the exact seam the gate honours) + the pod session's authed fetch (loads a
@@ -108,8 +108,8 @@ export default function CircleSettingsScreen({
     (async () => {
       if (typeof callSkill !== 'function' || !circleId) return;
       const [mem, who] = await Promise.all([
-        callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null),
-        callSkill('stoop', 'whoAmI', {}).catch(() => null),
+        callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null),
+        callSkill('pinboard', 'whoAmI', {}).catch(() => null),
       ]);
       if (alive) setSaveRoster({ members: Array.isArray(mem?.members) ? mem.members : [], myRef: who?.webid ?? who?.webId ?? '' });
     })();
@@ -119,7 +119,7 @@ export default function CircleSettingsScreen({
   // the alpha's "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS) — closed until tapped; web parity
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [guidedOpen, setGuidedOpen] = useState(false);   // Theme B — guided-setup chatbot modal
-  const [storageNote, setStorageNote] = useState(null);  // §4 — stoop storage-policy rejection note
+  const [storageNote, setStorageNote] = useState(null);  // §4 — pinboard storage-policy rejection note
   const baselinePodRef = useRef(undefined);              // §4 — pod tier at load (push only on change)
 
   // B · consent-card — REVIEWED apply-recipe state (source input → review model → native consent card).
@@ -235,7 +235,7 @@ export default function CircleSettingsScreen({
       await onProposePolicy?.(circleId, working);
     } else {
       await store.update(circleId, working);
-      // §4 storage-policy bridge — when the pod tier changed, drive stoop's
+      // §4 storage-policy bridge — when the pod tier changed, drive pinboard's
       // authoritative circle storage policy (web parity). The skill owns
       // admin-gating + the one-way guard; a rejection surfaces as a note and
       // never blocks the local save.

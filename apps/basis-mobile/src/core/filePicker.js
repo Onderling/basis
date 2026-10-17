@@ -10,7 +10,7 @@
  *
  * Defaults to the generic document picker (followup-2) so users
  * can pick PDFs, text files, archives, etc.  Image-only flows
- * (stoop compose, avatar) use `pickAndResize` directly — they don't
+ * (pinboard compose, avatar) use `pickAndResize` directly — they don't
  * route through this adapter.
  *
  * Why live in basis-mobile and not the substrate?  Because

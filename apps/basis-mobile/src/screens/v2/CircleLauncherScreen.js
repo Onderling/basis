@@ -204,9 +204,9 @@ import { resolveCircleEmbedder } from '../../../../basis/src/v2/embedPicker.js';
 // signed for it yet) is shared; the shell only paints the line and carries the button.
 import { caretakerNotice } from '../../../../basis/src/v2/caretakerNotice.js';
 import { interpretToCommand } from '../../../../basis/src/v2/interpretCommand.js';
-import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.js';
+import { scopePinboardCallSkill } from '../../../../basis/src/v2/circlePinboardScope.js';
 // Sealed media (2026-07-11): the per-circle media composition is SHARED src/ (platform-neutral,
-// no DOM). Mobile reuses it verbatim — same seal path as web's stoop noticeboard — so a noticeboard
+// no DOM). Mobile reuses it verbatim — same seal path as web's pinboard noticeboard — so a noticeboard
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../../../basis/src/v2/profileMediaReseal.js';
@@ -405,7 +405,7 @@ AsyncStorage.getItem(ACTION_FREQ_KEY).then((raw) => {
 // D1 (§5A) — in-memory fallback recipe (just the Veel-gebruikt row) for a
 // circle with no authored screen.  Never persisted.
 const DEFAULT_SCREEN_RECIPE = Object.freeze({
-  // #16 — quick-actions + the noticeboard (circle noticeboard via stoop listOpen), so a
+  // #16 — quick-actions + the noticeboard (circle noticeboard via pinboard listOpen), so a
   // screen-landing circle surfaces the open posts even with the chat tab hidden.
   id: '__default__', name: '', blocks: [
     { id: 'qa-default', type: 'quickActions', config: { limit: 4 } },
@@ -943,7 +943,7 @@ export default function CircleLauncherScreen({
         const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
         // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
         const to = Array.isArray(opts?.to) ? opts.to : undefined;
-        bundle?.callSkill?.('stoop', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
+        bundle?.callSkill?.('pinboard', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
       };
       const gov = bindCircleGovernance({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
@@ -1062,7 +1062,7 @@ export default function CircleLauncherScreen({
       const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
       const msgId = event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event);
       const to = Array.isArray(opts?.to) ? opts.to : undefined;
-      bundle.callSkill('stoop', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
+      bundle.callSkill('pinboard', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
     };
     return bindCircleGovernance({
       eventLog, callSkill: bundle.callSkill, getPolicy: (cid) => policyStore.get(cid),
@@ -1147,7 +1147,7 @@ export default function CircleLauncherScreen({
     if (!active) return;
     const msgId = `circle-recipe-${cid}-${Date.now()}`;
     const ts    = Date.now();
-    bundle.callSkill('stoop', 'broadcastCircleRecipe', {
+    bundle.callSkill('pinboard', 'broadcastCircleRecipe', {
       groupId: cid, recipe: active, msgId, ts,
     }).then((r) => {
       if (r?.error) console.warn('[circle-recipe] fan-out skipped:', r.error);
@@ -1365,7 +1365,7 @@ export default function CircleLauncherScreen({
     })();
   }, [loading, bundle, load, onboardingFlags]);
 
-  // objective L · Phase 2 — the unified Contacten roster (PeerGraph bots/peers + stoop ContactBook people),
+  // objective L · Phase 2 — the unified Contacten roster (PeerGraph bots/peers + pinboard ContactBook people),
   // via the SAME shared helpers ContactsScreen uses. Fed to CircleShareScreen for the out-of-circle recipient
   // picker. Loaded lazily when the share view opens (below); best-effort, never blocks the launcher.
   const [shareContacts, setShareContacts] = useState([]);
@@ -1388,7 +1388,7 @@ export default function CircleLauncherScreen({
     return () => { alive = false; };
   }, [view, bundle]);
 
-  // The first load WITH the agent bundle is the answer: stoop's store is loaded inside the agent's boot, which the
+  // The first load WITH the agent bundle is the answer: pinboard's store is loaded inside the agent's boot, which the
   // bundle awaits — instrumented on a phone (2026-10-08): the store loaded, then the first load with the bundle listed
   // the circle at once. (A comment here used to say the store hydrated "a beat after" the bundle and retried boot on a
   // timer; it no longer does.) Before the bundle exists there is no answer yet, so nothing is settled.
@@ -1585,7 +1585,7 @@ export default function CircleLauncherScreen({
 
   // β.5 — context-menu handlers (long-press a tile to open).  Pin / Mute
   // are local toggles; Settings reuses the existing per-circle Settings
-  // sub-screen; Leave fires /leave-group (via stoop.leaveGroup) after a
+  // sub-screen; Leave fires /leave-group (via pinboard.leaveGroup) after a
   // native Alert confirmation.
   const onPinCircle = useCallback(async (cid) => {
     try { setPinnedMap(await pinStore.toggle(cid)); }
@@ -2223,7 +2223,7 @@ export default function CircleLauncherScreen({
           if (doc && typeof bundle?.callSkill === 'function') {
             const msgId = `circle-rules-${selected.id}-${Date.now()}`;
             const ts    = Date.now();
-            bundle.callSkill('stoop', 'broadcastCircleRules', {
+            bundle.callSkill('pinboard', 'broadcastCircleRules', {
               groupId: selected.id, rulesDoc: doc, msgId, ts,
             }).then((r) => {
               if (r?.error) console.warn('[circle-rules] fan-out skipped:', r.error);
@@ -2352,7 +2352,7 @@ export default function CircleLauncherScreen({
         eventLog={eventLog}
         circles={circles}
         recipeStore={recipeStore}
-        onStoopEvent={bundle?.onStoopEvent}
+        onPinboardEvent={bundle?.onPinboardEvent}
         emitMemberProps={bundle?.emitMemberProps}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
@@ -2796,7 +2796,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, onStoopEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -2824,29 +2824,29 @@ function CircleDetail({
   // CircleDetail is a separate component from the outer CircleLauncherScreen, so it needs its own
   // handle; the store is a stateless AsyncStorage wrapper, so a second instance is free.
   const overrideStore = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
-  // Per-circle stoop restructure (parity with web circleApp.js `stoopCall`): the
-  // noticeboard + screen noticeboard block call the raw 3-arg `callSkill('stoop', …)`
+  // Per-circle pinboard restructure (parity with web circleApp.js `pinboardCall`): the
+  // noticeboard + screen noticeboard block call the raw 3-arg `callSkill('pinboard', …)`
   // directly, bypassing scopeReadyDispatch — so scope them to THIS circle here.
-  // Writes get the circle id as the stoop scope key; list reads are filtered to the
+  // Writes get the circle id as the pinboard scope key; list reads are filtered to the
   // circle. One shared agent, per-circle scope key (NOT N agents). NB: the 3-arg raw
   // dispatch is the `rawCallSkill` PROP (the parent's `bundle.callSkill`) — `bundle`
   // is not in scope in this component.
   // Sealed media (2026-07-11): thread THIS circle's media gateway into the wrapper (4th arg,
-  // web parity with circleApp.js `getStoopMedia`) so a noticeboard image attachment seals + rides
+  // web parity with circleApp.js `getPinboardMedia`) so a noticeboard image attachment seals + rides
   // the SAME `{type:'media'}` blob pointer basis's own circle chat images use — one
   // circle's gateway per wrapper ⇒ per-circle by construction (no cross-seal). A p0/p1 circle
   // resolves no composition → the wrapper refuses attachments (sealed-only) and the 📎 hides.
-  const getStoopMedia = useCallback(async () => {
+  const getPinboardMedia = useCallback(async () => {
     const comp = await getCircleMediaComposition(circle?.id, policy);
     return (comp && comp.mediaGateway)
       ? { mediaGateway: comp.mediaGateway, localActor: getCircleActorWebId() || 'me', t }
       : null;
   }, [circle?.id, policy]);
-  const stoopCall = useMemo(
-    () => scopeStoopCallSkill(
-      rawCallSkill, circle?.id, () => getCircleSealStrategy(circle?.id, policy), getStoopMedia,
+  const pinboardCall = useMemo(
+    () => scopePinboardCallSkill(
+      rawCallSkill, circle?.id, () => getCircleSealStrategy(circle?.id, policy), getPinboardMedia,
     ),
-    [rawCallSkill, circle?.id, policy, getStoopMedia],
+    [rawCallSkill, circle?.id, policy, getPinboardMedia],
   );
   // Resolve this circle's sealed-media composition for the noticeboard: gate the 📎 affordance
   // (null for p0/p1 → hidden, web parity `circleMedia ? ... : null`) + open sealed full images on
@@ -3088,7 +3088,7 @@ function CircleDetail({
       let mem = [];
       let raw = [];
       try {
-        const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circle.id });
+        const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circle.id });
         raw = Array.isArray(res?.members) ? res.members : [];
         mem = normalizeCircleMembers(res);
       } catch { /* keep empty */ }
@@ -3149,10 +3149,10 @@ function CircleDetail({
           // materializers call `callSkill(appOrigin, opId, args)` (3-arg), so pass
           // the RAW 3-arg dispatch, not the 2-arg `callSkill` resolver (#16; also
           // un-breaks the tasks/agenda screen blocks that shared the latent bug).
-          // `stoopCall` = the raw 3-arg `rawCallSkill` scoped to this circle (the
+          // `pinboardCall` = the raw 3-arg `rawCallSkill` scoped to this circle (the
           // earlier `bundle?.callSkill` was undefined here — `bundle` isn't a prop).
           hostOps:  {
-            callSkill: stoopCall, eventLog, circles, policy, actionFrequency,
+            callSkill: pinboardCall, eventLog, circles, policy, actionFrequency,
             fetchImpl: getCirclePodFetch() || undefined,
             // Sender labels through the reveal ladder (batch 4, web≡mobile) — the noticeboard
             // block stamps `senderLabel`; `revealPolicy` (not `policy`, taken above) gates names.
@@ -3221,8 +3221,8 @@ function CircleDetail({
   // tap-to-retry handler for failed bubbles.  Re-fires with the
   // SAME msgId so receiver-side dedup suppresses duplicates.
   const broadcastFanOut = useCallback(({ msgId, text, ts, card }) => {
-    // Shared fan-out (Phase 2). RAW 3-arg callSkill (app-targeted at stoop) — the 2-arg resolving one
-    // arg-shifts (op→'stoop') and never delivers. The helper marks δ.2 delivery state; onChange = the
+    // Shared fan-out (Phase 2). RAW 3-arg callSkill (app-targeted at pinboard) — the 2-arg resolving one
+    // arg-shifts (op→'pinboard') and never delivers. The helper marks δ.2 delivery state; onChange = the
     // RN rerender tick. The `card` rides through like on web — the helper's wire whitelist projects it —
     // so a media-carrying message fans with its embed instead of arriving as bare text. `signStatement`
     // is the chat lane's cutover hook (web parity): the appended entry is signed in place and the
@@ -3340,7 +3340,7 @@ function CircleDetail({
   // makes the member list say the appointment is acknowledged.
   const acknowledgeCaretakerNotice = useCallback(async () => {
     if (!circle?.id || typeof rawCallSkill !== 'function') return;
-    try { await rawCallSkill('stoop', 'acknowledgeCaretaker', { groupId: circle.id }); }
+    try { await rawCallSkill('pinboard', 'acknowledgeCaretaker', { groupId: circle.id }); }
     catch { /* the reload reflects the real state; an unsigned notice returns on a later open */ }
     setMembersReloadTick((n) => n + 1);
   }, [circle?.id, rawCallSkill]);
@@ -3370,7 +3370,7 @@ function CircleDetail({
     setBotLabel(null);   // reset on circle change — fail-closed until the roster resolves
     (async () => {
       let webid = null;
-      try { const r = await rawCallSkill('stoop', 'whoAmI', {}); webid = r?.webid ?? r?.webId ?? null; } catch { /* best-effort */ }
+      try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); webid = r?.webid ?? r?.webId ?? null; } catch { /* best-effort */ }
       if (!cancelled) myWebidRef.current = webid;
       // The help circle: you + the Onderling-bot (a product constant) — no listGroupMembers round-trip.
       if (circle.id === HELP_CIRCLE_ID) {
@@ -3384,7 +3384,7 @@ function CircleDetail({
       }
       let isAdmin = false;
       try {
-        const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circle.id });
+        const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circle.id });
         const mem = Array.isArray(res?.members) ? res.members : [];
         if (!cancelled) circleMembersRef.current = mem;
         const me = mem.find((m) => (m?.webid ?? m?.id) === webid);
@@ -3502,7 +3502,7 @@ function CircleDetail({
       try {
         const { offeringMatches, hopCard } = await buildFindExtras({
           query: reply?.payload?.query, groups: reply?.payload?.groups,
-          circleId: circle?.id, callSkill: (op, a) => rawCallSkill('stoop', op, a), t,
+          circleId: circle?.id, callSkill: (op, a) => rawCallSkill('pinboard', op, a), t,
         });
         if (offeringMatches.length) appendCircleMessage({ actor: 'bot', text: `${t('circle.offeringMatches.title')}\n${offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n')}` });
         if (hopCard) appendCircleMessage({ actor: 'bot', text: `${hopCard.title}\n${hopCard.body}` });
@@ -3517,10 +3517,10 @@ function CircleDetail({
   const openMandatePicker = useCallback(async ({ taskId }) => {
     if (!taskId || !circle?.id || typeof rawCallSkill !== 'function') return;
     let myWebid = '';
-    try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+    try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
     let members = [];
     try {
-      const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circle.id });
+      const res = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: circle.id });
       members = Array.isArray(res?.members) ? res.members : [];
     } catch { members = []; }
     // WHAT — only offerings I hold appear; that IS the attenuation, made visible.
@@ -3599,12 +3599,12 @@ function CircleDetail({
   }, [pendingForm, appendCircleMessage, runCircleCommandResolved]);
 
   // B (clarification) — candidate source for an id-like param. Base = the circle's already-loaded
-  // items (tasks + stoop posts, circle-scoped). Part C cross-app: ALSO pull the op's OWN list via the
+  // items (tasks + pinboard posts, circle-scoped). Part C cross-app: ALSO pull the op's OWN list via the
   // auto-resolving callSkill (makeResolvingCallSkill probes the right app by opId), so labels for item
   // types NOT in the preloaded set — folio files (listFiles), calendar events (listEvents) — resolve
   // too. Scoped to the circle (circleId/circleId/groupId); deduped by id; best-effort (failures keep base).
   // B (clarification) — the SHARED circle lookup (Phase 3, src/v2/circleLookup): base = the circle's
-  // already-loaded items (tasks + stoop posts), plus the op's OWN list via the app-qualified
+  // already-loaded items (tasks + pinboard posts), plus the op's OWN list via the app-qualified
   // rawCallSkill (so `listOpen` resolves on the right app, not probe-first-origin). Was an inline copy.
   const circleLookup = useMemo(
     () => makeCircleLookup({ getBase: () => items, appCallSkill: rawCallSkill }),
@@ -4343,8 +4343,8 @@ function CircleDetail({
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
-          // the open circle (S4 per-circle restructure — see stoopCall above).
-          <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia} selfProfileId={selfProfileId}
+          // the open circle (S4 per-circle restructure — see pinboardCall above).
+          <CircleNoticeboard callSkill={pinboardCall} onPinboardEvent={onPinboardEvent} media={circleMedia} selfProfileId={selfProfileId}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
@@ -4378,7 +4378,7 @@ function CircleDetail({
                     style={styles.rulesBannerBtn}
                     accessibilityRole="button"
                     onPress={async () => {
-                      try { await stoopCall('stoop', 'acceptGroupRules', { groupId: circle.id }); } catch { /* voluntary */ }
+                      try { await pinboardCall('pinboard', 'acceptGroupRules', { groupId: circle.id }); } catch { /* voluntary */ }
                       setMembersReloadTick((n) => n + 1);
                     }}
                   >

@@ -2988,11 +2988,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Best-effort bookkeeping behind a hard timeout: the STATEMENTS below are the enforcement,
       // and a registry whose sync stalls must never stall the ceremony with it.
       const bounded = (p, ms = 3000) => Promise.race([p, new Promise((res) => { setTimeout(res, ms); })]);
-      // THE GENERAL PERSONA'S PART (its tombstone, its person key, its circles) — only on a device that holds it: a device
-      // without it acts in no part in its name (its personas' parts, below, still run as each persona).
+      // THE GENERAL PERSONA'S PART. Its TOMBSTONE needs only the phrase and its row: minted or flipped from any device that
+      // reads the row (a synced registry brings it). Its person key and its circles need a device that HOLDS it — a device
+      // without it leaves those undone and says so (its personas' parts, below, still run as each persona).
       const holdsGeneral = personas.has('default');
       try {
-        const cur = holdsGeneral ? await bounded(agentsRegistryRef?.lookup?.('default')) : null;
+        const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
         if (cur) {
           const rec = deviceDelegationOf(cur, deviceId);
           known = !!rec;
@@ -3206,7 +3207,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         ok: true, deviceId, known, revokedIn, revokedUnder, circles: revokedIn.length, nodesTold, botsTold,
         // a device without the general persona did only its personas' parts — the lost device most likely held the
         // general persona too, and that part has to be done on a device that holds it (it is a member of those circles)
-        ...(holdsGeneral ? {} : { outcome: 'partial', undone: ['general'] }),
+        ...(holdsGeneral ? {} : { outcome: 'partial', undone: ['general-circles'] }),
         ...(personKeyVersion ? { personKeyVersion } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];

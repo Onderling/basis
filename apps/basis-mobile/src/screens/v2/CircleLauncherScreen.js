@@ -5322,7 +5322,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   // the once-per-self-per-device question ("what may this room see of you?"), while it is open
   const [askLevel, setAskLevel] = useState(false);
   // which self the level is for: null while the room still asks who enters
-  const roomSelfId = useMemo(() => { const s = roomSelfFor(roomR, heldSelves); return s?.asking ? null : (s?.id ?? 'default'); }, [roomR, heldSelves]);
+  const roomSelfId = useMemo(() => { const s = roomSelfFor(roomR, heldSelves); return s?.asking ? null : (s?.id ?? null); }, [roomR, heldSelves]);
   useEffect(() => {
     let live = true;
     (async () => {

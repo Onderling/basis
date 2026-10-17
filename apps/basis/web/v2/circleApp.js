@@ -3915,7 +3915,7 @@ function showNearby() {
   let roomLevel = null;   // the room self's level, read from its disclosure (re-read when the self changes)
   let firstUse = null;    // the once-per-self-per-device question, while it is open
   // which self the level is for: null while the room still asks who enters
-  const roomSelfId = () => { const s = nearbyRoomSelfNow().self; return s?.asking ? null : (s?.id ?? 'default'); };
+  const roomSelfId = () => { const s = nearbyRoomSelfNow().self; return s?.asking ? null : (s?.id ?? null); };
   const markAsked = (id) => { try { localStorage.setItem(`basis.${nearbyAskedKey(id)}`, '1'); } catch { /* best-effort */ } };
   const changeLevel = async (v) => {
     const id = roomSelfId();

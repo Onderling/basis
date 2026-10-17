@@ -68,6 +68,7 @@ describe('remove a persona from this device', () => {
     expect(own, 'Werk\'s device-map row is there before').toContain(werkWire);
     // the registry's medium refuses every write from here on
     lap.registryBackend.put = async () => { throw new Error('the medium is gone'); };
+    lap.registryBackend.putIf = async () => { throw new Error('the medium is gone'); };   // the conditional write too
     const r = await laptop.callSkill('household', 'removePersonaHere', { mnemonic: phrase, personaId: w });
     expect(r).toMatchObject({ ok: false, error: 'storage' });
     const keys = (await lap.chatVault.list?.()) ?? [];

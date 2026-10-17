@@ -278,3 +278,14 @@ describe('the create race', () => {
     expect((await pod.read(uri)).bytes).toBe('first creator');
   });
 });
+
+describe('an options object is not an etag', () => {
+  it('`{ contentType }` writes unconditionally; `{ ifMatch }` is compared', async () => {
+    const pod = createPseudoPod({ backend: createMemoryBackend(), mode: 'standalone', deviceId: 'laptop-anne' });
+    const uri = 'pseudo-pod://laptop-anne/feed.ics';
+    const a = await pod.write(uri, 'v1', { contentType: 'text/calendar' });
+    await pod.write(uri, 'v2', { contentType: 'text/calendar' });
+    await expect(pod.write(uri, 'v3', { ifMatch: a.etag })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect((await pod.read(uri)).bytes).toBe('v2');
+  });
+});

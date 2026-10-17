@@ -438,11 +438,14 @@ export function createPseudoPod({
     // same across writes, so no writer could ever see that another had written in between. A fresh one is minted.
     // `null` = "I read nothing": the write lands only while there is still nothing (or a record without an etag);
     // leaving it out (`undefined`) is an unconditional write.
+    // An options object is not an etag (callers pass `{ contentType }` here); `{ ifMatch }` is honoured.
+    const ifMatch = (typeof etag === 'string' || etag === null) ? etag
+      : (etag && typeof etag === 'object' && 'ifMatch' in etag ? etag.ifMatch : undefined);
     let written;
-    if (etag !== undefined) {
+    if (ifMatch !== undefined) {
       written = typeof backend.putIf === 'function'
-        ? await backend.putIf(key, bytes, etag)
-        : (((await backend.get(key))?.etag ?? null) === etag ? await backend.put(key, bytes) : { conflict: true });
+        ? await backend.putIf(key, bytes, ifMatch)
+        : (((await backend.get(key))?.etag ?? null) === ifMatch ? await backend.put(key, bytes) : { conflict: true });
       if (written?.conflict) throw Object.assign(new Error(`pseudo-pod: ${uri} changed since it was read`), { code: 'CONFLICT' });
     } else {
       written = await backend.put(key, bytes);

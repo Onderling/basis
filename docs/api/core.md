@@ -4215,7 +4215,7 @@ throws coded errors (INVALID_ARGUMENT, FORBIDDEN, NOT_READABLE, NOT_FOUND).
 
 - `opts` `object`
 - `opts.read` `(uri: string) => Promise<*|null>` — Storage-backed reader. Returns the resource value (any shape) on hit, `null`/`undefined` on miss. Errors propagate as a `NOT_READABLE` skill error.
-- `[opts.groupCheck]` `(uri: string, ctx: FetchResourceGateCtx) => boolean|Promise<boolean>` — Peer-fetch gate. When supplied, invoked per request — if truthy, the fetch is allowed. Used by apps that track group-membership rosters (Stoop, etc.) to deny ex-members.
+- `[opts.groupCheck]` `(uri: string, ctx: FetchResourceGateCtx) => boolean|Promise<boolean>` — Peer-fetch gate. When supplied, invoked per request — if truthy, the fetch is allowed. Used by apps that track group-membership rosters (Pinboard, etc.) to deny ex-members.
 - `[opts.capCheck]` `(uri: string, ctx: FetchResourceGateCtx) => boolean|Promise<boolean>` — Peer-fetch gate. Orthogonal cap-token verification. When supplied, invoked per request with `ctx.capToken` populated from the request parts. If truthy, the fetch is allowed.
 - `[opts.id='fetch-resource']` `string`
 - `[opts.visibility='authenticated']` `'public'|'authenticated'|'trusted'|'private'`

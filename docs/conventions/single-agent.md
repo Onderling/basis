@@ -33,8 +33,8 @@ model N scopes creates:
 - Visibly confusing transport-level logs — hard to reason about
   what's actually happening on the wire.
 
-This was a real bug in `apps/stoop-mobile` for several days
-(tracked in `Project Files/Stoop/single-agent-refactor-2026-05-08.md`).
+This was a real bug in `apps/pinboard-mobile` for several days
+(tracked in `Project Files/Pinboard/single-agent-refactor-2026-05-08.md`).
 It's a regression that's easy to introduce — every "factory that
 takes a transport and builds an Agent" tempts you to call it once
 per scope. Don't.
@@ -77,7 +77,7 @@ function getBundle(args, ctx) {
 ## When to lift to a substrate
 
 This pattern is currently implemented per-app:
-- `apps/stoop-mobile`'s `ServiceContext` + `buildGroupState`.
+- `apps/pinboard-mobile`'s `ServiceContext` + `buildGroupState`.
 - (Future) `apps/tasks-v0` / `apps/tasks-mobile`'s equivalent for
   multi-circle.
 
@@ -95,7 +95,7 @@ buildScopedSkillBus({
 ```
 
 Until the second consumer exists, **each app copies the pattern
-from this doc + the Stoop reference implementation**. Do not
+from this doc + the Pinboard reference implementation**. Do not
 pre-lift — by the rule of two, lift only when concretely needed
 by two real apps so the API surface is informed by both.
 

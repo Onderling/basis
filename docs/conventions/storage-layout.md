@@ -10,7 +10,7 @@
 > are now **type/domain-keyed, app-agnostic** (the former
 > `<app>/<function>` rule is superseded); added the *cross-app
 > type-indexable layout* standard (new section below). Rationale +
-> full decision record: `TODO-GENERAL.md` 🔴 "Stoop pod-backed
+> full decision record: `TODO-GENERAL.md` 🔴 "Pinboard pod-backed
 > storage" (D3). This resolves the open question in the substrates-v2
 > functional design §4.3.6.
 

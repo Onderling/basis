@@ -1021,7 +1021,7 @@ its coarse rung (categoryId under disclosure) lives in `offeringsTaxonomy.js`, n
 driver-kind open item — what someone ENGAGES WITH / cares about — carried as tags on the
 `{ kind, text, tags[] }` shape (no taxonomy / coarse rung: interests are FREE drivers, matched
 on-device by tag overlap). It folds the bespoke learned Layer-2 interest signal
-(stoop InterestProfile top terms) into one disclosure-controlled property on the profile graph.
+(pinboard InterestProfile top terms) into one disclosure-controlled property on the profile graph.
 
 Legacy `skill` (the pre-rename name for the human "I can do X" DATA — see
 NOTE-offering-rename-inventory.md) is READ-ACCEPTED and normalized to `offering`; new writes use

@@ -770,7 +770,7 @@ See [`repository-layout.md`](./repository-layout.md) for the full apps + package
 **How the monorepo resolves — the workspace + the two scopes.** All the code lives in one pnpm **workspace**:
 many packages in one repo, linked to each other on disk (not downloaded). Two npm scopes make the layer stack
 visible in every import — **`@onderling/*` are the substrate PACKAGES** (`packages/*` — item-store, core,
-circles, sdk, …), **`@onderling-app/*` are the APPS** (`apps/*` — basis, stoop, tasks, folio, …). "`@onderling-app`"
+circles, sdk, …), **`@onderling-app/*` are the APPS** (`apps/*` — basis, pinboard, tasks, folio, …). "`@onderling-app`"
 is NOT a second repo; it is the app scope. An app importing `@onderling/item-store` resolves to a **symlink**
 pointing at the sibling `packages/item-store`, never a published copy. The tree is deliberately **FLAT**
 (`.npmrc` `node-linker=hoisted`, per-app lockfiles) because Metro/Vite + the relative cross-package imports
@@ -1548,7 +1548,7 @@ ship — the locale file is the fastest index of what already exists.
 > **The five-homes description is complete** (§5): Agent · Circle · Pod · Surfaces · Connectivity, plus the
 > shared type dictionary — each chapter written only once it matched the running code. What is *not* complete
 > is the mapping of code onto those homes: much of `apps/basis/src/v2` is home code still living in the app,
-> the circle engine still sits in `apps/stoop`, and the event log is app code that belongs in a package. That
+> the circle engine still sits in `apps/pinboard`, and the event log is app code that belongs in a package. That
 > migration rides ordinary work — boundaries before directories, nothing relocated just to relocate — and no
 > guard yet fails a module for living outside its home, so this paragraph is the honest record of it.
 

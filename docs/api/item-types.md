@@ -90,7 +90,7 @@ absent — item-store data wins when both are set):
   - `completedBy`                     → `updatedBy`
   - `text`        (any string)       → `body`
 
-`text → body` covers Stoop / Folio / generic-message item types
+`text → body` covers Pinboard / Folio / generic-message item types
 whose canonical schemas require `body` (announcement, note,
 chat-message, offer, request, neighbourhood-job). The `task`
 schema requires `text` natively, so the copy is harmless
@@ -184,8 +184,8 @@ The canonical types a noticeboard post can be — what the board shows and what 
 **Kind:** constant · **Import:** `NOTICEBOARD_INTENTS` from `'@onderling/item-types'`
 
 The BOARD's own vocabulary: the three words a person picks between when posting, and the three the
-badge on a post can say. Distinct from the canonical `{type, kind}` a post is STORED as — stoop
-translates one into the other on the way in (`STOOP_TYPE_MAPPING`), and `noticeboardIntentOf`
+badge on a post can say. Distinct from the canonical `{type, kind}` a post is STORED as — pinboard
+translates one into the other on the way in (`PINBOARD_TYPE_MAPPING`), and `noticeboardIntentOf`
 translates back on the way out.
 
 It lives here, with the other board vocabulary, because both shells need it and neither may import
@@ -205,11 +205,11 @@ The shells' copies read `item.intent ?? item.kind ?? …`, so a post stored the 
 the badge its KIND — and `borrow` is a kind, not an intent, so the board printed the untranslated
 locale key `CIRCLE.NOTICEBOARD.INTENT.BORROW` at every asker (walked on a phone, both shells).
 The two vocabularies are not interchangeable and this is the one place that converts between them;
-stoop's forward map and this reverse are pinned to each other by a round-trip test.
+pinboard's forward map and this reverse are pinned to each other by a round-trip test.
 
-### `SYSTEM_STOOP_TYPES`
+### `SYSTEM_PINBOARD_TYPES`
 
-**Kind:** constant · **Import:** `SYSTEM_STOOP_TYPES` from `'@onderling/item-types'`
+**Kind:** constant · **Import:** `SYSTEM_PINBOARD_TYPES` from `'@onderling/item-types'`
 
 Item types the noticeboard holds that are system documents (rules, membership), never posts.
 

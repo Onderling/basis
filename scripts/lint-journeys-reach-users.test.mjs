@@ -39,12 +39,12 @@ const verbs = { setMemberRole: 'update', listRequests: 'list', addItem: 'add', e
 
 describe('the comparison — the three conditions, each on its own', () => {
   it('reports a WRITE op a journey drives and nothing reaches — the thing it exists for', () => {
-    expect(findUnreached({ journeyOps: ['stoop:setMemberRole'], reached: [], verbs }))
-      .toEqual(['stoop:setMemberRole']);
+    expect(findUnreached({ journeyOps: ['pinboard:setMemberRole'], reached: [], verbs }))
+      .toEqual(['pinboard:setMemberRole']);
   });
 
   it('says nothing about a READ op — a journey listing things is its eyes, not a feature claim', () => {
-    expect(findUnreached({ journeyOps: ['stoop:listRequests'], reached: [], verbs })).toEqual([]);
+    expect(findUnreached({ journeyOps: ['pinboard:listRequests'], reached: [], verbs })).toEqual([]);
   });
 
   it('says nothing when the op is reached under a DIFFERENT origin', () => {
@@ -60,21 +60,21 @@ describe('the comparison — the three conditions, each on its own', () => {
   });
 
   it('says nothing about an op no manifest declares — it cannot judge what it cannot read', () => {
-    expect(findUnreached({ journeyOps: ['stoop:whoKnows'], reached: [], verbs })).toEqual([]);
+    expect(findUnreached({ journeyOps: ['pinboard:whoKnows'], reached: [], verbs })).toEqual([]);
   });
 });
 
 describe('what counts as driving and reaching', () => {
   it('reads the waist through any alias, and the journeys own call() helper', () => {
     const ops = opsIn(
-      "await rawCallSkill('stoop','acknowledgeCaretaker',{});\nawait call(bram,'setMemberRole',{});",
-      'stoop',
+      "await rawCallSkill('pinboard','acknowledgeCaretaker',{});\nawait call(bram,'setMemberRole',{});",
+      'pinboard',
     );
-    expect([...ops].sort()).toEqual(['stoop:acknowledgeCaretaker', 'stoop:setMemberRole']);
+    expect([...ops].sort()).toEqual(['pinboard:acknowledgeCaretaker', 'pinboard:setMemberRole']);
   });
 
   it('ignores comments — prose about a retired op is not a call site', () => {
-    expect([...opsIn("// callSkill('stoop','ghostOp')\n/* skill('stoop','other') */")]).toEqual([]);
+    expect([...opsIn("// callSkill('pinboard','ghostOp')\n/* skill('pinboard','other') */")]).toEqual([]);
   });
 });
 
@@ -93,17 +93,17 @@ describe('the guard on the current tree', () => {
 
   it('FAILS on a baselined gap that has since been closed — debt must not outlive itself', () => {
     const r = withBaselineCopy(
-      (current) => ({ ...current, 'stoop:leaveGroup': 'reached long ago' }),
+      (current) => ({ ...current, 'pinboard:leaveGroup': 'reached long ago' }),
       (file) => run(file),
     );
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/now REACHED/);
-    expect(r.stderr).toMatch(/stoop:leaveGroup/);
+    expect(r.stderr).toMatch(/pinboard:leaveGroup/);
   });
 
   it('…and the repo’s own baseline is untouched by that — the test drives a copy', () => {
     const before = readFileSync(BASELINE, 'utf8');
-    withBaselineCopy((c) => ({ ...c, 'stoop:leaveGroup': 'reached long ago' }), (file) => run(file));
+    withBaselineCopy((c) => ({ ...c, 'pinboard:leaveGroup': 'reached long ago' }), (file) => run(file));
     expect(readFileSync(BASELINE, 'utf8')).toBe(before);
     expect(run().status).toBe(0);
   });

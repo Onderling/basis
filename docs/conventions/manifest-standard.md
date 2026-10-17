@@ -13,7 +13,7 @@ fails CI on drift. Issues carry a **code** (not a free string) so tooling and te
 
 > A manifest is conformant when `manifestConformance(m).ok === true`.
 
-The standard encodes only rules that are already TRUE of every app manifest (tasks-v0, stoop, household,
+The standard encodes only rules that are already TRUE of every app manifest (tasks-v0, pinboard, household,
 calendar, folio, basis). It is green on `master` and goes red on a real regression. Rules the codebase
 does not universally hold to are deliberately **not** conformance failures — see "What is not a failure" below.
 
@@ -33,7 +33,7 @@ map; and a `domainVerbs` entry must not itself be an atom. The map classifies ea
 'write', help: 'read' }` — because the atom catalogue cannot say whether a domain verb writes (see "Declared
 reach" below); a plain list is refused. This is the drift guard against a new noun-specific verb
 sneaking into an op without either mapping to an atom (`add` / `list` / `complete` / `claim` / …) or being
-named explicitly as domain-specific (folio `sync`, household `register`, stoop `report`). It is the packaged
+named explicitly as domain-specific (folio `sync`, household `register`, pinboard `report`). It is the packaged
 form of the existing atom-discipline guard (B · Layer 1).
 
 ### 3. Noun-declaration discipline — `nouns-required` / `nouns-vacuous`

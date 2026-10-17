@@ -86,7 +86,7 @@ export async function verbsByOp(root) {
   const specs = [
     ['apps/basis/manifest.js',     'basisManifest'],
     ['apps/household/manifest.js', 'householdManifest'],
-    ['apps/stoop/manifest.js',     'stoopManifest'],
+    ['apps/pinboard/manifest.js',     'pinboardManifest'],
     ['apps/folio/manifest.js',     'folioManifest'],
     ['apps/tasks-v0/manifest.js',  'tasksManifest'],
   ];

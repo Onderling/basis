@@ -21,7 +21,7 @@ code is the next step.)
 **The base the rows ride on.** Almost every row between agents goes out through one send:
 `sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' })` (`packages/secure-agent/src/createSecureAgent.js`). It holds
 a message on the device for a peer that cannot be reached (24 h, 50 per peer, 64 peers, persisted as the shell's
-outbox) and sends it when the peer shows up. A circle's "fan" is stoop's `broadcastToCircle`
+outbox) and sends it when the peer shows up. A circle's "fan" is pinboard's `broadcastToCircle`
 (`packages/circles/src/circleFanOut.js`): one hold-forward copy per member, over the relay. The relay itself sees
 addresses, sizes, timing and ciphertext — never content.
 
@@ -30,11 +30,11 @@ addresses, sizes, timing and ciphertext — never content.
 | I want to… | Mechanism | Lives in | Who learns what | Used today by | Not for |
 |---|---|---|---|---|---|
 | put an item in a circle so every member has it (tasks, lists, appointments, the noticeboard) | the circle's store, carried as signed snapshots on the task lane | `apps/basis/src/v2/taskRail.js` (`routeTaskMirror`, `onItemApplied`), `noticeboardCarry.js`, `noticeboardFan.js` | each member's device: the signed item; the relay: size and timing | `core/agent/realAgent.js`, `circleLanes.js` (every shell) | one person only (→ contact thread) |
-| say who joined, left or was evicted | membership statements on the membership lane | `membershipRail.js`; fan: stoop `broadcastCircleMembership` | every member; an evicted person also gets their own evict | `realAgent.js`, `circleLanes.js` | anything but membership |
+| say who joined, left or was evicted | membership statements on the membership lane | `membershipRail.js`; fan: pinboard `broadcastCircleMembership` | every member; an evicted person also gets their own evict | `realAgent.js`, `circleLanes.js` | anything but membership |
 | carry chat, governance, keys, a circle's rules or policy | the statement lanes | `chatRail.js`, `keyRail.js`, `governanceAppWiring.js`, `policyUpdateLane.js`, `rulesUpdateLane.js` | every member | `realAgent.js`, `circleLanes.js`, mobile `CircleLauncherScreen.js` | content for one person |
 | catch up on what I missed while offline | pull-all (governance) and windowed frontier replay (tasks, chat) | `governanceCatchUp.js`, `frontierReplay.js`, `catchUpTargets.js` | the peer asked learns who asked and their frontier | `realAgent.js`, `circleLanes.js`, `enrollOffer.js` (the shells kick it through the agent) | a live push (→ the lanes) |
 | hold a sealed photo or file for the members who hold its key | the blob bucket behind a gate (token → ACL → presigned URL; the client opens) | `@onderling/blob-gateway` (`uploadBlob`, `openBlob`, `gatekeeper`), `circleMediaGateway.js` | the bucket: ciphertext and size; the gate: who holds a token | `core/handlers/mediaEmbed.js`, `profileMediaReseal.js`, mobile `CircleLauncherScreen.js` | serving plaintext (→ link-sealed blob) |
-| be told when another agent publishes on a topic (offer matching) | protocol pub/sub — the publisher keeps the subscribers (in memory, no offline hold, not sealed by the secure layer) | `packages/core/src/protocol/pubSub.js` (`publish`, `subscribe`) | the publisher learns its subscribers | `packages/offering-match/src/OfferingMatch.js` (built by stoop's and tasks' agents) | anything that must reach an offline member (→ the lanes) |
+| be told when another agent publishes on a topic (offer matching) | protocol pub/sub — the publisher keeps the subscribers (in memory, no offline hold, not sealed by the secure layer) | `packages/core/src/protocol/pubSub.js` (`publish`, `subscribe`) | the publisher learns its subscribers | `packages/offering-match/src/OfferingMatch.js` (built by pinboard's and tasks' agents) | anything that must reach an offline member (→ the lanes) |
 
 ## Between me and one other person
 
@@ -44,7 +44,7 @@ addresses, sizes, timing and ciphertext — never content.
 | have a bot write first (a reminder, a link sent privately) | the door's reach to a person's own chat | `doorReach.js` (`createPersonReach`) | Telegram learns the text on a Telegram door; the inbox path learns the turn | `bin/device-runner.mjs` | anything a person did not ask the bot for |
 | call a skill on another agent (an op, with a token) | task exchange (A2A-style) | `packages/core/src/protocol/taskExchange.js`, `secure-agent/peerSkillCalls.js` (`peer.invoke`) | the callee learns the op, its args and the token | `core/src/Agent.js`, the box (`bin/device-runner.mjs`), `screenView.js`, the box's agenda link through the runner (`feed.put`, presenting the token its companion's owner granted it) | a broadcast |
 | let another person's agent act for me on one task | a task grant | `packages/core/src/permissions/TaskGrant.js` | the holder learns the scope | `apps/tasks-v0/src/Agent.js` (loaded by `realAgent.js`), `mandate.js`, mobile `CircleLauncherScreen.js` | standing access (→ surface grants) |
-| fetch a file a contact posted, straight from them | the attachment fetch over the one-to-one channel (`attachment-request` / `attachment-response`) | `packages/chat-p2p/src/wireChat.js`, stoop `src/lib/Attachments.js` | the relay: address and size; the poster: who asked, and for which file | stoop `src/Agent.js` (wires it), web `circleApp.js` (refreshes the noticeboard when the bytes land) | a file for many, or a link a program opens (→ the blob gate) — its purpose: a file straight to ONE contact over hold-forward, with no bucket, edge or gate in between |
+| fetch a file a contact posted, straight from them | the attachment fetch over the one-to-one channel (`attachment-request` / `attachment-response`) | `packages/chat-p2p/src/wireChat.js`, pinboard `src/lib/Attachments.js` | the relay: address and size; the poster: who asked, and for which file | pinboard `src/Agent.js` (wires it), web `circleApp.js` (refreshes the noticeboard when the bytes land) | a file for many, or a link a program opens (→ the blob gate) — its purpose: a file straight to ONE contact over hold-forward, with no bucket, edge or gate in between |
 | ask the people in the room (Nearby) | the nearby ask channel over the local network | `nearbyAskChannel.js` | any peer on the LAN: the ask's text and tags | `nearbyRoomBinding.js` (composed by the mobile shell and `src/index.js`) | anything private |
 
 ## Between my own devices
@@ -55,7 +55,7 @@ addresses, sizes, timing and ciphertext — never content.
 | make a circle I joined appear on my other devices | circle follow | `circleFollowSync.js` | my devices: the circle's id, handle, address and relays | `realAgent.js` | other people |
 | keep my own rows (my appointments, my planned work) on all my devices | the own-devices store, on the task lane under its own scope, fanned by the sibling carry | `ownDevicesStore.js` (+ `grantsRail.js`'s sibling-gated catch-up) | my devices only; a household bot has no siblings, so there it stays local | `bin/device-runner.mjs`, `realAgent.js`, mobile `agentBundle.js`, `assistantOps.js` | anything a circle should see |
 | back up my device's log to my pod, and let a connected screen read its slice | the history mirror and view lanes | `historyMirror.js` (`provisionHistoryMirror`), `surfaceGrants.js` (`viewLaneId`), `surfaceNudge.js` | the pod: ciphertext and batch sizes | `realAgent.js`; only web hands it a provider (`circleApp.js`); off by default | live traffic |
-| write through to my pod (registry, settings, a shared-pod circle) | pod write-through | `registryCarrier.js`; stoop's pod writes (`stoopPodWrite`) | the pod: sealed blobs under opaque names | `realAgent.js`, mobile `core/circlePods.js`, web `circleApp.js` | anything that must reach another person live |
+| write through to my pod (registry, settings, a shared-pod circle) | pod write-through | `registryCarrier.js`; pinboard's pod writes (`pinboardPodWrite`) | the pod: sealed blobs under opaque names | `realAgent.js`, mobile `core/circlePods.js`, web `circleApp.js` | anything that must reach another person live |
 
 ## To a reader that is no agent
 

@@ -4,7 +4,7 @@
  *
  * The waist takes `(appOrigin, opId, args)`, and both are usually string literals at the call site. Nothing
  * checks them: an op that does not exist dispatches, resolves to nothing, and the caller reads an empty
- * result as "no data". That is silent — `callSkill('stoop', 'listGroups')` shipped on mobile against an op
+ * result as "no data". That is silent — `callSkill('pinboard', 'listGroups')` shipped on mobile against an op
  * that never existed (only a core GroupManager method by that name), leaving a sections list permanently
  * empty with every test green. `src/screens/**` has no test coverage, so nothing else catches this class.
  *
@@ -28,14 +28,14 @@ const HERE = path.dirname(new URL(import.meta.url).pathname);
 
 /**
  * Where each app origin's ops are DECLARED. This deliberately differs from surface-coverage.mjs on three
- * rows: coverage renders the composed CHAT catalogue (which carries the mock stand-ins for stoop/tasks/folio),
- * while a call-site check needs the app's REAL declaration — `apps/stoop/manifest.js` declares 34 ops where
+ * rows: coverage renders the composed CHAT catalogue (which carries the mock stand-ins for pinboard/tasks/folio),
+ * while a call-site check needs the app's REAL declaration — `apps/pinboard/manifest.js` declares 34 ops where
  * the mock declares a handful. Both entries are listed; every op either source declares counts as declared.
  */
 const SPECS = [
   { name: 'basis',     path: 'apps/basis/manifest.js',                            pick: (m) => m.basisManifest },
   { name: 'household', path: 'apps/household/manifest.js',                        pick: (m) => m.householdManifest },
-  { name: 'stoop',     path: 'apps/stoop/manifest.js',                            pick: (m) => m.stoopManifest },
+  { name: 'pinboard',     path: 'apps/pinboard/manifest.js',                            pick: (m) => m.pinboardManifest },
   { name: 'folio',     path: 'apps/folio/manifest.js',                            pick: (m) => m.folioManifest },
   { name: 'calendar',  path: 'apps/calendar/manifest.js',                         pick: (m) => m.calendarManifest },
   { name: 'agents',    path: 'apps/agents/manifest.js',                           pick: (m) => m.agentsManifest },
@@ -43,7 +43,7 @@ const SPECS = [
   { name: 'params',    path: 'apps/basis/src/v2/paramsManifest.js',               pick: (m) => m.paramsManifest },
   // the composed chat stand-ins — tasks has no app manifest of its own today
   { name: 'tasks',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockTasksManifest },
-  { name: 'stoop',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockStoopManifest },
+  { name: 'pinboard',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockPinboardManifest },
   { name: 'folio',     path: 'apps/basis/src/core/manifests/mockManifests.js',    pick: (m) => m.mockFolioManifest },
 ];
 
@@ -109,7 +109,7 @@ if (skipped.length) for (const s of skipped) console.error(`(skipped ${s})`);
 /**
  * BASELINE — the same discipline as `lint-unreached-exports` / `lint-codenames`: the existing backlog is
  * recorded once and the guard fails on anything NEW. This is not a shrug. The first run found 179 literal
- * call sites naming ops no manifest declares — overwhelmingly `stoop` (102) and `household` (65) — which is
+ * call sites naming ops no manifest declares — overwhelmingly `pinboard` (102) and `household` (65) — which is
  * a real invariant-4 gap (the manifest is meant to be the single contract) far too large to close in the
  * same turn as the guard. Baselining makes the number VISIBLE and non-growing; closing it is its own work.
  * Do not grow this file. `--update` rewrites it; a shrinking baseline is the point.

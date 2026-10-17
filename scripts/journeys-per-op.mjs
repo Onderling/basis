@@ -42,7 +42,7 @@ const full = process.argv.includes('--full');
 const MANIFESTS = [
   ['apps/basis/manifest.js',     'basisManifest'],
   ['apps/household/manifest.js', 'householdManifest'],
-  ['apps/stoop/manifest.js',     'stoopManifest'],
+  ['apps/pinboard/manifest.js',     'pinboardManifest'],
   ['apps/folio/manifest.js',     'folioManifest'],
   ['apps/calendar/manifest.js',  'calendarManifest'],
   ['apps/agents/manifest.js',    'agentsManifest'],
@@ -53,7 +53,7 @@ const MANIFESTS = [
 const TEST_ROOTS = [
   'apps/basis/test', 'apps/basis/test-browser', 'apps/basis-mobile/test',
   'apps/e2e-journeys', 'apps/sdk-journeys',
-  'apps/household/test', 'apps/stoop/test', 'apps/folio/test',
+  'apps/household/test', 'apps/pinboard/test', 'apps/folio/test',
   'apps/calendar/test', 'apps/agents/test', 'apps/params/test',
 ];
 

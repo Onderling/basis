@@ -13,8 +13,8 @@
  *
  * **Connection tiebreaker:** when both peers discover each other at once, only the peer whose pubKey sorts
  * lexicographically LOWER initiates; the higher-key peer waits for the inbound connection. The initiator
- * sends a `_mdns_hello` frame immediately so the server can key the connection by real pubKey before app
- * data arrives.
+ * sends a `_mdns_hello` frame immediately, and the two sides prove their keys to each other (the challenged
+ * hello, below) before either keys the connection — a TXT record's pubKey and a hello's `_from` are claims.
  *
  * The failure mode this contract protects against is the nasty one: a mismatched implementation does not
  * error, it simply never sees the other side.
@@ -23,8 +23,53 @@
  * Do not construct this directly on a phone. `@onderling/react-native` exports a subclass with the Android
  * MdnsModule already injected (and the `isAvailable()` guard the mesh builder uses).
  */
-import { Transport, DISCOVERABILITY } from '@onderling/core';
+import { Transport, DISCOVERABILITY, AgentIdentity } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
+
+/**
+ * THE HELLO IS PROVEN. A connection is keyed by a pubKey only when the far end has signed THIS side's nonce with that
+ * key — a hello's `_from` and a TXT record's `pubKey` are claims, and keying on a claim let any device on the Wi-Fi
+ * become another device's row and its route. Three frames, each side proving itself to the other:
+ *   dialler → listener   { _mdns_hello: true, _from: D, nonce: nD }
+ *   listener → dialler   { _mdns_challenge: true, _from: L, nonce: nL, sig: L.sign(challenge|nD|nL|L|D) }
+ *   dialler → listener   { _mdns_proof: true, sig: D.sign(proof|nD|nL|D|L) }
+ * The dialler keys the connection on a verified challenge (and `_from` must be the key it dialled); the listener on a
+ * verified proof. The message signed is built HERE, never taken from the far end, and names its role and both nonces.
+ * A connection without a key carries NO data: any other frame on it is dropped and the socket refused. Part of the wire contract: a peer
+ * on an older build is never keyed (both sides must ship this together).
+ */
+const HELLO_DOMAIN = 'onderling-mdns-hello-v1';
+/**
+ * The two messages of the challenged hello — built here, never taken from the far end. They differ by ROLE and both
+ * carry BOTH nonces, so a listener's challenge signature can never be replayed as a dialler's proof (or the reverse),
+ * under any nonce a relay picks.
+ * @param {string} nD  the dialler's nonce
+ * @param {string} nL  the listener's nonce
+ * @param {string} L   the listener's pubKey (it signs the challenge)
+ * @param {string} D   the dialler's pubKey
+ * @returns {string}
+ */
+export const helloChallengeMessage = (nD, nL, L, D) => `${HELLO_DOMAIN}|challenge|${nD}|${nL}|${L}|${D}`;
+/**
+ * The dialler's proof: signed by the dialler over both nonces (see `helloChallengeMessage`).
+ * @param {string} nD
+ * @param {string} nL
+ * @param {string} D   the dialler's pubKey (it signs the proof)
+ * @param {string} L   the listener's pubKey
+ * @returns {string}
+ */
+export const helloProofMessage = (nD, nL, D, L) => `${HELLO_DOMAIN}|proof|${nD}|${nL}|${D}|${L}`;
+const HANDSHAKE_MS = 10_000;
+function freshNonce() {
+  const b = new Uint8Array(24);
+  globalThis.crypto.getRandomValues(b);
+  return b64Encode(b);
+}
+const sigB64 = (bytes) => b64Encode(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+function verifies(message, sig, pubKey) {
+  try { return typeof sig === 'string' && typeof pubKey === 'string' && AgentIdentity.verify(message, sig, pubKey) === true; }
+  catch { return false; }
+}
 
 /** The DNS-SD service type every Onderling device advertises and browses for. Part of the wire contract. */
 export const SERVICE_TYPE = '_onderling';
@@ -57,6 +102,7 @@ export const SERVICE_TYPE = '_onderling';
 export class MdnsTransport extends Transport {
   #hostname;
   #pubKey;
+  #identity;
   #native;
   #emitter;
 
@@ -66,6 +112,10 @@ export class MdnsTransport extends Transport {
   #pubKeyToConn = new Map();
   // connectionId → null (unidentified inbound, waiting for hello frame)
   #pending      = new Set();
+  // connectionId → the handshake in flight: { role: 'dialler'|'listener', peer, nonce, timer }
+  #handshakes   = new Map();
+  // pubKeys being dialled (a second discovery event mid-handshake must not open a second socket)
+  #dialling     = new Set();
   // pubKey → ms timestamp of last successful send or inbound frame — used
   // by routing to detect zombie TCP connections (present in the maps but
   // not actually delivering).  A value of 0 means "never seen activity".
@@ -92,6 +142,7 @@ export class MdnsTransport extends Transport {
     );
     super({ address: identity.pubKey, identity });
     this.#pubKey   = identity.pubKey;
+    this.#identity = identity;
     this.#hostname = hostname ?? `dw-${identity.pubKey.slice(0, 8)}`;
     this.#native   = native;
     this.#emitter  = emitter;
@@ -311,17 +362,18 @@ export class MdnsTransport extends Transport {
           return;
         }
 
+        if (this.#dialling.has(pubKey)) return;
         console.log('[MdnsTransport] initiating TCP connect to', host, port);
+        this.#dialling.add(pubKey);
         try {
           const connId = await this.#native.connect(host, port);
           console.log('[MdnsTransport] TCP connected, connId:', connId);
-          this.#registerConn(connId, pubKey);
-          await this.#native.send(connId, b64Encode(
-            new TextEncoder().encode(JSON.stringify({ _mdns_hello: true, _from: this.#pubKey }))
-          ));
-          console.log('[MdnsTransport] hello sent, emitting peer-discovered');
-          this.emit('peer-discovered', pubKey);
+          // NOT keyed yet: the TXT record's pubKey is a claim until the listener signs our nonce with it
+          const nonce = freshNonce();
+          this.#startHandshake(connId, { role: 'dialler', peer: pubKey, nonce });
+          await this.#sendFrame(connId, { _mdns_hello: true, _from: this.#pubKey, nonce });
         } catch (err) {
+          this.#dialling.delete(pubKey);
           console.warn('[MdnsTransport] connect/hello failed:', err?.message);
           this.emit('error', err);
         }
@@ -340,28 +392,14 @@ export class MdnsTransport extends Transport {
           envelope = JSON.parse(new TextDecoder().decode(b64Decode(data)));
         } catch { return; }
 
-        // Identify an inbound connection on first message
-        if (this.#pending.has(connectionId)) {
-          if (envelope._mdns_hello) {
-            const peerKey = envelope._from;
-            if (peerKey) {
-              // A hello on a NEW connection from a peer we already map: the new socket is the live one (a
-              // peer that restarted dials again before its dead socket's close ever reaches us). Re-map
-              // rather than ignore — ignoring left this connection unmapped, so every reply went to the
-              // dead socket ("no connection to …") while their envelopes kept arriving here. The old
-              // connection is NOT closed: when both sides dialled at once this "old" one is the peer's
-              // live inbound, and closing it from both ends leaves nobody connected. It stays readable
-              // (`#connToPubKey`) and its late close cannot unmap the live one (see the guard below).
-              const previous = this.#pubKeyToConn.get(peerKey);
-              this.#pending.delete(connectionId);
-              this.#registerConn(connectionId, peerKey);
-              if (!previous) this.emit('peer-discovered', peerKey);
-            }
-            return; // internal frame — don't pass upstream
-          }
-          // Non-hello first frame: pass upstream and let Agent identify via its own protocol
-          this.#pending.delete(connectionId);
+        // The handshake frames are internal: never passed upstream, and the only way a connection gets a key.
+        if (envelope && (envelope._mdns_hello || envelope._mdns_challenge || envelope._mdns_proof)) {
+          this.#onHandshakeFrame(connectionId, envelope);
+          return;
         }
+        // No row, no route, no DATA: a frame from a connection without a key is dropped and the socket refused — it
+        // cannot be replied to, and the hello exists so that nothing arrives from a key nobody proved.
+        if (!this.#connToPubKey.has(connectionId)) { this.#refuse(connectionId); return; }
 
         const mappedPubKey = this.#connToPubKey.get(connectionId);
         if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());
@@ -372,6 +410,7 @@ export class MdnsTransport extends Transport {
       // Connection closed — clean up both maps
       this.#emitter.addListener('MdnsClientDisconnected', ({ connectionId }) => {
         this.#pending.delete(connectionId);
+        this.#endHandshake(connectionId);
         const pubKey = this.#connToPubKey.get(connectionId);
         if (pubKey) {
           this.#connToPubKey.delete(connectionId);
@@ -389,6 +428,79 @@ export class MdnsTransport extends Transport {
         this.emit('error', new Error(`MdnsModule: ${message}`));
       }),
     );
+  }
+
+  async #sendFrame(connId, obj) {
+    await this.#native.send(connId, b64Encode(new TextEncoder().encode(JSON.stringify(obj))));
+  }
+
+  #startHandshake(connId, hs) {
+    const timer = setTimeout(() => {
+      if (!this.#handshakes.has(connId)) return;
+      console.warn('[MdnsTransport] hello not proven in time — closing', connId);
+      this.#refuse(connId);
+    }, HANDSHAKE_MS);
+    timer.unref?.();
+    this.#handshakes.set(connId, { ...hs, timer });
+  }
+
+  #endHandshake(connId) {
+    const hs = this.#handshakes.get(connId);
+    if (!hs) return null;
+    clearTimeout(hs.timer);
+    this.#handshakes.delete(connId);
+    if (hs.role === 'dialler') this.#dialling.delete(hs.peer);
+    return hs;
+  }
+
+  /** A connection that could not prove its key is closed — it was never a row, never a route. */
+  #refuse(connId) {
+    this.#endHandshake(connId);
+    this.#pending.delete(connId);
+    this.#native.close?.(connId).catch(() => {});
+  }
+
+  #onHandshakeFrame(connId, f) {
+    const hs = this.#handshakes.get(connId);
+    // listener: a hello on an inbound connection → challenge it, prove ourselves
+    if (f._mdns_hello && this.#pending.has(connId) && !hs) {
+      const claimed = typeof f._from === 'string' ? f._from : null;
+      if (!claimed || claimed === this.#pubKey || typeof f.nonce !== 'string') { this.#refuse(connId); return; }
+      const nonce = freshNonce();
+      this.#startHandshake(connId, { role: 'listener', peer: claimed, nonce, theirNonce: f.nonce });
+      const sig = sigB64(this.#identity.sign(helloChallengeMessage(f.nonce, nonce, this.#pubKey, claimed)));
+      this.#sendFrame(connId, { _mdns_challenge: true, _from: this.#pubKey, nonce, sig }).catch(() => this.#refuse(connId));
+      return;
+    }
+    // dialler: the listener proved its key → key the connection, prove ours
+    if (f._mdns_challenge && hs?.role === 'dialler') {
+      const ok = f._from === hs.peer && typeof f.nonce === 'string' && verifies(helloChallengeMessage(hs.nonce, f.nonce, f._from, this.#pubKey), f.sig, f._from);
+      if (!ok) { console.warn('[MdnsTransport] listener did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return; }
+      this.#endHandshake(connId);
+      const sig = sigB64(this.#identity.sign(helloProofMessage(hs.nonce, f.nonce, this.#pubKey, hs.peer)));
+      this.#sendFrame(connId, { _mdns_proof: true, sig }).catch(() => {});
+      const previous = this.#pubKeyToConn.get(hs.peer);
+      this.#registerConn(connId, hs.peer);
+      if (!previous) this.emit('peer-discovered', hs.peer);
+      return;
+    }
+    // listener: the dialler proved its key → key the connection
+    if (f._mdns_proof && hs?.role === 'listener') {
+      if (!verifies(helloProofMessage(hs.theirNonce, hs.nonce, hs.peer, this.#pubKey), f.sig, hs.peer)) {
+        console.warn('[MdnsTransport] dialler did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return;
+      }
+      this.#endHandshake(connId);
+      this.#pending.delete(connId);
+      // A hello on a NEW connection from a peer we already map: the new socket is the live one (a peer that restarted
+      // dials again before its dead socket's close reaches us). Re-map rather than ignore; the old connection is NOT
+      // closed (when both sides dialled at once it is the peer's live inbound) and its late close cannot unmap this.
+      const previous = this.#pubKeyToConn.get(hs.peer);
+      this.#registerConn(connId, hs.peer);
+      if (!previous) this.emit('peer-discovered', hs.peer);
+      return;
+    }
+    // anything else (a frame out of order, a second hello) is a connection that is not following the contract
+    this.#refuse(connId);
   }
 
   #registerConn(connId, pubKey) {

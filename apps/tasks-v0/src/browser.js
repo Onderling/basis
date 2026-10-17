@@ -43,8 +43,8 @@ import { buildMultiCircleOnboardingSkills }   from './skills/multiCircleOnboardi
  *                                            circles don't pollute chat identity
  * @param {object}         args.circleConfig    {circleId, name, kind, members}
  * @param {object}         [args.persistDb]   Pass-through to `buildBundle`'s
- *                                            `persistDb` opt; mirrors stoop's
- *                                            `createBrowserStoopAgent`.  Pass
+ *                                            `persistDb` opt; mirrors pinboard's
+ *                                            `createBrowserPinboardAgent`.  Pass
  *                                            `{dbName, storeName?}` (IDB
  *                                            browser path) or `{dbName,
  *                                            asyncStorage}` (RN).  Omit for

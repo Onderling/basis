@@ -2,7 +2,7 @@
  * folioAuth — pure-helpers shim around `@onderling/oidc-session-rn`.
  *
  * **2026-05-08:** the implementation moved to the
- * `@onderling/oidc-session-rn` substrate (Stoop V3 Phase 40.3 — rule
+ * `@onderling/oidc-session-rn` substrate (Pinboard V3 Phase 40.3 — rule
  * of two consumer).
  *
  * This shim re-exports ONLY the pure helpers (no `expo-auth-session`

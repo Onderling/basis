@@ -1,11 +1,11 @@
 /**
  * Tasks M4 — cross-pod type-index via innerKeyMap + pullFromInner.
  *
- * Analog of apps/stoop/test/crossAppIndex.test.js, adapted for Tasks.
+ * Analog of apps/pinboard/test/crossAppIndex.test.js, adapted for Tasks.
  * Proves that the Tasks `innerKeyMap` (buildBundle + podPathMap) lets
  * `CachingDataSource.pullFromInner('<logical prefix>')` enumerate all
  * objects of a canonical type regardless of which device/member wrote
- * them — just as the stoop pattern does.
+ * them — just as the pinboard pattern does.
  *
  * No new production code is exercised beyond what M4 ships: the real
  * `classify`/`reverseResolve` through a real `@onderling/local-store`

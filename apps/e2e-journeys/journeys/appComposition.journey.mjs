@@ -44,7 +44,7 @@ export async function run({ relayUrl }) {
     // ── The F-002 proof: a leave TRAVELS ─────────────────────────────────────────────────────────
     // In the mirror-only harness this is invisible to everyone but the leaver. Here the `leave`
     // statement rides the membership lane, is verified at each receiver's rail, and folds.
-    const left = await bram.agent.callSkill('stoop', 'leaveGroup', { groupId: CIRCLE, confirm: true });
+    const left = await bram.agent.callSkill('pinboard', 'leaveGroup', { groupId: CIRCLE, confirm: true });
     check('the member can leave (the act is gated as irreversible, and confirmed)',
       !left?.error, JSON.stringify(left)?.slice(0, 120));
 

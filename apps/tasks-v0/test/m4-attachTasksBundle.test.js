@@ -1,7 +1,7 @@
 /**
  * Tasks M4 — attachTasksBundle / detachTasksBundle.
  *
- * Device-independent analog of apps/stoop/test/attachPodToBundle.test.js,
+ * Device-independent analog of apps/pinboard/test/attachPodToBundle.test.js,
  * adapted for Tasks. Asserts: setAnchor + _podCtx(classify/reverse)
  * + attachInner(source); bundle-derived circleId; provision callback
  * called best-effort; detach resets active + anchor.

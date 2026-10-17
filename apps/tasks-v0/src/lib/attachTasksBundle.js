@@ -2,7 +2,7 @@
  * attachTasksBundle / detachTasksBundle — the ONE device-independent
  * pod-attach activation for Tasks, shared by Tasks web AND mobile.
  *
- * Mirror of `apps/stoop/src/lib/attachPodToBundle.js` (commit `11a269a`).
+ * Mirror of `apps/pinboard/src/lib/attachPodToBundle.js` (commit `11a269a`).
  * Tasks M4 — platform-parity principle: web ≡ mobile; neither is the
  * "primitive" one. The pod-storage mechanism is all substrate +
  * the shared bundle (closure `innerKeyMap` + `_podCtx`); only this
@@ -15,7 +15,7 @@
  * best-effort — never blocks local-first use, `pod-independence.md`)
  * → fill `_podCtx` (classify+reverse) → `cache.attachInner(source)`.
  *
- * Pod provisioning: Tasks does not have its own provisioner yet (Stoop's
+ * Pod provisioning: Tasks does not have its own provisioner yet (Pinboard's
  * `existingPodProvisioner` is app-specific; Tasks is the second consumer
  * but the rule-of-two lift to a shared package is a separate work item).
  * Callers may inject a `provision` callback; when absent the step is

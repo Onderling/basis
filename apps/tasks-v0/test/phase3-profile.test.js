@@ -59,7 +59,7 @@ describe('Phase 3 — canonical profile + circle vocabulary', () => {
       const bundle = buildBundle();
       // The shipped tagNormalisation.json maps NL "schilderen" → canonical
       // "painting" (and category "klusjes"). We deliberately rely on this
-      // cross-language behaviour so Stoop / Tasks / Folio all see the same
+      // cross-language behaviour so Pinboard / Tasks / Folio all see the same
       // canonical tag regardless of input language.
       await writeCanonicalProfile({
         dataSource: bundle.cache,

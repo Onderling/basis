@@ -101,9 +101,9 @@ LLM provider preference when multiple are wired (CPU vs. cloud).
 quiet-hours, language preference, conversation-summary frequency.
 
 **Cross-app shared-defaults (Rule 3):** Household MAY seed defaults
-from a pre-existing `<pod>/stoop/settings/shared.json` for fields
+from a pre-existing `<pod>/pinboard/settings/shared.json` for fields
 like locale and default-share-location — the user has already made
-those decisions in Stoop and shouldn't re-make them here.
+those decisions in Pinboard and shouldn't re-make them here.
 
 **Status (2026-05-07):** household is in design / DD-stage; no
 persisted settings yet. Update this section when they land.

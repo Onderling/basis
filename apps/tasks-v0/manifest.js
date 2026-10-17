@@ -73,7 +73,7 @@ export const tasksManifest = {
    * app-local (non-canonical, F-SP1-a) item type so the `pod-settings`
    * view can declare `view.type: 'circle-storage-policy'`
    * (validateView pins `view.type` ∈ `manifest.itemTypes`).  Like
-   * stoop's `'group-rules'` placeholder for its settings view, the
+   * pinboard's `'group-rules'` placeholder for its settings view, the
    * circle storage policy is a SINGLETON record (one merged object:
    * `{policy, groupPodUri?}`), not a list of items. See
    * (`shape: 'record'`) — the view encodes that reality.
@@ -431,7 +431,7 @@ export const tasksManifest = {
           // `surfaces.chat.brief`; the `tasks_briefSummary` skill
           // (defined in src/skills/briefSummary.js, registered via
           // wireSkills) returns a count of open tasks + the topmost
-          // rows.  `order: 20` slots between household (10) + stoop (30).
+          // rows.  `order: 20` slots between household (10) + pinboard (30).
           brief: { summarySkill: 'tasks_briefSummary', order: 20, label: 'Tasks' },
         },
       },
@@ -1223,7 +1223,7 @@ export const tasksManifest = {
     },
     /*
      * .4 (2026-05-20) — pod-settings view consumed by
-     * `apps/tasks-v0/web/pod-settings.html`. Mirrors stoop's
+     * `apps/tasks-v0/web/pod-settings.html`. Mirrors pinboard's
      * adopt settings view (commit 9e7003b): the manifest models the
      * data shape (record + per-field patch declarations); the page
      * keeps its rich custom UI (pod-sign-in flow, conditional
@@ -1240,10 +1240,10 @@ export const tasksManifest = {
      * `setCircleStoragePolicy({circleId, storagePolicy, groupPodUri?})`
      * — a FLAT skill (no nested `{patch: {...}}` wrapper), so
      * `argWrapper` is NOT needed here (omitted).  Same flat shape
-     * as stoop's `setHopMode({global})` field.
+     * as pinboard's `setHopMode({global})` field.
      *
      * `setCircleStoragePolicy` and `getCircleStoragePolicy` are NOT
-     * declared in `operations[]` (same choice stoop made for
+     * declared in `operations[]` (same choice pinboard made for
      * `getSettings`/`updateSettings`/`setHopMode`).  They are
      * pod-plumbing skills, not chat/slash-callable primary flows.
      * Non-strict `validateManifest` permits `dataSource.skillId` and

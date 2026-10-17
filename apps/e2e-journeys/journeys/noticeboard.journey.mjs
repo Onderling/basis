@@ -1,16 +1,16 @@
-// J-circle: the real stoop neighbourhood flow over the relay — host creates a
+// J-circle: the real pinboard neighbourhood flow over the relay — host creates a
 // circle + invite code, a stranger joins (admin-verified), host posts to the
 // noticeboard, the stranger sees it, replies, and that spins a private 1:1 chat.
 import { AgentIdentity, DataPart } from '@onderling/core';
 import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
 import { RelayTransport }          from '@onderling/transports';
-import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
-// stoop's manifest by relative path — the way this corpus already reaches APP internals (see the
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/pinboard';
+// pinboard's manifest by relative path — the way this corpus already reaches APP internals (see the
 // last-admin journey's key-rail import), and a journey is not a reason to widen an app's public API.
 // `renderGate` is a different case: it is a PACKAGE, so it comes through the barrel like any other
 // consumer. Reaching its raw src was a layering violation, and the dep-boundaries guard said so.
-import { stoopManifest }       from '../../stoop/manifest.js';
+import { pinboardManifest }       from '../../pinboard/manifest.js';
 import { renderGate }          from '@onderling/app-manifest';
 import { wait, checker }           from './_util.mjs';
 
@@ -77,10 +77,10 @@ export async function run({ relayUrl }) {
     // This is the template for the rest of the corpus, not a one-off: a journey is only evidence
     // about a person to the extent that it enters the way a person enters.
     const typed = 'vraag Iemand een boormachine te leen?';
-    const gate = renderGate(stoopManifest);
+    const gate = renderGate(pinboardManifest);
     const compiled = gate.map((rule) => rule.command(typed)).find(Boolean);
     check('what a person TYPES compiles to an op — the manifest is the way in',
-      compiled?.opId === 'postRequest' && compiled?.appOrigin === 'stoop'
+      compiled?.opId === 'postRequest' && compiled?.appOrigin === 'pinboard'
       && typeof compiled?.args?.text === 'string' && compiled.args.text.includes('boormachine'),
       `"${typed}" → ${JSON.stringify(compiled)?.slice(0, 120)}`);
 
@@ -115,7 +115,7 @@ export async function run({ relayUrl }) {
     // This asserts the OUTCOME — the removed person stops receiving — not the mechanism. It used to
     // assert that the ban pruned the MemberMap, and failed permanently, because the system
     // deliberately does not prune it: `members.removeMember(webId)` was there once and was itself
-    // the bug (see the note at stoop's removeMember). The MemberMap is a display cache; the fan
+    // the bug (see the note at pinboard's removeMember). The MemberMap is a display cache; the fan
     // projects the circle's roster and exit-filters, so a stale row there targets nobody. A check
     // that pins the wrong layer stays red forever and stops anyone reading this journey's reds.
     await wait(1200);

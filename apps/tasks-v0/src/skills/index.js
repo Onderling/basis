@@ -64,7 +64,7 @@ import {
  * Cross-pod ref soft cap on `addTask({embeds: [...]})`. Eight keeps
  * the task panel readable while still allowing "this task touches
  * several other items" use cases. Tasks V2 substrate-adoption (the
- * A4 equivalent from Stoop V2 web). V2 functional design §4b.
+ * A4 equivalent from Pinboard V2 web). V2 functional design §4b.
  */
 // Parameter register (#36) — cross-pod embed soft cap per task (scope:device, kind:internal).
 const MAX_EMBEDS_PER_TASK = param({ key: 'tasksV0.maxEmbedsPerTask', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });

@@ -2,7 +2,7 @@
  * dcr — re-export shim around `@onderling/oidc-session-rn`'s DCR helpers.
  *
  * **2026-05-08:** the implementation moved to
- * `@onderling/oidc-session-rn` (Stoop V3 Phase 40.3 — rule-of-two
+ * `@onderling/oidc-session-rn` (Pinboard V3 Phase 40.3 — rule-of-two
  * consumer). This file is a thin shim that pre-binds
  * `keyPrefix: 'folio'` so the legacy DCR cache keys
  * (`folio-dcr-client-id-<host>`) are unchanged.

@@ -60,7 +60,7 @@ async function corridor({ relayUrl, circleId, pod, check, label }) {
     check(`[${label}] the other member reads the household item back`, hhSeen);
 
     // The rules doc is lane-shaped, so it exercises a different path than the item store.
-    const edited = await anne.agent.callSkill('stoop', 'editGroupRules', {
+    const edited = await anne.agent.callSkill('pinboard', 'editGroupRules', {
       groupId: circleId, rules: { name: 'Huisregels', purpose: 'proef', agreements: 'wees aardig' },
     });
     check(`[${label}] the admin can set the circle's rules`, !edited?.error, JSON.stringify(edited)?.slice(0, 120));

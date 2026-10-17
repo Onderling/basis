@@ -74,7 +74,7 @@ describe('household manifest → NavModel (Slice A.2)', () => {
       const claim = tasks.itemActions.find((a) => a.opId === 'claim');
       expect(claim).toBeTruthy();
       // (2026-05-26) canonicalised appliesTo.state to array form
-      // across all apps (tasks-v0 / calendar / stoop / household).
+      // across all apps (tasks-v0 / calendar / pinboard / household).
       expect(claim.appliesTo.state).toEqual(['open']);
     });
 

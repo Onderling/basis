@@ -64,7 +64,7 @@ export async function run({ relayUrl }) {
     // ── 2. AN ATTACHMENT RIDES ALONG ─────────────────────────────────────────────────────────────
     // The plaintext gate is proven in J-attachments; what matters here is that a SEALED attachment
     // can accompany the work into the circle at all, which is the half Frits named.
-    const withFile = await anne.agent.callSkill('stoop', 'postRequest', {
+    const withFile = await anne.agent.callSkill('pinboard', 'postRequest', {
       text: `foto van de schuur (bij: ${taskId})`, intent: 'ask',
       attachments: [{
         type: 'media', mime: 'image/jpeg',

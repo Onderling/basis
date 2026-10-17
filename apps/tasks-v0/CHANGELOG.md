@@ -131,7 +131,7 @@ reassign/remove).
   overwrite an existing circleId. `/circles.html` empty-state links
   to `/welcome.html`.
 **** (`203607c`): agent-registry on `createCircleAgent`.
-  Helper `registerAgentBundle` lifted from Stoop's app code into
+  Helper `registerAgentBundle` lifted from Pinboard's app code into
   `@onderling/agent-registry`. Tasks builds a standalone-mode
   pseudoPod per circle + registers with capabilities `['tasks',
   'tasks-v0', \`circle:<circleId>\`]`. `bundle.pseudoPod` +
@@ -144,7 +144,7 @@ reassign/remove).
 ### — pod OIDC sign-in
 
 - (`bab079b`) `apps/tasks-v0/src/lib/podSignIn.js` mirrors
-  Stoop's Phase 52.15.3. Four new skills: `startPodSignIn`,
+  Pinboard's Phase 52.15.3. Four new skills: `startPodSignIn`,
   `completePodSignIn`, `signOutOfPod`, `podSignInStatus`. Uses
   `createSolidAuthNode` from `@onderling/oidc-session`.
   `/pod-settings.html`'s sign-in card unlocked: issuer input
@@ -182,7 +182,7 @@ reassign/remove).
 
 **** (`5899ad2`): substrate-mirror infrastructure +
   addTask fan-out. New `apps/tasks-v0/src/lib/substrateStack.js`
-  + `apps/tasks-v0/src/substrateMirror.js` mirror Stoop's
+  + `apps/tasks-v0/src/substrateMirror.js` mirror Pinboard's
   pattern. `wireTasksSubstrateMirror` subscribes to
   `kind: 'task'` envelopes, URI-prefix filters by
   `/tasks/circles/<circleId>/tasks/`, dedupes via
@@ -212,8 +212,8 @@ reassign/remove).
     gate-bypass).
   - New private `#findBySyncedFromId(id)` helper.
 - `@onderling/agent-registry`:
-  - New `registerAgentBundle` helper lifted from Stoop. Used by
-    Stoop + Tasks without a cross-app dep.
+  - New `registerAgentBundle` helper lifted from Pinboard. Used by
+    Pinboard + Tasks without a cross-app dep.
 
 ### New deps on `apps/tasks-v0/package.json`
 
@@ -247,7 +247,7 @@ Capability **U** from the V2 functional design. Closes the door on "I marked the
   - `ItemStore` constructor accepts `enforceDependencies?: boolean` (default `false` — back-compat). When `true`, `markComplete` and `approve` walk `current.dependencies`, look each up, filter out missing-or-removed (treat as satisfied), reject when any open dep remains.
   - New typed error `DependenciesOpenError extends Error` with `code: 'DEPENDENCIES_OPEN'` + `openDeps[]`. Re-exported from the package barrel.
   - `markComplete` / `approve` / `addItems` honour a new `ctx.actionOverride` string (replaces the audit entry's `action` field; used for `force-complete` and `force-spawn`) plus `ctx.reason` (lands in `details.reason`).
-  - 7 substrate tests in `packages/item-store/test/V2_7-enforce-dependencies.test.js`. Stoop is unaffected — its items don't pass `enforceDependencies: true`.
+  - 7 substrate tests in `packages/item-store/test/V2_7-enforce-dependencies.test.js`. Pinboard is unaffected — its items don't pass `enforceDependencies: true`.
 
 ### App-side
 
@@ -269,7 +269,7 @@ Capability **U** from the V2 functional design. Closes the door on "I marked the
 - ✅ 7 added in `packages/item-store/test/V2_7-enforce-dependencies.test.js`: gate-off back-compat; gate-on rejection on `markComplete` + `approve`; missing-dep treated as satisfied; happy-path close-after-child; `actionOverride` bypasses gate + relabels audit; `addItems` honours `actionOverride`.
 - ✅ 11 added in `apps/tasks-v0/test/v2_7-hard-deps.test.js`: error shape; child-then-parent close; `approve` symmetry; `forceCompleteTask` admin-only + reason-mandatory + bypasses gate + audit logged + no-cascade; `addSubtask` post-submit blocking + `proposalRequired`; `proposeSubtask` master-only; `approveSubtaskProposal` spawns + rolls back + preserves `submit`; `declineSubtaskProposal` keeps submission valid; assignee-only on approve/decline; `forceSpawnSubtask` admin-only + reason-mandatory + audit logged; assignee can self-spawn during their own submission.
 
-Tests now: **308 across 29 files** (Tasks) + **61 across 4 files** (item-store) — Stoop's 429 untouched.
+Tests now: **308 across 29 files** (Tasks) + **61 across 4 files** (item-store) — Pinboard's 429 untouched.
 
 ### UI wiring (added in the same release)
 
@@ -299,7 +299,7 @@ Tests now: **319 across 30 files** (Tasks).
 
 ## [0.3.7] — 2026-05-08 — single-agent + per-circle state via bundleResolver
 
-The desktop-side mirror of Stoop's 2026-05-08 `single-agent-refactor`. One `core.Agent` per process serves N circles; per-circle state lives in `CircleState`; skills resolve their circle at dispatch time. Unblocks tasks-mobile Phase 41.x and stops the path of spinning N agents for N circles.
+The desktop-side mirror of Pinboard's 2026-05-08 `single-agent-refactor`. One `core.Agent` per process serves N circles; per-circle state lives in `CircleState`; skills resolve their circle at dispatch time. Unblocks tasks-mobile Phase 41.x and stops the path of spinning N agents for N circles.
 
 Shipped in two passes within the day:
 - **Part 1** — extract `buildMeshAgent` (the foundation `core.Agent` + `policyEngine` + `trustRegistry` + identity vault).
@@ -322,7 +322,7 @@ Shipped in two passes within the day:
 
 - ✅ New `test/v2_8-single-agent.test.js` — 5 tests: one meshAgent serves two CircleStates with isolated ItemStores; strict resolution returns `{error: 'circleId required'}` when no circleId + no topic; `singleCircleResolver` keeps the V0 back-compat path; cross-circle role-policy gate fires when caller has no role in the resolved circle; `<circleId>/...` envelope topic resolves the right circle.
 - ✅ All 319 prior tests pass unchanged. **Tests now: 324 across 31 files** (Tasks).
-✅ Stoop's 435/41 still green — has no Stoop impact (Stoop's own single-agent refactor predates this).
+✅ Pinboard's 435/41 still green — has no Pinboard impact (Pinboard's own single-agent refactor predates this).
 
 ### Smokes
 
@@ -333,7 +333,7 @@ Shipped in two passes within the day:
 
 - Tasks-mobile Phase 41.2's `ServiceContext` can `import { buildMeshAgent, wireSkills, multiCircleResolver } from '@onderling-app/tasks-v0'` and have the shape from day one — no per-circle agent multiplication.
 Multi-circle CLI launches stop spinning N agents (the dashboard path).
-- Future `@onderling/scoped-skill-bus` lift (if Stoop or another app trips the rule of two on this factory shape) lands without a Tasks rewrite.
+- Future `@onderling/scoped-skill-bus` lift (if Pinboard or another app trips the rule of two on this factory shape) lands without a Tasks rewrite.
 
 ### Deferred
 
@@ -359,7 +359,7 @@ Capability **S** from the V2 functional design. One screen lists every circle th
 
 - ✅ 6 added in `test/v2_5-dashboard.test.js`: pure aggregator counters; busiest-first sort; single-circle launcher returns own circle; multi-circle filters by membership (other-circle leakage prevented); dispatcher routing for `circles`; `bot.circles` end-to-end render.
 
-Tests now: **297 across 28 files** (Tasks). Stoop's 429 + core's 1279 still green.
+Tests now: **297 across 28 files** (Tasks). Pinboard's 429 + core's 1279 still green.
 
 ---
 
@@ -380,7 +380,7 @@ V2 implements the V2 functional design (`Project Files/Tasks App/functional-desi
 Substrate touches kept to an absolute minimum (per the rule-of-two policy):
 - `core.VaultMemory` — `snapshot()` / `fromSnapshot()` already added in follow-up B; reused in.
 - `core.InternalTransport` — `bus` getter already added in; reused.
-- `item-store.ItemStore#materialise` — additive: now passes `scheduledAt` + `estimateMinutes` through. Pure-additive; Stoop's V1 paths don't read these.
+- `item-store.ItemStore#materialise` — additive: now passes `scheduledAt` + `estimateMinutes` through. Pure-additive; Pinboard's V1 paths don't read these.
 
 No new substrates promoted in V2. The four self-contained capabilities (calendar emission, planner, invoicing, availability) all stay app-local pending a second consumer.
 
@@ -442,7 +442,7 @@ The design called for chat-p2p broadcast. After looking at the chat-p2p substrat
 - ✅ 13 added in `test/v2_3-availability.test.js`: data-class round-trip + state rotation + malformed-input rejection + isoWeekOf / halfDayOf helpers + pruneStale; opt-in gate, set/read flow, coordinator vs member view, opted-out-member indistinguishability, disabled-state rejection, admin-only enable, opt-out blob deletion.
 - ✅ 5 added in `test/v2_3-bot-availability.test.js`: dispatcher routing for `available <state>` + `week`, friendly hint when state missing, end-to-end `bot.available` + `bot.week` against an opted-in member.
 
-Tests now: **277 across 25 files** (Tasks). Stoop's 429 + core's 1279 still green.
+Tests now: **277 across 25 files** (Tasks). Pinboard's 429 + core's 1279 still green.
 
 ## [0.3.2] — 2026-05-08 — compensated-role + invoicing + bot invoice
 
@@ -471,7 +471,7 @@ Capability **P** from the V2 functional design. Circles with `compensation.enabl
 - ✅ 8 added in `test/v2_2-invoicing.test.js`: non-comped completer → no line; comped completer → line at expected path; multiple completions → one rolled JSON; admin sees totals; self-only access; non-self denied; toggle admin gate; toggle off detaches listener; `setMemberCompensation` mutates the live config.
 - ✅ 2 added in `test/v2_2-bot-invoice.test.js`: dispatcher routing + bot reply (paid-pro table vs non-pro empty message).
 
-Tests now: **259 across 23 files** (Tasks). Stoop's 429 + core's 1279 still green; the item-store substrate change is additive and Stoop's V1 paths don't read the new fields.
+Tests now: **259 across 23 files** (Tasks). Pinboard's 429 + core's 1279 still green; the item-store substrate change is additive and Pinboard's V1 paths don't read the new fields.
 
 ## [0.3.1] — 2026-05-08 — calendar write-side + bot calendar
 
@@ -501,7 +501,7 @@ First V2 phase. Closes the follow-up R1 carried into the V2 design: the tasks ag
 - ✅ `BotAgentRegistry` — auto-rotate-on-restore branch from follow-up B (0.2.5) is **no longer the common path**: with stable tasks-agent identity, persisted bot tokens'`agentId` matches across boots and stays valid. Defensive fallback retained for the case where the agent vault is wiped but bot vaults persist (e.g. partial cleanup).
 - ✅ Tests: 3 added in `test/v2_0-agent-identity-persistence.test.js` (first boot persists; second boot restores; multi-circle isolation; external-identity override skips persistence). `test/v1_5-bot-cap-token.test.js` restart-survival assertion updated — `tokenId` is now stable across restart (was `not.toBe(originalTokenId)`).
 
-Tests now: **235 across 19 files** (Tasks). Core + Stoop unaffected.
+Tests now: **235 across 19 files** (Tasks). Core + Pinboard unaffected.
 
 ## [0.2.5] — 2026-05-08 — follow-ups (token scope + persistence + revocation)
 
@@ -532,11 +532,11 @@ Closes the three deferred items flagged at the bottom of [0.2.4].
 **Tasks-agent identity persistence** — required for token IDs to survive restart unchanged. Not strictly necessary for because the auto-rotate makes restarts seamless, but durable token IDs would help cross-process audit trails.
 - **Revocation list persistence** — same shape: a vault-backed `RevocationRegistry` substrate (rule-of-two — promote when a second app needs it).
 
-Tests now: **232 across 18 files** (Tasks) + **1279 / 13 skipped** (core) + Stoop's full **429** still green.
+Tests now: **232 across 18 files** (Tasks) + **1279 / 13 skipped** (core) + Pinboard's full **429** still green.
 
 ## [0.2.4] — 2026-05-08 — cap-token-bound bot agent (the missing planned item)
 
-Closes the last item from the plan in`Project Files/Tasks App/coding-plan-2026-05-07.md` § "Chat-bot bridge (Telegram)" → "Capability-token-bound bot agent (lift Stoop V2's substrate-candidate pattern: bot is an agent under the user's root identity, with a scoped cap-token specific to that bot binding)".
+Closes the last item from the plan in`Project Files/Tasks App/coding-plan-2026-05-07.md` § "Chat-bot bridge (Telegram)" → "Capability-token-bound bot agent (lift Pinboard V2's substrate-candidate pattern: bot is an agent under the user's root identity, with a scoped cap-token specific to that bot binding)".
 
 The previous work shipped chat-bot dispatch via direct in-process handler calls (trust-map mode). The cap-token path now actually exists alongside it: the bot is a real`core.Agent` with its own pubKey, holding a `CapabilityToken` issued by the tasks agent, dispatching via `agent.invoke()` so `taskExchange.handleTaskRequest` runs `PolicyEngine.checkInbound` to verify signature + expiry + subject + issuer trust.
 
@@ -616,7 +616,7 @@ Tests now: **219 across 17 files** (Tasks).
 
 ### — push notifications
 
-Substrate lift (rule-of-two): `PushPolicy` was sitting at `apps/stoop/src/lib/PushPolicy.js` — Tasks trips the second-consumer rule, so the class moved to`@onderling/notifier` (`packages/notifier/src/PushPolicy.js`) and Stoop's lib copy is now a thin re-export. Eight focused unit tests added at the substrate level (`packages/notifier/test/PushPolicy.test.js`).
+Substrate lift (rule-of-two): `PushPolicy` was sitting at `apps/pinboard/src/lib/PushPolicy.js` — Tasks trips the second-consumer rule, so the class moved to`@onderling/notifier` (`packages/notifier/src/PushPolicy.js`) and Pinboard's lib copy is now a thin re-export. Eight focused unit tests added at the substrate level (`packages/notifier/test/PushPolicy.test.js`).
 
 App-side:
 
@@ -626,7 +626,7 @@ App-side:
 - ✅ CLI `--push` flag lazy-imports `@onderling/relay`'s `ExpoPushSender` and forwards it to `createCircleAgent`. `@onderling/relay` added as a tasks-v0 dependency.
 - ✅ Tests: 4 added in `test/v1_5-push.test.js` — push fires for the master with a bound token; skipped when the recipient has no token; dormant without `pushSender`; honours `pushPolicy.maxPerDay` from the circle config.
 
-Tests now: **212 across 16 files** (Tasks) + **53 across 5 files** (notifier) + Stoop's full 429-test suite still green after the substrate lift.
+Tests now: **212 across 16 files** (Tasks) + **53 across 5 files** (notifier) + Pinboard's full 429-test suite still green after the substrate lift.
 
 ## [0.2.1] — 2026-05-08 — Review polish + custom-role UI
 
@@ -691,20 +691,20 @@ substrates were lifted by parallel work).
 - ✅ Per-event observability: counters + p50/p90 latencies.
 - ✅ Pause / archive blocks `addTask` with discrete error codes.
 - ✅ Privacy notice in nl + en; surfaced via `getPrivacyNotice` + `/privacy.html`.
-- ✅ Stoop's tests stay structurally green: 410/429 in a full-suite run; the 3 failing tests (in phase13/phase14/phase29/web/testbed) all pass in isolation — pre-existing timing flakes under full-suite load (Stoop's full run takes ~90s wall + 229s collect; timing-sensitive crypto + scheduling tests stress under that). Item-store tests 53/54 (1 pre-existing flaky audit-ordering test from a `Date.now()` race in close-succession writes — not introduced by V1).
+- ✅ Pinboard's tests stay structurally green: 410/429 in a full-suite run; the 3 failing tests (in phase13/phase14/phase29/web/testbed) all pass in isolation — pre-existing timing flakes under full-suite load (Pinboard's full run takes ~90s wall + 229s collect; timing-sensitive crypto + scheduling tests stress under that). Item-store tests 53/54 (1 pre-existing flaky audit-ordering test from a `Date.now()` race in close-succession writes — not introduced by V1).
 
 ### V1 acceptance gates — partial
 
 - ⚠️ **Circle switcher UI** — not built. V1 ships `--circle <path>` per launch; switching circles means restart-with-different-config. Multi-circle-switcher screen is work.
 - ⚠️ **Localisation back-fill** — localisation scaffolding shipped (`locales/{en,nl}.json` + `lib/localisation.js` + 60+ keyed strings + privacy notice in both langs). HTML pages still ship hardcoded English; `data-i18n` attribute back-fill is opportunistic per touched page.
-- ⚠️ **Inrupt-migration** — undecided. Tasks V1 ships local-only-mode-by-default; pod sign-in surface is the same legacy bespoke UX Stoop / Folio currently use. Documented inheritance.
+- ⚠️ **Inrupt-migration** — undecided. Tasks V1 ships local-only-mode-by-default; pod sign-in surface is the same legacy bespoke UX Pinboard / Folio currently use. Documented inheritance.
 
 ### V1 design + plan documents
 
 - `Project Files/Tasks App/advice-2026-05-07.md` — integration advice + high-level design.
 - `Project Files/Tasks App/critique-2026-05-07.md` — design review pushback.
 - `Project Files/Tasks App/coding-plan-2026-05-07.md` — phased build plan; 11 phases, ~27 dev-days, ~85 tests target (actual: 176, including substrate test parities).
-- `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md` — Stoop-side migration log for the lifted substrates.
+- `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md` — Pinboard-side migration log for the lifted substrates.
 - `Project Files/Substrates/apps/H4-tasks.md` — substrate-composition sketch (V1 update).
 
 - `Project Files/Tasks App/advice-2026-05-07.md` — integration advice + high-level design.
@@ -744,7 +744,7 @@ substrates were lifted by parallel work).
 ### Phase 3 — canonical user-skills profile + per-circle vocabulary (2026-05-08)
 
 - ✅ New `src/skills/profile.js` — canonical-profile, circle-vocabulary, per-circle-member-skills, and per-circle-posture readers + writers, all over a `core.DataSource` (composes the local-store bundle).
-- ✅ Canonical user-skills profile path: **`mem://user/profile/skills.json`** — intentionally NOT app-namespaced, so Stoop / Tasks / Folio / future apps read the same blob.
+- ✅ Canonical user-skills profile path: **`mem://user/profile/skills.json`** — intentionally NOT app-namespaced, so Pinboard / Tasks / Folio / future apps read the same blob.
 - ✅ Circle skill vocabulary at `<circle-pod>/circles/<circleId>/skills.json`; per-circle member projection at `<circle-pod>/circles/<circleId>/skills/<webid-encoded>.json`; per-circle posture at `<user-pod>/posture/<circleId>.json`.
 - ✅ Tag normalisation: leans on the shipped `@onderling/identity-resolver/normaliseTag` so NL "schilderen" / EN "painting" / "schilderwerk" all canonicalise to one tag — cross-language matching works out of the box. Off-taxonomy `categoryId` values get nulled; duplicates dedupe by canonical tag.
 - ✅ `prefilledFormShape({canonicalProfile, circleVocabulary, taxonomy?})` — pure function, returns `{prefilled, vocabSuggestions, taxonomyHints}` for the UI's three lists. `prefilled` annotated with `inCircleVocabulary`. Handles null inputs.
@@ -765,14 +765,14 @@ substrates were lifted by parallel work).
 - ✅ Updated `apps/tasks-v0/README.md` with the V1 surface, V1//V2+ split, full file inventory, V1 + Circle CLI examples, test-coverage table.
 - ✅ Updated `Project Files/Substrates/apps/H4-tasks.md` to reflect the V1 substrate composition + new substrate dependencies (`local-store`, `chat-p2p`) + V1 design locks.
 - ✅ Finalised this CHANGELOG with a top-level `0.2.0` entry + acceptance gates summary (passed / partial).
-- ✅ Final acceptance run: **176/176 tests passing** across 13 files; Stoop 429/429 untouched.
+- ✅ Final acceptance run: **176/176 tests passing** across 13 files; Pinboard 429/429 untouched.
 
 ### Phase 10 — localisation + archive + pause + privacy notice (2026-05-08)
 
 - ✅ Added `i18next@^26` dependency.
 - ✅ New `locales/en.json` + `locales/nl.json` — every leaf carries the project-mandated `{text, doc}` shape (per `Project Files/conventions/localisation.md`); `doc` field is mandatory and explains where the string appears + tone. Coverage: common, nav, status pills, action labels, composer fields, circle labels, inbox event chips, error codes (~60 keys per language).
-- ✅ New `src/lib/localisation.js` — i18next wrapper. `unwrapLeaves()` transforms `{text, doc}` pairs to bare strings at init time so callers write `t('common.save')` (not `t('common.save.text')`). Falls back to the key when missing; supports `{{params}}` interpolation; `setLang(lng)` for runtime switching. Mirrors Stoop's wrapper pattern.
-- ✅ New `src/lib/privacyNotice.js` — `PRIVACY_NOTICE` (frozen) with 6 items per language. Inherits items 1-4 from Stoop's notice (encryption, relay surface, abuse-tracing, group governance) + 2 Tasks-specific items (calendar-stays-on-device + pod-data-sharing caution principles).
+- ✅ New `src/lib/localisation.js` — i18next wrapper. `unwrapLeaves()` transforms `{text, doc}` pairs to bare strings at init time so callers write `t('common.save')` (not `t('common.save.text')`). Falls back to the key when missing; supports `{{params}}` interpolation; `setLang(lng)` for runtime switching. Mirrors Pinboard's wrapper pattern.
+- ✅ New `src/lib/privacyNotice.js` — `PRIVACY_NOTICE` (frozen) with 6 items per language. Inherits items 1-4 from Pinboard's notice (encryption, relay surface, abuse-tracing, group governance) + 2 Tasks-specific items (calendar-stays-on-device + pod-data-sharing caution principles).
 - ✅ New `src/skills/circleControls.js`:
   - `pauseCircle()` / `unpauseCircle()` — admin/coord only. Sets `circle.paused = true|false`.
   - `archiveCircle()` / `unarchiveCircle()` — admin only. Sets `circle.archived = true|false`. Reversible (does NOT delete items).
@@ -902,7 +902,7 @@ App side (`apps/tasks-v0`):
 - **Per-circle skill vocabulary** + cadence config + observability stats.
 - **Local-only mode** is a hard rule — app boots without a Solid pod.
 
-### Substrate movements during V1 (lifted from Stoop, rule of two satisfied)
+### Substrate movements during V1 (lifted from Pinboard, rule of two satisfied)
 
 - New `@onderling/local-store` package (`CachingDataSource` + `SyncCadence` + `Settings` split).
 - New `@onderling/chat-p2p` package (peer-to-peer chat threads).
@@ -910,7 +910,7 @@ App side (`apps/tasks-v0`):
 - `@onderling/notifier` extension: `UsageMetrics` (in-memory per-event counter).
 - `core.GroupManager` extension: canonical `issueInviteSkill` / `redeemInviteSkill` helpers.
 
-Stoop's `apps/stoop/src/lib/` files affected become re-export shims; per-PR migration plan at `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`. **No Stoop V3 substrates touched** (e.g. `@onderling/oidc-session-rn` stays out of scope).
+Pinboard's `apps/pinboard/src/lib/` files affected become re-export shims; per-PR migration plan at `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`. **No Pinboard V3 substrates touched** (e.g. `@onderling/oidc-session-rn` stays out of scope).
 
 ---
 

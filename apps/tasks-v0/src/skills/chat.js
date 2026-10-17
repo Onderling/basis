@@ -1,5 +1,5 @@
 /**
- * chat skills — Tasks V1 Phase 14 (mirrors Stoop's chat surface).
+ * chat skills — Tasks V1 Phase 14 (mirrors Pinboard's chat surface).
  *
  * Phase 41.18.4 (2026-05-10) — added so the mobile appeal-thread
  * screen has a concrete read/send surface. The substrate side is
@@ -52,7 +52,7 @@ export function buildChatSkills({ bundleResolver } = {}) {
         return { error: 'chat-not-wired' };
       }
       // Recipient: prefer toWebid (used by appealTask + most callers),
-      // fall back to toStableId / toPubKey for symmetry with Stoop's
+      // fall back to toStableId / toPubKey for symmetry with Pinboard's
       // surface.
       const r = await ctrl.send({
         toWebid:    a.toWebid    ?? null,

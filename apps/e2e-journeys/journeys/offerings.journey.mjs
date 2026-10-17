@@ -14,7 +14,7 @@ import { AgentIdentity, DataPart } from '@onderling/core';
 import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
 import { RelayTransport }          from '@onderling/transports';
-import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/pinboard';
 import { wait, checker }           from './_util.mjs';
 
 export const name = 'J-offerings (ask · answer · offer · lend, across three people)';
@@ -128,7 +128,7 @@ export async function run({ relayUrl }) {
       JSON.stringify(accepted)?.slice(0, 140));
 
     // ── 4. OFFERINGS — what a person says they can do: persona drivers (`agents:setProfileDriver`, kind 'offering'),
-    // set in the person's own editor, which this stoop-only journey does not boot. The stoop roster list it used to
+    // set in the person's own editor, which this pinboard-only journey does not boot. The pinboard roster list it used to
     // walk has no door any more (2026-10-15) — walking it here proved an op nobody reaches.
 
     // ── 5. LENDING — the object leaves the house and comes back ───────────────────────────────────

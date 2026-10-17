@@ -2,7 +2,7 @@
  * backgroundTasks — re-export shim around `@onderling/sync-engine-rn`.
  *
  * **2026-05-08:** the implementation lifted into the substrate
- * (Stoop V3 mobile = rule-of-two consumer). The helpers are fully
+ * (Pinboard V3 mobile = rule-of-two consumer). The helpers are fully
  * generic — peer-injected `TaskManager` / `BackgroundFetch` — so
  * no folio-specific glue stays here.
  */

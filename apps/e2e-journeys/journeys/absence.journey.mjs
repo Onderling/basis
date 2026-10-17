@@ -32,7 +32,7 @@ export async function run({ relayUrl }) {
   try {
     circle = await bootAppCircle({ relayUrl, circleId: CIRCLE, handles: ['anne', 'bram', 'cato'] });
     const [anne, bram, cato] = circle.people;
-    const call = (node, op, args) => node.agent.callSkill('stoop', op, args);
+    const call = (node, op, args) => node.agent.callSkill('pinboard', op, args);
 
     // A message BEFORE the absence, so the journey can tell "caught up" from "never had anything".
     await sendCircleChat(anne, { groupId: CIRCLE, msgId: 'before-1', text: 'tot morgen' });

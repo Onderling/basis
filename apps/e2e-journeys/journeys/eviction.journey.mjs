@@ -36,7 +36,7 @@ export async function run({ relayUrl }) {
     });
     const [anne, bram, cato] = circle.people;
     const [zus] = circle.outsiders;
-    const call = (node, op, args) => node.agent.callSkill('stoop', op, args);
+    const call = (node, op, args) => node.agent.callSkill('pinboard', op, args);
 
     check('the circle starts with all three', hasMember(await rosterOf(anne, CIRCLE), bram.pubKey));
 

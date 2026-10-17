@@ -4,8 +4,8 @@
  * Lifts the `core.Agent` + `policyEngine` + `trustRegistry` +
  * `tokenRegistry` + identity vault out of `createCircleAgent` so a
  * single agent serves every circle the process knows about. Mirrors
- * Stoop's 2026-05-08 single-agent refactor (see
- * `Project Files/Stoop/single-agent-refactor-2026-05-08.md` § "Tasks-app
+ * Pinboard's 2026-05-08 single-agent refactor (see
+ * `Project Files/Pinboard/single-agent-refactor-2026-05-08.md` § "Tasks-app
  * fix propagation"). Per-circle state lives in `CircleState` (see
  * `./Circle.js`); skills register once via `./wireSkills.js` with a
  * `bundleResolver` that picks the right CircleState per call.

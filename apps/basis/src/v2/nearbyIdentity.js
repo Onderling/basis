@@ -40,8 +40,9 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
     /** The room self's Nearby level (its disclosure under `nearby`; nothing set → `handle`). While the room asks: none. */
     async level() {
       const self = roomSelf?.() ?? null;
-      if (self?.asking === true) return 'none';
-      try { return nearbyLevelFrom((await callSkill?.('agents', 'getProfileDisclosure', { id: self?.id ?? 'default' }))?.disclosure); } catch { return 'handle'; }
+      // no self entering (none held, or the room still asks): nothing is shown — never the general persona by default
+      if (!self?.id || self.asking === true) return 'none';
+      try { return nearbyLevelFrom((await callSkill?.('agents', 'getProfileDisclosure', { id: self.id }))?.disclosure); } catch { return 'handle'; }
     },
     /**
      * Set the room self's level — through the one writer (`setNearbyLevel`), for THAT self. While the room asks who
@@ -51,7 +52,8 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
     async setLevel(level) {
       const self = roomSelf?.() ?? null;
       if (self?.asking === true) return { ok: false, reason: 'asking' };
-      try { return (await callSkill?.('household', 'setNearbyLevel', { personaId: self?.id ?? 'default', level })) ?? { ok: false, reason: 'no-answer' }; }
+      if (!self?.id) return { ok: false, reason: 'not-a-self-here' };
+      try { return (await callSkill?.('household', 'setNearbyLevel', { personaId: self.id, level })) ?? { ok: false, reason: 'no-answer' }; }
       catch (err) { return { ok: false, reason: String(err?.message ?? err) }; }
     },
     /**
@@ -78,9 +80,9 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
      */
     async cardPrefill() {
       const self = roomSelf?.() ?? null;
-      if (self?.asking === true) return {};
+      if (!self?.id || self.asking === true) return {};
       let released = {};
-      try { released = (await callSkill?.('agents', 'getPersonaRelease', { id: self?.id ?? 'default', contextId: NEARBY_CONTEXT }))?.released ?? {}; } catch { released = {}; }
+      try { released = (await callSkill?.('agents', 'getPersonaRelease', { id: self.id, contextId: NEARBY_CONTEXT }))?.released ?? {}; } catch { released = {}; }
       const pick = (k) => (typeof released?.[k] === 'string' && released[k].trim() ? released[k].trim() : (typeof released?.[k]?.value === 'string' ? released[k].value : null));
       const label = pick('realName') ?? pick('handle');
       return label ? { label } : {};

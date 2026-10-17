@@ -487,7 +487,7 @@ export async function bootAgentBundle(opts = {}) {
   // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
   // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
   // agent, like everything else here built before the agent lands.
-  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none: the general persona's face
+  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none yet: no face (never the general persona by default)
   const nearbyRoomSelfRef = { current: () => null };
   // what the room is told about me, and what an ask in it is weighed against (nearbyIdentity.js) — one per bundle
   const nearbyIdentity = createNearbyIdentity({

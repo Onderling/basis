@@ -69,8 +69,8 @@ export const householdManifest = {
     'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
     'pause-persona':    'write',   // a device entry: which held personas do not run here
     'resume-persona':   'write',
-    'remove-persona':   'write',
-    'set-nearby-level': 'write',   // a self's Nearby level, on its disclosure   // this device's delegation under one persona, tombstoned; its keys here wiped
+    'remove-persona':   'write',   // this device's delegation under one persona, tombstoned; its keys here wiped
+    'set-nearby-level': 'write',   // a self's Nearby level, on its disclosure
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony

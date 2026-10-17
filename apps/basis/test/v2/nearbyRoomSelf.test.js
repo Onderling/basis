@@ -27,7 +27,8 @@ describe('who enters the room', () => {
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' })).toEqual({ label: 'Werk' });
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }, 'handle'), 'a persona has no handle of the general persona').toEqual({ label: 'Werk' });
     expect(await as({ id: 'default' })).toEqual({ label: 'Frits' });
-    expect(await as(null, 'handle')).toEqual({ label: 'frits' });
+    expect(await as({ id: 'default' }, 'handle')).toEqual({ label: 'frits' });
+    expect(await as(null, 'handle'), 'no self entering: nobody, never the general persona by default').toBe(null);
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }, 'none')).toBe(null);
   });
   it('what the shells hand the face: the chosen self, or ASKING while the room asks — never an absence', () => {

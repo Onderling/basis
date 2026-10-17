@@ -57,3 +57,28 @@ export function nearbyLevelWrites(level) {
 export function nearbyLevelLabelKey(level) {
   return level === 'none' ? 'circle.nearbyScreen.face_none' : revealPresetLabelKey(level);
 }
+
+/** Whether the self chose a Nearby level at all (any entry under `nearby`), as opposed to sitting on the floor default. */
+export function nearbyLevelIsSet(disclosure) {
+  const ctx = disclosure?.perContext?.[NEARBY_CONTEXT];
+  return !!ctx && typeof ctx === 'object' && Object.keys(ctx).length > 0;
+}
+
+/**
+ * THE FIRST-USE QUESTION — "what may this room see of you?" — asked once per self on each DEVICE. The answer (the level)
+ * is the person's and travels with the self; the "asked" mark is the device's (`nearbyAskedKey`), so a self whose level
+ * was already chosen elsewhere is shown it here and not asked again.
+ */
+export const NEARBY_ASKED_PREFIX = 'nearby-asked:';
+/** The device-level mark that this self was asked here (a shell keeps it in its own storage, under its own prefix). */
+export function nearbyAskedKey(selfId) { return `${NEARBY_ASKED_PREFIX}${selfId}`; }
+/**
+ * Ask now? Only for a chosen self (never while the room asks who enters), not asked on this device, and with no level of
+ * its own yet. A self whose level was chosen ELSEWHERE is shown it and marked asked here (`mark`), never asked.
+ * @param {{self: {id?: string, asking?: boolean}|null, asked: boolean, levelSet: boolean}} a
+ * @returns {{ask: boolean, mark: boolean}}
+ */
+export function nearbyFirstUse({ self = null, asked = false, levelSet = false } = {}) {
+  if (self?.asking === true || asked === true) return { ask: false, mark: false };
+  return levelSet === true ? { ask: false, mark: true } : { ask: true, mark: false };
+}

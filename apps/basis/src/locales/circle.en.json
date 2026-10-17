@@ -3418,6 +3418,18 @@
       "text": "That is a name you show, not a separate address: whoever is looking here can tell it comes from the same device.",
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
+    "first_use_title": {
+      "text": "What may this room see of you?",
+      "doc": "Nearby first-use question (once per self per device): the room self's level."
+    },
+    "first_use_body": {
+      "text": "You choose this per persona; it goes with it to your other devices. You can change it later under \"Show here as\".",
+      "doc": "Under the first-use question: the level is the persona's and syncs; where to change it later."
+    },
+    "first_use_later": {
+      "text": "Later (your handle until then)",
+      "doc": "Dismiss the first-use question; the self stays on the floor default (its handle) and is not asked again on this device."
+    },
     "face_row": {
       "text": "Show here as",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."

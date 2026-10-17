@@ -751,6 +751,7 @@ import {
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { createNearbyIdentity, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
+import { nearbyFirstUse, nearbyAskedKey } from '../../src/v2/nearbyLevel.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
@@ -3912,7 +3913,33 @@ function showNearby() {
   let notice = null;
   let lastAsk = null;
   let roomLevel = null;   // the room self's level, read from its disclosure (re-read when the self changes)
-  const readRoomLevel = () => _nearbyIdentity?.level?.().then((l) => { roomLevel = l; draw(nearbyScreen.model()); }).catch(() => {});
+  let firstUse = null;    // the once-per-self-per-device question, while it is open
+  // which self the level is for: null while the room still asks who enters
+  const roomSelfId = () => { const s = nearbyRoomSelfNow().self; return s?.asking ? null : (s?.id ?? 'default'); };
+  const markAsked = (id) => { try { localStorage.setItem(`basis.${nearbyAskedKey(id)}`, '1'); } catch { /* best-effort */ } };
+  const changeLevel = async (v) => {
+    const id = roomSelfId();
+    const w = await _nearbyIdentity?.setLevel?.(v);
+    if (!w?.ok) { notice = { key: 'level_not_set' }; draw(nearbyScreen.model()); return; }
+    roomLevel = v;
+    if (id) markAsked(id);   // a chosen level answers the first-use question too
+    firstUse = null;
+    // "Handle" with no handle set announces nothing and looks identical to "Nobody". The binding
+    // reports the label it actually sent, so say so rather than leaving the person to guess.
+    const r = await ensureNearbyRoom()?.announceFace?.();
+    notice = faceNoticeFor({ choice: v, result: r });
+    draw(nearbyScreen.model());
+  };
+  const readRoomLevel = () => _nearbyIdentity?.levelState?.().then((st) => {
+    roomLevel = st.level;
+    const id = roomSelfId();
+    let asked = true;
+    try { asked = id ? !!localStorage.getItem(`basis.${nearbyAskedKey(id)}`) : true; } catch { asked = true; }
+    const fu = nearbyFirstUse({ self: id ? { id } : { asking: true }, asked, levelSet: st.set });
+    if (fu.mark) markAsked(id);
+    firstUse = fu.ask ? { onChoose: changeLevel, onLater: () => { markAsked(id); firstUse = null; draw(nearbyScreen.model()); } } : null;
+    draw(nearbyScreen.model());
+  }).catch(() => {});
   _unsubscribeNearbyHeard = _nearbyRoom?.subscribeToHeard?.(({ msgId, heard }) => {
     if (lastAsk && msgId === lastAsk.id && nearbyScreen) { notice = { key: 'ask_heard', vars: { heard, peers: lastAsk.peers } }; draw(nearbyScreen.model()); }
   }) ?? null;
@@ -3944,16 +3971,8 @@ function showNearby() {
     },
     onAskAction: handleNearbyAskAction,
     level: roomLevel,
-    onLevelChange: async (v) => {
-      const w = await _nearbyIdentity?.setLevel?.(v);
-      if (!w?.ok) { notice = { key: 'level_not_set' }; draw(nearbyScreen.model()); return; }
-      roomLevel = v;
-      // "Handle" with no handle set announces nothing and looks identical to "Nobody". The binding
-      // reports the label it actually sent, so say so rather than leaving the person to guess.
-      const r = await ensureNearbyRoom()?.announceFace?.();
-      notice = faceNoticeFor({ choice: v, result: r });
-      draw(nearbyScreen.model());
-    },
+    firstUse,
+    onLevelChange: changeLevel,
     onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); notice = null; draw(nearbyScreen.model()); },
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);

@@ -486,3 +486,23 @@ describe('the card prefill', () => {
     expect(el.querySelector('.circle-nearby__card-label').value).toBe('mine');
   });
 });
+
+describe('the first-use question', () => {
+  it('asks before anything else, offers every level, and hands the choice back', () => {
+    const chosen = [];
+    let later = 0;
+    const el = render(model(), { firstUse: { onChoose: (v) => chosen.push(v), onLater: () => { later += 1; } } });
+    const block = el.querySelector('.circle-nearby__first-use');
+    expect(block, 'the question is shown').not.toBe(null);
+    expect(el.querySelector('.circle-nearby__title').nextElementSibling).toBe(block);
+    const opts = [...block.querySelectorAll('.circle-nearby__first-use-option')];
+    expect(opts.map((b) => b.textContent)).toEqual(['circle.nearbyScreen.face_none', 'circle.reveal.preset.handle', 'circle.reveal.preset.profile', 'circle.reveal.preset.full']);
+    opts[2].click();
+    expect(chosen).toEqual(['profile']);
+    block.querySelector('.circle-nearby__first-use-later').click();
+    expect(later).toBe(1);
+  });
+  it('is absent when the shell does not ask', () => {
+    expect(render(model()).querySelector('.circle-nearby__first-use')).toBe(null);
+  });
+});

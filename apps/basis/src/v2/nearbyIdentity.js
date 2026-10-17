@@ -6,7 +6,7 @@
  * call): the relay this device rides, and the NKN address only when the publication lock allows it (the same lock the
  * invite QR honours). A shell hands in only how it finds its relay and NKN address.
  */
-import { nearbyLevelFrom, NEARBY_CONTEXT } from './nearbyLevel.js';
+import { nearbyLevelFrom, nearbyLevelIsSet, NEARBY_CONTEXT } from './nearbyLevel.js';
 
 /**
  * @param {object} a
@@ -38,11 +38,16 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
     /** The room self's offerings, as the shared-skills line shows them (from the last `getDrivers`). */
     mySkills() { return offeringsNow; },
     /** The room self's Nearby level (its disclosure under `nearby`; nothing set → `handle`). While the room asks: none. */
-    async level() {
+    async level() { return (await this.levelState()).level; },
+    /** The level and whether the self chose one (`set`) — the first-use question asks only when it did not. */
+    async levelState() {
       const self = roomSelf?.() ?? null;
       // no self entering (none held, or the room still asks): nothing is shown — never the general persona by default
-      if (!self?.id || self.asking === true) return 'none';
-      try { return nearbyLevelFrom((await callSkill?.('agents', 'getProfileDisclosure', { id: self.id }))?.disclosure); } catch { return 'handle'; }
+      if (!self?.id || self.asking === true) return { level: 'none', set: false };
+      try {
+        const disclosure = (await callSkill?.('agents', 'getProfileDisclosure', { id: self.id }))?.disclosure;
+        return { level: nearbyLevelFrom(disclosure), set: nearbyLevelIsSet(disclosure) };
+      } catch { return { level: 'handle', set: false }; }
     },
     /**
      * Set the room self's level — through the one writer (`setNearbyLevel`), for THAT self. While the room asks who

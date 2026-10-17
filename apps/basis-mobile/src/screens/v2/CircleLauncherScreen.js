@@ -18,9 +18,9 @@ import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
-import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
+import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyAsked, markNearbyAsked, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
 import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
-import { NEARBY_LEVELS, nearbyLevelLabelKey } from '../../../../basis/src/v2/nearbyLevel.js';
+import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../basis/src/v2/nearbyLevel.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -5319,11 +5319,34 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   }, [bundle]);
   // the room self's level, read from ITS disclosure — re-read whenever the self changes
   const [roomLevel, setRoomLevel] = useState(null);
+  // the once-per-self-per-device question ("what may this room see of you?"), while it is open
+  const [askLevel, setAskLevel] = useState(false);
+  // which self the level is for: null while the room still asks who enters
+  const roomSelfId = useMemo(() => { const s = roomSelfFor(roomR, heldSelves); return s?.asking ? null : (s?.id ?? 'default'); }, [roomR, heldSelves]);
   useEffect(() => {
     let live = true;
-    Promise.resolve(bundle?.nearbyIdentity?.level?.()).then((l) => { if (live && l) setRoomLevel(l); }).catch(() => {});
+    (async () => {
+      const st = (await bundle?.nearbyIdentity?.levelState?.()) ?? null;
+      if (!live || !st) return;
+      setRoomLevel(st.level);
+      const asked = roomSelfId ? await readNearbyAsked(roomSelfId) : true;
+      const fu = nearbyFirstUse({ self: roomSelfId ? { id: roomSelfId } : { asking: true }, asked, levelSet: st.set });
+      if (fu.mark) markNearbyAsked(roomSelfId);
+      if (live) setAskLevel(fu.ask);
+    })().catch(() => {});
     return () => { live = false; };
-  }, [bundle, roomR]);
+  }, [bundle, roomR, roomSelfId]);
+  const changeLevel = useCallback(async (v) => {
+    const w = await bundle?.nearbyIdentity?.setLevel?.(v);
+    if (!w?.ok) { setNotice({ key: 'level_not_set' }); return; }
+    setRoomLevel(v);
+    if (roomSelfId) markNearbyAsked(roomSelfId);   // a chosen level answers the first-use question too
+    setAskLevel(false);
+    // Same as web: a face that resolves to nothing is announced as a retraction, and the person is
+    // told, because "handle" with no handle looks exactly like "Nobody" from the inside.
+    const r = await bundle?.nearbyRoom?.announceFace?.();
+    setNotice(faceNoticeFor({ choice: v, result: r }));
+  }, [bundle, roomSelfId]);
   // View state, not model state: whether THIS device currently has a text box open says nothing about
   // the room. `answering` holds the ask id being replied to.
   const [composing, setComposing] = useState(false);
@@ -5441,15 +5464,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       onSay={say}
       onInviteAction={inviteAction}
       level={roomLevel}
-      onLevelChange={async (v) => {
-        const w = await bundle?.nearbyIdentity?.setLevel?.(v);
-        if (!w?.ok) { setNotice({ key: 'level_not_set' }); return; }
-        setRoomLevel(v);
-        // Same as web: a face that resolves to nothing is announced as a retraction, and the person is
-        // told, because "handle" with no handle looks exactly like "Nobody" from the inside.
-        const r = await bundle?.nearbyRoom?.announceFace?.();
-        setNotice(faceNoticeFor({ choice: v, result: r }));
-      }}
+      onLevelChange={changeLevel}
+      firstUse={askLevel ? { onChoose: changeLevel, onLater: () => { if (roomSelfId) markNearbyAsked(roomSelfId); setAskLevel(false); } } : null}
       onSetQuiet={(v) => screen?.setQuiet?.(v)}
       onSetRadio={(v) => screen?.setRadio?.(v)}
       onCompose={() => { setNotice(null); setComposing(true); }}
@@ -5477,7 +5493,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, firstUse = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -5508,6 +5524,23 @@ function NearbyScreen({
         </Pressable>
       </View>
       <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
+      {firstUse ? (
+        // The first-use question, before anything else: what may this room see of the self entering it.
+        <View style={styles.nearbyAsks} testID="nearby-first-use">
+          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.first_use_title')}</Text>
+          <Text style={styles.muted}>{t('circle.nearbyScreen.first_use_body')}</Text>
+          <View style={styles.nearbyActions}>
+            {NEARBY_LEVELS.map((v) => (
+              <Pressable key={v} accessibilityRole="button" testID={`nearby-first-use-${v}`} style={styles.nearbyAction} onPress={() => firstUse.onChoose?.(v)}>
+                <Text style={styles.nearbyActionText}>{t(nearbyLevelLabelKey(v))}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable accessibilityRole="button" testID="nearby-first-use-later" style={styles.nearbyAction} onPress={() => firstUse.onLater?.()}>
+            <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.first_use_later')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {visKey ? (
         // One line for the state; the sentence behind it one tap away (sketch §2). A degraded state keeps
         // its sentence in view — that one is a warning, not an explanation.

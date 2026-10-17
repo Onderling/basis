@@ -75,7 +75,7 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     await announce(A, A2);
     await announce(A2, B);
     const knows = (node, webid, otherAddr) => until(async () => {
-      const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       const row = (res?.members ?? []).find((m) => m.webid === webid);
       return row?.circleAddresses?.includes(otherAddr) ? row : null;
     }, { timeout: 20000, step: 100 });
@@ -88,7 +88,7 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     expect(seedRequest, 'the enrolled device can sign a seed request').toBeTruthy();
     await A2.agent.sendPeerMessage(A.agent.circleAddressFor(GROUP), seedRequest, SEND);
     expect(await until(async () => {
-      const res = await A2.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       return (res?.members ?? []).some((m) => m.webid === B.pubKey) ? true : null;
     }, { timeout: 20000, step: 100 }), 'the always-on device never received the roster seed (no row for Bea)').toBe(true);
 
@@ -125,7 +125,7 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     // The emitter's two halves, as the shells run them: append + member fan, then the own-write carry.
     const res = await A.chatRail.appendMessage(GROUP, { msgId, ts: Date.now(), text, actor: A.pubKey });
     expect(res?.statement).toBeTruthy();
-    const fan = await A.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId: GROUP, event: res.statement, msgId, ts: Date.now() });
+    const fan = await A.agent.callSkill('pinboard', 'broadcastCircleChatStatement', { groupId: GROUP, event: res.statement, msgId, ts: Date.now() });
     expect(fan?.error).toBeUndefined();
     const carried = await A.agent.siblingCarry.carry({ subtype: CHAT_STATEMENT_BROADCAST, circleId: GROUP, event: res.statement, msgId, ts: Date.now() });
     expect(carried.attempted, 'the production sibling set named the always-on device').toBe(1);
@@ -134,7 +134,7 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
   });
 
   it("the PRIMARY CONTACT ADDRESS is Anna's choice: enrolling the always-on device did not make it primary on Bea's roster; the tap on it does, over the production announce wire", async () => {
-    const rowOnB = async () => ((await B.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === A.pubKey);
+    const rowOnB = async () => ((await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === A.pubKey);
     const phone = A.agent.circleAddressFor(GROUP), box = A2.agent.circleAddressFor(GROUP);
     let row = await rowOnB();
     expect(row.circleAddress, "the phone joined, so the phone is primary — the box's announce only added itself").toBe(phone);
@@ -147,7 +147,7 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     expect(row.circleAddresses, 'primary first, the phone kept behind it').toEqual([box, phone]);
     // …and the choice is on Anna's own devices too (the fan reached the phone; the box recorded its own row).
     expect(await until(async () => {
-      const res = await A.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       return (res?.members ?? []).find((m) => m.webid === A.pubKey)?.circleAddress === box ? true : null;
     }, { timeout: 10000, step: 100 }), "the phone's own row never took the choice").toBe(true);
   });
@@ -156,7 +156,7 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
     const text = `van bea ${Date.now().toString(36)}`;
     const msgId = `m-bea-${Date.now().toString(36)}`;
     const res = await B.chatRail.appendMessage(GROUP, { msgId, ts: Date.now(), text, actor: B.pubKey });
-    const fan = await B.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId: GROUP, event: res.statement, msgId, ts: Date.now() });
+    const fan = await B.agent.callSkill('pinboard', 'broadcastCircleChatStatement', { groupId: GROUP, event: res.statement, msgId, ts: Date.now() });
     expect(fan?.error).toBeUndefined();
 
     // Bea delivered to ONE of Anna's devices; the carry hands it to the other. Both hold it, each exactly once.
@@ -168,9 +168,9 @@ describe('L100 · the one sibling carry — Anna\'s always-on device follows the
   });
 
   it('a role change Anna makes on the phone is on the always-on device\'s roster, live — the membership lane rides the same carry', async () => {
-    const roleOn = async (node) => (await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members?.find((m) => m.webid === B.pubKey)?.role ?? null;
+    const roleOn = async (node) => (await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members?.find((m) => m.webid === B.pubKey)?.role ?? null;
     expect(await roleOn(A2)).toBe('member');
-    const r = await A.agent.callSkill('stoop', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: 'admin' });
+    const r = await A.agent.callSkill('pinboard', 'setMemberRole', { groupId: GROUP, memberWebid: B.pubKey, role: 'admin' });
     expect(r?.ok ?? !r?.error, JSON.stringify(r)).toBe(true);
     expect(await until(async () => ((await roleOn(A2)) === 'admin' ? true : null), { timeout: 10000, step: 200 }),
       'the always-on device never saw the promotion Anna made on her phone').toBe(true);

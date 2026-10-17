@@ -564,12 +564,12 @@ describe('renderWeb D-mig-1a — list-surface field selectors', () => {
   });
 });
 
-/* ─── D-mig-1a: real stoop manifest projects contacts + noticeboard ─────── */
+/* ─── D-mig-1a: real pinboard manifest projects contacts + noticeboard ─────── */
 
-describe('renderWeb D-mig-1a — stoop manifest projection', () => {
-  it('stoop contacts section carries listContacts + label + category', async () => {
-    const { stoopManifest } = await import('../../../apps/stoop/manifest.js');
-    const c = renderWeb(stoopManifest).sections.find((s) => s.id === 'contacts');
+describe('renderWeb D-mig-1a — pinboard manifest projection', () => {
+  it('pinboard contacts section carries listContacts + label + category', async () => {
+    const { pinboardManifest } = await import('../../../apps/pinboard/manifest.js');
+    const c = renderWeb(pinboardManifest).sections.find((s) => s.id === 'contacts');
     expect(c).toBeDefined();
     expect(c.itemType).toBe('contact');
     expect(c.dataSource).toEqual({ skillId: 'listContacts' });
@@ -579,9 +579,9 @@ describe('renderWeb D-mig-1a — stoop manifest projection', () => {
     expect(c.searchFields).toEqual(['label', 'handle']);
   });
 
-  it('stoop noticeboard section carries listOpen + kind + post', async () => {
-    const { stoopManifest } = await import('../../../apps/stoop/manifest.js');
-    const p = renderWeb(stoopManifest).sections.find((s) => s.id === 'noticeboard');
+  it('pinboard noticeboard section carries listOpen + kind + post', async () => {
+    const { pinboardManifest } = await import('../../../apps/pinboard/manifest.js');
+    const p = renderWeb(pinboardManifest).sections.find((s) => s.id === 'noticeboard');
     expect(p).toBeDefined();
     expect(p.itemType).toBe('post');
     expect(p.dataSource).toEqual({ skillId: 'listOpen' });
@@ -886,7 +886,7 @@ describe('renderWeb V0.7 — Q26 field.requiresField conditional display', () =>
 });
 
 describe('renderWeb V0.7 — Q25 field.readSkill multi-skill records', () => {
-  // E.4 signal: stoop's holidayMode is reachable both via getMyProfile
+  // E.4 signal: pinboard's holidayMode is reachable both via getMyProfile
   // AND via dedicated getHolidayMode. declares the dedicated skill
   // so the adapter can refresh single fields without re-fetching the
   // whole record.

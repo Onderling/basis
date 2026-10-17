@@ -14,7 +14,7 @@
  * `CachingDataSource` directly.
  *
  * The three persist adapters (File / IndexedDB / AsyncStorage) + the
- * picker are duplicated from tasks-v0 / stoop by DESIGN: importing
+ * picker are duplicated from tasks-v0 / pinboard by DESIGN: importing
  * across apps (`apps/tasks-v0/...`) is forbidden, and the adapters do
  * not (yet) live in `@onderling/local-store`.  When a later slice lifts
  * them into the substrate, this file collapses to a thin re-use.  The
@@ -124,7 +124,7 @@ async function pickPersist(args = {}) {
 }
 
 /* ───────────────────────── persist adapters ─────────────────────────
- * Same surface + semantics as tasks-v0/stoop's `storage/persist/*`:
+ * Same surface + semantics as tasks-v0/pinboard's `storage/persist/*`:
  *   load() → Map, save(map), scheduleSave(map), flush(map), cancel(),
  *   close().  Copied (not imported) to avoid an app→app dependency. */
 
@@ -325,7 +325,7 @@ class AsyncStoragePersist {
       this.#storage = asyncStorage;
     } else {
       // Lazy require so vitest can import this module without an
-      // AsyncStorage polyfill (same pattern tasks-v0/stoop use).
+      // AsyncStorage polyfill (same pattern tasks-v0/pinboard use).
       // eslint-disable-next-line global-require
       this.#storage = require('@react-native-async-storage/async-storage').default;
     }

@@ -63,7 +63,7 @@ export function interceptButtonTap({ opId, itemId, buttonLabel, t, embed, extra,
       followUp: {
         kind:          'single',
         opId:          'respondToItem',
-        appOrigin:     'stoop',
+        appOrigin:     'pinboard',
         threadId:      null,
         replyShape:    'text',
         prefilledArgs: { itemId },
@@ -125,7 +125,7 @@ export function interceptButtonTap({ opId, itemId, buttonLabel, t, embed, extra,
   // thread (someone offered to help with your post).  Three button
   // intercepts plus the corresponding peer-message side-effects:
   //
-  //   [Accept]  → callSkill('stoop','acceptResponder',{requestId, responderWebid})
+  //   [Accept]  → callSkill('pinboard','acceptResponder',{requestId, responderWebid})
   //               + send 'help-with-accepted' envelope back over NKN
   //   [Decline] → send 'help-with-declined' envelope back over NKN
   //   [Counter] → append an inline counter-prompt bubble in the DM

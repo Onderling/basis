@@ -64,7 +64,7 @@ describe('a persona\'s circle carries no byte of the default', () => {
     const B = agent.persona(id);
     expect(agent.circleSelf(Y).webid).toBe(B.chatId.pubKey);
     // the person's circle list (what every launcher reads) holds the circle founded as the persona
-    const ids = ((await agent.callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
+    const ids = ((await agent.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
     expect(ids, 'a circle founded as a persona is in the person\'s list').toContain(Y);
     // the create records the circle on the restore list after answering (not awaited) — put away once it is there
     let put = null;
@@ -90,7 +90,7 @@ describe('the create wizard founds as the persona', () => {
     state.groupId = 'c-1'; state.name = 'X'; state.purpose = 'p'; state.persona = 'p-0123456789ab';
     const { state: out } = await createSubmit({ state, callSkill });
     expect(out.submitError).toMatch(/kapot/);
-    expect(calls).toEqual(['household.bindCirclePersona:p-0123456789ab', 'stoop.createGroupV2:', 'household.bindCirclePersona:']);
+    expect(calls).toEqual(['household.bindCirclePersona:p-0123456789ab', 'pinboard.createGroupV2:', 'household.bindCirclePersona:']);
   });
   it('the default founds as before — no bind at all', async () => {
     const calls = [];
@@ -117,11 +117,11 @@ describe('never across selves: the circle-less noticeboard post', () => {
     const orig = console.info;
     console.info = (...a) => { lines.push(a.join(' ')); return orig.apply(console, a); };
     try {
-      await agent.callSkill('stoop', 'postRequest', { text: 'wie leent me een ladder', kind: 'request' });
+      await agent.callSkill('pinboard', 'postRequest', { text: 'wie leent me een ladder', kind: 'request' });
       for (let i = 0; i < 30 && !lines.some((l) => l.includes('noticeboard') && l.includes('circle store')); i++) await new Promise((r) => setTimeout(r, 100));
     } finally { console.info = orig; }
     const fanned = lines.filter((l) => l.includes('noticeboard') && l.includes('circle store'));
-    // it lands in the default's own noticeboard circle (stoop's bundle group) — the default's, by construction
+    // it lands in the default's own noticeboard circle (pinboard's bundle group) — the default's, by construction
     expect(fanned.length, 'it fanned somewhere').toBeGreaterThan(0);
     expect(fanned.some((l) => l.includes(Y)), 'never to the persona\'s').toBe(false);
     await agent.shutdown?.();

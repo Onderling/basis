@@ -154,7 +154,7 @@ const FILE_ROLES = new Set(['member', 'coordinator', 'observer']);
 async function restore(file, { call, tier, switches, done, notRestored }) {
   // The book as it is now. A person already in it keeps the role the book gives them (a file is older than the book);
   // a new person comes in with the file's role, never as an admin.
-  const bookNow = await call('stoop', 'listContacts', {});
+  const bookNow = await call('pinboard', 'listContacts', {});
   const rowsNow = Array.isArray(bookNow) ? bookNow : (bookNow?.contacts ?? bookNow?.items ?? []);
   const inBook = new Map(rowsNow.filter((c) => c?.webid).map((c) => [c.webid, c.role ?? null]));
 
@@ -169,7 +169,7 @@ async function restore(file, { call, tier, switches, done, notRestored }) {
     }
     let role = p.role ?? 'member';
     if (!FILE_ROLES.has(role)) { notRestored.push({ what: 'role-capped', id: p.id, from: role, to: 'member' }); role = 'member'; }
-    const r = await call('stoop', 'addContact', clean({ webid: p.id, channel: p.channel, role, displayName: p.displayName }));
+    const r = await call('pinboard', 'addContact', clean({ webid: p.id, channel: p.channel, role, displayName: p.displayName }));
     if (r?.ok === false) { notRestored.push({ what: 'person', id: p.id, why: r.error ?? 'refused' }); continue; }
     inBook.set(p.id, role);
     if (typeof tier === 'function') await tier(p.id, role).catch(() => {});

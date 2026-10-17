@@ -98,7 +98,7 @@ function paint(container, ctx, state, rerender) {
   chips.className = 'cc-logs-chips';
 
   // Each filter is an editable chip with a clear-X.
-  appendChipInput(chips, doc, 'App',   state.filterApp,   'household / tasks-v0 / stoop / folio',
+  appendChipInput(chips, doc, 'App',   state.filterApp,   'household / tasks-v0 / pinboard / folio',
     (v) => { state.filterApp = v; rerender(); });
   appendChipInput(chips, doc, 'Type',  state.filterType,  'item-changed / notification',
     (v) => { state.filterType = v; rerender(); });

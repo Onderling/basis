@@ -24,9 +24,9 @@ test('I5 — drivers and persona properties: one store or two, and keyed how?', 
   const peers = await bootPeers(browser, 1);
   const [A] = peers;
   try {
-    // `stoop`/`whoAmI` is the identity op the other walk specs use; `basis`/`whoami` is the POD sign-in
+    // `pinboard`/`whoAmI` is the identity op the other walk specs use; `basis`/`whoami` is the POD sign-in
     // message and answers about a session, not about me. Guessing that cost this spec its first run.
-    const me = await call(A.page, 'stoop', 'whoAmI', {});
+    const me = await call(A.page, 'pinboard', 'whoAmI', {});
     const webid = me?.webid ?? null;
     const pubKey = me?.pubKey ?? null;
     log('I5 · who am I', 'OBSERVED', JSON.stringify({ webid: String(webid).slice(0, 24), pubKey: String(pubKey).slice(0, 16) }));
@@ -53,7 +53,7 @@ test('I5 — drivers and persona properties: one store or two, and keyed how?', 
         : (n(byPub) ? 'written under one id, readable under another — a KEYING mismatch, not two stores'
           : 'written and readable under neither — the write and the read are different stores'));
 
-    // The persona half: stoop writes the member map, agents reads the profile registry.
+    // The persona half: pinboard writes the member map, agents reads the profile registry.
     const gid = await (async () => {
       await gotoCircles(A.page); await createCircle(A.page, 'Persona Kring');
       await openCircleMatching(A.page, /persona.?kring/i);
@@ -67,7 +67,7 @@ test('I5 — drivers and persona properties: one store or two, and keyed how?', 
     // on the circle's roster (their own `member-props` statement since 2026-09-22); the read for that is the roster row.
     // `getPersonaView` is the person's own profile (properties + per-context disclosure policy) in the agents
     // registry — it never held the roster record and is not supposed to.
-    const roster = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const roster = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid });
     const mine = (roster?.members ?? []).find((m) => m?.webid === webid) ?? null;
     log('I5 · the roster row carries the disclosed property?',
       mine?.personaProperties?.mobility === 'walks' ? 'PASS' : 'FINDING', JSON.stringify(mine?.personaProperties ?? null));

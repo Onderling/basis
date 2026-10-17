@@ -45,7 +45,7 @@ export function renderGate(manifestOrList, opts = {}) {
         if (!r) return null;                             // no declared verb matched → next rule / LLM
         const call = Array.isArray(r) ? r[0] : r;        // single-command dispatch; multi is a follow-up
         // Carry the owning app so the downstream resolver can disambiguate a COLLIDING bare op-id (e.g.
-        // `addTask`/`listOpen`, declared by household + tasks-v0 + stoop) to the app whose manifest this
+        // `addTask`/`listOpen`, declared by household + tasks-v0 + pinboard) to the app whose manifest this
         // gate rule came from — instead of the merge's first-declarer (the de-shadow, K0). `manifest.app`
         // matches the merged catalogue's `appOrigin`. Harmless to consumers that ignore the field.
         return call ? { opId: call.skillId, args: call.args, appOrigin: manifest.app } : null;

@@ -84,10 +84,10 @@ export function useContactLensSheet({ callSkill, pairCircleIdOf = null, shareRel
     setAsk({ id: seq.current, mode, model, resolve });
   }), []);
 
-  /** Add a card AFTER the sheet: the stoop reply, or `null` when the person closed it (nothing added). */
+  /** Add a card AFTER the sheet: the pinboard reply, or `null` when the person closed it (nothing added). */
   const addWithSheet = useCallback(async (payload) => {
     const model = await contactAddSheetModel({ payload, callSkill });
-    if (!model) return callSkill('stoop', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
+    if (!model) return callSkill('pinboard', 'addContactFromQr', { payload, persona: DEFAULT_PERSONA });
     const choice = await askPerson('add', model);
     if (!choice) return null;
     return addContactAs({ callSkill, payload, ...choice, pairCircleIdOf });
@@ -96,7 +96,7 @@ export function useContactLensSheet({ callSkill, pairCircleIdOf = null, shareRel
   /** The thread header's control: the row's lens, changed in place; `{ saved, personaName }` or `null` (closed). */
   const openLens = useCallback(async (contactId, name) => {
     let row = null;
-    try { row = ((await callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c?.webid === contactId) ?? null; } catch { row = null; }
+    try { row = ((await callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c?.webid === contactId) ?? null; } catch { row = null; }
     const model = await contactLensModel({ callSkill, row: row ?? { webid: contactId }, pairCircleIdOf });
     const choice = await askPerson('change', { ...model, name: name || row?.displayName || row?.handle || contactId });
     if (!choice) return null;

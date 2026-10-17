@@ -169,7 +169,7 @@ export function allCircleRows(opts = {}) {
 }
 
 /**
- * Resolve the stoop mute-set's KEYS (stableId, or a webid fallback — `_resolveMuteKey`'s contract) into
+ * Resolve the pinboard mute-set's KEYS (stableId, or a webid fallback — `_resolveMuteKey`'s contract) into
  * the ACTOR REFS the log entries carry, against the circle roster. A stableId with no roster row passes
  * through unchanged (it simply matches nothing — deny-nothing, hide-only-what-resolves). Pure; both
  * shells build their `excludeActors` through this so the mapping cannot drift per platform.

@@ -53,7 +53,7 @@ describe('a circle composer offers what the circle composes', () => {
     // Read against the DEVICE's own declarations — this fixture's `/logs` is the fixture's op, and the
     // body rule that matters here is the one basis declares.
     const device = createComposerCommands({ kind: 'circle' });
-    expect(device.parse('/logs --app=stoop').args).toEqual({ app: 'stoop' });
+    expect(device.parse('/logs --app=pinboard').args).toEqual({ app: 'pinboard' });
     expect(device.parse('/block alice').args, 'an argline body lands as _match, as the handlers read it')
       .toEqual({ _match: 'alice' });
   });

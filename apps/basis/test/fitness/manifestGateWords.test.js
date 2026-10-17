@@ -8,10 +8,10 @@
 import { describe, it, expect } from 'vitest';
 import { createGate } from '@onderling/manifest-host';
 import { calendarManifest } from '../../../calendar/manifest.js';
-import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
+import { mockTasksManifest, mockPinboardManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
 import { householdManifest } from '../../../household/manifest.js';
 
-const MANIFESTS = [calendarManifest, mockTasksManifest, mockStoopManifest, mockFolioManifest, householdManifest];
+const MANIFESTS = [calendarManifest, mockTasksManifest, mockPinboardManifest, mockFolioManifest, householdManifest];
 const appOf = (m) => m.appId ?? m.app;
 const matched = (m) => (m.operations ?? []).filter((op) => op?.surfaces?.slash?.match);
 

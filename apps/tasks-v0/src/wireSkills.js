@@ -8,7 +8,7 @@
  *
  * Design: this is the only place skills get registered. Circle.js
  * goes from "register N times per circle" to "build CircleState; wire
- * once" — see Stoop's 2026-05-08 single-agent-refactor for the
+ * once" — see Pinboard's 2026-05-08 single-agent-refactor for the
  * functional sketch this mirrors.
  *
  * Mandatory args:

@@ -4,7 +4,7 @@
  * Aliased via vite.config.js → resolve.alias.  Static `import { join,
  * dirname, ... } from 'node:path'` statements come from sync-engine
  * (PathMap, scanLocal, versions), pseudo-pod (NodeFsBackend),
- * tasks-v0 + stoop FilePersist, folio CLI/server, archive Db.
+ * tasks-v0 + pinboard FilePersist, folio CLI/server, archive Db.
  *
  * Unlike `fs.js` and `crypto.js`, this stub is a REAL implementation —
  * path manipulation is pure string operations with no I/O, so we can

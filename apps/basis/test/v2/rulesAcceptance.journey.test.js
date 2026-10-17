@@ -14,7 +14,7 @@ import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/me
 import { joinCircleFromInvite, buildCircleInviteUri } from '../../src/v2/circleInvite.js';
 
 const C = 'rules-gated-circle';
-const members = async (n) => (await n.agent.callSkill('stoop', 'listGroupMembers', { groupId: C }))?.members ?? [];
+const members = async (n) => (await n.agent.callSkill('pinboard', 'listGroupMembers', { groupId: C }))?.members ?? [];
 const rowOf = (rows, webid) => rows.find((m) => (m.webid ?? m.addr ?? m.ref) === webid) ?? null;
 
 /** The per-test membership receiver: MEMBERSHIP_BROADCAST envelopes feed the node's own rail ingest. */
@@ -95,8 +95,8 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
   it('a rules change makes acceptance STALE (visible, never a lockout) · re-accept supersedes, everywhere', async () => {
     // A (admin) raises the rules to v2. The rules DOC travels by store/pod sync, not the peer fan —
     // so each assertion below is scoped to what that device can honestly know.
-    const cur = (await A.agent.callSkill('stoop', 'getGroupRules', { groupId: C }))?.rules ?? {};
-    const edited = await A.agent.callSkill('stoop', 'editGroupRules', {
+    const cur = (await A.agent.callSkill('pinboard', 'getGroupRules', { groupId: C }))?.rules ?? {};
+    const edited = await A.agent.callSkill('pinboard', 'editGroupRules', {
       groupId: C, rules: { ...cur, agreements: 'be kind, now with feeling', version: 1 },
     });
     expect(edited.version).toBe(2);
@@ -111,7 +111,7 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
 
     // A (a founder — never carried a join acceptance) re-accepts the current version through the OP.
     // The statement is A's own signed `rules-accept` on the membership spine; the fan carries it.
-    const accepted = await A.agent.callSkill('stoop', 'acceptGroupRules', { groupId: C });
+    const accepted = await A.agent.callSkill('pinboard', 'acceptGroupRules', { groupId: C });
     expect(accepted.acceptanceId, 'the V1 audit item (the onboarding contract)').toBeTruthy();
     expect(accepted.rulesAccepted, 'the spine half emitted').toBe('2');
 

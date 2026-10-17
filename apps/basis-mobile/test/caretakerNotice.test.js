@@ -171,7 +171,7 @@ describe('mobile — the screen is wired to all of that (source guard: RN cannot
 
     const handler = SCREEN.slice(SCREEN.indexOf('const acknowledgeCaretakerNotice'));
     expect(handler.slice(0, 500)).toMatch(
-      /rawCallSkill\('stoop',\s*'acknowledgeCaretaker',\s*\{\s*groupId:\s*circle\.id\s*\}\)/);
+      /rawCallSkill\('pinboard',\s*'acknowledgeCaretaker',\s*\{\s*groupId:\s*circle\.id\s*\}\)/);
     // …and the roster reload is what makes the member list say the appointment is acknowledged.
     expect(handler.slice(0, 500)).toMatch(/setMembersReloadTick/);
   });

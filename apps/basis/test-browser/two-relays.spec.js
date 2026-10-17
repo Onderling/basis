@@ -84,10 +84,10 @@ test('a joiner on its own relay comes beside the circle relay, and is still ther
     // announce row cost them their foundership, so their admin-signed join was dropped before the key fold; and
     // the joiner never pulled the `create`). Read through the same skill the DM seal reads.
     const rosterKeys = (page) => page.evaluate(async () => {
-      const mine = await window.onderlingCall('stoop', 'listMyCircles', {});
+      const mine = await window.onderlingCall('pinboard', 'listMyCircles', {});
       const ids = mine?.circles ?? [];
       const gid = ids.find((g) => /twee.?relays/i.test(mine?.names?.[g] ?? '')) ?? ids[0];
-      const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: gid });
+      const r = await window.onderlingCall('pinboard', 'listGroupMembers', { groupId: gid });
       return (r?.members ?? []).map((m) => ({ role: m.role, personKey: m.personKey ?? null }));
     });
     const keyed = async (page, role) => {

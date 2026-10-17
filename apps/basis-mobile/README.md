@@ -1,6 +1,6 @@
 # basis-mobile
 
-Android RN composition shell that unifies tasks-v0 + stoop + folio +
+Android RN composition shell that unifies tasks-v0 + pinboard + folio +
 household + calendar over a shared InternalBus, rendered with React
 Native + `renderMobile(manifest) → NavModel`.
 
@@ -41,7 +41,7 @@ test/                  # vitest — bundle-boot smoke plus the JM-* journey + pr
 - ✅ `composeManifests()` merges all 5 app manifests; benign op-id
   collisions are aliased deterministically.
 - ✅ `buildNavModels()` produces a `renderMobile` NavModel per app
-  (basis, household, tasks-v0, stoop, folio, calendar) — every
+  (basis, household, tasks-v0, pinboard, folio, calendar) — every
   manifest projects to a JSON-serialisable NavModel.
 - ✅ `bootAgentBundle()` boots a **real** per-app agent via
   basis's `realAgent` chain (the `opts.skillStub` seam is
@@ -78,7 +78,7 @@ test/                  # vitest — bundle-boot smoke plus the JM-* journey + pr
 
 Two workflows: **tests** (lightweight, runs today via a symlink to
 basis's `node_modules`) and **Android** (real local install
-+ native gradle build, mirrors stoop-mobile's setup). Pick one — they
++ native gradle build, mirrors pinboard-mobile's setup). Pick one — they
 share the same `node_modules/` slot, so flipping between them needs
 an `rm` first.
 
@@ -105,7 +105,7 @@ Prerequisites:
 - A physical Android device (USB-debug on, `adb devices` shows the
   phone) **or** an Android Studio AVD.
 - Java 17, Android SDK Platform-Tools.
-- Same Expo 52 pin already set up for stoop-mobile.
+- Same Expo 52 pin already set up for pinboard-mobile.
 
 ```sh
 cd apps/basis-mobile
@@ -146,7 +146,7 @@ The Expo entry (`index.js`) imports the canonical polyfills FIRST
 (`@onderling/react-native/platform/polyfills`) — Hermes resolves
 crypto at module-load, so any later import that needs
 `crypto.getRandomValues` / `globalThis.Buffer` / `Blob` would crash
-otherwise. See `apps/stoop-mobile/index.js` for the canonical
+otherwise. See `apps/pinboard-mobile/index.js` for the canonical
 comment. **Don't reorder the imports in `index.js`** — it's the
 single most common Hermes footgun.
 
@@ -154,12 +154,12 @@ single most common Hermes footgun.
 
 1. App cold-boots without a redbox.
 2. ChatScreen shows "Booting agents…" → "Agents ready" → per-app
-   section counts (basis, household, tasks-v0, stoop, folio,
+   section counts (basis, household, tasks-v0, pinboard, folio,
    calendar — 6 NavModel rows).
 3. The bottom-right "/" FAB is visible; tap → modal opens; typing
    `/` shows slash suggestions from the merged catalogue.
 4. Kill + relaunch — VaultAsyncStorage + AsyncStoragePersist should
-   restore identity + stoop's cached state (no second onboarding).
+   restore identity + pinboard's cached state (no second onboarding).
 5. NknTransport's "Mesh transport ready" banner appears
    (`boot.transport_ready`).
 
@@ -183,7 +183,7 @@ Metro 52 disables `unstable_enablePackageExports` by default, so the
 package's `exports` map for `./platform/polyfills` is invisible.  The
 canonical fix is the `@onderling/react-native/metro-preset`, used via
 `metro.config.js`.  This app ships one — if it's missing, copy it
-from `apps/stoop-mobile/metro.config.js` and adjust the watch folders
+from `apps/pinboard-mobile/metro.config.js` and adjust the watch folders
 + subpath resolvers.  Always re-run with the cache busted:
 
 ```sh
@@ -214,7 +214,7 @@ on the phone; just re-run `npm start` after the bump.
 Almost all of these are in the **build toolchain** (Metro, `@expo/cli`,
 walker, etc.) — they don't ship to the device.  `npm audit fix` can't
 resolve them because the only "fix" is upgrading Expo 52 → 55+, which
-breaks the canonical pin (stoop-mobile + tasks-mobile + this app all
+breaks the canonical pin (pinboard-mobile + tasks-mobile + this app all
 share Expo 52).  Verify the runtime profile is clean:
 
 ```sh

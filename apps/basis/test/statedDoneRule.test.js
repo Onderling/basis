@@ -48,7 +48,7 @@ describe('ticking a chore off by its words', () => {
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
-    for (const [webid, role] of [['telegram:1', 'member'], ['telegram:2', 'member']]) { await own('stoop', 'addContact', { webid, channel: 'telegram', role }); await agent.setDoorCaller(webid, role); }
+    for (const [webid, role] of [['telegram:1', 'member'], ['telegram:2', 'member']]) { await own('pinboard', 'addContact', { webid, channel: 'telegram', role }); await agent.setDoorCaller(webid, role); }
     const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });
     expect((await as('telegram:1')('lists', 'addToList', { list: 'Klusjes', text: 'ramen', assignee: 'mij' })).ok).toBe(true);
     const done = await as('telegram:1')('lists', 'markListItemDone', { item: 'ramen' });

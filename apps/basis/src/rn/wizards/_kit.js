@@ -12,7 +12,7 @@
  *
  * Why live in `apps/basis/`?  The basis-unifier
  * principle: wizards are chat-shell orchestration over substrate
- * apps (stoop, contact-book, …).  They belong here next to the
+ * apps (pinboard, contact-book, …).  They belong here next to the
  * state machine + web renderer, not in basis-mobile.  RN
  * apps that want to render the same wizards import from this
  * directory.

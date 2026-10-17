@@ -16,7 +16,7 @@ import { householdManifest }  from '../../household/manifest.js';
 import { calendarManifest }   from '../../calendar/manifest.js';
 import { tasksManifest }      from '../../tasks-v0/manifest.js';
 import { folioManifest }      from '../../folio/manifest.js';
-import { stoopManifest }      from '../../stoop/manifest.js';
+import { pinboardManifest }      from '../../pinboard/manifest.js';
 import { agentsManifest }     from '../../agents/manifest.js';
 import { basisManifest } from '../manifest.js';
 
@@ -25,7 +25,7 @@ const MANIFESTS = [
   ['calendar',    calendarManifest],
   ['tasks-v0',    tasksManifest],
   ['folio',       folioManifest],
-  ['stoop',       stoopManifest],
+  ['pinboard',       pinboardManifest],
   ['agents',      agentsManifest],
   ['basis', basisManifest],
 ];

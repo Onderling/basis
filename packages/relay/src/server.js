@@ -116,7 +116,7 @@
  * `acceptedGroups` is unset or empty, the relay accepts every client
  * (legacy behaviour, fully backward compatible).
  *
- * Phase 2 (Stoop V1 — 2026-05-05):
+ * Phase 2 (Pinboard V1 — 2026-05-05):
  *
  *   - `register` may additionally carry a `rotationProof` (built by
  *     `core.KeyRotation.buildProof`) when the connecting `address` is
@@ -754,7 +754,7 @@ export async function startRelay(opts = {}) {
           return;
         }
 
-        // Q-E.2 + Phase 2 (Stoop V1, 2026-05-05): apply the operator's
+        // Q-E.2 + Phase 2 (Pinboard V1, 2026-05-05): apply the operator's
         // serving policy when configured — "my relay serves these circles".
         // NOT a membership boundary (see the header): membership binds at the
         // circle, via the seal and the roster, on every transport.

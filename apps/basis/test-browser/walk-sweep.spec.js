@@ -123,10 +123,10 @@ test('corpus 2.3 / 2.4 — the same person in two circles, by choice', async ({ 
     test.skip(!joinedY?.joined, 'Y join failed');
 
     // THE QUESTION: can the admin of Y learn anything about X — or that Cato is the same person?
-    const catoWebid = (await call(Cato.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-    const inX = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gx }))?.members ?? [])
+    const catoWebid = (await call(Cato.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+    const inX = ((await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gx }))?.members ?? [])
       .find((m) => m.webid === catoWebid);
-    const inY = ((await call(Bram.page, 'stoop', 'listGroupMembers', { groupId: gy }))?.members ?? [])
+    const inY = ((await call(Bram.page, 'pinboard', 'listGroupMembers', { groupId: gy }))?.members ?? [])
       .find((m) => m.webid === catoWebid);
     log('corpus 2.3 · is Cato the same WEBID in both circles?', (inX && inY) ? 'OBSERVED' : 'OBSERVED',
       `X:${inX ? 'same webid' : 'different/absent'} · Y:${inY ? 'same webid' : 'different/absent'}`);
@@ -138,12 +138,12 @@ test('corpus 2.3 / 2.4 — the same person in two circles, by choice', async ({ 
       `X=${String(addrX).slice(0, 12)} Y=${String(addrY).slice(0, 12)}`);
 
     // Can Y's admin see circle X at all?
-    const yAdminSeesX = await call(Bram.page, 'stoop', 'listGroupRoster', { groupId: gx });
+    const yAdminSeesX = await call(Bram.page, 'pinboard', 'listGroupRoster', { groupId: gx });
     log('corpus 2.3 · can Y\'s admin read X\'s roster?',
       (yAdminSeesX?.members ?? []).length === 0 ? 'PASS' : 'FINDING',
       JSON.stringify(yAdminSeesX)?.slice(0, 140));
 
-    const yAdminCircles = await call(Bram.page, 'stoop', 'listMyCircles', {});
+    const yAdminCircles = await call(Bram.page, 'pinboard', 'listMyCircles', {});
     log('corpus 2.3 · does Y\'s admin know X exists?',
       (yAdminCircles?.circles ?? []).includes(gx) ? 'FINDING' : 'PASS',
       JSON.stringify(yAdminCircles?.circles));

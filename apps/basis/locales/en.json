@@ -171,11 +171,11 @@
     "trust": {
       "known": {
         "text": "known",
-        "doc": "Trust level for an acknowledged contact. Stoop persists this as Dutch 'bekend'; chat-shell translates EN at the boundary."
+        "doc": "Trust level for an acknowledged contact. Pinboard persists this as Dutch 'bekend'; chat-shell translates EN at the boundary."
       },
       "trusted": {
         "text": "trusted",
-        "doc": "Trust level for a fully-trusted contact. Stoop persists this as Dutch 'vertrouwd'; chat-shell translates EN at the boundary."
+        "doc": "Trust level for a fully-trusted contact. Pinboard persists this as Dutch 'vertrouwd'; chat-shell translates EN at the boundary."
       },
       "none": {
         "text": "none",

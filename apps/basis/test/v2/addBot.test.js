@@ -2,7 +2,7 @@
  * addBotToGraph — the ONE input decoder behind both shells' contact-add box (C13: one handshake,
  * two rungs, and the URI names the rung).
  *
- * The load-bearing pair: a `onderling-contact://` card takes the FAST rung (asymmetric add via stoop's
+ * The load-bearing pair: a `onderling-contact://` card takes the FAST rung (asymmetric add via pinboard's
  * `addContactFromQr` — the card's decoding stays there, the one decoder), while a `onderling-invite://`
  * pasted in the same box is REFUSED with a typed error — silently upserting a "contact" out of a
  * circle invite would skip the verified rung's consent gate.
@@ -17,7 +17,7 @@ describe('addBotToGraph — the C13 fast rung', () => {
     const addContact = vi.fn(async () => ({ contact: { webid: 'did:bram', displayName: 'Bram', peerAddr: 'addr:bram' } }));
     const payload = `${CONTACT_CARD_PREFIX}abc123`;
     const rec = await addBotToGraph({ input: payload, peerGraph: graph(), addContact });
-    expect(addContact).toHaveBeenCalledWith(payload);   // the payload passes through UNDECODED — stoop decodes
+    expect(addContact).toHaveBeenCalledWith(payload);   // the payload passes through UNDECODED — pinboard decodes
     expect(rec.displayName).toBe('Bram');
     expect(rec.peerAddr).toBe('addr:bram');             // deliver-ready: the DM address rides the card
   });
@@ -29,7 +29,7 @@ describe('addBotToGraph — the C13 fast rung', () => {
     expect(g.upsert).not.toHaveBeenCalled();            // the pre-C13 bug: this became a hybrid "bot" row
   });
 
-  it('surfaces a stoop error result as a thrown, coded error', async () => {
+  it('surfaces a pinboard error result as a thrown, coded error', async () => {
     const addContact = vi.fn(async () => ({ error: 'malformed-card' }));
     await expect(addBotToGraph({ input: `${CONTACT_CARD_PREFIX}zzz`, peerGraph: graph(), addContact }))
       .rejects.toMatchObject({ code: 'malformed-card' });

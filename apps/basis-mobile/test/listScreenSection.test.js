@@ -21,8 +21,8 @@ import { sectionForScreen } from '../../basis/src/v2/pageProjection.js';
 // → CircleListScreen's buildScreenModel defaulted to `[labelField]` (= ['label']),
 // which the projected section now declares explicitly (same behaviour).
 const RETIRED_LITERAL = {
-  contacts: { appOrigin: 'stoop', listOp: 'listContacts', categoryField: 'category', searchFields: ['label', 'handle'] },
-  noticeboard: { appOrigin: 'stoop', listOp: 'listOpen',     categoryField: 'kind' },
+  contacts: { appOrigin: 'pinboard', listOp: 'listContacts', categoryField: 'category', searchFields: ['label', 'handle'] },
+  noticeboard: { appOrigin: 'pinboard', listOp: 'listOpen',     categoryField: 'kind' },
 };
 
 describe('mobile list-screen config sourced from the projected manifest section', () => {

@@ -18,9 +18,9 @@
  * become lookups rather than conventions.
  *
  * ── Why this lives in a substrate package ────────────────────────────────────────────────────────────────
- * stoop decides whether a fanned governance event may wake a device, and basis decides whether the same
- * event shows in chat. stoop cannot import basis app code (invariant 5), so before this the wake rule
- * existed TWICE — in `governanceLog.js` and again inline in stoop's `broadcastCircleGovernance` — held
+ * pinboard decides whether a fanned governance event may wake a device, and basis decides whether the same
+ * event shows in chat. pinboard cannot import basis app code (invariant 5), so before this the wake rule
+ * existed TWICE — in `governanceLog.js` and again inline in pinboard's `broadcastCircleGovernance` — held
  * together only by a fitness test. A shared substrate module is importable by both, which retires the
  * duplication instead of guarding it.
  */
@@ -199,7 +199,7 @@ export function retentionWindowFor(retainClass) {
  *
  * `payload` is consulted ONLY for kinds whose table entry is not the whole story — today just `governance`,
  * where a decision opening wakes and the votes that follow do not. Keeping that exception here, next to the
- * table, is what lets stoop and basis stop each deriving it.
+ * table, is what lets pinboard and basis stop each deriving it.
  *
  * @param {string} kind
  * @param {object} [payload]  the entry's payload, when the kind needs it

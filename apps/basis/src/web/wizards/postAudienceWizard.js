@@ -4,7 +4,7 @@
  * basis — C5 post-audience picker (2026-05-24).
  *
  * Single-step rich UI that ENRICHES /post with audience targeting.
- * Per the audit's S8 finding: stoop's substrate has an audience model
+ * Per the audit's S8 finding: pinboard's substrate has an audience model
  * (subset of group + per-tag + distance) but no compositional UI.
  * The wizard collects audience config + calls postRequest with the
  * extended args; substrate uses them when audience-filter ships, or
@@ -17,9 +17,9 @@
  *   - Explicit webids (CSV)
  *
  * Substrate skill: postRequest (existing).  Args extended with
- * `audience: { minTrust, tags, distanceKm, recipients }`.  If stoop
+ * `audience: { minTrust, tags, distanceKm, recipients }`.  If pinboard
  * ignores the audience field today, the post still files; the
- * audience intent is preserved for when stoop wires audience-filter.
+ * audience intent is preserved for when pinboard wires audience-filter.
  */
 
 import { mkBody, mkActions, mkField, mkTextarea, mkRadioGroup, mkError, mkSubmitting, refreshActions } from './_wizardKit.js';

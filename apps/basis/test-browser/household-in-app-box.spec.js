@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from '../test/support/pairRealAgents.js';
-import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { addBoxCard } from '../test/support/addBoxCard.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
@@ -60,7 +60,7 @@ test('a joined app holds the household\'s existing lines, without a reload', asy
     const page = await ctx.newPage();
     await page.goto(appUrl);
     await expect.poll(() => page.evaluate(() => typeof window.onderlingContactChannel?.sendTurn === 'function'), { timeout: 120_000 }).toBe(true);
-    const added = await page.evaluate((payload) => window.onderlingCall('stoop', 'addContactFromQr', { payload }), cardLink);
+    const added = await page.evaluate((payload) => window.onderlingCall('pinboard', 'addContactFromQr', { payload }), cardLink);
     expect(added?.error, JSON.stringify(added)).toBeFalsy();
     const bertAsk = async (text, extra = {}) => page.evaluate(async ({ text, extra, bot }) => {
       const ch = window.onderlingContactChannel;

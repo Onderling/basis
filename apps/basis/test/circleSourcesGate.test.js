@@ -1,6 +1,6 @@
 /**
  * Regression: circles whose source op is ABSENT from the manifest catalogue must still
- * load. `listMyCircles` (stoop) + `getMyCircles` are agent skills, not manifest ops; the
+ * load. `listMyCircles` (pinboard) + `getMyCircles` are agent skills, not manifest ops; the
  * catalogue "perf gate" used to skip them on every origin → loadCircles returned nothing
  * → "No circles yet" on reload even though the data persisted. (Fix in circleSources.js.)
  */
@@ -14,7 +14,7 @@ describe('makeResolvingCallSkill — catalogue gate', () => {
     const calls = [];
     const raw = async (origin, opId) => {
       calls.push(`${origin}/${opId}`);
-      if (origin === 'stoop' && opId === 'listMyCircles') return { circles: ['kleurenwiezen', 'boi'] };
+      if (origin === 'pinboard' && opId === 'listMyCircles') return { circles: ['kleurenwiezen', 'boi'] };
       return null;
     };
     // catalogue knows getMyCircles@tasks but NOTHING about listMyCircles
@@ -22,7 +22,7 @@ describe('makeResolvingCallSkill — catalogue gate', () => {
     const callSkill = makeResolvingCallSkill(raw, undefined, () => catalogue);
     const r = await callSkill('listMyCircles', {});
     expect(r).toEqual({ circles: ['kleurenwiezen', 'boi'] });
-    expect(calls).toContain('stoop/listMyCircles');     // stoop was NOT skipped
+    expect(calls).toContain('pinboard/listMyCircles');     // pinboard was NOT skipped
   });
 
   it('still gates a catalogue-KNOWN op to its declared origin (getMyCircles → tasks only)', async () => {
@@ -31,12 +31,12 @@ describe('makeResolvingCallSkill — catalogue gate', () => {
     const catalogue = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
     const callSkill = makeResolvingCallSkill(raw, undefined, () => catalogue);
     await callSkill('getMyCircles', {});
-    expect(calls).not.toContain('stoop');   // skipped: catalogue says getMyCircles is on tasks
+    expect(calls).not.toContain('pinboard');   // skipped: catalogue says getMyCircles is on tasks
     expect(calls).toContain('tasks');
   });
 
   it('loadCircles surfaces groups from listMyCircles with an empty catalogue', async () => {
-    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles'
+    const raw = async (origin, opId) => (origin === 'pinboard' && opId === 'listMyCircles'
       ? { circles: ['kleurenwiezen', 'boi', 'mai'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => ({ opsById: new Map() }));
     const circles = await loadCircles(circleSourcesFromAgent({ callSkill }));
@@ -44,7 +44,7 @@ describe('makeResolvingCallSkill — catalogue gate', () => {
   });
 
   it('null catalogue → tries every origin (unchanged)', async () => {
-    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles' ? { circles: ['x'] } : null);
+    const raw = async (origin, opId) => (origin === 'pinboard' && opId === 'listMyCircles' ? { circles: ['x'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => null);
     expect(await callSkill('listMyCircles', {})).toEqual({ circles: ['x'] });
   });

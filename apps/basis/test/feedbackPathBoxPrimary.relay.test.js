@@ -12,7 +12,7 @@
  * What that turned out to be, once the walk sent the way the SHELL sends — to the Contacten row's address,
  * not to an address the test knew: the row named the sharing device's KEY (`pubKey`, an enrolled box's
  * delegation key, which is no address anywhere) instead of the address the card names (`peerAddr`, the
- * person's). A key nobody holds on any relay: the HI went nowhere. `stoopContactToRow` fixed; this walk
+ * person's). A key nobody holds on any relay: the HI went nowhere. `pinboardContactToRow` fixed; this walk
  * reads the row the way `showContactThread` does, so the row's address is part of the claim.
  *
  * The claims: (1) the fresh install's FIRST message, sent to the roster row's address, lands on the box —
@@ -30,7 +30,7 @@ import { EventLog } from '../src/eventLog.js';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
 import { seedContactCard } from '../src/v2/seededContact.js';
-import { stoopContactToRow } from '../src/v2/contactsSource.js';
+import { pinboardContactToRow } from '../src/v2/contactsSource.js';
 import { pairCircleIdFor } from '../src/v2/pairRoster.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
@@ -57,7 +57,7 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     relay = await startJourneyRelay();
     dataDir = mkdtempSync(path.join(tmpdir(), 'basis-box-primary-'));
     // The maker's WEB device: his account, one circle, the pair roster wired (the shell's shape).
-    const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), stoopPersistDb: { path: path.join(dataDir, 'web-stoop-state.json') } };
+    const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), pinboardPersistDb: { path: path.join(dataDir, 'web-pinboard-state.json') } };
     web = await bootRealAgentNode('maker-web', { contactChannel: true, pairRoster: true, agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
     await web.agent.connectPeerTransport({ relayUrl: relay.url, onPeerMessage: (env) => web._routerRef.fn?.(env), awaitRelayReady: true });
     await createCircle(web, { groupId: CIRCLE, name: 'Thuis' });
@@ -81,7 +81,7 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     const seeded = await seedContactCard({ payload: card, callSkill: (a, o, x) => visitor.agent.callSkill(a, o, x) });
     expect(seeded.seeded).toBe(true);
     // the visitor names itself, as a tester does under Mij, so the card its first message carries has a name
-    await visitor.agent.callSkill('stoop', 'setMyDisplayName', { displayName: 'Vera' });
+    await visitor.agent.callSkill('pinboard', 'setMyDisplayName', { displayName: 'Vera' });
   }, 240_000);
 
   afterAll(async () => {
@@ -93,10 +93,10 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
 
   /** The address the SHELL writes to: the Contacten row's, as `showContactThread` resolves it — not a value the test knows. */
   const rowAddress = async () => {
-    const res = await visitor.agent.callSkill('stoop', 'listContacts', {});
+    const res = await visitor.agent.callSkill('pinboard', 'listContacts', {});
     const book = (res?.contacts ?? []).find((c) => c.webid === web.pubKey);
     expect(book, 'the seeded contact is in the book').toBeTruthy();
-    return stoopContactToRow(book).peerAddr;
+    return pinboardContactToRow(book).peerAddr;
   };
 
   it('the first message lands on the box (the primary) and the web device has it', async () => {
@@ -115,7 +115,7 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     const onBoxCard = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-card') ?? null, { timeout: 15_000, step: 500 });
     expect(onBoxCard, `the box never took the visitor's card:\n${box.out.slice(-800)}`).toBeTruthy();
     expect(onBoxCard.name, 'the card named the visitor').toBe('Vera');
-    const named = await until(async () => (((await web.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === visitor.pubKey && c.displayName === 'Vera') ? true : null), { timeout: 20_000, step: 500 });
+    const named = await until(async () => (((await web.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === visitor.pubKey && c.displayName === 'Vera') ? true : null), { timeout: 20_000, step: 500 });
     expect(named, 'the web device\'s book names the visitor "Vera" — carried from the box').toBe(true);
   }, 90_000);
 
@@ -125,7 +125,7 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
     // message rode a route to a per-circle address the box had never registered, and the fallback carried it.
     const pairId = pairCircleIdFor(visitor.pubKey, web.pubKey);
     const formed = await until(async () => {
-      const res = await visitor.agent.callSkill('stoop', 'listContacts', {});
+      const res = await visitor.agent.callSkill('pinboard', 'listContacts', {});
       const row = (res?.contacts ?? []).find((c) => c.webid === web.pubKey);
       return row?.pairCircleId === pairId ? row : null;
     }, { timeout: 25_000, step: 500 });
@@ -142,7 +142,7 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
   }, 90_000);
 
   /** The book row for the visitor as a device holds it — `undefined` when the book does not know them. */
-  const bookRow = async (node) => ((await node.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).find((c) => (c.webid ?? c.pubKey) === visitor.pubKey);
+  const bookRow = async (node) => ((await node.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => (c.webid ?? c.pubKey) === visitor.pubKey);
   // The box has no callSkill from here: what it holds is what its walk log says landed (`contact-hidden`, a sibling's
   // mark) and what its channel did (`contact-returned`, the visitor's turn unhid the row).
   const boxLogged = (kind, pred = () => true) => walkLog(dataDir).find((e) => e.kind === kind && pred(e)) ?? null;
@@ -150,7 +150,7 @@ describe('the feedback path with the box as PRIMARY device and the web app besid
   it('the maker hides the visitor on the web → the box\'s row is hidden too → the visitor writes → both show them again (L106, on every device)', async () => {
     // The maker hides the visitor from the WEB device (the tester who wrote is a peer-graph row there; hiding
     // puts them in the book, hidden). The mark is carried live to the box — not at the next catch-up.
-    const hid = await web.agent.callSkill('stoop', 'setContactHidden', { webid: visitor.pubKey, hidden: true });
+    const hid = await web.agent.callSkill('pinboard', 'setContactHidden', { webid: visitor.pubKey, hidden: true });
     expect(hid?.contact?.hidden, JSON.stringify(hid)).toBe(true);
     expect((await bookRow(web))?.hidden).toBe(true);
     const onBoxHidden = await until(async () => boxLogged('contact-hidden', (e) => e.hidden === true), { timeout: 30_000, step: 500 });

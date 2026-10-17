@@ -42,7 +42,7 @@ const fakeTransport = () => ({
 });
 
 describe('buildSubstrateStack — entry shapes + validation', () => {
-  it('builds from an agent (stoop/tasks shape): adapter transport + agent.address deviceId', () => {
+  it('builds from an agent (pinboard/tasks shape): adapter transport + agent.address deviceId', () => {
     const stack = buildSubstrateStack({ agent: mockAgent({ address: 'laptop-1' }) });
     expect(stack.deviceId).toBe('laptop-1');
     expect(typeof stack.transport.publishEnvelope).toBe('function');
@@ -76,8 +76,8 @@ describe('buildSubstrateStack — entry shapes + validation', () => {
 
   it('falls back to fallbackDeviceId when the agent has no address', () => {
     const agent = mockAgent({ address: null });
-    const stack = buildSubstrateStack({ agent, fallbackDeviceId: 'stoop-device' });
-    expect(stack.deviceId).toBe('stoop-device');
+    const stack = buildSubstrateStack({ agent, fallbackDeviceId: 'pinboard-device' });
+    expect(stack.deviceId).toBe('pinboard-device');
     stack.stop();
   });
 

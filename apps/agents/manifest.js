@@ -29,7 +29,7 @@
  *
  * itemType `'agent'` is app-local (F-SP1-a — not canonical in
  * `@onderling/item-types`); permitted by validateManifest.  The DETAIL
- * view mirrors the stoop `settings` / tasks-v0 `pod-settings` record-
+ * view mirrors the pinboard `settings` / tasks-v0 `pod-settings` record-
  * view precedent (`shape: 'record'` + a runtime-derived dataSource arg
  * via `argsFromContext`), still read-only (no `fields[]` patch surface —
  * mutation goes through the explicit ops above).
@@ -601,7 +601,7 @@ export const agentsManifest = {
       labelField: 'name',
       dataSource: { skillId: 'listAgents' },
     },
-    // DETAIL — one agent, record shape (mirrors stoop `settings` /
+    // DETAIL — one agent, record shape (mirrors pinboard `settings` /
     // tasks-v0 `pod-settings`).  `agentId` is a RUNTIME-derived arg
     // (the selected row / URL), supplied via the fetch-section context
     // as `$agentId` (same pattern tasks-v0 uses for `$circleId`).

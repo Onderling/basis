@@ -2,7 +2,7 @@
  * @onderling/react-native/components — UI primitives shared across
  * mobile apps.
  *
- * Lifted from apps/stoop-mobile/src/components/* 2026-05-09 (Phase
+ * Lifted from apps/pinboard-mobile/src/components/* 2026-05-09 (Phase
  * 41.0.b B1–B4; Tasks-mobile is the second consumer).
  *
  * Components consume tokens via `useTheme()` from

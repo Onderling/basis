@@ -47,7 +47,7 @@ describe('the bot\'s people', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
     for (const [webid, role, displayName, extra] of [[FRITS, 'member', 'Frits'], [BERT, 'coordinator', 'Bert'], [OLGA, 'observer', 'Olga'], [ADMIN, 'admin', 'Anne']]) {
-      await own('stoop', 'addContact', { webid, channel: webid.startsWith('bot:') ? 'web' : 'telegram', role, displayName, ...(extra ?? {}) });
+      await own('pinboard', 'addContact', { webid, channel: webid.startsWith('bot:') ? 'web' : 'telegram', role, displayName, ...(extra ?? {}) });
       if (!webid.startsWith('bot:')) await agent.setDoorCaller(webid, role);
     }
     const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });

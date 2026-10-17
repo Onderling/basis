@@ -36,7 +36,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
  * each shell hand-parsed and hand-dispatched, because basis's ops were not on the agent's waist and a
  * shell had to do something bespoke to reach them. With the ops mounted (`realAgent`'s `basis` branch),
  * both circle composers dispatch the GENERAL case through the shared seam: `composerCommands.parse` reads
- * the line against the manifest — the op's own `body` rule, so `/logs --app=stoop` and `/block alice`
+ * the line against the manifest — the op's own `body` rule, so `/logs --app=pinboard` and `/block alice`
  * mean what they always meant — and the shell calls `callSkill('basis', opId, args)`.
  *
  * So reachability is no longer a list to maintain: an op is typeable BECAUSE it declares a slash command.

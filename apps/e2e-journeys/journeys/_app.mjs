@@ -3,7 +3,7 @@
 // WHY THIS EXISTS (Frits, 2026-08-23: "the headless e2e runner should just act like the app,
 // without a full browser needed").
 //
-// The journeys in this directory historically build **stoop agents over the substrate mirror**. That
+// The journeys in this directory historically build **pinboard agents over the substrate mirror**. That
 // composition is real, but it is not the one the product ships: it has no device log, and therefore
 // none of the rails — membership, governance, keys, tasks, chat. A journey written against it can
 // only measure what that harness can do, which produced a false negative the day a `leave` "failed"
@@ -11,11 +11,11 @@
 //
 // The app's composition is `createRealHouseholdAgent` — the same factory the web and mobile shells
 // boot — and the basis test harness already assembles it faithfully (device log, rails, waist, the
-// stoop agent inside it, per-circle signing identities). That harness is vitest-free and imports
+// pinboard agent inside it, per-circle signing identities). That harness is vitest-free and imports
 // cleanly under plain node, so the journey runner can use it directly. No browser, no vitest.
 //
 // WHICH HARNESS FOR WHAT:
-//   • stoop + mirror (the older journeys) — fine for transport, noticeboard, offerings, bots: things
+//   • pinboard + mirror (the older journeys) — fine for transport, noticeboard, offerings, bots: things
 //     that live in the item store and do not depend on a lane.
 //   • the APP composition (this file) — required for anything lane-shaped: membership folds, rules
 //     propagation, key rotation, catch-up, enrolment. If a journey asserts one of those against the
@@ -218,7 +218,7 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
   // circle onto a pod (`storage-policy-writer-unavailable`; the code records why: "the only way a
   // basis circle becomes pod-backed is to be CREATED that way"). So the pod mode creates it that way.
   if (pod) {
-    const created = await admin.agent.callSkill('stoop', 'createGroupV2', {
+    const created = await admin.agent.callSkill('pinboard', 'createGroupV2', {
       groupId: circleId, name: circleId, rules: {},
       storagePolicy: 'shared', groupPodUri: `mem://${circleId}/`,
     });
@@ -240,7 +240,7 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
 }
 
 /** Send a circle chat message the way a shell does: append the signed render entry AND fan the
- *  statement through the real stoop op. (`chatRail.appendMessage` alone only writes locally.) */
+ *  statement through the real pinboard op. (`chatRail.appendMessage` alone only writes locally.) */
 export { sendCircleChat };
 
 /**
@@ -264,7 +264,7 @@ export function goDark(node) {
  * The journey drives `sink.append(event)` directly, which is exactly what the control agent does.
  */
 const keyFanRoster = async (node, circleId) => {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
   return Array.isArray(r?.members) ? r.members : [];
 };
 
@@ -276,7 +276,7 @@ export function keySinkFor(node, circleId) {
     emitStatement: (gid, event) => node.agent.keyEmit?.(gid ?? circleId, event) ?? null,
     statementSubtype: KEY_STATEMENT_BROADCAST,
     // Through the waist, exactly as both shells now do.
-    fanStatement: (gid, statement, only) => node.agent.callSkill('stoop', 'broadcastCircleKeyStatement', {
+    fanStatement: (gid, statement, only) => node.agent.callSkill('pinboard', 'broadcastCircleKeyStatement', {
       groupId: gid ?? circleId, event: statement,
       msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
       ...(only ? { only } : {}),
@@ -474,7 +474,7 @@ export async function roleOf(node, circleId, pubKey) {
 
 /** The circle's roster as that person's own device projects it. */
 export async function rosterOf(node, circleId) {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
   return Array.isArray(r?.members) ? r.members : [];
 }
 
@@ -494,7 +494,7 @@ export async function untilTrue(pred, ms = 15000, step = 200) {
 
 /**
  * The governance handle for one person, wired exactly as a shell wires it: events ride the device
- * log's governance lane, are signed with the per-circle key, and fan through the real stoop op.
+ * log's governance lane, are signed with the per-circle key, and fan through the real pinboard op.
  *
  * `policy` lets a journey choose the decision-class map under test — the default map makes
  * `removeMember` any-admin, which never needs a vote, so a journey that wants to exercise VOTING
@@ -510,7 +510,7 @@ export function governanceFor(node, { policy = {} } = {}) {
     circleIdentityFor: node.agent.circleIdentityFor,
     broadcast: (channel, circleId, event) => {
       const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-      node.agent.callSkill('stoop', op, {
+      node.agent.callSkill('pinboard', op, {
         groupId: circleId, event,
         msgId: event?.body?.hash ? `gov:${event.body.hash}` : `gov-${Math.random().toString(36).slice(2, 10)}`,
         ts: Date.now(),

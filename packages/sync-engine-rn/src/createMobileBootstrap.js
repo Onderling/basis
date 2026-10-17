@@ -10,7 +10,7 @@
  *   1. Restore tokens (caller-supplied `restoreTokens`).
  *   2. If authenticated → build a `PodClient` via `defaultPodFactory`.
  *   3. Hand control to a caller-supplied `buildEngine({podClient, oidc})`
- *      to construct the actual engine (Folio's SyncEngine, Stoop's
+ *      to construct the actual engine (Folio's SyncEngine, Pinboard's
  *      `bundle.cache.attachInner`, …).
  *   4. Wire `setBgRunOnce` to the engine's runOnce equivalent so
  *      background-fetch triggers reach a live engine.
@@ -21,8 +21,8 @@
  * pass `null` for `runOnceFn`.
  *
  * Lifted from `apps/folio-mobile/src/lib/serviceBuilder.js` 2026-05-08
- * (Stoop V3 Phase 40.2).  Folio-mobile's `ServiceContext` should be
- * the canonical caller; Stoop V3's mobile bootstrap mirrors it.
+ * (Pinboard V3 Phase 40.2).  Folio-mobile's `ServiceContext` should be
+ * the canonical caller; Pinboard V3's mobile bootstrap mirrors it.
  */
 
 import { setBgRunOnce, clearBgRunOnce } from './bgRunOnce.js';

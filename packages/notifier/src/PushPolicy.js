@@ -8,8 +8,8 @@
  *   - **Quiet hours**: optional [startHourLocal, endHourLocal) window
  *     during which all sends are suppressed.
  *
- * Substrate-promoted 2026-05-07 (rule-of-two: Stoop V1 Tasks).
- * The original copy lived at `apps/stoop/src/lib/PushPolicy.js`; both
+ * Substrate-promoted 2026-05-07 (rule-of-two: Pinboard V1 Tasks).
+ * The original copy lived at `apps/pinboard/src/lib/PushPolicy.js`; both
  * apps now import from here.
  *
  * The class does not depend on `notifier`'s scheduler — callers pass

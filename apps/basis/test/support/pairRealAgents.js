@@ -14,7 +14,7 @@
  *
  * It reuses the SAME production op/handler modules the web + mobile shells use —
  * no bespoke re-implementation of the join protocol:
- *   - create + invite   : createGroupState.finalSubmit → stoop.createGroupV2,
+ *   - create + invite   : createGroupState.finalSubmit → pinboard.createGroupV2,
  *                         then v2/circleInvite.buildCircleInviteUri.
  *   - join / redeem      : v2/circleInvite.joinCircleFromInvite →
  *                         joinGroupState.finalSubmit (setMyHandle →
@@ -152,7 +152,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const keyEventStore = createKeyEventStore();
   const sealedContent = [];
 
-  // S4 — a per-node control-agent router over this node's own circle-producer map, wired as the stoop
+  // S4 — a per-node control-agent router over this node's own circle-producer map, wired as the pinboard
   // agent's `controlAgent`. For an UNSEALED (p0) circle the map stays empty → getProducer returns null →
   // the redeem/leave membership hooks no-op (the pre-S4 behaviour the default harness relies on). A SEALED
   // circle (`sealCircleViaProducer`) registers a producer here, so the REAL `removeMember` op routes into
@@ -169,8 +169,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // we hand it in via the existing secureAgentOpts pass-through. Ref-indirected
     // so the router can be built after boot with the live callSkill/sendPeerMessage.
     secureAgentOpts: { onPeerMessage: (env) => routerRef.fn?.(env) },
-    // The real per-circle control-agent router (S4) — the same one circleApp.js wires as stoopControlAgent.
-    stoopControlAgent: circleControlAgentRouter,
+    // The real per-circle control-agent router (S4) — the same one circleApp.js wires as pinboardControlAgent.
+    pinboardControlAgent: circleControlAgentRouter,
     // A fresh, code-minting REAL circle must show only real members — keep demo
     // scaffolding off so rosters carry exactly the creator + real joiners.
     seedDemoData: false,
@@ -201,7 +201,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     eventLog: chatEventLog,
     // The MIGRATION gate only (the store copy's one-time carry-over): live receive is the signed
     // statement path below.
-    ingest: (payload, fromPeerAddr) => callSkill('stoop', 'ingestCircleMessage', { payload, fromPeerAddr }),
+    ingest: (payload, fromPeerAddr) => callSkill('pinboard', 'ingestCircleMessage', { payload, fromPeerAddr }),
     logger: QUIET,
   });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
@@ -232,7 +232,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       // shortcut stands alone, as before.
       let roster = [];
       try {
-        const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
         roster = Array.isArray(r?.members) ? r.members : [];
       } catch { roster = []; }
       if (roster.length && !roster.some((m) => (m?.webid ?? m?.addr ?? m?.ref) === ref)) return false;
@@ -300,11 +300,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
         // a hidden contact who writes again comes back (L106), composed as the shells do: the book says who is
         // hidden; the landing unhides the row. Recorded too, so a walk can assert the marker's moment.
-        isHidden: async (contactId) => ((await agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
-        onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
+        isHidden: async (contactId) => ((await agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? []).some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true),
+        onReturned: async (contactId) => { await agent.callSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: false }); returned.push(contactId); },
         // the first message carries my card; an arriving card goes into the book — as the shells compose it
-        myCard: async (personaId = null) => { try { return (await agent.callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
-        onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card }); },
+        myCard: async (personaId = null) => { try { return (await agent.callSkill('pinboard', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
+        onCard: async ({ card }) => { await agent.callSkill('pinboard', 'addContactFromQr', { payload: card }); },
         sealFor: agent.contactSeal?.sealFor ?? null,   // sealed to the person's current key, as the shells compose it
         openFor: agent.contactSeal?.openFor ?? null,
         authFor: agent.linkedTurnAuth ?? null,          // a turn to a linked bot carries this device's statement, as the shells compose it
@@ -683,7 +683,7 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
 
 
 /**
- * Create a circle via the real create-wizard op path (createGroupState.finalSubmit → stoop.createGroupV2).
+ * Create a circle via the real create-wizard op path (createGroupState.finalSubmit → pinboard.createGroupV2).
  * The single-admin creator step, split out so ONE circle can then take MULTIPLE joiners (the sealed-circle
  * three-member case) instead of `pairCircle` minting a fresh circle per pair.
  */
@@ -734,7 +734,7 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
 // (`openerForIdentity` → AgentIdentity.sharedCopyOpener) — the exact app seam, no secret ever surfaced. Key
 // establishment/rotation ride the log as key-events fanned over `sendPeerMessage` (real hold-forward when a peer
 // is offline); content is sealed by the seal resolver under the current version and fanned the same way. This is
-// the none key-rotation mechanism end-to-end, with the harness standing in only for the stoop skill that would
+// the none key-rotation mechanism end-to-end, with the harness standing in only for the pinboard skill that would
 // emit/record the events (as it already stands in for the browser's connectPeerTransport wiring).
 
 /** A member's stable sealing PUBLIC key — derived from its published network key (deterministic, no trail dependency). */
@@ -796,7 +796,7 @@ export async function postSealed({ admin, members = [], groupId, text }) {
 // `bootSealedCircle`/`removeAndRotate` above stand in for the control agent (they call the key-event builders
 // directly). The helpers below instead stand up the REAL per-circle producer + control agent — the same
 // `createCirclePodProducer` the web shell builds — wired with the same `makeKeyEventLogSink`. A membership
-// change then flows through the production path: the admin's stoop `removeMember` op → the control-agent
+// change then flows through the production path: the admin's pinboard `removeMember` op → the control-agent
 // router → the producer's control agent → `emitKeyEvent` → the sink → the fan. No harness stand-in on the
 // remove path; the sink records the admin's own copy + fans the rotation to the remaining members over the bus.
 
@@ -872,7 +872,7 @@ export function readSealed(node, env, groupId) {
 
 /** Read a circle roster via the real listGroupMembers op. */
 export async function readRoster(node, groupId) {
-  const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId });
+  const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId });
   return Array.isArray(res?.members) ? res.members : [];
 }
 
@@ -886,12 +886,12 @@ export async function teardown(...nodes) {
 
 /**
  * Send one circle chat over the SIGNED path — the exact production shape: append the signed render entry
- * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real stoop core
+ * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real pinboard core
  * (`broadcastCircleChatStatement` → transport / pod routing per the circle's policy). The drop-in
  * replacement for the deleted plain-envelope `broadcastCircleMessage` in every journey test.
  */
 export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now(), card } = {}) {
   const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, card });
   if (!res) return { error: 'no-circle-signer' };
-  return node.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });
+  return node.agent.callSkill('pinboard', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });
 }

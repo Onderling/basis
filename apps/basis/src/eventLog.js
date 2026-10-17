@@ -127,7 +127,7 @@ export function isSilentEntry(entry) {
  * `@onderling/relay` (`push/wakePayload.js`) + `@onderling/notifier`
  * (`PushPolicy`) and is driven off push tokens + `humanInTheLoop`, reached via
  * the circle fan-out (`@onderling/kring-host` `broadcastCircleFanOut` →
- * `stoop broadcastCircleMessage`). When that path grows an entry-kind gate, it
+ * `pinboard broadcastCircleMessage`). When that path grows an entry-kind gate, it
  * MUST consult `shouldWakeForEntry(entry)` BEFORE enqueuing a wake so a silent
  * system entry can never nudge a device. Until then this is the pure,
  * unit-testable source of truth that gate plugs into.
@@ -138,7 +138,7 @@ export function isSilentEntry(entry) {
 export function shouldWakeForEntry(entry) {
   if (!entry || typeof entry !== 'object') return false;
   // The kind decides — including the ONE per-event exception (`governance`: a decision opening wakes, the
-  // votes that follow do not), which `kindWakes` owns so stoop and basis stop each deriving it.
+  // votes that follow do not), which `kindWakes` owns so pinboard and basis stop each deriving it.
   if (typeof entry.type === 'string' && entry.type in ENTRY_KINDS) {
     return kindWakes(entry.type, entry.payload);
   }

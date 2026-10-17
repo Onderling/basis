@@ -7,7 +7,7 @@
  * PAGE RELOAD (a fresh backend over the same dbName reads prior writes).
  *
  * Uses `fake-indexeddb/auto` to run a real IndexedDB shape in the Node
- * test env (same approach as apps/stoop's IndexedDBPersist tests).
+ * test env (same approach as apps/pinboard's IndexedDBPersist tests).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';

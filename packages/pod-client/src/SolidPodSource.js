@@ -528,7 +528,7 @@ export class SolidPodSource extends DataSource {
     if (/^https?:\/\//i.test(input)) return input;
     // Fail loud: a non-http(s) URI scheme (`mem://`, `pseudo-pod://`,
     // …) is a LOGICAL key, not a pod path.  Concatenating it onto the
-    // pod root silently produced `…/mem://…` → 404 (the Stoop
+    // pod root silently produced `…/mem://…` → 404 (the Pinboard
     // pod-write bug, 2026-05-16).  Callers MUST map logical keys to
     // pod paths (via `@onderling/pod-routing`) before they reach a pod
     // client.

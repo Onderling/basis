@@ -1,7 +1,7 @@
 /**
  * basis — i18next wrapper.
  *
- * Mirrors `apps/stoop/src/lib/localisation.js` + `apps/tasks-v0/src/lib/localisation.js`.
+ * Mirrors `apps/pinboard/src/lib/localisation.js` + `apps/tasks-v0/src/lib/localisation.js`.
  * Per `Project Files/conventions/localisation.md`:
  *   - every user-facing string lives in `locales/<lang>.json`
  *   - leaf shape is `{ text, doc }` where `doc` is a translator note

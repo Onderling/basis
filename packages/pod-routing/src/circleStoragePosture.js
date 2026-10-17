@@ -5,7 +5,7 @@
  * The same closed set was written three times, in two different languages, and the two languages
  * disagreed:
  *
- *   stoop + tasks-v0   `no-pod | centralised | decentralised | hybrid`
+ *   pinboard + tasks-v0   `no-pod | centralised | decentralised | hybrid`
  *   basis              `none   | shared      | personal       | hybrid`
  *
  * They cut the space identically — verified 2026-08-27 against both implementations, term by term —

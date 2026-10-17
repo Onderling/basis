@@ -55,9 +55,9 @@ async function coreJourney(A, B, label, lines) {
     `${got.length} bubble(s)`);
 
   // The island: remove B and check the two halves that matter.
-  const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-  const bId = (await call(B.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-  const rem = await call(A.page, 'stoop', 'removeMember', { groupId: gid, memberWebid: bId, reason: label });
+  const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+  const bId = (await call(B.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+  const rem = await call(A.page, 'pinboard', 'removeMember', { groupId: gid, memberWebid: bId, reason: label });
   log(`${label} · removal`, rem?.revoked ? 'PASS' : 'FINDING', JSON.stringify(rem)?.slice(0, 110));
   await B.page.waitForTimeout(12000);
   await openCircleMatching(B.page, byId).catch(() => {});

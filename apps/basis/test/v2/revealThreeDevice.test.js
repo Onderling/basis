@@ -28,7 +28,7 @@ import {
 
 const GROUP = 'reveal-circle';
 const rosterOn = async (node) => {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
   return Array.isArray(r?.members) ? r.members : [];
 };
 const rowFor = (roster, webid) => roster.find((m) => m?.webid === webid) ?? null;
@@ -50,7 +50,7 @@ describe('names and reveals across three devices', () => {
   });
 
   it("a member's display name stays on their OWN device — no other roster ever holds it", async () => {
-    const set = await B.agent.callSkill('stoop', 'setMyDisplayName', { displayName: 'Bram de Wit' });
+    const set = await B.agent.callSkill('pinboard', 'setMyDisplayName', { displayName: 'Bram de Wit' });
     expect(set?.error).toBeUndefined();
 
     // Bram's own device has it (his MemberMap row is his to write)…
@@ -72,7 +72,7 @@ describe('names and reveals across three devices', () => {
     // Anna opts in to seeing names. This is HER display preference, recorded on HER device — it is
     // NOT a reveal: it cannot stand in for a member's own release, and its marker carries an honest
     // name (`viewerNameOptIn`) so no gate can mistake it for the discloser's consent again.
-    const r = await A.agent.callSkill('stoop', 'setGroupReveal', { groupId: GROUP, showDisplayName: true });
+    const r = await A.agent.callSkill('pinboard', 'setGroupReveal', { groupId: GROUP, showDisplayName: true });
     expect(r?.error).toBeUndefined();
 
     const onA = rowFor(await rosterOn(A), B.pubKey);

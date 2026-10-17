@@ -54,15 +54,15 @@ describe('makeResolvingCallSkill', () => {
       calls.push([app, op]);
       return app === 'tasks' && op === 'getMyCircles' ? { circles: [], echoed: args.x } : null;
     };
-    const resolve = makeResolvingCallSkill(raw, ['stoop', 'tasks', 'folio']);
+    const resolve = makeResolvingCallSkill(raw, ['pinboard', 'tasks', 'folio']);
     const res = await resolve('getMyCircles', { x: 7 });
     expect(res).toEqual({ circles: [], echoed: 7 });
-    expect(calls).toEqual([['stoop', 'getMyCircles'], ['tasks', 'getMyCircles']]); // stopped at first hit
+    expect(calls).toEqual([['pinboard', 'getMyCircles'], ['tasks', 'getMyCircles']]); // stopped at first hit
   });
 
   it('returns null when every origin yields null/throws or callSkill is missing', async () => {
     expect(await makeResolvingCallSkill(null)('op')).toBeNull();
     const raw = async () => { throw new Error('x'); };
-    expect(await makeResolvingCallSkill(raw, ['stoop'])('op')).toBeNull();
+    expect(await makeResolvingCallSkill(raw, ['pinboard'])('op')).toBeNull();
   });
 });

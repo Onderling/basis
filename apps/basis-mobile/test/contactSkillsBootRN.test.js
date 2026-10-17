@@ -13,7 +13,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createContactSkillRegistry } from '../../basis/src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../basis/src/v2/contactThreadChannel.js';
 import { makePeerRouter } from '../../basis/src/core/handlers/peerRouter.js';
-import { listContacts, mergeContacts, stoopContactToRow } from '../../basis/src/v2/contactsSource.js';
+import { listContacts, mergeContacts, pinboardContactToRow } from '../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../basis/src/v2/addBot.js';
 import { sendA2ATask } from '@onderling/core';
 import { PeerGraph } from '@onderling/core';
@@ -54,12 +54,12 @@ describe('contact-skill registry — mobile parity', () => {
     expect(sent[0]).toMatchObject({ addr: 'NKNADDR', p: { subtype: 'contact-msg', text: 'hoi' } });
   });
 
-  it('S1 #2/#3 deps resolve: merge stoop contacts + inbound peer DM (mobile import paths)', async () => {
+  it('S1 #2/#3 deps resolve: merge pinboard contacts + inbound peer DM (mobile import paths)', async () => {
     // #2 — the directory merge the RN ContactsScreen uses.
     expect(typeof mergeContacts).toBe('function');
     const peerRows = [{ contactId: 'bot', name: 'Bot', isBot: true }];
-    const stoopRows = [{ webid: 'w-alice', displayName: 'Alice', trustLevel: 'vertrouwd', tags: ['buur'] }].map(stoopContactToRow);
-    const merged = mergeContacts(peerRows, stoopRows);
+    const pinboardRows = [{ webid: 'w-alice', displayName: 'Alice', trustLevel: 'vertrouwd', tags: ['buur'] }].map(pinboardContactToRow);
+    const merged = mergeContacts(peerRows, pinboardRows);
     expect(merged.map((r) => r.name)).toEqual(['Bot', 'Alice']);   // bot first, then person
     expect(merged[1]).toMatchObject({ isBot: false, trustLevel: 'vertrouwd', tags: ['buur'] });
 

@@ -21,11 +21,11 @@ describe('share my contact — parity', () => {
   const nl = JSON.parse(read('../../basis/src/locales/circle.nl.json'));
   const mobileClassifier = read('../../basis/src/v2/scanRoute.js');   // the list moved to the shared router (2026-10-09)
 
-  it('both shells resolve the panel through the shared loader — neither builds the link or asks stoop itself', () => {
+  it('both shells resolve the panel through the shared loader — neither builds the link or asks pinboard itself', () => {
     for (const src of [webHost, mobileScreen]) expect(src).toMatch(/loadShareMyContact\(/);
     // (comments describe; code decides — strip them before looking for a shell doing the loader's job)
     const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    // the PANEL's own function on web (the host also asks stoop for the card elsewhere — the first message carries it)
+    // the PANEL's own function on web (the host also asks pinboard for the card elsewhere — the first message carries it)
     const bare = code(webHost); const at = bare.indexOf('function showShareMyContact(');
     const webPanelFn = bare.slice(at, bare.indexOf('\n}', at));
     for (const src of [webPanelFn, code(webPanel), code(mobileScreen)]) expect(src).not.toMatch(/#contact=|getContactShareQr/);

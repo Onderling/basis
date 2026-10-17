@@ -3,7 +3,7 @@
  * routes over basis's REAL cross-peer wire (the secure-mesh chat agent),
  * instead of an app meshAgent's in-process bus.
  *
- * OBJ-2 keystone (2026-06-18). The tasks/stoop substrate mirror builds its
+ * OBJ-2 keystone (2026-06-18). The tasks/pinboard substrate mirror builds its
  * notify-envelope transport with `createAgentTransportAdapter(agent)`, which
  * fans out per-recipient via `agent.transportFor(addr)`. In basis the app
  * agents are InternalTransport(bus)-only, so that adapter never crosses devices.
@@ -12,7 +12,7 @@
  * agent's `sa.peer.sendTo` (NKN/relay/mdns/rendezvous, routed by the unified
  * RoutingStrategy) — and receives via `handleInbound`, which the chat agent's
  * single inbound peer-message router calls for every message. So the unchanged
- * `wireXSubstrateMirror` (household, and later tasks/stoop) syncs across real
+ * `wireXSubstrateMirror` (household, and later tasks/pinboard) syncs across real
  * devices. Transport-agnostic by construction: the mirror doesn't know which
  * wire it's on.
  *

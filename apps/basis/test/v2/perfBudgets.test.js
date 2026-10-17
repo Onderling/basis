@@ -46,7 +46,7 @@ describe('makeResolvingCallSkill — catalogue short-circuit (Perf #2)', () => {
     };
     const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalogue);
     await call('listNotes', {});
-    // Exactly one probe (tasks-v0), zero wasted probes on stoop / household /
+    // Exactly one probe (tasks-v0), zero wasted probes on pinboard / household /
     // calendar / folio.  Replaces 5 probes with 1.
     expect(spy.calls).toHaveLength(1);
     expect(spy.calls[0].origin).toBe('tasks');
@@ -67,13 +67,13 @@ describe('makeResolvingCallSkill — catalogue short-circuit (Perf #2)', () => {
     const spy = makeSpy();
     const catalogue = {
       opsById: new Map([
-        ['stoop/getBulletin', { op: { id: 'getBulletin' }, appOrigin: 'stoop' }],
+        ['pinboard/getBulletin', { op: { id: 'getBulletin' }, appOrigin: 'pinboard' }],
       ]),
     };
     const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalogue);
     await call('getBulletin', {});
     expect(spy.calls).toHaveLength(1);
-    expect(spy.calls[0].origin).toBe('stoop');
+    expect(spy.calls[0].origin).toBe('pinboard');
   });
 
   it('stops probing after the first non-null hit (existing behaviour)', async () => {
@@ -81,14 +81,14 @@ describe('makeResolvingCallSkill — catalogue short-circuit (Perf #2)', () => {
       calls: [],
       raw: async (origin, opId, args) => {
         spy.calls.push({ origin, opId, args });
-        // Stoop returns a value; tasks-v0 / others should never get a probe.
-        if (origin === 'stoop') return { items: ['hit'] };
+        // Pinboard returns a value; tasks-v0 / others should never get a probe.
+        if (origin === 'pinboard') return { items: ['hit'] };
         return null;
       },
     };
     const catalogue = {
       opsById: new Map([
-        ['stoop/x',    { op: { id: 'x' }, appOrigin: 'stoop'    }],
+        ['pinboard/x',    { op: { id: 'x' }, appOrigin: 'pinboard'    }],
         ['tasks-v0/x', { op: { id: 'x' }, appOrigin: 'tasks' }],
       ]),
     };
@@ -106,7 +106,7 @@ describe('createRealHouseholdAgent — seed-once budget (Perf #1)', () => {
   it('boots with seedTasks:false ⇒ NO addTask invocations (sanity, fast path)', async () => {
     const { createRealHouseholdAgent } = await import('../../src/core/agent/realAgent.js');
     // Spy by counting addTask invocations through agent.callSkill.
-    const a = await createRealHouseholdAgent({ seedTasks: false, seedStoopPosts: false });
+    const a = await createRealHouseholdAgent({ seedTasks: false, seedPinboardPosts: false });
     const calls = [];
     const wrap = a.callSkill;
     let invocations = 0;

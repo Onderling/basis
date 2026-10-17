@@ -76,7 +76,7 @@ export function selfWebidOf(agent, circleId = null) {
  * knows — visible as members still using the fallback, which is exactly the signal that reads right.
  *
  * @param {object} a
- * @param {Array<object>} a.members   roster rows (`stoop listGroupMembers`)
+ * @param {Array<object>} a.members   roster rows (`pinboard listGroupMembers`)
  * @param {string} a.circleId
  * @param {string|null} [a.exceptWebid]  omit one member (the person we are sending TO)
  * @returns {Array<{circleId, memberWebid, circleAddress, circleAddressProof}>}
@@ -136,7 +136,7 @@ export async function makeThisDevicePrimary({ agent, circleIds = null, logger = 
   if (!agent || typeof agent.callSkill !== 'function') return { circles: 0, announced: 0, failed: [] };
   let ids = Array.isArray(circleIds) ? circleIds : null;
   if (!ids) {
-    try { ids = ((await agent.callSkill('stoop', 'listMyCircles', {}))?.circles ?? []).filter((c) => typeof c === 'string' && c); }
+    try { ids = ((await agent.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []).filter((c) => typeof c === 'string' && c); }
     catch { ids = []; }
   }
   let announced = 0;
@@ -178,7 +178,7 @@ export async function announceOwnCircleAddress({ agent, circleId, primary = fals
   let sent = 0;
   let reached = false;
   try {
-    const res = await agent.callSkill('stoop', 'broadcastCircleAddresses', {
+    const res = await agent.callSkill('pinboard', 'broadcastCircleAddresses', {
       groupId: circleId, announcements: [announcement],
     });
     sent = Number(res?.sent) || 0;
@@ -207,7 +207,7 @@ export async function announceOwnCircleAddress({ agent, circleId, primary = fals
   // leaves the row alone, and the next boot tries again.
   if (reached) {
     try {
-      await agent.callSkill('stoop', 'recordCircleAddressAnnouncement', {
+      await agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', {
         groupId:            circleId,
         memberWebid:        announcement.memberWebid,
         circleAddress:      announcement.circleAddress,
@@ -262,7 +262,7 @@ export async function announceOwnCircleAddressIfChanged({
   let rows = Array.isArray(members) ? members : null;
   if (!rows) {
     try {
-      const res = await agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      const res = await agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
       rows = Array.isArray(res?.members) ? res.members : [];
     } catch { return { announced: false, reason: 'roster-unreadable' }; }
   }
@@ -326,7 +326,7 @@ export async function propagateCircleAddressesAfterJoin({
 
   let members = [];
   try {
-    const res = await agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const res = await agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     members = Array.isArray(res?.members) ? res.members : [];
   } catch (err) {
     logger?.warn?.('[circle-address] roster read failed after join', err?.message ?? err);
@@ -347,7 +347,7 @@ export async function propagateCircleAddressesAfterJoin({
     .filter((w) => w && w !== newMemberWebid && w !== selfWebidOf(agent, circleId));
   if (newcomer.length && settled.length) {
     try {
-      const r = await agent.callSkill('stoop', 'broadcastCircleAddresses', {
+      const r = await agent.callSkill('pinboard', 'broadcastCircleAddresses', {
         groupId: circleId, announcements: newcomer, to: settled,
       });
       out.toCircle = Number(r?.sent) || 0;
@@ -369,7 +369,7 @@ export async function propagateCircleAddressesAfterJoin({
   //    newcomer's per-circle address, and is the one envelope shape the receiver verifies.
   if (others.length) {
     try {
-      const r = await agent.callSkill('stoop', 'broadcastCircleAddresses', {
+      const r = await agent.callSkill('pinboard', 'broadcastCircleAddresses', {
         groupId: circleId, announcements: others, to: [newMemberWebid],
       });
       out.toNewMember = Number(r?.sent) || 0;
@@ -421,7 +421,7 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
     let recorded = 0;
     for (const one of proven) {
       try {
-        const r = await agent?.callSkill?.('stoop', 'recordCircleAddressAnnouncement', {
+        const r = await agent?.callSkill?.('pinboard', 'recordCircleAddressAnnouncement', {
           groupId:            circleId,
           memberWebid:        one.memberWebid,
           circleAddress:      one.circleAddress,
@@ -478,7 +478,7 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
         try { await agent?.knownPeersSync?.pushTo?.(one.circleAddress); }
         catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine who I know', err?.message ?? err); }
         try {
-          const r = await agent?.callSkill?.('stoop', 'broadcastCircleAddresses', { groupId: circleId, announcements: [one] });
+          const r = await agent?.callSkill?.('pinboard', 'broadcastCircleAddresses', { groupId: circleId, announcements: [one] });
           if (r && !r.error) introduced += 1;
         } catch (err) { logger?.warn?.('[circle-address] could not introduce a new device of mine to the circle', err?.message ?? err); }
       }

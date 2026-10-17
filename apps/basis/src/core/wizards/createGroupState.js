@@ -27,7 +27,7 @@ export { OFFERING_AXES };
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
 import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat } from '../../v2/circleTemplates.js';
-import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
+import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 // The persona a circle is FOUNDED as — the join wizard's list, read the same way (one reader, two wizards).
@@ -145,7 +145,7 @@ export function setKind(state, kind) {
   // same choice, and the RADIO is the authority: its default is "No pod (local only — simplest)", and a
   // template's `pod` (every template says `personal` or `shared`) is a preference that only means
   // something once a pod is actually attached. They used to be two fields: the person's "No pod" went to
-  // stoop while the template's `personal` went into the policy the store reads — a phone circle created
+  // pinboard while the template's `personal` went into the policy the store reads — a phone circle created
   // "local only" ran pod-carried with no pod, and nothing fanned (W27, 2026-08-30).
   const storagePolicy = state?.storagePolicy ?? DEFAULT_CIRCLE_STORAGE_POSTURE;
   return { ...next, storagePolicy, pod: storagePolicy };
@@ -351,7 +351,7 @@ export async function resolveFounderKey({ founderPubKey = null, getMyPeerAddr = 
   if (typeof founderPubKey === 'string' && founderPubKey) return founderPubKey;
   try { const k = typeof getMyPeerAddr === 'function' ? getMyPeerAddr() : null; if (typeof k === 'string' && k) return k; } catch { /* next rung */ }
   if (typeof callSkill === 'function') {
-    try { const w = (await callSkill('stoop', 'whoAmI', {}))?.webid; if (typeof w === 'string' && w) return w; } catch { /* none */ }
+    try { const w = (await callSkill('pinboard', 'whoAmI', {}))?.webid; if (typeof w === 'string' && w) return w; } catch { /* none */ }
   }
   return null;
 }
@@ -381,7 +381,7 @@ export function withPersonas(state, personas) {
 export async function loadFounderHandle({ callSkill } = {}) {
   if (typeof callSkill !== 'function') return { needsHandle: false, handleSuggestions: [] };
   let entry = null;
-  try { entry = (await callSkill('stoop', 'getMyProfile', {}))?.entry ?? null; } catch { return { needsHandle: false, handleSuggestions: [] }; }
+  try { entry = (await callSkill('pinboard', 'getMyProfile', {}))?.entry ?? null; } catch { return { needsHandle: false, handleSuggestions: [] }; }
   if (!entry || (typeof entry.handle === 'string' && entry.handle.trim())) return { needsHandle: false, handleSuggestions: [] };
   const prior = await loadPriorHandles({ callSkill });
   return { needsHandle: true, handleSuggestions: handleSuggestions(prior, entry.displayName ?? '') };
@@ -542,7 +542,7 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
       bound = true;
     }
     const rules  = { ...buildRulesObjectFromState(state), ...(state.rulesExtra && typeof state.rulesExtra === 'object' ? state.rulesExtra : {}) };
-    const result = await callSkill('stoop', 'createGroupV2', {
+    const result = await callSkill('pinboard', 'createGroupV2', {
       groupId:              state.groupId,
       name:                 state.name,
       rules,
@@ -574,7 +574,7 @@ export async function finalSubmit({ state, callSkill, shareRelease = null, relea
     let named = Promise.resolve(false);
     const handle = String(state.handle ?? '').trim();
     if (state.needsHandle && isValidHandle(handle)) {
-      named = withinMs(Promise.resolve().then(() => callSkill('stoop', 'setMyHandle', { handle })), releaseTimeoutMs)
+      named = withinMs(Promise.resolve().then(() => callSkill('pinboard', 'setMyHandle', { handle })), releaseTimeoutMs)
         .then((r) => !r?.error)
         .catch((err) => {
           if (typeof console !== 'undefined') console.warn(`[create] the founder's handle was not set (Me → handle sets it): ${err?.message ?? err}`);

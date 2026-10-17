@@ -1,6 +1,6 @@
 {
   "version":   1,
-  "_comment":  "Stoop V1 Phase 12 — keyword → canonical tag dictionary. ~80 hand-curated entries for V1; expand opportunistically. Each entry maps a lowercase token to a `{tag, category}` pair so cross-language matching works (Dutch 'fiets' and English 'bicycle' both → tag 'bicycle' in category 'vervoer').",
+  "_comment":  "Pinboard V1 Phase 12 — keyword → canonical tag dictionary. ~80 hand-curated entries for V1; expand opportunistically. Each entry maps a lowercase token to a `{tag, category}` pair so cross-language matching works (Dutch 'fiets' and English 'bicycle' both → tag 'bicycle' in category 'vervoer').",
   "entries": {
     "fiets":         { "tag": "bicycle",       "category": "vervoer" },
     "fietsen":       { "tag": "bicycle",       "category": "vervoer" },

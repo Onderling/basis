@@ -70,7 +70,7 @@ import { synthesizeGenericOps } from './genericOpSynth.js';
  *     bare form (no churn for solo apps).
  *   - Slash collisions (a command declared by ≥2 apps) follow the
  *     Objective-D policy: prefix-all + per-host override.  Every declarer
- *     gets an app-qualified command (`/tasks:done`, `/stoop:done`) in the
+ *     gets an app-qualified command (`/tasks:done`, `/pinboard:done`) in the
  *     commandMenu; the BARE token resolves to the `slashOverrides` winner if
  *     pinned, else the bare entry is marked `{ambiguous, choices}` (the parser
  *     surfaces the choices instead of firing one app).  Non-colliding commands

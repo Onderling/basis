@@ -42,8 +42,8 @@ async function werkOnlyLaptop({ registry = null } = {}) {
 describe('a device without the general persona, at the person-sites', () => {
   it('the add-a-device offer names no circle in the clear — Werk\'s circles are not the general persona\'s', async () => {
     const { phone, laptop } = await werkOnlyLaptop();
-    await laptop.callSkill('stoop', 'createGroupV2', { groupId: 'werkoverleg', name: 'Werkoverleg', rules: { text: 'w' } });
-    expect((await laptop.callSkill('stoop', 'listMyCircles', {}))?.circles, 'the laptop is in Werk\'s circle').toContain('werkoverleg');
+    await laptop.callSkill('pinboard', 'createGroupV2', { groupId: 'werkoverleg', name: 'Werkoverleg', rules: { text: 'w' } });
+    expect((await laptop.callSkill('pinboard', 'listMyCircles', {}))?.circles, 'the laptop is in Werk\'s circle').toContain('werkoverleg');
     // it holds no general persona (so no circle in the clear) and no root (so no persona to seal): nothing to offer
     const offer = await laptop.callSkill('household', 'buildEnrollOffer', {});
     expect(offer?.ok).toBe(false);
@@ -100,7 +100,7 @@ describe('a device without the general persona, at the person-sites', () => {
 
   it('a contact card asked with no persona is the primary\'s, never the general persona\'s', async () => {
     const { phone, laptop, w } = await werkOnlyLaptop();
-    const card = await laptop.callSkill('stoop', 'getContactShareQr', {});
+    const card = await laptop.callSkill('pinboard', 'getContactShareQr', {});
     const decoded = decodeContactCard(card?.payload);
     expect(decoded, 'a card was made').toBeTruthy();
     expect(decoded.webid, 'the card is Werk\'s').toBe(phone.persona(w).chatId.pubKey);

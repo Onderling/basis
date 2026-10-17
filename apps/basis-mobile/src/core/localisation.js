@@ -6,7 +6,7 @@
  * Convention enforced from day 1: every user-facing string
  * goes through `t()` with a locale entry; hardcoded English is a
  * defect.  Mirrors apps/tasks-v0/src/lib/localisation.js + the
- * stoop-mobile equivalent.
+ * pinboard-mobile equivalent.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from '../../locales/en.json';

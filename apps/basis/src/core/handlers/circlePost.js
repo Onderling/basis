@@ -4,8 +4,8 @@ import { notifyIfResonant } from './driverMatchNotify.js';
  * Inbound circle-post handler. Bundle H Phase 2 — lifted from
  * `apps/basis/web/main.js:807` (2026-05-24).
  *
- * Ingests a peer's fan-out post into the local stoop substrate via
- * `stoop.ingestRemotePost`.  Handles dedup + eviction-filter inside
+ * Ingests a peer's fan-out post into the local pinboard substrate via
+ * `pinboard.ingestRemotePost`.  Handles dedup + eviction-filter inside
  * the skill; we just publish a notification on success.
  *
  * The NKN sender address is recorded alongside `fromPubKey` so
@@ -43,7 +43,7 @@ export function makeHandleCirclePost({
     }
     let result;
     try {
-      result = await callSkill('stoop', 'ingestRemotePost', {
+      result = await callSkill('pinboard', 'ingestRemotePost', {
         payload,
         fromPubKey:  fromPubKey ?? fromAddr,
         fromPeerAddr: fromAddr,
@@ -66,7 +66,7 @@ export function makeHandleCirclePost({
     }
     logger.info?.('[peer] circle-post ingested: new itemId=' + result?.itemId);
     publishEvent?.({
-      app:   'stoop',
+      app:   'pinboard',
       type:  'notification',
       actor: payload.from ?? fromAddr,
       payload: {
@@ -85,7 +85,7 @@ export function makeHandleCirclePost({
         item: { ...payload, id: result?.itemId ?? payload.requestId, title: payload.text },
         getDrivers: () => loadDrivers(groupId),
         notify: (p) => publishEvent?.({
-          app: 'stoop', type: 'notification', actor: payload.from ?? fromAddr,
+          app: 'pinboard', type: 'notification', actor: payload.from ?? fromAddr,
           payload: {
             message: p.message,
             driverMatch: true,

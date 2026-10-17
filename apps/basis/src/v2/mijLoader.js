@@ -34,13 +34,13 @@ export async function loadMijModel({ callSkill, personaId, circles = [], activeC
     try { await migrateRosterOfferings({ callSkill, circleId: activeCircleId }); } catch { /* non-fatal */ }
     // availability unification — one-time, marker-guarded seed of the unified
     // `availability` property from the most-restrictive legacy signal (holidayMode /
-    // per-skill availability). Reads the active circle's stoop context; global once seeded.
+    // per-skill availability). Reads the active circle's pinboard context; global once seeded.
     try { await migrateAvailability({ callSkill }); } catch { /* non-fatal */ }
     // location fold-in (audit §4) — one-time, marker-guarded seed of the person-level
-    // `location` property from the bespoke stoop `profile.location` coarse geo field.
+    // `location` property from the bespoke pinboard `profile.location` coarse geo field.
     try { await migrateLocation({ callSkill }); } catch { /* non-fatal */ }
     // interests fold-in (audit 4) — one-time, marker-guarded seed of an `interest`-kind
-    // driver from the bespoke learned Layer-2 interest signal (stoop getInterestProfile terms).
+    // driver from the bespoke learned Layer-2 interest signal (pinboard getInterestProfile terms).
     try { await migrateInterests({ callSkill }); } catch { /* non-fatal */ }
   }
 
@@ -90,8 +90,8 @@ export async function loadMijModel({ callSkill, personaId, circles = [], activeC
     const id = typeof c === 'string' ? c : (c?.id ?? c?.groupId);
     if (!id) return c;
     try {
-      const me = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null;
-      const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: id }))?.members ?? [];
+      const me = (await callSkill('pinboard', 'whoAmI', {}))?.webid ?? null;
+      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: id }))?.members ?? [];
       const mine = me ? rows.find((m) => (m.webid ?? m.addr ?? m.ref) === me) : null;
       const said = mine?.said?.personaProperties;
       return { ...c, ...(said && typeof said === 'object' ? { sharedOnLane: said } : {}) };

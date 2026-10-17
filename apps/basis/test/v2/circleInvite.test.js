@@ -1,7 +1,7 @@
 /**
  * v2 circle invite/join glue — reuses the classic membership core. Verifies the issue side
  * (build a onderling-invite:// URI from the current code) round-trips into the join side (decode +
- * run the shared finalSubmit chain), with callSkill mocked at the stoop-skill boundary.
+ * run the shared finalSubmit chain), with callSkill mocked at the pinboard-skill boundary.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
@@ -11,7 +11,7 @@ describe('buildCircleInviteUri', () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'OPEN-SESAME', expiresAt: 123 } : {}));
     const r = await buildCircleInviteUri({ callSkill, circleId: 'circle-1', adminPeerAddr: 'addr-admin' });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'getCurrentMembershipCode', { groupId: 'circle-1' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'getCurrentMembershipCode', { groupId: 'circle-1' });
     expect(r.uri).toMatch(/^onderling-invite:\/\//);
   });
 
@@ -107,7 +107,7 @@ describe('buildCircleInviteUri', () => {
       return {};
     });
     const r = await buildCircleInviteUri({ callSkill, circleId: 'c', adminPeerAddr: 'a' });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'rotateMyGroupCode', { groupId: 'c' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'rotateMyGroupCode', { groupId: 'c' });
     expect(r.uri).toMatch(/^onderling-invite:\/\//);
   });
 });
@@ -127,7 +127,7 @@ describe('joinCircleFromInvite', () => {
     const r = await joinCircleFromInvite({ inviteUri: uri, rulesAccepted: true, callSkill: joinSkill, handle: 'frits' });
     expect(r.ok).toBe(true);
     expect(r.circleId).toBe('kaas');
-    expect(joinSkill).toHaveBeenCalledWith('stoop', 'redeemMembershipCode', expect.objectContaining({ groupId: 'kaas', code: 'CODE-9' }));
+    expect(joinSkill).toHaveBeenCalledWith('pinboard', 'redeemMembershipCode', expect.objectContaining({ groupId: 'kaas', code: 'CODE-9' }));
   });
 
   it('requires a handle and rejects a bad invite', async () => {

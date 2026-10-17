@@ -75,7 +75,7 @@ describe('capabilitiesOf', () => {
 
   // DECLARED-AUTHORITATIVE (decision 2026-07-02): a manifest that declares `nouns` curates its own
   // capability surface — an op-derived pair the author didn't declare is DROPPED. This is how a broad
-  // `appliesTo` (e.g. stoop cancelRequest `type:'*'`) stops minting capabilities on internal itemTypes.
+  // `appliesTo` (e.g. pinboard cancelRequest `type:'*'`) stops minting capabilities on internal itemTypes.
   it('drops a derived pair the declared nouns omit (declared is authoritative)', () => {
     const curated = {
       app: 'curated',

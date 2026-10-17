@@ -37,7 +37,7 @@ import { attachConsequences } from '../../v2/optionConsequences.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // B5 — web ≡ mobile: the same two imports the web wizard uses for the same field.
 import { markAxisTouched } from '../../v2/circleTemplates.js';
-import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
+import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/pinboard/lib/inviteCeiling';
 
 import {
   Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField,

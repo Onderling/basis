@@ -160,7 +160,7 @@ describe('materializeScreen · α.2.b — rules', () => {
       screen,
       hostOps: { circles, callSkill },
     });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'getGroupRules', { groupId: 'g1' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'getGroupRules', { groupId: 'g1' });
     expect(out[0].status).toBe('ok');
     expect(out[0].content.doc.purpose).toBe('Circle zijn');
     expect(out[0].content.multiCircle).toBe(false);

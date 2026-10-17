@@ -16,7 +16,7 @@ export function itemCircleId(item = {}) {
   if (item.circleId) return item.circleId;
   if (item.circleId) return item.circleId;
   if (item.groupId) return item.groupId;
-  // Stoop persists the per-call circle scope NESTED, not at the top level:
+  // Pinboard persists the per-call circle scope NESTED, not at the top level:
   //  • real posts → source.targets[{ kind:'group', groupId }] (the write path injects it)
   //  • system items (rules / membership) → source.groupId
   // Reading top-level only meant every item looked "unscoped" → the circle filter kept

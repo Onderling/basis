@@ -1,7 +1,7 @@
 /**
  * Reply to a noticeboard post — the ONE path both shells take (web≡mobile by construction).
  *
- * The op (`stoop.respondToItem`) sends the reply to the poster over the sealed wire and names who it
+ * The op (`pinboard.respondToItem`) sends the reply to the poster over the sealed wire and names who it
  * went to. This helper then persists OUR side of that exchange into the poster's contact thread, so the
  * conversation the reply starts is visible and durable on the replier's device too — and returns the
  * poster's address so the shell can open that thread right away.
@@ -24,7 +24,7 @@ import { contactIdFor } from '../core/handlers/threadedChat.js';
 export async function replyToPost({ callSkill, contactChannel = null, notePeer = null, identityOf = null, itemId, body } = {}) {
   if (typeof callSkill !== 'function') throw new Error('replyToPost: callSkill required');
   let r;
-  try { r = await callSkill('stoop', 'respondToItem', { itemId, body }); }
+  try { r = await callSkill('pinboard', 'respondToItem', { itemId, body }); }
   catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
   if (!r || r.error || r.ok === false) return { ok: false, error: r?.error ?? 'reply-failed' };
   const addr = typeof r.toPubKey === 'string' && r.toPubKey ? r.toPubKey : null;

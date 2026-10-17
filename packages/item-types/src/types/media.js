@@ -1,7 +1,7 @@
 /**
  * `media` type — a media item (images first; `mime` distinguishes
  * photo/video/audio later). Media Phase 1 (2026-07-09): the canonical
- * noun for "a picture in chat / on a card" that stoop, basis and
+ * noun for "a picture in chat / on a card" that pinboard, basis and
  * folio can all point at.
  *
  * A media item does NOT carry bytes. Its `source` field is the storage
@@ -13,7 +13,7 @@
  * composes with that line, it does not duplicate it: `enc` stays an
  * opaque object owned by blob-gateway. Non-blob refs (https://,
  * pseudo-pod://, urn:dec:item:) are equally valid `source.ref`s, so
- * stoop's inline-bytes migration and pod-hosted files fit the same
+ * pinboard's inline-bytes migration and pod-hosted files fit the same
  * noun.
  *
  * `mime` / `width` / `height` are writer-asserted passthrough hints

@@ -66,7 +66,7 @@ import { REPORT_KIND, REPORT_EVENT, reportEntryId } from './reportModel.js';
 export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy }) {
   let members = [];
   try {
-    const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     members = (Array.isArray(r?.members) ? r.members : [])
       .map((m) => ({ ref: m.webid ?? m.pubKey ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member' }))
       .filter((m) => m.ref);
@@ -95,7 +95,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  * @param {()=>string} deps.genId        fresh proposal ids
  * @param {()=>number} [deps.now]
  * @param {(channel:'governance'|'report', circleId:string, event:object, opts?:{to?:string[]})=>void} [deps.broadcast]
- *   fan a just-appended event to the circle's members (the shell wires it to the stoop
+ *   fan a just-appended event to the circle's members (the shell wires it to the pinboard
  *   broadcastCircle{Governance,Report} skill). Absent ⇒ local-only (single-device).
  *   `opts.to` NARROWS the recipient set — the report channel passes the circle's admin refs, so a report
  *   never lands on the device of the person it is about.

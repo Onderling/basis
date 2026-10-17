@@ -36,7 +36,7 @@ It is also a useful design tool. Asking the question tells you *where the gate a
   changes what you see here" so it cannot be mistaken for a circle setting.
 - **Hiding a contact is a preference ordered by device clocks.** The mark rides the person's own devices
   (newest `hiddenAt` wins) and each device stamps its own clock, so a laptop ten minutes behind can lose its
-  newer unhide. Accepted, and said on the field (`apps/stoop/manifest.js`, `setContactHidden.hiddenAt`): it is a
+  newer unhide. Accepted, and said on the field (`apps/pinboard/manifest.js`, `setContactHidden.hiddenAt`): it is a
   filter on what you see, and it gets the log's order when the contact book becomes an item type.
 
 ## The inverse failure

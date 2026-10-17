@@ -3,7 +3,7 @@
  *
  * ⚠ RETIRED as a production store (2026-07-18, PLAN-capabilities-tasks-roles
  * ). NO application constructs `new ItemStore` anymore — every consumer
- * (tasks-v0, stoop, tasks-mobile, household, presence-v0) runs on the canonical
+ * (tasks-v0, pinboard, tasks-mobile, household, presence-v0) runs on the canonical
  * thin `CircleItemStore` + the lifecycle/CRUD FUNCTIONS over it (`taskLifecycle`
  * / `taskCrud`), bundled for the ItemStore-ergonomic surface by `createTaskStore`.
  * This class is retained ONLY as (a) the parity reference the migration tests
@@ -95,7 +95,7 @@ export class ItemStore extends Emitter {
    *   `DependenciesOpenError` if `item.dependencies[]` contains any
    *   open (uncompleted, present) entries. Removed-or-missing deps
    *   are treated as satisfied. Off by default for back-compat;
-   *   apps with DAG semantics opt in (Tasks does, Stoop doesn't).
+   *   apps with DAG semantics opt in (Tasks does, Pinboard doesn't).
    *   The gate is bypassed when `ctx.actionOverride` is supplied
    *   (force-complete admin path).
    */
@@ -959,7 +959,7 @@ export class ItemStore extends Emitter {
       // claim, etc.) carry the verb direction (`lend` / `borrow` /
       // `share` / `give` / `receive` / `sell` / `buy` / `help` /
       // `other`) on this field. Apps adopting the canonical shape
-      // (Stoop, Tasks) rely on it being persisted alongside `type`.
+      // (Pinboard, Tasks) rely on it being persisted alongside `type`.
       ...(partial.kind !== undefined ? { kind: partial.kind } : {}),
       text:                 partial.text,
       ...(partial.notes ? { notes: partial.notes } : {}),

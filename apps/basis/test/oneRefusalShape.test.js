@@ -57,7 +57,7 @@ describe('one refusal shape, one order', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
     for (const [webid, role, displayName] of [['telegram:1', 'member', 'Frits'], ['telegram:2', 'observer', 'Olga'], ['telegram:3', 'member', 'Bert']]) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName });
       await agent.setDoorCaller(webid, role);
     }
     expect(await agent.doorRefusal('addToList', 'telegram:1')).toBeNull();
@@ -76,7 +76,7 @@ describe('one refusal shape, one order', () => {
     expect(byRole.refusal).toMatchObject({ layer: 'op-rule', code: 'cannot-reassign' });
     // … and so does a door setting (nobody gives chores to others)
     await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'self' });
-    await own('stoop', 'addContact', { webid: 'telegram:1', channel: 'telegram', role: 'coordinator', displayName: 'Frits' });
+    await own('pinboard', 'addContact', { webid: 'telegram:1', channel: 'telegram', role: 'coordinator', displayName: 'Frits' });
     const bySetting = await agent.callSkill('lists', 'addToList', { list: 'Klusjes', text: 'ramen', assignee: 'Bert' }, { caller: 'telegram:1' });
     expect(bySetting.refusal).toMatchObject({ layer: 'door-settings', code: 'setting:assign' });
   }, 180_000);

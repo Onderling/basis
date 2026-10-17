@@ -9,7 +9,7 @@
  *                                   `@onderling/sync-engine-rn` for ergonomic
  *                                   colocation
  *
- * Lifted from `apps/stoop-mobile/src/lib/{activeCadence,appStateBridge,bgRunOnce}.js`
+ * Lifted from `apps/pinboard-mobile/src/lib/{activeCadence,appStateBridge,bgRunOnce}.js`
  * 2026-05-09 (Phase 41.0 L2; Tasks-mobile is the second consumer).
  */
 

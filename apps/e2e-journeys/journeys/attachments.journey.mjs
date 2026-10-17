@@ -36,7 +36,7 @@ export async function run({ relayUrl }) {
   try {
     circle = await bootAppCircle({ relayUrl, circleId: CIRCLE, handles: ['anne', 'bram', 'cato'] });
     const [anne, bram, cato] = circle.people;
-    const post = (node, args) => node.agent.callSkill('stoop', 'postRequest', args);
+    const post = (node, args) => node.agent.callSkill('pinboard', 'postRequest', args);
 
     // ── 1. THE GATE — plaintext is refused at the act ─────────────────────────────────────────────
     const withBytes = await post(anne, {

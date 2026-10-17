@@ -42,8 +42,8 @@ walker.
 
 ## What `embeds` is for
 
-The original problem: a Stoop post wants to attach a Tasks task; a
-Folio note wants to reference a Stoop supply-offer; a Tasks task
+The original problem: a Pinboard post wants to attach a Tasks task; a
+Folio note wants to reference a Pinboard supply-offer; a Tasks task
 wants to attach a photo. Cross-app + cross-pod references are
 **first-class** in the canonical model.
 

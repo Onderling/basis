@@ -1,7 +1,7 @@
 /**
  * Browser-safe shim for `@onderling/relay`.
  *
- * `@onderling/relay` is a Node-only HTTP server package; only stoop's
+ * `@onderling/relay` is a Node-only HTTP server package; only pinboard's
  * WebPushSender uses it (`import { PushSender } from '@onderling/relay'`).
  * In the browser bundle that code path is unreachable (no VAPID keys
  * are configured), but Rollup walks the static import graph anyway.

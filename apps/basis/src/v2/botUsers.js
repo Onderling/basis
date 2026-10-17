@@ -185,7 +185,7 @@ export function createBotUsers({ store, adminUid = null, onChange = null } = {})
  */
 export function contactBookStore(callSkill) {
   const rows = async () => {
-    const r = await callSkill('stoop', 'listContacts', {});
+    const r = await callSkill('pinboard', 'listContacts', {});
     const list = Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []);
     return list.filter((c) => c && isChannel(c.channel)).map(toUser);
   };
@@ -201,11 +201,11 @@ export function contactBookStore(callSkill) {
   return {
     async get(id) { return (await rows()).find((u) => u.id === id) ?? null; },
     // A revoked person's row is HIDDEN in the book (the book's own flag), not deleted: a new code brings it back.
-    async hide(id) { await callSkill('stoop', 'setContactHidden', { webid: id, hidden: true }); },
-    async unhide(id) { await callSkill('stoop', 'setContactHidden', { webid: id, hidden: false }); },
+    async hide(id) { await callSkill('pinboard', 'setContactHidden', { webid: id, hidden: true }); },
+    async unhide(id) { await callSkill('pinboard', 'setContactHidden', { webid: id, hidden: false }); },
     async list() { return rows(); },
     async put(user) {
-      const r = await callSkill('stoop', 'addContact', {
+      const r = await callSkill('pinboard', 'addContact', {
         webid: user.id, channel: user.channel, role: user.role, ...(user.displayName ? { displayName: user.displayName } : {}),
         ...('pubKey' in user ? { pubKey: user.pubKey ?? null } : {}),
         ...('linkedRoot' in user ? { linkedRoot: user.linkedRoot ?? null } : {}),

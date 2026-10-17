@@ -3,11 +3,11 @@
  * captured image(s) per the supplied preset, return the canonical
  * `PickedImage` shape.
  *
- * Lifted from apps/stoop-mobile/src/lib/imagePicker.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/imagePicker.js 2026-05-09
  * (Phase 41.0 L3; Tasks-mobile is the second consumer).
  *
  * Output shape — byte-identical to the web side
- * (apps/stoop/web/lib/imageResize.js):
+ * (apps/pinboard/web/lib/imageResize.js):
  *   {mime, width, height, dataB64, bytes, thumbnail}
  *
  * Output is always JPEG. The MIME field is fixed for forward-compat;

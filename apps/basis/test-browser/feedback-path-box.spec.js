@@ -86,7 +86,7 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     // ── A visitor's fresh web app: the card the build ships with, through the path the seed takes. ──────
     visitor = await bootPeer(browser, 'visitor');
     await gotoCircles(visitor.page);
-    const added = await visitor.page.evaluate(async (payload) => window.onderlingCall('stoop', 'addContactFromQr', { payload }), card);
+    const added = await visitor.page.evaluate(async (payload) => window.onderlingCall('pinboard', 'addContactFromQr', { payload }), card);
     expect(added?.contact?.webid, JSON.stringify(added).slice(0, 300)).toBeTruthy();
     // Record every carried turn the maker's channel is handed (the wire as the box built it).
     await maker.page.evaluate(() => {
@@ -108,7 +108,7 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     // ── …and the maker's SCREEN shows it: a row in Contacten, the text painted. ───────────────────────
     const seen = await waitForContactMessageDetailed(maker.page, marker, { tries: 12, every: 3000 });
     // What the maker's device holds, whether or not a row shows it: the peer graph and the contact DM store.
-    const visitorId = (await visitor.page.evaluate(async () => window.onderlingCall('stoop', 'whoAmI', {})))?.pubKey ?? null;
+    const visitorId = (await visitor.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.pubKey ?? null;
     const held = await maker.page.evaluate(async ({ m, v }) => {
       const peers = await window.onderlingPeers?.all?.().catch(() => null);
       const ids = [...new Set([...(peers ?? []).map((p) => p.pubKey ?? p.id).filter(Boolean), ...(v ? [v] : [])])];
@@ -149,13 +149,13 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     await maker.page.waitForTimeout(1500);
     const makerRows = await maker.page.evaluate(() => [...document.querySelectorAll('.cc-contacts__row')].map((r) => `${r.dataset.contactId?.slice(0, 12)}${r.classList.contains('cc-contacts__row--bot') ? '(bot)' : ''}:${r.querySelector('.cc-contacts__name')?.textContent?.slice(0, 12)}`)).catch(() => null);
     // …and who each row IS: the visitor's keys, the box's (the maker's own) — a row that is neither is a defect of its own.
-    const visitorWho = await visitor.page.evaluate(async () => { const w = await window.onderlingCall('stoop', 'whoAmI', {}); return { pubKey: String(w?.pubKey).slice(0, 12), webid: String(w?.webid).slice(0, 12), address: String(w?.address ?? w?.peerAddress ?? '').slice(0, 12) }; }).catch((e) => String(e));
+    const visitorWho = await visitor.page.evaluate(async () => { const w = await window.onderlingCall('pinboard', 'whoAmI', {}); return { pubKey: String(w?.pubKey).slice(0, 12), webid: String(w?.webid).slice(0, 12), address: String(w?.address ?? w?.peerAddress ?? '').slice(0, 12) }; }).catch((e) => String(e));
     const makerGraph = await maker.page.evaluate(async () => ((await window.onderlingPeers?.all?.()) ?? []).map((p) => `${String(p.pubKey ?? p.id).slice(0, 12)}:${p.name ?? ''}:${p.reachable}`)).catch((e) => String(e));
     // …and the rosters each side holds (who, at which addresses) — an unresolved row is an address on no roster here.
     const rostersOf = async (page) => page.evaluate(async () => {
-      const ids = ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+      const ids = ((await window.onderlingCall('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
       const out = {};
-      for (const cid of ids) { try { const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: cid }); out[String(cid).slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}@[${(m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)).join(',')}]${m.circleAddress ? `*${String(m.circleAddress).slice(0, 8)}` : ''}${m.handle ? ` h=${m.handle}` : ''}${m.said ? ` said=${JSON.stringify(m.said)}` : ''}`); } catch (e) { out[String(cid).slice(0, 14)] = String(e); } }
+      for (const cid of ids) { try { const r = await window.onderlingCall('pinboard', 'listGroupMembers', { groupId: cid }); out[String(cid).slice(0, 14)] = (r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}@[${(m.circleAddresses ?? []).map((a) => String(a).slice(0, 8)).join(',')}]${m.circleAddress ? `*${String(m.circleAddress).slice(0, 8)}` : ''}${m.handle ? ` h=${m.handle}` : ''}${m.said ? ` said=${JSON.stringify(m.said)}` : ''}`); } catch (e) { out[String(cid).slice(0, 14)] = String(e); } }
       return out;
     }).catch((e) => String(e));
     // SIBLINGS FOLLOW A CIRCLE (L109): the box founded the pair circle with the visitor; the maker's tab is the
@@ -178,7 +178,7 @@ test('a visitor writes to the maker: the box takes it, the maker\'s screen shows
     // of theirs speaks as to its siblings) used to be a second, nameless row here — sorted by key bytes, first in
     // CI — and an answer sent to it went nowhere (the STEP5 red of 2026-09-19). Asserted so it cannot come back.
     const personRows = (makerRows ?? []).filter((r) => !r.includes('(bot)'));
-    const makerBook = await maker.page.evaluate(async () => ((await window.onderlingCall('stoop', 'listContacts', {}))?.contacts ?? []).map((c) => `${String(c.webid).slice(0, 8)}:${c.displayName ?? ''}/${c.handle ?? ''}`)).catch((e) => String(e));
+    const makerBook = await maker.page.evaluate(async () => ((await window.onderlingCall('pinboard', 'listContacts', {}))?.contacts ?? []).map((c) => `${String(c.webid).slice(0, 8)}:${c.displayName ?? ''}/${c.handle ?? ''}`)).catch((e) => String(e));
     expect(personRows, `the maker's Contacten lists exactly the visitor, named by their key (no name given, no placeholder) — no row for the maker's own addresses (box: ${JSON.stringify(boxPrimary)}; maker book: ${JSON.stringify(makerBook)}; maker rosters: ${JSON.stringify(makerRosters)})`).toEqual([`${String(visitorWho?.webid)}:${String(visitorWho?.webid)}`]);
     const reply = `dank je, ik kijk ernaar ${Date.now().toString(36)}`;
     const answered = await sendDirectMessage(maker.page, reply, { to: seen.contactId });

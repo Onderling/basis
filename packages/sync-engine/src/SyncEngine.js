@@ -221,7 +221,7 @@ export class SyncEngine extends Emitter {
    *
    * ─── hook surface (Folio app-side concerns) ────────────────
    * Slice G #5 (2026-05-20) — substrate's app-glue seam.  Each hook
-   * defaults to a no-op so non-Folio consumers (stoop-mobile, tasks-
+   * defaults to a no-op so non-Folio consumers (pinboard-mobile, tasks-
    * mobile) work without configuration.  Folio's subclass pre-binds
    * its own implementations via `super({ ...hooks })`.
    *

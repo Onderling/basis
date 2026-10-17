@@ -11,9 +11,9 @@
  *        `basis chatMessageInbox` (received append), and `basis circleChatRehydrate` (legacy insert).
  *   2. the peer fan-out WIRE envelope
  *        `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
- *      — built by hand in `stoop broadcastCircleMessage`.
- *   3. the durable itemStore item's `source` (persisted by `stoop broadcastCircleMessage`/`ingestCircleMessage`),
- *      later RESHAPED back to the wire/inbox shape by hand in `stoop getMessagesSince`
+ *      — built by hand in `pinboard broadcastCircleMessage`.
+ *   3. the durable itemStore item's `source` (persisted by `pinboard broadcastCircleMessage`/`ingestCircleMessage`),
+ *      later RESHAPED back to the wire/inbox shape by hand in `pinboard getMessagesSince`
  *      and `basis circleChatRehydrate.itemToEnvelope`.
  *
  * This module makes those shapes PROJECTIONS of one canonical Envelope so a
@@ -34,7 +34,7 @@
  *
  * Placement (CLAUDE.md invariant 5): this lives in `@onderling/item-store`
  * — the ONE substrate every producer/consumer of these shapes already
- * depends on (stoop, basis, basis-mobile via basis, kring-host). The
+ * depends on (pinboard, basis, basis-mobile via basis, kring-host). The
  * projections are the item-store's own concern: `chatEnvelopeFromStoreItem`
  * is a `fromItem`, `toEventLogItem` is an item projection, and `toWireEnvelope`
  * is a pure function with no other dep. No new package, no Metro/EAS
@@ -50,7 +50,7 @@ export const CIRCLE_CHAT_KIND = 'circle-chat-message';
  * consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, card? }`.
  *
  * This replaces the two hand-maintained reshapers that read a stored item's
- * `source` and re-emit the envelope — `stoop getMessagesSince`'s `.map(...)`
+ * `source` and re-emit the envelope — `pinboard getMessagesSince`'s `.map(...)`
  * and `basis circleChatRehydrate.itemToEnvelope`. They differ only in their
  * leniency toward malformed items, expressed here as one explicit flag rather
  * than as two silently-drifting copies:
@@ -196,7 +196,7 @@ export function fromEventLogItem(evt) {
 
 /**
  * `toWire` — project the canonical fields onto the peer fan-out WIRE
- * envelope that `stoop broadcastCircleMessage` sends over the reliable
+ * envelope that `pinboard broadcastCircleMessage` sends over the reliable
  * transport:
  *   `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
  *
@@ -243,7 +243,7 @@ export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid
  * NOTE (honest degrade): the live send path degrades pod-signal to a
  * full-body `toWireEnvelope` fan until the real shared-pod write is wired,
  * so this shape is defined + unit-tested now but not yet fanned on the
- * live path. It plugs in at the stoop `broadcastToCircle` pod seam.
+ * live path. It plugs in at the pinboard `broadcastToCircle` pod seam.
  *
  * @param {object} a
  * @param {string} a.circleId

@@ -1,7 +1,7 @@
 /**
  * ConfirmModal — yes/no overlay used for destructive confirmations.
  *
- * Lifted from apps/stoop-mobile/src/components/ConfirmModal.js
+ * Lifted from apps/pinboard-mobile/src/components/ConfirmModal.js
  * 2026-05-09 (Phase 41.0.b B3). Pure controlled — caller manages
  * `visible` + provides `onConfirm` / `onCancel`. Tokens via
  * `useTheme()`. The default labels are English; apps with localised

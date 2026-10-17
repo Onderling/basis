@@ -1,7 +1,7 @@
 /**
  * Closed-beta privacy-notice content (Tasks V1+V2).
  *
- * Mirrors Stoop's `apps/stoop/src/lib/privacyNotice.js` shape:
+ * Mirrors Pinboard's `apps/pinboard/src/lib/privacyNotice.js` shape:
  * `{lang: [{heading, body}, ...]}` — apps render each item as a
  * heading + paragraph block on a /privacy.html page (or in an
  * onboarding modal).
@@ -11,9 +11,9 @@
  * this is the source of truth for both nl + en. When adding an
  * item, update both.
  *
- * Items 1-4 are inherited from Stoop's notice (encryption, relay
+ * Items 1-4 are inherited from Pinboard's notice (encryption, relay
  * surface, abuse-tracing, group governance) — Tasks's network
- * footprint mostly mirrors Stoop's, so the user-facing language
+ * footprint mostly mirrors Pinboard's, so the user-facing language
  * doesn't need to diverge for those.
  *
  * Items 5-6 cover V1-era Tasks-specific pod-data flows:

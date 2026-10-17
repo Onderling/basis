@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SEAL_SCHEMES, sealForAudience, openSealedEnvelope, buildGroupKeyResource, generateKeypair, generateGroupKey,
 } from '@onderling/pod-client';
-import { membershipRecord, membershipRecords, keyspacesBound } from '@onderling-app/stoop/lib/membershipRecord';
+import { membershipRecord, membershipRecords, keyspacesBound } from '@onderling-app/pinboard/lib/membershipRecord';
 import { circleMemberActors } from '../src/v2/circleMemberActors.js';
 import {
   bootRealAgentNode, connectAgentsOverBus, pairCircle, readRoster, teardown,

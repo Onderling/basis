@@ -26,7 +26,7 @@ import { cachedShare } from './botUsage.js';
 import { SURFACE_PREFS } from './surfacePref.js';
 import { feedCompanionOf } from './feedCompanion.js';
 import { CONTACT_SCHEME } from './contactCardLink.js';
-import { decodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { readDayAndTime } from '../forms/parseDate.js';
 import { replyLine } from './replyLine.js';
 import { THREAD_LANGS } from './botThreads.js';
@@ -1152,7 +1152,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     let body = null;
     try { body = c.startsWith(CONTACT_SCHEME) ? decodeContactCard(c.slice(CONTACT_SCHEME.length)) : null; } catch { body = null; }
     if (!body || !feedCompanionOf([body])) return { ok: false, error: { code: 'not-a-companion', message: t('circle.bot.companion_not_one') } };
-    const r = await callSkill('stoop', 'addContactFromQr', { payload: c });
+    const r = await callSkill('pinboard', 'addContactFromQr', { payload: c });
     if (!r?.contact || r?.error) return { ok: false, error: { code: 'not-added', message: t('circle.bot.companion_not_one') } };
     return { ok: true, message: t('circle.bot.companion_set') };
   }

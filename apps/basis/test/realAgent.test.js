@@ -142,7 +142,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
 
   it("rejects unknown appOrigin", async () => {
     const a = await createRealHouseholdAgent();
-    // Post-slice-2b: 'stoop' is now a wired branch (real
+    // Post-slice-2b: 'pinboard' is now a wired branch (real
     // NeighbourhoodAgent).  Use a genuinely unrecognised origin to
     // verify the throw still fires for unknown apps.
     await expect(a.callSkill('not-a-real-app', 'listOpen', {})).rejects.toThrow(

@@ -7,7 +7,7 @@
  * which Anna still opens with the seed she rotated away from. Anna's reply comes sealed FROM version 2, so Bea pulls
  * the chain, verifies the link from the version she holds, and her next message is sealed to version 2.
  *
- * Real agents over the shared bus, the production stoop skills, the production channel with the agent's seal.
+ * Real agents over the shared bus, the production pinboard skills, the production channel with the agent's seal.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { bootRealAgentNode, connectNodesOverBus, until, teardown } from '../support/pairRealAgents.js';
@@ -26,7 +26,7 @@ const tapLanded = (node) => {   // what the channel handed to the app, opened
   node.contactThreadChannel.persistInbound = async (t) => { landed.push(t); return orig(t); };
   return landed;
 };
-const contactKey = async (node, webid) => (((r) => r?.items ?? r?.contacts ?? [])(await node.agent.callSkill('stoop', 'listContacts', {}))).find((c) => c.webid === webid)?.personKey ?? null;
+const contactKey = async (node, webid) => (((r) => r?.items ?? r?.contacts ?? [])(await node.agent.callSkill('pinboard', 'listContacts', {}))).find((c) => c.webid === webid)?.personKey ?? null;
 const dm = (from, to, text, messageId) => from.contactThreadChannel.sendTurn({ peerAddr: to.pubKey, threadId: to.pubKey, text, messageId }).sent;
 
 describe('contacts seal direct messages to the person key', () => {
@@ -42,8 +42,8 @@ describe('contacts seal direct messages to the person key', () => {
     rawAtA = tapWire(A); rawAtB = tapWire(B); landedAtA = tapLanded(A); landedAtB = tapLanded(B);
     // The Hi: each takes the other's card.
     for (const [me, other] of [[A, B], [B, A]]) {
-      const card = await other.agent.callSkill('stoop', 'getContactShareQr', {});
-      const r = await me.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload });
+      const card = await other.agent.callSkill('pinboard', 'getContactShareQr', {});
+      const r = await me.agent.callSkill('pinboard', 'addContactFromQr', { payload: card.payload });
       expect(r.error, JSON.stringify(r)).toBeUndefined();
     }
   }, 60_000);
@@ -68,13 +68,13 @@ describe('contacts seal direct messages to the person key', () => {
     const thiefKey = personKeyPubKeyB64(derivePersonKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default'), 1));
     const forged = signPersonKeyLink(seed1, { version: 2, pubKey: thiefKey, prevVersion: 1 });
     const before = await contactKey(B, A.pubKey);
-    const r = await B.agent.callSkill('stoop', 'setContactPersonKey', { webid: A.pubKey, personKey: { version: 2, pubKey: thiefKey }, links: [forged] });
+    const r = await B.agent.callSkill('pinboard', 'setContactPersonKey', { webid: A.pubKey, personKey: { version: 2, pubKey: thiefKey }, links: [forged] });
     expect(r.personKey ?? null).toEqual(before);
     expect(await contactKey(B, A.pubKey), 'the forged chain moved the record').toEqual(before);
     // A fresh card with the thief's OWN link key — the pin refuses it.
     const thiefLinkPub = personKeyPubKeyB64(derivePersonLinkKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default')));
     const forgedByOwnLink = signPersonKeyLink(derivePersonLinkKeySeed(Bootstrap.create().bootstrap.deriveAgentSeed('default')), { version: 2, pubKey: thiefKey, prevVersion: 1 });
-    await B.agent.callSkill('stoop', 'setContactPersonKey', { webid: A.pubKey, personKey: { version: 2, pubKey: thiefKey, linkKeyPub: thiefLinkPub }, links: [forgedByOwnLink] });
+    await B.agent.callSkill('pinboard', 'setContactPersonKey', { webid: A.pubKey, personKey: { version: 2, pubKey: thiefKey, linkKeyPub: thiefLinkPub }, links: [forgedByOwnLink] });
     expect(await contactKey(B, A.pubKey), 'a card with a different link key replaced the pin').toEqual(before);
     // And the genuine link, signed by the real link key, IS what Bea will accept — proven by the rotation below.
   });

@@ -113,7 +113,7 @@ test('RC1a + DG1 — the roster after a role change, and what an evicted member 
     const groupId = await activeCircle(A.page);
     log('active circle', groupId ? 'PASS' : 'BLOCKED', String(groupId));
     const roster  = await dispatch(A.page, 'listGroupRoster',  { groupId });
-    const members = await call(A.page, 'stoop', 'listGroupMembers', { groupId });
+    const members = await call(A.page, 'pinboard', 'listGroupMembers', { groupId });
     log('RC1a roster reads', 'OBSERVED',
       `listGroupRoster=${JSON.stringify(roster?.members ?? roster)} | listGroupMembers=${JSON.stringify((members?.members ?? []).map((m) => [String(m.webid).slice(0, 8), m.role]))}`);
 
@@ -176,7 +176,7 @@ test('FINDING — right after creating a circle, can the founder invite anyone?'
     // refusing" — a race the founder waits out is a very different defect from a permanent one.
     const timeline = [];
     for (let i = 0; i < 12; i++) {
-      const r = await call(A.page, 'stoop', 'getCurrentMembershipCode', { groupId });
+      const r = await call(A.page, 'pinboard', 'getCurrentMembershipCode', { groupId });
       timeline.push(`${i * 5}s:${r?.error ? `ERR(${r.error})` : (r?.code ? 'CODE' : JSON.stringify(r)?.slice(0, 50))}`);
       if (!r?.error) break;
       await A.page.waitForTimeout(5000);
@@ -185,16 +185,16 @@ test('FINDING — right after creating a circle, can the founder invite anyone?'
     log('founder can invite', ok ? 'PASS' : 'FINDING', timeline.join(' '));
 
     // And what the roster says about the founder at the same moment.
-    const members = await call(A.page, 'stoop', 'listGroupMembers', { groupId });
+    const members = await call(A.page, 'pinboard', 'listGroupMembers', { groupId });
     log('founder role', 'OBSERVED',
       JSON.stringify((members?.members ?? []).map((m) => [String(m.webid).slice(0, 8), m.role, m.adminVia ?? '-'])));
 
     // MECHANISM: deriveRoster identifies founders from the circle's `group-rules` AUTHOR. If the
     // circle carries no rules — or none naming an author — there is nobody to force to `admin`, and a
     // circle ends up with a member who made it and cannot run it.
-    const rules = await call(A.page, 'stoop', 'getGroupRules', { groupId });
+    const rules = await call(A.page, 'pinboard', 'getGroupRules', { groupId });
     log('group rules', 'OBSERVED', JSON.stringify(rules)?.slice(0, 300));
-    const mine = await call(A.page, 'stoop', 'listMyCircles', {});
+    const mine = await call(A.page, 'pinboard', 'listMyCircles', {});
     log('my circles', 'OBSERVED', JSON.stringify(mine)?.slice(0, 300));
   } finally { await teardown(peers); }
 });

@@ -25,7 +25,7 @@
  *     transports: { mdns: new MdnsTransport({ identity }), ble: new BleTransport({ identity }) },
  *   });
  *
- * This is the destination; consumers (basis realAgent, basis-mobile, stoop-mobile)
+ * This is the destination; consumers (basis realAgent, basis-mobile, pinboard-mobile)
  * migrate onto it (T5.3b), after which `createMeshAgent`'s bespoke router/transport wiring is
  * deleted in favour of this (T5.3c).
  */

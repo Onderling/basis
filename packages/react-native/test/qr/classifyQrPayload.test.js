@@ -1,8 +1,8 @@
 /**
  * classifyQrPayload — substrate-level coverage. The plug-in
  * dispatcher logic only; per-app classifier shapes are exercised
- * by each consumer's own tests (Stoop's invite/contact/recovery
- * stays in apps/stoop-mobile/test/qrScanner.test.js).
+ * by each consumer's own tests (Pinboard's invite/contact/recovery
+ * stays in apps/pinboard-mobile/test/qrScanner.test.js).
  */
 
 import { describe, it, expect } from 'vitest';

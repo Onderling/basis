@@ -15,7 +15,7 @@
  * The rest of the list is DERIVED, never hand-written: the role's compose fragment names a build context and a
  * Dockerfile, the Dockerfile names the workspace package it installs (`pnpm install --filter "<pkg>..."`),
  * and that package's workspace dependency closure is read from the package.json files — plus every app or package
- * its source reaches by a RELATIVE import (`../../stoop/src/lib/contactCard.js`), which no package.json names: the
+ * its source reaches by a RELATIVE import (`../../pinboard/src/lib/contactCard.js`), which no package.json names: the
  * image holds the whole tree, so that file is in it, and a change to it must rebuild the role. Relative volume
  * mounts (a script the role runs from the repo) count too. A role with no build section gets its own
  * files plus its mounts.

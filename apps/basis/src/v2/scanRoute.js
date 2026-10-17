@@ -32,16 +32,16 @@ export const SCAN_CLASSIFIERS = Object.freeze([
 /**
  * WHERE each kind goes — a TABLE of DECLARED targets, never a shell callback: the router is a projector from a
  * scanned payload to a flow or op the manifests declare, plus the needs that carry the payload in.
- *   contact → stoop's `add-contact` flow (the "what they see" sheet paints its persona/reveal needs, then the add)
- *   invite  → stoop's `joinGroup` flow (the join wizard: the invite, the rules, the identity)
+ *   contact → pinboard's `add-contact` flow (the "what they see" sheet paints its persona/reveal needs, then the add)
+ *   invite  → pinboard's `joinGroup` flow (the join wizard: the invite, the rules, the identity)
  *   enroll  → household's `enroll-device` flow (its first step stashes the offer; then the phrase)
  *   claim   → household's `claim-companion` flow (the line is its `claim` need)
  *   pair    → household's `pairCirclePeer` op (its `circle` param is picked from listMyCircles)
  * scanRoute.test.js holds every target to the manifests: an id named here that nothing declares is a red test.
  */
 export const SCAN_TARGETS = Object.freeze({
-  contact: { kind: 'flow', app: 'stoop',     id: 'add-contact',     needs: (payload) => ({ payload }) },
-  invite:  { kind: 'flow', app: 'stoop',     id: 'joinGroup',       needs: (payload) => ({ invite: typeof payload === 'string' ? payload : payload?.inviteUri }) },
+  contact: { kind: 'flow', app: 'pinboard',     id: 'add-contact',     needs: (payload) => ({ payload }) },
+  invite:  { kind: 'flow', app: 'pinboard',     id: 'joinGroup',       needs: (payload) => ({ invite: typeof payload === 'string' ? payload : payload?.inviteUri }) },
   enroll:  { kind: 'flow', app: 'household', id: 'enroll-device',   needs: (payload) => ({ offer: payload }) },
   claim:   { kind: 'flow', app: 'household', id: 'claim-companion', needs: (payload) => ({ claim: `${payload.code}@${payload.node}` }) },
   pair:    { kind: 'op',   app: 'household', id: 'pairCirclePeer',  needs: (payload) => ({ addr: payload }) },

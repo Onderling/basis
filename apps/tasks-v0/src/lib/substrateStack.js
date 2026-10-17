@@ -2,7 +2,7 @@
  * Substrate-stack builder for Tasks-v0 circle bundles — THIN SHIM.
  *
  * The stack logic lives ONCE in `@onderling/substrate-stack` (it used to be a
- * self-described "mirror of Stoop's" copy — the exact cross-app duplication
+ * self-described "mirror of Pinboard's" copy — the exact cross-app duplication
  * invariant #3 forbids; consolidated 2026-07-09). This shim preserves the
  * Tasks entry name, its literal deviceId fallback, and the
  * `existingPseudoPod` reuse option (forwarded as-is).

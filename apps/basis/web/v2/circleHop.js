@@ -1,7 +1,7 @@
 /**
  * basis v2 — hopping (web DOM renderer).
  *
- * A device-global hop stance toggle (backed by Stoop's getHopMode /
+ * A device-global hop stance toggle (backed by Pinboard's getHopMode /
  * setHopMode) plus, when a relay chain is supplied, a hop-match card
  * (Me → gate → target) with an "ask the gate to relay" action gated on the
  * max-one-hop limit. Pure render: the host passes `hopMode` + optional

@@ -22,7 +22,7 @@
  *     from the subpath; substrates / pure tests use the default.
  *
  * Lifted from `apps/folio-mobile/src/auth/{OidcSessionRN, folioAuth, dcr}.js`
- * 2026-05-08 (Stoop V3 Phase 40.3, rule-of-two consumer).
+ * 2026-05-08 (Pinboard V3 Phase 40.3, rule-of-two consumer).
  */
 
 export {

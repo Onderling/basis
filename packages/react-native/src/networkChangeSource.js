@@ -1,7 +1,7 @@
 /**
  * React Native — the platform half of the network-change watcher (Nearby step C).
  *
- * Lives in the RN substrate rather than in one shell, so basis-mobile, stoop-mobile and folio-mobile get the
+ * Lives in the RN substrate rather than in one shell, so basis-mobile, pinboard-mobile and folio-mobile get the
  * same source. It knows which RN signals mean "the network may have changed" and nothing else; the
  * coalescing and the decision to re-announce live in basis's shared `v2/networkChangeWatcher.js`.
  *

@@ -75,7 +75,7 @@ export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds =
   if (typeof hostOps.selfIn !== 'function') {
     let me = hostOps.myWebid ?? null;
     if (!me && typeof hostOps.callSkill === 'function' && screen.blocks.some(needsMe)) {
-      me = await hostOps.callSkill('stoop', 'whoAmI', {}).then((r) => r?.webid ?? null).catch(() => null);
+      me = await hostOps.callSkill('pinboard', 'whoAmI', {}).then((r) => r?.webid ?? null).catch(() => null);
     }
     ops = { ...hostOps, selfIn: () => me };
   }
@@ -177,7 +177,7 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
   let name = self ? (self.name ?? null) : null;
   if (!self) {
     try {
-      const prof = typeof callSkill === 'function' ? await callSkill('stoop', 'getMyProfile', {}) : null;
+      const prof = typeof callSkill === 'function' ? await callSkill('pinboard', 'getMyProfile', {}) : null;
       name = prof?.entry?.displayName || prof?.entry?.handle || null;
     } catch { /* nameless: the painter says "Mij" */ }
   }
@@ -239,7 +239,7 @@ async function materializeAgents(block, { callSkill, deviceId: personDeviceId = 
     const addr = typeof n?.address === 'string' ? n.address : '';
     items.push({ kind: 'companion', label: n?.label || (addr ? `${addr.slice(0, 8)}…` : null), here: false });
   }
-  const contacts = self ? [] : await callSkill('stoop', 'listContacts', {}).then((r) => r?.contacts ?? []).catch(() => []);
+  const contacts = self ? [] : await callSkill('pinboard', 'listContacts', {}).then((r) => r?.contacts ?? []).catch(() => []);
   const bots = new Set(linkedBotsOf(contacts));
   const names = new Map();
   for (const c of bookRowsOf({ contacts })) for (const a of [c?.peerAddr, c?.webid]) if (a) names.set(a, c.displayName || c.handle || null);
@@ -358,7 +358,7 @@ async function materializeRules(block, activeCircleIds, { callSkill } = {}, scre
   // circle to focus.").  Single-circle (or screenIsAll with 1 circle)
   // renders cleanly.
   const cid = activeCircleIds[0];
-  const res = await callSkill('stoop', 'getGroupRules', { groupId: cid });
+  const res = await callSkill('pinboard', 'getGroupRules', { groupId: cid });
   const rules = res?.rules ?? null;
   const docRaw = rules?.source?.doc ?? rules?.doc ?? null;
   const doc = normalizeRulesDoc(docRaw);

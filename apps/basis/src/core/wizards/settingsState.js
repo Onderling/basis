@@ -3,7 +3,7 @@
  * src/web/wizards/settingsWizard.js (2026-05-24).
  *
  * Settings is a panel of mostly-independent controls (locale +
- * transport-mode + stoop handle/displayName/holiday-mode) — there
+ * transport-mode + pinboard handle/displayName/holiday-mode) — there
  * isn't much step-machine here, but the LOAD + SAVE substrate
  * calls + the language/transport option catalogues ARE portable.
  *
@@ -23,7 +23,7 @@ export const TRANSPORT_MODES = Object.freeze(['nkn', 'relay', 'both']);
 /** Initial panel state — both reads start as null (loading). */
 export function initialState() {
   return {
-    profile:    null,    // {handle, displayName, ...} from stoop
+    profile:    null,    // {handle, displayName, ...} from pinboard
     holiday:    null,    // boolean or null
     loading:    true,
     loadError:  null,
@@ -38,11 +38,11 @@ export function initialState() {
  */
 export async function loadSettings({ state, callSkill }) {
   try {
-    const p = await callSkill('stoop', 'getStoopProfile', {});
+    const p = await callSkill('pinboard', 'getPinboardProfile', {});
     state.profile = p ?? null;
   } catch { /* swallow */ }
   try {
-    const h = await callSkill('stoop', 'getHolidayMode', {});
+    const h = await callSkill('pinboard', 'getHolidayMode', {});
     state.holiday = h?.holidayMode === true;
   } catch { /* swallow */ }
   state.loading = false;
@@ -58,7 +58,7 @@ export async function saveHandle({ callSkill, handle }) {
   const v = String(handle ?? '').trim();
   if (!v) return { ok: false, error: 'empty' };
   try {
-    await callSkill('stoop', 'setMyHandle', { handle: v });
+    await callSkill('pinboard', 'setMyHandle', { handle: v });
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };
@@ -70,7 +70,7 @@ export async function saveDisplayName({ callSkill, displayName }) {
   const v = String(displayName ?? '').trim();
   if (!v) return { ok: false, error: 'empty' };
   try {
-    await callSkill('stoop', 'setMyDisplayName', { displayName: v });
+    await callSkill('pinboard', 'setMyDisplayName', { displayName: v });
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };
@@ -80,7 +80,7 @@ export async function saveDisplayName({ callSkill, displayName }) {
 /** Toggle holiday mode.  Returns {ok, holidayMode} or {ok:false, error}. */
 export async function setHolidayMode({ callSkill, on }) {
   try {
-    const r = await callSkill('stoop', 'setHolidayMode', { on: !!on });
+    const r = await callSkill('pinboard', 'setHolidayMode', { on: !!on });
     return { ok: true, holidayMode: r?.holidayMode ?? !!on };
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };

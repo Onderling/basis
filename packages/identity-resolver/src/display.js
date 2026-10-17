@@ -3,11 +3,11 @@
  *   - initials() + paletteFor() for avatar pills
  *   - validateHandle() + normaliseHandle() for handle inputs
  *
- * Lifted from apps/stoop-mobile/src/lib/{avatar,handle}.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/{avatar,handle}.js 2026-05-09
  * (Phase 41.0.b A1; Tasks-mobile is the second consumer).
  *
  * Pure JS; safe to import from any layer (web or RN). The handle
- * validator carries Stoop's defaults (3..32 chars, lowercase ASCII +
+ * validator carries Pinboard's defaults (3..32 chars, lowercase ASCII +
  * digits + `-_`); apps with different rules can re-implement
  * client-side. The SDK-side `setMyHandle` skill is always the
  * authoritative gate.

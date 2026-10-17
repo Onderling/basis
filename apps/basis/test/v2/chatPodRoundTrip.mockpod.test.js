@@ -1,6 +1,6 @@
 /**
  * The chat POD RE-ROOT keystone — the SIGNED statement over a shared MockPod (real MemoryStorageBackend,
- * real sealing, real stoop fan core). The pod stays transport, never authority: the row carries the signed
+ * real sealing, real pinboard fan core). The pod stays transport, never authority: the row carries the signed
  * statement, and whoever reads it back verifies at their chat rail exactly like a fanned statement.
  *
  *   pod-signal  A seals+writes the statement row, fans a REF (subtype circle-chat-statement, no body) →
@@ -15,7 +15,7 @@ import {
   resolveCircleStorage, generateGroupKey, isSealed,
   writeSealedMessage, readSealedMessage, readSealedMessagesSince,
 } from '@onderling/pod-client';
-import { createNeighbourhoodAgent } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent } from '@onderling-app/pinboard';
 import { EventLog } from '../../src/eventLog.js';
 import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 
@@ -45,7 +45,7 @@ async function chatDevice(ref, rosterAll) {
   return { ref, cid, eventLog, rail };
 }
 
-/** Sender A: a real stoop bundle whose pod seam seals+writes the shared MockPod; the fan is captured. */
+/** Sender A: a real pinboard bundle whose pod seam seals+writes the shared MockPod; the fan is captured. */
 async function bootSenderA({ backend, seal, circleDataMove, deliver }) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
@@ -71,7 +71,7 @@ describe('chat pod re-root — the SIGNED statement over the shared pod', () => 
     const delivered = [];
     const A = await bootSenderA({ backend, seal, circleDataMove: () => 'pod-signal', deliver: (addr, env) => delivered.push(env) });
 
-    // Anne writes locally (the signed render entry) and fans THROUGH the stoop core.
+    // Anne writes locally (the signed render entry) and fans THROUGH the pinboard core.
     const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'p1', ts: Date.now(), text: 'hoi via de pod', actor: 'me' });
     const r = await callSkill(A.agent, 'broadcastCircleChatStatement', { groupId: CIRCLE, event: statement, msgId: 'p1', ts: Date.now() });
 

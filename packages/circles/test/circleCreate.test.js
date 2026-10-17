@@ -1,6 +1,6 @@
 /**
  * circleCreate — the §8c slice-a lift of the zero-key circle-creation writers. Proves `createGroupWithRules`
- * behaves byte-identically to its pre-lift stoop skill body: a `group-rules` typed-item write over the
+ * behaves byte-identically to its pre-lift pinboard skill body: a `group-rules` typed-item write over the
  * injected store, honest refusals on bad args, no key operation.
  */
 import { describe, it, expect } from 'vitest';

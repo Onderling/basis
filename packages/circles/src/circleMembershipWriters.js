@@ -2,14 +2,14 @@ import { hasHumanRules } from './circleRulesDoc.js';
 import { personKeyAnnouncement, MEMBER_PROPS_FIELDS } from '@onderling/core';
 import { releaseUnchanged } from '@onderling/agent-registry';
 /**
- * Key-coupled membership WRITERS — pure-body lift out of stoop's `buildSkills` (the §8c migration, slice-b).
+ * Key-coupled membership WRITERS — pure-body lift out of pinboard's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
  * (`membership-redemption` / `group-leave` / `group-removal`) — validation, redemption-ceiling, the
  * cross-circle-link proof, the admin gate, the roster upsert, the deletePosts loop. The state body is entirely
  * KEY-FREE.
  *
  * The one key-coupled step in each writer — the single trailing group-key grant/revoke — is left as an
- * INJECTED `grantKey`/`revokeKey` callback. Stoop binds it to `grant/revokePodAccess(controlAgent, …)`; the
+ * INJECTED `grantKey`/`revokeKey` callback. Pinboard binds it to `grant/revokePodAccess(controlAgent, …)`; the
  * key custodian (`controlAgent` + the sealing/keyStore handle) therefore NEVER enters this package. This keeps
  * `@onderling/circles` key-custody-agnostic and free of any `@onderling/pod-client` dependency (invariant 5,
  * the pure-DI rule in `index.js`).
@@ -17,7 +17,7 @@ import { releaseUnchanged } from '@onderling/agent-registry';
  * Each writer ALSO emits its membership transition onto the circle's SIGNED spine — the per-author, hash-chained
  * log the roster folds deterministically (join · leave · evict). That, too, is an INJECTED hook (`emitSpine`),
  * for the same reason the key step is: signing needs the acting device's circle-scoped identity + the chain
- * primitive, neither of which may enter this pure package. Stoop (and the journey harness) bind it to
+ * primitive, neither of which may enter this pure package. Pinboard (and the journey harness) bind it to
  * `createSpineAppender({ store, signer })` from `@onderling/core`. The hook is OPTIONAL — absent, the writer
  * behaves exactly as before (the typed item is still written), so this is purely additive.
  *

@@ -2,7 +2,7 @@
  * getIssuerPickerHtml — server-rendered issuer picker.
  *
  * Pure string-shape tests; no DOM. Consumer-side adoption (Folio +
- * Stoop sign-in pages) is the integration coverage.
+ * Pinboard sign-in pages) is the integration coverage.
  *
  * Phase 52.15.4 (2026-05-14).
  */

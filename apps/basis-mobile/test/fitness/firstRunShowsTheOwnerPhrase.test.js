@@ -18,7 +18,7 @@
  * `restoreOwnerPhrase` installed it as a NEW root — a different person, at addresses nobody had seen.
  *
  * The same mistake had already been made and fixed once, in `CircleMyDataScreen`, whose comment records it
- * ("was stoop getMnemonicOnce (wrong seed)"). One host got the fix; the other did not. That is the repo's
+ * ("was pinboard getMnemonicOnce (wrong seed)"). One host got the fix; the other did not. That is the repo's
  * most-repeated defect, and this guard exists because noticing it is the hard part.
  */
 

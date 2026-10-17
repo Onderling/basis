@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { routeScan, SCAN_CLASSIFIERS, SCAN_TARGETS } from '../../src/v2/scanRoute.js';
-import stoopManifest from '../../../stoop/manifest.js';
+import pinboardManifest from '../../../pinboard/manifest.js';
 import householdManifest from '../../../household/manifest.js';
 
 describe('routeScan — one scanner, routed by scheme', () => {
@@ -32,7 +32,7 @@ describe('routeScan — one scanner, routed by scheme', () => {
 });
 
 describe('the route table names only DECLARED targets', () => {
-  const MANIFESTS = { stoop: stoopManifest, household: householdManifest };
+  const MANIFESTS = { pinboard: pinboardManifest, household: householdManifest };
   it('every kind has a target, and every target exists in its manifest', () => {
     expect(Object.keys(SCAN_TARGETS).sort()).toEqual(SCAN_CLASSIFIERS.map((c) => c.kind).sort());
     for (const [kind, t] of Object.entries(SCAN_TARGETS)) {

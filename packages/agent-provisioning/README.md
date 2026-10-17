@@ -89,7 +89,7 @@ const { agent, identity, vault, mnemonic, oidc, webid } =
 ## Where this sits in the layering
 
 ```
-                  Apps (Tasks, Stoop, Folio)
+                  Apps (Tasks, Pinboard, Folio)
                           │
                           ▼
         @onderling/agent-provisioning  ← this package (facade)
@@ -137,7 +137,7 @@ npm test
   pointer predicates) waits for the `@onderling/pod-onboarding`
   substrate — see Phase 50.5.b.3 in the coding plan.
 - Apps haven't migrated yet (Phase 50.5.b.5). Tasks V1
-  desktop, Folio's `bin/folio init`, and Stoop V1.5 desktop
+  desktop, Folio's `bin/folio init`, and Pinboard V1.5 desktop
   continue to use their existing bring-up flows; they'll move
   to `provisionAgent` when convenient.
 

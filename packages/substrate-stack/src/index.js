@@ -3,13 +3,13 @@
  *
  * Wires `@onderling/pseudo-pod` + `@onderling/pod-routing` + `@onderling/notify-envelope`
  * (+ optional `@onderling/versioning`) into one stack. Consolidates the three
- * near-identical app-local builders (stoop / tasks-v0 / household
+ * near-identical app-local builders (pinboard / tasks-v0 / household
  * `substrateStack.js` — self-described mirrors, the exact cross-app
  * duplication invariant #3 forbids); the app files stay as THIN SHIMS over
  * this factory so no importer changes.
  *
  * Two entry shapes (both preserved from the originals):
- *   - **agent-derived** (stoop/tasks): pass `agent` — the notify-envelope
+ *   - **agent-derived** (pinboard/tasks): pass `agent` — the notify-envelope
  *     transport adapter is built from it (`createAgentTransportAdapter`,
  *     per-recipient routing via `agent.transportFor`, subscribing every
  *     named transport).
@@ -48,7 +48,7 @@ import { createVersionStore }                   from '@onderling/versioning';
  *   — injected notify-envelope transport adapter; wins over `agent`.
  * @param {string} [args.deviceId]   — required when no `agent`.
  * @param {string} [args.fallbackDeviceId] — app-shim literal fallback
- *   (e.g. 'stoop-device'), used only when neither deviceId nor
+ *   (e.g. 'pinboard-device'), used only when neither deviceId nor
  *   agent.address resolve.
  * @param {object} [args.existingPseudoPod] — reuse instead of constructing.
  * @param {object} [args.backend]    — StorageBackend (default MemoryBackend).
@@ -149,7 +149,7 @@ export function buildSubstrateStack({
  * expects, routing per-recipient over the agent's attached transports
  * (`agent.transportFor(addr)`) and subscribing envelope receivers on EVERY
  * named transport (relay, mdns, internal, ble, …), not just the primary.
- * (Lifted verbatim from the stoop/tasks-v0 duplicates.)
+ * (Lifted verbatim from the pinboard/tasks-v0 duplicates.)
  *
  * @param {object} agent — duck-typed core Agent.
  */

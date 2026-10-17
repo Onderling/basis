@@ -38,8 +38,8 @@ describe('the agent says what a direct message to a contact is sealed to', () =>
     expect(await A.agent.contactSeal.statusFor(B.pubKey)).toEqual({ sealed: 'device' });
   });
   it('after the card: sealed to the person, naming the version', async () => {
-    const card = await B.agent.callSkill('stoop', 'getContactShareQr', {});
-    expect((await A.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload })).error).toBeUndefined();
+    const card = await B.agent.callSkill('pinboard', 'getContactShareQr', {});
+    expect((await A.agent.callSkill('pinboard', 'addContactFromQr', { payload: card.payload })).error).toBeUndefined();
     expect(await A.agent.contactSeal.statusFor(B.pubKey)).toEqual({ sealed: 'person', to: { version: 1, pubKey: B.agent.personKey().pubKey } });
   });
   it('asked by an ALIAS of the contact (a registered address, or the mesh address on their record), it still answers for the person', async () => {
@@ -47,7 +47,7 @@ describe('the agent says what a direct message to a contact is sealed to', () =>
     expect(A.agent.registerPeerAddress('alias-of-b', B.pubKey)).toBe(true);
     expect((await A.agent.contactSeal.statusFor('alias-of-b')).sealed).toBe('person');
     // the mesh address on the contact record itself, bound nowhere else
-    expect((await A.agent.callSkill('stoop', 'addContact', { webid: B.pubKey, peerAddr: 'mesh-addr-of-b' })).error).toBeUndefined();
+    expect((await A.agent.callSkill('pinboard', 'addContact', { webid: B.pubKey, peerAddr: 'mesh-addr-of-b' })).error).toBeUndefined();
     expect((await A.agent.contactSeal.statusFor('mesh-addr-of-b')).sealed).toBe('person');
     expect((await A.agent.contactSeal.statusFor('nobody-at-all')).sealed).toBe('device');
   });

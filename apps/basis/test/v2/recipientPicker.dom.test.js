@@ -9,14 +9,14 @@
 //      spy (circleApp can't be booted headless), so a regression in the arg mapping would fail here.
 import { describe, it, expect, vi } from 'vitest';
 import { renderRecipientPicker } from '../../web/v2/recipientPicker.js';
-import { stoopContactToRow, peerToContactRow } from '../../src/v2/contactsSource.js';
+import { pinboardContactToRow, peerToContactRow } from '../../src/v2/contactsSource.js';
 
 const t = (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k);
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
 
-// A stoop person WITH a key, a peer WITH a key, and a URL-only bot WITHOUT one (must be excluded).
+// A pinboard person WITH a key, a peer WITH a key, and a URL-only bot WITHOUT one (must be excluded).
 const contacts = [
-  stoopContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE', trustLevel: 'vertrouwd' }),
+  pinboardContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE', trustLevel: 'vertrouwd' }),
   peerToContactRow({ pubKey: 'KEY_PEER', name: 'Peer One' }),
   peerToContactRow({ url: 'https://bot.example/agent', name: 'URL Bot' }),   // no key → excluded
 ];

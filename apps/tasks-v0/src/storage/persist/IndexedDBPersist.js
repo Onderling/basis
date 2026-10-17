@@ -2,7 +2,7 @@
  * IndexedDBPersist — Browser IndexedDB adapter for tasks-v0's
  * `CachingDataSource` local cache.
  *
- * Identical surface + semantics to `apps/stoop/src/lib/IndexedDBPersist.js`.
+ * Identical surface + semantics to `apps/pinboard/src/lib/IndexedDBPersist.js`.
  * Copied (not imported) to avoid an app→app dependency; the substrate
  * candidate is to lift the three adapters + `persistPicker` into
  * `@onderling/local-store` (rule-of-two now satisfied — see
@@ -10,9 +10,9 @@
  *
  * Default `dbName` for tasks-v0 callers is `'tasks-cache'`; basis
  * web composition passes `{dbName:'cc-tasks-cache', storeName:'items'}`
- * to keep the IDB database isolated from stoop's `'cc-stoop-cache'`.
+ * to keep the IDB database isolated from pinboard's `'cc-pinboard-cache'`.
  *
- * See the stoop original for the storage-shape rationale + browser-only
+ * See the pinboard original for the storage-shape rationale + browser-only
  * contract (`globalThis.indexedDB` is required).
  */
 

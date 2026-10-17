@@ -47,7 +47,7 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
     const ownerRootVault = new VaultMemory();
     // what a shell keeps on its disk across the restart: the vaults, the registry, the circle stores and the device log
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-rejoin-'));
-    const vaults = { ownerRootVault, rootKeyStore: new RootKeyStoreVault({ vault: ownerRootVault }), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), stoopPersistDb: { path: path.join(dir, 'stoop-state.json') } };
+    const vaults = { ownerRootVault, rootKeyStore: new RootKeyStoreVault({ vault: ownerRootVault }), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') } };
     const d2Log = log();
     const storage = memStorage();
     const pre = await bootRealAgentNode('d2-pre', { agentOpts: { ...vaults } });
@@ -58,8 +58,8 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
     const got = await mid.agent.callSkill('household', 'receivePersonas', { mnemonic: phrase, personas: [b] });
     expect(got.ok, JSON.stringify(got)).toBe(true);
     // the shell's stores write behind; a person restarts after the write has landed (the file's temp copy is gone)
-    await until(async () => (fs.existsSync(path.join(dir, 'stoop-state.json')) && !fs.existsSync(path.join(dir, 'stoop-state.json.tmp'))
-      && fs.statSync(path.join(dir, 'stoop-state.json')).size > 1000) || null, { timeout: 10_000, step: 100 });
+    await until(async () => (fs.existsSync(path.join(dir, 'pinboard-state.json')) && !fs.existsSync(path.join(dir, 'pinboard-state.json.tmp'))
+      && fs.statSync(path.join(dir, 'pinboard-state.json')).size > 1000) || null, { timeout: 10_000, step: 100 });
     await teardown(mid);
     const d2 = await bootRealAgentNode('d2', { agentOpts: { ...vaults, enrollOfferStorage: storage, deviceLog: d2Log } });
     nodes.push(d2);
@@ -77,7 +77,7 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
 
     const d2Addr = d2.agent.circleAddressFor(Y);
     const atCor = await until(async () => {
-      const members = (await cor.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? [];
+      const members = (await cor.agent.callSkill('pinboard', 'listGroupMembers', { groupId: Y }))?.members ?? [];
       const mine = members.find((m) => m.webid === B.chatId.pubKey);
       return (mine?.circleAddresses ?? []).includes(d2Addr) ? members : null;
     }, { timeout: 30_000, step: 300 });
@@ -88,7 +88,7 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
     expect(row.steps.some((s) => /redeem|invite/.test(s)), JSON.stringify(row.steps)).toBe(false);
     // the circle is on the new device with its roster
     const atD2 = await until(async () => {
-      const members = (await d2.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? [];
+      const members = (await d2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: Y }))?.members ?? [];
       return members.some((m) => m.webid === cor.pubKey) ? members : null;
     }, { timeout: 20_000, step: 300 });
     expect(atD2, 'Cor is on Y\'s roster on the new device').toBeTruthy();
@@ -100,7 +100,7 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
     // what Cor says in Y reaches the new device. A restore is a replacement, as for the default: the new device is
     // announced as Buurt's PRIMARY address, so that is where Cor delivers (the first device keeps its proven address).
     const primaryAtCor = await until(async () => {
-      const r = ((await cor.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? []).find((m) => m.webid === B.chatId.pubKey);
+      const r = ((await cor.agent.callSkill('pinboard', 'listGroupMembers', { groupId: Y }))?.members ?? []).find((m) => m.webid === B.chatId.pubKey);
       return r?.circleAddress === d2Addr ? r : null;
     }, { timeout: 20_000, step: 300 });
     expect(primaryAtCor, 'the new device is Buurt\'s primary at Cor').toBeTruthy();

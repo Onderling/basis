@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighbourhoodAgent } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent } from '@onderling-app/pinboard';
 import { makeHandleGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
 
 const ADMIN = 'https://id.example/admin';
@@ -25,7 +25,7 @@ async function setup() {
   });
   await b.offeringMatch.start();
   const callSkill = async (app, op, args, from = ADMIN) => b.agent.skills.get(op).handler({ parts: [DataPart(args)], from, agent: b.agent, envelope: null });
-  await callSkill('stoop', 'createGroupV2', { groupId: GROUP, name: 'Thuis', rules: RULES });
+  await callSkill('pinboard', 'createGroupV2', { groupId: GROUP, name: 'Thuis', rules: RULES });
   const replies = [];
   const handle = makeHandleGroupRedeemRequest({
     callSkill, sendPeer: async (to, payload) => { replies.push({ to, payload }); },
@@ -40,13 +40,13 @@ async function setup() {
 describe('a bound code and the redeemer\'s canonical key', () => {
   it('Bob\'s code from Bob\'s second address: admitted', async () => {
     const { callSkill, redeem } = await setup();
-    const bound = await callSkill('stoop', 'rotateMyGroupCode', { groupId: GROUP, boundTo: BOB_KEY, inviteExpiresInHours: 24 });
+    const bound = await callSkill('pinboard', 'rotateMyGroupCode', { groupId: GROUP, boundTo: BOB_KEY, inviteExpiresInHours: 24 });
     const r = await redeem(BOB_OTHER_ADDR, { code: bound.code });
     expect(r.ok, JSON.stringify(r)).toBe(true);
   });
   it('Mallory\'s request naming Bob\'s key: invalid-or-expired-code', async () => {
     const { callSkill, redeem } = await setup();
-    const bound = await callSkill('stoop', 'rotateMyGroupCode', { groupId: GROUP, boundTo: BOB_KEY, inviteExpiresInHours: 24 });
+    const bound = await callSkill('pinboard', 'rotateMyGroupCode', { groupId: GROUP, boundTo: BOB_KEY, inviteExpiresInHours: 24 });
     const r = await redeem(MALLORY, { code: bound.code, requesterKey: BOB_KEY, requesterWebid: BOB_KEY, personKey: { version: 1, pubKey: BOB_KEY } });
     expect(r).toMatchObject({ error: 'invalid-or-expired-code' });
   });

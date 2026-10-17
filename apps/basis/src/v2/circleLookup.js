@@ -9,7 +9,7 @@
 //
 // App-qualified: the fetch goes to the op's OWN app (`app` = the catalogue entry's appOrigin, passed by
 // clarifyCommandTargets), NOT probe-first-origin — so a shared op name like `listOpen` resolves on the
-// right app (the bug that sent it to stoop). Best-effort: a live-fetch throw keeps the base, so web
+// right app (the bug that sent it to pinboard). Best-effort: a live-fetch throw keeps the base, so web
 // safely degrades to its cache and mobile to its loaded items. Without `app` or `appCallSkill` it
 // returns the base only (no live fetch).
 

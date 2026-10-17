@@ -7004,7 +7004,7 @@ snapshots:
       '@onderling-app/agents': link:../agents
       '@onderling-app/calendar': link:../calendar
       '@onderling-app/folio': link:../folio
-      '@onderling-app/stoop': link:../stoop
+      '@onderling-app/pinboard': link:../pinboard
       '@onderling-app/tasks': link:../tasks-v0
       '@onderling/agent-registry': link:../../packages/agent-registry
       '@onderling/app-manifest': link:../../packages/app-manifest

@@ -7,7 +7,7 @@
 
 ## Why this exists
 
-Stoop has a Dutch buurt as primary audience and English-speaking
+Pinboard has a Dutch buurt as primary audience and English-speaking
 contributors. Folio's user base is similar. Future apps will land in
 the same shape. Hardcoding strings in source means every new locale
 is a refactor. **Build for translation from the first commit.**
@@ -26,7 +26,7 @@ is a refactor. **Build for translation from the first commit.**
    are responsible for translating substrate error codes into
    localised text. This keeps substrates locale-agnostic.
 4. **The default locale is `en`.** Every app ships at minimum `en`.
-   Stoop also ships `nl` from V1.
+   Pinboard also ships `nl` from V1.
 5. **Locale files are JSON.** Flat or nested by feature; one file per
    locale per app.
 6. **Locale fallback is automatic.** Missing key in `nl` → fall back

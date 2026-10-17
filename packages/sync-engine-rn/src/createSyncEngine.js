@@ -10,7 +10,7 @@
  * the substrate's stock `SyncEngine` is used.
  *
  * Lifted from `apps/folio/src/rn/serviceFactory.js` 2026-05-08
- * (Stoop V3 mobile = rule-of-two consumer).  The original folio
+ * (Pinboard V3 mobile = rule-of-two consumer).  The original folio
  * version hardcoded its own SyncEngine subclass; the lifted version
  * accepts that subclass via `SyncEngineClass`.
  *

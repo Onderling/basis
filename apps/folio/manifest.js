@@ -18,7 +18,7 @@
  * See `Project Files/basis/slash-coverage-audit-2026-05-24.md`.
  *
  * Folio is structurally different from the item-store apps (tasks-v0,
- * stoop, household): it doesn't have an ItemStore + circle-scoped items.
+ * pinboard, household): it doesn't have an ItemStore + circle-scoped items.
  * Its "items" are markdown files mirrored to a Solid pod via `@onderling/sync-engine`.
  *
  * ⚠ CORRECTED 2026-08-03. This used to say folio's skills are "HTTP route handlers + CLI commands + RN

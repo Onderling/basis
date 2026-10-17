@@ -1,5 +1,5 @@
 /**
- * Inbound threaded-chat handler — a peer answered one of OUR NOTICEBOARD POSTS (stoop's
+ * Inbound threaded-chat handler — a peer answered one of OUR NOTICEBOARD POSTS (pinboard's
  * `respondToItem` sends a `chat-message` whose `threadId` is the post id).
  *
  * The reply lands in the REPLIER'S CONTACT THREAD (decided with Frits 2026-09-03): the answer to a

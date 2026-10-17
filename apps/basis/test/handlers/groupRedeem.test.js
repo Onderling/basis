@@ -41,7 +41,7 @@ describe('makeHandleGroupRedeemRequest', () => {
     const d = reqDeps();
     const handle = makeHandleGroupRedeemRequest(d);
     await handle('peer-A', validRequest({ shareCard: true, peerDisplay: 'Anne' }));
-    expect(d.callSkill).toHaveBeenCalledWith('stoop', 'verifyMembershipCodeForPeer',
+    expect(d.callSkill).toHaveBeenCalledWith('pinboard', 'verifyMembershipCodeForPeer',
       expect.objectContaining({
         groupId: 'g-1', code: 'JOIN-XYZ',
         requesterWebid: 'peer-A',

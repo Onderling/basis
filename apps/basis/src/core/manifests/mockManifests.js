@@ -1,5 +1,5 @@
 /**
- * basis — slash-routing manifests for tasks-v0 / stoop / folio.
+ * basis — slash-routing manifests for tasks-v0 / pinboard / folio.
  *
  * NOTE: the "mock" prefix is HISTORICAL.  Post slices 1 / 2b / 4 of the
  * integration plan (2026-05-23), the SKILL HANDLERS for these three
@@ -17,7 +17,7 @@
  *   - Co-locating the three slash-binding manifests here makes it
  *     obvious what they actually do + makes future renames easier.
  *
- * If you're adding a new chat slash command for tasks/stoop/folio,
+ * If you're adding a new chat slash command for tasks/pinboard/folio,
  * declare it here.  If you're adding the IMPLEMENTATION, register a
  * handler in the relevant `apps/<app>/src/browser.js`.
  *
@@ -50,17 +50,17 @@ import { tasksManifest } from '../../../../tasks-v0/manifest.js';
 export const mockTasksManifest = tasksManifest;
 
 /**
- * stoop manifest — Part G dissolve (2026-06-17).
+ * pinboard manifest — Part G dissolve (2026-06-17).
  *
- * This file's former `mockStoopManifest` literal (the chat-shell slash/
- * gate surface for the REAL stoop NeighbourhoodAgent skills) has been
- * FOLDED INTO the real `apps/stoop/manifest.js`, which is now the ONE
- * stoop manifest (same move folio + tasks already made).  We re-export
+ * This file's former `mockPinboardManifest` literal (the chat-shell slash/
+ * gate surface for the REAL pinboard NeighbourhoodAgent skills) has been
+ * FOLDED INTO the real `apps/pinboard/manifest.js`, which is now the ONE
+ * pinboard manifest (same move folio + tasks already made).  We re-export
  * it under the historical name so every importer (circleGate.js, web/
  * main.js's manifestsByOrigin, journeys tests) keeps working unchanged.
  *
- * The merged manifest's `.app` is `'stoop'` on BOTH sides — NO app-origin
- * migration (unlike tasks-v0→tasks).  All dispatch strings stay 'stoop'.
+ * The merged manifest's `.app` is `'pinboard'` on BOTH sides — NO app-origin
+ * migration (unlike tasks-v0→tasks).  All dispatch strings stay 'pinboard'.
  *
  * Slash collisions reconciled in the real manifest (richer gate wins,
  * real-skill param vocab):
@@ -71,27 +71,27 @@ export const mockTasksManifest = tasksManifest;
  *     former realAgent itemId→requestId bridge is REMOVED.
  *   - /reveal: COLLISION (real setPeerReveal vs mock revealPeer alias).
  *     Kept ONE op `setPeerReveal` (richer flags gate); the `revealPeer`
- *     op + its STOOP_OP_ALIAS entry are DROPPED.  adaptStoopReply now
+ *     op + its PINBOARD_OP_ALIAS entry are DROPPED.  adaptPinboardReply now
  *     keys its reveal branch on `setPeerReveal`.
  *   - /report, /lend-assign, /skills, /leave-group, /tree, /sign-out,
  *     /respond, /bulletin: merged to one op each, real params.
  *
- * The thin ALIASED ops (listFeed /feed, getStoopProfile /stoop-profile)
+ * The thin ALIASED ops (listFeed /feed, getPinboardProfile /pinboard-profile)
  * carry distinct commands from their real targets and dispatch via
- * STOOP_OP_ALIAS — KEPT.  getBulletin has NO manifest op (it's a
- * circleContent source op aliased to listOpen); its STOOP_OP_ALIAS entry
+ * PINBOARD_OP_ALIAS — KEPT.  getBulletin has NO manifest op (it's a
+ * circleContent source op aliased to listOpen); its PINBOARD_OP_ALIAS entry
  * STAYS.  The mock-only ops (holiday-mode, contacts, wizards, groups,
  * share-qr, startDm) carry real handlers + are relocated into the real
- * manifest.  The realAgent stoop adapter (reply-shape + semantic aliases
+ * manifest.  The realAgent pinboard adapter (reply-shape + semantic aliases
  * + EN→NL trust / on-off→boolean / peer→peerWebid / min-trust→minTrust /
  * trust→trustOffer transforms) is KEPT — legitimate presentation→storage
  * mapping, NOT drift.
  *
  * The brief/search decls below still attach to `listFeed`.
  */
-import { stoopManifest } from '../../../../stoop/manifest.js';
+import { pinboardManifest } from '../../../../pinboard/manifest.js';
 
-export const mockStoopManifest = stoopManifest;
+export const mockPinboardManifest = pinboardManifest;
 
 /**
  * Folio manifest — Part G dissolve (2026-06-11).
@@ -118,14 +118,14 @@ export const mockFolioManifest = folioManifest;
 // v0.7 — brief-summary decls on each app's list op. /brief fans
 // across these to produce the morning brief. Household's decl
 // lives in `mockAgent.js`.
-mockStoopManifest.operations.find((o) => o.id === 'listFeed')
+mockPinboardManifest.operations.find((o) => o.id === 'listFeed')
   .surfaces.chat.brief = { summarySkill: 'briefSummary', order: 30, label: 'Circle' };
 mockFolioManifest.operations.find((o) => o.id === 'readNote')
   .surfaces.chat.brief = { summarySkill: 'briefSummary', order: 20, label: 'Folio' };
 
 // v0.7.5 — search decls. Each app declares a text-search skill
 // so /find can fan across them.
-mockStoopManifest.operations.find((o) => o.id === 'listFeed')
+mockPinboardManifest.operations.find((o) => o.id === 'listFeed')
   .surfaces.chat.search = { searchSkill: 'searchPosts' };
 mockFolioManifest.operations.find((o) => o.id === 'readNote')
   .surfaces.chat.search = { searchSkill: 'searchFiles' };

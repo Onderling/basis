@@ -51,7 +51,7 @@ export async function run({ relayUrl }) {
     const [anne, bram, cato] = circle.people;
     const block = (node, op, peer) => node.agent.callSkill('basis', op, { peer });
     const rosterRows = async () =>
-      (await anne.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+      (await anne.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
 
     // A baseline, so "nothing arrived" can be told apart from "nothing ever worked".
     await sendCircleChat(bram, { groupId: CIRCLE, msgId: 'before-1', text: 'ik heb een ladder' });

@@ -27,7 +27,7 @@ reg.register({
   actions: [{ id: 'mark-done', label: 'Mark done' }],
 });
 
-// Stoop renders an embedded task ref:
+// Pinboard renders an embedded task ref:
 const chip = reg.renderCompact(embeddedTask);
 //   → <TaskChip task={…} />   when 'task' is registered
 //   → { kind: 'permission-denied', ... } when nothing is registered

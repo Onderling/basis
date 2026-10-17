@@ -1,6 +1,6 @@
 /**
  * Noticeboard posts have ONE carry (the circle store + task lane). Both shells must bridge a landed post
- * into stoop's index through `setNoticeboardLandedHook`, and neither may still register the retired
+ * into pinboard's index through `setNoticeboardLandedHook`, and neither may still register the retired
  * `circle-post` envelope — a second carry is exactly the drift this replaced (W1). Shell files have no
  * runtime coverage, so this reads the source.
  */

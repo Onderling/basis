@@ -1,12 +1,12 @@
 /**
  * bootstrapIdentity — load-or-generate the agent identity at app start.
  *
- * Lifted from apps/stoop-mobile/src/lib/identityBootstrap.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/identityBootstrap.js 2026-05-09
  * (Phase 41.0.b A3; Tasks-mobile is the second consumer).
  *
- * Stoop hardcoded the keychain service namespace to `'stoop'`; the
+ * Pinboard hardcoded the keychain service namespace to `'pinboard'`; the
  * substrate factory takes it as an arg so each app's identity material
- * lives in its own keychain partition (`stoop`, `tasks`, `folio`, …).
+ * lives in its own keychain partition (`pinboard`, `tasks`, `folio`, …).
  *
  * The KeychainVault import is lazy — its module-load imports
  * `react-native-keychain` (a TS file), which vitest can't parse.

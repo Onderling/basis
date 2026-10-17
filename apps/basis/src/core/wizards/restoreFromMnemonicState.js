@@ -41,7 +41,7 @@ export function canAdvanceFromConfirm(state) {
 }
 
 /**
- * Submit the restore via callSkill('stoop', 'restoreFromMnemonic', ...).
+ * Submit the restore via callSkill('pinboard', 'restoreFromMnemonic', ...).
  * Pure function over state + callSkill — easy to unit-test with a stub
  * callSkill.  Returns the mutated state (caller re-renders).
  *
@@ -56,12 +56,12 @@ export async function submitRestore({ state, callSkill }) {
   try {
     const mnemonic = state.mnemonic.trim();
     // Step 1b — install the OWNER ROOT first: persist the phrase + re-derive the
-    // default profile (= the feedback pseudonym). Then run the legacy stoop restore
+    // default profile (= the feedback pseudonym). Then run the legacy pinboard restore
     // for pod reattachment. Different identity vaults (cc-owner-root/cc-chat-id vs
-    // cc-stoop-id) → no conflict; both take effect on the caller's reload.
+    // cc-pinboard-id) → no conflict; both take effect on the caller's reload.
     const owner = await callSkill('household', 'restoreOwnerPhrase', { mnemonic });
     if (owner?.error) throw new Error(owner.error);
-    const result = await callSkill('stoop', 'restoreFromMnemonic', {
+    const result = await callSkill('pinboard', 'restoreFromMnemonic', {
       mnemonic,
       confirm:  true,
     });

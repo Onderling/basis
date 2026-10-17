@@ -16,7 +16,7 @@
  * accepted ALIASES (the real spellings apps already ship — `add`≡`create`, `remove`≡`delete`,
  * `reassign`≡`assign`, `edit`/`patch`≡`update`, `read`≡`get`, `grab`≡`claim`, `done`≡`complete`).
  *
- * NOT every verb reduces to an atom — the ~20% DOMAIN TAIL (folio `sync`/`watch`, stoop
+ * NOT every verb reduces to an atom — the ~20% DOMAIN TAIL (folio `sync`/`watch`, pinboard
  * `report`/`mute`, household `register`, `help`, …) is genuinely orthogonal. A manifest declares
  * those in `manifest.domainVerbs`; the `{atoms:true}` validator mode (see `validate.js`) then
  * requires every `op.verb` to be an atom (or alias) OR a declared domain verb — the fitness

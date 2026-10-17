@@ -9,7 +9,7 @@
  * itself only ships shape + a neutral default.
  *
  * Lifted alongside Phase 41.0.b B0 (2026-05-09; Tasks-mobile is the
- * second consumer of the components, the first to need a non-Stoop
+ * second consumer of the components, the first to need a non-Pinboard
  * palette).
  */
 

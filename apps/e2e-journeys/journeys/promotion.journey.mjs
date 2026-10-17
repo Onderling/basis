@@ -38,7 +38,7 @@ export async function run({ relayUrl }) {
   try {
     circle = await bootAppCircle({ relayUrl, circleId: CIRCLE, handles: ['anne', 'bram', 'cato'] });
     const [anne, bram, cato] = circle.people;
-    const call = (node, op, args) => node.agent.callSkill('stoop', op, args);
+    const call = (node, op, args) => node.agent.callSkill('pinboard', op, args);
 
     check('the circle starts with one admin',
       (await roleOf(anne, CIRCLE, anne.pubKey)) === 'admin'

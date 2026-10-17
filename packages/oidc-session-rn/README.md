@@ -30,7 +30,7 @@ Solid OIDC sign-in for React Native:
   (`@onderling/oidc-session-rn/picker`) — drop-in component for
   Sign-In screens. Renders the curated list as radio tiles +
   expandable "Custom URL" option. Adopted by folio-mobile /
-  stoop-mobile / tasks-mobile.
+  pinboard-mobile / tasks-mobile.
 
 ## Origins
 
@@ -59,7 +59,7 @@ across the RN and web apps.
 ## Per-app key prefix
 
 Each app provides its own `appId` so a single device running both a
-Folio install and a Stoop install doesn't share secure-store keys
+Folio install and a Pinboard install doesn't share secure-store keys
 or DCR-cached `client_id` values:
 
 ```js
@@ -68,7 +68,7 @@ import { OidcSessionRN } from '@onderling/oidc-session-rn';
 const session = new OidcSessionRN({
   store: SecureStore,
   appId: 'folio',     // → secure-store keys: folio-oidc-access-token, …
-  // appId: 'stoop',  // → secure-store keys: stoop-oidc-access-token, …
+  // appId: 'pinboard',  // → secure-store keys: pinboard-oidc-access-token, …
 });
 ```
 
@@ -85,7 +85,7 @@ import * as SecureStore from 'expo-secure-store';
 function SignInScreen({ issuer = 'https://login.inrupt.com' }) {
   const { ready, signIn, lastError } = useOidcSignIn({
     issuer,
-    scheme: 'stoop',                 // matches app.json's URL scheme
+    scheme: 'pinboard',                 // matches app.json's URL scheme
     onWarning: (msg) => console.warn(msg),
   });
 
@@ -93,7 +93,7 @@ function SignInScreen({ issuer = 'https://login.inrupt.com' }) {
     <Button
       onPress={async () => {
         const tokens = await signIn();
-        const session = new OidcSessionRN({ store: SecureStore, appId: 'stoop' });
+        const session = new OidcSessionRN({ store: SecureStore, appId: 'pinboard' });
         await session.adoptTokens(tokens);
         // hand `session` to the app's ServiceContext / bundle config
       }}

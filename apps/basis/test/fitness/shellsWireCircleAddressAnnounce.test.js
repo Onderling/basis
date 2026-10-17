@@ -63,12 +63,12 @@ describe('FITNESS — per-circle address announcing is wired by every shell', ()
   it('the wire kind is named ONCE, in the kernel, and imported by both the substrate and the app', () => {
     // A second literal is how the fan and the receiver come to disagree about a string, which is a
     // failure with no error message anywhere.
-    const stoop = readFileSync(dir('../../../stoop/src/skills/index.js'), 'utf8');
+    const pinboard = readFileSync(dir('../../../pinboard/src/skills/index.js'), 'utf8');
     const basis = readFileSync(dir('../../src/v2/circleAddressAnnounce.js'), 'utf8');
-    expect(stoop).toMatch(/CIRCLE_ADDRESS_ANNOUNCE_KIND/);
+    expect(pinboard).toMatch(/CIRCLE_ADDRESS_ANNOUNCE_KIND/);
     expect(basis).toMatch(/CIRCLE_ADDRESS_ANNOUNCE_KIND/);
     // Neither may spell it out for itself.
-    expect(stoop).not.toMatch(/'circle-address-announce'/);
+    expect(pinboard).not.toMatch(/'circle-address-announce'/);
     expect(basis).not.toMatch(/'circle-address-announce'/);
   });
 });

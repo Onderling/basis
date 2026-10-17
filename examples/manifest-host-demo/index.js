@@ -68,7 +68,7 @@ async function main() {
 
   // ── SP-11b — cross-surface recombination polish ──────────────────
   log('— SP-11b: cross-surface recombination —');
-  const three = await setupRecombinationDemo({ mountStoop: true });
+  const three = await setupRecombinationDemo({ mountPinboard: true });
   log('mounted apps:        ' + three.host.list().join(', '));
   log('composed toolCatalogue: ' + three.composed.toolCatalogue.length + ' tools');
   for (const app of three.host.list()) {

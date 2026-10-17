@@ -9,7 +9,7 @@
  * rides a build-time variable beside the app-native relay: `VITE_SEEDED_CONTACT_CARD` on web,
  * `EXPO_PUBLIC_SEEDED_CONTACT_CARD` on mobile. On boot, when the card is set and the person is not yet
  * in the book, it goes in through the very path a scanned card takes (`addContactFromQr`) — so the
- * contact carries the card's address, name and points, and is a person, never a bot (a stoop contact
+ * contact carries the card's address, name and points, and is a person, never a bot (a pinboard contact
  * is always a person: `contactsSource.js`). Absent or malformed ⇒ nothing happens, quietly: an install
  * without a seeded contact is not an error state.
  *
@@ -44,13 +44,13 @@ export async function seedContactCard({ payload, callSkill } = {}) {
   if (!webid) return { seeded: false, reason: 'malformed-card' };
   let present = false;
   try {
-    const r = await callSkill('stoop', 'listContacts', {});
+    const r = await callSkill('pinboard', 'listContacts', {});
     const rows = Array.isArray(r?.items) ? r.items : (Array.isArray(r?.contacts) ? r.contacts : []);
     present = rows.some((c) => c?.webid === webid);
   } catch { present = false; }
   if (present) return { seeded: false, reason: 'already-known', webid };
   try {
-    const r = await callSkill('stoop', 'addContactFromQr', { payload: trimmed });
+    const r = await callSkill('pinboard', 'addContactFromQr', { payload: trimmed });
     if (r?.error) return { seeded: false, reason: r.error, webid };
     return { seeded: true, webid };
   } catch (err) {

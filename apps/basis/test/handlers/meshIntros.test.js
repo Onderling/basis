@@ -122,7 +122,7 @@ describe('handleCirclePeerIntro (Slice 4)', () => {
       peerDisplay: 'Bob',
     });
     expect(result).toEqual({ ok: true, introId: 'intro-1' });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'recordPeerIntro', {
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'recordPeerIntro', {
       groupId: 'westend',
       peerAddr: 'addr-bob',
       peerDisplay: 'Bob',

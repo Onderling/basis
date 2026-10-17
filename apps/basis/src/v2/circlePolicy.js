@@ -132,7 +132,7 @@ export const CIRCLE_POLICY_ENUMS = {
   governanceEnactment:  ['settle', 'auto'],
   agents:               ['yes', 'admin-approval', 'no'],
   revealPolicy:         ['pairwise', 'open'],
-  // Where this circle's content lives. NOT a literal — stoop and tasks-v0 speak the same list, and
+  // Where this circle's content lives. NOT a literal — pinboard and tasks-v0 speak the same list, and
   // when it was written out four times in two vocabularies a circle mode read as unestablishable
   // through three attempts. One source (`@onderling/pod-routing`, which owns the persisted shape).
   pod:                  [...CIRCLE_STORAGE_POSTURE_NAMES],
@@ -410,7 +410,7 @@ export function normalizeCirclePolicy(stored = {}) {
       typeof p.privateDm === 'boolean' ? p.privateDm : DEFAULT_CIRCLE_POLICY.privateDm,
     // S6.C deep — which whole apps this circle composes into its catalogue (the bot's
     // tools + slash-suggest). null/absent = all DEFAULT_CIRCLE_ORIGINS; a list
-    // narrows (e.g. ['stoop'] for a circle-only circle). Validation is loose here —
+    // narrows (e.g. ['pinboard'] for a circle-only circle). Validation is loose here —
     // the catalogue scoping intersects with the apps that actually have ops.
     apps:               Array.isArray(p.apps) ? p.apps.filter((x) => typeof x === 'string') : null,
     // kept as plain object maps; per-entry coercion happens at read time

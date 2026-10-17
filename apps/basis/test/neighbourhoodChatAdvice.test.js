@@ -119,7 +119,7 @@ describe('persistence — wizard policy reaches the circle store (E8 link)', () 
   });
 
   it('the storage choice IS the policy\'s pod axis: "No pod" beats the template\'s personal', () => {
-    // Two names for one fact used to be two fields: the person's "No pod" went to stoop as
+    // Two names for one fact used to be two fields: the person's "No pod" went to pinboard as
     // `storagePolicy`, the template's `personal` went into the policy as `pod` — the field the store
     // reads. A phone circle created "local only" ran pod-carried and nothing fanned (W27, 2026-08-30).
     const seeded = setKind(initialState(), 'neighbourhood');

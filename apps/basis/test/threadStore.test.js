@@ -244,11 +244,11 @@ describe('Thread — v0.2 schema extensions', () => {
   it('passes filter + permissions through', () => {
     const t = new Thread({
       filter: { apps: ['household'] },
-      permissions: { allowCommands: false, allowedApps: ['stoop'] },
+      permissions: { allowCommands: false, allowedApps: ['pinboard'] },
     });
     expect(t.filter).toEqual({ apps: ['household'] });
     expect(t.permissions).toEqual({
-      allowCommands: false, allowedApps: ['stoop'],
+      allowCommands: false, allowedApps: ['pinboard'],
     });
   });
 

@@ -64,7 +64,7 @@ describe('#240 manifest convergence — canonical shapes', () => {
   it('every appliesTo.type is either a non-empty string OR an array of strings', () => {
     // F-SP3-a (locked 2026-05-20): renderChat tolerates both shapes
     // because some ops legitimately apply to multiple item types
-    // (e.g. stoop.startDm targets both 'contact' AND 'member' rows).
+    // (e.g. pinboard.startDm targets both 'contact' AND 'member' rows).
     // This test is more lax than the appliesTo.state one above
     // because we DON'T force a canonical here — the convention is:
     //   - single type: bare string (`type: 'task'`)
@@ -88,7 +88,7 @@ describe('#240 manifest convergence — canonical shapes', () => {
   it('the composed catalogue still validates clean (no new warnings from this slice)', () => {
     // The merged catalogue should not surface any UNEXPECTED warnings.  Benign
     // collision warnings are the documented first-mount-wins policy:
-    //   - op-id collisions (e.g. startDm in both basis + stoop) →
+    //   - op-id collisions (e.g. startDm in both basis + pinboard) →
     //     prefixed as `<app>/<op>`.
     //   - slash collisions (Part G 2026-06-17: the REAL household shares
     //     generic commands like `/help`, `/claim`, `/done` with basis /

@@ -1,6 +1,6 @@
 // location — a first-class, disclosure-controlled PLACE property with the design's
 // CANONICAL coarseness ladder (plans/NOTE-personal-properties-and-disclosure.md §2). It
-// folds in the bespoke stoop `profile.location {cell,label,source}` field (a per-circle
+// folds in the bespoke pinboard `profile.location {cell,label,source}` field (a per-circle
 // MemberMap geo attribute) as ONE person-level property on the profile graph, governed by
 // the SAME disclosure policy as every other property — mirroring the availability fold-in
 // (availability.js, decision; audit 4 flagged location as the STRONG next candidate).

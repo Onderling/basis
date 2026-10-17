@@ -78,7 +78,7 @@ describe('the box\'s household moves to its circle id once', () => {
     const old = await boot(dir, BEFORE);
     await ensureHouseholdLists({ callSkill: (a, o, x) => old.callSkill(a, o, x), t });
     await old.callSkill('lists', 'addToList', { list: 'Boodschappen', text: 'melk' });
-    await old.callSkill('stoop', 'addContact', { webid: ADMIN, channel: 'telegram', role: 'admin', displayName: 'Anne' });
+    await old.callSkill('pinboard', 'addContact', { webid: ADMIN, channel: 'telegram', role: 'admin', displayName: 'Anne' });
     await old.setDoorCaller(ADMIN, 'admin');
     await old.callSkill('lists', 'addToList', { list: 'Klusjes', text: 'ramen', assignee: 'mij' }, { caller: ADMIN });
     await old.callSkill('lists', 'addToList', { list: 'Klusjes', text: 'stoffen', assignee: 'mij' }, { caller: ADMIN });

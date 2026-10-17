@@ -93,7 +93,7 @@ shell / per-circle config); the host itself is policy-free.
 
    **Canonical default (SP-12 audit 2026-05-24, #246):** hosts SHOULD
    adopt **first-mount-wins** unless they have a specific reason to
-   pick another policy.  Rationale: today household/stoop/calendar
+   pick another policy.  Rationale: today household/pinboard/calendar
    have ZERO command-name overlap (audit confirmed across all 31
    slash commands), so collisions are rare; first-mount-wins handles
    the rare case predictably with no per-command config burden.  Add

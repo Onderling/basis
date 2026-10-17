@@ -10,10 +10,10 @@
  *   2. Propose — proposed resolution (≥5 chars)
  *   3. File — review + submit
  *
- * Substrate gap (inherited from web): stoop doesn't ship dedicated
+ * Substrate gap (inherited from web): pinboard doesn't ship dedicated
  * raiseDispute / proposeResolution / acceptResolution skills yet,
- * so this files as a `kind:'dispute'` stoop.postRequest.  When
- * stoop ships them, `submitDispute` in the state machine swaps
+ * so this files as a `kind:'dispute'` pinboard.postRequest.  When
+ * pinboard ships them, `submitDispute` in the state machine swaps
  * call sites without the wizard layer noticing.
  *
  * No hardcoded strings — every label flows in via the `t` prop.

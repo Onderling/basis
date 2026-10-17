@@ -41,7 +41,7 @@ describe('a door\'s person runs in the door\'s circle', () => {
     });
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
-    await own('stoop', 'addContact', { webid: MEMBER, channel: 'telegram', role: 'member' });
+    await own('pinboard', 'addContact', { webid: MEMBER, channel: 'telegram', role: 'member' });
     await agent.setDoorCaller(MEMBER, 'member');
     // a second circle on the bot, reached by the host (which may name any circle)
     await own('lists', 'createList', { text: 'Geheim', circleId: OTHER });

@@ -106,7 +106,7 @@ describe('joiner ↔ joiner addressing in a three-member circle (real relay, fal
   it('the fallback really is off — a member with no per-circle address would be UNREACHABLE, not downgraded', async () => {
     // The guard on the guard. If this resolves to an address, every assertion below would also pass
     // with the announcement removed, and the test would be decorative.
-    const { resolveMemberAddress } = await import('../../../stoop/src/lib/memberAddress.js');
+    const { resolveMemberAddress } = await import('../../../pinboard/src/lib/memberAddress.js');
     const stranger = { webid: 'webid:someone', pubKey: 'a-perfectly-good-global-key' };
     const res = await resolveMemberAddress(stranger, {
       circleId: GROUP, preferCircleAddress: true, allowFallback: false,

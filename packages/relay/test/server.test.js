@@ -400,7 +400,7 @@ describe('startRelay — group auth (Q-E.2)', () => {
   });
 });
 
-// ── Phase 2 (Stoop V1, 2026-05-05) — quotas + revocation + rotation ────────
+// ── Phase 2 (Pinboard V1, 2026-05-05) — quotas + revocation + rotation ────────
 
 describe('startRelay — Phase 2: per-group revocation', () => {
   let admin, member, gm, proof, relay;

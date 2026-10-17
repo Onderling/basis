@@ -74,7 +74,7 @@ describe('enrolled with a persona: its circles come along', () => {
     // the phone hears the box under WERK — no invite, no redeem: the same member, one more device
     const boxAddr = box.agent.circleAddressFor(Y);
     const atPhone = await until(async () => {
-      const members = (await phone.agent.callSkill('stoop', 'listGroupMembers', { groupId: Y }))?.members ?? [];
+      const members = (await phone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: Y }))?.members ?? [];
       return members.find((m) => m.webid === W.chatId.pubKey)?.circleAddresses?.includes(boxAddr) ? members : null;
     }, { timeout: 30_000, step: 300 });
     expect(atPhone, 'the phone learned the box\'s address under Werk').toBeTruthy();

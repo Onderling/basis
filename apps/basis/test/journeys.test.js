@@ -40,7 +40,7 @@ import {
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { tEn } from './support/bundleTranslator.js';
 import {
-  mockTasksManifest, mockStoopManifest, mockFolioManifest,
+  mockTasksManifest, mockPinboardManifest, mockFolioManifest,
 } from '../src/core/manifests/mockManifests.js';
 import { calendarManifest } from '@onderling-app/calendar/manifest';
 import { createLocalBuiltins } from '../src/core/localBuiltins.js';
@@ -61,7 +61,7 @@ async function bootTestWorkspace() {
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
-    { manifest: mockStoopManifest },
+    { manifest: mockPinboardManifest },
     { manifest: mockFolioManifest },
     { manifest: calendarManifest },
   ], { runtime: 'browser' });
@@ -98,11 +98,11 @@ async function bootTestWorkspace() {
       // real circle agent composed in realAgent.js.
       return agent.callSkill('tasks', opId, args);
     }
-    if (appOrigin === 'stoop') {
-      // Post-slice-2b (integration-plan 2026-05-23): stoop is the
+    if (appOrigin === 'pinboard') {
+      // Post-slice-2b (integration-plan 2026-05-23): pinboard is the
       // real NeighbourhoodAgent.  realAgent.callSkill knows the
-      // listFeed→listOpen alias + getStoopProfile/revealPeer adapters.
-      return agent.callSkill('stoop', opId, args);
+      // listFeed→listOpen alias + getPinboardProfile/revealPeer adapters.
+      return agent.callSkill('pinboard', opId, args);
     }
     if (appOrigin === 'folio') {
       // Post-slice-4: folio is the dedicated browser folio agent
@@ -225,11 +225,11 @@ describe('J3 — Anne is moving in (cross-app follow-ups)', () => {
     expect(reply.memberName).toBe('Anne');
   });
 
-  it("collectFollowUps suggests folio.shareFolder + stoop.postRequest after addMember", () => {
+  it("collectFollowUps suggests folio.shareFolder + pinboard.postRequest after addMember", () => {
     const followUps = collectFollowUps('addMember', 'household', { ok: true }, ws.catalogue());
     const apps = followUps.map((f) => f.appOrigin);
     expect(apps).toContain('folio');
-    expect(apps).toContain('stoop');
+    expect(apps).toContain('pinboard');
   });
 
   it("resolveContact finds Anne by exact handle", async () => {
@@ -278,11 +278,11 @@ describe('J5 — Profile / settings record panel', () => {
   let ws;
   beforeEach(async () => { ws = await bootTestWorkspace(); });
 
-  it("a record-shape reply renders with a title (/stoop-profile)", async () => {
+  it("a record-shape reply renders with a title (/pinboard-profile)", async () => {
     // Part G — the household `/profile` record demo was retired with the
     // chore mock (the real household manifest has no profile op).  The
-    // record-reply journey is still covered by stoop's profile record.
-    const reply = await ws.userInput('/stoop-profile');
+    // record-reply journey is still covered by pinboard's profile record.
+    const reply = await ws.userInput('/pinboard-profile');
     expect(reply.shape).toBe('record');
     expect(reply.payload.title).toBeTruthy();
   });
@@ -388,10 +388,10 @@ describe('J8 — Multi-thread filter + event routing', () => {
   it("EventLog logs delivered events for /logs queries", () => {
     ws.router.deliver({
       id: 'e-3', ts: Date.now(),
-      app: 'stoop', type: 'notification',
+      app: 'pinboard', type: 'notification',
       payload: { message: 'new post' },
     });
-    const logged = ws.eventLog.query({ filter: { apps: ['stoop'] } });
+    const logged = ws.eventLog.query({ filter: { apps: ['pinboard'] } });
     expect(logged.length).toBeGreaterThan(0);
   });
 });
@@ -469,10 +469,10 @@ describe('Bonus — /apps toggle (OQ-4.B)', () => {
   let ws;
   beforeEach(async () => { ws = await bootTestWorkspace(); });
 
-  it("toggling stoop off removes its commands from the catalogue", async () => {
-    ws.appRegistry.setEnabled('stoop', false);
+  it("toggling pinboard off removes its commands from the catalogue", async () => {
+    ws.appRegistry.setEnabled('pinboard', false);
     const cat = ws.catalogue();
-    const stoopCmds = cat.commandMenu.filter((e) => e.appOrigin === 'stoop');
-    expect(stoopCmds).toEqual([]);
+    const pinboardCmds = cat.commandMenu.filter((e) => e.appOrigin === 'pinboard');
+    expect(pinboardCmds).toEqual([]);
   });
 });

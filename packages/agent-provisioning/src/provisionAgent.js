@@ -26,7 +26,7 @@
  * in.  When they're available as proper substrates, the facade gains
  * the ability to construct them too.
  *
- * Apps that want bespoke shapes (Folio's CLI auth, Stoop's relay
+ * Apps that want bespoke shapes (Folio's CLI auth, Pinboard's relay
  * choice, Tasks's single-agent topology) keep composing
  * substrates manually — every substrate stands alone.  This facade
  * is the **canonical path**, not the only path.

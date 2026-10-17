@@ -2,7 +2,7 @@
  * membershipRail — membership statements ride THE RAIL (the membership rider, decision A).
  *
  * The membership writers (`@onderling/circles`: redeem → join, leaveGroup → leave, removeMember → evict)
- * already emit signed spine statements; this moves their destination from stoop's unsynced store to the
+ * already emit signed spine statements; this moves their destination from pinboard's unsynced store to the
  * DEVICE LOG's membership lane — reusing everything the governance rider proved: the declared-kind gate,
  * verify-on-ingest (signature + key↔ref binding — the receiver-enforced eviction guard), the live fan, and
  * the pull-all catch-up. `deriveRoster` folds the rail's VERIFIED bodies (author resolved to ref) as the
@@ -78,7 +78,7 @@ export function rosterBindingVerifier(callSkill) {
       //
       // The rule, in one line: a content lane verifies against the membership FOLD; the membership
       // lane verifies against the TRAIL.
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
       // SET-AWARE (add-a-device): a statement signed at ANY of the member's proven addresses
       // binds to the member; checking the primary alone would refuse every second device's
       // statements on every rail.
@@ -104,7 +104,7 @@ export function membershipBindingVerifier(callSkill, { circleIdentityFor = null,
   const spinelessRoster = (circleId) => {
     const hit = memo.get(circleId);
     if (hit && Date.now() - hit.at < memoMs) return hit.promise;
-    const promise = callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
+    const promise = callSkill('pinboard', 'listGroupMembers', { groupId: circleId, spineless: true });
     memo.set(circleId, { at: Date.now(), promise });
     promise.catch(() => memo.delete(circleId));
     return promise;

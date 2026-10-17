@@ -11,10 +11,10 @@
  *
  *   • **basis** — `createLocalBuiltins` returns a map KEYED BY OP ID. Both directions are checked
  *     STRICTLY (set equality), because they can be: today the sets match exactly (34 ≡ 34).
- *   • **stoop** — skills register three ways (defineSkill literals, a cores map, realAgent
+ *   • **pinboard** — skills register three ways (defineSkill literals, a cores map, realAgent
  *     adapters) and the shell wizard registry implements the wizard ops, so "implemented" is a
  *     TEXT-level scan over the named implementation sources, biased to under-report (a mention
- *     counts). Declared-but-NOWHERE fails. The reverse direction is NOT hard-checked here: stoop's
+ *     counts). Declared-but-NOWHERE fails. The reverse direction is NOT hard-checked here: pinboard's
  *     113 undeclared skills are protocol-internal ops (broadcast…, ingest…, record…) — the manifest
  *     deliberately declares the curated surface, and 113 allow-notes would be noise, not a guard.
  *   • **folio** — skills are built FROM the manifest (`buildSkillsFromManifest`), so declared ⇒
@@ -32,11 +32,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const load = (rel) => import(pathToFileURL(path.join(ROOT, rel)).href);
 
-/** op id → reason. Empty today — basis measures exact, stoop's declared set all resolves. */
+/** op id → reason. Empty today — basis measures exact, pinboard's declared set all resolves. */
 const ALLOW = {
   basisDeclaredUnimplemented: {},
   basisImplementedUndeclared: {},
-  stoopDeclaredUnimplemented: {},
+  pinboardDeclaredUnimplemented: {},
 };
 
 describe('G-S1 — manifest completeness', () => {
@@ -58,26 +58,26 @@ describe('G-S1 — manifest completeness', () => {
       'basis implements op(s) the manifest does not declare — the manifest is the surface truth').toEqual([]);
   });
 
-  it('stoop: every declared op resolves to SOME implementation source', async () => {
-    const m = await load('apps/stoop/manifest.js');
-    const manifest = m.default ?? m.stoopManifest;
-    // The places a stoop op is implemented: its own skills + service, the realAgent adapters that
+  it('pinboard: every declared op resolves to SOME implementation source', async () => {
+    const m = await load('apps/pinboard/manifest.js');
+    const manifest = m.default ?? m.pinboardManifest;
+    // The places a pinboard op is implemented: its own skills + service, the realAgent adapters that
     // synthesize ops (getCurrentGroup etc.), the chat layer (startDm), the circle-scope dispatch
     // adapters, and the shell wizard registry (the *Wizard ops are shell-implemented flows).
     const sources = [
-      'apps/stoop/src/skills/index.js',
-      'apps/stoop/src/Service.js',
-      'apps/stoop/src/chat/llmChat.js',
+      'apps/pinboard/src/skills/index.js',
+      'apps/pinboard/src/Service.js',
+      'apps/pinboard/src/chat/llmChat.js',
       'apps/basis/src/core/agent/realAgent.js',
-      'apps/basis/src/v2/circleStoopScope.js',
+      'apps/basis/src/v2/circlePinboardScope.js',
       'apps/basis-mobile/src/core/wizardRegistry.js',
     ].map((rel) => readFileSync(path.join(ROOT, rel), 'utf8')).join('\n');
 
     const missing = (manifest.operations ?? []).map((o) => o.id)
       .filter((id) => !new RegExp(`\\b${id}\\b`).test(sources))
-      .filter((id) => !ALLOW.stoopDeclaredUnimplemented[id]);
+      .filter((id) => !ALLOW.pinboardDeclaredUnimplemented[id]);
     expect(missing,
-      'stoop declares op(s) that appear in NO implementation source — declared-without-implementation')
+      'pinboard declares op(s) that appear in NO implementation source — declared-without-implementation')
       .toEqual([]);
   });
 

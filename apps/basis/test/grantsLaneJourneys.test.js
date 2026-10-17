@@ -126,7 +126,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
     // P's OWN roster row becoming the SET is what gives the grants fan its sibling target.
     await announce(L, P.pubKey);
     const row = await until(async () => {
-      const res = await P.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await P.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       const r = (res?.members ?? []).find((m) => m.webid === P.pubKey);
       return (r?.circleAddresses?.includes(addrL)) ? r : null;
     }, { timeout: 15000, step: 50 });
@@ -136,7 +136,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
     // carries it; here it is hand-aimed like L's.
     await announce(P, addrL);
     const rowL = await until(async () => {
-      const res = await L.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await L.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       const r = (res?.members ?? []).find((m) => m.webid === P.pubKey);
       return (r?.circleAddresses?.includes(addrP)) ? r : null;
     }, { timeout: 15000, step: 50 });
@@ -318,8 +318,8 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
     await announce(N, P.pubKey);
     await announce(P, addrN);
     await until(async () => {
-      const onP = ((await P.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrN);
-      const onN = ((await N.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrP);
+      const onP = ((await P.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrN);
+      const onN = ((await N.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP }))?.members ?? []).find((m) => m.webid === P.pubKey)?.circleAddresses?.includes(addrP);
       return (onP && onN) ? true : null;
     }, { timeout: 15000, step: 50 });
     await N.agent.sendPeerMessage(addrP, { subtype: GRANTS_CATCHUP_SUBTYPES.request, circleId: OWN_DEVICES_SCOPE }, { ...SEND, circleId: GROUP });

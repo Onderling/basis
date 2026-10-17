@@ -1,7 +1,7 @@
 /**
  * ChipRow — horizontal scrollable row of selectable chips.
  *
- * Lifted from apps/stoop-mobile/src/components/ChipRow.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/components/ChipRow.js 2026-05-09
  * (Phase 41.0.b B2). Pure-controlled: pass `items`, `selected`,
  * and `onToggle`. Tokens come from `useTheme()`.
  */

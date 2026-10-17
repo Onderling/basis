@@ -9,7 +9,7 @@
  *   - hostAgent   — household skills + calendar
  *   - chatAgent   — user-facing surface (via @onderling/secure-agent)
  *   - tasksCircle   — real tasks-v0 Circle agent
- *   - stoopAgent  — real Stoop NeighbourhoodAgent
+ *   - pinboardAgent  — real Pinboard NeighbourhoodAgent
  *   - folioAgent  — real Folio browser agent (web-only handlers today)
  *
  * Portability rules (per Project Files/conventions/node-portability):
@@ -132,8 +132,8 @@ import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
-import { createBrowserStoopAgent } from '@onderling-app/stoop/browser';
-import { STOOP_OP_ALIAS } from '../../v2/stoopOpAliases.js';
+import { createBrowserPinboardAgent } from '@onderling-app/pinboard/browser';
+import { PINBOARD_OP_ALIAS } from '../../v2/pinboardOpAliases.js';
 import { shouldFanNoticeboardItem, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
 import { toCircleStorePost } from '../../v2/noticeboardCarry.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
@@ -392,7 +392,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Opt-in demo scaffolding. OFF by default: a freshly created REAL circle must
   // show only real members (the creator + actual joiners) and no phantom tasks.
   // When explicitly enabled (demo deploy / journey fixtures), the factory seeds
-  // the three named demo members (Anne/Karl/Maria) into the default tasks + stoop
+  // the three named demo members (Anne/Karl/Maria) into the default tasks + pinboard
   // circles, the matching demo contacts, and the starter demo tasks/posts. Nothing
   // here fabricates peers into the `_sync` hint — that reads real state regardless.
   const seedDemoData = opts.seedDemoData === true;
@@ -461,7 +461,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // (capture-then-flush: they survive the local-wins attach so "use theirs" stays honorable).
   const settingsRestoreCtx = { medium: null, attached: false, conflicts: [] };
 
-  // Host agent — in-process app skills (household, tasks-v0, stoop,
+  // Host agent — in-process app skills (household, tasks-v0, pinboard,
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
   const hostVault = await sealedVault(opts.hostVault ?? makeBrowserVault('cc-host-id:'));
@@ -1013,7 +1013,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const want = addrs.filter((a) => typeof a === 'string' && a);
     if (!want.length) return false;
     const mine = new Set(await ownAddresses().catch(() => []));
-    const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
+    const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members ?? [];
     const members = new Set(rows.flatMap((m) => [m?.webid, m?.addr, m?.address, m?.peerAddr]).filter(Boolean));
     return want.every((a) => mine.has(a) || members.has(a));
   }
@@ -1209,7 +1209,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     reFannedCircles.add(circleId);
     try {
       for (const owed of owedChatStatements({ eventLog: opts.deviceLog, circleId, myRef: circleSelfRef(circleId) })) {
-        callSkill('stoop', 'broadcastCircleChatStatement', {
+        callSkill('pinboard', 'broadcastCircleChatStatement', {
           groupId: circleId, event: owed.statement, msgId: owed.msgId, ts: owed.ts,
         }).catch(() => { /* best-effort — the next boot, or the member's own catch-up, retries */ });
       }
@@ -1291,7 +1291,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * pseudo-pod: the shared substrate stack already built above for household
    * (`circleSubstrate.pseudoPod`), whose URI authority is the CHAT identity's pubKey —
    * i.e. this user's device pod, not a per-circle pod.  Mirrors the sibling bring-up
-   * pattern (stoop-mobile bootstrapBundle / tasks-v0 Circle.js): `registerAgentBundle`
+   * pattern (pinboard-mobile bootstrapBundle / tasks-v0 Circle.js): `registerAgentBundle`
    * registers THIS device (the chat agent) in the resource — so the roster is non-empty
    * out of the box — and returns the live registry handle the read skills query.
    * Best-effort: a register failure falls back to a bare `createAgentRegistry` over the
@@ -1860,7 +1860,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * The ONE recovery phrase that re-derives every profile — including the feedback
    * no-login pseudonym (the default-profile chat identity). Host skills so they can
    * close over the owner root (created above); reached via callSkill('household', …).
-   * Deliberately NOT the stoop `getMnemonicOnce` (that reveals the unrelated stoop
+   * Deliberately NOT the pinboard `getMnemonicOnce` (that reveals the unrelated pinboard
    * sub-agent seed) and NOT the shared `restoreFromMnemonic` (legacy direct-seed).
    */
   hostAgent.register('revealOwnerPhrase', async () => {
@@ -1994,7 +1994,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleIds: async () => {
       const ids = new Set(Object.keys(await readSelfCircleMemberships().catch(() => ({}))));
       try {
-        for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+        for (const c of ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])) {
           const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
           if (typeof id === 'string' && id) ids.add(id);
         }
@@ -2018,7 +2018,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { rows = await ownDeviceSiblingRows(); } catch { rows = []; }
     for (const d of rows) { if (d?.address) out.add(d.address); if (d?.circleId) { const mine = circleAddressFor(d.circleId); if (mine) out.add(mine); } }
     try {
-      for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+      for (const c of ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])) {
         const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
         const mine = id ? circleAddressFor(id) : null;
         if (mine) out.add(mine);
@@ -2101,7 +2101,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleIds: async () => {
         const ids = new Set(Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})));
         try {
-          const r = (await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data;
+          const r = (await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data;
           for (const c of r?.circles ?? []) { const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id); if (id) ids.add(id); }
         } catch { /* the record's list alone still serves */ }
         return [...ids];
@@ -2208,7 +2208,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** My seed for a version — the current one, or one I rotated away from (a message sealed before the rotation). */
   const personSeedFor = (version) => (persona.personKey?.version === version ? persona.personKey.seed : (persona.personKey?.previous ?? []).find((p) => p.version === version)?.seed ?? null);
   const contactRecords = async () => {
-    try { return bookRowsOf(await callSkill('stoop', 'listContacts', {})); } catch { return []; }
+    try { return bookRowsOf(await callSkill('pinboard', 'listContacts', {})); } catch { return []; }
   };
   /**
    * The PERSON an address names: an address this device has bound to an identity (a per-circle or mesh alias) resolves
@@ -2235,7 +2235,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     let best = null;
     for (const circleId of (opts.circlesForPeer?.(webid) ?? [])) {
       try {
-        const row = ((await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === webid);
+        const row = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []).find((m) => m?.webid === webid);
         if (row?.personKey && (!best || row.personKey.version > best.version)) best = { version: row.personKey.version, pubKey: row.personKey.pubKey };
       } catch { /* next circle */ }
     }
@@ -2247,7 +2247,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     chain: personKeyChainOf,
     isContact: async (addr) => !!(await contactRecordOf(addr)) || (opts.circlesForPeer?.(await webidFor(addr)) ?? []).length > 0,
     known: contactPersonKeyOf,
-    adopt: async (addr, current, links) => (await callSkill('stoop', 'setContactPersonKey', { webid: await webidFor(addr), personKey: current, links }))?.personKey ?? null,
+    adopt: async (addr, current, links) => (await callSkill('pinboard', 'setContactPersonKey', { webid: await webidFor(addr), personKey: current, links }))?.personKey ?? null,
     sendToPeer: (to, payload, o) => sendCircleScoped(to, payload, { guarantee: 'hold-forward', ...o }),
     onRefused: ({ reason, from }) => console.info(`[person-key-chain] refused ${reason} from ${String(from).slice(0, 12)}…`),
   });
@@ -2306,12 +2306,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   // same sibling set. A greeting binds a key on the ONE device it landed on, and a card scanned on the
   // phone is a contact on the phone — this carries both to the person's other devices, live, to a
   // newly announced sibling in full, and on request. The contact book is read and written RAW here
-  // (the stoop agent directly, not the waist), because the waist's add is what fans a row out and a
+  // (the pinboard agent directly, not the waist), because the waist's add is what fans a row out and a
   // landed row must not fan back.
-  const stoopAgentRef = { current: null };   // late-bound: the stoop agent is created further down this scope
-  // WHO this device's own stoop call is: in a persona's circle (the args name it), the persona — `actAs` at the core's
+  const pinboardAgentRef = { current: null };   // late-bound: the pinboard agent is created further down this scope
+  // WHO this device's own pinboard call is: in a persona's circle (the args name it), the persona — `actAs` at the core's
   // in-process membrane, so the skill's `from` and the trail's actor are it. Anything else: the default, as before.
-  const stoopActAs = (args) => {
+  const pinboardActAs = (args) => {
     // a call that names WHICH persona it is for (a card) is made as that persona
     if (typeof args?.persona === 'string' && args.persona !== 'default') {
       const w = personas.get(args.persona)?.chatId?.pubKey ?? null;
@@ -2323,12 +2323,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { as = circleSelf(c).sendAs ?? null; } catch { as = null; }   // (circleSelf is bound further down; early boot reads none)
     return as ? { actAs: as } : {};
   };
-  const rawStoop = async (opId, args = {}) => {
-    const result = await chatAgent.invoke(stoopAgentRef.current.address, opId, [DataPart(args)], stoopActAs(args));
+  const rawPinboard = async (opId, args = {}) => {
+    const result = await chatAgent.invoke(pinboardAgentRef.current.address, opId, [DataPart(args)], pinboardActAs(args));
     return (Array.isArray(result) ? result[0] : null)?.data ?? null;
   };
-  const rawContacts = async () => (await rawStoop('listContacts', {}))?.contacts ?? [];
-  // Merge every persona's `listMyCircles` into the default's — one list for the person (see the waist's stoop branch).
+  const rawContacts = async () => (await rawPinboard('listContacts', {}))?.contacts ?? [];
+  // Merge every persona's `listMyCircles` into the default's — one list for the person (see the waist's pinboard branch).
   const withPersonaCircles = async (reply, parts) => {
     const idOf = (c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null));
     const seen = new Set(reply.circles.map(idOf).filter(Boolean));
@@ -2337,7 +2337,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     for (const [pid, rt] of personas) {
       if (pid === 'default' || !rt?.chatId?.pubKey) continue;
       let theirs = null;
-      try { theirs = (await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', parts, { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null; } catch { theirs = null; }
+      try { theirs = (await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', parts, { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null; } catch { theirs = null; }
       for (const c of theirs?.circles ?? []) { const id = idOf(c); if (id && !seen.has(id)) { seen.add(id); circles.push(c); } }
       if (Array.isArray(left) && Array.isArray(theirs?.left)) for (const l of theirs.left) if (!left.includes(l)) left.push(l);
     }
@@ -2399,7 +2399,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const out = { ok: true, emitted: [], unchanged: [], failed: [] };
     for (const [from, ids] of bySelf) {
       const r = await emitMemberProps(
-        { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
+        { emitSpine: membershipEmit, myRowIn: async (cid) => (await rawPinboard('listGroupMembers', { groupId: cid }))?.members ?? [] },   // the FOLDED row: my previous member-props counts
         { from, circleIds: ids, props },
       );
       if (r?.error) return { ...r, emitted: out.emitted, unchanged: out.unchanged, failed: [...out.failed, ...ids] };
@@ -2409,10 +2409,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   async function tellMyRostersWhatISay() {
     if (typeof membershipEmit !== 'function') return { error: 'no-membership-rail' };
-    const me = (await rawStoop('getMyProfile', {}))?.entry ?? {};
+    const me = (await rawPinboard('getMyProfile', {}))?.entry ?? {};
     // the DEFAULT's names over the DEFAULT's circles: `listMyCircles` answers for its caller, and this call is the
     // default's — a persona's circle is never on it, so never hears them (pinned over a relay: its names are its own)
-    const circles = ((await rawStoop('listMyCircles', {}))?.circles ?? [])
+    const circles = ((await rawPinboard('listMyCircles', {}))?.circles ?? [])
       .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
     // Names only. The PICTURE does not ride here: it is the persona's `profilePicture` attribute and travels
     // in the per-circle RELEASE (`shareDisclosureToCircle` → `personaProperties`), re-sealed for each circle.
@@ -2431,16 +2431,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
     contacts: {
       has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
-      add: (contact) => rawStoop('addContact', contact),
+      add: (contact) => rawPinboard('addContact', contact),
       get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
       // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-      setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawStoop('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
+      setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
       // …and a newer change of what the contact sees of the person (L125), by the same rule
-      setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawStoop('setContactPersona', {
+      setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawPinboard('setContactPersona', {
         webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
       }),
       // …and a newer identity link to a household bot (or its undoing), by the same rule
-      setLinked: (webid, linkedRow, linkedAt) => rawStoop('addContact', { webid, linkedRow, linkedAt }),
+      setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
     },
     onLanded: () => savePeerBindings(),
   });
@@ -2452,7 +2452,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const memberships = await readSelfCircleMemberships().catch(() => ({}));
     const ids = Object.keys(memberships);
     try {
-      const r = await rawStoop('listMyCircles', {});
+      const r = await rawPinboard('listMyCircles', {});
       for (const c of (Array.isArray(r?.circles) ? r.circles : [])) {
         const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
         if (typeof id === 'string' && id && !ids.includes(id)) ids.push(id);
@@ -2499,7 +2499,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     siblings: (circleId) => (circleId ? siblingsFor({ circleId }) : ownDeviceSiblings()),
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     myEntries: myCircleEntries,
-    myLeft: async () => { try { return (await rawStoop('listMyCircles', {}))?.left ?? []; } catch { return []; } },
+    myLeft: async () => { try { return (await rawPinboard('listMyCircles', {}))?.left ?? []; } catch { return []; } },
     isIn: async (circleId) => (await myCircleEntries()).some((e) => e.id === circleId),
     kringOn: (circleId) => followSelection.kringOn(circleId),
     consume: (entry) => (typeof circleFollowConsume === 'function'
@@ -2705,7 +2705,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // address nobody holds. The row is retired here, at the moment the ceremony succeeds and the running
   // identity is known to be the one going away. Best-effort: the map is a display cache, not a record.
   const retireCurrentSelfRow = async () => {
-    const bundle = stoopAgentRef.current?.bundle;
+    const bundle = pinboardAgentRef.current?.bundle;
     const members = bundle?.members;
     if (!members || typeof members.removeMember !== 'function') return;
     try {
@@ -2733,7 +2733,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // The THROWAWAY self's circle ids, read while its registry is still this device's. The clear that
       // follows on the next boot is named after them, and by then there is no agent to ask.
       let throwawayCircleIds = [];
-      try { throwawayCircleIds = circleIdsFrom(await rawStoop('listMyCircles', {})); }
+      try { throwawayCircleIds = circleIdsFrom(await rawPinboard('listMyCircles', {})); }
       catch { /* a registry that cannot be read leaves the named stores to the list's own constants */ }
       const r = await restoreOwnerRoot({
         mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,
@@ -2804,7 +2804,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }).catch(() => null);
       if (stmt) revokedIn.push({ circleId, address });
       try {
-        await opts.stoopControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
+        await opts.pinboardControlAgent?.revokeRecipient?.({ groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address), policy: 'ban' });
       } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
     }
     return revokedIn;
@@ -2896,7 +2896,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const retiredSealingFor = (circleId) => new Set(retired.map(({ seed }) => sealingPublicKeyFromNetworkKey(deriveCircleAddress(seed, circleId))));
       for (const circleId of circles) {
         try {
-          const roster = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
           const me = (Array.isArray(roster?.members) ? roster.members : []).find((m) => (m.webid ?? m.addr ?? m.ref) === chatId.pubKey);
           if (me?.role !== 'admin' || typeof keyEmit !== 'function') continue;
           const events = await keyEventsFromRail(keyRail, circleId);
@@ -2916,7 +2916,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           const statement = await keyEmit(circleId, event);
           if (!statement) continue;
           await absorbHistoryKeys(circleId, [{ version: event.version, groupKey }]);
-          await callSkill('stoop', 'broadcastCircleKeyStatement', {
+          await callSkill('pinboard', 'broadcastCircleKeyStatement', {
             groupId: circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
           }).catch(() => {});
           rotated.push({ circleId, version: event.version });
@@ -3177,8 +3177,8 @@ export async function createRealHouseholdAgent(opts = {}) {
                     signCeremonyCommitmentFromSeed(deriveCircleSeed(selfSeed, c), { circleId: c, circleAddress: address, commitment }),
                 });
                 if (!ann) continue;
-                await callSkill('stoop', 'broadcastCircleAddresses', { groupId: cid, announcements: [ann] });
-                await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+                await callSkill('pinboard', 'broadcastCircleAddresses', { groupId: cid, announcements: [ann] });
+                await callSkill('pinboard', 'recordCircleAddressAnnouncement', {
                   groupId: cid, memberWebid: ann.memberWebid, circleAddress: ann.circleAddress, circleAddressProof: ann.circleAddressProof,
                   ...(ann.ceremonyCommitment ? { ceremonyCommitment: ann.ceremonyCommitment, ceremonyCommitmentProof: ann.ceremonyCommitmentProof } : {}),
                 });
@@ -3346,7 +3346,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (typeof peerAddr !== 'string' || !peerAddr) return null;
     let row = null;
     try {
-      const rows = (await rawStoop('listContacts', {}))?.contacts ?? [];
+      const rows = (await rawPinboard('listContacts', {}))?.contacts ?? [];
       row = rows.find((c) => c?.webid === peerAddr || c?.pubKey === peerAddr || c?.peerAddr === peerAddr || c?.personKey?.pubKey === peerAddr) ?? null;
     } catch { row = null; }
     const pid = row?.persona;
@@ -3540,11 +3540,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         let rows = [];
         let members = [];
         try {
-          const all = await callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
+          const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
           const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
           rows = items.filter((it) => it?.source?.groupId === circleId);
         } catch { rows = []; }
-        try { members = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
+        try { members = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { members = []; }
         const snap = rosterSnapshot({
           rows, members,
           // This device's proven address in the circle — the same announcement the seed serve introduces
@@ -3569,7 +3569,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       const memberships = await readSelfCircleMemberships().catch(() => ({}));
       let rows = [];
-      try { rows = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
+      try { rows = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { rows = []; }
       const nameOf = new Map(rows.map((c) => [typeof c === 'string' ? c : (c?.groupId ?? c?.id), typeof c === 'string' ? null : (c?.name ?? null)]));
       const circles = Object.keys(memberships)
         .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household')
@@ -3599,12 +3599,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       let landed = 0;
       for (const [circleId, snap] of Object.entries(rostersOf(body))) {
         try {
-          const r = await callSkill('stoop', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members });
+          const r = await callSkill('pinboard', 'recordRosterSeed', { groupId: circleId, rows: snap.rows, members: snap.members });
           if (r && !r.error) landed += 1;
           // The owner's own proven address from before the wipe — through the announce's receive door,
           // proof re-verified, so what the owner said with it binds on this device too.
           if (snap.own) {
-            await callSkill('stoop', 'recordCircleAddressAnnouncement', {
+            await callSkill('pinboard', 'recordCircleAddressAnnouncement', {
               groupId: circleId, memberWebid: snap.own.memberWebid, circleAddress: snap.own.circleAddress,
               circleAddressProof: snap.own.circleAddressProof,
               ...(snap.own.ceremonyCommitment ? { ceremonyCommitment: snap.own.ceremonyCommitment, ceremonyCommitmentProof: snap.own.ceremonyCommitmentProof } : {}),
@@ -3889,7 +3889,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           const webid = (await AgentIdentity.fromSeed(proof.root.deriveAgentSeed(pid), new VaultMemory())).pubKey;
           const rosters = {};
           for (const cid of Object.keys(own)) {
-            const members = ((await rawStoop('listGroupMembers', { groupId: cid }))?.members ?? []).filter((m) => m?.webid && m.webid !== webid);
+            const members = ((await rawPinboard('listGroupMembers', { groupId: cid }))?.members ?? []).filter((m) => m?.webid && m.webid !== webid);
             rosters[cid] = { rows: [], members };
           }
           const one = bootstrapOfferFromRosters({ body: bodyWithRosters({ body: {}, rosters }), selfPubKey: webid, memberships: own, persona: pid });
@@ -3928,7 +3928,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * real handlers registered on hostAgent). of the
    * integration-plan-2026-05-23 moved them into a dedicated browser
    * agent — see the `createBrowserFolioAgent` boot block below the
-   * tasks/stoop blocks, and the 'folio' branch in `callSkill`.
+   * tasks/pinboard blocks, and the 'folio' branch in `callSkill`.
    *
    * shareFolder now issues a REAL PodCapabilityToken via
    * autoShare.mintShareToken; the other skills retained their
@@ -4028,7 +4028,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleRoleOf: async (circleId, webid) => {
       if (!circleId || !webid) return null;
       try {
-        const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
         const rows = Array.isArray(r?.members) ? r.members : [];
         return rows.find((m) => (m?.webid ?? m?.pubKey) === webid)?.role ?? null;
       } catch { return null; }
@@ -4053,7 +4053,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         ] : []),
       ],
     },
-    // Mirrors `opts.stoopPersistDb` below.  Browser passes
+    // Mirrors `opts.pinboardPersistDb` below.  Browser passes
     // `{dbName:'cc-tasks-state', storeName:'items'}` (IDB); mobile
     // gets `{dbName:'cc-tasks-cache', asyncStorage}` (AsyncStorage)
     // synthesised by basis-mobile/agentBundle.js.  Without it,
@@ -4195,21 +4195,21 @@ export async function createRealHouseholdAgent(opts = {}) {
   // entries so the user gets visible feedback on /circle-new.
   const provisionedCircles = new Map();   // circleId → {name, kind, provisionedAt}
 
-  /* ─── stoop real agent (integration plan 2026-05-23) ──
+  /* ─── pinboard real agent (integration plan 2026-05-23) ──
    *
-   * Replaces the previous mock-stoop handlers (~85 lines: listFeed,
-   * postRequest, searchPosts, stoop_briefSummary, getStoopProfile,
-   * revealPeer) with the actual Stoop NeighbourhoodAgent composed
-   * in-process.  Boots 110 real stoop skills; ~6 surface via chat
-   * ops today, the rest reachable via agent.callSkill('stoop', …).
+   * Replaces the previous mock-pinboard handlers (~85 lines: listFeed,
+   * postRequest, searchPosts, pinboard_briefSummary, getPinboardProfile,
+   * revealPeer) with the actual Pinboard NeighbourhoodAgent composed
+   * in-process.  Boots 110 real pinboard skills; ~6 surface via chat
+   * ops today, the rest reachable via agent.callSkill('pinboard', …).
    *
-   * Separate identity vault prefix (`cc-stoop-id:`) so stoop's per-
+   * Separate identity vault prefix (`cc-pinboard-id:`) so pinboard's per-
    * circle identity is isolated from chat + tasks (decision #2).
    * IndexedDBPersist via opts.persistDb keeps the local cache alive
    * across page reloads.
    */
-  const stoopIdentityVault = await sealedVault(opts.stoopIdentityVault
-    ?? makeBrowserVault('cc-stoop-id:'));
+  const pinboardIdentityVault = await sealedVault(opts.pinboardIdentityVault
+    ?? makeBrowserVault('cc-pinboard-id:'));
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
   // ride its membership lane — signed with the per-circle key, fanned via broadcastCircleMembership,
   // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
@@ -4255,19 +4255,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       return (kind === 'leave' || kind === 'evict') && Boolean(author) && author !== chatId.pubKey;
     }
     async function adminsOf(circleId) {
-      const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
+      const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
       return rows.filter((m) => m?.role === 'admin' && m?.webid).map((m) => m.webid);
     }
     function retellDeparture(circleId, statement, adminsBefore = null) {
       if (!circleId || !isDeparture(statement) || !membershipEmit) return;
       const kind = statement.body.kind;
       (async () => {
-        const rows = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
+        const rows = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
         const amAdmin = rows.find((m) => m?.webid === chatId.pubKey)?.role === 'admin';
         const present = new Set(rows.map((m) => m?.webid));
         const emptied = Array.isArray(adminsBefore) && adminsBefore.length > 0 && adminsBefore.every((a) => !present.has(a));
         if (!amAdmin && !emptied) return;
-        const r = await callSkill('stoop', 'broadcastCircleMembership', {
+        const r = await callSkill('pinboard', 'broadcastCircleMembership', {
           groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
         });
         console.info(`[membership-fan] retold a ${kind} in ${String(circleId).slice(0, 8)} ${amAdmin ? 'as its admin' : 'as the departure emptied its admins'}: sent ${r?.sent ?? 0}/${r?.attempted ?? 0}`);
@@ -4276,7 +4276,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipEmit = makeMembershipEmitter({
       rail: membershipRail,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
-      fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
+      fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
         // a leave or an evict is told once, with no later chance: say whom it did not reach (a probe that names its
@@ -4296,7 +4296,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         .finally(() => siblingCarry.carry({ subtype: MEMBERSHIP_BROADCAST, circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
-    // The fold's compaction verdict comes back the same road the statements went out on (L121): stoop hands
+    // The fold's compaction verdict comes back the same road the statements went out on (L121): pinboard hands
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.
     membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
@@ -4322,7 +4322,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         delegation: (scope) => deviceKitOf(selfOfOwnLane(scope))?.record ?? null,
         belongs: (scope, item) => ownLaneOf(selfOfOwnItem(item)) === scope,
       },
-      // A landed snapshot that is a noticeboard post goes to the shell's bridge (stoop's index + notification).
+      // A landed snapshot that is a noticeboard post goes to the shell's bridge (pinboard's index + notification).
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item) => {
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
@@ -4338,7 +4338,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the person's own scope has no members to fan to: it reaches their other devices by the one carry, only
       fan: (circleId, statement) => (isOwnLane(circleId)
         ? siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
-        : callSkill('stoop', 'broadcastCircleTask', {
+        : callSkill('pinboard', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
@@ -4392,7 +4392,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     });
     chatEmit = makeChatEmitter({
       rail: chatRail,
-      fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleChatStatement', {
+      fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleChatStatement', {
         groupId: circleId, event: statement, msgId: statement.body.subject, ts: Date.now(),
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
@@ -4433,7 +4433,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     }),
-    fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
+    fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
@@ -4447,14 +4447,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
       callSkill: (...a) => callSkill(...a),
     }),
-    fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
+    fan: (circleId, statement) => callSkill('pinboard', 'broadcastCircleGovernance', {
       groupId: circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ })
       .finally(() => siblingCarry.carry({ subtype: 'circle-governance-broadcast', circleId, event: statement, msgId: `policy:${statement.body.hash}`, ts: Date.now() }).catch(() => {})),
   });
   /**
    * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
-   * (stoop's `reliableSend`) AND the shells' `sendPeerMessage` (delivery receipts, replies). With a
+   * (pinboard's `reliableSend`) AND the shells' `sendPeerMessage` (delivery receipts, replies). With a
    * `circleId` the envelope is signed as the circle identity and routed over the circle's own points;
    * without one it is an ordinary hold-forward send. A second sender that did not know about circles
    * is how the receipt left as the canonical identity and was refused on arrival (2026-08-29).
@@ -4530,7 +4530,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
   // "A POST MATCHES WHAT I OFFER" — judged here, on this device, against the drivers of kind 'offering' of the self this
   // device is in that circle (a persona's circle is the persona's; no circle = the default), by the one driver matcher.
-  // A local closure the stoop agent calls: reachable by no op and no wire, so no value leaves the device. Away (the
+  // A local closure the pinboard agent calls: reachable by no op and no wire, so no value leaves the device. Away (the
   // person's one availability record, `opts.availability`) matches nothing.
   const matchesMine = async (circleId, post) => {
     try {
@@ -4541,10 +4541,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       return (await matchProfileDrivers({ properties: offerings, item: post })).length > 0;
     } catch { return false; }
   };
-  const stoopAgent = await createBrowserStoopAgent({
+  const pinboardAgent = await createBrowserPinboardAgent({
     matchesMine,
     bus,
-    identityVault: stoopIdentityVault,
+    identityVault: pinboardIdentityVault,
     // Circle-scoped spine signing (principle 5): each membership statement is signed with the PER-CIRCLE
     // identity (derived from the profile seed — same on every device of the user, never persisted), and
     // carries the member's ref (webid == the chat pubKey in the basis binding) as the signed authorRef the
@@ -4552,8 +4552,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // In a persona's circle both are the persona's: its per-circle key (`circleIdentityFor` routes through `personaOf`)
     // and its webid as the ref the roster verifies.
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: circleSelf(circleId).webid ?? chatId.pubKey }),
-    // ...and stoop's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
-    // about it arrive AS the persona (`stoopActAs`).
+    // ...and pinboard's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
+    // about it arrive AS the persona (`pinboardActAs`).
     selfWebidFor: (circleId) => circleSelf(circleId).webid,
     membershipEmit,
     membershipRead,
@@ -4565,11 +4565,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // so anything that arrived by another road is dropped too. Keys line up because in basis' binding
     // a member's actor/webid IS their chat pubKey — the address the set is keyed on.
     mutedSet: sa.mute,
-    // Bind chatAgent's pubKey as the local actor so real stoop
+    // Bind chatAgent's pubKey as the local actor so real pinboard
     // skills' `from` lookups resolve back to 'me' (admin role).
     localActor: chatId.pubKey,
-    group:      opts.stoopGroup ?? 'cc-default-circle',
-    members:    opts.stoopMembers ?? [
+    group:      opts.pinboardGroup ?? 'cc-default-circle',
+    members:    opts.pinboardMembers ?? [
       { webid: chatId.pubKey,     role: 'admin'       },
       // Demo-only phantom members — gated behind seedDemoData (OFF by default)
       // so a fresh REAL circle's roster shows only the creator + actual joiners.
@@ -4579,29 +4579,29 @@ export async function createRealHouseholdAgent(opts = {}) {
         { webid: 'webid:maria',     displayName: 'Maria', role: 'member'      },
       ] : []),
     ],
-    persistDb:  opts.stoopPersistDb,   // browser IDB; opt-in via caller
+    persistDb:  opts.pinboardPersistDb,   // browser IDB; opt-in via caller
     contentSeal,                       // its posts are content too — sealed on the way to disk
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent
     // → membership hooks no-op (the pre-S4 behaviour).
-    controlAgent: opts.stoopControlAgent,
+    controlAgent: opts.pinboardControlAgent,
     // Route circle chat fan-out through the SAME reliable choke durable circle content uses:
     // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`. This is what gives a circle chat
     // failover (`_sendWithFailover`) + offline hold-forward — the reliability the bus-local
-    // `chat.send` transport (stoop's own in-process agent) never had. The stoop skill builds a
+    // `chat.send` transport (pinboard's own in-process agent) never had. The pinboard skill builds a
     // conforming `circle-chat-message` envelope and calls this per recipient; a briefly-offline
     // member has the message HELD and flushed on reconnect, exactly like a task/noticeboard fan.
     reliableSend: (to, envelope, sendOpts = {}) => sendCircleScoped(to, envelope, sendOpts),
     // Connectivity Phase 3 — LIVE shared-pod key-custody seams (host-injected by circleApp over each
     // circle's per-circle StorageBackend + its live group-key {seal,open}). All keyed by circleId so the
-    // ONE stoop agent resolves each circle's member-side custody per call (invariant #6):
+    // ONE pinboard agent resolves each circle's member-side custody per call (invariant #6):
     //   • circleDataMove(circleId)          → the send-path data-move branch (policy.pod).
     //   • podWrite(circleId, envelope)      → seal+write a chat statement row, return its opaque pod ref
     //     (the pod-signal fan / pod-only carry). The READ side lives with the shells now (the pod chat
-    //     catch-up range-reads + verifies at the rail) — stoop no longer reads the chat pod.
+    //     catch-up range-reads + verifies at the rail) — pinboard no longer reads the chat pod.
     // Absent (opt not supplied) → fan-out-full, unchanged.
-    circleDataMove: opts.stoopCircleDataMove,
-    podWrite:       opts.stoopPodWrite,
+    circleDataMove: opts.pinboardCircleDataMove,
+    podWrite:       opts.pinboardPodWrite,
     // The per-user address-fallback setting reaches the FAN too, not only `reliableSend` below.
     // The two enforce different halves of the same choice: the fan decides WHICH address a member
     // is reached at, `reliableSend` decides which transports may carry it. Until now only the
@@ -4610,15 +4610,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     // undefined → the skills' own `true` default, i.e. no behaviour change for a host that
     // passes nothing.
     allowAddressFallback: opts.allowAddressFallback,
-    label:      'StoopAgent(cc)',
+    label:      'PinboardAgent(cc)',
   });
-  stoopAgentRef.current = stoopAgent;   // the raw contact-book reads above may run from here on
-  // Every noticeboard item the stoop store ACCEPTS fans to its circle — a request, an offer, an
+  pinboardAgentRef.current = pinboardAgent;   // the raw contact-book reads above may run from here on
+  // Every noticeboard item the pinboard store ACCEPTS fans to its circle — a request, an offer, an
   // announcement, and the next kind — through the one `circle-post` door (`noticeboardFan.js` decides from
   // the item; a received item never echoes). Installed on the store event, so no op has to remember.
-  try { stoopAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
+  try { pinboardAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
   catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
-  await chatAgent.hello(stoopAgent.address);
+  await chatAgent.hello(pinboardAgent.address);
 
   // Contacts made before the persona field existed record NONE. Write `default` onto them once — only where the
   // pair circle id PROVES it (`backfillContactPersonas`): a row whose pair circle is not the default identity's is
@@ -4627,25 +4627,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   backfillContactPersonas({
     rows: await rawContacts().catch(() => []),
     selfWebid: chatId.pubKey,
-    setPersona: (webid, persona) => rawStoop('setContactPersona', { webid, persona, personaAt: 0 }),
+    setPersona: (webid, persona) => rawPinboard('setContactPersona', { webid, persona, personaAt: 0 }),
   }).then((r) => { if (r.mismatched && typeof console !== 'undefined') console.warn(`[contact-persona] ${r.mismatched} contact row(s) not provably the default persona's — left unrecorded`); })
     .catch(() => {});
 
-  // Pre-seed the local actor's stoop handle + displayName so
-  // /stoop-profile has something to show (real getMyProfile returns
+  // Pre-seed the local actor's pinboard handle + displayName so
+  // /pinboard-profile has something to show (real getMyProfile returns
   // {entry: null} until the user first sets these).  Opts out with
-  // seedStoopProfile:false.
-  if (opts.seedStoopProfile !== false) {
+  // seedPinboardProfile:false.
+  if (opts.seedPinboardProfile !== false) {
     try {
-      if (opts.stoopHandle) {
-        await chatAgent.invoke(stoopAgent.address, 'setMyHandle', [DataPart({ handle: opts.stoopHandle })]);
+      if (opts.pinboardHandle) {
+        await chatAgent.invoke(pinboardAgent.address, 'setMyHandle', [DataPart({ handle: opts.pinboardHandle })]);
       }
-      if (opts.stoopDisplayName) {
-        await chatAgent.invoke(stoopAgent.address, 'setMyDisplayName', [DataPart({ displayName: opts.stoopDisplayName })]);
+      if (opts.pinboardDisplayName) {
+        await chatAgent.invoke(pinboardAgent.address, 'setMyDisplayName', [DataPart({ displayName: opts.pinboardDisplayName })]);
       }
     } catch (err) {
       if (typeof console !== 'undefined') {
-        console.warn('[realAgent] seed stoop profile failed:', err.message ?? err);
+        console.warn('[realAgent] seed pinboard profile failed:', err.message ?? err);
       }
     }
   }
@@ -4653,15 +4653,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Pre-seed 3 demo posts so /feed has content out of the box.  DEMO-ONLY
   // (the posts name the demo members) — a real circle starts with an empty
   // feed, so this is gated behind the opt-in seedDemoData flag (OFF by
-  // default).  seedStoopPosts:false remains an independent opt-out.
+  // default).  seedPinboardPosts:false remains an independent opt-out.
   //
-  // Perf #1 (2026-05-30): skip when stoop already has open posts
+  // Perf #1 (2026-05-30): skip when pinboard already has open posts
   // (warm-boot after persisted storage).  One listOpen probe avoids 3
   // sequential postRequest round-trips that were blocking every boot.
-  if (seedDemoData && opts.seedStoopPosts !== false) {
+  if (seedDemoData && opts.seedPinboardPosts !== false) {
     let alreadySeeded = false;
     try {
-      const probe = await chatAgent.invoke(stoopAgent.address, 'listOpen', [DataPart({})]);
+      const probe = await chatAgent.invoke(pinboardAgent.address, 'listOpen', [DataPart({})]);
       const data  = Array.isArray(probe) ? probe[0]?.data : null;
       const items = Array.isArray(data?.items) ? data.items : [];
       alreadySeeded = items.length > 0;
@@ -4674,10 +4674,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       ];
       for (const seed of SEED_POSTS) {
         try {
-          await chatAgent.invoke(stoopAgent.address, 'postRequest', [DataPart(seed)]);
+          await chatAgent.invoke(pinboardAgent.address, 'postRequest', [DataPart(seed)]);
         } catch (err) {
           if (typeof console !== 'undefined') {
-            console.warn('[realAgent] seed stoop post failed:', err.message ?? err);
+            console.warn('[realAgent] seed pinboard post failed:', err.message ?? err);
           }
         }
       }
@@ -4696,7 +4696,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * stay deferred per the slice-4 scope reduction).
    *
    * Separate identity vault prefix (`cc-folio-id:`) so folio's web
-   * identity is isolated from chat / tasks / stoop (decision #2).
+   * identity is isolated from chat / tasks / pinboard (decision #2).
    * podRoot is reserved — when basis lands real pod-attached
    * folio writes (mobile), pass `opts.folioPodRoot` so
    * shareFolder tokens carry the real pod URI.
@@ -4729,7 +4729,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *                    `.app` is `'tasks'`, and the catalogue keys ops
    *                    by `m.app`.  The directory / npm package
    *                    (`@onderling-app/tasks`) keep their names.
-   *   - 'stoop'      → stoopAgent.address (slice-2b NeighbourhoodAgent)
+   *   - 'pinboard'      → pinboardAgent.address (slice-2b NeighbourhoodAgent)
    *   - 'folio'      → folioAgent.address (slice-4 web-only agent)
    *
    * Some opIds are renamed across the boundary (the chat surface
@@ -4746,7 +4746,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     listMine: 'listOpen',
     // F1 circle content (5.3) — `loadCircleItems` reads a circle's
     // tasks via the unique source op `getMyTasks` (no app defines it,
-    // so `makeResolvingCallSkill` probes past stoop/household and lands
+    // so `makeResolvingCallSkill` probes past pinboard/household and lands
     // here).  Map to listOpen scoped to the resolved circle (= circle).
     getMyTasks: 'listOpen',
     // briefSummary / searchTasks: tasks-v0 doesn't expose these as
@@ -4774,9 +4774,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /**
-   * Stoop opId aliases — chat-shell vocabulary → real skill name.
-   *   /feed       → listOpen     (no `listFeed` in real stoop)
-   *   /stoop-profile → getMyProfile
+   * Pinboard opId aliases — chat-shell vocabulary → real skill name.
+   *   /feed       → listOpen     (no `listFeed` in real pinboard)
+   *   /pinboard-profile → getMyProfile
    *
    * Part G dissolve (2026-06-17) — the `revealPeer → setPeerReveal`
    * alias was DROPPED: the `revealPeer` op no longer exists (the
@@ -4785,10 +4785,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    * `peer→peerWebid` + `action→reveal` value transforms below STAY.
    *
    * F1 circle content (5.3d) — `loadCircleItems` reads a circle's
-   * stoop posts via the source ops `getBulletin` / `getFeed`.  Stoop
+   * pinboard posts via the source ops `getBulletin` / `getFeed`.  Pinboard
    * has neither as a real skill; both are aspirational names in
    * `circleContent.DEFAULT_SOURCES`.  `makeResolvingCallSkill` probes
-   * stoop first (`DEFAULT_CIRCLE_ORIGINS`), so aliasing `getBulletin`
+   * pinboard first (`DEFAULT_CIRCLE_ORIGINS`), so aliasing `getBulletin`
    * here lands the call on the real `listOpen` per-circle reader.
    * `getFeed` stays un-aliased so the resolver falls through every
    * origin → null → no duplicate items (otherwise both source ops
@@ -4796,7 +4796,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * twice).  Same alias pattern tasks-v0 uses for
    * `getMyTasks → listOpen` above.
    */
-  // The alias table lives in `stoopOpAliases.js` — the circle scope reads the same one.
+  // The alias table lives in `pinboardOpAliases.js` — the circle scope reads the same one.
 
   // 2026-05-24 — retry-on-HI-race now lives in secure-agent's
   // sendToPeer (task). sa.peer.sendTo handles it transparently.
@@ -4836,7 +4836,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           myCircleIds: () => _listMyKnownCircles(),
           rosterOf: async (circleId) => {
             const reply = await chatAgent.invoke(
-              stoopAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })], stoopActAs({ groupId: circleId }),
+              pinboardAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })], pinboardActAs({ groupId: circleId }),
             );
             return reply?.[0]?.data?.members ?? [];
           },
@@ -4850,7 +4850,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /**
-   * A noticeboard item stoop just accepted goes into the CIRCLE's store — and the store's own mirror carries
+   * A noticeboard item pinboard just accepted goes into the CIRCLE's store — and the store's own mirror carries
    * it (a signed task-lane snapshot, fanned + catch-up served). This retired the second sync
    * implementation (a `circle-post` envelope fanned by hand, 2026-08-30 — option B). Which items qualify is
    * `noticeboardFan.js`'s decision; the canonical shape the store's registry needs is `noticeboardCarry.js`'s.
@@ -4890,7 +4890,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   async function _listMyKnownCircles(asSelf = null) {
     try {
       const result = await chatAgent.invoke(
-        stoopAgent.address, 'listMyCircles', [DataPart({})], asSelf ? { actAs: asSelf } : {},
+        pinboardAgent.address, 'listMyCircles', [DataPart({})], asSelf ? { actAs: asSelf } : {},
       );
       const circles = result?.[0]?.data?.circles ?? [];
       return Array.isArray(circles) ? circles : [];
@@ -4901,7 +4901,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   /**
    * F1 5.3d — read the post's first `kind:'group'` target groupId
-   * off the substrate item.  Stoop persists per-call targets under
+   * off the substrate item.  Pinboard persists per-call targets under
    * `source.targets[]`; basis's circle-scope filter
    * (`circleScope.itemCircleId`) reads top-level `item.groupId`.
    * The listOpen-reply adapter uses this to bridge the two.
@@ -5016,12 +5016,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     : (typeof ctx?.caller === 'string' && ctx.caller ? ctx.caller : (typeof ctx?.actAs === 'string' && ctx.actAs ? ctx.actAs : null)));
   /** A circle's people as the chore rules read them: its folded roster, by ref, with their handle and role. */
   async function circlePeople(circleId) {
-    const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
+    const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     return (Array.isArray(r?.members) ? r.members : []).filter((m) => m?.webid).map((m) => ({ webid: m.webid, displayName: m.handle ?? m.displayName ?? null, role: m.role ?? null, channel: 'circle' }));
   }
 
   /** The household's book: every contact the bot keeps (its people, by the door they came in through). */
-  const contactsBook = () => callSkill('stoop', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
+  const contactsBook = () => callSkill('pinboard', 'listContacts', {}).then((r) => (Array.isArray(r) ? r : (r?.contacts ?? r?.items ?? []))).catch(() => []);
 
   /**
    * The people a door's person may name, and whether they may: in a circle the bot joined, its roster (whose handles are
@@ -5716,11 +5716,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return adapted;
     }
-    if (appOrigin === 'stoop') {
+    if (appOrigin === 'pinboard') {
       // Derived: briefSummary builds a summary from listOpen since
-      // stoop doesn't expose its own briefSummary skill.
-      if (opId === 'briefSummary' || opId === 'stoop_briefSummary') {
-        const list = await callSkill('stoop', 'listFeed', {});
+      // pinboard doesn't expose its own briefSummary skill.
+      if (opId === 'briefSummary' || opId === 'pinboard_briefSummary') {
+        const list = await callSkill('pinboard', 'listFeed', {});
         const items = list?.items ?? [];
         if (items.length === 0) return { ok: true };   // empty → /brief skips
         const tr = agentT;
@@ -5729,11 +5729,11 @@ export async function createRealHouseholdAgent(opts = {}) {
           message: tr('circle.noticeboard.brief', { count: items.length }),
         };
       }
-      // Derived: searchPosts (no dedicated skill in stoop today).
+      // Derived: searchPosts (no dedicated skill in pinboard today).
       if (opId === 'searchPosts') {
         const q = String(args?.query ?? '').toLowerCase();
         if (!q) return { items: [] };
-        const list = await callSkill('stoop', 'listFeed', {});
+        const list = await callSkill('pinboard', 'listFeed', {});
         const hits = (list?.items ?? []).filter((p) =>
           String(p.text ?? p.label ?? '').toLowerCase().includes(q),
         );
@@ -5741,8 +5741,8 @@ export async function createRealHouseholdAgent(opts = {}) {
           items: hits.map((p) => ({ id: p.id, label: p.text ?? p.label, type: 'post' })),
         };
       }
-      const realOpId = STOOP_OP_ALIAS[opId] ?? opId;
-      // Arg normalisation between chat-shell vocabulary + real stoop.
+      const realOpId = PINBOARD_OP_ALIAS[opId] ?? opId;
+      // Arg normalisation between chat-shell vocabulary + real pinboard.
       let realArgs = args ?? {};
       if (realOpId === 'setPeerReveal') {
         // Chat-shell sends {peer, action: 'on'/'off'}; real takes
@@ -5767,7 +5767,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
       }
       // Chat-shell trust enums use English ('known' / 'trusted');
-      // stoop's underlying skill persists Dutch ('bekend' / 'vertrouwd').
+      // pinboard's underlying skill persists Dutch ('bekend' / 'vertrouwd').
       // Translate at the boundary so the chat surface stays EN-first.
       const TRUST_EN_TO_NL = { known: 'bekend', trusted: 'vertrouwd' };
       if (realOpId === 'listContacts') {
@@ -5797,7 +5797,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (realOpId === 'getContactShareQr') {
         // 2026-05-27 — inject the chat-shell's current NKN peer
         // address into the card so the scanner can DM straight back
-        // (no pod lookup needed).  The stoop substrate has no NKN
+        // (no pod lookup needed).  The pinboard substrate has no NKN
         // identity of its own; only the chat-layer secure-agent does.
         // …gated by the user's publication lock: a contact card is the single most travelled copy of
         // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
@@ -5819,7 +5819,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
         );
         // A PERSONA's card: its own chat address (its socket's), its own person key and chain, the relays IT is on — and the
-        // card is asked AS it (`stoopActAs`), so nothing of the default rides along.
+        // card is asked AS it (`pinboardActAs`), so nothing of the default rides along.
         const cardPersona = typeof realArgs.persona === 'string' && realArgs.persona !== 'default' ? personas.get(realArgs.persona) : null;
         if (realArgs.persona && realArgs.persona !== 'default' && !cardPersona?.chatId) return { error: 'no-such-persona' };
         if (cardPersona) {
@@ -5855,7 +5855,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
       }
-      // F1 5.3d — per-circle posts.  Stoop's browser bundle in
+      // F1 5.3d — per-circle posts.  Pinboard's browser bundle in
       // basis runs single-group (`cc-default-circle`); the
       // substrate's `postRequest` falls back to that bundle groupId
       // when `args.targets` is empty, so a per-call `groupId` (from
@@ -5883,7 +5883,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (REQUIRES_GROUP_ID.has(realOpId) && !realArgs.groupId) {
         realArgs = {
           ...realArgs,
-          groupId: opts.stoopGroup ?? 'cc-default-circle',
+          groupId: opts.pinboardGroup ?? 'cc-default-circle',
         };
       }
       // Identity 5B/C — present THIS device's per-circle ADDRESS
@@ -5912,40 +5912,40 @@ export async function createRealHouseholdAgent(opts = {}) {
       // invoke for member count.
       if (realOpId === 'getCurrentGroup') {
         const membersResult = await chatAgent.invoke(
-          stoopAgent.address, 'listGroupMembers',
-          [DataPart({ groupId: opts.stoopGroup ?? 'cc-default-circle' })],
+          pinboardAgent.address, 'listGroupMembers',
+          [DataPart({ groupId: opts.pinboardGroup ?? 'cc-default-circle' })],
         );
         const members = membersResult?.[0]?.data?.members ?? [];
         const tr = agentT;
         return {
           title:       tr('circle.groups.current_title'),
-          groupId:     opts.stoopGroup ?? 'cc-default-circle',
+          groupId:     opts.pinboardGroup ?? 'cc-default-circle',
           memberCount: members.length,
           mode:        tr('circle.groups.single_mode'),
           note:        tr('circle.groups.current_note'),
         };
       }
-      let rawReply = null;   // the stoop reply before shaping — the own-devices fan below reads the contact row
-      const runStoop = async () => {
+      let rawReply = null;   // the pinboard reply before shaping — the own-devices fan below reads the contact row
+      const runPinboard = async () => {
         const parts = [DataPart(realArgs)];
-        const result = await chatAgent.invoke(stoopAgent.address, realOpId, parts, stoopActAs(realArgs));
+        const result = await chatAgent.invoke(pinboardAgent.address, realOpId, parts, pinboardActAs(realArgs));
         const first  = Array.isArray(result) ? result[0] : null;
         let reply    = first?.data ?? null;
-        // THE DEVICE'S CIRCLES are every self's: stoop answers `listMyCircles` for its caller, so the person's list (the
+        // THE DEVICE'S CIRCLES are every self's: pinboard answers `listMyCircles` for its caller, so the person's list (the
         // launcher, the circle switcher, every shell) is the default's answer merged with each persona's — a circle
         // founded or joined as a persona stays in the person's list. (Internal reads that must stay the default's —
-        // what the default's names are told to — ask stoop directly, not through here.)
+        // what the default's names are told to — ask pinboard directly, not through here.)
         if (realOpId === 'listMyCircles' && reply && Array.isArray(reply.circles)) reply = await withPersonaCircles(reply, parts);
         rawReply = reply;
-        // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
+        // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the pinboard
         // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
-        return adaptStoopReply(opId, reply, realArgs);
+        return adaptPinboardReply(opId, reply, realArgs);
       };
       // The three roster reads share one answer per circle for a short window (every lane asks at boot,
-      // the verifier per statement — see rosterReadCache.js); any other stoop op may have changed a
+      // the verifier per statement — see rosterReadCache.js); any other pinboard op may have changed a
       // roster and clears it.
-      if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runStoop);
-      const out = await runStoop();
+      if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runPinboard);
+      const out = await runPinboard();
       rosterReads.afterWrite(realOpId);
       // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
       // is a contact on the person's other devices too. Best-effort and after success.
@@ -6086,7 +6086,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // block above).  Routing lives HERE in the shared agent (invariant #1) so
       // web + mobile both reach it through the bare `agent.callSkill`.  The
       // thin reply adapter below is presentation-only (same licence as the
-      // stoop adapter): the cores return the registry vocabulary
+      // pinboard adapter): the cores return the registry vocabulary
       // ({agents:[…]} / {agent}), the chat-shell renderer expects
       // {items:[{id,label,…}]} for shape:'list' and a flat record payload for
       // shape:'record'.
@@ -6755,7 +6755,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /**
-   * Bridge real stoop reply shapes → basis's chat-shell
+   * Bridge real pinboard reply shapes → basis's chat-shell
    * expectations.  Mock-era shapes the chat renderer was built
    * against:
    *   postRequest     → {ok, message, itemId, _sync}
@@ -6763,7 +6763,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *   getMyProfile    → {title, handle, displayName, circle, ...}
    *   setPeerReveal   → {ok, message, peer, action}
    */
-  function adaptStoopReply(opId, data, args) {
+  function adaptPinboardReply(opId, data, args) {
     if (data == null) return null;
     // In the person's words: every shell hands the agent its translator.
     const tr = agentT;
@@ -6796,13 +6796,13 @@ export async function createRealHouseholdAgent(opts = {}) {
           ...p,
           label: p.text ?? p.label ?? p.id,
           // chat-shell appliesTo gate matches on
-          // `item.type`.  Stoop posts are 'post' in the chat-shell
+          // `item.type`.  Pinboard posts are 'post' in the chat-shell
           // vocabulary (mockManifests respondToItem + markReturned
           // both gate `type: 'post'`).  Substrate item.type carries
           // the canonical 'request'|'offer'|'report' taxonomy, so we
           // map them all to chat-shell 'post' here.
           type:  'post',
-          // Chat-shell convention: `state: open|done`.  Stoop posts
+          // Chat-shell convention: `state: open|done`.  Pinboard posts
           // are "open" while addedBy is set + not closed; "done"
           // when there's a `closedAt`.
           state: p.closedAt ? 'done' : 'open',
@@ -6823,13 +6823,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     // getMyProfile: real returns {entry: {handle, displayName, ...}|null}
     // → adapt to {title, handle, displayName, circle}.
-    if (opId === 'getStoopProfile') {
+    if (opId === 'getPinboardProfile') {
       const e = data.entry ?? {};
       return {
         title:       tr('circle.noticeboard.profile_title'),
         handle:      e.handle ?? null,
         displayName: e.displayName ?? null,
-        circle:       opts.stoopGroup ?? 'cc-default-circle',
+        circle:       opts.pinboardGroup ?? 'cc-default-circle',
       };
     }
     // setPeerReveal: real returns {} on success → adapt to chat shape.
@@ -6868,7 +6868,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     // listContacts: real returns {contacts: [...]} → chat-shell {items: [...]}.
     // Each contact carries {webid, displayName?, handle?, trustLevel?, tags?, ...};
-    // surface displayName || handle || webid as the label.  Stoop
+    // surface displayName || handle || webid as the label.  Pinboard
     // persists trustLevel in Dutch ('bekend'/'vertrouwd'); we translate
     // to EN for the chat surface.
     const TRUST_NL_TO_EN = { bekend: 'known', vertrouwd: 'trusted' };
@@ -6880,7 +6880,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         })));
       }
       return {
-        // The book's own rows, under the name both shells' Contacten roster reads (`stoopContactToRow` was
+        // The book's own rows, under the name both shells' Contacten roster reads (`pinboardContactToRow` was
         // written for this shape: displayName, the Dutch trust words). Until 2026-09-18 only the chat-shell
         // `items` below were returned, so a person added from a card — the seeded contact included — was in
         // the book and on no screen: the roster read `contacts`, found nothing, and said "No contacts yet".
@@ -7288,17 +7288,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `/zoek` to lexical-only. Rebuilds the note index on the next `/zoek`
     // when the embedder identity changes.
     setFolioNoteEmbedder: (e) => folioAgent.setNoteEmbedder?.(e) ?? null,
-    // S4 — route stoop's items to the user's REAL pod on sign-in (parity with folio/
-    // calendar). Delegates to the stoop agent's attachPod (builds a SolidPodSource +
+    // S4 — route pinboard's items to the user's REAL pod on sign-in (parity with folio/
+    // calendar). Delegates to the pinboard agent's attachPod (builds a SolidPodSource +
     // activates the already-built pod-routing write-through). Pass {podRoot, webid, fetch}.
-    attachStoopPod: (opts) => (typeof stoopAgent?.attachPod === 'function' ? stoopAgent.attachPod(opts) : Promise.resolve({ ok: false })),
-    detachStoopPod: () => stoopAgent?.detachPod?.(),
-    // S6.4 — subscribe to events the inner stoop agent emits (e.g.
-    // 'stoop:attachment-fetched' when a recipient's requested attachment bytes
-    // arrive over the 1:1 channel). The stoop agent extends core.Emitter
-    // (on/off). Returns an unsubscribe fn; a no-op when stoop isn't composed.
-    onStoopEvent: (event, handler) => {
-      const a = stoopAgent?.bundle?.agent;
+    attachPinboardPod: (opts) => (typeof pinboardAgent?.attachPod === 'function' ? pinboardAgent.attachPod(opts) : Promise.resolve({ ok: false })),
+    detachPinboardPod: () => pinboardAgent?.detachPod?.(),
+    // S6.4 — subscribe to events the inner pinboard agent emits (e.g.
+    // 'pinboard:attachment-fetched' when a recipient's requested attachment bytes
+    // arrive over the 1:1 channel). The pinboard agent extends core.Emitter
+    // (on/off). Returns an unsubscribe fn; a no-op when pinboard isn't composed.
+    onPinboardEvent: (event, handler) => {
+      const a = pinboardAgent?.bundle?.agent;
       if (!a || typeof a.on !== 'function' || typeof handler !== 'function') return () => {};
       a.on(event, handler);
       return () => { try { a.off?.(event, handler); } catch { /* defensive */ } };
@@ -7371,7 +7371,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // calls enableSecureRendezvous for the common case; these stay exposed for
     // the Nearby/mDNS path + diagnostics.
     addSecureTransport:     sa.addSecureTransport,
-    /** The roster-read window at the stoop waist; a shell that lands a membership statement outside the waist clears it here. */
+    /** The roster-read window at the pinboard waist; a shell that lands a membership statement outside the waist clears it here. */
     rosterReads,
     removeSecureTransport:  sa.removeSecureTransport,
     enableSecureRendezvous: sa.enableSecureRendezvous,
@@ -7790,7 +7790,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     heldCircleStores: async () => {
       const ids = new Set(homeCircleId && homeCircleId !== 'household' ? [homeCircleId] : []);
       try {
-        for (const c of ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? [])) {
+        for (const c of ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [])) {
           const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
           if (typeof id === 'string' && id && id !== 'household') ids.add(id);
         }
@@ -7849,7 +7849,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return out.sort((a, b) => (a.id === 'default' ? -1 : b.id === 'default' ? 1 : 0));
     },
-    /** WHO this device is in a circle (its persona): `{ webid, sendAs, personKey }` — the redeem and stoop's "me" read it. */
+    /** WHO this device is in a circle (its persona): `{ webid, sendAs, personKey }` — the redeem and pinboard's "me" read it. */
     circleSelf,
     circleSealingKeyPairFor,   // this device's per-circle sealing keypair (the address key's ed2curve image)
     historyKeyChainFor,   // group-key versions absorbed at a replace ceremony (the history sidecar)
@@ -8003,7 +8003,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         selfKeys: [selfCircleKey].filter(Boolean),
         // …and our WEBID, because a founder's own row can carry a pubKey that is neither of those:
         // `deriveRoster` gives a founder no keys, so the row comes from the display cache and brings
-        // this device's stoop identity with it. Without this the row reads as a stranger's.
+        // this device's pinboard identity with it. Without this the row reads as a stranger's.
         selfWebid: chatId.pubKey,
       });
     },
@@ -8055,25 +8055,25 @@ export async function createRealHouseholdAgent(opts = {}) {
       else mountedLocalApps.delete(appOrigin);
     },
   };
-  // (Run HERE, at the END of boot: from its old place it raced boot — it reads stoop's circle list and writes through the
+  // (Run HERE, at the END of boot: from its old place it raced boot — it reads pinboard's circle list and writes through the
   // waist, and a heal that got there before either existed read nothing or wrote nothing, silently.)
   // Every circle this device is in belongs on the restore list. A create writes its record after answering; one
   // that did not land (an agents store that was down) is written here, at the next boot. Not awaited: boot does
   // not wait on it, and each write is bounded.
   healRestoreList({
-    circleIds: async () => circleIdsFrom(await rawStoop('listMyCircles', {}))
+    circleIds: async () => circleIdsFrom(await rawPinboard('listMyCircles', {}))
       .filter((id) => id && id !== 'household' && id !== tasksPrimaryCircleId),
     memberships: () => readSelfCircleMemberships(),
     addressFor: circleAddressFor,
     write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, address }),
     log: (msg) => { if (typeof console !== 'undefined') console.warn(msg); },
   }).catch(() => { /* the next boot tries again */ });
-  // ...and each persona's, over ITS circles (stoop asked AS it), ITS record and ITS address — written under its own
+  // ...and each persona's, over ITS circles (pinboard asked AS it), ITS record and ITS address — written under its own
   // profile, which also gives the circle back its binding when the record was what had gone missing.
   for (const [pid, rt] of personas) {
     if (pid === 'default' || !rt?.chatId?.pubKey) continue;
     healRestoreList({
-      circleIds: async () => circleIdsFrom((await chatAgent.invoke(stoopAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null),
+      circleIds: async () => circleIdsFrom((await chatAgent.invoke(pinboardAgentRef.current.address, 'listMyCircles', [DataPart({})], { actAs: rt.chatId.pubKey }))?.[0]?.data ?? null),
       memberships: async () => circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {}),
       addressFor: (circleId) => rt.circleAddressFor(circleId),
       write: (circleId, address) => callSkill('agents', 'setProfileCircleMembership', { id: pid, circleId, address }),

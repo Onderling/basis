@@ -3,7 +3,7 @@
   "version":     "0.1.0",
   "private":     true,
   "type":        "module",
-  "description": "SP-4b + SP-11(+11b) recombination demo — household + tasks-v0 (multi-circle) + stoop composed in one @canopy/manifest-host, driven by a chat-agent with a mocked LLM. Proves: cross-app tool dispatch, multi-circle isolation through the host, namespaced (appId.opId) routing, 3-app collision-free composition, and a canonical cross-app embeds:[{type,ref}] reference resolved across apps.",
+  "description": "SP-4b + SP-11(+11b) recombination demo — household + tasks-v0 (multi-circle) + pinboard composed in one @canopy/manifest-host, driven by a chat-agent with a mocked LLM. Proves: cross-app tool dispatch, multi-circle isolation through the host, namespaced (appId.opId) routing, 3-app collision-free composition, and a canonical cross-app embeds:[{type,ref}] reference resolved across apps.",
   "scripts": {
     "start": "node index.js",
     "test":  "vitest run"
@@ -17,7 +17,7 @@
     "@canopy/circles":       "file:../../packages/circles",
     "@canopy-app/household": "file:../../apps/household",
     "@canopy-app/tasks-v0":  "file:../../apps/tasks-v0",
-    "@canopy-app/stoop":     "file:../../apps/stoop"
+    "@canopy-app/pinboard":     "file:../../apps/pinboard"
   },
   "devDependencies": {
     "vitest": "^2.1.9"

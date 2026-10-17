@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
+import { mockTasksManifest, mockPinboardManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
 import { basisManifest } from '../../manifest.js';
 import { householdManifest } from '../../../household/manifest.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -19,7 +19,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const bundle = (lang) => JSON.parse(readFileSync(path.join(HERE, `../../src/locales/circle.${lang}.json`), 'utf8'));
 const resolve = (b, key) => key.replace(/^circle\./, '').split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), b);
 
-const MANIFESTS = { basis: basisManifest, tasks: mockTasksManifest, household: householdManifest, stoop: mockStoopManifest, folio: mockFolioManifest, calendar: calendarManifest, lists: listsManifest, agents: agentsManifest };
+const MANIFESTS = { basis: basisManifest, tasks: mockTasksManifest, household: householdManifest, pinboard: mockPinboardManifest, folio: mockFolioManifest, calendar: calendarManifest, lists: listsManifest, agents: agentsManifest };
 
 describe('every row-action button an op declares has a translated label in both languages', () => {
   const nl = bundle('nl'); const en = bundle('en');

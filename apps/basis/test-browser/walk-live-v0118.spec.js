@@ -40,8 +40,8 @@ async function boot(browser, label) {
   await page.waitForTimeout(6000);   // let the relay dial + the boot kicks run
   return { ctx, page, label };
 }
-const myCircles = async (page) => (await call(page, 'stoop', 'listMyCircles', {}))?.circles ?? [];
-const rosterOf = async (page, gid) => ((await call(page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? []);
+const myCircles = async (page) => (await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [];
+const rosterOf = async (page, gid) => ((await call(page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? []);
 
 test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclosure lands', async ({ browser }) => {
   test.setTimeout(600_000);
@@ -49,8 +49,8 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
   const B = await boot(browser, 'B(other person)');
   let A2 = null;
   try {
-    const aWho = await call(A.page, 'stoop', 'whoAmI', {});
-    const bWho = await call(B.page, 'stoop', 'whoAmI', {});
+    const aWho = await call(A.page, 'pinboard', 'whoAmI', {});
+    const bWho = await call(B.page, 'pinboard', 'whoAmI', {});
     expect(aWho?.webid, 'A has an identity').toBeTruthy();
     expect(bWho?.webid, 'B has an identity').toBeTruthy();
     expect(aWho.webid).not.toBe(bWho.webid);
@@ -94,7 +94,7 @@ test('v0.1.18 on the live build: a leave travels, a leave follows, and a disclos
     await expect.poll(() => A2.page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 60_000 }).toBe(true);
     const a2In = await until(async () => ((await myCircles(A2.page)).includes(gid) ? true : null), { timeout: 90_000 });
     expect(a2In, "A's second device consumed the offer and is in the circle").toBe(true);
-    const a2Who = await call(A2.page, 'stoop', 'whoAmI', {});
+    const a2Who = await call(A2.page, 'pinboard', 'whoAmI', {});
     expect(a2Who?.webid, 'the second device is the SAME person').toBe(aWho.webid);
     log('STEP3 A enrols a second device', 'PASS', 'same person, in the circle');
 

@@ -2,7 +2,7 @@
 
 This confirms the first-match-wins semantics. The renderGate that compiles manifest `match` blocks into ordered rules is the consumer; cross-app ordering is determined by manifest registration order. I have everything needed. Let me produce the plan.
 
-I've verified all load-bearing claims against the live main-tree files: the canonical `match` block shape (`verbs`/`body`/`arg`/`dropTrailing`, multiword phrases as token arrays), the `pickerSource:{listOp}` param convention, the three broken stoop blocks (`signOutOfPod` body:'reject' @1011, `markReturned` @660-676, `reportPost` @1026-1039, `getItemTree` @980-991, `listOpen` type-only @1058), and first-match-wins in tokenGate. Here is the plan.
+I've verified all load-bearing claims against the live main-tree files: the canonical `match` block shape (`verbs`/`body`/`arg`/`dropTrailing`, multiword phrases as token arrays), the `pickerSource:{listOp}` param convention, the three broken pinboard blocks (`signOutOfPod` body:'reject' @1011, `markReturned` @660-676, `reportPost` @1026-1039, `getItemTree` @980-991, `listOpen` type-only @1058), and first-match-wins in tokenGate. Here is the plan.
 
 ---
 
@@ -45,7 +45,7 @@ match: {
 }
 ```
 
-### Stoop app
+### Pinboard app
 
 **`postRequest`** (~line 567) — bare `share`/`deel` **DROPPED** (collision → folio). Add match block:
 ```js

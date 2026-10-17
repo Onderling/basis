@@ -272,7 +272,7 @@ export const householdManifest = {
       id:        'claim',
       verb:      'claim',
       writes: { scope: 'circle' },
-      appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/stoop)
+      appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/pinboard)
       // DECLARATION LAYER (#34) — grabbing a household task writes `assignee` under the CLAIM policy
       // (first-wins). Same declared (task, assignee)→claim the receiver enforces for every app's task.
       resolves: [{ field: 'assignee', policy: 'claim' }],
@@ -356,7 +356,7 @@ export const householdManifest = {
       // a bare address). The circle is PICKED from the person's own circles — the form paints the pick-list from the
       // param's pickerSource, skipped when there is only one. Reached from Me → Scan.
       params: [
-        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'stoop' } },
+        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'pinboard' } },
         { name: 'addr',   kind: 'string', required: true },
       ],
       surfaces: {},

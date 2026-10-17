@@ -47,7 +47,7 @@ export async function bootAnnouncingBox({ t, tz, people, now = Date.now }) {
   const own = (a, o, x, ctx) => agent.callSkill(a, o, x, ctx);
   await ensureHouseholdLists({ callSkill: (a, o, x) => own(a, o, x), t });
   for (const p of people) {
-    await own('stoop', 'addContact', { webid: p.id, channel: 'telegram', role: p.role, displayName: p.name });
+    await own('pinboard', 'addContact', { webid: p.id, channel: 'telegram', role: p.role, displayName: p.name });
     await agent.setDoorCaller(p.id, p.role);
   }
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore() });

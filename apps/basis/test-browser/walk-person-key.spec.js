@@ -19,7 +19,7 @@ import { call, nameMe, becomeContacts, whoAmI } from './contactsWalk.js';
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-const contactKey = async (page, webid) => ((((r) => r?.contacts ?? r?.items ?? [])(await call(page, 'stoop', 'listContacts', {})))
+const contactKey = async (page, webid) => ((((r) => r?.contacts ?? r?.items ?? [])(await call(page, 'pinboard', 'listContacts', {})))
   .find((c) => c.webid === webid)?.personKey ?? null);
 /** Does this device hold a turn with `text` in its thread with `contactId`? The DURABLE thread, not the screen — so
  *  "does not" means it never arrived readable, not that the pane was closed. */
@@ -62,7 +62,7 @@ test('B revokes a device: A\'s next message to B is sealed to the new version �
     log('SETUP A + B on two devices, contacts, B2 reads', 'PASS', `B2 = ${String(enrolled.deviceId).slice(0, 10)}…`);
 
     // B1 revokes B2
-    const circles = ((await call(B1.page, 'stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
+    const circles = ((await call(B1.page, 'pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
     const revoked = await call(B1.page, 'household', 'revokeDevice', { mnemonic: phrase, deviceId: enrolled.deviceId, circleIds: circles });
     expect(revoked?.ok, JSON.stringify(revoked).slice(0, 300)).toBe(true);
     log('STEP1 B1 revoked B2', 'PASS', '');

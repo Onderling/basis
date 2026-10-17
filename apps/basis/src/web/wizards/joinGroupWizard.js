@@ -18,16 +18,16 @@
  *           in sequence; on success closes the panel + emits success.
  *
  * Substrate skills exercised:
- *   stoop.getGroupRules      → step 1's rules text
- *   stoop.redeemInviteWithGate → step 3's gated redeem (writes
+ *   pinboard.getGroupRules      → step 1's rules text
+ *   pinboard.redeemInviteWithGate → step 3's gated redeem (writes
  *                                rules-accept audit item)
- *   stoop.setMyHandle        → step 3's handle binding
- *   stoop.redeemInvite       → step 3's actual GroupManager redeem
+ *   pinboard.setMyHandle        → step 3's handle binding
+ *   pinboard.redeemInvite       → step 3's actual GroupManager redeem
  *
  * Args expected: `{ invite: <string|object> }`.  String form is the
  * `onderling-invite://<base64url-encoded-invite-object>` URL surfaced by
  * the QR rendering in /invite (A9, 7). Object form: the
- * already-decoded invite per stoop's GroupManager.issueInvite shape.
+ * already-decoded invite per pinboard's GroupManager.issueInvite shape.
  */
 
 // State-machine pieces (decodeInvite, summariseEmbeddedRules,

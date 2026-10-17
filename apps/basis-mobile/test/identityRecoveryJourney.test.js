@@ -29,7 +29,7 @@ import { readCustodyMode } from '../../basis/src/core/agent/ownerRootCustody.js'
 import { bootAgentBundle } from '../src/core/agentBundle.js';
 import { restoreFromMnemonic } from '../src/core/restoreFromMnemonic.js';
 
-// A real boot stands up the whole household/tasks/stoop/folio chain; generous but bounded.
+// A real boot stands up the whole household/tasks/pinboard/folio chain; generous but bounded.
 const BOOT_TIMEOUT = 60000;
 
 // Several circles, because one address proves nothing about per-circle derivation: the failure we are

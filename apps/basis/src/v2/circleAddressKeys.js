@@ -120,7 +120,7 @@ export function hasProvenCircleAddress(member) {
  * with no visible cause.
  *
  * @param {object} a
- * @param {Array<object>} a.members   roster rows (`stoop listGroupMembers`) — `{pubKey, circleAddress}`
+ * @param {Array<object>} a.members   roster rows (`pinboard listGroupMembers`) — `{pubKey, circleAddress}`
  * @param {(address: string, pubKey: string) => any} a.registerPeerAddress
  *   the agent seam (`agent.registerPeerAddress`); absent ⇒ nothing is bound and `{bound: 0}` is returned,
  *   which is the honest degradation on a host that has no secure agent wired.

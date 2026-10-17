@@ -4,9 +4,9 @@
 //   1. App cold-boots without redbox
 //   2. "Agents ready — 6 apps" appears
 //   3. Expanding the debug section shows all 6 NavModel rows
-//      (basis, household, tasks-v0, stoop, folio, calendar)
+//      (basis, household, tasks-v0, pinboard, folio, calendar)
 //
-// First boot is slow (vault + secure-agent + stoop-factory chain),
+// First boot is slow (vault + secure-agent + pinboard-factory chain),
 // so the wait timeout is generous (60s).
 //
 // Run via:
@@ -17,7 +17,7 @@ const EXPECTED_APPS = [
   'basis',
   'household',
   'tasks',
-  'stoop',
+  'pinboard',
   'folio',
   'calendar',
 ];

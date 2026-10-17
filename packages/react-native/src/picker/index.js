@@ -4,7 +4,7 @@
  * Two flavours:
  *   - `pickAndResize` (image) — camera + library, JPEG-normalised
  *     with thumbnail. Apps pick a preset (size + quality knobs).
- *     Stoop's NOTICEBOARD/CHAT/AVATAR presets stay in apps/stoop-mobile/
+ *     Pinboard's NOTICEBOARD/CHAT/AVATAR presets stay in apps/pinboard-mobile/
  *     src/lib/imagePicker.js (which re-exports through this submodule).
  *     Generic `DELIVERABLE_PRESET` + `AVATAR_PRESET` live here for apps
  *     that don't need a custom shape.

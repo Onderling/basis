@@ -52,7 +52,7 @@
     },
     "followup_prompt_respond_to_item_body": {
       "text": "Welke hulp bied je aan?",
-      "doc": "Vriendelijkere prompt voor [Help met] op een stoop-post (respondToItem.body)"
+      "doc": "Vriendelijkere prompt voor [Help met] op een pinboard-post (respondToItem.body)"
     },
     "download_not_wired": {
       "text": "Dit bestand heeft geen inline data om op te slaan — bestand: {{fileId}}",
@@ -391,7 +391,7 @@
         "doc": "Review-rij-label"
       },
       "substrate_warn": {
-        "text": "⚠️ V0 substraat-gat: dit wordt ingediend als een stoop-post met kind:dispute. Volledige bemiddeling (raiseDispute → proposeResolution → acceptResolution) komt wanneer stoop die skills uitlevert.",
+        "text": "⚠️ V0 substraat-gat: dit wordt ingediend als een prikbord-post met kind:dispute. Volledige bemiddeling (raiseDispute → proposeResolution → acceptResolution) komt wanneer prikbord die skills uitlevert.",
         "doc": "Waarschuwingsbanner over substraat-gat"
       },
       "filing": {

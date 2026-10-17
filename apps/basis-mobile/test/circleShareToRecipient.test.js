@@ -14,7 +14,7 @@ import {
   shareToRecipient, pickableRecipients as screenPickable,
 } from '../src/core/circleShareScreen.js';
 import { pickableRecipients as sharedPickable } from '../../basis/src/v2/shareRecipients.js';
-import { stoopContactToRow, peerToContactRow } from '../../basis/src/v2/contactsSource.js';
+import { pinboardContactToRow, peerToContactRow } from '../../basis/src/v2/contactsSource.js';
 
 describe('circle share screen — out-of-circle recipient (web≡mobile)', () => {
   it('re-exports the ONE shared selector (no mobile fork of pickableRecipients)', () => {
@@ -23,7 +23,7 @@ describe('circle share screen — out-of-circle recipient (web≡mobile)', () =>
 
   it('the selector projects the Contacten roster to recipient rows (same as web)', () => {
     const contacts = [
-      stoopContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE', trustLevel: 'vertrouwd' }),
+      pinboardContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE', trustLevel: 'vertrouwd' }),
       peerToContactRow({ url: 'https://bot/agent', name: 'URL Bot' }),   // no key → excluded
     ];
     expect(screenPickable(contacts)).toEqual([
@@ -35,7 +35,7 @@ describe('circle share screen — out-of-circle recipient (web≡mobile)', () =>
     const shareItemToPublishedKey = vi.fn(async () => ({ ok: true, ref: {} }));
     const policyOf = async () => ({ sharePosture: 'canonical' });
     // Take the recipient row straight from the shared selector — the same row the RN Pressable hands in.
-    const [dave] = screenPickable([stoopContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE' })]);
+    const [dave] = screenPickable([pinboardContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE' })]);
     const s = await shareToRecipient({
       itemId: 'i1', fromCircleId: 'A', toCircleId: '  B  ',
       recipient: dave.id, recipientNetworkKey: dave.recipientNetworkKey, name: dave.name,

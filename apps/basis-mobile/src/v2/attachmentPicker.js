@@ -3,7 +3,7 @@
  *
  * Mobile parity for web's `src/v2/attachmentEncoder.js`. Picks an image
  * (expo-image-picker), resizes + re-encodes it (expo-image-manipulator) into the
- * SAME inbound-attachment shape stoop.postRequest expects (and
+ * SAME inbound-attachment shape pinboard.postRequest expects (and
  * validateInboundAttachment checks):
  *
  *   { mime, dataB64, width, height, thumbnail }
@@ -16,9 +16,9 @@
 
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-// Parameter register (#36) — attachment caps. Reuse the SHARED keys (same tunable as the web encoder + stoop
+// Parameter register (#36) — attachment caps. Reuse the SHARED keys (same tunable as the web encoder + pinboard
 // Attachments) so the by-value mirror is documented as one param. scope:device, kind:internal.
-export const MAX_NOTICEBOARD_BYTES_PER_ATT = param({ key: 'attachment.maxNoticeboardBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });   // mirror web encoder / stoop Attachments
+export const MAX_NOTICEBOARD_BYTES_PER_ATT = param({ key: 'attachment.maxNoticeboardBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });   // mirror web encoder / pinboard Attachments
 const DEFAULT_MAX_DIM = param({ key: 'attachment.maxImageDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1280 });
 const THUMB_DIM = 120;
 

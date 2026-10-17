@@ -7,7 +7,7 @@
  * commands into a single grouped panel:
  *
  *   - General      — locale (EN/NL), transport mode (NKN / relay / both)
- *   - Stoop        — handle + displayName + holiday-mode toggle
+ *   - Pinboard        — handle + displayName + holiday-mode toggle
  *   - Privacy      — clear ContactBook + show mute list (read-only)
  *
  * The panel is opened via the /settings slash → surfaces.page side-panel.

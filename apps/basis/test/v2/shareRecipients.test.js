@@ -1,6 +1,6 @@
 /**
  * shareRecipients (objective L · Phase 2) — the SHARED (web≡mobile) selector behind the out-of-circle
- * recipient picker. Proves it turns the Contacten roster rows (`peerToContactRow`/`stoopContactToRow`) into
+ * recipient picker. Proves it turns the Contacten roster rows (`peerToContactRow`/`pinboardContactToRow`) into
  * the recipient rows `shareItemToPublishedKey` targets:
  *   • a contact WITH a published network key (peerAddr / pubKey) → a pickable recipient whose
  *     `recipientNetworkKey` IS that key (passed straight through to shareItemToPublishedKey),
@@ -8,13 +8,13 @@
  *   • trustLevel is surfaced when present (the light attestation seam), de-dup by id.
  */
 import { describe, it, expect } from 'vitest';
-import { peerToContactRow, stoopContactToRow } from '../../src/v2/contactsSource.js';
+import { peerToContactRow, pinboardContactToRow } from '../../src/v2/contactsSource.js';
 import { pickableRecipients, outOfCircleLinkWarning, recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 
 describe('pickableRecipients — the out-of-circle recipient selector', () => {
   it('maps contacts that carry a network key to recipient rows; the key IS recipientNetworkKey', () => {
-    // Real roster rows: a stoop ContactBook person (peerAddr from pubKey + trustLevel) and a discovered peer.
-    const person = stoopContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE', trustLevel: 'vertrouwd' });
+    // Real roster rows: a pinboard ContactBook person (peerAddr from pubKey + trustLevel) and a discovered peer.
+    const person = pinboardContactToRow({ webid: 'did:dave', displayName: 'Dave', pubKey: 'KEY_DAVE', trustLevel: 'vertrouwd' });
     const peer   = peerToContactRow({ pubKey: 'KEY_PEER', name: 'Peer One' });
     const rows = pickableRecipients([person, peer]);
     expect(rows).toEqual([
@@ -30,7 +30,7 @@ describe('pickableRecipients — the out-of-circle recipient selector', () => {
     expect(urlBot.peerAddr).toBeNull();
     expect(pickableRecipients([urlBot])).toEqual([]);
     // Mixed: only the keyed one survives.
-    const keyed = stoopContactToRow({ webid: 'did:ann', displayName: 'Ann', pubKey: 'KEY_ANN' });
+    const keyed = pinboardContactToRow({ webid: 'did:ann', displayName: 'Ann', pubKey: 'KEY_ANN' });
     expect(pickableRecipients([urlBot, keyed])).toEqual([
       { id: 'did:ann', name: 'Ann', recipientNetworkKey: 'KEY_ANN' },
     ]);
@@ -82,7 +82,7 @@ describe('outOfCircleLinkWarning — warn iff the pick grants by network key', (
 // same pure map `shareToPublishedKey` used at grant time.
 describe('recipientSealingKeyResolver — WebID → sealing key, re-derived from the contact', () => {
   const contacts = [
-    stoopContactToRow({ webid: 'did:ada', displayName: 'Ada', pubKey: 'NET_ADA' }),
+    pinboardContactToRow({ webid: 'did:ada', displayName: 'Ada', pubKey: 'NET_ADA' }),
     peerToContactRow({ pubKey: 'NET_PEER', name: 'Peer' }),
   ];
   const derive = (netKey) => `SEAL(${netKey})`;   // stands in for sealingPublicKeyFromNetworkKey (pure)

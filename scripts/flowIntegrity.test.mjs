@@ -1,7 +1,7 @@
 /**
  * G-S3 — FLOW INTEGRITY: a manifest's declared flows describe machines that actually exist.
  *
- * A flow declaration (`manifest.flows[]`, first one: stoop's `joinGroup`) is a promise in three
+ * A flow declaration (`manifest.flows[]`, first one: pinboard's `joinGroup`) is a promise in three
  * parts, and each has its own way of silently going false:
  *
  *   1. **declared steps ≡ exported steps** — the state module (`joinGroupState.js`) exports

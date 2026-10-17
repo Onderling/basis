@@ -34,7 +34,7 @@
 // and some things are NOT on the card at all (invariants ship regardless of kind).
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from './circlePolicy.js';
 import { TEMPLATE_CONVERSATION_KINDS } from './conversationKinds.js';
-import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
+import { INVITE_CEILING_FALLBACK } from '@onderling-app/pinboard/lib/inviteCeiling';
 
 /**
  * @typedef {{
@@ -137,7 +137,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
  * The numbers follow how each kind actually onboards: a household is a handful of people who already
  * live together; a neighbourhood takes a street in waves off one code read out at a door. The `_default` value
  * is the same one the substrate uses for a circle whose rules say nothing
- * (`@onderling-app/stoop/lib/inviteCeiling` → `INVITE_CEILING_FALLBACK`), so "nobody chose" means one
+ * (`@onderling-app/pinboard/lib/inviteCeiling` → `INVITE_CEILING_FALLBACK`), so "nobody chose" means one
  * number everywhere rather than two that drift.
  */
 export const TEMPLATE_INVITE_MAX_REDEMPTIONS = Object.freeze({

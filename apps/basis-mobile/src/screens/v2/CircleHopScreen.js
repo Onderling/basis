@@ -2,8 +2,8 @@
  * basis-mobile v2 — hopping (RN screen).
  *
  * RN counterpart of web's circleHop: the device-global hop stance toggle,
- * backed by Stoop's getHopMode / setHopMode (read on mount, flipped on
- * toggle). Per-contact hop flags + the hop-match card chain live in Stoop /
+ * backed by Pinboard's getHopMode / setHopMode (read on mount, flipped on
+ * toggle). Per-contact hop flags + the hop-match card chain live in Pinboard /
  * land later; this surfaces the global stance + explains hopping.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';

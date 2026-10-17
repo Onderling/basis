@@ -130,7 +130,7 @@ Folio's authentication surface is touched by two ongoing tracks:
 1. **Mobile (`apps/folio-mobile`)** uses
    [`@onderling/oidc-session-rn`](../../packages/oidc-session-rn/) —
    newly extracted 2026-05-08 from folio-mobile's own `src/auth/`
-   directory as the rule-of-two consumer with Stoop V3 Phase 40.3.
+   directory as the rule-of-two consumer with Pinboard V3 Phase 40.3.
    Folio-mobile is unchanged behaviourally; its `src/auth/{OidcSessionRN,
    folioAuth, dcr}.js` are now thin re-export shims around the
    substrate.
@@ -165,14 +165,14 @@ the project-wide convention in
 ```
 
 `shared.json` follows the user across every install of Folio (and is
-the blob a sibling app — Stoop, Archive — may read on its first run
+the blob a sibling app — Pinboard, Archive — may read on its first run
 to seed defaults per Rule 3 of the convention).
 `devices/<deviceId>.json` stays local to each install (poll cadence,
 mobile online-window, hop-relay decisions). The `deviceId` is
 [`core.AgentIdentity.deviceId`](../../packages/core/src/identity/AgentIdentity.js).
 
 **Cross-app shared-defaults (Rule 3):** when Folio runs on a pod
-that already has a `<pod>/stoop/settings/shared.json`, Folio MAY
+that already has a `<pod>/pinboard/settings/shared.json`, Folio MAY
 seed its own first-run defaults from those values for fields that
 mean the same thing (e.g. `defaultShareLocation`,
 `preferredLocale`). Document the field-mapping table in this section
@@ -180,7 +180,7 @@ once Folio implements it. **Don't slave to siblings continuously**
 — the rule is "defaults at first start, divergence allowed thereafter."
 
 Per-device blobs MUST NOT be pushed to the pod via bulk-sync (see
-the Stoop pod-layout doc
+the Pinboard pod-layout doc
 for the canonical implementation).
 
 **Status (2026-05-07):** Folio doesn't ship persisted settings yet;
@@ -377,7 +377,7 @@ flags two cross-app patterns relevant to Folio:
   earlier draft of this section recommended Folio host the
   sync; that recommendation has been moved.)*
 - **Canonical user-skills profile at `<user-pod>/profile/skills.json`.**
-  Tasks / Stoop / Household all import the user's skills from
+  Tasks / Pinboard / Household all import the user's skills from
   this canonical profile via a prefilled-form-edit-before-submit
   pattern. **Folio is the natural app for editing the canonical
   profile** (it already owns "your stuff on your pod" UX) — when

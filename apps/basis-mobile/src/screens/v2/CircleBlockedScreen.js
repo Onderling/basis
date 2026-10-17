@@ -34,7 +34,7 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
       const id = c?.id ?? c?.groupId;
       if (!id) continue;
       try {
-        const r = await callSkill('stoop', 'listGroupMembers', { groupId: id });
+        const r = await callSkill('pinboard', 'listGroupMembers', { groupId: id });
         if (Array.isArray(r?.members)) members.push(...r.members);
       } catch { /* unnamed keys still render */ }
     }

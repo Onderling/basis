@@ -1,7 +1,7 @@
 /**
  * contactCardLink — the clickable form of a contact card.
  *
- * A contact card is the `onderling-contact://<base64url>` payload stoop's `getContactShareQr` makes: the person's
+ * A contact card is the `onderling-contact://<base64url>` payload pinboard's `getContactShareQr` makes: the person's
  * webid, key, handle/name, the address they are written to, their relay. A QR is one way to hand it over; a LINK
  * is the other (Frits 2026-09-19: "simply link to the website, including the contact"). The card rides the URL's
  * FRAGMENT — `https://onderling.org/basis/#contact=<payload>` — as the add-a-device offer does: a fragment never
@@ -10,7 +10,7 @@
  * Both shells use these; the web boot reads the hash, mobile's deep link the same string.
  */
 
-import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 
 export const CONTACT_SCHEME = 'onderling-contact://';
 export const CONTACT_LINK_PARAM = 'contact';
@@ -64,7 +64,7 @@ function bodyOf(payload) {
 }
 
 /**
- * What the "share my contact" panel shows, resolved once for both shells: the card stoop makes, its link form, and
+ * What the "share my contact" panel shows, resolved once for both shells: the card pinboard makes, its link form, and
  * what the QR encodes. A shell paints; it decides nothing. No card (no identity yet) ⇒ `payload: null`; no http(s)
  * app url (a dev shell, a native build without `EXPO_PUBLIC_WEB_APP_URL`) ⇒ `link: null` — the QR and the code
  * still stand.
@@ -78,7 +78,7 @@ function bodyOf(payload) {
  */
 export async function loadShareMyContact({ callSkill, appUrl = null } = {}) {
   let payload = null;
-  try { payload = (await callSkill('stoop', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
+  try { payload = (await callSkill('pinboard', 'getContactShareQr', {}))?.payload ?? null; } catch { payload = null; }
   if (typeof payload !== 'string' || !payload) return { payload: null, link: null, qr: null, qrEncodes: null };
   const linkR = appUrl ? contactCardLink(appUrl, payload) : { ok: false };
   const link = linkR.ok ? linkR.link : null;
@@ -87,9 +87,9 @@ export async function loadShareMyContact({ callSkill, appUrl = null } = {}) {
 
 /**
  * The card's body, decoded — `{ webid, pubKey, handle, displayName, peerAddr, relays, personKey, … }` — or null. The
- * one decoder outside stoop for the one place that must READ a card before handing it to stoop: a card that arrives
+ * one decoder outside pinboard for the one place that must READ a card before handing it to pinboard: a card that arrives
  * in a message must name the sender (below), or a stranger could put anyone's name on their own address.
- * @param {string} payload  `onderling-contact://<body>` — the body is stoop's contact-card codec
+ * @param {string} payload  `onderling-contact://<body>` — the body is pinboard's contact-card codec
  */
 export function decodeContactCard(payload) {
   const body = bodyOf(payload);

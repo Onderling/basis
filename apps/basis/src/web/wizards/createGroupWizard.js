@@ -3,13 +3,13 @@
  *
  * basis — C1 create-group wizard (2026-05-24).
  *
- * 5-step wizard surfacing stoop.createGroupV2 — substantially richer
+ * 5-step wizard surfacing pinboard.createGroupV2 — substantially richer
  * than C2 (join-group): 14 distinct configuration questions across
  * identity, governance, rules, and technical settings.  Lands the
- * circle + mints the first membership code (shown ONCE per stoop's
+ * circle + mints the first membership code (shown ONCE per pinboard's
  * design — the user must copy it or it's lost).
  *
- * Substrate skill: stoop.createGroupV2
+ * Substrate skill: pinboard.createGroupV2
  * Returns: { groupId, code, expiresAt, ... } — the code is the
  * one-time-shown membership code for early members.
  *
@@ -41,7 +41,7 @@ import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // rule every other axis follows); the system cap comes from the module that ENFORCES it, so the
 // wizard cannot offer a number the substrate would silently clamp.
 import { markAxisTouched } from '../../v2/circleTemplates.js';
-import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
+import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/pinboard/lib/inviteCeiling';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { localCirclePolicyStore } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';

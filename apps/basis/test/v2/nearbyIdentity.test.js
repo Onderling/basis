@@ -15,7 +15,7 @@ const disclosureAt = (level) => {
   return { perContext: { [NEARBY_CONTEXT]: ctx } };
 };
 const stub = (levels = {}) => async (app, op, args) => {
-  if (app === 'stoop' && op === 'getMyProfile') return profile;
+  if (app === 'pinboard' && op === 'getMyProfile') return profile;
   if (app === 'agents' && op === 'getProfileDisclosure') return { disclosure: levels[args.id] ? disclosureAt(levels[args.id]) : { perContext: {} } };
   return null;
 };

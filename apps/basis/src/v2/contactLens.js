@@ -32,7 +32,7 @@ async function pairIdFor(contactWebid, { pairCircleIdOf = null, callSkill } = {}
   if (typeof contactWebid !== 'string' || !contactWebid) return null;
   if (typeof pairCircleIdOf === 'function') { try { return pairCircleIdOf(contactWebid) ?? null; } catch { return null; } }
   let me = null;
-  try { me = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null; } catch { me = null; }
+  try { me = (await callSkill('pinboard', 'whoAmI', {}))?.webid ?? null; } catch { me = null; }
   if (typeof me !== 'string' || !me || me === contactWebid) return null;
   try { return pairCircleIdFor(me, contactWebid); } catch { return null; }
 }
@@ -90,7 +90,7 @@ export async function addContactAs({ callSkill, payload, persona = DEFAULT_PERSO
   if (pairId && revealPreset) {
     await applyJoinRevealState({ state: { persona: chosen, revealPreset }, callSkill, contextId: pairId }).catch(() => {});
   }
-  return callSkill('stoop', 'addContactFromQr', { payload, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
+  return callSkill('pinboard', 'addContactFromQr', { payload, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
 }
 
 /**
@@ -130,9 +130,9 @@ export async function changeContactLens({
   const chosen = typeof persona === 'string' && persona ? persona : DEFAULT_PERSONA;
   // A contact with no key sees no persona of yours: there is no pair circle to say a release on. Refused, nothing written.
   let held = null;
-  try { held = bookRowsOf(await callSkill('stoop', 'listContacts', {})).find((c) => c?.webid === contactId) ?? null; } catch { held = null; }
+  try { held = bookRowsOf(await callSkill('pinboard', 'listContacts', {})).find((c) => c?.webid === contactId) ?? null; } catch { held = null; }
   if (isKeylessContact(held ?? { webid: contactId })) return { error: KEYLESS_REFUSAL, releaseShared: false };
-  const row = await callSkill('stoop', 'setContactPersona', { webid: contactId, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
+  const row = await callSkill('pinboard', 'setContactPersona', { webid: contactId, persona: chosen, ...(revealPreset ? { revealPreset } : {}) });
   if (row?.error) return { error: row.error, releaseShared: false };
   const pairId = await pairIdFor(contactId, { pairCircleIdOf, callSkill });
   if (pairId && revealPreset) {
@@ -141,7 +141,7 @@ export async function changeContactLens({
   let exists = pairCircleExists;
   if (exists === undefined && pairId) {
     try {
-      const r = await callSkill('stoop', 'listMyCircles', {});
+      const r = await callSkill('pinboard', 'listMyCircles', {});
       exists = (Array.isArray(r?.circles) ? r.circles : []).some((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id)) === pairId);
     } catch { exists = false; }
   }

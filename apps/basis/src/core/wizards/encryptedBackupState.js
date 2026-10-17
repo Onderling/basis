@@ -41,11 +41,11 @@ export function canCreateBackup(state) {
  */
 export function suggestedFilename(now = new Date()) {
   const stamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `stoop-backup-${stamp}.json.enc`;
+  return `pinboard-backup-${stamp}.json.enc`;
 }
 
 /**
- * Submit the backup via callSkill('stoop', 'encryptedBackup', ...).
+ * Submit the backup via callSkill('pinboard', 'encryptedBackup', ...).
  * On success: sets state.blob + advances to step 2.
  * On failure: sets state.submitError; stays on step 1.
  *
@@ -58,7 +58,7 @@ export async function submitCreateBackup({ state, callSkill }) {
   state.submitting  = true;
   state.submitError = null;
   try {
-    const result = await callSkill('stoop', 'encryptedBackup', { passphrase: state.passphrase });
+    const result = await callSkill('pinboard', 'encryptedBackup', { passphrase: state.passphrase });
     if (result?.error) throw new Error(result.error);
     if (!result?.blob) throw new Error('substrate returned no blob');
     state.blob       = result.blob;

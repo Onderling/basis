@@ -1,6 +1,6 @@
 /**
  * Per-circle ADDRESS announcing — the receive half (`recordCircleAddress`) and
- * the send half (`fanCircleAddresses`). Lifted verbatim out of stoop's
+ * the send half (`fanCircleAddresses`). Lifted verbatim out of pinboard's
  * `buildSkills` so the address record/patch logic, the release (persona
  * properties) propagation, its change-detector, and the fan assembly live once
  * in the circles substrate and cannot drift across callers (invariant 3 — logic

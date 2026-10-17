@@ -4,7 +4,7 @@
  * RN mirror of web's circleAdminPanel: member roster (+ remove, + the role, how it was come by, and
  * the control that changes it), announcements,
  * and muted peers (+ unmute). Self-contained: loads listGroupMembers/listMutedPeers
- * + dispatches the admin-gated stoop ops via the injected `callSkill` (a refusal
+ * + dispatches the admin-gated pinboard ops via the injected `callSkill` (a refusal
  * surfaces a notice).
  *
  * Reports are NOT here: moderation reports live on the ONE §8 surface — the
@@ -43,10 +43,10 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
     const [mem, mut, who] = await Promise.all([
-      callSkill('stoop', 'listGroupMembers', { groupId }).catch(() => null),
+      callSkill('pinboard', 'listGroupMembers', { groupId }).catch(() => null),
       // The ONE block set — the same list the stream filters by and the transport refuses on.
       callSkill('basis', 'muted', {}).catch(() => null),
-      callSkill('stoop', 'whoAmI', {}).catch(() => null),
+      callSkill('pinboard', 'whoAmI', {}).catch(() => null),
     ]);
     setMyWebid(who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
@@ -86,7 +86,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       execute: async () => {
         setNotice(null);
         try {
-          const r = await callSkill('stoop', 'setMemberRole', {
+          const r = await callSkill('pinboard', 'setMemberRole', {
             groupId, memberWebid: m.webid, role: control.role,
           });
           setNotice(r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name }));
@@ -98,7 +98,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const postAnnounce = useCallback(async () => {
     const text = announce.trim(); if (!text) return;
     setAnnounce(''); setNotice(null);
-    try { const r = await callSkill('stoop', 'postAnnouncement', { groupId, text }); setNotice(r?.error ? t('circle.admin.refused') : t('circle.admin.announced')); }
+    try { const r = await callSkill('pinboard', 'postAnnouncement', { groupId, text }); setNotice(r?.error ? t('circle.admin.refused') : t('circle.admin.announced')); }
     catch { setNotice(t('circle.admin.refused')); }
   }, [announce, callSkill, groupId]);
   // The same projection the web shell paints — a raw key is not a person's name, and the two shells

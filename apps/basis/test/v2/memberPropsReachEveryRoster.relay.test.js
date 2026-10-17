@@ -54,7 +54,7 @@ describe('a member\'s own name reaches every roster they are on — member-props
   });
 
   it('bram sets a display name under Mij → the admin\'s and cato\'s rows for bram show it in A, the admin\'s in B', async () => {
-    const r = await bram.agent.callSkill('stoop', 'setMyDisplayName', { displayName: 'Bram de Vries' });
+    const r = await bram.agent.callSkill('pinboard', 'setMyDisplayName', { displayName: 'Bram de Vries' });
     expect(r?.error).toBeUndefined();
     // …and the statement rode the lane: bram's OWN folded row names it (the local fold), before anyone else's does
     expect(await until(async () => (rowOf(await readRoster(bram, CIRCLE_A), bram.pubKey)?.displayName === 'Bram de Vries' ? true : null), { timeout: 10_000, step: 250 })).toBe(true);
@@ -80,13 +80,13 @@ describe('a member\'s own name reaches every roster they are on — member-props
   }, 60_000);
 
   it('a handle change reaches the rows too; a handle ANOTHER member holds is refused — by the op here (it reads the folded rosters), by the fold everywhere (kernel-tested)', async () => {
-    const r = await bram.agent.callSkill('stoop', 'setMyHandle', { handle: 'bramdv' });
+    const r = await bram.agent.callSkill('pinboard', 'setMyHandle', { handle: 'bramdv' });
     expect(r?.error).toBeUndefined();
     expect(await until(async () => (rowOf(await readRoster(admin, CIRCLE_A), bram.pubKey)?.handle === 'bramdv' ? true : null), { timeout: 20_000, step: 400 }), 'the admin\'s row has bram\'s new handle').toBe(true);
     // cato tries to take it. The op refuses first — it reads every folded roster it is on, so bram's lane-borne
     // rename counts (the local cache alone still had bram's join-time handle: measured, this was red). The FOLD is
     // the rule that binds on every other device (`rosterFold.test.js`, uniqueness deny-wins).
-    const stmt = await cato.agent.callSkill('stoop', 'setMyHandle', { handle: 'bramdv' });
+    const stmt = await cato.agent.callSkill('pinboard', 'setMyHandle', { handle: 'bramdv' });
     expect(stmt?.error, 'the op refuses a taken handle').toBe('invalid-handle');
     await settle(2000);
     expect(rowOf(await readRoster(admin, CIRCLE_A), cato.pubKey)?.handle, 'cato keeps the old handle on the admin\'s roster').toBe('cato');
@@ -94,12 +94,12 @@ describe('a member\'s own name reaches every roster they are on — member-props
   }, 60_000);
 
   it('an unchanged save appends nothing (the diff gate)', async () => {
-    const before = await bram.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE_A });
+    const before = await bram.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE_A });
     const rowsBefore = JSON.stringify(rowOf(before?.members ?? [], bram.pubKey));
-    const r = await bram.agent.callSkill('stoop', 'setMyDisplayName', { displayName: 'Bram de Vries' });   // the same name again
+    const r = await bram.agent.callSkill('pinboard', 'setMyDisplayName', { displayName: 'Bram de Vries' });   // the same name again
     expect(r?.error).toBeUndefined();
     await settle(1500);
-    const after = await bram.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE_A });
+    const after = await bram.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE_A });
     expect(JSON.stringify(rowOf(after?.members ?? [], bram.pubKey))).toBe(rowsBefore);
   }, 30_000);
 

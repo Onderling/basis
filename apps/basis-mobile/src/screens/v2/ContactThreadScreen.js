@@ -105,14 +105,14 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
   // Verbergen / Tonen (L106, web parity — contactThread.js's header control): every person gets the control — a
   // contact from the book, and a stranger who wrote to me (hiding them puts them in the book, hidden). A bot
   // does not: a bot is removed, not hidden. `null` keeps the header without it. The mark is the book's — the ONE
-  // stoop op changes it, on every device of the person; a message from the contact does the same as Tonen.
+  // pinboard op changes it, on every device of the person; a message from the contact does the same as Tonen.
   const hideable = !!contact && !contact.isBot;
   const [hidden, setHidden] = useState(() => (hideable ? contact.hidden === true : null));
   const toggleHidden = useCallback(async () => {
     if (hidden === null || typeof bundle?.callSkill !== 'function') return;
     const next = !hidden;
     try {
-      const r = await bundle.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: next });
+      const r = await bundle.callSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: next });
       if (r?.error) throw new Error(r.error);
       setHidden(next);
     } catch { setError(true); }

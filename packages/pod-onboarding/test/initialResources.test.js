@@ -18,7 +18,7 @@ const AGENT = {
   agentUri:    'agent://anne/laptop',
   pubKey:      'base64-pubkey-blob',
   displayName: 'Anne',
-  capabilities: ['stoop', 'tasks'],
+  capabilities: ['pinboard', 'tasks'],
 };
 
 describe('buildInitialStorageMapping', () => {
@@ -62,7 +62,7 @@ describe('buildInitialAgentRegistry', () => {
       pubKey:      'base64-pubkey-blob',
       name:        'Anne',
       role:        'device',
-      capabilities: ['stoop', 'tasks'],
+      capabilities: ['pinboard', 'tasks'],
       revokedAt:   null,
     });
     expect(typeof reg.agents[0].signedAt).toBe('string');

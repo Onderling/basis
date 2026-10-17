@@ -27,7 +27,7 @@ const ALLOWED = [
   /^packages\/kring-host\/src\/circleMembers\.js$/,     // the release projection feeding the ladder (realName ← personaProperties)
   /^packages\/core\/src\/discovery\/peerFacade\.js$/,  // builds Peer.revealState FROM the release — disclosure machinery, not a bypass
   /^packages\/agent-registry\/src\//,                  // the registry owns the attribute
-  /^apps\/stoop\/src\/lib\/deriveRoster\.js$/,         // writes the roster row
+  /^apps\/pinboard\/src\/lib\/deriveRoster\.js$/,         // writes the roster row
   /(^|\/)(test|tests|e2e|test-browser)\//, /\.(test|spec)\.[cm]?js$/,   // tests may construct fixtures
 ];
 

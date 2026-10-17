@@ -1,6 +1,6 @@
 /**
- * loadLocale — substrate-level coverage. The end-to-end Stoop locale
- * resolution is exercised in apps/stoop-mobile/test/localisation.test.js
+ * loadLocale — substrate-level coverage. The end-to-end Pinboard locale
+ * resolution is exercised in apps/pinboard-mobile/test/localisation.test.js
  * (which now goes through this substrate).
  */
 

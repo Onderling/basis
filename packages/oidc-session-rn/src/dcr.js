@@ -8,7 +8,7 @@
  *
  * Lifted from `apps/folio-mobile/src/auth/dcr.js` 2026-05-08.
  * Cache-key prefix is now configurable so a single device with both
- * a Folio install and a Stoop install doesn't share registrations.
+ * a Folio install and a Pinboard install doesn't share registrations.
  */
 
 const DEFAULT_KEY_PREFIX = 'oidc-dcr-client-id-';
@@ -17,7 +17,7 @@ const DEFAULT_KEY_PREFIX = 'oidc-dcr-client-id-';
  * Hash an issuer URL into a secure-store key suffix.
  *
  * @param {string} issuer
- * @param {string} keyPrefix   — e.g. 'folio-dcr-client-id-' or 'stoop-dcr-client-id-'.
+ * @param {string} keyPrefix   — e.g. 'folio-dcr-client-id-' or 'pinboard-dcr-client-id-'.
  *                                Defaults to 'oidc-dcr-client-id-'.
  * @returns {string}
  */
@@ -135,7 +135,7 @@ export async function registerClient({
  * @param {string} [args.clientName]
  * @param {string[]} [args.scopes]
  * @param {string} [args.keyPrefix]   Either a bare app-id ('folio',
- *                                     'stoop') or a full DCR-key prefix.
+ *                                     'pinboard') or a full DCR-key prefix.
  * @param {(url: string, init: object) => Promise<Response>} [args.fetchFn]
  * @returns {Promise<string>}         the client_id to use
  */

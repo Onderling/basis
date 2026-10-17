@@ -95,7 +95,7 @@ export class OfferingMatch {
    * @param {Array<string>} [args.offerings]             This agent's local offering list (legacy `skills` accepted).
    * @param {Object<string, 'always'|'negotiable'|'never'>} [args.posture]
    *
-   * Phase 40.20 (2026-05-08, Stoop V3 mobile broadcast-scope locked):
+   * Phase 40.20 (2026-05-08, Pinboard V3 mobile broadcast-scope locked):
    * @param {Array<{pubKey: string}>} [args.extraAudience=[]]
    *   Additional peers (beyond the closed group) to subscribe to.
    *   Inbound requests from these peers carry an `extraAudience` flag
@@ -220,7 +220,7 @@ export class OfferingMatch {
     // "no pubkey registered for recipient … send hi first".  We
     // swallow per-peer; agent.on('peer') will re-add + subscribe
     // them once hello lands.  Without this, one un-hello'd peer
-    // aborts the entire start() → buildGroupState fails → Stoop's
+    // aborts the entire start() → buildGroupState fails → Pinboard's
     // ServiceContext can't bring the bundle up.
     for (const pubKey of this.#peers.keys()) {
       try { await this.#subscribeToPeer(pubKey); } catch { /* swallow per-peer */ }

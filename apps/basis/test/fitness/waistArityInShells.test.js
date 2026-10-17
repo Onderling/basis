@@ -55,7 +55,7 @@ function resolvingCallsWithOrigin(src) {
       if (/agent|bundle|raw|app/i.test(receiver)) continue;   // a targeted waist, correctly given an origin
       if (ORIGINS.has(m[2])) out.push(`${i + 1}: ${line.trim().slice(0, 100)}`);
     }
-    // The renamed resolver: `resolveSkill('stoop', …)` is the same mistake wearing the new name.
+    // The renamed resolver: `resolveSkill('pinboard', …)` is the same mistake wearing the new name.
     for (const m of line.matchAll(/\bresolveSkill\s*\(\s*'([a-z][\w-]*)'/g)) {
       if (ORIGINS.has(m[1])) out.push(`${i + 1}: ${line.trim().slice(0, 100)}`);
     }

@@ -45,7 +45,7 @@ describe('the household bot\'s people reads', () => {
     });
     await ensureHouseholdLists({ callSkill: (a, o, x) => agent.callSkill(a, o, x), t });
     for (const [w, n, r] of [['telegram:1', 'Ann', 'member'], ['telegram:2', 'Bert', 'member'], ['telegram:9', 'Frits', 'admin']]) {
-      await agent.callSkill('stoop', 'addContact', { webid: w, channel: 'telegram', role: r, displayName: n });
+      await agent.callSkill('pinboard', 'addContact', { webid: w, channel: 'telegram', role: r, displayName: n });
       await agent.setDoorCaller(w, r);
     }
     const asAnn = (a, o, x) => agent.callSkill(a, o, x, { caller: 'telegram:1' });

@@ -2,7 +2,7 @@
  * S5 (mobile) — image attachment picker/encoder. Pure shaping + orchestration
  * with INJECTED expo fakes (no native modules needed), mirroring web's
  * attachmentEncoder test. Asserts the RESULT: the {mime,dataB64,width,height,
- * thumbnail} record matches the shape stoop.validateInboundAttachment accepts.
+ * thumbnail} record matches the shape pinboard.validateInboundAttachment accepts.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { toInboundAttachment, pickAndEncodeImage } from '../src/v2/attachmentPicker.js';

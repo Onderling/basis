@@ -5,18 +5,18 @@
  * The FUNCTIONALITY-side adapter that lets a caller invoke a calendar capability by its canonical
  * `(atom × noun)` pair instead of its bespoke op-id — the same seam the household pilot
  * (`apps/basis/src/v2/householdApp.js`) opened, and that tasks-v0 (`apps/tasks-v0/src/Service.js`) +
- * stoop (`apps/stoop/src/Service.js`) already carry. It is ADDITIVE: it registers the EXISTING
+ * pinboard (`apps/pinboard/src/Service.js`) already carry. It is ADDITIVE: it registers the EXISTING
  * `registerCalendarSkills(...)` skill set unchanged and routes `(atom, noun)` → opId → the real handler.
  * No skill, store, or manifest is modified; the legacy dispatch path (`createCalendarAgent` registering the
  * same skills on a `core.Agent`) stays byte-identical.
  *
- * ── The register-collector + DataPart wrapper (why calendar differs from tasks-v0/stoop) ──────────────
- * tasks-v0/stoop's `buildSkills(...)` RETURN an array of `{id, handler}` the service maps by id. calendar's
+ * ── The register-collector + DataPart wrapper (why calendar differs from tasks-v0/pinboard) ──────────────
+ * tasks-v0/pinboard's `buildSkills(...)` RETURN an array of `{id, handler}` the service maps by id. calendar's
  * `registerCalendarSkills(agent, store, opts)` instead REGISTERS each op onto a `core.Agent` via
  * `agent.register(name, fn)`. So this service passes a tiny COLLECTOR that captures those registrations into
  * a Map (`collector.register(name, fn)` → `byId.set(name, fn)`) — no real agent/transport is booted. The
  * calendar handlers read their args from the first DataPart (`parts?.[0]?.data`), so `callSkill` wraps `args`
- * in a synthetic single `DataPart` (mirroring tasks-v0/stoop). Calendar handlers RETURN `Parts[]` (a
+ * in a synthetic single `DataPart` (mirroring tasks-v0/pinboard). Calendar handlers RETURN `Parts[]` (a
  * `[DataPart({...})]`), not a bare object — a real `core.Agent` reply carries the same parts — so `callSkill`
  * returns that array verbatim: `callSkill(op, args)` is byte-identical to invoking the registered handler
  * directly.
@@ -75,7 +75,7 @@ export function createCalendarService({
      * callSkill(opId, args, ctx) — invoke a calendar op by its bespoke id. Wraps `args` in the single
      * `DataPart` the calendar handlers read via `parts?.[0]?.data`. Returns the handler's `Parts[]` verbatim
      * (byte-identical to invoking the registered handler directly). `ctx` is accepted for signature parity
-     * with the tasks-v0/stoop adapters; calendar handlers carry the actor inside `args.actor`.
+     * with the tasks-v0/pinboard adapters; calendar handlers carry the actor inside `args.actor`.
      */
     async callSkill(opId, args = {}, _ctx = {}) {
       const handler = byId.get(opId);

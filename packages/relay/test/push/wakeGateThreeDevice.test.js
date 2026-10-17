@@ -55,7 +55,7 @@ async function offlineWithToken(url, address, token, platform = 'ios') {
   await settle();                     // let the relay observe the socket closing
 }
 
-/** The wire shape stoop's `broadcastToCircle` produces for a control-plane fan (no chat envelope). */
+/** The wire shape pinboard's `broadcastToCircle` produces for a control-plane fan (no chat envelope). */
 const govEnvelope = (event, { noWake }) => ({
   subtype: 'circle-governance-broadcast',
   circleId: 'oosterpoort',

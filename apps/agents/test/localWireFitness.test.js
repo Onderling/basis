@@ -89,7 +89,7 @@ function seedResource() {
         role:         'device',
         name:         'Anne (laptop)',
         deviceId:     'laptop-anne',
-        capabilities: ['tasks', 'stoop'],
+        capabilities: ['tasks', 'pinboard'],
         grants: [
           { tokenId: 't-1', skill: 'tasks.addTask', capability: 'tasks', subject: 'circle:home', expiresAt: '2027-01-01T00:00:00.000Z' },
         ],
@@ -106,7 +106,7 @@ function seedResource() {
         deviceId:     'phone-anne',
         capabilities: ['tasks'],
         grants: [
-          { tokenId: 't-2', skill: 'stoop.postRequest', capability: 'stoop', subject: null, expiresAt: null },
+          { tokenId: 't-2', skill: 'pinboard.postRequest', capability: 'pinboard', subject: null, expiresAt: null },
         ],
         signedAt:  '2026-07-01T08:00:00.000Z',
         revokedAt: null,
@@ -328,8 +328,8 @@ describeLocalWireFitness(
         name: 'grantAgent (explicit capability + expiry + subject)',
         run:  (invoke) => invoke('grantAgent', {
           agentId:       'phone-anne',
-          skill:         'stoop.report',
-          capability:    'stoop',
+          skill:         'pinboard.report',
+          capability:    'pinboard',
           expiresInDays: 7,
           subject:       'pub-anne-phone',
         }),
@@ -534,7 +534,7 @@ describe('agents — P2 control-op semantics (direct core)', () => {
 
     const res = await AGENT_CORES.grantAgent(
       { registry: spied, tokens },
-      { agentId: 'phone-anne', skill: 'stoop.report' },
+      { agentId: 'phone-anne', skill: 'pinboard.report' },
     );
 
     expect(events).toEqual(['tokens.issue', 'registry.applyGrant']);
@@ -543,17 +543,17 @@ describe('agents — P2 control-op semantics (direct core)', () => {
     expect(res.tokenId).toBe('tok-1');
     // Defaults honoured on the token side: subject ← pubKey, 30 days.
     expect(tokens.issued).toEqual([
-      { subject: 'pub-anne-phone', skill: 'stoop.report', expiresIn: 30 * MS_PER_DAY },
+      { subject: 'pub-anne-phone', skill: 'pinboard.report', expiresIn: 30 * MS_PER_DAY },
     ]);
     // Mirror matches the issued token (read-back in the result).
     expect(res.agent.grantSummary.tokens).toContainEqual({
       tokenId:    'tok-1',
-      skill:      'stoop.report',
-      capability: 'stoop.report',        // capability defaults to skill
+      skill:      'pinboard.report',
+      capability: 'pinboard.report',        // capability defaults to skill
       subject:    'pub-anne-phone',
       expiresAt:  '2026-12-31T00:00:00.000Z',
     });
-    expect(res.agent.skills).toContain('stoop.report');
+    expect(res.agent.skills).toContain('pinboard.report');
   });
 
   it('grantAgent: a token-issue failure propagates and the mirror is untouched', async () => {
@@ -564,7 +564,7 @@ describe('agents — P2 control-op semantics (direct core)', () => {
     };
 
     await expect(
-      AGENT_CORES.grantAgent({ registry, tokens }, { agentId: 'phone-anne', skill: 'stoop.report' }),
+      AGENT_CORES.grantAgent({ registry, tokens }, { agentId: 'phone-anne', skill: 'pinboard.report' }),
     ).rejects.toThrow('issuer offline');
 
     // Never mirror a grant whose token doesn't exist.
@@ -627,7 +627,7 @@ describe('agents — P2 control-op semantics (direct core)', () => {
     expect(tokens.revoked).toEqual(['t-2']);
     expect(res.revoked).toBe(true);
     expect(res.tokenBacked).toBe(true);
-    // Grant gone; 'stoop' was only referenced by t-2 → un-mirrored too
+    // Grant gone; 'pinboard' was only referenced by t-2 → un-mirrored too
     // ('tasks' was never grant-backed and stays).
     expect(res.agent.grantSummary.total).toBe(0);
     expect(res.agent.skills).toEqual(['tasks']);

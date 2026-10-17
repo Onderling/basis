@@ -1,7 +1,7 @@
 /**
  * QrCodeView — render a QR code via react-native-qrcode-svg.
  *
- * Lifted from apps/stoop-mobile/src/components/QrCode.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/components/QrCode.js 2026-05-09
  * (Phase 41.0 L4; Tasks-mobile is the second consumer). The wrapper
  * exists so consumers can swap implementations later (e.g. fall back
  * to a hand-rolled SVG renderer if the lib goes unmaintained).

@@ -37,16 +37,16 @@
 
 // The manifest is the source of truth for surfaces (invariant 4), including the confirm this control
 // must honour: `setMemberRole` declares `ui.confirm`, and its severity is read from there rather than
-// restated per shell. Through basis's ONE door onto stoop's manifest (`mockStoopManifest` is a
+// restated per shell. Through basis's ONE door onto pinboard's manifest (`mockPinboardManifest` is a
 // re-export of the real one under its historical name) — a second relative path to the same file from
 // the same app is a reference living twice.
-import { mockStoopManifest as stoopManifest } from '../core/manifests/mockManifests.js';
+import { mockPinboardManifest as pinboardManifest } from '../core/manifests/mockManifests.js';
 import { confirmRequestForOp } from './confirmGate.js';
 import { translatorOr } from '../locales/translatorOr.js';
 
 /** The op this control drives, and its declaration. */
 const SET_MEMBER_ROLE = 'setMemberRole';
-const SET_MEMBER_ROLE_OP = (stoopManifest.operations ?? []).find((o) => o?.id === SET_MEMBER_ROLE) ?? null;
+const SET_MEMBER_ROLE_OP = (pinboardManifest.operations ?? []).find((o) => o?.id === SET_MEMBER_ROLE) ?? null;
 
 /**
  * Every locale key this control can ask for, flat, so the label-key fitness check can walk it and a

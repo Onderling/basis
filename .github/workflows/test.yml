@@ -13,7 +13,7 @@
 #     this repo is TWO commands; `relink-workspace` is not a repair here, it is
 #     step two. See docs/architecture.md § "How the monorepo resolves".
 #   * COVERAGE. It ran six suites and never ran the guards aggregate, basis,
-#     stoop or the journeys — so ~5k basis tests and every journey had never
+#     pinboard or the journeys — so ~5k basis tests and every journey had never
 #     been a gate at all. (2026-08-25: the live-pod tier joined too — fifteen
 #     `*.css.test.js` suites that nothing had run since they were written.)
 #   * TRIGGER. It ran on push to master/track-H-folio only, so work on a feature
@@ -123,7 +123,7 @@ jobs:
 
   # ── The one check `development` requires: the gate passed, or these bytes passed it already. ──
   # A matrix job skipped by `same bytes?` never expands into its per-suite names, so a branch that requires `basis`,
-  # `stoop`, … by name waits forever on a merge-back whose bytes were tested. This job always runs and says one thing:
+  # `pinboard`, … by name waits forever on a merge-back whose bytes were tested. This job always runs and says one thing:
   # green when the same bytes passed before, or when every gate job passed now; red otherwise (a skip counts as red
   # unless the bytes were the same). The browser tail is not here: it does not run on pull requests.
   tests-passed:
@@ -190,7 +190,7 @@ jobs:
           # (mesh-scenario.test.js, WebRTC auto-upgrade phase 10b). Two retries
           # failing in a row is a real regression.
           - { label: core,              dir: packages/core,              args: '-- --retry=2' }
-          - { label: stoop,             dir: apps/stoop,                 args: '' }
+          - { label: pinboard,             dir: apps/pinboard,                 args: '' }
           - { label: tasks-v0,          dir: apps/tasks-v0,              args: '' }
           - { label: item-store,        dir: packages/item-store,        args: '' }
           # The type dictionary. Absent from this matrix until 2026-09-03, which is how three container

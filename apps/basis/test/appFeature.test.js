@@ -12,8 +12,8 @@ describe('featureForApp', () => {
     expect(featureForApp('calendar')).toBe('calendar');
     expect(featureForApp('folio')).toBe('lists');
   });
-  it('returns null for core/always-on apps (stoop, household, basis)', () => {
-    expect(featureForApp('stoop')).toBeNull();
+  it('returns null for core/always-on apps (pinboard, household, basis)', () => {
+    expect(featureForApp('pinboard')).toBeNull();
     expect(featureForApp('household')).toBeNull();
     expect(featureForApp('basis')).toBeNull();
     expect(featureForApp(undefined)).toBeNull();
@@ -22,7 +22,7 @@ describe('featureForApp', () => {
 
 describe('isAppSurfaceEnabled (real circlePolicy)', () => {
   it('core apps are always enabled, whatever the policy', () => {
-    expect(isAppSurfaceEnabled('stoop', { features: { tasks: false } }, isFeatureEnabled)).toBe(true);
+    expect(isAppSurfaceEnabled('pinboard', { features: { tasks: false } }, isFeatureEnabled)).toBe(true);
   });
   it('tasks surfaces follow policy.features.tasks (default ON since the alpha cut; off → gated)', () => {
     // the alpha's default tab set is Gesprek · Prikbord · Taken · Leden → a fresh circle shows the task screen

@@ -34,7 +34,7 @@
  *      the wire response (so a generator `coreFn` still streams).
  *
  * Now the uniform invocation route: household (via realAgent), tasks-v0, and
- * stoop register their wire skills through this, and @onderling/app-scaffold
+ * pinboard register their wire skills through this, and @onderling/app-scaffold
  * generates code that imports it. The projector story (renderChat / renderGate
  * / …) stays the manifest's job; this helper is only the "manifest op → skill
  * handler" generator.

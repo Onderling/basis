@@ -2,10 +2,10 @@
  * UsageMetrics — local, in-memory counter for the push-UX feedback
  * loop and other "is this thing actually being used?" measurements.
  *
- * Lifted from `apps/stoop/src/lib/UsageMetrics.js` 2026-05-08
+ * Lifted from `apps/pinboard/src/lib/UsageMetrics.js` 2026-05-08
  * (Tasks V1 = rule-of-two consumer; the per-skill UsageMetrics
- * pattern was originally written for Stoop V1's closed-beta
- * runbook). Stoop's `lib/UsageMetrics.js` is now a re-export shim.
+ * pattern was originally written for Pinboard V1's closed-beta
+ * runbook). Pinboard's `lib/UsageMetrics.js` is now a re-export shim.
  *
  * Records per-event counts and the timestamp of the most recent
  * occurrence.  No persistence — apps that want metrics across

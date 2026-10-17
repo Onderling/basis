@@ -1,7 +1,7 @@
 /**
- * PushPolicy substrate test suite. Mirrors the Stoop phase-9 cases
+ * PushPolicy substrate test suite. Mirrors the Pinboard phase-9 cases
  * that motivated the lift; pinned here so the substrate's invariants
- * survive even if Stoop's copy moves again.
+ * survive even if Pinboard's copy moves again.
  */
 
 import { describe, it, expect, vi } from 'vitest';

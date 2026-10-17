@@ -798,7 +798,7 @@ function appendReview(prev, entry) {
  *    tree edge). See the subtask claim-confirmation arc.
  *
  * 2. Consumer migration (tasks-v0 → these functions).
- *    `apps/tasks-v0` (+ stoop/household/presence-v0/tasks-mobile) still call
+ *    `apps/tasks-v0` (+ pinboard/household/presence-v0/tasks-mobile) still call
  *    `ItemStore`'s methods. Swapping them to `import { claim, … } from
  *    '@onderling/item-store'` over a `CircleItemStore` is the SEPARATE next step.
  *    Do NOT edit those apps or `ItemStore.js` in this pass — this module only

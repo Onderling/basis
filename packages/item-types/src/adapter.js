@@ -35,7 +35,7 @@
  *   - `completedBy`                     → `updatedBy`
  *   - `text`        (any string)       → `body`
  *
- * `text → body` covers Stoop / Folio / generic-message item types
+ * `text → body` covers Pinboard / Folio / generic-message item types
  * whose canonical schemas require `body` (announcement, note,
  * chat-message, offer, request, neighbourhood-job). The `task`
  * schema requires `text` natively, so the copy is harmless

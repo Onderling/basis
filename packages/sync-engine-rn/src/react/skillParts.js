@@ -1,6 +1,6 @@
 /**
  * skillParts — pure helpers for the A2A `parts` shape that React-side
- * skill hooks share. Lifted from `apps/stoop-mobile/src/lib/skillParts.js`
+ * skill hooks share. Lifted from `apps/pinboard-mobile/src/lib/skillParts.js`
  * 2026-05-09 (Tasks-mobile is the second consumer).
  *
  * Pure JS, no React, no RN — sits in the React submodule because every

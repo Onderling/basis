@@ -16,7 +16,7 @@ npm install @onderling/item-types
 
 ## Why a shared taxonomy
 
-Three apps (Tasks, Stoop, Folio) all want to refer to the same kinds of
+Three apps (Tasks, Pinboard, Folio) all want to refer to the same kinds of
 things and embed each other's items inside their own (a task can pin a
 offer; a chat-message can quote a note). If every app coined its
 own type names, cross-references would silently break.
@@ -177,7 +177,7 @@ mutated**. Validation runs against the canonical schema.
    unknown fields** for every type.
 2. **Aliases for renames.** When a type or kind is renamed, the
    legacy name persists in the registry resolving to the canonical
-   name. Stoop's Q-A 2026-05-14 cutover demonstrated this with
+   name. Pinboard's Q-A 2026-05-14 cutover demonstrated this with
    `supply-offer` → `offer`. The registry's alias entries are
    normative — readers MUST honour them.
 3. **No removals.** Types may be marked deprecated, but the

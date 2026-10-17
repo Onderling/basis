@@ -5,7 +5,7 @@ import {
 } from '../src/circleMembers.js';
 
 describe('normalizeCircleMembers', () => {
-  it('maps the raw stoop skill shape { members: [{ webid, handle, displayName }] }', () => {
+  it('maps the raw pinboard skill shape { members: [{ webid, handle, displayName }] }', () => {
     const out = normalizeCircleMembers({
       groupId: 'g1',
       members: [
@@ -61,7 +61,7 @@ describe('normalizeCircleMembers', () => {
 
 describe('canonical Member projections', () => {
   it('both roster shapes → IDENTICAL canonical Member (shape 1 ≡ shape 2)', () => {
-    // shape 1 — raw stoop roster row
+    // shape 1 — raw pinboard roster row
     const fromRaw = memberFrom({ webid: 'did:anne', handle: '@anne', displayName: 'Anne de Vries', role: 'admin' });
     // shape 2 — chat-shell item (displayName COLLAPSED into label)
     const fromItem = memberFrom({ id: 'did:anne', type: 'member', webid: 'did:anne', label: 'Anne de Vries', handle: '@anne', role: 'admin' });

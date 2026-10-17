@@ -75,7 +75,7 @@ import { DataPart }    from '../Parts.js';
  * @param {(uri: string, ctx: FetchResourceGateCtx) => boolean|Promise<boolean>} [opts.groupCheck]
  *   Peer-fetch gate. When supplied,
  *   invoked per request — if truthy, the fetch is allowed. Used by
- *   apps that track group-membership rosters (Stoop, etc.) to deny
+ *   apps that track group-membership rosters (Pinboard, etc.) to deny
  *   ex-members.
  * @param {(uri: string, ctx: FetchResourceGateCtx) => boolean|Promise<boolean>} [opts.capCheck]
  *   Peer-fetch gate. Orthogonal

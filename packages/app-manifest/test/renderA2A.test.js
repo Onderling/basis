@@ -50,10 +50,10 @@ describe('renderA2A projects declared ops into kernel skills', () => {
   });
 
   it('takes several manifests, and the first declaration of an id wins', () => {
-    const other = { app: 'stoop', operations: [{ id: 'listOpen', verb: 'list', surfaces: {} }] };
+    const other = { app: 'pinboard', operations: [{ id: 'listOpen', verb: 'list', surfaces: {} }] };
     const dupe  = { app: 'household', operations: [{ id: 'addItem', verb: 'remove', surfaces: {} }] };
     const skills = renderA2A([manifest, other, dupe], { callSkill: async () => ({}) });
-    expect(skills.map((s) => s.id)).toEqual(['household.addItem', 'household.revealOwnerPhrase', 'stoop.listOpen']);
+    expect(skills.map((s) => s.id)).toEqual(['household.addItem', 'household.revealOwnerPhrase', 'pinboard.listOpen']);
   });
 
   it('the withhold list covers secret material, device ceremonies and authority over authority', () => {

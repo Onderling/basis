@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/substrate-stack",
   "version": "0.1.0",
-  "description": "Shared substrate-stack factory: composes @onderling/pseudo-pod + @onderling/pod-routing + @onderling/notify-envelope (+ optional @onderling/versioning) into one per-bundle stack. Consolidates the stoop/tasks-v0/household substrateStack.js triplets (invariant #3) and is the single composition seam where pod versioning gets injected (PLAN-pod-versioning-history-recovery P2).",
+  "description": "Shared substrate-stack factory: composes @onderling/pseudo-pod + @onderling/pod-routing + @onderling/notify-envelope (+ optional @onderling/versioning) into one per-bundle stack. Consolidates the pinboard/tasks-v0/household substrateStack.js triplets (invariant #3) and is the single composition seam where pod versioning gets injected (PLAN-pod-versioning-history-recovery P2).",
   "type": "module",
   "main": "src/index.js",
   "exports": {

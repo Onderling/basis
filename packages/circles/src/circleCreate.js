@@ -1,9 +1,9 @@
 import { personKeyAnnouncement } from '@onderling/core';
 /**
- * Zero-key membership writers — pure DI lift out of stoop's `buildSkills` (the §8c migration, slice-a). These
+ * Zero-key membership writers — pure DI lift out of pinboard's `buildSkills` (the §8c migration, slice-a). These
  * persist a circle's governance rules, and the join-time rules/privacy acceptance record; none touches key
  * material (the group content key bootstraps LAZILY on the first `controlAgent.addMember`), so they move
- * without the key-custody plumbing. Logic lives ONCE here (invariant 3); stoop keeps only a thin `defineSkill`
+ * without the key-custody plumbing. Logic lives ONCE here (invariant 3); pinboard keeps only a thin `defineSkill`
  * wrapper that injects `store` (+ `simulateSync` where the skill returned one) and passes the parsed args.
  *
  * Pure DI: imports NOTHING — not from an app (packages never depend UP on apps) and not from `@onderling/core`.
@@ -84,7 +84,7 @@ export async function redeemInviteWithGate({ store }, { a, from } = {}) {
  *   embedded) + mints an initial membership code (returned ONCE). Zero-key — the group content key bootstraps
  *   LAZILY on the first `controlAgent.addMember`, so this touches no key material.
  *
- * The stoop-local storage/code helpers, the invite-ceiling clamp + cap, and the best-effort pod-routing policy
+ * The pinboard-local storage/code helpers, the invite-ceiling clamp + cap, and the best-effort pod-routing policy
  * push are INJECTED so this module stays pure (imports nothing from apps/core):
  *   `deps = {store, members, metrics, simulateSync, clampInviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
  *            validateStoragePolicy, buildStoragePolicy, freshMembershipCode, setCirclePolicy}`.

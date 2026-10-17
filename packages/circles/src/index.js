@@ -29,31 +29,31 @@ export {
 } from './savedView.js';
 
 // The ONE circle-broadcast fan the `broadcastCircle*` family rides. Lifted out
-// of stoop as a pure DI core — the caller injects its deps + helpers.
+// of pinboard as a pure DI core — the caller injects its deps + helpers.
 export { createCircleFanOut } from './circleFanOut.js';
 
 // Per-circle ADDRESS announcing — receive half (`recordCircleAddress`) and send
-// half (`fanCircleAddresses`). Pure DI lift out of stoop; the caller injects the
+// half (`fanCircleAddresses`). Pure DI lift out of pinboard; the caller injects the
 // store, the core verify helpers, the announce kind, and the fan.
 export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';
 export { isRosterTrailItem } from './rosterTrail.js';
 
 // Roster read, plus the full member
 // roster read (`listCircleMembers` — the read with the per-peer ALLOWLIST projection).
-// Pure DI lift out of stoop; the caller injects the store, the membership projection,
+// Pure DI lift out of pinboard; the caller injects the store, the membership projection,
 // the shared exit + foreign-caller + allowlist-gate helpers, the release-key diff, the
 // fan-out core, and its `_sync` producer.
 export {
   listCircleRoster, listCircleMembers,
 } from './circleRoster.js';
 
-// Circle-creation writers (§8c slice-a, ZERO-KEY) — pure DI lift out of stoop; the group key bootstraps
+// Circle-creation writers (§8c slice-a, ZERO-KEY) — pure DI lift out of pinboard; the group key bootstraps
 // lazily on the first addMember, so creation moves without the key-custody plumbing.
 export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './circleCreate.js';
 
 // Key-coupled membership writers (§8c slice-b) — the membership-STATE bodies of the four writers lifted as
 // pure store functions; the single trailing group-key grant/revoke is left as an INJECTED `grantKey`/
-// `revokeKey` hook, so circles never holds the key custodian (`controlAgent`). Stoop binds the hook to
+// `revokeKey` hook, so circles never holds the key custodian (`controlAgent`). Pinboard binds the hook to
 // `grant/revokePodAccess`.
 export {
   redeemMembershipCode, verifyMembershipCodeForPeer, leaveGroup, removeMember, acceptGroupRules,

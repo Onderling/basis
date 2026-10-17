@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/chat-p2p",
   "version": "0.1.0",
-  "description": "Peer-to-peer chat over agent.transport.sendOneWay. Lifted from apps/stoop/src/chat/wireChat.js 2026-05-08 (Tasks V1 = rule-of-two consumer). Distinct from @onderling/chat-agent (LLM-mediated chat).",
+  "description": "Peer-to-peer chat over agent.transport.sendOneWay. Lifted from apps/pinboard/src/chat/wireChat.js 2026-05-08 (Tasks V1 = rule-of-two consumer). Distinct from @onderling/chat-agent (LLM-mediated chat).",
   "type": "module",
   "main": "index.js",
   "exports": {

@@ -1,6 +1,6 @@
 /**
- * offeringsMatch — pure functions for Stoop's Layer 1 matching
- * (Stoop V1 Phase 12, 2026-05-06; functional design § 4d).
+ * offeringsMatch — pure functions for Pinboard's Layer 1 matching
+ * (Pinboard V1 Phase 12, 2026-05-06; functional design § 4d).
  *
  * Matches over a member's OFFERINGS (the human-profile "I can do X" data — see
  * plans/NOTE-offering-rename-inventory.md); "skill" is reserved for the invocable A2A sense.

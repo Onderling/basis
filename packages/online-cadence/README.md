@@ -24,8 +24,8 @@ Foreground/background cadence helpers for React Native agents:
 
 ## Origins
 
-Extracted from `apps/stoop-mobile`'s cadence helpers once a second
-app needed them; stoop-mobile's copies are now thin re-exports
+Extracted from `apps/pinboard-mobile`'s cadence helpers once a second
+app needed them; pinboard-mobile's copies are now thin re-exports
 through this substrate. The bg-fetch helpers live in
 `@onderling/sync-engine-rn`; this package re-exports them for
 ergonomic colocation.

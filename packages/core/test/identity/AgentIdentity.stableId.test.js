@@ -57,7 +57,7 @@ describe('AgentIdentity — Phase 32 deterministic stableId', () => {
     const vaultA = new VaultMemory();
     const idA = await AgentIdentity.fromMnemonic(phrase, vaultA);
 
-    // Restore on a 2nd device.  Stoop's restoreFromMnemonic clears
+    // Restore on a 2nd device.  Pinboard's restoreFromMnemonic clears
     // any existing stableId (defence in depth — but with Phase 32,
     // the re-derivation produces the same value anyway).
     const vaultB = new VaultMemory();

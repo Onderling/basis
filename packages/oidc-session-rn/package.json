@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/oidc-session-rn",
   "version": "0.1.0",
-  "description": "Solid OIDC sign-in for React Native — OidcSessionRN (token persistence + bearer fetch + refresh), runOidcSignIn (expo-auth-session + PKCE), and DCR helpers. Lifted from apps/folio-mobile 2026-05-08 (Stoop V3 Phase 40.3). Slated to migrate to the unified Inrupt-cleanup substrate when that lands.",
+  "description": "Solid OIDC sign-in for React Native — OidcSessionRN (token persistence + bearer fetch + refresh), runOidcSignIn (expo-auth-session + PKCE), and DCR helpers. Lifted from apps/folio-mobile 2026-05-08 (Pinboard V3 Phase 40.3). Slated to migrate to the unified Inrupt-cleanup substrate when that lands.",
   "type": "module",
   "main": "index.js",
   "exports": {

@@ -15,7 +15,7 @@
  *   const { reveal, words, loading, error, reset } =
  *     useMnemonicReveal({ useSkill });
  *
- * Plan (Phase 41.0 L5): Tasks-mobile + Stoop-mobile both call this
+ * Plan (Phase 41.0 L5): Tasks-mobile + Pinboard-mobile both call this
  * with their own `useSkill`. Both apps register `getMnemonicOnce` and
  * `markMnemonicShown` skills with the same names.
  */

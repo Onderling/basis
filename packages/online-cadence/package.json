@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/online-cadence",
   "version": "0.1.0",
-  "description": "Foreground/background cadence helpers for React Native agents — pure-JS ticker + AppState bridge + bg-task convenience re-exports. Lifted from apps/stoop-mobile/src/lib/{activeCadence,appStateBridge,bgRunOnce}.js 2026-05-09; Tasks-mobile is the second consumer (rule of two).",
+  "description": "Foreground/background cadence helpers for React Native agents — pure-JS ticker + AppState bridge + bg-task convenience re-exports. Lifted from apps/pinboard-mobile/src/lib/{activeCadence,appStateBridge,bgRunOnce}.js 2026-05-09; Tasks-mobile is the second consumer (rule of two).",
   "type": "module",
   "main": "index.js",
   "exports": {

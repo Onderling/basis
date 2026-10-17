@@ -3,7 +3,7 @@
 // member's sealing PUBLIC key). The private key lives in a vault (custody); the public key is what the
 // circle's roster / control-agent uses to wrap the group key to this member.
 //
-// Note this is DISTINCT from a member's transport identity (e.g. stoop's NKN pubKey) — sealing is a
+// Note this is DISTINCT from a member's transport identity (e.g. pinboard's NKN pubKey) — sealing is a
 // separate key family. Generated once + persisted; the same member reuses it across sessions/devices
 // (sync the vault entry to use the same sealing identity on a second device).
 //

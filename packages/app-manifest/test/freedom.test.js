@@ -15,12 +15,12 @@ const tasks = {
     { id: 'doneTask', verb: 'complete', appliesTo: { type: 'task' } },
   ],
 };
-const stoop = {
-  app: 'stoop', itemTypes: ['post'],
+const pinboard = {
+  app: 'pinboard', itemTypes: ['post'],
   nouns: { post: { atoms: ['add'] } },
   operations: [{ id: 'postRequest', verb: 'add', appliesTo: { type: 'post' } }],
 };
-const sources = [{ manifest: tasks }, { manifest: stoop }];
+const sources = [{ manifest: tasks }, { manifest: pinboard }];
 
 describe('constants', () => {
   it('are the frozen ruling-Q3 vocabularies', () => {
@@ -32,25 +32,25 @@ describe('constants', () => {
 
 describe('buildCapabilityMatrix', () => {
   it('one row per capability of enabled apps, defaults when the template is silent', () => {
-    const rows = buildCapabilityMatrix(sources, { enabledApps: ['tasks', 'stoop'] });
+    const rows = buildCapabilityMatrix(sources, { enabledApps: ['tasks', 'pinboard'] });
     const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
     expect(byKey['tasks add task']).toMatchObject({ app: 'tasks', atom: 'add', noun: 'task', opId: 'addTask', enabled: true, freedom: 'optional', consequence: 'greyed' });
-    expect(byKey['stoop add post']).toMatchObject({ opId: 'postRequest', enabled: true });
+    expect(byKey['pinboard add post']).toMatchObject({ opId: 'postRequest', enabled: true });
   });
 
   it('a disabled app contributes no rows', () => {
     const rows = buildCapabilityMatrix(sources, { enabledApps: ['tasks'] });
-    expect(rows.some((r) => r.app === 'stoop')).toBe(false);
+    expect(rows.some((r) => r.app === 'pinboard')).toBe(false);
   });
 
   it('merges the admin template over defaults', () => {
     const template = {
       'tasks complete task': { freedom: 'required', consequence: 'hidden' },
-      'stoop add post': { enabled: false },
+      'pinboard add post': { enabled: false },
     };
     const byKey = Object.fromEntries(buildCapabilityMatrix(sources, { template }).map((r) => [r.key, r]));
     expect(byKey['tasks complete task']).toMatchObject({ freedom: 'required', consequence: 'hidden' });
-    expect(byKey['stoop add post'].enabled).toBe(false);
+    expect(byKey['pinboard add post'].enabled).toBe(false);
   });
 
   it('privacy floor forces optional even if the template says required', () => {
@@ -68,17 +68,17 @@ describe('buildCapabilityMatrix', () => {
 
 describe('effectiveCapabilityKeys — the gate-narrowing', () => {
   it('drops below app-level: a disabled capability leaves the set while its app stays enabled', () => {
-    const template = { 'stoop add post': { enabled: false } };
-    const keys = effectiveCapabilityKeys(sources, { enabledApps: ['tasks', 'stoop'], template });
+    const template = { 'pinboard add post': { enabled: false } };
+    const keys = effectiveCapabilityKeys(sources, { enabledApps: ['tasks', 'pinboard'], template });
     expect(keys.has(capabilityKey('tasks', 'add', 'task'))).toBe(true);
-    expect(keys.has(capabilityKey('stoop', 'add', 'post'))).toBe(false);   // ← narrowed below app-level
+    expect(keys.has(capabilityKey('pinboard', 'add', 'post'))).toBe(false);   // ← narrowed below app-level
   });
 
   it('with no template, every enabled-app capability is authorised (default-on)', () => {
-    const keys = effectiveCapabilityKeys(sources, { enabledApps: ['tasks', 'stoop'] });
+    const keys = effectiveCapabilityKeys(sources, { enabledApps: ['tasks', 'pinboard'] });
     expect(keys.has('tasks add task')).toBe(true);
     expect(keys.has('tasks complete task')).toBe(true);
-    expect(keys.has('stoop add post')).toBe(true);
+    expect(keys.has('pinboard add post')).toBe(true);
   });
 });
 
@@ -87,13 +87,13 @@ describe('Slice 4 — member opt-outs narrow admin-template ∩ user-prefs', () 
     const template = {
       'tasks add task': { freedom: 'required' },              // NOT opt-outable
       'tasks complete task': { freedom: 'optional' },          // opt-outable
-      'stoop add post': { privacyFloor: true },                // opt-outable (floor)
+      'pinboard add post': { privacyFloor: true },                // opt-outable (floor)
     };
-    const rows = buildCapabilityMatrix(sources, { template, optOuts: ['tasks complete task', 'tasks add task', 'stoop add post'] });
+    const rows = buildCapabilityMatrix(sources, { template, optOuts: ['tasks complete task', 'tasks add task', 'pinboard add post'] });
     const by = Object.fromEntries(rows.map((r) => [r.key, r]));
     expect(by['tasks add task']).toMatchObject({ optOutable: false, optedOut: false });      // required → can't opt out
     expect(by['tasks complete task']).toMatchObject({ optOutable: true, optedOut: true });
-    expect(by['stoop add post']).toMatchObject({ optOutable: true, optedOut: true });          // floor
+    expect(by['pinboard add post']).toMatchObject({ optOutable: true, optedOut: true });          // floor
   });
 
   it('effectiveCapabilityKeys removes opted-out OPT-OUTABLE caps only', () => {
@@ -107,7 +107,7 @@ describe('Slice 4 — member opt-outs narrow admin-template ∩ user-prefs', () 
   it('no optOuts ⇒ pure admin template (Slices 1–2 behaviour)', () => {
     const keys = effectiveCapabilityKeys(sources, {});
     expect(keys.has('tasks add task')).toBe(true);
-    expect(keys.has('stoop add post')).toBe(true);
+    expect(keys.has('pinboard add post')).toBe(true);
   });
 });
 
@@ -117,7 +117,7 @@ describe('affordanceTreatment (4c — consequence → UI)', () => {
     optOuts: ['tasks complete task'],
   });
   it('authorised cap → show', () => {
-    expect(affordanceTreatment(matrix, { app: 'stoop', atom: 'add', noun: 'post' })).toBe('show');
+    expect(affordanceTreatment(matrix, { app: 'pinboard', atom: 'add', noun: 'post' })).toBe('show');
   });
   it('admin-disabled cap → its consequence (hidden→hide)', () => {
     expect(affordanceTreatment(matrix, { app: 'tasks', atom: 'add', noun: 'task' })).toBe('hide');

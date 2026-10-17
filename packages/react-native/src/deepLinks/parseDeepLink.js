@@ -1,23 +1,23 @@
 /**
  * parseDeepLink — generic deep-link path dispatcher.
  *
- * Lifted from apps/stoop-mobile/src/lib/deepLinks.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/deepLinks.js 2026-05-09
  * (Phase 41.0.b A6; Tasks-mobile is the second consumer — its
  * `tasks://invite | tasks://bot-token | tasks://auth/callback` URLs
  * use the same dispatcher with its own parser table).
  *
  * The substrate handles:
- *   - scheme matching (`stoop:` / `tasks:` / `folio:` / …)
+ *   - scheme matching (`pinboard:` / `tasks:` / `folio:` / …)
  *   - URL parsing into `{path, query}` (no real-host required)
  *   - `parsers[path]` lookup; first match wins; the parser may
  *     return `null` to fall through to `{kind: 'unknown'}`
  *   - graceful fallthrough to `{kind: 'unknown', url}` on no match
  *
  * Apps provide:
- *   - `scheme`              — `'stoop:'` or `'tasks:'` or …
+ *   - `scheme`              — `'pinboard:'` or `'tasks:'` or …
  *   - `parsers`             — `{[path]: (query, url) => Parsed | null}`
  *   - optional `defaultPath` — the empty-path landing target
- *     (e.g. `'welcome'` for stoop), so `stoop://` and `stoop://welcome`
+ *     (e.g. `'welcome'` for pinboard), so `pinboard://` and `pinboard://welcome`
  *     resolve to the same parser.
  *
  * Pure JS — no Linking, no React. The deep-link handler in `App.js`
@@ -28,7 +28,7 @@
  * @typedef {{kind: string, params?: object, url?: string}} ParsedDeepLink
  *
  * @typedef {object} DeepLinkConfig
- * @property {string} scheme           e.g. `'stoop:'`, `'tasks:'`
+ * @property {string} scheme           e.g. `'pinboard:'`, `'tasks:'`
  * @property {Object<string, (query: object, url: string) => ParsedDeepLink | null>} parsers
  * @property {string} [defaultPath]    path used when the URL is `<scheme>//`
  *

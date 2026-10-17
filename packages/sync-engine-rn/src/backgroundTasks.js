@@ -8,7 +8,7 @@
  * without installing them.
  *
  * Lifted from `apps/folio/src/rn/backgroundTasks.js` 2026-05-08
- * (Stoop V3 mobile = rule-of-two consumer).
+ * (Pinboard V3 mobile = rule-of-two consumer).
  *
  * The platform realities:
  *   - iOS schedules background-fetch opportunistically; the cadence

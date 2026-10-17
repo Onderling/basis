@@ -1,6 +1,6 @@
 /**
  * `announcement` type — a broadcast to a circle (or sub-audience).
- * Stoop's group announcements; Tasks's circle-wide notices.
+ * Pinboard's group announcements; Tasks's circle-wide notices.
  */
 
 import { BASE_PROPERTIES, BASE_REQUIRED, NAMESPACE } from '../baseSchema.js';

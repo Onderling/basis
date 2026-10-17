@@ -5,7 +5,7 @@
  *   - Pure-fn helpers (`normaliseMnemonic`, `mnemonicWords`,
  *     `hasValidWordCount`, `looksLikeMnemonic`, `statusFor`,
  *     `BIP39_WORD_COUNTS`) — lifted verbatim from
- *     apps/stoop-mobile/src/lib/mnemonic.js.
+ *     apps/pinboard-mobile/src/lib/mnemonic.js.
  *   - `useMnemonicReveal({useSkill})` — hook driving the reveal flow
  *     via the consumer's `getMnemonicOnce` / `markMnemonicShown` skills.
  *   - `<MnemonicView words={[...]}>` — grid renderer with screenshot

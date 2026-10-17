@@ -1,7 +1,7 @@
 /**
  * setupPush — bring up push notifications for the local agent.
  *
- * Lifted from apps/stoop-mobile/src/lib/push.js 2026-05-09 (Phase
+ * Lifted from apps/pinboard-mobile/src/lib/push.js 2026-05-09 (Phase
  * 41.0 L6; Tasks-mobile is the second consumer). Thin wrapper over
  * `MobilePushBridge` from `@onderling/react-native/transport`.
  *

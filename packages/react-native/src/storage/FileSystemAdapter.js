@@ -3,8 +3,8 @@
  * cache, persisting the in-memory `Map` to a JSON file via
  * `expo-file-system`.
  *
- * Stoop V3 Phase 40.4 (2026-05-08): the mobile counterpart to
- * `apps/stoop/src/lib/FilePersist.js` (which uses `node:fs/promises`).
+ * Pinboard V3 Phase 40.4 (2026-05-08): the mobile counterpart to
+ * `apps/pinboard/src/lib/FilePersist.js` (which uses `node:fs/promises`).
  * Same API surface (`load`, `save`, `scheduleSave`, `flush`, `cancel`)
  * so app code that previously referenced `FilePersist` can switch by
  * swapping the constructor.
@@ -36,7 +36,7 @@ export class FileSystemAdapter {
    * @param {object} args
    * @param {object} args.FileSystem            namespace import of `expo-file-system`
    * @param {string} args.path                  absolute file URI under `documentDirectory`
-   *                                              (e.g. `${FileSystem.documentDirectory}stoop/state.json`).
+   *                                              (e.g. `${FileSystem.documentDirectory}pinboard/state.json`).
    * @param {number} [args.saveDelayMs=200]     debounce window (ms)
    */
   constructor({ FileSystem, path, saveDelayMs = 200 } = {}) {

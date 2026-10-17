@@ -8,7 +8,7 @@
  * `OidcSessionRN`, an opinionated `createMobileBootstrap` for apps
  * that want one-call setup).
  *
- * Lifted from `apps/folio-mobile` 2026-05-08 as part of Stoop V3
+ * Lifted from `apps/folio-mobile` 2026-05-08 as part of Pinboard V3
  * Phase 40.2 (the rule-of-two consumer of the same pattern).
  *
  * See `./README.md` for the cross-platform-substrate-separation

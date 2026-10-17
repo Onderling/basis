@@ -20,7 +20,7 @@ export {
 } from './src/issuers.js';
 
 // Phase 52.15.2 (2026-05-14) — substrate promotion of the browser-
-// redirect OIDC flow wrapper. Folio + Stoop's `OidcSession.js`
+// redirect OIDC flow wrapper. Folio + Pinboard's `OidcSession.js`
 // wrappers retire in 52.15.3.
 export {
   createSolidAuthNode,

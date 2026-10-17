@@ -51,9 +51,9 @@ const tasksLike = {
   ],
 };
 
-const stoopLike = {
-  app: 'stoop',
-  systemPrompt: 'stoop assistant',
+const pinboardLike = {
+  app: 'pinboard',
+  systemPrompt: 'pinboard assistant',
   itemTypes: ['post'],
   operations: [
     {
@@ -82,7 +82,7 @@ function stubRegistry(manifest) {
 
 describe('createGate', () => {
   it('projects rules from a manifest list; text routes to { opId, args, appOrigin }', () => {
-    const { rules } = createGate([tasksLike, stoopLike]);
+    const { rules } = createGate([tasksLike, pinboardLike]);
     expect(Array.isArray(rules)).toBe(true);
     // Rule name derives from appId ?? id ?? index (renderGate); these fixtures use `app`, so index.
     expect(rules.map((r) => r.name)).toEqual(['manifest:0', 'manifest:1']);
@@ -93,13 +93,13 @@ describe('createGate', () => {
     };
     expect(firstHit('add buy milk')).toEqual({ opId: 'addTask', args: { text: 'buy milk' }, appOrigin: 'tasks' });
     expect(firstHit('done t1')).toEqual({ opId: 'completeTask', args: { id: 't1' }, appOrigin: 'tasks' });
-    expect(firstHit('post need a drill')).toEqual({ opId: 'postRequest', args: { text: 'need a drill' }, appOrigin: 'stoop' });
+    expect(firstHit('post need a drill')).toEqual({ opId: 'postRequest', args: { text: 'need a drill' }, appOrigin: 'pinboard' });
     expect(firstHit('ramble with no verb')).toBeNull();
   });
 
   it('PARITY: createGate(list).rules === renderGate(list) (name/opId/args identical)', () => {
     const opts = { locale: 'en', trailLexicon: TRAIL };
-    const list = [tasksLike, stoopLike];
+    const list = [tasksLike, pinboardLike];
     const gated = createGate(list, opts).rules;
     const direct = renderGate(list, opts);
 
@@ -116,11 +116,11 @@ describe('createGate', () => {
   it('composes from a mounted manifest-host (host.manifests() in mount order)', () => {
     const host = createManifestHost();
     host.mount('tasks', tasksLike, { skillRegistry: stubRegistry(tasksLike), toSkillCtx: (c) => c });
-    host.mount('stoop', stoopLike, { skillRegistry: stubRegistry(stoopLike), toSkillCtx: (c) => c });
+    host.mount('pinboard', pinboardLike, { skillRegistry: stubRegistry(pinboardLike), toSkillCtx: (c) => c });
 
     const { rules } = createGate(host);
     // Same rules a plain list of the same manifests would yield.
-    const direct = renderGate([tasksLike, stoopLike]);
+    const direct = renderGate([tasksLike, pinboardLike]);
     expect(rules.map((r) => r.name)).toEqual(direct.map((r) => r.name));
     expect(rules[0].command('add wash car')).toEqual(direct[0].command('add wash car'));
   });
@@ -132,19 +132,19 @@ describe('createGate', () => {
   });
 
   it('first-match-wins preserves declaration order across apps', () => {
-    // Give stoop a colliding "add" verb; whichever app is FIRST in the list wins.
-    const stoopAdds = { ...stoopLike, operations: [
+    // Give pinboard a colliding "add" verb; whichever app is FIRST in the list wins.
+    const pinboardAdds = { ...pinboardLike, operations: [
       { id: 'addPost', verb: 'add', params: [{ name: 'text', kind: 'string', required: true }],
         surfaces: { chat: { hint: 'x' }, slash: { command: '/addp', body: { kind: 'text-only' },
                     match: { verbs: ['add'], body: 'text-only' } } } },
     ] };
     const firstHit = (rules, text) => { for (const r of rules) { const c = r.command(text); if (c) return c; } return null; };
 
-    const tasksFirst = createGate([tasksLike, stoopAdds]).rules;
+    const tasksFirst = createGate([tasksLike, pinboardAdds]).rules;
     expect(firstHit(tasksFirst, 'add x')).toMatchObject({ opId: 'addTask', appOrigin: 'tasks' });
 
-    const stoopFirst = createGate([stoopAdds, tasksLike]).rules;
-    expect(firstHit(stoopFirst, 'add x')).toMatchObject({ opId: 'addPost', appOrigin: 'stoop' });
+    const pinboardFirst = createGate([pinboardAdds, tasksLike]).rules;
+    expect(firstHit(pinboardFirst, 'add x')).toMatchObject({ opId: 'addPost', appOrigin: 'pinboard' });
   });
 
   it('forwards opts ({ locale, trailLexicon }) → trailing-verb pass', () => {

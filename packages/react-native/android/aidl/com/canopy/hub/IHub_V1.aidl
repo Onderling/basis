@@ -1,6 +1,6 @@
 // IHub_V1.aidl — Hub-Android Inter-Process Binding interface, version 1.
 //
-// Implemented by the Hub service. Bundles (Tasks, Stoop, Folio, …) bind to
+// Implemented by the Hub service. Bundles (Tasks, Pinboard, Folio, …) bind to
 // the service via `Context.bindService` and call these methods to delegate
 // storage + envelope routing to the central Hub agent. The Hub owns the
 // real-pod / pseudo-pod / replication-ring decisions; bundles stay

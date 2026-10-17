@@ -3,7 +3,7 @@
  *
  * Two layers:
  *   - `setupPush({agent, projectId, ...})` + `requestPushPermission()`
- *     — imperative API (lifted verbatim from apps/stoop-mobile).
+ *     — imperative API (lifted verbatim from apps/pinboard-mobile).
  *   - `usePushOptIn({agent, ...})` — React hook for Settings-screen
  *     UX: permission rationale → request → registration → status.
  *

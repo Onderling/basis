@@ -6,7 +6,7 @@
  * optional "Custom URL" tile that expands a text input. The selected
  * issuer URL is emitted via `onChange`.
  *
- * Adopted by `apps/{folio,stoop,tasks}-mobile/src/screens/SignInScreen.js`.
+ * Adopted by `apps/{folio,pinboard,tasks}-mobile/src/screens/SignInScreen.js`.
  *
  * Lives at the `/picker` subpath because it pulls `react-native`
  * components — same bundler-hygiene pattern as `/hook`. Pure-JS

@@ -56,7 +56,7 @@ describe('adaptForCanonical', () => {
     expect(input.createdAt).toBeUndefined();
   });
 
-  it('maps text → body (for Stoop / Folio / message-shaped types)', () => {
+  it('maps text → body (for Pinboard / Folio / message-shaped types)', () => {
     const out = adaptForCanonical({ type: 'announcement', text: 'hello circle' });
     expect(out.body).toBe('hello circle');
     expect(out.text).toBe('hello circle');     // input field preserved

@@ -1,6 +1,6 @@
 /**
  * pickAndResize — substrate-level coverage. Mirrors the shape of
- * apps/stoop-mobile/test/imagePicker.test.js (which now exercises
+ * apps/pinboard-mobile/test/imagePicker.test.js (which now exercises
  * the same code through the re-export shim).
  */
 

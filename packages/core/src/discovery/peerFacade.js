@@ -10,7 +10,7 @@
  *   - the redemption trail / roster — keyed by `webid`, the SOURCE OF
  *     MEMBERSHIP; carries the per-circle crypto (`circleAddress`, signing
  *     `pubKey`, `sealingPublicKey`) + the disclosed `personaProperties`
- *     (see apps/stoop/src/lib/deriveRoster.js).
+ *     (see apps/pinboard/src/lib/deriveRoster.js).
  *   - MemberMap — keyed by `webid`, the DISPLAY / identity-projection cache;
  *     carries `relation`, `trustLevel`, `peerAddr`, handle/displayName, etc.
  *     (see packages/identity-resolver/src/MemberMap.js).
@@ -37,7 +37,7 @@
  *
  * LAYERING (invariant 5, `apps → substrates → core`): this file lives in
  * `core` (alongside PeerGraph) and imports NOTHING from identity-resolver or
- * apps/stoop. The MemberMap list and the trail roster arrive as plain injected
+ * apps/pinboard. The MemberMap list and the trail roster arrive as plain injected
  * arrays, so the projection can be imported by an app without an up-dependency.
  */
 

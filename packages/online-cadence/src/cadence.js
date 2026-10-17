@@ -1,7 +1,7 @@
 /**
  * cadence — foreground / background ticker controller.
  *
- * Lifted from apps/stoop-mobile/src/lib/activeCadence.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/activeCadence.js 2026-05-09
  * (Phase 41.0 L2; Tasks-mobile is the second consumer).
  *
  * When the app is foreground we tick at `getPollIntervalMs()` (default

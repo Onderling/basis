@@ -120,7 +120,7 @@ Wire shape (forward-additive):
   "defaultPolicy": "one-pod",
   "mappings": {
     "sharing/*": "https://anne.pod/sharing/",
-    "group/circle-abc/*": "https://anne.pod/sharing/stoop/abc/"
+    "group/circle-abc/*": "https://anne.pod/sharing/pinboard/abc/"
   },
   "circlePolicies": {
     "circle-abc":     {"policy": "centralised", "groupPodUri": "https://anne.pod"},

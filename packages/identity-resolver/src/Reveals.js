@@ -1,6 +1,6 @@
 /**
  * Reveals — per-group + per-peer "show real name" state for the
- * Stoop-shape "handle by default, displayName on reveal" pattern.
+ * Pinboard-shape "handle by default, displayName on reveal" pattern.
  *
  * The reveal state is *the viewer's local choice* — i.e. it lives on
  * Anna's device and records "for these peers / these groups, I have
@@ -19,9 +19,9 @@
  * Resolution precedence (see Resolver.resolve()): peer override wins
  * over group default, group default wins over "show handle".
  *
- * Pure in-memory.  Persisting to the pod is the app's concern (Stoop
+ * Pure in-memory.  Persisting to the pod is the app's concern (Pinboard
  * writes to `/reveals/...` per the design in
- * `Project Files/Stoop/advice-2026-05-05.md` § "Handle / nickname
+ * `Project Files/Pinboard/advice-2026-05-05.md` § "Handle / nickname
  * design").
  *
  * ⚠ DEPRECATED-DELEGATING (C7). `@onderling/agent-registry`'s `disclosure.js` is now

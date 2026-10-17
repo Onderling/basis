@@ -2,12 +2,12 @@
  * Settings — per-app factory for the shared/device-split settings
  * pattern.
  *
- * **2026-05-08:** lifted from `apps/stoop/src/lib/Settings.js`
+ * **2026-05-08:** lifted from `apps/pinboard/src/lib/Settings.js`
  * (Tasks V1 = rule-of-two consumer per
- * `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
+ * `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`).
  *
- * The original Stoop file hard-coded the path prefix
- * (`mem://stoop/settings/...`) and the field schema. This substrate
+ * The original Pinboard file hard-coded the path prefix
+ * (`mem://pinboard/settings/...`) and the field schema. This substrate
  * version is a factory: `createSettingsModule({appId, sharedFields,
  * deviceFields, defaults})` returns an app-specific
  * `{loadSettings, saveSettings, updateSettings, DEFAULT_SETTINGS,
@@ -47,7 +47,7 @@ const ALLOWED_APP_ID = /^[a-z][a-z0-9_-]*$/;
  *   Optional per-field validator.  Receives the candidate value, the
  *   field name, and the default; returns the validated value (or the
  *   default if invalid).  Default: simple type-equality check against
- *   the default's typeof.  Apps with rich validation (Stoop's
+ *   the default's typeof.  Apps with rich validation (Pinboard's
  *   `pollIntervalMs >= 100` etc.) supply a custom one.
  */
 export function createSettingsModule({

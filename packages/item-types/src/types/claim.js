@@ -10,7 +10,7 @@
  *   • the `claim` **ATOM** (a VERB) — `@onderling/app-manifest` atoms.js:
  *     "self-assign an open item", a compare-and-swap on an EXISTING item's
  *     assignee, IN-PLACE. Used as `verb: 'claim'` on `task` / `post` /
- *     `calendar-event` (tasks-v0, stoop, calendar, household manifests).
+ *     `calendar-event` (tasks-v0, pinboard, calendar, household manifests).
  *     No new item is created — one field of the target item changes.
  *
  *   • the `claim` **NOUN** — THIS item-type (`CLAIM_SCHEMA`): a NEW,

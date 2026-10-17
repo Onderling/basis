@@ -89,7 +89,7 @@ async function exchange(args) {
 
 /**
  * The hook drives the whole sign-in flow.  See package README for
- * usage.  Pre-binds `scheme` (e.g. 'folio', 'stoop') so the redirect
+ * usage.  Pre-binds `scheme` (e.g. 'folio', 'pinboard') so the redirect
  * URI and DCR cache key are namespaced per app.
  */
 export function useOidcSignIn({
@@ -102,7 +102,7 @@ export function useOidcSignIn({
   onWarning,
 }) {
   if (typeof scheme !== 'string' || !scheme) {
-    throw new Error('useOidcSignIn: scheme is required (e.g. "folio", "stoop")');
+    throw new Error('useOidcSignIn: scheme is required (e.g. "folio", "pinboard")');
   }
   const effectiveClientName = clientName ?? `${scheme} (mobile)`;
 

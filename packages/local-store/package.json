@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/local-store",
   "version": "0.1.0",
-  "description": "Local-first DataSource (Map-cached, queue-based pod write-through, bulk-sync on attach) + foreground-only sync cadence + per-app Settings factory. Lifted from apps/stoop 2026-05-08 (Tasks V1 = rule-of-two consumer).",
+  "description": "Local-first DataSource (Map-cached, queue-based pod write-through, bulk-sync on attach) + foreground-only sync cadence + per-app Settings factory. Lifted from apps/pinboard 2026-05-08 (Tasks V1 = rule-of-two consumer).",
   "type": "module",
   "main": "index.js",
   "exports": {

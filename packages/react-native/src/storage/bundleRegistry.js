@@ -2,7 +2,7 @@
  * bundleRegistry — AsyncStorage-backed list of bundles (groups,
  * circles, …) the user has joined + a pointer at the active one.
  *
- * Lifted from apps/stoop-mobile/src/lib/groupRegistry.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/groupRegistry.js 2026-05-09
  * (Phase 41.0.b A5; Tasks-mobile is the second consumer — its
  * `CircleBundles.js` in Phase 41.7 reuses this shape verbatim with
  * `keyNamespace: 'tasks:circles'`).
@@ -25,7 +25,7 @@ async function _loadAsyncStorage() {
 
 /**
  * @typedef {object} BundleEntry
- * @property {string} id          required — `groupId` for stoop, `circleId` for tasks
+ * @property {string} id          required — `groupId` for pinboard, `circleId` for tasks
  * @property {string} [displayName]
  * @property {number} [joinedAt]  epoch-ms
  * (apps add app-specific fields freely; the substrate passes them through)
@@ -35,7 +35,7 @@ async function _loadAsyncStorage() {
  * Build a registry instance for one app's bundles.
  *
  * @param {object} args
- * @param {string} args.keyNamespace  AsyncStorage key prefix, e.g. `'stoop:groups'` or `'tasks:circles'`
+ * @param {string} args.keyNamespace  AsyncStorage key prefix, e.g. `'pinboard:groups'` or `'tasks:circles'`
  * @param {string} [args.idField='id'] field on each entry that uniquely identifies the bundle
  * @param {object} [args.storage]      inject for tests; defaults to AsyncStorage at first use
  * @returns {{

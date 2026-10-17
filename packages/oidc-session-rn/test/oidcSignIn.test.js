@@ -61,7 +61,7 @@ describe('completeSignIn', () => {
       result:      { type: 'success', params: { code: 'C' } },
       request:     { codeVerifier: 'V' },
       discovery:   { tokenEndpoint: 'https://idp/token' },
-      redirectUri: 'stoop://auth/callback',
+      redirectUri: 'pinboard://auth/callback',
       clientId:    'client-id',
       issuer:      'https://idp',
     });

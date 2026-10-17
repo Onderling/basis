@@ -241,7 +241,7 @@ function _parseItem(bytes) {
  * The whole `getItemTree` op body, once — walk an item's embeds/deps tree and materialise the
  * cross-pod refs in it.
  *
- * This existed TWICE, in stoop's skills and in tasks' workspace, the second copied from the first
+ * This existed TWICE, in pinboard's skills and in tasks' workspace, the second copied from the first
  * (its comment said so) along with a test described as an "analog" of the other. The two were
  * identical but for which store they read, which is exactly the difference a parameter is for. Two
  * copies of a decentralised READ path is a bad thing to let drift: it is the executable half of the

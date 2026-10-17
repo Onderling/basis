@@ -7,7 +7,7 @@
  *   - `<QrCodeView value={...}>` — renderer wrapping
  *     `react-native-qrcode-svg`.
  *
- * Lifted from `apps/stoop-mobile/src/lib/qrScanner.js` +
+ * Lifted from `apps/pinboard-mobile/src/lib/qrScanner.js` +
  * `src/components/QrCode.js` 2026-05-09 (Phase 41.0 L4; Tasks-mobile
  * is the second consumer).
  */

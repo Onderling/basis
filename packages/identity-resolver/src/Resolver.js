@@ -3,7 +3,7 @@
  *
  * Returns the right "how should I render this peer in the UI" answer
  * for a given (viewer, target, optional group) tuple.  Implements the
- * resolution order from `Project Files/Stoop/advice-2026-05-05.md` §
+ * resolution order from `Project Files/Pinboard/advice-2026-05-05.md` §
  * "Handle / nickname design":
  *
  *   1. If viewer has a peer-reveal record for target with

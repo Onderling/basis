@@ -1,6 +1,6 @@
 // sealedMessageLog.js — a per-message, range-queryable, SEALED circle log over the blind
 // `StorageBackend` port (@onderling/core). The connectivity Phase-3 shared-pod primitive: it is the ONE
-// place that owns the message-row KEY CONVENTION so the WRITE side (stoop `broadcastToCircle`'s podWrite
+// place that owns the message-row KEY CONVENTION so the WRITE side (pinboard `broadcastToCircle`'s podWrite
 // seam) and the READ side (the shells' pod chat catch-up + the receiver's ref resolution)
 // can never drift on how a circle's chat history is laid out at rest.
 //

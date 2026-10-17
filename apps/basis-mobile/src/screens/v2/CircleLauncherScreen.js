@@ -5437,6 +5437,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       onAskAction={askAction}
       onToggleAllow={toggleAllow}
       onSubmitCard={submitCard}
+      onPrefillCard={() => bundle?.nearbyIdentity?.cardPrefill?.() ?? Promise.resolve({})}
       onSay={say}
       onInviteAction={inviteAction}
       level={roomLevel}
@@ -5476,7 +5477,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, level = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onPrefillCard, level = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -5784,6 +5785,20 @@ function NearbyScreen({
             placeholder={t('circle.nearbyScreen.card_line')}
             testID="nearby-card-line"
           />
+          {onPrefillCard ? (
+            <Pressable
+              onPress={async () => {
+                let got = {};
+                try { got = (await onPrefillCard()) ?? {}; } catch { got = {}; }
+                if (typeof got.label === 'string' && got.label) setCardLabel(got.label.slice(0, 40));
+              }}
+              accessibilityRole="button"
+              testID="nearby-card-prefill"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_prefill')}</Text>
+            </Pressable>
+          ) : null}
           {/* The consequence, next to the fields. */}
           <Text style={styles.muted}>{t('circle.nearbyScreen.card_visible_to')}</Text>
           <Pressable

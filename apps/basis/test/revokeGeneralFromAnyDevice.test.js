@@ -25,7 +25,8 @@ describe('a revoke from a device without the general persona', () => {
   it('tombstones the lost device under the general persona too; only its circles are left undone', async () => {
     const pod = memoryPodSource();
     const viaPod = { provisionRegistryMedium: async (strategy) => createRegistryPodMedium({ podSource: pod, strategy }) };
-    const phone = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), ...viaPod });
+    const phoneOwner = new VaultMemory();   // a device restored from the phrase later = this same owner root
+    const phone = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: phoneOwner, chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), ...viaPod });
     const phrase = (await phone.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     const w = (await phone.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
     const lostWire = phone.persona('default').enrolledDevice.deviceId;   // the phone, as the general persona knows it
@@ -44,6 +45,12 @@ describe('a revoke from a device without the general persona', () => {
     expect((await laptop.deviceRecordsOf('default'))?.[lostWire]?.revoked, 'tombstoned under the general persona').toBe(true);
     expect(r.outcome).toBe('partial');
     expect(r.undone, 'only the general circles are left').toEqual(['general-circles']);
-    await phone.shutdown?.(); await laptop.shutdown?.();
+    // A LATER WRITE BY A DEVICE THAT NEVER SAW THE TOMBSTONE must not undo it: the phone (running, its own copy of the
+    // registry, no tombstone in it) writes for any reason; a device restored from the phrase then reads the pod
+    await phone.callSkill('agents', 'setProfileCircleMembership', { id: 'default', circleId: 'later', handle: 'a', address: 'y' });
+    await new Promise((res) => setTimeout(res, 300));
+    const restored = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: phoneOwner, chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), ...viaPod });
+    expect((await restored.deviceRecordsOf('default'))?.[lostWire]?.revoked, 'the tombstone survives a later write that never saw it').toBe(true);
+    await phone.shutdown?.(); await laptop.shutdown?.(); await restored.shutdown?.();
   }, 150_000);
 });

@@ -2992,9 +2992,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       // reads the row (a synced registry brings it). Its person key and its circles need a device that HOLDS it — a device
       // without it leaves those undone and says so (its personas' parts, below, still run as each persona).
       const holdsGeneral = personas.has('default');
+      let generalRowTombstoned = false;   // the general persona's row was read here and tombstoned (any device can)
       try {
         const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
         if (cur) {
+          generalRowTombstoned = true;
           const rec = deviceDelegationOf(cur, deviceId);
           known = !!rec;
           let props = cur.properties ?? {};
@@ -3077,7 +3079,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // `device-link` row in the own-devices scope, each device writes its own), so the ceremony — root in hand — derives
       // each persona's wire id for it, tombstones it on that persona's record (minted already revoked when absent, as the
       // default's is), and retires its addresses in that persona's circles as that persona.
-      const revokedUnder = holdsGeneral ? { default: deviceId } : {};
+      const revokedUnder = holdsGeneral || generalRowTombstoned ? { default: deviceId } : {};
       try {
         const internalId = linkedInternalId;
         const entries = internalId ? ((await bounded(agentsRegistryRef?.list?.())) ?? []) : [];

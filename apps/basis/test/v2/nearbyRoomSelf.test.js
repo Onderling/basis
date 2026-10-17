@@ -17,13 +17,18 @@ describe('who enters the room', () => {
     expect(nearbyRoomSelf({ active: ['default', 'p-aaaaaaaaaaaa'], held, remembered: null })).toMatchObject({ self: null, ask: true, choices: ['default', 'p-aaaaaaaaaaaa'] });
     expect(nearbyRoomSelf({ active: ['default'], held, remembered: 'p-aaaaaaaaaaaa' }), 'a remembered self no longer ticked does not win').toMatchObject({ self: 'default', ask: false });
   });
-  it('the face names the room self: a persona by its own name; the general persona as before; nobody stays nobody', async () => {
-    const callSkill = async (app, op) => (op === 'getMyProfile' ? { entry: { displayName: 'Frits', handle: 'frits' } } : null);
-    const as = (self, choice = 'name') => createNearbyIdentity({ readChoice: () => choice, callSkill, roomSelf: () => self }).myFace();
+  it('the face names the room self: a persona by its own name; the general persona by its level; none stays nobody', async () => {
+    const at = (level) => async (app, op, args) => {
+      if (op === 'getMyProfile') return { entry: { displayName: 'Frits', handle: 'frits' } };
+      if (op === 'getProfileDisclosure') return { disclosure: { perContext: { nearby: { '_nearby.level': { enabled: level !== 'none', rung: level } } } } };
+      return null;
+    };
+    const as = (self, level = 'profile') => createNearbyIdentity({ callSkill: at(level), roomSelf: () => self }).myFace();
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' })).toEqual({ label: 'Werk' });
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }, 'handle'), 'a persona has no handle of the general persona').toEqual({ label: 'Werk' });
     expect(await as({ id: 'default' })).toEqual({ label: 'Frits' });
-    expect(await as(null)).toEqual({ label: 'Frits' });
+    expect(await as({ id: 'default' }, 'handle')).toEqual({ label: 'frits' });
+    expect(await as(null, 'handle'), 'no self entering: nobody, never the general persona by default').toBe(null);
     expect(await as({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }, 'none')).toBe(null);
   });
   it('what the shells hand the face: the chosen self, or ASKING while the room asks — never an absence', () => {
@@ -33,7 +38,17 @@ describe('who enters the room', () => {
 
   it('while the room ASKS, no face is broadcast — never the general persona by default', async () => {
     const callSkill = async (app, op) => (op === 'getMyProfile' ? { entry: { displayName: 'Frits', handle: 'frits' } } : null);
-    const face = await createNearbyIdentity({ readChoice: () => 'name', callSkill, roomSelf: () => ({ asking: true }) }).myFace();
+    const face = await createNearbyIdentity({ callSkill, roomSelf: () => ({ asking: true }) }).myFace();
     expect(face, 'the question first; the room is entered as nobody').toBe(null);
+  });
+
+  it('the level is set for THE ROOM SELF through the one writer — and not at all while the room asks', async () => {
+    const calls = [];
+    const callSkill = async (app, op, args) => { calls.push([app, op, args]); return { ok: true }; };
+    expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }) }).setLevel('profile')).toEqual({ ok: true });
+    expect(calls).toEqual([['household', 'setNearbyLevel', { personaId: 'p-aaaaaaaaaaaa', level: 'profile' }]]);
+    calls.length = 0;
+    expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ asking: true }) }).setLevel('full')).toEqual({ ok: false, reason: 'asking' });
+    expect(calls, 'no self chosen yet: nothing written').toEqual([]);
   });
 });

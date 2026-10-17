@@ -19,7 +19,7 @@ describe('matching in the room as the room self', () => {
     expect((await agent.callSkill('agents', 'setProfileDriver', { id: w, key: 'fietsen', kind: 'offering', text: 'fietsband plakken', tags: 'fiets' }))?.ok, 'Werk offers bicycle repair').toBe(true);
     const callSkill = (app, op, args) => agent.callSkill(app, op, args);
     let room = { id: w, name: 'Werk' };
-    const id = createNearbyIdentity({ readChoice: () => 'name', callSkill, roomSelf: () => room });
+    const id = createNearbyIdentity({ callSkill, roomSelf: () => room });
     const asWerk = await id.getDrivers();
     const labels = Object.values(asWerk).map((d) => d?.text);
     expect(labels, `Werk's own offering: ${JSON.stringify(asWerk)}`).toContain('fietsband plakken');

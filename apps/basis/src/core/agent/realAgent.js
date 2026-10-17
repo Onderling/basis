@@ -231,6 +231,7 @@ import { bindCircleAddressKeysFor } from '../../v2/householdRosterPairing.js';
 import { sealingPublicKeyFromNetworkKey, sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
+import { nearbyLevelWrites, NEARBY_CONTEXT } from '../../v2/nearbyLevel.js';
 import { parseDateInput as parseCalendarDate } from '@onderling-app/calendar';
 // Imported by RELATIVE path (not the `@onderling-app/household` package name)
 // because basis doesn't carry household as a workspace dep yet (the
@@ -3801,6 +3802,23 @@ export async function createRealHouseholdAgent(opts = {}) {
       return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true, rekeyedTo: next })];
     }
     return [DataPart({ ok: true, personaId: pid, deviceId: wire, retiredIn, reloadRequired: true })];
+  }, { visibility: 'private' });
+  // WHAT THE NEARBY ROOM SEES OF A SELF — its level, on THAT self's disclosure under the reserved context `nearby`: the
+  // one writer (the general disclosure op refuses the context). The person's, not the device's: it rides the registry.
+  hostAgent.register('setNearbyLevel', async ({ parts }) => {
+    const d = parts?.[0]?.data ?? {};
+    const pid = typeof d.personaId === 'string' && d.personaId ? d.personaId : primaryId;
+    const writes = nearbyLevelWrites(d.level);
+    if (!writes) return [DataPart({ ok: false, error: 'unknown-level' })];
+    if (!personas.has(pid)) return [DataPart({ ok: false, error: 'not-held' })];
+    try {
+      const cur = await agentsRegistryRef?.lookup?.(pid);
+      if (!cur) return [DataPart({ ok: false, error: 'no-record' })];
+      let disclosure = cur.disclosure ?? { perContext: {} };
+      for (const w of writes) disclosure = setDisclosurePolicy(disclosure, NEARBY_CONTEXT, w.key, { enabled: w.enabled, ...(w.rung ? { rung: w.rung } : {}) });
+      await agentsRegistryRef.register({ ...cur, disclosure });
+      return [DataPart({ ok: true, personaId: pid, level: d.level })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'set-failed' })]; }
   }, { visibility: 'private' });
   // THE PERSONAS ON THIS DEVICE, as the "Persona's op dit apparaat" screen lists them: every self it holds — running or
   // paused — with whether it is the primary (which cannot be paused).

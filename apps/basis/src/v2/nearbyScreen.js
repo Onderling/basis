@@ -98,6 +98,7 @@ export function nearbyVisibilityKey(visibility) {
  * @param {object} [deps.invitePublish]  per-circle publish allows `{[circleId]: true}` — off by default
  * @param {() => string|null} [deps.myRoomAddress]  the ephemeral address I present here
  * @param {() => Promise<Record<string,object>>} [deps.getDrivers]  MY drivers — read on-device, never sent
+ * @param {() => Promise<string>} [deps.roomLevel]  the room self's Nearby level (`none` refuses a card)
  * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
  * @param {() => number} [deps.now]
  * @param {string} [deps.restingState]   passed through to the session adapter
@@ -126,6 +127,7 @@ export function createNearbyScreen({
   invitePublish = null,
   myRoomAddress = () => null,
   getDrivers = null,
+  roomLevel = null,
   judge,
   now = () => Date.now(),
   restingState,
@@ -621,6 +623,12 @@ export function createNearbyScreen({
     /** Publish my card to the room. Refused unless the card allow is on. */
     async showCard({ label, line, tags } = {}) {
       if (!allows.card) return { ok: false, reason: 'card-not-allowed' };
+      // the room self's level `none`: the room is told nothing — no card, whatever was typed
+      if (typeof roomLevel === 'function') {
+        let level = null;
+        try { level = await roomLevel(); } catch { level = null; }
+        if (level === 'none') return { ok: false, reason: 'level-none' };
+      }
       const built = createCard({ label, line, tags, from: safeCall(myRoomAddress, null), now });
       if (!built.ok) return built;
       if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel', card: built.card };

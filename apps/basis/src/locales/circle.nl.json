@@ -3154,6 +3154,10 @@
       "text": "Eén regel over waarom je hier bent",
       "doc": "Card line field — optional."
     },
+    "card_prefill": {
+      "text": "Vul in met wat deze ruimte van je mag zien",
+      "doc": "Nearby card form: fill the name field from the room self's Nearby level (its release under the reserved nearby context) — nothing more; the person still sends it."
+    },
     "card_visible_to": {
       "text": "Iedereen hier kan dit zien.",
       "doc": "Shown with the card composer. \"Everyone in this room\" is not obvious from a text field."
@@ -3418,14 +3422,6 @@
       "text": "Toon hier als",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
     },
-    "face_name": {
-      "text": "Je naam",
-      "doc": "displayName (the default)."
-    },
-    "face_handle": {
-      "text": "Je handle",
-      "doc": "the handle."
-    },
     "face_none": {
       "text": "Niemand",
       "doc": "withhold the label; rows show the key fragment."
@@ -3433,6 +3429,10 @@
     "face_empty": {
       "text": "Dat heb je nog niet ingesteld, dus niemand in de buurt ziet een naam — je sleutelfragment staat er.",
       "doc": "Nearby face picker: the chosen face (name or handle) resolves to nothing, so a retraction was announced."
+    },
+    "level_not_set": {
+      "text": "Dat is niet veranderd — probeer het opnieuw.",
+      "doc": "Nearby: setting the room self's level (what the room sees of it) was refused or failed; nothing changed."
     },
     "face_caveat": {
       "text": "Een vast gezicht maakt je herkenbaar op verschillende plekken, ook al wisselt je adres.",

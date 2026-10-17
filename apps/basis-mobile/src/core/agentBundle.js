@@ -60,7 +60,7 @@ import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
-import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
+import { readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -487,11 +487,10 @@ export async function bootAgentBundle(opts = {}) {
   // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
   // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
   // agent, like everything else here built before the agent lands.
-  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none: the general persona's face
+  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none yet: no face (never the general persona by default)
   const nearbyRoomSelfRef = { current: () => null };
   // what the room is told about me, and what an ask in it is weighed against (nearbyIdentity.js) — one per bundle
   const nearbyIdentity = createNearbyIdentity({
-    readChoice: readNearbyFace,
     callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
     relayUrl: () => resolveMobileRelayUrl(),
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,

@@ -23,7 +23,7 @@
  *     web and mobile cannot drift on what proximity entitles a stranger to.
  */
 
-import { NEARBY_FACES } from '../../src/v2/nearbyIdentity.js';
+import { NEARBY_LEVELS, nearbyLevelLabelKey } from '../../src/v2/nearbyLevel.js';
 import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
 } from '../../src/v2/nearbyScreen.js';
@@ -42,10 +42,11 @@ export function renderCircleNearby(container, {
   composing = false,
   onSubmitAsk = null,
   notice = null,
-  face = 'name',
-  onFaceChange = null,
+  level = null,          // the room self's Nearby level (null while it is being read)
+  onLevelChange = null,
   onToggleAllow = null,
   onSubmitCard = null,
+  onPrefillCard = null,   // async () => ({label?}) — only what the room self's level releases
   onSay = null,
   onInviteAction = null,
 } = {}) {
@@ -452,22 +453,22 @@ export function renderCircleNearby(container, {
     rs.appendChild(cav);
     mine.appendChild(rs);
   }
-  // The room face: the SAME faces a circle offers — name, handle, or nobody.
-  if (typeof onFaceChange === 'function') {
+  // What the room sees of the self entering it — its level, kept on that self (so it travels with the persona).
+  if (typeof onLevelChange === 'function') {
     const faceBlock = document.createElement('div');
     faceBlock.className = 'circle-nearby__face';
     const faceTitle = document.createElement('div');
     faceTitle.className = 'circle-nearby__face-title';
     faceTitle.textContent = tr('circle.nearbyScreen.face_row');
     faceBlock.appendChild(faceTitle);
-    for (const v of NEARBY_FACES) {
+    for (const v of NEARBY_LEVELS) {
       const lbl = document.createElement('label');
       lbl.className = `circle-nearby__face-option circle-nearby__face-option--${v}`;
       const radio = document.createElement('input');
-      radio.type = 'radio'; radio.name = 'nearby-face'; radio.value = v; radio.checked = face === v;
-      radio.addEventListener('change', () => onFaceChange(v));
+      radio.type = 'radio'; radio.name = 'nearby-level'; radio.value = v; radio.checked = level === v;
+      radio.addEventListener('change', () => onLevelChange(v));
       lbl.appendChild(radio);
-      lbl.appendChild(document.createTextNode(tr(`circle.nearbyScreen.face_${v}`)));
+      lbl.appendChild(document.createTextNode(tr(nearbyLevelLabelKey(v))));
       faceBlock.appendChild(lbl);
     }
     const caveat = document.createElement('div');
@@ -500,6 +501,20 @@ export function renderCircleNearby(container, {
     line.maxLength = CARD_MAX_LINE;
     line.placeholder = tr('circle.nearbyScreen.card_line');
     form.appendChild(line);
+
+    // "Fill in" from what this room may see of the self entering it — the person still reads and sends it.
+    if (typeof onPrefillCard === 'function') {
+      const fill = document.createElement('button');
+      fill.type = 'button';
+      fill.className = 'circle-nearby__card-prefill';
+      fill.textContent = tr('circle.nearbyScreen.card_prefill');
+      fill.addEventListener('click', async () => {
+        let got = {};
+        try { got = (await onPrefillCard()) ?? {}; } catch { got = {}; }
+        if (typeof got.label === 'string' && got.label) label.value = got.label.slice(0, CARD_MAX_LABEL);
+      });
+      form.appendChild(fill);
+    }
 
     // The consequence, next to the fields. "Everyone in this room" is not obvious from a text box.
     const who = document.createElement('div');

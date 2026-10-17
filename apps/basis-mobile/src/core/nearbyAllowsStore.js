@@ -7,7 +7,6 @@
  * sees the choice. Never fanned, never shared — it decides what THIS device shows and joins.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NEARBY_FACES } from '../../../basis/src/v2/nearbyIdentity.js';
 
 const KEY = 'cc.nearbyAllows';
 let cached = null;
@@ -31,20 +30,6 @@ export function firstNearbyMineOpen() {
   seen = true;
   AsyncStorage.setItem(SEEN_KEY, '1').catch(() => {});
   return true;
-}
-
-/**
- * The room face: which of the existing circle-style faces this device presents in Nearby —
- * 'name' (displayName, the default) · 'handle' · 'none'. Per device, like the allows.
- */
-const FACE_KEY = 'cc.nearbyFace';
-let face = 'name';
-AsyncStorage.getItem(FACE_KEY).then((raw) => { if (NEARBY_FACES.includes(raw)) face = raw; }).catch(() => {});
-export function readNearbyFace() { return face; }
-export function writeNearbyFace(next) {
-  if (!NEARBY_FACES.includes(next)) return;
-  face = next;
-  AsyncStorage.setItem(FACE_KEY, next).catch(() => {});
 }
 
 /**

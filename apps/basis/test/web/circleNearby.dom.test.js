@@ -466,3 +466,23 @@ describe('circles advertised in the room (step H)', () => {
   });
 });
 
+
+describe('the card prefill', () => {
+  it('fills the name field with what the shell hands back (the room self\'s release) — nothing is sent until the person sends it', async () => {
+    const sent = [];
+    const el = render(model({ allows: { card: true, chat: false } }), { onPrefillCard: async () => ({ label: 'Werk' }), onSubmitCard: (f) => sent.push(f) });
+    const fill = el.querySelector('.circle-nearby__card-prefill');
+    expect(fill, 'the button is offered').not.toBe(null);
+    fill.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(el.querySelector('.circle-nearby__card-label').value).toBe('Werk');
+    expect(sent, 'filling is not sending').toEqual([]);
+  });
+  it('an empty release leaves the field as it was', async () => {
+    const el = render(model({ allows: { card: true, chat: false } }), { onPrefillCard: async () => ({}) });
+    el.querySelector('.circle-nearby__card-label').value = 'mine';
+    el.querySelector('.circle-nearby__card-prefill').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(el.querySelector('.circle-nearby__card-label').value).toBe('mine');
+  });
+});

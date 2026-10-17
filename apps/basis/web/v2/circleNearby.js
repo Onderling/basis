@@ -46,6 +46,7 @@ export function renderCircleNearby(container, {
   onLevelChange = null,
   onToggleAllow = null,
   onSubmitCard = null,
+  onPrefillCard = null,   // async () => ({label?}) — only what the room self's level releases
   onSay = null,
   onInviteAction = null,
 } = {}) {
@@ -500,6 +501,20 @@ export function renderCircleNearby(container, {
     line.maxLength = CARD_MAX_LINE;
     line.placeholder = tr('circle.nearbyScreen.card_line');
     form.appendChild(line);
+
+    // "Fill in" from what this room may see of the self entering it — the person still reads and sends it.
+    if (typeof onPrefillCard === 'function') {
+      const fill = document.createElement('button');
+      fill.type = 'button';
+      fill.className = 'circle-nearby__card-prefill';
+      fill.textContent = tr('circle.nearbyScreen.card_prefill');
+      fill.addEventListener('click', async () => {
+        let got = {};
+        try { got = (await onPrefillCard()) ?? {}; } catch { got = {}; }
+        if (typeof got.label === 'string' && got.label) label.value = got.label.slice(0, CARD_MAX_LABEL);
+      });
+      form.appendChild(fill);
+    }
 
     // The consequence, next to the fields. "Everyone in this room" is not obvious from a text box.
     const who = document.createElement('div');

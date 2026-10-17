@@ -3961,6 +3961,7 @@ function showNearby() {
       notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' };
       draw(nearbyScreen.model());
     },
+    onPrefillCard: () => _nearbyIdentity?.cardPrefill?.() ?? Promise.resolve({}),
     onSay: (text) => { nearbyScreen.say(text); },
     onInviteAction: (action, invite) => {
       // A broadcast invite joins through the SAME path as a scanned QR — that is the point of step H: the

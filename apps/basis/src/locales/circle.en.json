@@ -3154,6 +3154,10 @@
       "text": "One line about why you are here",
       "doc": "Card line field — optional."
     },
+    "card_prefill": {
+      "text": "Fill in from what this room may see of you",
+      "doc": "Nearby card form: fill the name field from the room self's Nearby level (its release under the reserved nearby context) — nothing more; the person still sends it."
+    },
     "card_visible_to": {
       "text": "Everyone in this room can see this.",
       "doc": "Shown with the card composer. \"Everyone in this room\" is not obvious from a text field."

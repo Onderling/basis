@@ -31,21 +31,34 @@ import { b64Encode, b64Decode }       from './utils/base64.js';
  * key — a hello's `_from` and a TXT record's `pubKey` are claims, and keying on a claim let any device on the Wi-Fi
  * become another device's row and its route. Three frames, each side proving itself to the other:
  *   dialler → listener   { _mdns_hello: true, _from: D, nonce: nD }
- *   listener → dialler   { _mdns_challenge: true, _from: L, nonce: nL, sig: L.sign(proof(nD, L, D)) }
- *   dialler → listener   { _mdns_proof: true, sig: D.sign(proof(nL, D, L)) }
+ *   listener → dialler   { _mdns_challenge: true, _from: L, nonce: nL, sig: L.sign(challenge|nD|nL|L|D) }
+ *   dialler → listener   { _mdns_proof: true, sig: D.sign(proof|nD|nL|D|L) }
  * The dialler keys the connection on a verified challenge (and `_from` must be the key it dialled); the listener on a
- * verified proof. The message signed is built HERE, never taken from the far end. Part of the wire contract: a peer
+ * verified proof. The message signed is built HERE, never taken from the far end, and names its role and both nonces.
+ * A connection without a key carries NO data: any other frame on it is dropped and the socket refused. Part of the wire contract: a peer
  * on an older build is never keyed (both sides must ship this together).
  */
 const HELLO_DOMAIN = 'onderling-mdns-hello-v1';
 /**
- * The message one side signs to prove its key in the challenged hello — built here, never taken from the far end.
- * @param {string} nonce     the OTHER side's nonce
- * @param {string} prover    the pubKey doing the proving
- * @param {string} verifier  the pubKey it proves itself to
+ * The two messages of the challenged hello — built here, never taken from the far end. They differ by ROLE and both
+ * carry BOTH nonces, so a listener's challenge signature can never be replayed as a dialler's proof (or the reverse),
+ * under any nonce a relay picks.
+ * @param {string} nD  the dialler's nonce
+ * @param {string} nL  the listener's nonce
+ * @param {string} L   the listener's pubKey (it signs the challenge)
+ * @param {string} D   the dialler's pubKey
  * @returns {string}
  */
-export const helloProof = (nonce, prover, verifier) => `${HELLO_DOMAIN}|${nonce}|${prover}|${verifier}`;
+export const helloChallengeMessage = (nD, nL, L, D) => `${HELLO_DOMAIN}|challenge|${nD}|${nL}|${L}|${D}`;
+/**
+ * The dialler's proof: signed by the dialler over both nonces (see `helloChallengeMessage`).
+ * @param {string} nD
+ * @param {string} nL
+ * @param {string} D   the dialler's pubKey (it signs the proof)
+ * @param {string} L   the listener's pubKey
+ * @returns {string}
+ */
+export const helloProofMessage = (nD, nL, D, L) => `${HELLO_DOMAIN}|proof|${nD}|${nL}|${D}|${L}`;
 const HANDSHAKE_MS = 10_000;
 function freshNonce() {
   const b = new Uint8Array(24);
@@ -384,9 +397,9 @@ export class MdnsTransport extends Transport {
           this.#onHandshakeFrame(connectionId, envelope);
           return;
         }
-        // Any other frame on a connection that has not proven itself goes upstream (the agent verifies every
-        // envelope on its own), but the connection stays unkeyed: no row, no route.
-        if (this.#pending.has(connectionId) && !this.#handshakes.has(connectionId)) this.#pending.delete(connectionId);
+        // No row, no route, no DATA: a frame from a connection without a key is dropped and the socket refused — it
+        // cannot be replied to, and the hello exists so that nothing arrives from a key nobody proved.
+        if (!this.#connToPubKey.has(connectionId)) { this.#refuse(connectionId); return; }
 
         const mappedPubKey = this.#connToPubKey.get(connectionId);
         if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());
@@ -454,17 +467,17 @@ export class MdnsTransport extends Transport {
       const claimed = typeof f._from === 'string' ? f._from : null;
       if (!claimed || claimed === this.#pubKey || typeof f.nonce !== 'string') { this.#refuse(connId); return; }
       const nonce = freshNonce();
-      this.#startHandshake(connId, { role: 'listener', peer: claimed, nonce });
-      const sig = sigB64(this.#identity.sign(helloProof(f.nonce, this.#pubKey, claimed)));
+      this.#startHandshake(connId, { role: 'listener', peer: claimed, nonce, theirNonce: f.nonce });
+      const sig = sigB64(this.#identity.sign(helloChallengeMessage(f.nonce, nonce, this.#pubKey, claimed)));
       this.#sendFrame(connId, { _mdns_challenge: true, _from: this.#pubKey, nonce, sig }).catch(() => this.#refuse(connId));
       return;
     }
     // dialler: the listener proved its key → key the connection, prove ours
     if (f._mdns_challenge && hs?.role === 'dialler') {
-      const ok = f._from === hs.peer && typeof f.nonce === 'string' && verifies(helloProof(hs.nonce, f._from, this.#pubKey), f.sig, f._from);
+      const ok = f._from === hs.peer && typeof f.nonce === 'string' && verifies(helloChallengeMessage(hs.nonce, f.nonce, f._from, this.#pubKey), f.sig, f._from);
       if (!ok) { console.warn('[MdnsTransport] listener did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return; }
       this.#endHandshake(connId);
-      const sig = sigB64(this.#identity.sign(helloProof(f.nonce, this.#pubKey, hs.peer)));
+      const sig = sigB64(this.#identity.sign(helloProofMessage(hs.nonce, f.nonce, this.#pubKey, hs.peer)));
       this.#sendFrame(connId, { _mdns_proof: true, sig }).catch(() => {});
       const previous = this.#pubKeyToConn.get(hs.peer);
       this.#registerConn(connId, hs.peer);
@@ -473,7 +486,7 @@ export class MdnsTransport extends Transport {
     }
     // listener: the dialler proved its key → key the connection
     if (f._mdns_proof && hs?.role === 'listener') {
-      if (!verifies(helloProof(hs.nonce, hs.peer, this.#pubKey), f.sig, hs.peer)) {
+      if (!verifies(helloProofMessage(hs.theirNonce, hs.nonce, hs.peer, this.#pubKey), f.sig, hs.peer)) {
         console.warn('[MdnsTransport] dialler did not prove', String(hs.peer).slice(0, 12)); this.#refuse(connId); return;
       }
       this.#endHandshake(connId);

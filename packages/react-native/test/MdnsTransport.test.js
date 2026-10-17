@@ -42,7 +42,7 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { b64Encode } from '../src/utils/base64.js';
 import { MdnsTransport } from '../src/transport/MdnsTransport.js';
-import { helloProof } from '@onderling/transports/mdns';
+import { helloChallengeMessage, helloProofMessage } from '@onderling/transports/mdns';
 
 /** Fire a native emitter event into every registered listener. */
 function fireMdns(event, payload) {
@@ -60,7 +60,7 @@ const until = async (fn) => { for (let i = 0; i < 200; i++) { const v = fn(); if
 /** We dialled `remote` on `connId`: answer our hello with a challenge `remote` really signed. */
 async function proveListener(self, remote, connId = 'conn-1') {
   const hello = await until(() => sentOn(connId).find((f) => f._mdns_hello));
-  const sig = b64Encode(remote.sign(helloProof(hello.nonce, remote.pubKey, self.pubKey)));
+  const sig = b64Encode(remote.sign(helloChallengeMessage(hello.nonce, 'n-remote', remote.pubKey, self.pubKey)));
   fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_challenge: true, _from: remote.pubKey, nonce: 'n-remote', sig }) });
   return hello;
 }
@@ -70,7 +70,7 @@ async function proveDialler(self, remote, connId) {
   fireMdns('MdnsClientConnected', { connectionId: connId });
   fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_hello: true, _from: remote.pubKey, nonce: `n-${connId}` }) });
   const challenge = await until(() => sentOn(connId).find((f) => f._mdns_challenge));
-  const sig = b64Encode(remote.sign(helloProof(challenge.nonce, remote.pubKey, self.pubKey)));
+  const sig = b64Encode(remote.sign(helloProofMessage(`n-${connId}`, challenge.nonce, remote.pubKey, self.pubKey)));
   fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_proof: true, sig }) });
   return challenge;
 }
@@ -168,14 +168,14 @@ describe('MdnsTransport', () => {
     expect(transport._hasPeer(remoteHigher)).toBe(true);
     // and we proved ourselves back, over the listener's nonce
     const proof = await until(() => sentOn('conn-1').find((f) => f._mdns_proof));
-    expect(AgentIdentity.verify(helloProof('n-remote', identity.pubKey, remoteHigher), proof.sig, identity.pubKey)).toBe(true);
+    expect(AgentIdentity.verify(helloProofMessage(hello.nonce, 'n-remote', identity.pubKey, remoteHigher), proof.sig, identity.pubKey)).toBe(true);
   });
 
   it('a listener that cannot sign as the key it advertised is never keyed, and the socket is closed', async () => {
     await transport.connect();
     fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
     const hello = await until(() => sentOn('conn-1').find((f) => f._mdns_hello));
-    const sig = b64Encode(loId.sign(helloProof(hello.nonce, remoteHigher, identity.pubKey)));   // the wrong key signs
+    const sig = b64Encode(loId.sign(helloChallengeMessage(hello.nonce, 'x', remoteHigher, identity.pubKey)));   // the wrong key signs
     fireMdns('MdnsDataReceived', { connectionId: 'conn-1', data: b64json({ _mdns_challenge: true, _from: remoteHigher, nonce: 'x', sig }) });
     await until(() => h.native.close.mock.calls.length > 0);
     expect(transport._hasPeer(remoteHigher)).toBe(false);
@@ -221,8 +221,8 @@ describe('MdnsTransport', () => {
     const challenge = await until(() => sentOn('in-1').find((f) => f._mdns_challenge));
     expect(transport._hasPeer(remoteLower), 'a hello is a claim').toBe(false);
     // we proved OUR key over the dialler's nonce
-    expect(AgentIdentity.verify(helloProof('n-in-1', identity.pubKey, remoteLower), challenge.sig, identity.pubKey)).toBe(true);
-    const sig = b64Encode(loId.sign(helloProof(challenge.nonce, remoteLower, identity.pubKey)));
+    expect(AgentIdentity.verify(helloChallengeMessage('n-in-1', challenge.nonce, identity.pubKey, remoteLower), challenge.sig, identity.pubKey)).toBe(true);
+    const sig = b64Encode(loId.sign(helloProofMessage('n-in-1', challenge.nonce, remoteLower, identity.pubKey)));
     fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_proof: true, sig }) });
     expect(await discovered).toBe(remoteLower);
     expect(transport._hasPeer(remoteLower)).toBe(true);
@@ -235,7 +235,7 @@ describe('MdnsTransport', () => {
     fireMdns('MdnsClientConnected', { connectionId: 'in-9' });
     fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n' }) });
     const challenge = await until(() => sentOn('in-9').find((f) => f._mdns_challenge));
-    const sig = b64Encode(hiId.sign(helloProof(challenge.nonce, remoteLower, identity.pubKey)));   // a squatter signs
+    const sig = b64Encode(hiId.sign(helloProofMessage('n', challenge.nonce, remoteLower, identity.pubKey)));   // a squatter signs
     fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_proof: true, sig }) });
     await until(() => h.native.close.mock.calls.length > 0);
     expect(transport._hasPeer(remoteLower)).toBe(false);

@@ -17,21 +17,43 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 
 ## `src/MdnsTransport.js`
 
-### `helloProof`
+### `helloChallengeMessage`
 
-**Kind:** function · **Import:** `helloProof` from `'@onderling/transports/mdns'`
+**Kind:** function · **Import:** `helloChallengeMessage` from `'@onderling/transports/mdns'`
 
 ```js
-helloProof(nonce, prover, verifier)
+helloChallengeMessage(nD, nL, L, D)
 ```
 
-The message one side signs to prove its key in the challenged hello — built here, never taken from the far end.
+The two messages of the challenged hello — built here, never taken from the far end. They differ by ROLE and both
+carry BOTH nonces, so a listener's challenge signature can never be replayed as a dialler's proof (or the reverse),
+under any nonce a relay picks.
 
 **Parameters**
 
-- `nonce` `string` — the OTHER side's nonce
-- `prover` `string` — the pubKey doing the proving
-- `verifier` `string` — the pubKey it proves itself to
+- `nD` `string` — the dialler's nonce
+- `nL` `string` — the listener's nonce
+- `L` `string` — the listener's pubKey (it signs the challenge)
+- `D` `string` — the dialler's pubKey
+
+**Returns:** `string`
+
+### `helloProofMessage`
+
+**Kind:** function · **Import:** `helloProofMessage` from `'@onderling/transports/mdns'`
+
+```js
+helloProofMessage(nD, nL, D, L)
+```
+
+The dialler's proof: signed by the dialler over both nonces (see `helloChallengeMessage`).
+
+**Parameters**
+
+- `nD` `string`
+- `nL` `string`
+- `D` `string` — the dialler's pubKey (it signs the proof)
+- `L` `string` — the listener's pubKey
 
 **Returns:** `string`
 

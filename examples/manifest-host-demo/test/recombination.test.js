@@ -131,7 +131,7 @@ describe('SP-4b + SP-11: recombination demo (household + tasks-v0)', () => {
 /* ════════════════════════════════════════════════════════════════════
  * SP-11b — cross-surface recombination polish.
  *
- *   (1) stoop as a 3rd mounted app — three apps composed cleanly.
+ *   (1) pinboard as a 3rd mounted app — three apps composed cleanly.
  *   (2) a canonical cross-app `embeds:[{type,ref}]` reference resolved
  *       across two apps' stores.
  *   (3) a saved CROSS-CIRCLE view — now unblocked by SP-8
@@ -140,11 +140,11 @@ describe('SP-4b + SP-11: recombination demo (household + tasks-v0)', () => {
  *       describe block below.
  * ════════════════════════════════════════════════════════════════════ */
 
-describe('SP-11b: stoop as a 3rd mounted app', () => {
+describe('SP-11b: pinboard as a 3rd mounted app', () => {
   let runtime;
 
   beforeEach(async () => {
-    runtime = await setupRecombinationDemo({ mountStoop: true });
+    runtime = await setupRecombinationDemo({ mountPinboard: true });
   });
 
   afterEach(async () => {
@@ -152,14 +152,14 @@ describe('SP-11b: stoop as a 3rd mounted app', () => {
   });
 
   it('mounts all three apps', () => {
-    expect(runtime.host.list().sort()).toEqual(['household', 'stoop', 'tasks']);
+    expect(runtime.host.list().sort()).toEqual(['household', 'pinboard', 'tasks']);
   });
 
-  it('stoop mounts with a real, complete skill registry (zero manifest-op drift)', () => {
+  it('pinboard mounts with a real, complete skill registry (zero manifest-op drift)', () => {
     // The bundle's skill set covers every substrate-backed manifest op
-    // — `buildStoopSkillRegistry` reports nothing missing.
-    expect(runtime.stoop.missing).toEqual([]);
-    expect(Object.keys(runtime.stoop.mountable.skillRegistry).length)
+    // — `buildPinboardSkillRegistry` reports nothing missing.
+    expect(runtime.pinboard.missing).toEqual([]);
+    expect(Object.keys(runtime.pinboard.mountable.skillRegistry).length)
       .toBeGreaterThan(0);
   });
 
@@ -167,19 +167,19 @@ describe('SP-11b: stoop as a 3rd mounted app', () => {
     const ids = runtime.composed.toolCatalogue.map((t) => t.id);
 
     // Every id is namespaced to one of the three mounted apps.
-    expect(ids.every((id) => /^(household|tasks|stoop)\./.test(id))).toBe(true);
+    expect(ids.every((id) => /^(household|tasks|pinboard)\./.test(id))).toBe(true);
 
     // Each app contributes at least one tool (sample per app).
     expect(ids).toContain('household.addItem');
     expect(ids).toContain('tasks.addTask');
-    expect(ids.some((id) => id.startsWith('stoop.'))).toBe(true);
+    expect(ids.some((id) => id.startsWith('pinboard.'))).toBe(true);
 
     // Namespacing is what keeps a shared bare op-name (e.g. `listOpen`,
-    // which household, tasks AND stoop all define) collision-free in
+    // which household, tasks AND pinboard all define) collision-free in
     // the tool catalogue: three distinct ids, one per app.
     expect(ids).toContain('household.listOpen');
     expect(ids).toContain('tasks.listOpen');
-    expect(ids).toContain('stoop.listOpen');
+    expect(ids).toContain('pinboard.listOpen');
   });
 
   it('reports zero command collisions for the three-app combo', () => {
@@ -190,9 +190,9 @@ describe('SP-11b: stoop as a 3rd mounted app', () => {
 
   it('exposes a per-app system prompt for each of the three apps (not concatenated)', () => {
     const prompts = runtime.composed.perAppSystemPrompts;
-    expect(Object.keys(prompts).sort()).toEqual(['household', 'stoop', 'tasks']);
+    expect(Object.keys(prompts).sort()).toEqual(['household', 'pinboard', 'tasks']);
     // Each is its own entry — a string keyed per app, not one merged blob.
-    for (const app of ['household', 'stoop', 'tasks']) {
+    for (const app of ['household', 'pinboard', 'tasks']) {
       expect(typeof prompts[app]).toBe('string');
     }
   });
@@ -202,10 +202,10 @@ describe('SP-11b: cross-app embed reference (canonical embeds:[{type,ref}])', ()
   let runtime;
 
   beforeEach(async () => {
-    // Stoop isn't needed for the embed itself (household ↔ tasks), but
+    // Pinboard isn't needed for the embed itself (household ↔ tasks), but
     // running it under the 3-app host proves the reference works in the
     // full cross-surface composition.
-    runtime = await setupRecombinationDemo({ mountStoop: true });
+    runtime = await setupRecombinationDemo({ mountPinboard: true });
   });
 
   afterEach(async () => {

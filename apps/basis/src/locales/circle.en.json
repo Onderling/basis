@@ -7381,6 +7381,8 @@
     "done_remove_reload": "Done. {{name}} was taken off this device. Restart the app.",
     "remove_key_holder": "This device speaks as this persona; it cannot be taken off.",
     "remove_paused": "Resume this persona first: to retire its addresses it must still be able to speak.",
+    "slash_row": "• {{name}}",
+    "slash_row_state": "• {{name}} — {{state}}",
     "here_title": "On this device",
     "primary": "this device speaks as this persona",
     "paused": "paused on this device",

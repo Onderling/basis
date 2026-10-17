@@ -3703,7 +3703,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       const entry = makeAgentTrailEntry({ actor: chatId?.pubKey ?? 'owner', op: on ? 'pause-persona' : 'resume-persona', kind: 'settings-change', target: { kind: 'persona', ref: pid }, via: 'owner', outcome: 'ok' });
       if (entry) opts.deviceLog.append(entry);
     }
-    return { ok: true, paused: on, reloadRequired: true };
+    // the name rides back, so a typed `/pauze Werk` is answered in the screen's own words
+    let name = null;
+    try { name = (await agentsRegistryRef?.lookup?.(pid))?.name ?? null; } catch { /* nameless */ }
+    return { ok: true, paused: on, reloadRequired: true, personaId: pid, name };
   };
   hostAgent.register('pausePersona', async ({ parts }) => {
     return [DataPart(await setPaused(parts?.[0]?.data?.personaId, true))];

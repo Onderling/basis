@@ -32,6 +32,7 @@
  */
 import { whenWords, timeWords, dateLocaleOf } from './whenWords.js';
 import { translatorOr } from '../locales/translatorOr.js';
+import { personasHereRows } from './personasHere.js';
 
 /** The op families: op id → family. The ops a household bot reaches that act (its reads are painted as lists). */
 export const REPLY_FAMILY = Object.freeze({
@@ -57,6 +58,10 @@ export const REPLY_FAMILY = Object.freeze({
   // a household note written or taken away: in the op's own words ("Onthouden: …", "Vergeten: …")
   '__generic__:household:add:note': 'list',
   '__generic__:household:remove:note': 'list',
+  // this device's own selves (the device ops, typed `/hier`, `/pauze`, `/hervat`): the screen's own words — never on a bot
+  listPersonasHere: 'persona',
+  pausePersona: 'persona',
+  resumePersona: 'persona',
   // the people reads
   listOpen: 'who',
   listMine: 'mine',
@@ -104,6 +109,8 @@ export function replyFact(result, { opId, args = {} } = {}) {
         : own;
     case 'chore':
       return choreOpFact(id, result, args) ?? own;
+    case 'persona':
+      return personaFact(id, result);
     case 'who':
       return whoFact(result, args);
     case 'mine':
@@ -121,6 +128,26 @@ export function replyFact(result, { opId, args = {} } = {}) {
     default:
       return own;
   }
+}
+
+/**
+ * This device's selves, as the "Persona's op dit apparaat" screen says them: the list one row each (the general persona
+ * by the switcher's word, the primary and the paused ones with their state), a pause or resume with the screen's notice.
+ */
+function personaFact(id, result) {
+  const nameOf = (p) => (p.id === 'default' ? { tvars: { name: 'circle.switcher.you' } } : { vars: { name: p.name ?? p.id } });
+  if (id === 'listPersonasHere') {
+    const rows = personasHereRows(result.personas ?? []);
+    if (!rows.length) return null;
+    return { family: 'persona', lines: rows.map((r) => {
+      const n = r.nameKey ? { tvars: { name: r.nameKey } } : { vars: { name: r.name } };
+      return r.stateKey
+        ? { key: 'circle.receive_personas.slash_row_state', vars: { ...(n.vars ?? {}) }, tvars: { ...(n.tvars ?? {}), state: r.stateKey } }
+        : { key: 'circle.receive_personas.slash_row', vars: { ...(n.vars ?? {}) }, tvars: { ...(n.tvars ?? {}) } };
+    }) };
+  }
+  const n = nameOf({ id: result.personaId, name: result.name });
+  return { family: 'persona', key: id === 'pausePersona' ? 'circle.receive_personas.done_pause_reload' : 'circle.receive_personas.done_resume_reload', vars: { ...(n.vars ?? {}) }, tvars: { ...(n.tvars ?? {}) } };
 }
 
 /** A chore an add or a "make it a chore" made, with who holds it and its day (what the door said it did). */
@@ -239,6 +266,8 @@ function word(fact, t) {
     ...(fact.item != null ? { text: several ? listWords(fact.items, t) : (fact.items ?? [fact.item]).join(', ') } : {}),
     ...(several ? { count: fact.items.length } : {}),
     ...fact.vars,
+    // a var that is itself a word (the general persona's name, a state): translated here
+    ...(fact.tvars ? Object.fromEntries(Object.entries(fact.tvars).map(([k, key]) => [k, key ? t(key) : ''])) : {}),
   };
   if (fact.who !== undefined) vars.who = Array.isArray(fact.who) && !fact.who.length && fact.nobody ? t('circle.reply.who_nobody') : peopleWords(fact.who, t);
   if ('time' in vars) vars.time = timeWords(vars.time);

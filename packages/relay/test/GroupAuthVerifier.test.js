@@ -193,7 +193,7 @@ describe('GroupAuthVerifier — requiredRole (D3 composition)', () => {
   });
 });
 
-// ── Phase 2 (Stoop V1, 2026-05-05) — revoked members ──────────────────────
+// ── Phase 2 (Pinboard V1, 2026-05-05) — revoked members ──────────────────────
 
 describe('GroupAuthVerifier — revokedMembers (Phase 2C)', () => {
   it('rejects a proof whose memberPubKey is on revokedMembers', async () => {
@@ -230,7 +230,7 @@ describe('GroupAuthVerifier — revokedMembers (Phase 2C)', () => {
   });
 });
 
-// ── Phase 2 (Stoop V1, 2026-05-05) — verifyBound + rotation chain ─────────
+// ── Phase 2 (Pinboard V1, 2026-05-05) — verifyBound + rotation chain ─────────
 
 describe('GroupAuthVerifier — verifyBound + rotation chain (Phase 2B)', () => {
   it('accepts when proof.memberPubKey === connectingPubKey (no rotation needed)', async () => {

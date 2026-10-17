@@ -6,7 +6,7 @@
  * scheme. The `actionToNavigation` mapping (deep-link kind → nav
  * route) stays app-side because it depends on the app's route table.
  *
- * Lifted from apps/stoop-mobile/src/lib/deepLinks.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/deepLinks.js 2026-05-09
  * (Phase 41.0.b A6).
  */
 

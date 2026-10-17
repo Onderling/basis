@@ -1,7 +1,7 @@
 /**
  * podSignIn — Tasks V2 substrate-adoption (2026-05-14).
  *
- * Mirror of Stoop's `apps/stoop/src/lib/podSignIn.js`. Glue between
+ * Mirror of Pinboard's `apps/pinboard/src/lib/podSignIn.js`. Glue between
  * `createSolidAuthNode` (browser-redirect Solid OIDC, via
  * `@onderling/oidc-session`) and the circle bundle's
  * `CachingDataSource`. Four operations:
@@ -183,7 +183,7 @@ export async function completePodSignIn({
   // tasks-mobile's ServiceContext.attachPod calls. Wires setAnchor +
   // _podCtx (classify/reverse) + cache.attachInner so routing/
   // provisioning behave identically on web and mobile (platform-parity
-  // principle, mirror of stoop commit 11a269a).
+  // principle, mirror of pinboard commit 11a269a).
   //
   // `circle` here is a `{dataSource: CachingDataSource, …}` shaped holder
   // — it maps to `bundle.cache` in the attachTasksBundle contract.

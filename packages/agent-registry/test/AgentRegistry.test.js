@@ -20,7 +20,7 @@ const ANNE_LAPTOP = {
   role:         'device',
   name:         'Anne (laptop)',
   deviceId:     'laptop-anne',
-  capabilities: ['stoop', 'tasks'],
+  capabilities: ['pinboard', 'tasks'],
 };
 const ANNE_PHONE = {
   agentId:      'phone-anne',
@@ -88,7 +88,7 @@ describe('register + list', () => {
     expect(all[0]).toMatchObject({
       agentId:      'laptop-anne',
       pubKey:       PUB_A,
-      capabilities: ['stoop', 'tasks'],
+      capabilities: ['pinboard', 'tasks'],
     });
   });
 

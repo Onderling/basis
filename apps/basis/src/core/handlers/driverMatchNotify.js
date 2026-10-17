@@ -77,7 +77,7 @@ export async function evaluateItemForDrivers({ item, getDrivers, judge, minShare
  * anonymous-talk channel, and show WHY). Returns `{ notified, matches }`.
  *
  * `notify(payload)` receives `{ itemId, itemTitle, matches, topReason, message }` — the caller maps it
- * onto the existing publishEvent `{app:'stoop', type:'notification', payload:{message}}` shape.
+ * onto the existing publishEvent `{app:'pinboard', type:'notification', payload:{message}}` shape.
  *
  * @param {object} a
  * @param {object} a.item

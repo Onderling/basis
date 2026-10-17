@@ -21,7 +21,7 @@ describe('the header avatar', () => {
 
   it('loads the name, the initials and the picture ref of the persona', async () => {
     const callSkill = async (app, op, args) => {
-      if (app === 'stoop' && op === 'getMyProfile') return { entry: { handle: 'frits', displayName: 'Frits de Roos' } };
+      if (app === 'pinboard' && op === 'getMyProfile') return { entry: { handle: 'frits', displayName: 'Frits de Roos' } };
       if (app === 'agents' && op === 'getProfileProperties') return { properties: args?.id === 'default' ? { profilePicture: { value: 'pic' } } : {} };
       return null;
     };

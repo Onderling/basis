@@ -6,7 +6,7 @@
  *
  * **2026-05-08:** the underlying `setBgRunOnce` / `clearBgRunOnce` /
  * `bgRunOnce` helpers were lifted into the
- * `@onderling/sync-engine-rn` substrate (Stoop V3 Phase 40.2,
+ * `@onderling/sync-engine-rn` substrate (Pinboard V3 Phase 40.2,
  * rule-of-two satisfied). This file re-exports them and keeps the
  * folio-specific `BG_TASK_NAME` constant.
  *
@@ -35,6 +35,6 @@ export {
  * load) and `registerBackgroundFetch` / `unregisterBackgroundFetch`
  * (in ServiceContext).  Keep them in sync via this constant.
  *
- * Folio-specific (Stoop V3 will pick its own task name).
+ * Folio-specific (Pinboard V3 will pick its own task name).
  */
 export const BG_TASK_NAME = 'folio-mobile-sync-background';

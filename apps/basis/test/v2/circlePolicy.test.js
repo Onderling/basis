@@ -37,14 +37,14 @@ describe('circlePolicy · normalizeCirclePolicy', () => {
 
   it('S6.C — policy.apps defaults to null (all apps) + keeps a string list', () => {
     expect(normalizeCirclePolicy().apps).toBeNull();
-    expect(normalizeCirclePolicy({ apps: ['stoop', 'tasks'] }).apps).toEqual(['stoop', 'tasks']);
-    expect(normalizeCirclePolicy({ apps: ['stoop', 7, null] }).apps).toEqual(['stoop']);   // strings only
+    expect(normalizeCirclePolicy({ apps: ['pinboard', 'tasks'] }).apps).toEqual(['pinboard', 'tasks']);
+    expect(normalizeCirclePolicy({ apps: ['pinboard', 7, null] }).apps).toEqual(['pinboard']);   // strings only
     expect(normalizeCirclePolicy({ apps: 'nope' }).apps).toBeNull();                        // non-array → all
   });
 
   it('S6.C — a policy.apps edit replaces the list (not per-key merge like features)', () => {
-    const merged = mergeCirclePolicy({ apps: ['stoop', 'tasks'] }, { apps: ['stoop'] });
-    expect(merged.apps).toEqual(['stoop']);
+    const merged = mergeCirclePolicy({ apps: ['pinboard', 'tasks'] }, { apps: ['pinboard'] });
+    expect(merged.apps).toEqual(['pinboard']);
   });
 });
 

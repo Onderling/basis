@@ -34,8 +34,8 @@ export { createContactSkillRegistry, chainContactCallSkill } from './v2/contactS
 export { createContactThreadChannel, DEFAULT_CONTACT_SUBTYPES } from './v2/contactThreadChannel.js';
 // The same turn, on the person's other devices — the fan the contact channel is handed.
 export { makeContactTurnFan, makeContactTurnPeerHandler, contactTurnToWire, CONTACT_TURN_BROADCAST } from './v2/contactTurnFan.js';
-export { listContacts, peerToContactRow, stoopContactToRow, mergeContacts } from './v2/contactsSource.js';
-// S4 (stoop dissolution — pod foundation, SAFE offline slice): per-circle sealing
+export { listContacts, peerToContactRow, pinboardContactToRow, mergeContacts } from './v2/contactsSource.js';
+// S4 (pinboard dissolution — pod foundation, SAFE offline slice): per-circle sealing
 // identity + control-agent composition over the @onderling/pod-client sealing substrate.
 export { createCircleSealingIdentity } from './v2/circleSealingIdentity.js';
 export { createCircleControlAgent } from './v2/circleControlAgent.js';
@@ -81,7 +81,7 @@ export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS 
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';
 export { itemCircleId, isInCircle, scopeItems }       from './v2/circleScope.js';
-export { scopeStoopCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_STOOP_TYPES } from './v2/circleStoopScope.js';
+export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES } from './v2/circlePinboardScope.js';
 export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from './v2/circlePodProducer.js';
 export { realPodRouting, podRootFromWebid }           from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
@@ -303,8 +303,8 @@ export {
   createFallbackOffer, fallbackOfferStateIo, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from './v2/addressFallback.js';
 // Re-exported THROUGH the composer: a shell imports basis and nothing else from apps/
-// (`shellLayering.test.js`), so basis-mobile reaches stoop's fallback-report hook via here.
-export { setAddressFallbackReportHook } from '@onderling-app/stoop';
+// (`shellLayering.test.js`), so basis-mobile reaches pinboard's fallback-report hook via here.
+export { setAddressFallbackReportHook } from '@onderling-app/pinboard';
 export {
   DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, deliveryStates, isDeliveryState,
   advanceDelivery, deliveryAfterSend, receiptPolicy, shouldSendReceipt,

@@ -34,8 +34,8 @@ test('corpus 1.3 / 1.4 / 1.7 — grants: revoke then re-grant, grant while offli
     await C.page.waitForTimeout(5000);
     const gid = await activeCircle(A.page);
 
-    const bKey = (await call(B.page, 'stoop', 'whoAmI', {}))?.pubKey ?? null;
-    const cKey = (await call(C.page, 'stoop', 'whoAmI', {}))?.pubKey ?? null;
+    const bKey = (await call(B.page, 'pinboard', 'whoAmI', {}))?.pubKey ?? null;
+    const cKey = (await call(C.page, 'pinboard', 'whoAmI', {}))?.pubKey ?? null;
 
     // 1.3 — grant, revoke, grant again
     const g1 = await call(A.page, 'household', 'grantSurface', { viewPubKey: bKey, ops: ['listOpen'], reads: ['household'] });
@@ -79,7 +79,7 @@ test('corpus 6.3 — one device removed', async ({ browser }) => {
   const peers = await bootPeers(browser, 1);
   const [A] = peers;
   try {
-    const devices = await call(A.page, 'stoop', 'listMyCircles', {});
+    const devices = await call(A.page, 'pinboard', 'listMyCircles', {});
     const rev = await call(A.page, 'household', 'revokeDevice', { deviceId: 'no-such-device' });
     log('corpus 6.3 · does revoking an unknown device refuse cleanly?',
       rev?.error ? 'PASS' : 'FINDING', JSON.stringify(rev)?.slice(0, 160));
@@ -102,7 +102,7 @@ test('corpus 8.x / 9.x / 10.x — the property, persona and driver layers: is th
 
     // 9.x — personas
     // The real signatures: `getPersonaView(id, contextId)` — a persona and the context to view it in.
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
     const view = await call(A.page, 'agents', 'getPersonaView', { id: me, contextId: gid });
     const release = await call(A.page, 'agents', 'getPersonaRelease', { id: me, contextId: gid });
     log('corpus 9.x · persona surface', ok(view) || ok(release) ? 'OBSERVED' : 'BLOCKED',
@@ -187,7 +187,7 @@ test('corpus 9.1 / 9.2 / 10.x — personas across two circles, and drivers', asy
     await joinFromInvite(Cato.page, inviteY, { handle: 'cato', tag: 'p91' });
     await Cato.page.waitForTimeout(5000);
 
-    const cato = (await call(Cato.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const cato = (await call(Cato.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
 
     // 9.2 — record a property in ONE circle, then look at both.
     for (const [key, value] of [['woont', 'in de straat'], ['kanHelpenMet', 'tuin']]) {

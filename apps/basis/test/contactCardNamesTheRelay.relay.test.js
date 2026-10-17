@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, until, teardown } from './support/pairRealAgents.js';
-import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
 const textsAt = (node) => node.received.map((m) => m?.payload?.text).filter(Boolean);
@@ -40,12 +40,12 @@ describe('a contact from a card is reached on the relay the card named', () => {
 
   it('Anna\'s card names her relay; Bea scans it and writes; the message arrives although Bea was on another relay', async () => {
     // ── The card, as the app builds it: the address, and now the primary relay. ─────────────────
-    const card = await anna.agent.callSkill('stoop', 'getContactShareQr', {});
+    const card = await anna.agent.callSkill('pinboard', 'getContactShareQr', {});
     expect(typeof card?.payload).toBe('string');
     expect(card.relays, 'the card carries the sharer\'s primary relay').toEqual([relay1.url]);
 
     // ── The scan, minus the camera: the contact keeps the card's points. ──────────────────────────
-    const added = await bea.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload });
+    const added = await bea.agent.callSkill('pinboard', 'addContactFromQr', { payload: card.payload });
     expect(added?.contact?.webid).toBe(anna.pubKey);
     expect(added.contact.points, 'the scanned contact remembers where to find her').toEqual([relay1.url]);
     expect(bea.agent.relays.list().map((r) => r.url), 'Bea is on her own relay only, so far').toEqual([relay2.url]);
@@ -88,11 +88,11 @@ describe('with NKN up beside the relay, the card still names the RELAY address',
 
   it('the card names the address the relay reaches, and a message to it arrives over the relay', async () => {
     expect(carl.agent.peer?.address, 'NKN is up on Carl (the shape of the finding)').toMatch(/^d9b44acc/);
-    const card = await carl.agent.callSkill('stoop', 'getContactShareQr', {});
+    const card = await carl.agent.callSkill('pinboard', 'getContactShareQr', {});
     const decoded = decodeCardBody(String(card.payload).replace(/^onderling-contact:\/\//, ''));
     expect(decoded.peerAddr, 'the card names the relay address, not the mesh one').toBe(carl.agent.relay?.address ?? carl.pubKey);
     expect(decoded.relays).toEqual([relay.url]);
-    const added = await dana.agent.callSkill('stoop', 'addContactFromQr', { payload: card.payload });
+    const added = await dana.agent.callSkill('pinboard', 'addContactFromQr', { payload: card.payload });
     expect(added?.contact?.peerAddr).toBe(decoded.peerAddr);
     const sent = await dana.agent.sendPeerMessage(added.contact.peerAddr, { type: 'p2p-chat', msgId: 'dm-2', ts: Date.now(), text: 'hoi Carl, via je kaart' }, SEND);
     expect(sent?.held).not.toBe(true);

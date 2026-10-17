@@ -35,10 +35,10 @@ describe('makeHandleCirclePost', () => {
     const d = deps();
     const handle = makeHandleCirclePost(d);
     await handle('peer-A', env());
-    expect(d.callSkill).toHaveBeenCalledWith('stoop', 'ingestRemotePost',
+    expect(d.callSkill).toHaveBeenCalledWith('pinboard', 'ingestRemotePost',
       expect.objectContaining({ fromPubKey: 'pk-A', fromPeerAddr: 'peer-A' }));
     expect(d.publishEvent).toHaveBeenCalledWith(expect.objectContaining({
-      app: 'stoop', type: 'notification',
+      app: 'pinboard', type: 'notification',
     }));
   });
 

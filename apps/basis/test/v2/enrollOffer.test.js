@@ -221,7 +221,7 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     // exactly what the enroll walk used to hand-carry.
     const addrA2 = A2.agent.circleAddressFor(CIRCLE);
     const grew = await until(async () => {
-      const r = await A.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+      const r = await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
       const mine = (r?.members ?? []).find((m) => m.webid === A.pubKey);
       return mine?.circleAddresses?.includes(addrA2) ? true : null;
     }, { timeout: 15000, step: 100 });
@@ -241,7 +241,7 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     // binding verifiers read. This is the circularity broken.
     expect(report.steps, 'the seed was requested').toContain('seed-requested');
     expect(report.steps, 'the roster derived from the seed before the pulls').toContain('roster-derived');
-    const rows = (await A2.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    const rows = (await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
     const webids = rows.map((m) => m.webid ?? m.addr ?? m.ref);
     expect(webids, 'the person\'s own row derives').toContain(A.pubKey);
     expect(webids, 'the other member derives').toContain(B.pubKey);
@@ -328,7 +328,7 @@ describe('the enroll offer — the sibling is not there when the new device firs
     expect(row2.ok).toBe(true);
     expect(second.cleared, 'now it clears').toBe(true);
     expect(await pendingEnrollOffer(storage)).toBeNull();
-    const rows = (await A2.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    const rows = (await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
     expect(rows.map((m) => m.webid ?? m.addr ?? m.ref), 'the other member derives once the seed lands').toContain(B.pubKey);
   }, 150_000);
 });

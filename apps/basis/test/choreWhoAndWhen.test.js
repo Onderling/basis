@@ -47,7 +47,7 @@ describe('a chore that says who and when', () => {
     await ensureHouseholdLists({ callSkill: own, t });
     // the bot's people: contact rows, as its door admits them (the admin's role is the door's)
     for (const [webid, role, displayName] of [[FRITS, 'member', 'Frits'], [BERT, 'member', 'Bert'], [ADMIN, 'admin', 'Anne']]) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName });
       await agent.setDoorCaller(webid, role);
     }
     const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });
@@ -79,7 +79,7 @@ describe('a chore that says who and when', () => {
     await own('params', 'set-param', { key: 'assistant.assignPolicy', value: 'roles' });
 
     // a coordinator (the same role word as a circle's roster) may give chores to others — the tasks app's rule
-    await own('stoop', 'addContact', { webid: BERT, channel: 'telegram', role: 'coordinator', displayName: 'Bert' });
+    await own('pinboard', 'addContact', { webid: BERT, channel: 'telegram', role: 'coordinator', displayName: 'Bert' });
     const byCoordinator = await as(BERT)('lists', 'addToList', { list: 'Klusjes', text: 'bladeren harken', assignee: 'Frits' });
     expect(byCoordinator.ok, JSON.stringify(byCoordinator)).toBe(true);
     // …unless the household's setting says nobody gives chores to others
@@ -137,7 +137,7 @@ describe('a chore that says who and when', () => {
   it('a person with no name is named by the id the bot shows for them (/users)', async () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     const NONAME = 'web-person-without-a-name-1234567890abcdef';
-    await own('stoop', 'addContact', { webid: NONAME, channel: 'web', role: 'member' });
+    await own('pinboard', 'addContact', { webid: NONAME, channel: 'web', role: 'member' });
     await agent.setDoorCaller(NONAME, 'member');
     const r = await agent.callSkill('lists', 'addToList', { list: 'Klusjes', text: 'afwas', assignee: NONAME, due: '2026-10-07' }, { caller: ADMIN });
     expect(r.ok, JSON.stringify(r)).toBe(true);

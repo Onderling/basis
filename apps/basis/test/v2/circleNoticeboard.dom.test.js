@@ -26,7 +26,7 @@ describe('renderCircleNoticeboard — embeds[] surfacing', () => {
     expect(chips[1].textContent).toBe('📅 calendar-event: evt-1');
   });
 
-  it('reads stoop-legacy source.embeds too', () => {
+  it('reads pinboard-legacy source.embeds too', () => {
     const el = mount();
     renderCircleNoticeboard(el, { t, posts: [{
       id: 'p2', type: 'offer', text: 'x', source: { embeds: [{ type: 'request', ref: 'P-1' }] },

@@ -4,7 +4,7 @@
  * the ISSUER (B5).
  *
  * ── Why this file, when there are unit tests next door ──────────────────────────────────────────
- * The substrate tests (`apps/stoop/test/circleExits.test.js`) prove the roster projection drops a
+ * The substrate tests (`apps/pinboard/test/circleExits.test.js`) prove the roster projection drops a
  * removed member. That is necessary and it is not the claim. The claim is that a removed member
  * **cannot speak into the circle they were removed from, and can still speak in one they were not**
  * — and that runs through the boundary-authentication snapshot (`recordCircleRoster`), which is fed
@@ -230,7 +230,7 @@ describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay'
     await connectNodesOverRelay([admin, one, two], { relayUrl });
     // A circle whose invites admit exactly one person — the create wizard's number, on the wire.
     const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
-    const created = await adminCallSkill('stoop', 'createGroupV2', {
+    const created = await adminCallSkill('pinboard', 'createGroupV2', {
       groupId: CIRCLE, name: 'Ceiling', rules: { purpose: 'ceiling' }, inviteMaxRedemptions: 1,
     });
     expect(created.groupId).toBe(CIRCLE);
@@ -306,7 +306,7 @@ describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay'
     });
     expect(again.ok, `repeat join failed: ${again.error}`).toBe(true);
 
-    const rows = (await admin.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE })).members;
+    const rows = (await admin.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE })).members;
     expect(rows.filter((m) => m.webid === one.pubKey).length, 'still exactly one membership').toBe(1);
   }, 120000);
 });

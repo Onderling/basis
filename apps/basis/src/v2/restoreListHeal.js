@@ -3,7 +3,7 @@
  * restored device re-opens. Creating wrote that record inside the create's own wait, so an unreachable agents store
  * held "Creating circle…" for minutes (walk, 2026-10-09); and a write that failed there was simply lost, leaving a
  * circle the restore could not bring back. The create now writes it AFTER answering, and this heal runs at every
- * boot: one source of truth (the circles stoop says I am in), no pending store to keep in sync, and it also repairs
+ * boot: one source of truth (the circles pinboard says I am in), no pending store to keep in sync, and it also repairs
  * circles missed before this existed. The address is derived, never stored, so it can always be re-made.
  *
  * Idempotent: a circle already on the list is not touched (its handle and proof stay as the join wrote them).

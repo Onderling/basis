@@ -16,21 +16,21 @@ import { describe, it, expect } from 'vitest';
 import { resolveSlash } from '../src/resolveSlash.js';
 
 describe('resolveSlash — prefix-all (no override)', () => {
-  const collisions = [{ command: '/done', appIds: ['tasks', 'stoop'] }];
+  const collisions = [{ command: '/done', appIds: ['tasks', 'pinboard'] }];
 
   it('exposes an app-qualified form for EVERY declarer, in mount order', () => {
     const r = resolveSlash(collisions);
     expect(r.qualified).toEqual([
       { command: '/tasks:done', appId: 'tasks', base: 'done' },
-      { command: '/stoop:done', appId: 'stoop', base: 'done' },
+      { command: '/pinboard:done', appId: 'pinboard', base: 'done' },
     ]);
   });
 
   it('the bare token is AMBIGUOUS (choices offered), never silently fired', () => {
     const r = resolveSlash(collisions);
-    expect(r.ambiguous).toEqual({ '/done': ['tasks', 'stoop'] });
+    expect(r.ambiguous).toEqual({ '/done': ['tasks', 'pinboard'] });
     expect(r.winners).toEqual({});
-    expect(r.bareFor('/done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'stoop'] });
+    expect(r.bareFor('/done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'pinboard'] });
   });
 
   it('entries carry the qualified forms + bare resolution together', () => {
@@ -38,12 +38,12 @@ describe('resolveSlash — prefix-all (no override)', () => {
     expect(r.entries).toEqual([
       {
         command: '/done',
-        appIds: ['tasks', 'stoop'],
+        appIds: ['tasks', 'pinboard'],
         qualified: [
           { command: '/tasks:done', appId: 'tasks', base: 'done' },
-          { command: '/stoop:done', appId: 'stoop', base: 'done' },
+          { command: '/pinboard:done', appId: 'pinboard', base: 'done' },
         ],
-        bare: { status: 'ambiguous', choices: ['tasks', 'stoop'] },
+        bare: { status: 'ambiguous', choices: ['tasks', 'pinboard'] },
       },
     ]);
   });
@@ -53,23 +53,23 @@ describe('resolveSlash — prefix-all (no override)', () => {
     expect(r.isCollision('/done')).toBe(true);
     expect(r.isCollision('done')).toBe(true);
     expect(r.isCollision('/nope')).toBe(false);
-    expect(r.bareFor('done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'stoop'] });
+    expect(r.bareFor('done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'pinboard'] });
     expect(r.bareFor('/nope')).toBeNull();
   });
 });
 
 describe('resolveSlash — per-host override', () => {
-  const collisions = [{ command: '/done', appIds: ['tasks', 'stoop'] }];
+  const collisions = [{ command: '/done', appIds: ['tasks', 'pinboard'] }];
 
   it('bare token resolves to the pinned winner; others stay qualified', () => {
-    const r = resolveSlash(collisions, { done: 'stoop' });
-    expect(r.winners).toEqual({ '/done': 'stoop' });
+    const r = resolveSlash(collisions, { done: 'pinboard' });
+    expect(r.winners).toEqual({ '/done': 'pinboard' });
     expect(r.ambiguous).toEqual({});
-    expect(r.bareFor('/done')).toEqual({ status: 'winner', appId: 'stoop' });
+    expect(r.bareFor('/done')).toEqual({ status: 'winner', appId: 'pinboard' });
     // Qualified forms are UNCHANGED — every app stays reachable.
     expect(r.qualified).toEqual([
       { command: '/tasks:done', appId: 'tasks', base: 'done' },
-      { command: '/stoop:done', appId: 'stoop', base: 'done' },
+      { command: '/pinboard:done', appId: 'pinboard', base: 'done' },
     ]);
   });
 
@@ -81,7 +81,7 @@ describe('resolveSlash — per-host override', () => {
   it('an override naming a NON-declarer is ignored → falls back to ambiguous', () => {
     const r = resolveSlash(collisions, { done: 'folio' });   // folio doesn't declare /done
     expect(r.winners).toEqual({});
-    expect(r.bareFor('/done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'stoop'] });
+    expect(r.bareFor('/done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'pinboard'] });
   });
 
   it('an override for a NON-colliding command is inert (no phantom entries)', () => {
@@ -94,15 +94,15 @@ describe('resolveSlash — per-host override', () => {
 describe('resolveSlash — multiple + degenerate inputs', () => {
   it('resolves several colliding commands independently (override one, not the other)', () => {
     const collisions = [
-      { command: '/done', appIds: ['tasks', 'stoop'] },
-      { command: '/list', appIds: ['stoop', 'folio', 'tasks'] },
+      { command: '/done', appIds: ['tasks', 'pinboard'] },
+      { command: '/list', appIds: ['pinboard', 'folio', 'tasks'] },
     ];
     const r = resolveSlash(collisions, { list: 'folio' });
-    expect(r.bareFor('/done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'stoop'] });
+    expect(r.bareFor('/done')).toEqual({ status: 'ambiguous', choices: ['tasks', 'pinboard'] });
     expect(r.bareFor('/list')).toEqual({ status: 'winner', appId: 'folio' });
     expect(r.qualified.map((q) => q.command)).toEqual([
-      '/tasks:done', '/stoop:done',
-      '/stoop:list', '/folio:list', '/tasks:list',
+      '/tasks:done', '/pinboard:done',
+      '/pinboard:list', '/folio:list', '/tasks:list',
     ]);
   });
 

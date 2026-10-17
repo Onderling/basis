@@ -69,7 +69,7 @@ const SEED_FILES = [
     mime: 'text/markdown', bytes: 1234, state: 'synced',
     // (B9, 2026-05-23) — frontmatter `embeds` per
     // v1-web-functional-design § 4f.  Notes can declare references to
-    // tasks / stoop posts / events; the chat-shell renders them as
+    // tasks / pinboard posts / events; the chat-shell renders them as
     // clickable "See also" chips at the head of /readnote replies.
     frontmatter: {
       embeds: [

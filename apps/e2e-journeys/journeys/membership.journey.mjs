@@ -18,7 +18,7 @@
 // Scenarios 1–5 fold HAND-CONSTRUCTED signSpine statements (the deterministic-fold spec). Scenarios 6–7 then
 // drive the REAL membership WRITERS — `redeemMembershipCode` (join), `removeMember` (evict), `leaveGroup`
 // (leave) from `@onderling/circles` — each emitting its transition through the REAL spine appender
-// (`createSpineAppender`, the same one stoop wires): the statements those writers sign, shipped over the relay
+// (`createSpineAppender`, the same one pinboard wires): the statements those writers sign, shipped over the relay
 // and folded, converge to one roster across devices. That closes the loop from a user action to the fold.
 import {
   Agent, AgentIdentity, Parts, signSpine, verifySpine, foldRoster,
@@ -205,7 +205,7 @@ export async function run({ relayUrl }) {
 
     // ── Scenario 6 — REAL WRITERS: a redeem→JOIN and an admin removeMember→EVICT converge across devices ──
     // The statements here are NOT hand-built: `redeemMembershipCode` (mel's device) and `removeMember`
-    // (alpha's device) each sign + append via the SAME `createSpineAppender` stoop wires. We ship exactly
+    // (alpha's device) each sign + append via the SAME `createSpineAppender` pinboard wires. We ship exactly
     // those signed statements over the relay — in OPPOSITE orders to the two founder-devices — and fold.
     resetSpines();
     await seedCode(mel, 'JOIN-1');

@@ -8,7 +8,7 @@
  * matches `g.agent === webId`). So `memberActors` MUST be each member's signing
  * pubKey.
  *
- * The circle roster (`controlAgent.members()` / stoop `listGroupMembers`) carries
+ * The circle roster (`controlAgent.members()` / pinboard `listGroupMembers`) carries
  * **sealing** keys + WebIDs — and sealing is a ONE-WAY ed2curve derivation of the
  * signing key (non-invertible), so the roster itself cannot yield it. The signing
  * key lives in the `MemberMap`: `members.resolveByWebid(webid).pubKey` — the SAME
@@ -30,7 +30,7 @@
  * legacy roster row that lacks its own captured signing key; the bound record wins.
  */
 
-import { membershipRecord } from '@onderling-app/stoop/lib/membershipRecord';
+import { membershipRecord } from '@onderling-app/pinboard/lib/membershipRecord';
 
 /** Extract the WebID from a roster entry (tolerates {webId}/{webid}/string). */
 function webidOf(entry) {

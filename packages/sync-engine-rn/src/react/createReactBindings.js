@@ -2,7 +2,7 @@
  * createReactBindings — substrate factory that produces React hooks
  * for invoking skills on the active agent bundle.
  *
- * Lifted from apps/stoop-mobile/src/lib/{useSkill,useAgentEvent,useSkillResult}.js
+ * Lifted from apps/pinboard-mobile/src/lib/{useSkill,useAgentEvent,useSkillResult}.js
  * 2026-05-09 (Tasks-mobile is the second consumer).
  *
  * Why a factory: the substrate-level hooks need to read the active
@@ -28,7 +28,7 @@
  * Both `useSkill().call(args)` and `useSkillResult(skill, args, deps)`
  * inject `_scope: bundle.groupId ?? svc.activeGroupId ?? null` into
  * the args object so a single agent shared across N groups/circles can
- * resolve the right bundle at dispatch time. The Stoop V3 +
+ * resolve the right bundle at dispatch time. The Pinboard V3 +
  * Tasks single-agent refactors both rely on this. (Plain arrays
  * pass through unchanged.)
  */

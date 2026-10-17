@@ -85,7 +85,7 @@ function _lookup(lng, key) {
 /**
  * Substitute `{{name}}` markers in `tpl` with `params[name]`.  Missing
  * keys render as the literal `{{name}}` so they're visible in the UI
- * (matches stoop + i18next behaviour when interpolation fails).
+ * (matches pinboard + i18next behaviour when interpolation fails).
  */
 function _interpolate(tpl, params) {
   if (typeof tpl !== 'string')   return '';

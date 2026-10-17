@@ -2,7 +2,7 @@
  * S6.6 (mobile) — native push orchestration. Injects fake expo-notifications /
  * expo-device so the register flow is testable without the native dep. Asserts
  * the RESULT: a granted permission yields an Expo token forwarded to
- * stoop.subscribeExpoPush; denied/simulator paths short-circuit.
+ * pinboard.subscribeExpoPush; denied/simulator paths short-circuit.
  */
 import { describe, it, expect, vi } from 'vitest';
 import Module from 'module';
@@ -39,13 +39,13 @@ const fakeNotifications = ({ granted = true } = {}) => ({
 });
 
 describe('enableNativePush', () => {
-  it('requests permission, gets the Expo token, registers it with stoop', async () => {
+  it('requests permission, gets the Expo token, registers it with pinboard', async () => {
     const notifications = fakeNotifications();
     const callSkill = vi.fn(async () => ({ ok: true }));
     const res = await enableNativePush({ callSkill, notifications, device: fakeDevice() });
     expect(res).toEqual({ ok: true, token: TOKEN });
     expect(notifications.requestPermissionsAsync).toHaveBeenCalled();
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'subscribeExpoPush', { token: TOKEN });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'subscribeExpoPush', { token: TOKEN });
   });
 
   it('short-circuits on a simulator (no real device)', async () => {
@@ -62,7 +62,7 @@ describe('enableNativePush', () => {
     expect(callSkill).not.toHaveBeenCalled();
   });
 
-  it('reports register-failed when stoop rejects the token', async () => {
+  it('reports register-failed when pinboard rejects the token', async () => {
     const callSkill = vi.fn(async () => ({ error: 'nope' }));
     const res = await enableNativePush({ callSkill, notifications: fakeNotifications(), device: fakeDevice() });
     expect(res).toMatchObject({ ok: false, reason: 'register-failed' });
@@ -70,10 +70,10 @@ describe('enableNativePush', () => {
 });
 
 describe('disableNativePush', () => {
-  it('deregisters the token at stoop', async () => {
+  it('deregisters the token at pinboard', async () => {
     const callSkill = vi.fn(async () => ({ ok: true }));
     expect(await disableNativePush({ callSkill, token: TOKEN })).toEqual({ ok: true });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'unsubscribeExpoPush', { token: TOKEN });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'unsubscribeExpoPush', { token: TOKEN });
   });
 });
 

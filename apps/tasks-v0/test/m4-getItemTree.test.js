@@ -1,9 +1,9 @@
 /**
  * Tasks M4 — getItemTree skill (workspace.js).
  *
- * Analog of apps/stoop/test/getItemTree.test.js, adapted for Tasks.
+ * Analog of apps/pinboard/test/getItemTree.test.js, adapted for Tasks.
  * Asserts the Phase 3.3c cross-pod read path: top-level embeds
- * (Tasks canonical shape) and source.embeds (Stoop-originated items)
+ * (Tasks canonical shape) and source.embeds (Pinboard-originated items)
  * are both bridged; https refs materialise; 401/403 → PERMISSION_DENIED
  * placeholder; urn:dec:item: → local; missing itemId → error.
  *
@@ -65,7 +65,7 @@ describe('getItemTree skill (Tasks M4 Phase 3.3c)', () => {
     expect(tree.embeds[0].item).toEqual({ id: 'X', type: 'task', text: 'linked task' });
   });
 
-  it('bridges source.embeds (Stoop-originated item embedded in a task)', async () => {
+  it('bridges source.embeds (Pinboard-originated item embedded in a task)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true, status: 200,
       text: async () => '{"id":"P","type":"request","text":"post"}',
@@ -73,7 +73,7 @@ describe('getItemTree skill (Tasks M4 Phase 3.3c)', () => {
     const skill = skillsWith({
       T1: {
         id: 'T1', type: 'task',
-        source: { embeds: [{ type: 'request', ref: 'https://bob.pod/stoop/items/P.json' }] },
+        source: { embeds: [{ type: 'request', ref: 'https://bob.pod/pinboard/items/P.json' }] },
       },
     });
     const { tree } = await call(skill, { itemId: 'T1' });

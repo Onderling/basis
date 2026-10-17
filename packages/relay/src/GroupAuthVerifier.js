@@ -14,7 +14,7 @@
  *         adminPubKey:    '<base64url>',
  *         requiredRole?:  'member',
  *
- *         // Phase 2 (Stoop V1 — 2026-05-05) additions; all optional.
+ *         // Phase 2 (Pinboard V1 — 2026-05-05) additions; all optional.
  *         quotas?:        { msgsPerDay?: number },
  *         revokedMembers?: ['<memberPubKey>', ...],
  *       },
@@ -33,7 +33,7 @@
  * observer > external); deployments using custom roles can pass a
  * `roleRanks` map at construction time.
  *
- * Phase 2 (Stoop V1, 2026-05-05) additions, all opt-in:
+ * Phase 2 (Pinboard V1, 2026-05-05) additions, all opt-in:
  *
  *   - `verifyBound({ proof, connectingPubKey, rotationProof? })` is the
  *     strict counterpart to `verify(proof)`.  It also checks that the
@@ -45,7 +45,7 @@
  *   - `revokedMembers: ['<pubKey>']` per accepted-group entry: members
  *     whose proofs are rejected even when otherwise valid.  Static
  *     config; dynamic admin-signed revocation messages are deferred
- *     to V2 (Stoop Relay Kit).
+ *     to V2 (Pinboard Relay Kit).
  *   - `quotas: { msgsPerDay? }` per accepted-group entry.  The verifier
  *     exposes the configured quota on `verify`'s return value; the
  *     *enforcement* (per-group counters) lives in the relay server, not
@@ -142,7 +142,7 @@ export class GroupAuthVerifier {
    * Without this check, anyone holding any valid groupProof could
    * register at any address — the relay's `clients` map is keyed by
    * address, so every subsequent message would route to the spoofing
-   * connection.  Apps that want this tightening (Stoop V1 does) call
+   * connection.  Apps that want this tightening (Pinboard V1 does) call
    * `verifyBound`; existing relays that prefer the looser legacy
    * behaviour keep using `verify()`.
    *

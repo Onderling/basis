@@ -150,7 +150,7 @@ describe('adminsOfViaSkill — the one roster read every shell hands the lanes',
     ] }; };
     const admins = await adminsOfViaSkill(callSkill)('c1');
     expect([...admins]).toEqual(['w-anna']);
-    expect(calls).toEqual([['stoop', 'listGroupMembers', { groupId: 'c1' }]]);
+    expect(calls).toEqual([['pinboard', 'listGroupMembers', { groupId: 'c1' }]]);
   });
 
   it('no roster (or no callSkill yet) → no admins, never a throw', async () => {

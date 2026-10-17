@@ -63,13 +63,13 @@ describe('C15 silent system-entry lane', () => {
 describe('buildCircleStream', () => {
   it('tags each event with its circle name and keeps newest-first', () => {
     const events = [
-      { id: 'e1', ts: 300, app: 'stoop',    type: 'circle-post',   payload: { groupId: 'grp-9' } },
+      { id: 'e1', ts: 300, app: 'pinboard',    type: 'circle-post',   payload: { groupId: 'grp-9' } },
       { id: 'e2', ts: 100, app: 'tasks', type: 'task-claimed', payload: { circleId: 'circle-1' } },
       { id: 'e3', ts: 200, app: 'household',type: 'note-added',   payload: {} },
     ];
     const rows = buildCircleStream({ events, circles });
     expect(rows.map((r) => r.id)).toEqual(['e1', 'e3', 'e2']); // ts desc
-    expect(rows[0]).toMatchObject({ circleId: 'grp-9', circleName: 'Block 9', app: 'stoop' });
+    expect(rows[0]).toMatchObject({ circleId: 'grp-9', circleName: 'Block 9', app: 'pinboard' });
     expect(rows[2]).toMatchObject({ circleId: 'circle-1', circleName: 'Garden circle' });
   });
 
@@ -81,7 +81,7 @@ describe('buildCircleStream', () => {
   });
 
   it('tolerates an unknown circleId (tag id kept, name null)', () => {
-    const events = [{ id: 'e9', ts: 1, app: 'stoop', type: 'x', payload: { circleId: 'ghost' } }];
+    const events = [{ id: 'e9', ts: 1, app: 'pinboard', type: 'x', payload: { circleId: 'ghost' } }];
     const [row] = buildCircleStream({ events, circles });
     expect(row.circleId).toBe('ghost');
     expect(row.circleName).toBeNull();
@@ -111,7 +111,7 @@ describe('buildCircleStream', () => {
     });
 
     it('does NOT add provenance fields to non-task rows (backwards-compatible)', () => {
-      const events = [{ id: 'e1', ts: 1, app: 'stoop', type: 'circle-post', payload: { circleId: 'circle-1', kind: 'question', ref: 'q-1' } }];
+      const events = [{ id: 'e1', ts: 1, app: 'pinboard', type: 'circle-post', payload: { circleId: 'circle-1', kind: 'question', ref: 'q-1' } }];
       const [row] = buildCircleStream({ events, circles });
       expect(row).not.toHaveProperty('taskId');
       expect(row).not.toHaveProperty('addedBy');
@@ -121,10 +121,10 @@ describe('buildCircleStream', () => {
 
 describe('circleRows (SP-13)', () => {
   const events = [
-    { id: 'a', ts: 300, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'ask' } },
-    { id: 'b', ts: 250, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'offer' } },
-    { id: 'c', ts: 200, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'lend' } },
-    { id: 'd', ts: 150, app: 'stoop',    type: 'circle-post', payload: { groupId: 'circle-1', kind: 'ask' } },
+    { id: 'a', ts: 300, app: 'pinboard',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'ask' } },
+    { id: 'b', ts: 250, app: 'pinboard',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'offer' } },
+    { id: 'c', ts: 200, app: 'pinboard',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'lend' } },
+    { id: 'd', ts: 150, app: 'pinboard',    type: 'circle-post', payload: { groupId: 'circle-1', kind: 'ask' } },
     { id: 'e', ts: 100, app: 'tasks', type: 'task-claimed', payload: { circleId: 'circle-1' } },
     { id: 'f', ts:  50, app: 'household',type: 'note-added',   payload: {} },
   ];

@@ -57,7 +57,7 @@ const APPS = discoverManifestApps();
 describe('FITNESS: verb × noun algebra — nouns[].atoms are canonical SDK atoms', () => {
   it('discovers the app manifests (guards against a broken scan)', () => {
     expect(APPS.length).toBeGreaterThanOrEqual(6);
-    for (const expected of ['tasks-v0', 'stoop', 'household', 'calendar', 'folio']) {
+    for (const expected of ['tasks-v0', 'pinboard', 'household', 'calendar', 'folio']) {
       expect(APPS, `expected ${expected} among discovered app manifests`).toContain(expected);
     }
   });

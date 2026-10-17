@@ -33,7 +33,7 @@ describe('the household circle and the bound invite', () => {
       // as the box does after founding: the bot present at its address in the new circle
       onCreated: ({ circleId: cid }) => bindCircleAddresses([bot], cid) });
 
-    const circlesOf = async () => (await bot.agent.callSkill('stoop', 'listMyCircles', {}))?.circles ?? [];
+    const circlesOf = async () => (await bot.agent.callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [];
     expect(await circlesOf()).not.toContain(circleId);
     const inv = await inApp.inviteFor(bob.pubKey);
     expect(inv.ok, JSON.stringify(inv)).toBe(true);
@@ -45,14 +45,14 @@ describe('the household circle and the bound invite', () => {
     expect(JSON.stringify(eveTry), 'refused as a wrong code, not for a harness reason').toMatch(/invalid-or-expired-code/);
     const bobJoin = await join(bob, inv.uri);
     expect(bobJoin?.error, JSON.stringify(bobJoin)).toBeFalsy();
-    const roster = await bot.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const roster = await bot.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     expect((roster?.members ?? []).map((m) => m.webid)).toContain(bob.pubKey);
     expect((roster?.members ?? []).map((m) => m.webid)).not.toContain(eve.pubKey);
 
     // `/revoke` evicts: the circle's roster loses every address that is Bob's
     const out = await inApp.evict(bob.pubKey);
     expect(out.removed, JSON.stringify(out)).toBe(1);
-    const after = await bot.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const after = await bot.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     expect((after?.members ?? []).map((m) => m.webid)).not.toContain(bob.pubKey);
     expect((await inApp.evict(bob.pubKey)).removed).toBe(0);   // nobody left to remove
   }, 120_000);

@@ -68,7 +68,7 @@ export { OFFERINGS_TAXONOMY, OFFERING_LADDER, deriveOfferingCategory, offeringDe
 export { AVAILABILITY_STATES, AVAILABILITY_AWAY, AVAILABILITY_LADDER, isAvailabilityState, availabilityState, isAway, availabilityDescriptor } from './src/availability.js';
 // location fold-in (NOTE-skills-properties-audit §4, personal-properties design §2) — ONE
 // person-level coarse-enum property with the CANONICAL disclosure ladder (in-area → region →
-// municipality → district → coords) folding the bespoke stoop `profile.location` field.
+// municipality → district → coords) folding the bespoke pinboard `profile.location` field.
 export { LOCATION_LADDER, LOCATION_IN_AREA, isLocationValue, locationLabel, inArea, locationDescriptor } from './src/location.js';
 // media property (deferred media-descriptor bridge; NOTE-reveal-state-and-profile-updates §1.4/§2.6)
 // — the `media` property type: a persona attribute (e.g. `profilePicture`) whose VALUE is a SEALED

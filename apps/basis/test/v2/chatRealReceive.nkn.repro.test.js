@@ -39,7 +39,7 @@ describe.skip('GATE — circle chat via the REAL receiver over REAL NKN', () => 
     const msgId = 'm-' + Math.random().toString(36).slice(2);
     const text = 'hello over real NKN';
     const tChat = Date.now();
-    const r = await A.agent.callSkill('stoop', 'broadcastCircleMessage', { groupId, msgId, text });
+    const r = await A.agent.callSkill('pinboard', 'broadcastCircleMessage', { groupId, msgId, text });
     console.log('[gate-nkn] broadcast result:', JSON.stringify(r));
 
     // Poll patiently — the chat send rides the already-established handshake, but NKN delivery

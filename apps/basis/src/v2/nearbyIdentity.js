@@ -73,7 +73,7 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
         const level = await this.level();
         if (level === 'none') return null;
         if (self && self.id !== 'default') return self.name ? { label: String(self.name) } : null;
-        const e = (await callSkill?.('stoop', 'getMyProfile', {}))?.entry ?? {};
+        const e = (await callSkill?.('pinboard', 'getMyProfile', {}))?.entry ?? {};
         const label = level === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
         return label ? { label: String(label) } : null;
       } catch { return null; }

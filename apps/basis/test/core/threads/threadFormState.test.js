@@ -47,23 +47,23 @@ describe('buildFilterFromFormState', () => {
   });
   it('includes only the populated slots', () => {
     const state = {
-      apps:   new Set(['stoop']),
+      apps:   new Set(['pinboard']),
       types:  new Set(),
       actors: 'webid:anne, webid:frits',
     };
     expect(buildFilterFromFormState(state)).toEqual({
-      apps:   ['stoop'],
+      apps:   ['pinboard'],
       actors: ['webid:anne', 'webid:frits'],
     });
   });
   it('renders all three slots together when all populated', () => {
     const state = {
-      apps:   new Set(['stoop', 'household']),
+      apps:   new Set(['pinboard', 'household']),
       types:  new Set(['notification']),
       actors: 'webid:anne',
     };
     expect(buildFilterFromFormState(state)).toEqual({
-      apps:       ['stoop', 'household'],
+      apps:       ['pinboard', 'household'],
       eventTypes: ['notification'],
       actors:     ['webid:anne'],
     });
@@ -82,12 +82,12 @@ describe('emptyFormState + formStateFromThread', () => {
   it('formStateFromThread maps existing thread → form state', () => {
     const existing = {
       id: 't-1', name: 'My thread',
-      filter: { apps: ['stoop'], eventTypes: ['mention'], actors: ['webid:anne'] },
+      filter: { apps: ['pinboard'], eventTypes: ['mention'], actors: ['webid:anne'] },
       permissions: { allowCommands: false },
     };
     const s = formStateFromThread(existing);
     expect(s.name).toBe('My thread');
-    expect([...s.apps]).toEqual(['stoop']);
+    expect([...s.apps]).toEqual(['pinboard']);
     expect([...s.types]).toEqual(['mention']);
     expect(s.actors).toBe('webid:anne');
     expect(s.allowCommands).toBe(false);
@@ -121,14 +121,14 @@ describe('submitThreadForm', () => {
   it('creates a new thread when no existingThread', () => {
     const store = makeFakeStore();
     const r = submitThreadForm(
-      { name: 'My thread', apps: new Set(['stoop']), types: new Set(), actors: '', allowCommands: true },
+      { name: 'My thread', apps: new Set(['pinboard']), types: new Set(), actors: '', allowCommands: true },
       store,
     );
     expect(r.ok).toBe(true);
     expect(r.created).toBe(true);
     expect(r.threadId).toBe('t-1');
     expect(store._created[0].name).toBe('My thread');
-    expect(store._created[0].filter).toEqual({ apps: ['stoop'] });
+    expect(store._created[0].filter).toEqual({ apps: ['pinboard'] });
     expect(store._created[0].permissions).toEqual({ allowCommands: true });
   });
 

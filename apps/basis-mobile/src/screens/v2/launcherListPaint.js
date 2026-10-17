@@ -3,7 +3,7 @@
  *
  * "No circles yet." is a claim about the account, so it is made only on an answer: the boot retry loop has
  * SETTLED (a load returned circles, or the tries ran out). Before that an empty list means "not known yet" —
- * the stoop store hydrates after the agent bundle, and the gaps between retries used to paint the empty state
+ * the pinboard store hydrates after the agent bundle, and the gaps between retries used to paint the empty state
  * for an account that had circles. Circles already on screen are never swapped for the loading line: a reload
  * repaints in place (React Native drops a press whose row unmounts mid-tap).
  *

@@ -8,7 +8,7 @@
  *
  *   - **prefix-all (default):** a colliding command is ambiguous as a bare
  *     token, so the canonical way to invoke it is the APP-QUALIFIED form
- *     (`/tasks:done`, `/stoop:done`) — always available for EVERY declarer.
+ *     (`/tasks:done`, `/pinboard:done`) — always available for EVERY declarer.
  *     The bare token (`/done`) resolves to the per-host override winner if one
  *     is pinned, else it is surfaced as AMBIGUOUS (offer the qualified choices)
  *     rather than silently firing one app.

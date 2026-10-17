@@ -65,7 +65,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
     expect(await until(async () => (textsAt(phone).includes('hoi, hier Bea') ? true : null), { timeout: 15_000 }),
       'the phone must receive Bea directly — the baseline the box must not break').toBe(true);
     // …and the person keeps her: the card scan, minus the camera.
-    await phone.agent.callSkill('stoop', 'addContact', { webid: bea.pubKey, pubKey: bea.pubKey, displayName: 'Bea' });
+    await phone.agent.callSkill('pinboard', 'addContact', { webid: bea.pubKey, pubKey: bea.pubKey, displayName: 'Bea' });
     const knowsBea = (node) => !!node.agent.sa.agent.security.getPeerKey(bea.pubKey);
     expect(knowsBea(phone), 'the phone holds Bea — her greeting landed there').toBe(true);
 
@@ -100,7 +100,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
     // the phone can reach, at a proven per-circle address.
     const boxAddr = box.agent.circleAddressFor(CIRCLE);
     const grown = await until(async () => {
-      const r = await phone.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+      const r = await phone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
       const mine = (r?.members ?? []).find((m) => m.webid === phone.pubKey);
       return mine?.circleAddresses?.includes(boxAddr) ? true : null;
     }, { timeout: 20_000, step: 100 });
@@ -125,7 +125,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
       + `the PHONE got it: ${textsAt(phone).includes('ben je er nog?')} — the greeting stayed with the device instead of the person`).toBe(true);
     expect(knowsBea(box), 'the box holds Bea, learned from its sibling, not from a greeting of its own').toBe(true);
     // …and the contact book followed: Bea is a contact on the box, by the name the phone gave her.
-    const contacts = await box.agent.callSkill('stoop', 'listContacts', {});
+    const contacts = await box.agent.callSkill('pinboard', 'listContacts', {});
     const beaOnBox = (contacts?.items ?? []).find((c) => c.webid === bea.pubKey);
     expect(beaOnBox?.label, 'the contact book did not follow the key to the box').toBe('Bea');
   }, 180_000);

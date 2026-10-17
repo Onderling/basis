@@ -3,7 +3,7 @@
  * + per-circle member-skills projection + per-circle posture (Phase 3).
  *
  * Canonical user profile lives at `mem://user/profile/offerings.json`
- * — intentionally NOT app-namespaced so Stoop, Tasks, Folio etc. can
+ * — intentionally NOT app-namespaced so Pinboard, Tasks, Folio etc. can
  * read the same blob. When a pod is attached via the localStoreBundle,
  * the CachingDataSource forwards reads/writes through to
  * `<user-pod>/profile/offerings.json` (same path, same shape). The legacy

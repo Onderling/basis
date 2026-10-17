@@ -60,7 +60,7 @@
     "@onderling-app/agents": "workspace:*",
     "@onderling-app/calendar": "workspace:*",
     "@onderling-app/folio": "workspace:*",
-    "@onderling-app/stoop": "workspace:*",
+    "@onderling-app/pinboard": "workspace:*",
     "@onderling-app/tasks": "workspace:*",
     "@onderling/agent-registry": "workspace:*",
     "@onderling/app-manifest": "workspace:*",

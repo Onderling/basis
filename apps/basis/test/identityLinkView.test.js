@@ -15,8 +15,8 @@ const LINK = encodeLinkStartLink('https://basis.example/app', { botAddress: 'BOT
 function book() {
   const rows = new Map();
   const callSkill = async (app, op, args) => {
-    if (app === 'stoop' && op === 'listContacts') return { contacts: [...rows.values()] };
-    if (app === 'stoop' && op === 'addContact') { rows.set(args.webid, { ...(rows.get(args.webid) ?? {}), ...args }); return { contact: rows.get(args.webid) }; }
+    if (app === 'pinboard' && op === 'listContacts') return { contacts: [...rows.values()] };
+    if (app === 'pinboard' && op === 'addContact') { rows.set(args.webid, { ...(rows.get(args.webid) ?? {}), ...args }); return { contact: rows.get(args.webid) }; }
     return null;
   };
   return { rows, callSkill };

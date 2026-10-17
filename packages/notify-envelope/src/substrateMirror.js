@@ -19,7 +19,7 @@
  * `itemStore` is the RAW ItemStore (substrate API: addItems / applySync /
  * removeSync / listOpen / listClosed), NOT a legacy adapter.
  *
- * (Stoop's mirror is intentionally NOT built on this — it has a different shape:
+ * (Pinboard's mirror is intentionally NOT built on this — it has a different shape:
  * kind 'request', a backfill model, evictionRoster + agentRegistry, add-only.)
  *
  * @param {object} args

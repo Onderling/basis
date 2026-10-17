@@ -367,7 +367,7 @@ describe('leaving a circle', () => {
  *
  * A freshly created circle with nobody in it reported one transitional member. It was never a member:
  * it was the FOUNDER's own row. `deriveRoster` gives a founder no keys of their own, so the whole row
- * comes from the display cache, and the `pubKey` that lands there is this device's STOOP agent identity
+ * comes from the display cache, and the `pubKey` that lands there is this device's PINBOARD agent identity
  * — a key seeded once per device, constant across every circle, and not one of `selfKeys`.
  *
  * So the row failed the `mine.has(pubKey)` test, proved no address, and took the last branch: allow the
@@ -383,8 +383,8 @@ describe('our own roster row is ours even when its pubKey is a display-cache art
   const OWN_ADDRESS = 'relay:me.c1';
   const MY_CHAT_KEY = 'chat-key-mine';
   const MY_CIRCLE_KEY = 'circle-key-mine';
-  // The stoop agent's identity: one per DEVICE, identical in every circle. The linkable thing.
-  const STRAY_DEVICE_KEY = 'stoop-identity-constant-across-every-circle';
+  // The pinboard agent's identity: one per DEVICE, identical in every circle. The linkable thing.
+  const STRAY_DEVICE_KEY = 'pinboard-identity-constant-across-every-circle';
 
   const record = () => {
     const s = createCircleSenderAuthorization();
@@ -404,7 +404,7 @@ describe('our own roster row is ours even when its pubKey is a display-cache art
       'a circle with nobody in it cannot have a transitional member').toBe(0);
   });
 
-  it('does not admit the device-wide stoop key onto this circle\'s allow-list', () => {
+  it('does not admit the device-wide pinboard key onto this circle\'s allow-list', () => {
     const verdict = record().authorizeSender({
       circleId: 'c1', ownAddress: OWN_ADDRESS, senderKey: STRAY_DEVICE_KEY, from: 'relay:someone-else',
     });

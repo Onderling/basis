@@ -1,8 +1,8 @@
 /**
  * .4 — pod-settings.html -adopt.
  *
- * Mirrors stoop's -adopt settings test (commit 9e7003b /
- * `apps/stoop/test/stoop-web.test.js`).  Asserts:
+ * Mirrors pinboard's -adopt settings test (commit 9e7003b /
+ * `apps/pinboard/test/pinboard-web.test.js`).  Asserts:
  *
  *   1. The manifest validates with the new view added.
  *   2. The `pod-settings` view declares `shape: 'record'`.
@@ -121,8 +121,8 @@ describe('Slice B.2.4: pod-settings V0.4-adopt manifest declaration', () => {
     });
     // No creative-verb affordances surface here — getCircleStoragePolicy
     // and setCircleStoragePolicy are NOT in manifest.operations[] (they're
-    // pod-plumbing skills, mirroring stoop's getSettings/updateSettings
-    // choice). Same #6 territory as stoop's settings view.
+    // pod-plumbing skills, mirroring pinboard's getSettings/updateSettings
+    // choice). Same #6 territory as pinboard's settings view.
     expect(section.affordances).toEqual([]);
     // The view is not flagged readOnly (it mutates via the patch ops);
     // but because the per-field skills aren't manifest ops, no

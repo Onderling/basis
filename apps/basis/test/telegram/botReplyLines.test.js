@@ -47,7 +47,7 @@ describe('the household bot says one line per op family', () => {
     });
     await ensureHouseholdLists({ callSkill: (a, o, x) => agent.callSkill(a, o, x), t });
     // one of the household's people, whom a chore can be given to by name
-    await agent.callSkill('stoop', 'addContact', { webid: 'telegram:77', channel: 'telegram', role: 'member', displayName: 'Bob' });
+    await agent.callSkill('pinboard', 'addContact', { webid: 'telegram:77', channel: 'telegram', role: 'member', displayName: 'Bob' });
     const catalogue = createDoorCatalogue({ householdManifest: agent.manifest, slim: true, getApps: () => householdBotApps() });
     const doorCall = withAssistantOps({
       callSkill: (a, o, x, ctx) => agent.callSkill(a, o, x, ctx), t, refusal: agent.doorRefusal, threads: { langOf: () => null },

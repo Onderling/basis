@@ -164,7 +164,7 @@ describe('secretbox / secretunbox', () => {
   });
 });
 
-// ── stableId (Stoop V1 Phase 11, 2026-05-06) ──────────────────────────────
+// ── stableId (Pinboard V1 Phase 11, 2026-05-06) ──────────────────────────────
 
 describe('AgentIdentity.stableId', () => {
   it('is set on first generate()', async () => {

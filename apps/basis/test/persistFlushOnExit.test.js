@@ -28,7 +28,7 @@ describe('a waiting save, flushed on exit', () => {
 
 describe('a cancelled save is not flushed on exit', () => {
   it('cancel() untracks the waiting save', async () => {
-    const { IndexedDBPersist } = await import('../../stoop/src/lib/IndexedDBPersist.js');
+    const { IndexedDBPersist } = await import('../../pinboard/src/lib/IndexedDBPersist.js');
     const p = new IndexedDBPersist({ dbName: 'flush-on-exit-cancel', saveDelayMs: 60_000 });
     const before = pendingSaveCount();
     p.scheduleSave(new Map([['a', 1]]));

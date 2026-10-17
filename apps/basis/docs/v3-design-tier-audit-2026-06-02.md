@@ -77,7 +77,7 @@ current truth and v3's sketch is the older intent.
 | Sketch | Tier | Evidence / note |
 |--------|------|-----------------|
 | 7A · hop wordt zichtbaar · "1 mogelijke match HOP" · drie regels | 🟢 | Auto-hop-prompt when no in-circle match (#344);`circleHop.js` `buildHopChain` / `MAX_HOPS=1` / anonymised relay. |
-| 7B · Bert's hop-instellingen · per contact (Uit / Aan-met-goedkeuring / Altijd) | 🟢 | Per-contact hop override (, #336`contactHopOverrides.js`); respects Stoop trust-tiers. |
+| 7B · Bert's hop-instellingen · per contact (Uit / Aan-met-goedkeuring / Altijd) | 🟢 | Per-contact hop override (, #336`contactHopOverrides.js`); respects Pinboard trust-tiers. |
 
 ## §8 · Skill-vragen en -aanbod · het circle-stuk
 

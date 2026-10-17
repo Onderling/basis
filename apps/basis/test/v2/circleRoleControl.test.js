@@ -105,7 +105,7 @@ describe('the confirmation comes from the op’s own declaration', () => {
     const control = roleControlFor({ members: [ann, bob, cara], member: ann, myRef: 'w-ann' });
     const req = roleChangeConfirm({ control, name: 'Ann', t });
     expect(req).toMatchObject({
-      severity: 'warn',                       // declared in apps/stoop/manifest.js, not restated per shell
+      severity: 'warn',                       // declared in apps/pinboard/manifest.js, not restated per shell
       opId: 'setMemberRole',
       message: ROLE_CONTROL_KEYS.confirm_handover,
       title: 'circle.confirm.title',

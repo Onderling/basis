@@ -42,7 +42,7 @@ describe('matchesFilter — single-key matches', () => {
   it('apps: OR within the array', () => {
     expect(matchesFilter(ev({ app: 'tasks' }), { apps: ['household', 'tasks'] }))
       .toBe(true);
-    expect(matchesFilter(ev({ app: 'stoop' }), { apps: ['household', 'tasks'] }))
+    expect(matchesFilter(ev({ app: 'pinboard' }), { apps: ['household', 'tasks'] }))
       .toBe(false);
   });
 
@@ -169,20 +169,20 @@ describe('describeFilter', () => {
 describe('matchesFilter — expression tree (OQ-2.A, v0.6 catch-up)', () => {
   const houseNotif  = { id: 'e1', ts: 1, app: 'household', type: 'notification', actor: 'webid:anne' };
   const tasksRemind = { id: 'e2', ts: 2, app: 'tasks',  type: 'reminder',     actor: 'webid:karl' };
-  const stoopPost   = { id: 'e3', ts: 3, app: 'stoop',     type: 'item-changed', actor: 'webid:anne' };
+  const pinboardPost   = { id: 'e3', ts: 3, app: 'pinboard',     type: 'item-changed', actor: 'webid:anne' };
 
   it('and: [F1, F2] → both must match', () => {
     const f = { and: [{ apps: ['household'] }, { actors: ['webid:anne'] }] };
     expect(matchesFilter(houseNotif,  f)).toBe(true);
     expect(matchesFilter(tasksRemind, f)).toBe(false);  // wrong app
-    expect(matchesFilter(stoopPost,   f)).toBe(false);  // wrong app
+    expect(matchesFilter(pinboardPost,   f)).toBe(false);  // wrong app
   });
 
   it('or: [F1, F2] → either matches', () => {
     const f = { or: [{ apps: ['household'] }, { actors: ['webid:karl'] }] };
     expect(matchesFilter(houseNotif,  f)).toBe(true);   // app matches
     expect(matchesFilter(tasksRemind, f)).toBe(true);   // actor matches
-    expect(matchesFilter(stoopPost,   f)).toBe(false);
+    expect(matchesFilter(pinboardPost,   f)).toBe(false);
   });
 
   it('not: F → inverts F', () => {
@@ -197,7 +197,7 @@ describe('matchesFilter — expression tree (OQ-2.A, v0.6 catch-up)', () => {
     };
     expect(matchesFilter(tasksRemind, f)).toBe(true);    // tasks-v0 ✓ AND not notif ✓
     expect(matchesFilter(houseNotif,  f)).toBe(false);   // app ✓ but type IS notification
-    expect(matchesFilter(stoopPost,   f)).toBe(false);   // wrong app
+    expect(matchesFilter(pinboardPost,   f)).toBe(false);   // wrong app
   });
 
   it('nested or-of-ands', () => {
@@ -209,7 +209,7 @@ describe('matchesFilter — expression tree (OQ-2.A, v0.6 catch-up)', () => {
     };
     expect(matchesFilter(houseNotif,  f)).toBe(true);
     expect(matchesFilter(tasksRemind, f)).toBe(true);
-    expect(matchesFilter(stoopPost,   f)).toBe(false);
+    expect(matchesFilter(pinboardPost,   f)).toBe(false);
   });
 
   it('empty or: [] matches nothing', () => {

@@ -2,7 +2,7 @@
  * MnemonicView — render a 12/24-word recovery phrase.
  *
  * Plan (Phase 41.0 L5): grid layout, copy-to-clipboard button,
- * screenshot warning banner. Stoop-mobile + Tasks-mobile both
+ * screenshot warning banner. Pinboard-mobile + Tasks-mobile both
  * consume.
  */
 

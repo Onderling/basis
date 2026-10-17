@@ -14,7 +14,7 @@
  * subpath exports (same pattern as hostOps.js, agentBundle.js).
  */
 import { flowForOp } from '../../../basis/src/v2/pageProjection.js';
-import { stoopManifest } from '../../../stoop/manifest.js';
+import { pinboardManifest } from '../../../pinboard/manifest.js';
 import ConflictDisputeWizardModal     from '../../../basis/src/rn/wizards/conflictDisputeWizardModal.js';
 import CreateGroupWizardModal         from '../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import JoinGroupWizardModal           from '../../../basis/src/rn/wizards/joinGroupWizardModal.js';
@@ -43,12 +43,12 @@ export const WIZARD_REGISTRY = Object.freeze({
  * React component class or undefined.
  *
  * The join wizard DELEGATES TO ITS DECLARED FLOW (batch 6): `flows: [{ id: 'joinGroup', … }]` on
- * the stoop manifest is the admission this wizard exists, pinned to the state machine by G-S3.
+ * the pinboard manifest is the admission this wizard exists, pinned to the state machine by G-S3.
  * An undeclared flow refuses to launch (web's mount applies the same gate — web ≡ mobile); the
  * other wizards migrate to declarations as they are touched.
  */
 export function wizardModalFor(opId) {
-  if (opId === 'joinGroupWizard' && !flowForOp(stoopManifest, opId)) {
+  if (opId === 'joinGroupWizard' && !flowForOp(pinboardManifest, opId)) {
     console.error('[wizardRegistry] join wizard has no declared flow (manifest.flows) — refusing to launch');
     return undefined;
   }

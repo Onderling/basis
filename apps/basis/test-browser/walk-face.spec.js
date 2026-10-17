@@ -37,9 +37,9 @@ const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
-const circleIds = async (page) => ((await call(page, 'stoop', 'listMyCircles', {}))?.circles ?? [])
+const circleIds = async (page) => ((await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [])
   .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-const rosterRow = async (page, circleId, webid) => ((await call(page, 'stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
+const rosterRow = async (page, circleId, webid) => ((await call(page, 'pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
   .find((m) => m.webid === webid) ?? null;
 const hasSealedPicture = (row) => {
   const p = row?.personaProperties?.profilePicture ?? row?.said?.personaProperties?.profilePicture;
@@ -111,7 +111,7 @@ test('in a circle: a face set under Mij and shared is drawn on the members tab a
     expect(p.joined, `B joined: ${p.outcome}`).toBe(true);
     // pair() answers its own dialogs; from here on none is expected — dismiss rather than hang on one
     for (const peer of [A, B]) peer.page.on('dialog', (d) => d.dismiss().catch(() => {}));
-    const bId = (await call(B.page, 'stoop', 'whoAmI'))?.webid;
+    const bId = (await call(B.page, 'pinboard', 'whoAmI'))?.webid;
     const circle = (await circleIds(A.page)).find((id) => !/^pair-|^cc-help$/.test(String(id)));
     expect(circle, 'the shared circle').toBeTruthy();
 
@@ -170,7 +170,7 @@ test('to a contact: the face shown to a contact is drawn on their Contacten row'
     A = await bootPeer(browser, 'A'); B = await bootPeer(browser, 'B');
     for (const peer of [A, B]) peer.page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await gotoCircles(A.page); await gotoCircles(B.page);
-    const bId = (await call(B.page, 'stoop', 'whoAmI'))?.webid;
+    const bId = (await call(B.page, 'pinboard', 'whoAmI'))?.webid;
     const { pairId } = await becomeContacts(A, B);
 
     await setPicture(B.page);

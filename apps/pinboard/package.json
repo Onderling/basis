@@ -1,0 +1,73 @@
+{
+  "name": "@onderling-app/pinboard",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Pinboard \u2014 neighbourhood-skill-app. V2 of the H5 / neighbourhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./manifest": "./manifest.js",
+    "./browser": "./src/browser.js",
+    "./lib/geo": "./src/lib/geo.js",
+    "./lib/membershipRecord": "./src/lib/membershipRecord.js",
+    "./lib/inviteCeiling": "./src/lib/inviteCeiling.js",
+    "./lib/contactCard": "./src/lib/contactCard.js",
+    "./lib/podPathMap": "./src/lib/podPathMap.js",
+    "./lib/existingPodProvisioner": "./src/lib/existingPodProvisioner.js",
+    "./lib/derivePodRoot": "./src/lib/derivePodRoot.js",
+    "./lib/attachPodToBundle": "./src/lib/attachPodToBundle.js",
+    "./locales/en": "./locales/en.json",
+    "./locales/nl": "./locales/nl.json"
+  },
+  "bin": {
+    "pinboard-ui": "bin/pinboard-ui.js",
+    "pinboard-testbed": "bin/pinboard-testbed.js",
+    "pinboard-web": "bin/pinboard-web.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ui": "node bin/pinboard-ui.js",
+    "testbed": "node bin/pinboard-testbed.js",
+    "web": "node bin/pinboard-web.js"
+  },
+  "dependencies": {
+    "@onderling/agent-registry": "file:../../packages/agent-registry",
+    "@onderling/agent-ui": "file:../../packages/agent-ui",
+    "@onderling/substrate-stack": "file:../../packages/substrate-stack",
+    "@onderling/app-manifest": "file:../../packages/app-manifest",
+    "@onderling/chat-agent": "file:../../packages/chat-agent",
+    "@onderling/chat-p2p": "file:../../packages/chat-p2p",
+    "@onderling/circles": "file:../../packages/circles",
+    "@onderling/core": "file:../../packages/core",
+    "@onderling/transports": "file:../../packages/transports",
+    "@onderling/vault": "file:../../packages/vault",
+    "@onderling/identity-resolver": "file:../../packages/identity-resolver",
+    "@onderling/item-store": "file:../../packages/item-store",
+    "@onderling/item-types": "file:../../packages/item-types",
+    "@onderling/llm-client": "file:../../packages/llm-client",
+    "@onderling/local-store": "file:../../packages/local-store",
+    "@onderling/notifier": "file:../../packages/notifier",
+    "@onderling/notify-envelope": "file:../../packages/notify-envelope",
+    "@onderling/oidc-session": "file:../../packages/oidc-session",
+    "@onderling/pod-client": "file:../../packages/pod-client",
+    "@onderling/pod-onboarding": "workspace:*",
+    "@onderling/pod-routing": "file:../../packages/pod-routing",
+    "@onderling/pseudo-pod": "file:../../packages/pseudo-pod",
+    "@onderling/relay": "file:../../packages/relay",
+    "@onderling/sdk": "file:../../packages/sdk",
+    "@onderling/offering-match": "file:../../packages/offering-match",
+    "i18next": "^23.15.0",
+    "tweetnacl": "^1.0.3"
+  },
+  "optionalDependencies": {
+    "@inrupt/solid-client-authn-node": "4.0.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@onderling/blob-gateway": "file:../../packages/blob-gateway",
+    "fake-indexeddb": "^6.2.5",
+    "vitest": "^2.1.0"
+  }
+}

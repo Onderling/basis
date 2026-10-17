@@ -6,7 +6,7 @@ import {
   MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES,
 } from '../../src/v2/membershipRail.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
-import { projectCircleRoster } from '../../../stoop/src/skills/index.js';
+import { projectCircleRoster } from '../../../pinboard/src/skills/index.js';
 
 // The membership rider's acceptance: membership statements ride the device log's membership lane —
 // signed with per-circle keys, fanned + VERIFIED on ingest, pull-all caught-up — and the roster folds them

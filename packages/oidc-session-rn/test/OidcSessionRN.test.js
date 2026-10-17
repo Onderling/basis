@@ -32,9 +32,9 @@ describe('buildSecureStoreKeys', () => {
     expect(k.CLIENT_ID).toBe('folio-oidc-client-id');
   });
 
-  it('stoop appId produces stoop-oidc-* keys', () => {
-    const k = buildSecureStoreKeys('stoop');
-    expect(k.ACCESS_TOKEN).toBe('stoop-oidc-access-token');
+  it('pinboard appId produces pinboard-oidc-* keys', () => {
+    const k = buildSecureStoreKeys('pinboard');
+    expect(k.ACCESS_TOKEN).toBe('pinboard-oidc-access-token');
   });
 
   it('rejects illegal characters in appId', () => {
@@ -66,15 +66,15 @@ describe('OidcSessionRN — constructor validation', () => {
 describe('OidcSessionRN — adoptTokens + isAuthenticated', () => {
   it('adopts a fresh token set and persists', async () => {
     const s = buildStore();
-    const sess = new OidcSessionRN({ store: s, appId: 'stoop' });
+    const sess = new OidcSessionRN({ store: s, appId: 'pinboard' });
     await sess.adoptTokens({
       accessToken: 'A', refreshToken: 'R', idToken: 'I',
       expiresIn: 60, issuer: 'https://idp', webid: 'https://anne/me',
     });
     expect(sess.isAuthenticated()).toBe(true);
     expect(sess.webid).toBe('https://anne/me');
-    expect(s._peek()['stoop-oidc-access-token']).toBe('A');
-    expect(s._peek()['stoop-oidc-issuer']).toBe('https://idp');
+    expect(s._peek()['pinboard-oidc-access-token']).toBe('A');
+    expect(s._peek()['pinboard-oidc-issuer']).toBe('https://idp');
   });
 
   it('rejects bad token sets', async () => {
@@ -150,7 +150,7 @@ describe('OidcSessionRN — getAuthenticatedFetch', () => {
 describe('OidcSessionRN — logout', () => {
   it('clears in-memory state and removes vault entries', async () => {
     const s = buildStore();
-    const sess = new OidcSessionRN({ store: s, appId: 'stoop' });
+    const sess = new OidcSessionRN({ store: s, appId: 'pinboard' });
     await sess.adoptTokens({ accessToken: 'A', issuer: 'https://idp', expiresIn: 60 });
     await sess.logout();
     expect(sess.isAuthenticated()).toBe(false);

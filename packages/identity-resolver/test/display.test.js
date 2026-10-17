@@ -1,6 +1,6 @@
 /**
  * display — pure-fn coverage. Mirrors the assertions
- * apps/stoop-mobile/test/{avatar,handle}.test.js exercise through
+ * apps/pinboard-mobile/test/{avatar,handle}.test.js exercise through
  * the re-export shims (if/when those test files exist).
  */
 

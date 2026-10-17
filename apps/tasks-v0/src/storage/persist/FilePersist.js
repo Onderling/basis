@@ -2,7 +2,7 @@
  * FilePersist — Node fs adapter for tasks-v0's `CachingDataSource`
  * local cache.
  *
- * Identical surface + semantics to `apps/stoop/src/lib/FilePersist.js`.
+ * Identical surface + semantics to `apps/pinboard/src/lib/FilePersist.js`.
  * Copied (not imported) to avoid an app→app dependency.  Substrate-
  * extraction candidate — lift the three adapters + persistPicker into
  * `@onderling/local-store` once we have a third consumer.

@@ -81,7 +81,7 @@ describe('makePeerRouter — A2A DataPart unwrap', () => {
   it('dispatches a {type:message, parts:[DataPart]} envelope on the part\'s subtype, handing over the part data', () => {
     const seen = [];
     const route = makeRouterForParts({ handlers: { 'chat-message': (from, p) => seen.push([from, p]) }, logger: quiet });
-    const data = { type: 'stoop-chat', subtype: 'chat-message', threadId: 'post-1', body: 'hoi', nonce: 'n1' };
+    const data = { type: 'pinboard-chat', subtype: 'chat-message', threadId: 'post-1', body: 'hoi', nonce: 'n1' };
     route({ from: 'peer-B', payload: { type: 'message', parts: [{ type: 'DataPart', data }] } });
     expect(seen).toEqual([['peer-B', data]]);
   });

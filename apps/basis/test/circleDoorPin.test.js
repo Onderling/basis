@@ -58,7 +58,7 @@ describe('the circle door pins its circle', () => {
     // a chore another member holds, read in the circle: the household's book does not name them, and under the circle's
     // default reveal policy nobody is named — only "you" for the reader's own
     // Bert is ALSO in the household's book (a linked key), with a household name: it does not reach the circle
-    await own('stoop', 'addContact', { webid: 'bert-ref', displayName: 'Bert Huisnaam', channel: 'web', role: 'member' });
+    await own('pinboard', 'addContact', { webid: 'bert-ref', displayName: 'Bert Huisnaam', channel: 'web', role: 'member' });
     await agent.setDoorCaller(BERT, 'member');
     await asBert('lists', 'addToList', { list: 'Klusjes', text: 'vuilnis' });
     await asBert('tasks', 'claimTask', { id: 'vuilnis' });

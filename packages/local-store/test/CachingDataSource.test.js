@@ -1,7 +1,7 @@
 /**
  * CachingDataSource — focused substrate test for the Phase 1
  * `innerKeyMap` seam (logical-key ↔ inner-URI translation at the
- * `#inner` boundary). Stoop's apps/stoop/test/phase{4,33,34}.js +
+ * `#inner` boundary). Pinboard's apps/pinboard/test/phase{4,33,34}.js +
  * tasks-v0 exercise the broader behaviour end-to-end; this file
  * pins the new seam + its behaviour-neutral identity default.
  */

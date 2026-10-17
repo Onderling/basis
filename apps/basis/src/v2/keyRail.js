@@ -61,7 +61,7 @@ export function keyBindingVerifier(callSkill, { rotateClassFor = null } = {}) {
       // caretaker's own rail took version 2 and the other member's rail held nothing — the caretaker
       // could remove someone but not rotate the key, which is the half that stops the departed
       // opening new content. Backward secrecy silently broken, on a circle that looked administered.
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;

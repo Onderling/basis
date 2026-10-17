@@ -20,8 +20,8 @@ test('B discloses a property and shares it from Mij; A\'s roster row for B carri
     const p = await pair(A, B, { name: 'Lane share', re: /lane.?share/i, handle: 'bea' });
     expect(p.joined, `B joined: ${p.outcome}`).toBe(true);
     await B.page.waitForTimeout(3000);
-    const bId = (await B.page.evaluate(async () => window.onderlingCall('stoop', 'whoAmI', {})))?.webid;
-    const gid = (await A.page.evaluate(async () => ((await window.onderlingCall('stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).find((id) => !/^pair-|^cc-help$/.test(String(id)))));
+    const bId = (await B.page.evaluate(async () => window.onderlingCall('pinboard', 'whoAmI', {})))?.webid;
+    const gid = (await A.page.evaluate(async () => ((await window.onderlingCall('pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).find((id) => !/^pair-|^cc-help$/.test(String(id)))));
     expect(gid, 'the circle id').toBeTruthy();
     log('STEP1 a circle of two', 'PASS', `${String(gid).slice(0, 12)}…, B = ${String(bId).slice(0, 12)}…`);
 
@@ -46,7 +46,7 @@ test('B discloses a property and shares it from Mij; A\'s roster row for B carri
 
     // A's roster row for B carries the property — folded from B's statement, the admin wrote nothing.
     const rowOnA = async () => A.page.evaluate(async ([cid, who]) => {
-      const r = await window.onderlingCall('stoop', 'listGroupMembers', { groupId: cid });
+      const r = await window.onderlingCall('pinboard', 'listGroupMembers', { groupId: cid });
       const m = (r?.members ?? []).find((x) => x.webid === who);
       return m ? { personaProperties: m.personaProperties ?? null, said: m.said ?? null } : null;
     }, [gid, bId]);

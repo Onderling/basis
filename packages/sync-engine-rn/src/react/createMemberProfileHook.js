@@ -2,7 +2,7 @@
  * createMemberProfileHook — factory that produces a `useMemberProfile`
  * hook over the active bundle's MemberMap.
  *
- * Lifted from apps/stoop-mobile/src/lib/useMemberProfile.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/useMemberProfile.js 2026-05-09
  * (Phase 41.0.b A7; Tasks-mobile is the second consumer).
  *
  *   const useMemberProfile = createMemberProfileHook({ useService });

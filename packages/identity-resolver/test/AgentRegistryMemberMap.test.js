@@ -16,7 +16,7 @@ const ANNE = {
   role:         'device',
   name:         'Anne (laptop)',
   deviceId:     'laptop-anne',
-  capabilities: ['stoop', 'tasks'],
+  capabilities: ['pinboard', 'tasks'],
   revokedAt:    null,
 };
 const BOB = {
@@ -69,7 +69,7 @@ describe('AgentRegistryMemberMap — resolveByWebid', () => {
       pubKey:      'pub-anne',
       stableId:    'laptop-anne',
       role:        'device',
-      capabilities: ['stoop', 'tasks'],
+      capabilities: ['pinboard', 'tasks'],
       deviceId:    'laptop-anne',
       agentUri:    'https://anne.pod/profile#me/agent/laptop',
     });

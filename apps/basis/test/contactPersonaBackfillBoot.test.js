@@ -33,16 +33,16 @@ describe('the persona backfill at boot', () => {
     const boot = () => createRealHouseholdAgent({
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass),
       chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
-      stoopPersistDb: { path: path.join(dir, 'stoop-state.json') },
+      pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') },
       seedDemoData: false, seedHousehold: false,
     });
-    const rowOf = async (agent) => bookRowsOf(await agent.callSkill('stoop', 'listContacts', {})).find((c) => c?.webid === THEM) ?? null;
+    const rowOf = async (agent) => bookRowsOf(await agent.callSkill('pinboard', 'listContacts', {})).find((c) => c?.webid === THEM) ?? null;
 
     // First boot: the row as a pre-persona device holds it — the pair roster's own write, no persona.
     const first = await boot();
     const self = first.meta.chatAddress;
     const pairCircleId = pairCircleIdFor(self, THEM);
-    const added = await first.callSkill('stoop', 'addContact', { webid: THEM, pairCircleId });
+    const added = await first.callSkill('pinboard', 'addContact', { webid: THEM, pairCircleId });
     expect(added?.contact, JSON.stringify(added)).toBeTruthy();
     const before = await rowOf(first);
     expect(before, 'the seeded row is in the book').toMatchObject({ webid: THEM, pairCircleId });

@@ -1,6 +1,6 @@
 /**
  * location fold-in (audit §4) — one-time seed of the person-level `location` property from
- * the bespoke stoop `profile.location {cell,label,source}` field (locationMigration.js).
+ * the bespoke pinboard `profile.location {cell,label,source}` field (locationMigration.js).
  * Pins: marker idempotence, coarse-label seeding (never raw coords), the skip-but-mark case
  * (no bespoke location), and that the marker is set once the seed persists.
  */
@@ -9,7 +9,7 @@ import {
   migrateLocation, LOCATION_MIGRATION_KEY,
 } from '../src/core/locationMigration.js';
 
-/** A callSkill stub over a tiny in-memory profile + a stoop location signal; records calls. */
+/** A callSkill stub over a tiny in-memory profile + a pinboard location signal; records calls. */
 function makeHost({ location = null, markerDone = false } = {}) {
   const calls = [];
   const props = {};
@@ -18,7 +18,7 @@ function makeHost({ location = null, markerDone = false } = {}) {
     calls.push({ origin, opId, args });
     if (origin === 'agents' && opId === 'getProfileProperties') return { ok: true, properties: { ...props } };
     if (origin === 'agents' && opId === 'setProfileProperty') { props[args.key] = { mode: 'own', value: args.value }; return { ok: true }; }
-    if (origin === 'stoop' && opId === 'getMyLocation') return { location };
+    if (origin === 'pinboard' && opId === 'getMyLocation') return { location };
     return { ok: false, reason: `unstubbed ${origin}.${opId}` };
   };
   return { callSkill, calls, props };
@@ -26,7 +26,7 @@ function makeHost({ location = null, markerDone = false } = {}) {
 
 const setPropCalls = (calls) => calls.filter((c) => c.opId === 'setProfileProperty');
 
-describe('location migration — seed from the bespoke stoop location', () => {
+describe('location migration — seed from the bespoke pinboard location', () => {
   it('seeds the COARSE label token from {cell,label,source}, and marks done', async () => {
     const host = makeHost({ location: { cell: '52.3,4.9', label: 'Amsterdam', source: 'geocode' } });
     const res = await migrateLocation({ callSkill: host.callSkill });

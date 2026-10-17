@@ -39,8 +39,8 @@ export function itemMatchesAppliesTo(appliesTo, item) {
   if (appliesTo.type !== undefined) {
     const types = Array.isArray(appliesTo.type) ? appliesTo.type : [appliesTo.type];
     // NavModel (2026-05-21) — wildcard: `appliesTo.type === '*'`
-    // means "any of manifest.itemTypes".  Surfaced by stoop's
-    // `cancelRequest` (spans ask/offer/lend) — the stoop -adopt
+    // means "any of manifest.itemTypes".  Surfaced by pinboard's
+    // `cancelRequest` (spans ask/offer/lend) — the pinboard -adopt
     // agent had to work around this inline in mine.html.  Fixed once
     // in the substrate so every consumer shares one gate.  See
     // `DESIGN-navmodel-sketch.md` + `packages/app-manifest/src/

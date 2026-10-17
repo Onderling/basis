@@ -33,7 +33,7 @@ vs mobile (`apps/basis-mobile/src/screens/`) vs the shared `apps/basis/src/`.*
 The intended model: **logic is written once in `src/` and both shells inject only platform adapters.**
 A mobile screen should contain **RN UI + the transport/bundle adapter and nothing else** — every
 dispatch/resolution/feedback/messaging decision should live in a shared `src/` module that web and
-mobile both call. The bugs fixed this session (dispatch arity, `listOpen`→stoop, `/klaar` unreachable,
+mobile both call. The bugs fixed this session (dispatch arity, `listOpen`→pinboard, `/klaar` unreachable,
 fan-out arg-shift) all lived in places where **mobile reimplemented** web's logic instead of sharing it.
 
 ## State (what the audit found)
@@ -77,7 +77,7 @@ explicit). Verify: web `/feedback → text → /klaar → /feedback-stop`; feedb
 
 ### Phase 2 — extract a shared `broadcastFanOut` + optimistic-append *(mechanical)*
 Lift the fan-out body (optimistic→pending→sent/failed, retry-same-`msgId`,
-`rawCallSkill('stoop','broadcastKringMessage',…)`) into a shared helper beside `deliveryState.js`,
+`rawCallSkill('pinboard','broadcastKringMessage',…)`) into a shared helper beside `deliveryState.js`,
 injecting only the rerender/notify callback (web `rerender` / RN `setDeliveryTick`). Same for the
 optimistic `chat-message` event builder. Delete both inline copies. Verify both shells still deliver +
 mark status; the `recipient-pubkey-unknown` reporting stays intact.
@@ -179,4 +179,4 @@ DOM rendering + their dispatcher. Every circle-bot/feedback/kring decision lives
 modules, so the next change can't drift between platforms. This is the basis instance of the
 broader **manifest-driven, write-once** direction (see `PLAN-manifest-gate-surfaces.md`,
 `[[project-manifest-driven-surfaces-endgame]]`); a later pass can repeat the audit per app
-(household/tasks/stoop/folio/calendar).
+(household/tasks/pinboard/folio/calendar).

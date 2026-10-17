@@ -17,7 +17,7 @@ import { AgentIdentity, DataPart } from '@onderling/core';
 import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
 import { RelayTransport }          from '@onderling/transports';
-import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/pinboard';
 import { wait, checker }           from './_util.mjs';
 
 export const name = 'J-roles (admin vs member, enforced at the act; eviction and the bystander)';
@@ -142,7 +142,7 @@ export async function run({ relayUrl }) {
     await wait(2000);
     check('the leaver\'s own device drops the membership', !has(await rosterOf(cato, CATO), CATO));
     // PROPAGATION is deliberately NOT asserted here. `leaveGroup` emits a `leave` spine statement, and a
-    // statement needs a lane: this harness runs stoop agents over the substrate mirror with no device log
+    // statement needs a lane: this harness runs pinboard agents over the substrate mirror with no device log
     // and therefore no membership rail, so the statement has nowhere to travel. The shipping composition
     // does propagate it, pinned in `apps/basis/test/v2/leavePropagation.test.js`. Asserting it here would
     // measure the harness, not the product.

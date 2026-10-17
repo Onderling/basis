@@ -4,7 +4,7 @@
  * Pure geometry (fit / data-url parsing / mime choice) is tested directly; the
  * Canvas round-trip is verified with INJECTED fakes so we assert the RESULT —
  * the {mime, dataB64, width, height, thumbnail} record matches the shape
- * stoop.validateInboundAttachment accepts — without a real browser canvas.
+ * pinboard.validateInboundAttachment accepts — without a real browser canvas.
  */
 import { describe, it, expect, vi } from 'vitest';
 import {

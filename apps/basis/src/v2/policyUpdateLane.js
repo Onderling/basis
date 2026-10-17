@@ -256,7 +256,7 @@ export function makeCirclePolicyLane({ emitter, headStore, readPolicy, writePoli
 export function adminsOfViaSkill(callSkill) {
   return async (circleId) => {
     let res = null;
-    try { res = typeof callSkill === 'function' ? await callSkill('stoop', 'listGroupMembers', { groupId: circleId }) : null; }
+    try { res = typeof callSkill === 'function' ? await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }) : null; }
     catch { res = null; }
     return new Set((res?.members ?? []).filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean));
   };

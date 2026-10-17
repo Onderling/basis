@@ -15,8 +15,8 @@
  * `apps/tasks-v0/src/Circle.js`'s `tokenFor` reader. New writes always
  * land in the per-app shape.
  *
- * Tasks-mobile passes `appKey: 'tasks'`. If a future Stoop install
- * shares a webid + device, it'll write `appKey: 'stoop'` into the
+ * Tasks-mobile passes `appKey: 'tasks'`. If a future Pinboard install
+ * shares a webid + device, it'll write `appKey: 'pinboard'` into the
  * same map without clobbering — the substrate-side per-app push
  * sender (deferred to a follow-up; tracked in
  * `Project Files/Tasks App/mobile-coding-plan-2026-05-08.md` Batch 5)

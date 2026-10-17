@@ -55,7 +55,7 @@ export default function EncryptedBackupWizardModal({
             {state.step === 1 && (
               <Body
                 title={t('circle.wizard.backup.title')}
-                intro="Pick a passphrase to encrypt your local stoop data. Keep it safe — without it the backup is unrecoverable."
+                intro="Pick a passphrase to encrypt your local pinboard data. Keep it safe — without it the backup is unrecoverable."
               >
                 <Field
                   label="Passphrase"

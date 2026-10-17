@@ -1,10 +1,10 @@
 /**
  * classifyQrPayload — generic, plugin-driven QR payload classifier.
  *
- * Lifted from apps/stoop-mobile/src/lib/qrScanner.js 2026-05-09
- * (Phase 41.0 L4; Tasks-mobile is the second consumer). Stoop's
- * three classifiers (invite/contact/recovery) stay in stoop-mobile
- * (they're Stoop-payload-shaped); Tasks-mobile registers its own
+ * Lifted from apps/pinboard-mobile/src/lib/qrScanner.js 2026-05-09
+ * (Phase 41.0 L4; Tasks-mobile is the second consumer). Pinboard's
+ * three classifiers (invite/contact/recovery) stay in pinboard-mobile
+ * (they're Pinboard-payload-shaped); Tasks-mobile registers its own
  * (e.g. `tasks://invite`, `tasks://bot-token`).
  *
  * `classifyQrPayload(text, classifiers)` walks `classifiers` in

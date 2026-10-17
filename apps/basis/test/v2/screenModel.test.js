@@ -26,7 +26,7 @@ describe('buildScreenModel — text filter', () => {
 
 describe('buildScreenModel — D-mig-2 searchFields (the filter grammar)', () => {
   // Contacts whose label is a display name but whose `handle` is distinct —
-  // exactly stoop's contact row shape (label = displayName ?? handle ?? webid).
+  // exactly pinboard's contact row shape (label = displayName ?? handle ?? webid).
   const people = [
     { id: 'a', label: 'Karin de Vries', handle: 'kdv' },
     { id: 'b', label: 'Anna Bakker',    handle: 'zephyr' },   // handle unrelated to label

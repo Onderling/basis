@@ -71,7 +71,7 @@ describe('#237 folio operations via mobile bundle.callSkill', () => {
   }
 
   // Real-agent boot lifts createRealHouseholdAgent + composes folio,
-  // tasks-v0, stoop, household — first boot can clear 5s on a cold
+  // tasks-v0, pinboard, household — first boot can clear 5s on a cold
   // module cache.  Bump per-test timeout the same way bootSmoke
   // implicitly relies on (its tests run 2-3s).
   const BOOT_TIMEOUT = 15000;

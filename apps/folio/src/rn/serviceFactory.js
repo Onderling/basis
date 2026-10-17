@@ -2,13 +2,13 @@
  * serviceFactory — convenience for building a SyncEngine on RN.
  *
  * **2026-05-08:** the implementation lifted into the new
- * `@onderling/sync-engine-rn` substrate (Stoop V3 mobile = rule-of-two
+ * `@onderling/sync-engine-rn` substrate (Pinboard V3 mobile = rule-of-two
  * consumer). This file is now a thin shim that pre-binds Folio's
  * `SyncEngine` subclass so callers don't have to.
  *
  * Folio's subclass adds conflict-marker writing + auto-share hooks
  * (see `apps/folio/src/SyncEngine.js`); other consumers of the
- * substrate (Stoop V3 mobile) call the substrate's `createSyncEngine`
+ * substrate (Pinboard V3 mobile) call the substrate's `createSyncEngine`
  * directly without `SyncEngineClass` (and get the substrate's stock
  * `SyncEngine`).
  */

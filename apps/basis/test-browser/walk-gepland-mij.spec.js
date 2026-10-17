@@ -24,7 +24,7 @@ test('my own appointment shows on Vandaag, and is still there after a reload', a
     expect(made?.ok, JSON.stringify(made)).toBe(true);
     expect((await A.page.evaluate(async (w) => window.onderlingCall('calendar', 'addEvent', { title: 'kapper', when: w }), await at(2, 9)))?.ok).toBe(true);
     // one in a circle, between my own two: Gepland's twin is ONE time line across the circles and my own
-    const circleId = await A.page.evaluate(async () => { const r = await window.onderlingCall('stoop', 'listMyCircles', {}); const c = (r?.circles ?? [])[0]; return typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null); });
+    const circleId = await A.page.evaluate(async () => { const r = await window.onderlingCall('pinboard', 'listMyCircles', {}); const c = (r?.circles ?? [])[0]; return typeof c === 'string' ? c : (c?.groupId ?? c?.id ?? null); });
     expect(circleId, 'a fresh profile has a circle').toBeTruthy();
     const inCircle = await A.page.evaluate(async ([w, cid]) => window.onderlingCall('calendar', 'addEvent', { title: 'repetitie', when: w, circleId: cid }), [await at(1, 19), circleId]);
     expect(inCircle?.ok, JSON.stringify(inCircle)).toBe(true);

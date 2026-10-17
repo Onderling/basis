@@ -220,7 +220,7 @@
       "category": "test"
     },
     {
-      "file": "apps/basis-mobile/test/circleStoopMediaMobile.test.js",
+      "file": "apps/basis-mobile/test/circlePinboardMediaMobile.test.js",
       "specifier": "../../../packages/blob-gateway/src/index.js",
       "reachesInto": "@onderling/blob-gateway",
       "category": "test"

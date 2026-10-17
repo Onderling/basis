@@ -1,10 +1,10 @@
 /**
  * locationMigration — one-time, silent seed of the person-level `location` property on the
- * root persona from the bespoke stoop `profile.location {cell,label,source}` field (location
+ * root persona from the bespoke pinboard `profile.location {cell,label,source}` field (location
  * fold-in, plans/NOTE-skills-properties-audit.md §4; personal-properties design §2). Mirrors
  * availabilityMigration.js: seed once, guarded by a marker, then never touch the old field.
  *
- * Most-restrictive seeding: the bespoke stoop location is ALREADY coarse (a grid `cell` + a
+ * Most-restrictive seeding: the bespoke pinboard location is ALREADY coarse (a grid `cell` + a
  * human `label`, no raw coords), so we seed the COARSE LABEL token — never coordinates. When
  * there is no bespoke location, nothing is seeded (the property stays ∅) but the marker is
  * still set, so this stays a genuine one-time migration.
@@ -22,7 +22,7 @@ export const LOCATION_MIGRATION_KEY = '_migrations.location';
 const unwrap = (v) => (v && typeof v === 'object' && 'mode' in v ? v.value : v);
 
 /**
- * Seed the default profile's `location` from the bespoke stoop location, once. Safe to call
+ * Seed the default profile's `location` from the bespoke pinboard location, once. Safe to call
  * on every Mij load — the marker makes repeats free.
  *
  * @param {object} args
@@ -39,11 +39,11 @@ export async function migrateLocation({ callSkill, defaultId = 'default' } = {})
   if (!props || props.ok === false) return { ok: false, reason: 'no-profile' };
   if (unwrap(props?.properties?.[LOCATION_MIGRATION_KEY])) return { ok: true, already: true };
 
-  // Source: the bespoke stoop coarse location {cell,label,source}. Seed the COARSE label
-  // token (most-restrictive: never raw coords — the stoop field is already coarse).
+  // Source: the bespoke pinboard coarse location {cell,label,source}. Seed the COARSE label
+  // token (most-restrictive: never raw coords — the pinboard field is already coarse).
   let seedValue = null;
   try {
-    const r = await callSkill('stoop', 'getMyLocation', {});
+    const r = await callSkill('pinboard', 'getMyLocation', {});
     const loc = r?.location ?? null;
     if (isLocationValue(loc)) seedValue = locationLabel(loc);
   } catch { /* */ }

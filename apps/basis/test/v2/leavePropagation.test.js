@@ -8,7 +8,7 @@
  * It also pins a COMPOSITION difference worth knowing. `leaveGroup` emits a `leave` spine statement,
  * but a statement needs a lane to travel on: in the basis composition (device log → membership lane →
  * fan → verify-at-the-rail) it arrives and folds, which is what this test proves. In the
- * stoop/substrate-mirror composition the e2e journeys use, there is no membership rail, so the same
+ * pinboard/substrate-mirror composition the e2e journeys use, there is no membership rail, so the same
  * op leaves the circle's view of the roster unchanged — that is a property of that harness, not of
  * the product, and the roles journey says so in place.
  */
@@ -47,14 +47,14 @@ describe('PROBE — a voluntary leave reaches the circle', () => {
     expect(joined.joined?.ok, JSON.stringify(joined.joined)).toBe(true);
     await bindCircleAddresses([A, B], CIRCLE);
 
-    const rows = async (n) => (await n.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    const rows = async (n) => (await n.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
     const hasB = (r) => r.some((m) => (m.webid ?? m.addr ?? m.ref) === B.pubKey);
     expect(hasB(await rows(A)), 'precondition: A sees B as a member').toBe(true);
 
     // The act: B leaves of their own accord, through the production op.
     // `confirm: true` — leaving is gated as irreversible, which is right; the gate is not what
     // this probe is about.
-    const left = await B.agent.callSkill('stoop', 'leaveGroup', { groupId: CIRCLE, confirm: true });
+    const left = await B.agent.callSkill('pinboard', 'leaveGroup', { groupId: CIRCLE, confirm: true });
     expect(left?.error, JSON.stringify(left)).toBeUndefined();
 
     // B's own device must reflect it…

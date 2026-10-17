@@ -100,7 +100,7 @@ describe('the box enrols from the phone\'s offer and the circle reaches it', () 
     // empty; one address on it that is not the phone's own is the box.)
     const own = phone.agent.circleAddressFor(CIRCLE);
     const grown = await until(async () => {
-      const r = await phone.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+      const r = await phone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
       const mine = (r?.members ?? []).find((m) => m.webid === phone.pubKey);
       const others = (mine?.circleAddresses ?? []).filter((a) => a !== own);
       return others.length ? others : null;

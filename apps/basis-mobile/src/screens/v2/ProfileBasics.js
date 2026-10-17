@@ -2,7 +2,7 @@
  * basis-mobile v2 — the person's own basics (RN; web: profileBasics.js): handle + display name, and the coarse
  * location. Painted at the top of the person's own editor (CircleMijScreen, the default persona), where Mij's "Edit"
  * door leads; Mij itself is the declared screen (name, readings, devices) and lists no section by hand. Loads
- * getMyProfile and dispatches the stoop mutations through the injected `callSkill`.
+ * getMyProfile and dispatches the pinboard mutations through the injected `callSkill`.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
@@ -24,7 +24,7 @@ export default function ProfileBasics({ callSkill }) {
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
-    const prof = await callSkill('stoop', 'getMyProfile', {}).catch(() => null);
+    const prof = await callSkill('pinboard', 'getMyProfile', {}).catch(() => null);
     const entry = prof?.entry ?? {};
     setProfile(entry);
     setHandle(entry.handle ?? '');
@@ -37,21 +37,21 @@ export default function ProfileBasics({ callSkill }) {
   const saveIdentity = useCallback(async () => {
     setBusy(true);
     try {
-      if (handle && handle !== profile.handle) await callSkill('stoop', 'setMyHandle', { handle: handle.trim() });
-      if (display !== (profile.displayName ?? '')) await callSkill('stoop', 'setMyDisplayName', { displayName: display.trim() });
+      if (handle && handle !== profile.handle) await callSkill('pinboard', 'setMyHandle', { handle: handle.trim() });
+      if (display !== (profile.displayName ?? '')) await callSkill('pinboard', 'setMyDisplayName', { displayName: display.trim() });
     } catch { /* surfaced on reload */ }
     setBusy(false); load();
   }, [handle, display, profile, callSkill, load]);
   const geocode = useCallback(async () => {
     const q = geoQuery.trim(); if (!q) return;
-    try { const r = await callSkill('stoop', 'geocode', { query: q }); setGeoResult(r?.error ? null : r); } catch { setGeoResult(null); }
+    try { const r = await callSkill('pinboard', 'geocode', { query: q }); setGeoResult(r?.error ? null : r); } catch { setGeoResult(null); }
   }, [geoQuery, callSkill]);
   const saveLocation = useCallback(async () => {
     if (!geoResult) return;
-    try { await callSkill('stoop', 'setMyLocation', { cell: geoResult.cell, label: geoResult.label, source: 'geocode' }); } catch { /* */ }
+    try { await callSkill('pinboard', 'setMyLocation', { cell: geoResult.cell, label: geoResult.label, source: 'geocode' }); } catch { /* */ }
     setGeoResult(null); setGeoQuery(''); load();
   }, [geoResult, callSkill, load]);
-  const clearLocation = useCallback(async () => { try { await callSkill('stoop', 'clearMyLocation', {}); } catch { /* */ } load(); }, [callSkill, load]);
+  const clearLocation = useCallback(async () => { try { await callSkill('pinboard', 'clearMyLocation', {}); } catch { /* */ } load(); }, [callSkill, load]);
 
   return (
     <View style={styles.wrap} testID="profile-basics">

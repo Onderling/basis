@@ -67,7 +67,7 @@ import { sealedPersist } from '@onderling/local-store';   // content is sealed o
  *   When set, `buildBundle` becomes async (returns Promise<bundle>),
  *   loads any prior snapshot into the cache, and wires
  *   `onLocalChange → persist.scheduleSave` for restart-survival.
- *   Mirrors stoop's `Agent.js` `persistDb` path so web (IDB) and
+ *   Mirrors pinboard's `Agent.js` `persistDb` path so web (IDB) and
  *   mobile (AsyncStorage) get the same restart-survival semantics.
  * @param {string[]} [args.localOnlyPrefixes]
  *   Paths matching ANY prefix here never sync to the inner pod.
@@ -177,7 +177,7 @@ async function buildBundleWithPersistImpl({
 }) {
   const picked = await pickPersist(persistDb);
   // `pickPersist` returns null when no path/dbName is set — defensive
-  // fall-through to the in-memory shape (matches stoop's Agent.js).
+  // fall-through to the in-memory shape (matches pinboard's Agent.js).
   let loadedStore;
   let persist = null;
   let onLocalChange;
@@ -252,11 +252,11 @@ function assembleBundle({
   return {
     cache,
     // M4: expose the mutable podCtx as `_podCtx` so `attachTasksBundle`
-    // can fill it at pod sign-in time (same seam as Stoop's Agent.js
+    // can fill it at pod sign-in time (same seam as Pinboard's Agent.js
     // Phase 2.4-core, and as tasks-mobile's forward-courtesy seam).
     _podCtx: podCtx,
     // Present only when `persistDb` was set; exposed so callers /
-    // tests can `flush()` before disposing (mirrors stoop's _persist).
+    // tests can `flush()` before disposing (mirrors pinboard's _persist).
     _persist: persist,
     async attachInner(nextInner) {
       if (!nextInner || typeof nextInner.read !== 'function') {
@@ -272,7 +272,7 @@ function assembleBundle({
       // pendingTimer closes over the live Map reference, so the most
       // recent state lands on disk).  Tests that need strict ordering
       // wait `> saveDelayMs` (default 200ms) before re-opening.  Match
-      // stoop's Agent.js — it relies on the same debounce-fires-on-its
+      // pinboard's Agent.js — it relies on the same debounce-fires-on-its
       // -own pattern and doesn't force-flush on close.
       try { persist?.close?.(); } catch { /* defensive */ }
     },

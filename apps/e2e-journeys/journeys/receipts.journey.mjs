@@ -51,7 +51,7 @@ function deliveryFor(node, { sendReceipts = true } = {}) {
       deliveryMap: map,
       eventLog: node.chatEventLog,
       listCircleMembers: async (circleId) => {
-        const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId })
+        const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId })
           .catch(() => null);
         return Array.isArray(r?.members) ? r.members : [];
       },

@@ -191,7 +191,7 @@ Reasoning:
 
 **Platform-shell exception (locked 2026-05-08).** When two apps in
 `apps/` are **platform-shells of the same product** (e.g. `apps/folio`
-+ `apps/folio-mobile`, `apps/stoop` + `apps/stoop-mobile`, or
++ `apps/folio-mobile`, `apps/pinboard` + `apps/pinboard-mobile`, or
 `apps/tasks-v0` + `apps/tasks-mobile` — the `-v0` desktop suffix still
 counts as the shared shell),
 the mobile shell MAY import the SyncEngine / Agent subclass +
@@ -200,7 +200,7 @@ This is acknowledged as a single-product dependency, not a
 cross-app coupling. Three constraints apply:
 
 1. **The two packages name-relate.** `apps/folio-mobile` ↔ `apps/folio`;
-   `apps/stoop-mobile` ↔ `apps/stoop`; `apps/tasks-mobile` ↔
+   `apps/pinboard-mobile` ↔ `apps/pinboard`; `apps/tasks-mobile` ↔
    `apps/tasks-v0`. Same product, separate platform shells.
 2. **The dep is on the shared shell only, never the reverse.** Mobile
    imports from desktop; desktop never imports from mobile.
@@ -217,7 +217,7 @@ for the SyncEngine subclass. The remaining import is the legitimate
 single-product dependency this exception covers.
 
 **Substrate-of-substrates / share substrates between apps**: still
-requires rule-of-two and substrate extraction (see Stoop V3 Phases
+requires rule-of-two and substrate extraction (see Pinboard V3 Phases
 40.2-40.3 for the canonical lift).
 
 **Verification:** `grep -r "@onderling-app/" apps/*/src apps/*/package.json`
@@ -633,9 +633,9 @@ unanswered: may a mobile shell import an app directly?
 **No. A shell imports its COMPOSER, and nothing else from `apps/`.**
 
 ```
-shells (basis-mobile · stoop-mobile · folio-mobile)
-  → their composer (basis / stoop / folio)
-    → apps (stoop · tasks · folio · calendar · agents)
+shells (basis-mobile · pinboard-mobile · folio-mobile)
+  → their composer (basis / pinboard / folio)
+    → apps (pinboard · tasks · folio · calendar · agents)
       → packages/ → core
 ```
 
@@ -644,7 +644,7 @@ shell (invariant 1) — the composer is where an op is resolved, so a shell that
 resolve one itself.
 
 **Checked 2026-07-28:** every shell already obeys this in source. `basis-mobile`'s 26 `@onderling-app/*`
-imports all go through `basis`; stoop-mobile → stoop; folio-mobile → folio. Only the *declared* dependencies
+imports all go through `basis`; pinboard-mobile → pinboard; folio-mobile → folio. Only the *declared* dependencies
 had drifted (four apps listed in `basis-mobile/package.json` that nothing imported); those were removed.
 
 Guarded by `apps/basis-mobile/test/shellLayering.test.js`.

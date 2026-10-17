@@ -3,17 +3,17 @@
 > **Status:** locked 2026-05-07. Project-wide convention.
 > **Companions:**
 > - [`./pod-layout-conventions.md`](./pod-layout-conventions.md) — coming once a 2nd app adopts the same shape (rule of two)
-> - `../Stoop/pod-layout-2026-05-06.md` — current canonical example
+> - `../Pinboard/pod-layout-2026-05-06.md` — current canonical example
 > - [`./architectural-layering.md`](./architectural-layering.md) — apps don't import each other; this convention rides on the pod, not on cross-app imports.
 > **Applies to:** every directory under `apps/` whose users sign in
 > with a Solid pod and have settings worth persisting.
 
 ## Why this exists
 
-Three observations from work on Stoop:
+Three observations from work on Pinboard:
 
 1. **Some settings belong to the user, not the device.** "Default share location with new contacts" follows the user; "poll cadence" follows the device. Hardcoding either to one blob is wrong.
-2. **A user often runs more than one of these apps on the same pod.** When they install Folio next to Stoop, "do I broadcast my displayName?" is conceptually the same answer in both. Re-asking is friction; silently ignoring the prior answer is creepy.
+2. **A user often runs more than one of these apps on the same pod.** When they install Folio next to Pinboard, "do I broadcast my displayName?" is conceptually the same answer in both. Re-asking is friction; silently ignoring the prior answer is creepy.
 3. **The pod is the natural place to coordinate this.** Apps already write there; reading another app's blob to seed a default is one extra request, no new substrate.
 
 This doc nails down the resulting rule for every app that ships in this repo.
@@ -51,11 +51,11 @@ Each app's `loadSettings({dataSource, deviceId})` reads both blobs, merges (devi
 
 Per-device blobs are install-scoped and disposable:
 
-- They MUST NOT be pushed to the pod via the bulk-sync path. Bulk-sync (Phase 34 in Stoop) explicitly skips `<app>/settings/devices/*` and the migration-marker key.
+- They MUST NOT be pushed to the pod via the bulk-sync path. Bulk-sync (Phase 34 in Pinboard) explicitly skips `<app>/settings/devices/*` and the migration-marker key.
 - A fresh install gets a fresh `deviceId` and starts with defaults — there is no "restore my old device's settings from the pod" path. By design: devices aren't replaced 1-for-1; their settings shouldn't be either.
 - ACPs on per-device blobs are owner-only (same as shared.json). Multi-device sync is implicit (the same user owns all installs); the deviceId namespacing prevents cross-install overwrites, not cross-user reads.
 
-In Stoop, this is enforced via `CachingDataSource`'s `localOnlyPrefixes` constructor option. Other apps adopting this layout SHOULD use the same pattern (or a substrate equivalent once the local-store extraction lands — tracked in `Project Files/Substrates/substrate-candidates.md`).
+In Pinboard, this is enforced via `CachingDataSource`'s `localOnlyPrefixes` constructor option. Other apps adopting this layout SHOULD use the same pattern (or a substrate equivalent once the local-store extraction lands — tracked in `Project Files/Substrates/substrate-candidates.md`).
 
 ## Rule 3 — Apps may seed defaults from another app's settings
 
@@ -82,7 +82,7 @@ In an app's first-run path:
 ```js
 async function maybeSeedFromSiblingApp({ podClient, mySettings }) {
   if (mySettings.shared?.bootstrappedFromSibling) return mySettings;
-  for (const sibling of ['stoop', 'folio', 'archive', 'household']) {
+  for (const sibling of ['pinboard', 'folio', 'archive', 'household']) {
     if (sibling === MY_APP_NAME) continue;
     const path = `${podRoot}/${sibling}/settings/shared.json`;
     try {
@@ -116,15 +116,15 @@ Every app's README MUST include a **Settings layout** section noting:
 - Which fields are device-scoped vs. shared-scoped.
 - Which sibling-app fields are seeded as defaults at first run, if any.
 
-The Stoop README is the canonical example — see its `## Settings layout` section.
+The Pinboard README is the canonical example — see its `## Settings layout` section.
 
 ## Migration
 
-Apps with a pre-existing flat `<pod>/<app>/settings.json` SHOULD migrate lazily on first load: read the legacy blob, partition by field, write the new layout, delete the legacy blob, set a marker key (e.g. `<app>/settings/.migrated-from-v2`) so subsequent loads skip the work. Stoop ships this as `_migrateLegacyIfPresent` in `apps/stoop/src/lib/Settings.js` — fork that pattern.
+Apps with a pre-existing flat `<pod>/<app>/settings.json` SHOULD migrate lazily on first load: read the legacy blob, partition by field, write the new layout, delete the legacy blob, set a marker key (e.g. `<app>/settings/.migrated-from-v2`) so subsequent loads skip the work. Pinboard ships this as `_migrateLegacyIfPresent` in `apps/pinboard/src/lib/Settings.js` — fork that pattern.
 
 ## Tracking
 
-Stoop Phase 33 introduced the layout: see`Project Files/Stoop/coding-plan-v2-2026-05-07.md` § Phase 33 + `Project Files/Stoop/pod-layout-2026-05-06.md`.
+Pinboard Phase 33 introduced the layout: see`Project Files/Pinboard/coding-plan-v2-2026-05-07.md` § Phase 33 + `Project Files/Pinboard/pod-layout-2026-05-06.md`.
 - Cross-app shared-defaults rule (Rule 3 above) was added 2026-05-07; first consumer is whichever sibling-app ships next; rule-of-two extraction into a substrate (`@onderling/cross-app-bootstrap` or similar) is tracked in `Project Files/Substrates/substrate-candidates.md`.
 - Open questions:
   - Should the field-mapping table between siblings live in a shared registry, or stay per-app? Likely per-app for now (loose coupling); revisit if 4+ apps each maintain similar mappings.

@@ -37,7 +37,7 @@ describe('the last admin leaves and the copy to the caretaker is lost', () => {
         return live?.(env);
       };
     }
-    const left = await anne.agent.callSkill('stoop', 'leaveGroup', { groupId: CIRCLE, confirm: true });
+    const left = await anne.agent.callSkill('pinboard', 'leaveGroup', { groupId: CIRCLE, confirm: true });
     expect(left?.error, JSON.stringify(left)).toBeUndefined();
     // the bystander lands it, and its fold names the caretaker (the drop above picked the same one, or this says so)
     const both = [bram, cato];

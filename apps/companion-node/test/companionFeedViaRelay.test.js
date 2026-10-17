@@ -13,7 +13,7 @@ import { VaultMemory } from '@onderling/vault';
 import { RelayTransport } from '@onderling/transports';
 import { startRelay } from '@onderling/relay';
 import { randomKey, sealForLink, feedLinkPath } from '@onderling/blob-gateway';
-import { decodeContactCard } from '../../stoop/src/lib/contactCard.js';
+import { decodeContactCard } from '../../pinboard/src/lib/contactCard.js';
 import { ownerDevice } from './support/ownerDevice.js';
 import { grantAgendaFiles } from './support/grantAgendaFiles.js';
 import { startCompanionNode, FEED_SERVE_OP } from '../src/index.js';

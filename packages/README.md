@@ -19,7 +19,7 @@ peer deps; apps compose freely.
 ```
   ┌──────────────────────────────────────────────────────────┐
   │ apps/                                                     │
-  │   tasks-v0  stoop  folio  *-mobile  household  …          │
+  │   tasks-v0  pinboard  folio  *-mobile  household  …          │
   └──────────────────────────────────────────────────────────┘
                 ↓ (compose freely; one-way)
   ┌──────────────────────────────────────────────────────────┐
@@ -236,7 +236,7 @@ if (hubInstalled) {
 | **52.4** | `@onderling/notify-envelope` |
 | **52.5** | `@onderling/pod-onboarding` |
 | **52.6** | `@onderling/item-store` + `@onderling/pod-client` extensions |
-| **52.7** | per-app `item-types` adoption (Tasks ✓, Stoop ✓, Folio N/A) |
+| **52.7** | per-app `item-types` adoption (Tasks ✓, Pinboard ✓, Folio N/A) |
 | **52.8** | `@onderling/pseudo-pod` V1 cache mode |
 | **52.9** | `@onderling/notifier` envelope bridge |
 | **52.10** | `@onderling/agent-registry` |
@@ -285,10 +285,10 @@ formal version + the rationale per mechanism.
 JS-side substrate V2 work is complete. Remaining items are app-side
 integration, native Android, or major new projects:
 
-- **App adoption** — Stoop `postRequest` mapping onto `offer` / `request` /
+- **App adoption** — Pinboard `postRequest` mapping onto `offer` / `request` /
   `claim` (needs a UX disambiguation step at post time — the `kind`
   subfield's verb (`lend` / `borrow` / `give` / etc.) decides direction).
-  Stoop `groupMirror` retirement (2-week dual-runtime per plan).
+  Pinboard `groupMirror` retirement (2-week dual-runtime per plan).
   Tasks-mobile `actorResolver` ↑ swap data source from circle.members
   to an agent-registry sync cache when wired.
 - **Native Android** — `HubDiscoveryModule.kt` + `HubBindingModule.kt`

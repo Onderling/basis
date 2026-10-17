@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { manifestPages, pageForOp, pageLabel, sectionForScreen } from '../../src/v2/pageProjection.js';
 import { basisManifest } from '../../manifest.js';
-import { stoopManifest } from '../../../stoop/manifest.js';
+import { pinboardManifest } from '../../../pinboard/manifest.js';
 
 /**
  * D / consumer-switch — the shared selectors over renderWeb's PAGE
@@ -72,27 +72,27 @@ describe('pageProjection — selectors over renderWeb(manifest).pages', () => {
  */
 describe('sectionForScreen — section selector over renderWeb(manifest).sections', () => {
   // Built the SAME way circleApp.js builds circleManifestsByOrigin: key each
-  // composed manifest under its `app` (+ `appId`).  The real stoop manifest
+  // composed manifest under its `app` (+ `appId`).  The real pinboard manifest
   // (step 1a) declares the `contacts` + `noticeboard` views.
   const manifestsByOrigin = {};
-  for (const m of [stoopManifest]) {
+  for (const m of [pinboardManifest]) {
     if (m.app)   manifestsByOrigin[m.app]   = m;
     if (m.appId) manifestsByOrigin[m.appId] = m;
   }
 
-  it('resolves `contacts` → stoop / listContacts / category (from the real manifest)', () => {
+  it('resolves `contacts` → pinboard / listContacts / category (from the real manifest)', () => {
     const found = sectionForScreen(manifestsByOrigin, 'contacts');
     expect(found).not.toBeNull();
-    expect(found.appOrigin).toBe('stoop');
+    expect(found.appOrigin).toBe('pinboard');
     expect(found.section.dataSource.skillId).toBe('listContacts');
     expect(found.section.categoryField).toBe('category');
     expect(found.section.labelField).toBe('label');
   });
 
-  it('resolves `noticeboard` → stoop / listOpen / kind (from the real manifest)', () => {
+  it('resolves `noticeboard` → pinboard / listOpen / kind (from the real manifest)', () => {
     const found = sectionForScreen(manifestsByOrigin, 'noticeboard');
     expect(found).not.toBeNull();
-    expect(found.appOrigin).toBe('stoop');
+    expect(found.appOrigin).toBe('pinboard');
     expect(found.section.dataSource.skillId).toBe('listOpen');
     expect(found.section.categoryField).toBe('kind');
     // labelField omitted on the noticeboard view → the panel defaults to 'label'.
@@ -109,14 +109,14 @@ describe('sectionForScreen — section selector over renderWeb(manifest).section
   it('mirrors the panel config-resolution: fetch skill + args + fields the shell derives', () => {
     // The exact resolution openCircleScreenPanel performs over the projected
     // section — proves the config sourced from the manifest matches what the
-    // retired LIST_SCREENS literal supplied (stoop/listContacts/category).
+    // retired LIST_SCREENS literal supplied (pinboard/listContacts/category).
     const { section, appOrigin } = sectionForScreen(manifestsByOrigin, 'contacts');
     const fetchSkill    = section.dataSource.skillId;
     const fetchArgs     = section.dataSource.args ?? {};
     const categoryField = section.categoryField;
     const labelField    = section.labelField ?? 'label';
     expect({ appOrigin, fetchSkill, fetchArgs, categoryField, labelField }).toEqual({
-      appOrigin: 'stoop', fetchSkill: 'listContacts', fetchArgs: {}, categoryField: 'category', labelField: 'label',
+      appOrigin: 'pinboard', fetchSkill: 'listContacts', fetchArgs: {}, categoryField: 'category', labelField: 'label',
     });
   });
 });

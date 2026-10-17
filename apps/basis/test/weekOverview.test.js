@@ -46,7 +46,7 @@ describe('the week overview', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
     for (const [webid, role, displayName] of [['telegram:1', 'member', 'Frits'], ['telegram:2', 'member', 'Bert']]) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName });
       await agent.setDoorCaller(webid, role);
     }
     const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });

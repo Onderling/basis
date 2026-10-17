@@ -15,7 +15,7 @@
  *
  * Usage:
  *   node scripts/audit-locales.mjs
- *   node scripts/audit-locales.mjs --apps apps/stoop apps/folio   # subset
+ *   node scripts/audit-locales.mjs --apps apps/pinboard apps/folio   # subset
  *   node scripts/audit-locales.mjs --json                          # machine-readable
  *
  * Designed to be hand-runnable; CI integration is open (repo has no

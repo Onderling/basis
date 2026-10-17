@@ -16,7 +16,7 @@ describe('a circle with no self on this device gets no device kit', () => {
     const Y = 'werk-circle';
     expect((await phone.callSkill('household', 'bindCirclePersona', { circleId: Y, personaId: w })).ok).toBe(true);
     expect((await phone.callSkill('agents', 'setProfileCircleMembership', { id: w, circleId: Y, address: phone.persona(w).circleAddressFor(Y) }))?.ok).toBe(true);
-    await phone.callSkill('stoop', 'recordRosterSeed', { groupId: Y, rows: [{ id: 'redeem-cor', text: 'cor', kind: 'membership-redemption', source: { groupId: Y, redeemedBy: 'cor-webid-0123456789' } }] });
+    await phone.callSkill('pinboard', 'recordRosterSeed', { groupId: Y, rows: [{ id: 'redeem-cor', text: 'cor', kind: 'membership-redemption', source: { groupId: Y, redeemedBy: 'cor-webid-0123456789' } }] });
     const file = (await phone.callSkill('household', 'exportRecoveryFile', {}))?.file;
 
     // device A: restored with the default only, the file imported (Werk's circle is in it)

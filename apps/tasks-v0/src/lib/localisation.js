@@ -1,7 +1,7 @@
 /**
  * Tasks V1 — i18next wrapper.
  *
- * Mirrors `apps/stoop/src/lib/localisation.js`. The substrate convention
+ * Mirrors `apps/pinboard/src/lib/localisation.js`. The substrate convention
  * (`Project Files/conventions/localisation.md`) is:
  *   - every user-facing string lives in `locales/<lang>.json`
  *   - leaf shape is `{text, doc}` where `doc` is a translator note
@@ -69,7 +69,7 @@ export async function initLocalisation({ lng = 'en', fallbackLng = 'en' } = {}) 
 
 /**
  * Translate a key. Falls back to the key itself when no translation
- * exists (matches Stoop's pattern; the failure mode is visible in
+ * exists (matches Pinboard's pattern; the failure mode is visible in
  * the UI rather than silent empty strings).
  *
  * @param {string} key

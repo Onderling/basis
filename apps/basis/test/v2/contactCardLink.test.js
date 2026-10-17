@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { contactCardLink, contactCardFromLink, loadShareMyContact, decodeContactCard, cardNamesSender, CONTACT_LINK_PARAM } from '../../src/v2/contactCardLink.js';
-import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 
 const CARD = 'onderling-contact://eyJ3ZWJpZCI6Ind4In0';
 
@@ -43,7 +43,7 @@ describe('contactCardFromLink', () => {
 
 describe('loadShareMyContact — what the panel shows, for both shells', () => {
   it('the card and its link; the code alone without an app url; nothing without a card', async () => {
-    const callSkill = async (app, op) => (app === 'stoop' && op === 'getContactShareQr' ? { payload: CARD } : {});
+    const callSkill = async (app, op) => (app === 'pinboard' && op === 'getContactShareQr' ? { payload: CARD } : {});
     const LINK = `https://onderling.org/basis/#${CONTACT_LINK_PARAM}=eyJ3ZWJpZCI6Ind4In0`;
     // the QR is the LINK when there is one — a camera opens it; the in-app scanner reads it too (2026-09-21)
     expect(await loadShareMyContact({ callSkill, appUrl: 'https://onderling.org/basis/' })).toEqual({ payload: CARD, link: LINK, qr: LINK, qrEncodes: 'link' });

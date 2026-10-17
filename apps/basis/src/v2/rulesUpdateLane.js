@@ -8,7 +8,7 @@
  * channel happened to carry the new doc. This closes that window with the machinery the lane
  * riders already proved:
  *
- *   write:  stoop's `editGroupRules` (the ONE rules writer — the governed changeRule enact routes
+ *   write:  pinboard's `editGroupRules` (the ONE rules writer — the governed changeRule enact routes
  *           through it too) calls the host-injected emitter below, which appends a SIGNED
  *           `rules-update` statement (payload = the full doc + the monotonic version) on the
  *           governance rail and fans it through the existing circle-governance broadcast.
@@ -27,7 +27,7 @@
 
 /**
  * The write half: append + fan one rules-update statement. Built by the host (realAgent) over its
- * governance-lane rail; injected into stoop as `rulesUpdateEmit` (the membershipEmit pattern).
+ * governance-lane rail; injected into pinboard as `rulesUpdateEmit` (the membershipEmit pattern).
  *
  * @param {object} a
  * @param {{append: Function}} a.rail  a governance-lane rail (declared kinds include 'rules-update')
@@ -74,7 +74,7 @@ export function makeRulesUpdateEmitter({ rail, fan = null } = {}) {
 export async function preservedRulesStatementsFor({ callSkill, circleId } = {}) {
   if (typeof callSkill !== 'function' || typeof circleId !== 'string' || !circleId) return [];
   try {
-    const r = await callSkill('stoop', 'getGroupRulesUpdateStatement', { groupId: circleId });
+    const r = await callSkill('pinboard', 'getGroupRulesUpdateStatement', { groupId: circleId });
     return (r?.statement?.body && typeof r.statement.sig === 'string') ? [r.statement] : [];
   } catch { return []; }
 }
@@ -117,7 +117,7 @@ export async function applyRulesUpdates({ rail, callSkill, circleId } = {}) {
   // Receiver-enforced authority: the author must be an ADMIN on this device's roster.
   let admins = new Set();
   try {
-    const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     admins = new Set((Array.isArray(r?.members) ? r.members : [])
       .filter((m) => m && m.role === 'admin')
       .map((m) => m.webid ?? m.addr ?? m.ref)
@@ -150,7 +150,7 @@ export async function applyRulesUpdates({ rail, callSkill, circleId } = {}) {
   // the two-layers-one-fact drift). NB deliberately not `getGroupRules`: that op's answer is a
   // display projection on some compositions, not the raw item.
   try {
-    const rec = await callSkill('stoop', 'recordGroupRulesUpdate', {
+    const rec = await callSkill('pinboard', 'recordGroupRulesUpdate', {
       // `updatedBy` = the statement's VERIFIED admin author (the rail resolved the binding, the
       // check above proved the role). The mirror item carries it so the roster's founder-authority
       // derivation works on THIS device too — the receiver's only rules item is the mirror, and an

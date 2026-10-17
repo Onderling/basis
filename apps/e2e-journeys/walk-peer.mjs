@@ -8,7 +8,7 @@
  * phone. That is this.
  *
  * It is NOT a test harness: nothing here asserts. It boots the **same app agent the shells boot**
- * (`createRealHouseholdAgent` via the real-agent support module — stoop skills, circles, per-circle
+ * (`createRealHouseholdAgent` via the real-agent support module — pinboard skills, circles, per-circle
  * addressing, circle-scoped routing) and gives you a prompt.
  *
  *   node apps/e2e-journeys/walk-peer.mjs                     # starts its own local relay
@@ -212,7 +212,7 @@ async function main() {
       if (!circleId || !memberWebid || !role) {
         console.log('usage: role <circleId> <memberWebid> <admin|member>'); return { error: 'usage' };
       }
-      const r = await call('stoop', 'setMemberRole', { groupId: circleId, memberWebid, role });
+      const r = await call('pinboard', 'setMemberRole', { groupId: circleId, memberWebid, role });
       console.log(r?.error ? `refused: ${r.error}` : `ok: ${memberWebid.slice(0, 12)}… is now ${role}`);
       return r ?? {};
     },
@@ -220,7 +220,7 @@ async function main() {
     /** Sign for a caretaker appointment — the circle can then see that I know it landed on me. */
     async ack(circleId) {
       if (!circleId) { console.log('usage: ack <circleId>'); return { error: 'usage' }; }
-      const r = await call('stoop', 'acknowledgeCaretaker', { groupId: circleId });
+      const r = await call('pinboard', 'acknowledgeCaretaker', { groupId: circleId });
       console.log(r?.ok ? `signed for ${r.seed?.slice(0, 12)}…` : `not signed: ${r?.reason}`);
       return r ?? {};
     },
@@ -242,7 +242,7 @@ async function main() {
 
     async members(circleId) {
       if (!circleId) { console.log('usage: members <circleId>'); return { error: 'usage' }; }
-      const r = await call('stoop', 'listGroupMembers', { groupId: circleId });
+      const r = await call('pinboard', 'listGroupMembers', { groupId: circleId });
       for (const m of r?.members ?? []) {
         console.log(`  ${String(m.webid ?? '?').slice(0, 20)}…  pubKey=${String(m.pubKey ?? '-').slice(0, 12)}…  circleAddress=${m.circleAddress ?? '-'}`);
       }
@@ -389,7 +389,7 @@ async function main() {
     try {
       // `listMyCircles` is what the shells use (circleSources.fetchGroups) — it returns EVERY circle the
       // actor is in, including one just created. `getCurrentGroup` only ever returned the active one.
-      const r = await call('stoop', 'listMyCircles', {});
+      const r = await call('pinboard', 'listMyCircles', {});
       const ids = Array.isArray(r?.circles) ? r.circles : [];
       return { circles: ids.map((b) => (typeof b === 'string' ? { id: b } : b)) };
     } catch { return { circles: [] }; }

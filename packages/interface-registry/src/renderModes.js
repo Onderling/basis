@@ -4,7 +4,7 @@
  * Every bundle registering a type must supply BOTH renderer
  * functions:
  *   - `compact(item, ctx?)` — chip / row / card for an embedded ref
- *     (a task inside a Stoop post; a supply-offer inside a Tasks task).
+ *     (a task inside a Pinboard post; a supply-offer inside a Tasks task).
  *     Should fit in a single line of UI space.
  *   - `full(item, ctx?)`    — detail view for a direct view of the
  *     resource (the user tapped through to see the whole thing).

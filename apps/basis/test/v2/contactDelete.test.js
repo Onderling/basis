@@ -31,7 +31,7 @@ describe('deleteContact — what the person granted that contact ends with it', 
     expect(r.ok).toBe(true);
     expect(calls).toContain(`household.revokeCompanionGrant:${JSON.stringify({ to: BOT })}`);
     expect(calls).toContain(`household.revokeCompanionGrant:${JSON.stringify({ to: 'K'.repeat(43) })}`);
-    expect(calls.findIndex((c) => c.startsWith('stoop.setContactHidden'))).toBeLessThan(calls.findIndex((c) => c.startsWith('household.revokeCompanionGrant')));
+    expect(calls.findIndex((c) => c.startsWith('pinboard.setContactHidden'))).toBeLessThan(calls.findIndex((c) => c.startsWith('household.revokeCompanionGrant')));
   });
 
   it('the delete never waits on the revokes: a node that does not answer does not hold it up', async () => {

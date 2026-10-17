@@ -38,11 +38,11 @@ export function makeCircleGovernance({
   if (typeof readGovernanceState !== 'function') {
     throw new Error('makeCircleGovernance: readGovernanceState is required (the rail\'s verified events + disputed set)');
   }
-  // Map a governed action to the REAL op. removeMember/editGroupRules are stoop skills;
+  // Map a governed action to the REAL op. removeMember/editGroupRules are pinboard skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
   async function enact(circleId, action, subject) {
-    if (action === 'removeMember') return callSkill('stoop', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
-    if (action === 'changeRule')   return callSkill('stoop', 'editGroupRules', { groupId: circleId, rules: subject });
+    if (action === 'removeMember') return callSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
+    if (action === 'changeRule')   return callSkill('pinboard', 'editGroupRules', { groupId: circleId, rules: subject });
     if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
     if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
     return { ok: false, error: 'unknown-action' };

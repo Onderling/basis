@@ -9,9 +9,9 @@ Three options, in order of effort:
   2. EAS Build → APK (best for "give it to a friend")
 
   You already have eas.json in apps/mesh-demo, so you've used this before. For
-  Stoop-mobile (or any other app):
+  Pinboard-mobile (or any other app):
 
-  cd apps/stoop-mobile
+  cd apps/pinboard-mobile
   eas build --platform android --profile preview
 
   The preview profile in eas.json should look like:

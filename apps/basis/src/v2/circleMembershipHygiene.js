@@ -7,7 +7,7 @@
  *   • **global** — the substrate's `removeMember` deleted the member from the ONE per-device
  *     `MemberMap`, which carries no circle on a row. Tidying up circle A dropped that person's
  *     identity in every circle you shared with them. Fixed in the substrate
- *     (`apps/stoop/src/lib/circleExits.js` replaces the cache deletion with a per-circle exit).
+ *     (`apps/pinboard/src/lib/circleExits.js` replaces the cache deletion with a per-circle exit).
  *   • **inert** — the `group-removal` audit item was read by nothing, so the removed member stayed
  *     on the circle's roster, stayed in the fan-out, and — the part that matters — stayed in the
  *     **boundary-authentication snapshot**. Their key was still in `recordCircleRoster`'s allowed
@@ -41,7 +41,7 @@ import { forgetCircleAddressKeys } from './circleAddressKeys.js';
 async function rawRoster({ callSkill, circleId }) {
   if (typeof callSkill !== 'function' || !circleId) return [];
   try {
-    const res = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const res = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     return Array.isArray(res?.members) ? res.members : [];
   } catch { return []; }
 }
@@ -101,7 +101,7 @@ export async function removeCircleMember({
   // roster projection honours, and routes the key rotation to THIS circle's producer.
   let res;
   try {
-    res = await skill('stoop', 'removeMember', {
+    res = await skill('pinboard', 'removeMember', {
       groupId: circleId,
       ...(memberWebid ? { memberWebid } : {}),
       ...(memberStableId ? { memberStableId } : {}),
@@ -164,7 +164,7 @@ export async function leaveCircleLocally({ agent = null, callSkill = null, circl
   // `followed`: this leave follows a sibling's (2026-09-22) — the marker only; the statement, the key rotation and
   // any deleting were the leaving device's. Everything below (unbind, snapshot, presence) is this device's own.
   let res;
-  try { res = await skill('stoop', 'leaveGroup', { groupId: circleId, confirm: true, ...(followed ? { followed: true } : {}) }); }
+  try { res = await skill('pinboard', 'leaveGroup', { groupId: circleId, confirm: true, ...(followed ? { followed: true } : {}) }); }
   catch (err) { res = { error: err?.message ?? 'leave-failed' }; }
   if (res?.error) { out.error = res.error; return out; }
   out.ok = true;

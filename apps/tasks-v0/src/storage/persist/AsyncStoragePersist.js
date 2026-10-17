@@ -3,13 +3,13 @@
  * async-storage adapter for tasks-v0's `CachingDataSource` local cache.
  *
  * Identical surface + semantics to
- * `apps/stoop/src/lib/AsyncStoragePersist.js`.  Copied (not imported)
+ * `apps/pinboard/src/lib/AsyncStoragePersist.js`.  Copied (not imported)
  * to avoid an app→app dependency; substrate-extraction candidate —
  * lift these three adapters + persistPicker into `@onderling/local-store`
  * once a third app needs them.
  *
  * Default prefix is `'tasks-cache:'` so a single AsyncStorage instance
- * hosting both stoop ('stoop-cache:') and tasks-v0 caches keeps them
+ * hosting both pinboard ('pinboard-cache:') and tasks-v0 caches keeps them
  * isolated.  basis-mobile's agentBundle passes
  * `{dbName:'cc-tasks-cache', asyncStorage}` (no explicit prefix).
  */
@@ -42,7 +42,7 @@ export class AsyncStoragePersist {
       this.#storage = asyncStorage;
     } else {
       // Lazy require so vitest can import this module without an
-      // AsyncStorage polyfill — same pattern stoop's adapter uses.
+      // AsyncStorage polyfill — same pattern pinboard's adapter uses.
       // eslint-disable-next-line global-require
       this.#storage = require('@react-native-async-storage/async-storage').default;
     }

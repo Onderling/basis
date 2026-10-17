@@ -46,7 +46,7 @@ describe('the columns name each op with its app', () => {
         expect(Boolean(m?.operations?.some((o) => o.id === op) || declaresGeneric(m, op)), `${column}: ${q} is declared by ${app}`).toBe(true);
       }
     }
-    // the chores' open read is on the member's column — as the tasks app's, never household's or stoop's
+    // the chores' open read is on the member's column — as the tasks app's, never household's or pinboard's
     expect(BOT_OP_MAP.member).toContain('tasks.listOpen');
     expect(BOT_OP_MAP.member).not.toContain('household.listOpen');
   });
@@ -70,7 +70,7 @@ describe('the door gate decides on the qualified op', () => {
     // something for household's own read to return, were it reached
     await own('household', 'addItem', { type: 'shopping', text: 'geheim' }).catch(() => {});
     for (const [role, webid] of Object.entries(PEOPLE)) {
-      await own('stoop', 'addContact', { webid, channel: 'telegram', role, displayName: role });
+      await own('pinboard', 'addContact', { webid, channel: 'telegram', role, displayName: role });
       await agent.setDoorCaller(webid, role);
     }
     door = withAssistantOps({
@@ -108,8 +108,8 @@ describe('the door gate decides on the qualified op', () => {
         expect(r?.refusal, `${role}: ${q} → ${JSON.stringify(r).slice(0, 200)}`).toBeTruthy();
       }
     }
-    // the stoop app's own `listOpen` too: one name, three apps, one of them the bot's
-    expect((await agent.callSkill('stoop', 'listOpen', {}, { caller: PEOPLE.member }))?.refusal).toMatchObject({ layer: 'door-map' });
+    // the pinboard app's own `listOpen` too: one name, three apps, one of them the bot's
+    expect((await agent.callSkill('pinboard', 'listOpen', {}, { caller: PEOPLE.member }))?.refusal).toMatchObject({ layer: 'door-map' });
   });
 
   it('a bare id two apps declare is refused as ambiguous, not resolved to one of them', async () => {

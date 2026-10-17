@@ -29,10 +29,10 @@ describe('reply-to-post surface parity', () => {
 
   it('both reply doors go through the shared replyToPost helper (no raw respondToItem call)', () => {
     // Matched piecewise, not as one line: the call spans lines on web and reformatting it is not drift.
-    expect(webApp).toMatch(/replyToPost\(\{[\s\S]{0,240}callSkill: stoopCall[\s\S]{0,240}contactChannel: circleContactChannel/);
+    expect(webApp).toMatch(/replyToPost\(\{[\s\S]{0,240}callSkill: pinboardCall[\s\S]{0,240}contactChannel: circleContactChannel/);
     expect(mobileBoard).toMatch(/replyToPost\(\{[\s\S]{0,120}callSkill, contactChannel[\s\S]{0,120}itemId: post\.id, body/);
-    expect(webApp).not.toMatch(/stoopCall\('stoop', 'respondToItem'/);
-    expect(mobileBoard).not.toMatch(/callSkill\('stoop', 'respondToItem'/);
+    expect(webApp).not.toMatch(/pinboardCall\('pinboard', 'respondToItem'/);
+    expect(mobileBoard).not.toMatch(/callSkill\('pinboard', 'respondToItem'/);
   });
 
   it('both shells key an inbound turn on the PERSON, not the address it arrived at', () => {

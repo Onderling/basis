@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 
 import { PeerGraph } from '@onderling/core';
 import {
-  listContacts, peerToContactRow, stoopContactToRow, mergeContacts, splitShownHidden, nameContactsFromRosters, loadContactRoster, markLookalikes, markRenames, makeContactNameStore,
+  listContacts, peerToContactRow, pinboardContactToRow, mergeContacts, splitShownHidden, nameContactsFromRosters, loadContactRoster, markLookalikes, markRenames, makeContactNameStore,
 } from '../src/v2/contactsSource.js';
 
 describe('peerToContactRow', () => {
@@ -95,9 +95,9 @@ describe('listContacts', () => {
   });
 });
 
-describe('stoopContactToRow (S1 #2 — member directory)', () => {
+describe('pinboardContactToRow (S1 #2 — member directory)', () => {
   it('maps a ContactBook person → a non-bot row with trust + tags + peerAddr', () => {
-    const row = stoopContactToRow({
+    const row = pinboardContactToRow({
       webid: 'https://alice.example/me', pubKey: 'PKALICE', displayName: 'Alice',
       trustLevel: 'vertrouwd', tags: ['buur', 'klusser'],
     });
@@ -108,9 +108,9 @@ describe('stoopContactToRow (S1 #2 — member directory)', () => {
   });
 
   it('falls back name → handle → webid; drops an entry with no id', () => {
-    expect(stoopContactToRow({ webid: 'w', handle: 'bob' }).name).toBe('bob');
-    expect(stoopContactToRow({ pubKey: 'k' }).name).toBe('k');
-    expect(stoopContactToRow({})).toBeNull();
+    expect(pinboardContactToRow({ webid: 'w', handle: 'bob' }).name).toBe('bob');
+    expect(pinboardContactToRow({ pubKey: 'k' }).name).toBe('k');
+    expect(pinboardContactToRow({})).toBeNull();
   });
 
   it('a contact from a CARD is written to at the address the card names — never at their device key', () => {
@@ -120,10 +120,10 @@ describe('stoopContactToRow (S1 #2 — member directory)', () => {
     // from the days when a contact's pubKey WAS its mesh address — so every message to the seeded contact
     // went to a key nobody holds on any relay, and sat "sealed to the device only" forever. Measured on the
     // published app: the thread opened on `b5_-JbBf…` while the card said `LE1n…`.
-    const row = stoopContactToRow({ webid: 'LE1n', pubKey: 'b5_-JbBf-device-key', peerAddr: 'LE1n', displayName: 'Wilfred' });
+    const row = pinboardContactToRow({ webid: 'LE1n', pubKey: 'b5_-JbBf-device-key', peerAddr: 'LE1n', displayName: 'Wilfred' });
     expect(row.peerAddr, 'the address the card names').toBe('LE1n');
     // A legacy book entry with only a pubKey (the mesh-era shape) still routes by it.
-    expect(stoopContactToRow({ webid: 'w2', pubKey: 'MESHKEY' }).peerAddr).toBe('MESHKEY');
+    expect(pinboardContactToRow({ webid: 'w2', pubKey: 'MESHKEY' }).peerAddr).toBe('MESHKEY');
   });
 });
 
@@ -133,30 +133,30 @@ describe('mergeContacts — the peer graph wins the row, the book keeps the NAME
     // first message put the recipient in the peer graph (address only, no name); the merge let the peer row
     // win whole, so the book's name — the one thing the card gave — was replaced by the key.
     const peerRows = [{ contactId: 'LE1n', name: 'LE1n', isBot: false, peerAddr: 'LE1n' }];
-    const stoopRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', trustLevel: 'bekend' }];
-    const [row] = mergeContacts(peerRows, stoopRows);
+    const pinboardRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', trustLevel: 'bekend' }];
+    const [row] = mergeContacts(peerRows, pinboardRows);
     expect(row.name, 'the card\'s name stands when the graph has none').toBe('Wilfred');
     expect(row.trustLevel).toBe('bekend');
     // A peer row that HAS a name (a bot, a peer that introduced itself) keeps it.
-    const [named] = mergeContacts([{ contactId: 'LE1n', name: 'Wil the bot', isBot: true }], stoopRows);
+    const [named] = mergeContacts([{ contactId: 'LE1n', name: 'Wil the bot', isBot: true }], pinboardRows);
     expect(named.name).toBe('Wil the bot');
   });
 });
 
 describe('a HIDDEN contact (L106) — the book\'s mark survives the merge, and the roster splits on it', () => {
   it('the book\'s hidden mark rides the merged row, whatever the peer graph says', () => {
-    const stoopRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', hidden: true }];
-    const [row] = mergeContacts([{ contactId: 'LE1n', name: 'LE1n', isBot: false, peerAddr: 'LE1n' }], stoopRows);
+    const pinboardRows = [{ contactId: 'LE1n', name: 'Wilfred', isBot: false, source: 'contact', peerAddr: 'LE1n', hidden: true }];
+    const [row] = mergeContacts([{ contactId: 'LE1n', name: 'LE1n', isBot: false, peerAddr: 'LE1n' }], pinboardRows);
     expect(row.hidden, 'a graph row never un-hides what the book hid').toBe(true);
-    const [alone] = mergeContacts([], stoopRows);
+    const [alone] = mergeContacts([], pinboardRows);
     expect(alone.hidden).toBe(true);
-    const [shown] = mergeContacts([], [{ ...stoopRows[0], hidden: false }]);
+    const [shown] = mergeContacts([], [{ ...pinboardRows[0], hidden: false }]);
     expect(shown.hidden).toBe(false);
   });
-  it('stoopContactToRow carries the mark; splitShownHidden folds the hidden rows away', () => {
-    const row = stoopContactToRow({ webid: 'w', displayName: 'W', hidden: true, hiddenAt: 5 });
+  it('pinboardContactToRow carries the mark; splitShownHidden folds the hidden rows away', () => {
+    const row = pinboardContactToRow({ webid: 'w', displayName: 'W', hidden: true, hiddenAt: 5 });
     expect(row.hidden).toBe(true);
-    expect(stoopContactToRow({ webid: 'v', displayName: 'V' }).hidden).toBe(false);
+    expect(pinboardContactToRow({ webid: 'v', displayName: 'V' }).hidden).toBe(false);
     const { shown, hidden } = splitShownHidden([row, { contactId: 'v', name: 'V', hidden: false }, { contactId: 'b', name: 'Bot', isBot: true }]);
     expect(shown.map((r) => r.contactId)).toEqual(['v', 'b']);
     expect(hidden.map((r) => r.contactId)).toEqual(['w']);
@@ -164,16 +164,16 @@ describe('a HIDDEN contact (L106) — the book\'s mark survives the merge, and t
 });
 
 describe('mergeContacts (S1 #2)', () => {
-  it('merges peer + stoop rows, de-dupes by contactId (peer wins), bots first', () => {
+  it('merges peer + pinboard rows, de-dupes by contactId (peer wins), bots first', () => {
     const peerRows = [
       { contactId: 'bot1', name: 'Bot One', isBot: true },
       { contactId: 'shared', name: 'Peer view', isBot: false, peerAddr: 'PK' },
     ];
-    const stoopRows = [
+    const pinboardRows = [
       { contactId: 'shared', name: 'Contact view', isBot: false, source: 'contact' },
       { contactId: 'alice', name: 'Alice', isBot: false, source: 'contact' },
     ];
-    const merged = mergeContacts(peerRows, stoopRows);
+    const merged = mergeContacts(peerRows, pinboardRows);
     expect(merged.map((r) => r.contactId)).toEqual(['bot1', 'alice', 'shared']); // bot first, then people A-Z
     // the peer entry wins on collision (keeps a bot's skills / live peer data)
     expect(merged.find((r) => r.contactId === 'shared').name).toBe('Peer view');
@@ -189,7 +189,7 @@ describe('THE BOOK READS THE ROSTER (2026-09-21) — a contact with a pair roste
   // Fable's answer 4 on member-props: the one road for a name is the member's own signed statement on the membership
   // lane, folded on every device; the card names a contact only until their roster says something. Every device of
   // the person is in every pair circle since the siblings follow a circle, so this holds on the laptop as on the box.
-  const book = (over) => stoopContactToRow({ webid: 'bea', pubKey: 'bea', displayName: 'Bea (card)', pairCircleId: 'pair-ab', ...over });
+  const book = (over) => pinboardContactToRow({ webid: 'bea', pubKey: 'bea', displayName: 'Bea (card)', pairCircleId: 'pair-ab', ...over });
   it('the roster\'s `said` displayName wins, then its handle; the card stays where the roster says nothing; a bot is untouched', async () => {
     const rosters = { 'pair-ab': [{ webid: 'bea', said: { displayName: 'Beatrix', handle: 'bea' } }] };
     const rosterRow = async (cid, webid) => (rosters[cid] ?? []).find((m) => m.webid === webid) ?? null;
@@ -210,7 +210,7 @@ describe('THE BOOK READS THE ROSTER (2026-09-21) — a contact with a pair roste
     expect(await nameContactsFromRosters([book()], {})).toEqual([book()]);
   });
   it('re-sorts by the roster name (Contacten is alphabetical on what is painted)', async () => {
-    const rows = [stoopContactToRow({ webid: 'a', displayName: 'Zed', pairCircleId: 'p-a' }), stoopContactToRow({ webid: 'b', displayName: 'Mia' })];
+    const rows = [pinboardContactToRow({ webid: 'a', displayName: 'Zed', pairCircleId: 'p-a' }), pinboardContactToRow({ webid: 'b', displayName: 'Mia' })];
     const named = await nameContactsFromRosters(rows, { rosterRow: async (cid) => (cid === 'p-a' ? { webid: 'a', said: { displayName: 'Aaf' } } : null) });
     expect(named.map((r) => r.name)).toEqual(['Aaf', 'Mia']);
   });

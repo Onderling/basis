@@ -25,35 +25,35 @@ React Native platform layer + adapters for the onderling agent SDK.
 - `./picker/*` — image-picker substrate. `pickAndResize({mode,
   preset, max})` over `expo-image-picker` + `expo-image-manipulator`,
   generic `DELIVERABLE_PRESET` + `AVATAR_PRESET`. Lifted from
-  `apps/stoop-mobile/src/lib/imagePicker.js` 2026-05-09 — Phase 41.0
+  `apps/pinboard-mobile/src/lib/imagePicker.js` 2026-05-09 — Phase 41.0
   L3, Tasks-mobile is the second consumer.
 - `./qr/*` — QR substrate. `classifyQrPayload(text, classifiers)` is
   a pure-fn plug-in dispatcher; `<QrCodeView>` (subpath import
   `./qr/view`) wraps `react-native-qrcode-svg`. Lifted from
-  `apps/stoop-mobile/src/lib/qrScanner.js` + `components/QrCode.js`
+  `apps/pinboard-mobile/src/lib/qrScanner.js` + `components/QrCode.js`
   2026-05-09 — Phase 41.0 L4.
 - `./mnemonic/*` — recovery-phrase substrate. Pure helpers
   (`normaliseMnemonic`, `looksLikeMnemonic`, `statusFor`,
   `BIP39_WORD_COUNTS`), `useMnemonicReveal({useSkill})` hook, and
   `<MnemonicView>` (subpath `./mnemonic/view`). Lifted from
-  `apps/stoop-mobile/src/lib/mnemonic.js` 2026-05-09 — Phase 41.0 L5;
+  `apps/pinboard-mobile/src/lib/mnemonic.js` 2026-05-09 — Phase 41.0 L5;
   the hook + view are new substrate UI for Tasks-mobile.
 - `./push/*` — push opt-in substrate. `setupPush` +
   `requestPushPermission` (imperative — lifted from
-  `apps/stoop-mobile/src/lib/push.js`) plus the new
+  `apps/pinboard-mobile/src/lib/push.js`) plus the new
   `usePushOptIn({agent, ...})` hook for Settings-screen UX. Lifted
   2026-05-09 — Phase 41.0 L6.
 - `./localisation/*` — locale resolver substrate. `loadLocale({bundles,
   defaultLang})` returns a `{t, format, setLang, currentLang,
   initLocalisation, isInitialised}` instance. Lifted from
-  `apps/stoop-mobile/src/lib/localisation.js` 2026-05-09 — Phase 41.0 L7.
+  `apps/pinboard-mobile/src/lib/localisation.js` 2026-05-09 — Phase 41.0 L7.
   Apps now pass their own locale bundles instead of the substrate
-  hardcoding Stoop's.
+  hardcoding Pinboard's.
 
 ## Origins
 
 The platform layer was extracted in earlier phases (see
-Stoop V3 Phase 40.x
+Pinboard V3 Phase 40.x
 + Tasks-mobile Phase 41.0).
 The Phase 41.0 lifts (L3 + L4 + L5 + L6 + L7) added `./picker`,
 `./qr`, `./mnemonic`, `./push`, `./localisation` as submodules of the same

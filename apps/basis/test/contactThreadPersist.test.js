@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { makePeerRouter } from '../src/core/handlers/peerRouter.js';
-import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 
 /** A minimal itemStore stub matching wireChat's `{ addItems, listOpen }` surface. */
 function memItemStore() {

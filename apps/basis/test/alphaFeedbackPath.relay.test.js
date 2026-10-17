@@ -32,7 +32,7 @@ import { EventLog } from '../src/eventLog.js';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, until, teardown } from './support/pairRealAgents.js';
 import { seedContactCard } from '../src/v2/seededContact.js';
-import { stoopContactToRow } from '../src/v2/contactsSource.js';
+import { pinboardContactToRow } from '../src/v2/contactsSource.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const CIRCLE = 'thuis-feedback-circle';
@@ -72,7 +72,7 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     env = { PATH: process.env.PATH, HOME: dataDir, ONDERLING_RELAY_URL: relayUrl, BASIS_VAULT_PASSPHRASE: 'test-only-passphrase' };
     // What the phone keeps across a reboot: its vaults and its item store (IndexedDB in the shell; a
     // file here). A reboot that forgot its rosters would not know its own box.
-    vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), stoopPersistDb: { path: path.join(dataDir, 'phone-stoop-state.json') } };
+    vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), pinboardPersistDb: { path: path.join(dataDir, 'phone-pinboard-state.json') } };
 
     // ── Frits' phone: his account, one circle (the sibling rail rides circles), on the relay. ──────
     phone = await bootPhone(vaults, relayUrl);
@@ -110,17 +110,17 @@ describe('the alpha feedback path — a fresh install reaches the maker, and the
     const callSkill = (app, op, args) => person.agent.callSkill(app, op, args);
     const seeded = await seedContactCard({ payload: card, callSkill });
     expect(seeded, 'the card did not seed').toEqual({ seeded: true, webid: phone.pubKey });
-    const res = await callSkill('stoop', 'listContacts', {});
+    const res = await callSkill('pinboard', 'listContacts', {});
     const row = res.items.find((c) => c.webid === phone.pubKey);
     expect(row, 'the maker is not in the book').toBeTruthy();
-    expect(stoopContactToRow(row).isBot, 'the maker must be a person, never a bot').toBe(false);
+    expect(pinboardContactToRow(row).isBot, 'the maker must be a person, never a bot').toBe(false);
     // …and in CONTACTEN, which is what a tester sees. Both shells build the roster from `res.contacts` — the
-    // book's own rows, the shape `stoopContactToRow` was written for — while the reply had carried only the
+    // book's own rows, the shape `pinboardContactToRow` was written for — while the reply had carried only the
     // chat-shell `items`. So the seeded contact was in the book and on no screen (published 2026-09-18,
     // measured in a headless browser: "No contacts yet"). The reply carries both.
     const bookRow = (res.contacts ?? []).find((c) => c.webid === phone.pubKey);
     expect(bookRow, 'the roster reads `contacts`; the reply must carry the book\'s rows under that name').toBeTruthy();
-    expect(stoopContactToRow(bookRow).name, 'the name testers see: the card\'s display name, else its handle, else the address').toBe(bookRow.displayName ?? bookRow.handle ?? bookRow.webid);
+    expect(pinboardContactToRow(bookRow).name, 'the name testers see: the card\'s display name, else its handle, else the address').toBe(bookRow.displayName ?? bookRow.handle ?? bookRow.webid);
     expect(bookRow.trustLevel, 'the book\'s own trust wording, not the chat translation').toMatch(/^(bekend|vertrouwd)$/);
   }, 30_000);
 

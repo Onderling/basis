@@ -2,7 +2,7 @@
  * createSettingsHook — factory that produces a `useSettings` hook over
  * the consumer's `getSettings` / `updateSettings` skills.
  *
- * Lifted from apps/stoop-mobile/src/lib/useSettings.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/useSettings.js 2026-05-09
  * (Phase 41.0.b A7; Tasks-mobile is the second consumer).
  *
  *   const useSettings = createSettingsHook({

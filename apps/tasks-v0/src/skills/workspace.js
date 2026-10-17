@@ -164,17 +164,17 @@ export function buildWorkspaceSkills({ bundleResolver, roleOf = makeRoleOf(null)
      * Agent-side by design: Tasks web + mobile are both thin A2A
      * clients, so the walk lives here and serves BOTH equally — one
      * device-independent path (the platform-parity principle). Mirror
-     * of Stoop's `getItemTree` skill (commit `a2685c6`).
+     * of Pinboard's `getItemTree` skill (commit `a2685c6`).
      *
      * Tasks stores `embeds` at the top level on the task item (unlike
-     * Stoop's `source.embeds` shape). Both are bridged here for
+     * Pinboard's `source.embeds` shape). Both are bridged here for
      * forward-compatibility.
      */
     defineSkill('getItemTree', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
       const a = argsFromParts(parts);
-      // One implementation, in the package that owns `treeOf` — stoop has the same op and this body
+      // One implementation, in the package that owns `treeOf` — pinboard has the same op and this body
       // was copied from it.
       return itemTreeFor({
         itemId:        a.itemId,

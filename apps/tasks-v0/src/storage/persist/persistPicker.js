@@ -3,7 +3,7 @@
  * runtime so the tasks-v0 browser factory doesn't hard-import the
  * node-only `FilePersist` (which would break the browser bundle).
  *
- * Mirrors `apps/stoop/src/lib/persistPicker.js` exactly.  Same caller-
+ * Mirrors `apps/pinboard/src/lib/persistPicker.js` exactly.  Same caller-
  * facing contract:
  *
  *   - `FilePersist`           Node:    `{path: '/data/tasks.json'}`
@@ -11,7 +11,7 @@
  *   - `AsyncStoragePersist`   RN:      `{dbName, asyncStorage}`
  *
  * Substrate-extraction candidate — the three adapters + this picker
- * are now duplicated across stoop and tasks-v0.  Rule-of-two satisfied;
+ * are now duplicated across pinboard and tasks-v0.  Rule-of-two satisfied;
  * a later slice should lift them into `@onderling/local-store`.
  */
 

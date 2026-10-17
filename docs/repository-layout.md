@@ -43,7 +43,7 @@ neither is the primitive one. The direction is that the separate apps **dissolve
 |---|---|
 | **basis** (+ `-mobile`) | The front door — one chat/command UI that composes every app's manifest. Static web bundle; the mesh agent runs browser-side. |
 | **household** | Shared household state (chores, lists) on a Solid pod; chat- or Telegram-driven. |
-| **stoop** (+ `-mobile`) | Neighbourhood (*buurt*) sharing — borrow/lend/give, prikbord, offering-matching (*aanbod*), closed groups with their own governance. |
+| **pinboard** (+ `-mobile`) | Neighbourhood (*buurt*) sharing — borrow/lend/give, prikbord, offering-matching (*aanbod*), closed groups with their own governance. |
 | **tasks-v0** (+ `tasks-mobile`) | Task ledger (`@onderling-app/tasks`) with DAG dependencies, offering-based dispatch, role-aware governance, co-ownership, and task-scoped delegation. |
 | **folio** (+ `-mobile`) | Markdown notes/files mirrored to and from a Solid pod. |
 | **calendar** | Appointments/events with cross-peer invite + RSVP over the mesh. |

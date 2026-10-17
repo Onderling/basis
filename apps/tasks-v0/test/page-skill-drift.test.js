@@ -3,7 +3,7 @@
  *
  * Per DESIGN-tier-policy.md, T2/T3 pages may call skills not declared
  * in the manifest (e.g. page-internal app skills like setHopMode that
- * stoop's settings uses but doesn't manifest-declare).  But every
+ * pinboard's settings uses but doesn't manifest-declare).  But every
  * skill the page CALLS must actually EXIST — typos and skill renames
  * are still bugs.
  *
@@ -24,7 +24,7 @@
  *   - whether the page should be T2/T3 etc. (that's the tier
  *     header policy, not code-enforced)
  *
- * Lives in tasks-v0; sibling canaries exist in stoop (apps/stoop/test/
+ * Lives in tasks-v0; sibling canaries exist in pinboard (apps/pinboard/test/
  * page-skill-drift.test.js).  Folio's pages haven't adopted the
  * manifest yet so no canary there.
  */
@@ -61,8 +61,8 @@ const WEBDIR = join(HERE, '..', 'web');
 // of the manifest skill builders.  Each entry MUST cite the file +
 // reason so future readers know why it's exempted.
 const ALLOWLIST = new Set([
-  // pod-settings.html copy-pasted a whoAmI lookup from stoop's app.js.
-  // The skill exists on the stoop agent (apps/stoop/src/skills/
+  // pod-settings.html copy-pasted a whoAmI lookup from pinboard's app.js.
+  // The skill exists on the pinboard agent (apps/pinboard/src/skills/
   // index.js:3151) but tasks-v0 doesn't define it.  Either the call
   // should be removed from pod-settings.html OR tasks-v0 should
   // declare its own whoAmI. Tracked finding from the canary

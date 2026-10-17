@@ -22,7 +22,7 @@
  *
  *   • validates the envelope (`isValidChatEnvelope`)
  *   • dedupes on `msgId` (single shared LRU, cap 256)
- *   • mirrors into stoop's itemStore via `ingest` (honours mute /
+ *   • mirrors into pinboard's itemStore via `ingest` (honours mute /
  *     eviction / deduped / error verdicts — same contract as today's
  *     `ingestCircleMessage` skill)
  *   • appends to `eventLog` in the byte-for-byte same shape

@@ -3,8 +3,8 @@
  *
  * ── RETIRED IN PART, 2026-07-27 ──────────────────────────────────────────────────────────────────────────
  * This file used to drive TWO copies of the rule and require them to agree: `governanceWakeHint` in basis,
- * and an inline `a.event.event === 'propose'` in stoop's `broadcastCircleGovernance`, which existed because
- * stoop cannot import basis app code (invariant #5). The duplication is GONE — the rule moved to the shared
+ * and an inline `a.event.event === 'propose'` in pinboard's `broadcastCircleGovernance`, which existed because
+ * pinboard cannot import basis app code (invariant #5). The duplication is GONE — the rule moved to the shared
  * substrate table (`@onderling/item-store` `entryKinds.js`) and both now call `kindWakes`.
  *
  * What remains is the guard that matters: **that the duplication does not come back**, and that the rule is
@@ -16,12 +16,12 @@ import { readFileSync } from 'node:fs';
 import { governanceWakeHint, GOV_EVENT } from '../../src/v2/governanceLog.js';
 import { kindWakes } from '@onderling/item-store';
 
-const stoopSrc = () => readFileSync(new URL('../../../stoop/src/skills/index.js', import.meta.url), 'utf8');
+const pinboardSrc = () => readFileSync(new URL('../../../pinboard/src/skills/index.js', import.meta.url), 'utf8');
 
 describe('there is exactly one wake rule', () => {
-  it('stoop derives the rule from the SHARED table, not from its own copy', () => {
-    const src = stoopSrc();
-    expect(src, 'stoop should call the shared kindWakes').toContain("kindWakes('governance'");
+  it('pinboard derives the rule from the SHARED table, not from its own copy', () => {
+    const src = pinboardSrc();
+    expect(src, 'pinboard should call the shared kindWakes').toContain("kindWakes('governance'");
     // The inline re-derivation this file used to police must not reappear.
     expect(src).not.toMatch(/const wakes = !!a\.event && a\.event\.event === '[a-z]+';/);
   });
@@ -40,14 +40,14 @@ describe('there is exactly one wake rule', () => {
     }
   });
 
-  it('the stoop skill still stamps `noWake` as the INVERSE of the rule', () => {
+  it('the pinboard skill still stamps `noWake` as the INVERSE of the rule', () => {
     // Agreeing on the rule is not enough — it has to be wired the right way round. Inverting this line
     // would wake on every vote and stay silent on the decision, and every rule test above would pass.
-    expect(stoopSrc()).toContain('noWake: !wakes,');
+    expect(pinboardSrc()).toContain('noWake: !wakes,');
   });
 
   it('a REPORT fan is unconditionally silent — not governed by the rule at all', () => {
-    const src = stoopSrc();
+    const src = pinboardSrc();
     const start = src.indexOf("defineSkill('broadcastCircleReport'");
     expect(start).toBeGreaterThan(-1);
     const body = src.slice(start, src.indexOf('visibility:', start));

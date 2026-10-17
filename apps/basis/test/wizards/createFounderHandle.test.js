@@ -39,7 +39,7 @@ describe("the founder's handle", () => {
     expect(await named).toBe(true);
     const ops = callSkill.mock.calls.map((c) => c[1]);
     expect(ops.indexOf('setMyHandle')).toBeGreaterThan(ops.indexOf('createGroupV2'));
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'setMyHandle', { handle: 'bea' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'setMyHandle', { handle: 'bea' });
   });
   it('no handle needed → setMyHandle is never called', async () => {
     const callSkill = profile({ handle: 'bea' });

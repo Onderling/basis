@@ -1,18 +1,18 @@
 /**
  * wireChat — peer-to-peer chat over `agent.transport.sendOneWay`.
  *
- * **2026-05-08:** lifted from `apps/stoop/src/chat/wireChat.js`
+ * **2026-05-08:** lifted from `apps/pinboard/src/chat/wireChat.js`
  * (Tasks V1 = rule-of-two consumer per
- * `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
- * Stoop's wireChat.js is now a thin shim that pre-binds Stoop's
+ * `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`).
+ * Pinboard's wireChat.js is now a thin shim that pre-binds Pinboard's
  * envelope-type + Phase 39 attachment helpers.
  *
- * Originally Stoop V1 Phase 14 (2026-05-06).
+ * Originally Pinboard V1 Phase 14 (2026-05-06).
  *
  * Wire shape (the DataPart's `data` field):
  *
  *   {
- *     type:         'p2p-chat' | 'stoop-chat' (legacy),
+ *     type:         'p2p-chat' | 'pinboard-chat' (legacy),
  *     subtype:      'chat-message' | 'reveal-request' | 'reveal-accept'
  *                    | 'broadcast-post' | 'contact-add-request'
  *                    | 'attachment-request' | 'attachment-response',
@@ -29,7 +29,7 @@
  * threads survive restarts and sync to the pod when one is wired.
  *
  * **Envelope types.** New deployments emit `'p2p-chat'`; readers
- * accept BOTH `'p2p-chat'` (new) AND `'stoop-chat'` (legacy) by
+ * accept BOTH `'p2p-chat'` (new) AND `'pinboard-chat'` (legacy) by
  * default so a mixed-version network keeps working. Apps tweak via
  * `emitEnvelopeType` + `acceptedEnvelopeTypes` constructor args.
  *
@@ -48,7 +48,7 @@ import { createAddressedDeliver } from '@onderling/item-store';
 const DEFAULT_EMIT_ENVELOPE_TYPE = 'p2p-chat';
 
 /** Default accepted envelope types (new + legacy). */
-const DEFAULT_ACCEPTED_ENVELOPE_TYPES = Object.freeze(['p2p-chat', 'stoop-chat']);
+const DEFAULT_ACCEPTED_ENVELOPE_TYPES = Object.freeze(['p2p-chat', 'pinboard-chat']);
 
 /** Tiny base64 helper — same shape as Attachments.js so we don't
  *  drag a dependency. */
@@ -298,7 +298,7 @@ export function wireChat({
           ...(storedAttachment ? { attachments: [storedAttachment] } : {}),
         },
       }], { actor: data.fromWebid ?? `pubkey:${fromPubKey?.slice?.(0, 12) ?? '?'}` });
-      agent.emit('stoop:chat-message', {
+      agent.emit('pinboard:chat-message', {
         threadId: data.threadId, fromWebid: data.fromWebid, body: data.body,
         hasAttachment: !!storedAttachment,
       });
@@ -321,7 +321,7 @@ export function wireChat({
           sentAt:       data.sentAt ?? Date.now(),
         },
       }], { actor: data.fromWebid ?? `pubkey:${fromPubKey?.slice?.(0, 12) ?? '?'}` });
-      agent.emit('stoop:reveal-event', {
+      agent.emit('pinboard:reveal-event', {
         threadId: data.threadId, fromWebid: data.fromWebid, subtype: data.subtype,
       });
       metrics?.record?.(`${data.subtype}-received`);
@@ -407,7 +407,7 @@ export function wireChat({
         },
         ...(typeof data.dueAt === 'number' ? { dueAt: data.dueAt } : {}),
       }], { actor: data.fromWebid ?? `pubkey:${fromPubKey?.slice?.(0, 12) ?? '?'}` });
-      agent.emit('stoop:contact-broadcast', {
+      agent.emit('pinboard:contact-broadcast', {
         postId: data.postId, fromWebid: data.fromWebid, notifyWorthy,
       });
       metrics?.record?.(notifyWorthy
@@ -514,7 +514,7 @@ export function wireChat({
             .catch(() => { /* best-effort */ });
         }
       }
-      agent.emit('stoop:attachment-fetched', { itemId, attId, ref });
+      agent.emit('pinboard:attachment-fetched', { itemId, attId, ref });
       metrics?.record?.('attachment-fetched');
       return;
     }
@@ -538,7 +538,7 @@ export function wireChat({
           sentAt:       data.sentAt ?? Date.now(),
         },
       }], { actor: data.fromWebid ?? `pubkey:${fromPubKey?.slice?.(0, 12) ?? '?'}` });
-      agent.emit('stoop:contact-request', {
+      agent.emit('pinboard:contact-request', {
         fromWebid: data.fromWebid, trustOffer: data.trustOffer ?? 'bekend',
       });
       metrics?.record?.('contact-request-received');
@@ -638,13 +638,13 @@ export function wireChat({
 //
 // Pre-lift, the distance filter above did
 //   `const { distanceKm } = await import('../lib/geo.js');`
-// which worked when wireChat lived at `apps/stoop/src/chat/wireChat.js`.
+// which worked when wireChat lived at `apps/pinboard/src/chat/wireChat.js`.
 // After the substrate lift the `'../lib/geo.js'` path resolves to a
 // non-existent file inside `packages/chat-p2p/`, breaking RN bundling
 // (Metro statically follows dynamic `import()` chains).
 //
 // Inlined here as a private helper so chat-p2p stays self-contained.
-// Canonical implementation lives in `apps/stoop/src/lib/geo.js` —
+// Canonical implementation lives in `apps/pinboard/src/lib/geo.js` —
 // keep the two in sync (or lift this trio into a tiny `@onderling/cell-grid`
 // substrate when a third consumer surfaces; rule-of-two not yet
 // triggered, the third caller is mobile's own `lib/geo.js`).

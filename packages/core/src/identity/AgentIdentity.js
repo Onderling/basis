@@ -1,6 +1,6 @@
 /**
  * AgentIdentity — Ed25519 keypair + nacl.box encryption + a separate
- * `stableId` (Stoop V1 Phase 11, 2026-05-06).
+ * `stableId` (Pinboard V1 Phase 11, 2026-05-06).
  *
  * The agent's *network* identity is its Ed25519 public key (rotates
  * via `Agent.rotateIdentity()`).  The agent's *stable* identity is
@@ -31,11 +31,11 @@ import { mnemonicToSeed, seedToMnemonic } from './Mnemonic.js';
 
 const { convertPublicKey, convertKeyPair } = ed2curve;
 
-/** Vault key for the per-agent stableId (Stoop V1 Phase 11). */
+/** Vault key for the per-agent stableId (Pinboard V1 Phase 11). */
 const STABLE_ID_KEY = 'agent-stable-id';
 
 /**
- * Vault key for the per-install deviceId (Stoop.1, 2026-05-06).
+ * Vault key for the per-install deviceId (Pinboard.1, 2026-05-06).
  *
  * Unlike `stableId`, `deviceId` is **install-scoped**: a fresh random UUID
  * generated once per install, persisted in the vault, NEVER derived from
@@ -51,7 +51,7 @@ const DEVICE_ID_KEY = 'agent-device-id';
  * 2026-05-07).  **Permanent** — never change.  Changing it would
  * invalidate every restored identity's stableId across all apps.
  */
-const STABLE_ID_HKDF_SALT = 'stoop-stableId-v1';
+const STABLE_ID_HKDF_SALT = 'pinboard-stableId-v1';
 const STABLE_ID_BYTES = 16;
 
 /**
@@ -76,7 +76,7 @@ function _deriveStableIdFromSeed(seed) {
  *
  * when the vault has nothing AND a
  * `seed` is supplied, derive the stableId deterministically via
- * HKDF-SHA256(seed, salt='stoop-stableId-v1').  This makes
+ * HKDF-SHA256(seed, salt='pinboard-stableId-v1').  This makes
  * `restoreFromMnemonic` produce the SAME stableId across devices —
  * mute / report / contact-cache state survives the restore.
  *
@@ -128,9 +128,9 @@ export class AgentIdentity {
   /** @type {{ publicKey: Uint8Array, secretKey: Uint8Array }} */
   #boxKP;
   #vault;
-  /** @type {string | null} — the stable opaque user id (Stoop V1 Phase 11). */
+  /** @type {string | null} — the stable opaque user id (Pinboard V1 Phase 11). */
   #stableId = null;
-  /** @type {string | null} — per-install device id (Stoop.1). */
+  /** @type {string | null} — per-install device id (Pinboard.1). */
   #deviceId = null;
 
   constructor({ seed, vault, stableId = null, deviceId = null }) {
@@ -297,7 +297,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Stable opaque user identifier (Stoop V1 Phase 11).  Generated once
+   * Stable opaque user identifier (Pinboard V1 Phase 11).  Generated once
    * at first construction (or lazy-init on legacy vaults), persisted
    * under `agent-stable-id`, **untouched by rotation**.  Apps use it
    * for the "this person" key (mute / ban / report / peer-cache).
@@ -313,7 +313,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Per-install device identifier (Stoop.1, 2026-05-06).
+   * Per-install device identifier (Pinboard.1, 2026-05-06).
    *
    * UUIDv4 string, generated once at first construction (or lazy-init
    * on legacy vaults), persisted under `agent-device-id`, **untouched

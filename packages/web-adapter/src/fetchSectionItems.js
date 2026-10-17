@@ -23,7 +23,7 @@
  * keys override).
  *
  * Removes adapter-side hard-coding of "this section calls listMine /
- * listMyRequests / getDagTree" that household + tasks-v0 + stoop web
+ * listMyRequests / getDagTree" that household + tasks-v0 + pinboard web
  * bootstraps all currently duplicate.  Same helper feeds renderMobile
  * (Slice C) — keeping section→data-fetch logic device-independent.
  *

@@ -26,7 +26,7 @@ import { VaultMemory } from '@onderling/vault';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, sendCircleChat, until, teardown } from './support/pairRealAgents.js';
-import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));
 const CIRCLE = 'thuis-box-used-dir';
@@ -117,7 +117,7 @@ describe('the box that booted unenrolled first enrols into the same data dir, cl
     enrolledWebid = enrolled.webid;
 
     // (1) The throwaway identity is nobody: not a member, not an address — as the phone folds the circle…
-    const phoneView = await phone.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+    const phoneView = await phone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
     const phoneRows = (phoneView?.members ?? []).map((m) => ({ webid: m.webid, set: m.circleAddresses ?? [] }));
     expect(phoneRows.map((r) => r.webid), 'the throwaway profile is not a member on the phone').not.toContain(throwaway.webid);
     expect(phoneRows.flatMap((r) => r.set), 'no address of the throwaway profile in any set on the phone').not.toContain(throwaway.peerAddr);

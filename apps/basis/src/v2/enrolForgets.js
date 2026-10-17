@@ -39,14 +39,14 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc-own-devices',           // the person's own items: their appointments of no circle, their planned rows
     'cc-outbox-state',          // web's outbox
     'cc-outbox-cache',          // mobile's
-    // Settings, the stoop and the household — each shell names its own, and the two sets are NOT the same
+    // Settings, the pinboard and the household — each shell names its own, and the two sets are NOT the same
     // words. `lint-content-classification` found the web half missing from this list on its first run, which
     // is the entire reason it exists: the table was assembled by hand and reviewed by hand, and three of the
     // person's stores were still unsaid.
     'cc-settings-state',        // web
     'cc-settings-cache',        // mobile
-    'cc-stoop-state',
-    'cc-stoop-cache',
+    'cc-pinboard-state',
+    'cc-pinboard-cache',
     'cc-household-state',
     'cc-household-cache',
     'cc-tasks-cache',

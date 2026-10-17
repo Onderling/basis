@@ -33,7 +33,7 @@ import {
 } from '../src/index.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import {
-  mockTasksManifest, mockStoopManifest, mockFolioManifest,
+  mockTasksManifest, mockPinboardManifest, mockFolioManifest,
 } from '../src/core/manifests/mockManifests.js';
 import { calendarManifest } from '@onderling-app/calendar/manifest';
 import { createLocalBuiltins } from '../src/core/localBuiltins.js';
@@ -56,7 +56,7 @@ async function bootWorkspace({ chatVault } = {}) {
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
-    { manifest: mockStoopManifest },
+    { manifest: mockPinboardManifest },
     { manifest: mockFolioManifest },
     { manifest: calendarManifest },
   ], { runtime: 'browser' });
@@ -78,7 +78,7 @@ async function bootWorkspace({ chatVault } = {}) {
     if (appOrigin === 'basis') return localBuiltins[opId]?.(args ?? {});
     if (appOrigin === 'household')   return agent.callSkill(appOrigin, opId, args);
     if (appOrigin === 'tasks')    return agent.callSkill('tasks', opId, args);
-    if (appOrigin === 'stoop')       return agent.callSkill('stoop', opId, args);
+    if (appOrigin === 'pinboard')       return agent.callSkill('pinboard', opId, args);
     if (appOrigin === 'folio')       return agent.callSkill('folio', opId, args);
     if (appOrigin === 'calendar')    return agent.callSkill('calendar', opId, args);
     return { ok: false, error: `${appOrigin}.${opId} not wired` };
@@ -116,26 +116,26 @@ async function bootWorkspace({ chatVault } = {}) {
 
 /* ════════════════════════════════════════════════════════════
  * JM-1 — Compose across apps in one chat
- * (stoop post → DM → tasks-v0 task)
+ * (pinboard post → DM → tasks-v0 task)
  * ══════════════════════════════════════════════════════════ */
 
-describe('JM-1 — compose across apps (stoop → DM → task)', () => {
+describe('JM-1 — compose across apps (pinboard → DM → task)', () => {
   /*
    * Roadmap quote:
    *   Anne is in a circle thread on her phone.  Frits posts "Anyone
-   *   got a ladder?" (stoop).  Anne taps [Help with] → spawns a DM
+   *   got a ladder?" (pinboard).  Anne taps [Help with] → spawns a DM
    *   with Frits; mid-conversation, she clicks [Convert to task] →
    *   spawns a tasks-v0 task for "Bring ladder Saturday" in her
-   *   household circle, with an embed-card linking back to the stoop
+   *   household circle, with an embed-card linking back to the pinboard
    *   post.
    *
    * Substrate spine tested here:
-   *   1. postRequest creates a stoop item.
+   *   1. postRequest creates a pinboard item.
    *   2. respondToItem (via /help-with) spawns the DM-style thread
    *      keyed on the post id (the chat-shell convention CC-ST.2
    *      already verifies the thread spawn).
    *   3. addTask in tasks-v0 succeeds with a reference back to the
-   *      stoop post (we don't require formal cross-app linking
+   *      pinboard post (we don't require formal cross-app linking
    *      here — that's territory — just that all three
    *      skills run in sequence without error).
    */
@@ -172,7 +172,7 @@ describe('JM-1 — compose across apps (stoop → DM → task)', () => {
 describe('JM-2 — offline post, online sync (substrate persistence)', () => {
   /*
    * Roadmap quote:
-   *   Anne loses signal while drafting a stoop post.  She finishes
+   *   Anne loses signal while drafting a pinboard post.  She finishes
    *   it, hits send; basis-mobile queues it.  Five minutes
    *   later she's back on Wi-Fi; the post fans out via mesh + her
    *   phone shows the ack from a neighbour who saw it.
@@ -281,7 +281,7 @@ describe('JM-7 — sub-task spawn from chat about parent (uses #219 skills)', ()
 describe('JM-8 — cross-device handoff (same identity, two devices)', () => {
   /*
    * Roadmap quote:
-   *   Anne posts a stoop request from her phone.  Frits sees it on
+   *   Anne posts a pinboard request from her phone.  Frits sees it on
    *   his laptop in basis (web).  He clicks [Help with] → DM
    *   spawns.  Anne replies from her phone (same identity, two
    *   devices).  DM stays in sync via NKN/Relay.
@@ -309,10 +309,10 @@ describe('JM-8 — cross-device handoff (same identity, two devices)', () => {
 });
 
 /* ════════════════════════════════════════════════════════════
- * JM-9 — Calendar invite from a stoop thread
+ * JM-9 — Calendar invite from a pinboard thread
  * ══════════════════════════════════════════════════════════ */
 
-describe('JM-9 — calendar invite from a stoop thread', () => {
+describe('JM-9 — calendar invite from a pinboard thread', () => {
   /*
    * Roadmap quote:
    *   Mid-DM about the ladder pickup, Anne taps [Schedule] → opens
@@ -368,13 +368,13 @@ describe('JM-10 — holiday mode silences right things', () => {
     expect(r1.payload.ok).toBe(true);
     expect(r1.payload.holidayMode).toBe(true);
 
-    const r2 = await ws.callSkill('stoop', 'getHolidayMode', {});
+    const r2 = await ws.callSkill('pinboard', 'getHolidayMode', {});
     expect(r2.holidayMode).toBe(true);
 
     const r3 = await ws.userInput('/holiday-mode off');
     expect(r3.payload.holidayMode).toBe(false);
 
-    const r4 = await ws.callSkill('stoop', 'getHolidayMode', {});
+    const r4 = await ws.callSkill('pinboard', 'getHolidayMode', {});
     expect(r4.holidayMode).toBe(false);
   });
 });

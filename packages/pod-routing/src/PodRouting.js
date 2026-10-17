@@ -121,7 +121,7 @@ export function createPodRouting({
         if (policy.policy === 'hybrid') {
           // Canonical ledger (the circle's `group/*` data) lives on the
           // shared group pod — identical to `centralised` for the
-          // data Stoop emits today. Members' personal drafts are the
+          // data Pinboard emits today. Members' personal drafts are the
           // `personal-in-group/*` storage-function (resolved by the
           // generic mapping → own pod) and stay off this path; that
           // ledger-vs-draft split is all V1 models. No groupPodUri →
@@ -225,7 +225,7 @@ export function createPodRouting({
    * Re-point routing at a (newly known) anchor pod.
    *
    * `createPodRouting` takes `anchorPodUri` at construction; an app
-   * that boots no-pod and later attaches a pod (Stoop's opt-in pod
+   * that boots no-pod and later attaches a pod (Pinboard's opt-in pod
    * sign-in) needs to switch the default policy + config-resource
    * location without rebuilding the whole stack (pod-routing is also
    * wired into notify-envelope).  Rebuilds `defaults` + `configUri`

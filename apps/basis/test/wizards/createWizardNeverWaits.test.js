@@ -30,12 +30,12 @@ describe("the agent answers the create before it writes the restore list", () =>
     expect(createBlock).toMatch(/setProfileCircleMembership/);
     expect(createBlock).not.toMatch(/await callSkill\('agents', 'setProfileCircleMembership'/);
   });
-  it('a write that did not land is healed at the next boot — at the END of boot, once stoop and the waist exist', () => {
-    // It sat right after the reopen until 2026-10-12, where it ran before the stoop agent and `callSkill` existed and so
+  it('a write that did not land is healed at the next boot — at the END of boot, once pinboard and the waist exist', () => {
+    // It sat right after the reopen until 2026-10-12, where it ran before the pinboard agent and `callSkill` existed and so
     // read nothing and wrote nothing, silently (proven in personaRestoreHealBoot.test.js, which walks it across two boots).
     const heal = AGENT.indexOf('healRestoreList({');
     const end = AGENT.indexOf('  selfAgent = api;\n  return api;');
-    expect(heal).toBeGreaterThan(AGENT.indexOf('stoopAgentRef.current = stoopAgent;'));
+    expect(heal).toBeGreaterThan(AGENT.indexOf('pinboardAgentRef.current = pinboardAgent;'));
     expect(heal).toBeGreaterThan(AGENT.indexOf('const callSkill = async (appOrigin, opId, args, ctx = {})'));
     expect(end - heal).toBeGreaterThan(0);
   });

@@ -45,7 +45,7 @@ function laneFor(node) {
     headStore: makePolicyHeadStore(io),
     readPolicy: (cid) => policies.get(cid),
     writePolicy: (cid, p) => policies.update(cid, p),
-    adminsOf: async (cid) => new Set(((await call('stoop', 'listGroupMembers', { groupId: cid }))?.members ?? [])
+    adminsOf: async (cid) => new Set(((await call('pinboard', 'listGroupMembers', { groupId: cid }))?.members ?? [])
       .filter((m) => m?.role === 'admin').map((m) => m.webid).filter(Boolean)),
   });
   return { lane, policies, call };

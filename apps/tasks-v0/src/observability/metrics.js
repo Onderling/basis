@@ -1,7 +1,7 @@
 /**
  * metrics — Tasks V1 Phase 9 observability.
  *
- * Composes `@onderling/notifier`'s `UsageMetrics` (lifted from Stoop
+ * Composes `@onderling/notifier`'s `UsageMetrics` (lifted from Pinboard
  * 2026-05-08) for counters, plus a tiny per-name latency reservoir
  * for the two time-series the UX cares about most:
  *

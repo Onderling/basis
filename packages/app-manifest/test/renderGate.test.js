@@ -51,8 +51,8 @@ describe('renderGate — manifest → token-gate rules', () => {
   });
 
   it('several manifests: each is a rule, declaration order, first match wins', () => {
-    const stoop = { appId: 'stoop', operations: [{ id: 'markReturned', surfaces: { slash: { match: { verbs: ['returned'], body: 'match', arg: 'id' } } } }] };
-    const r2 = renderGate([tasks, stoop]);
+    const pinboard = { appId: 'pinboard', operations: [{ id: 'markReturned', surfaces: { slash: { match: { verbs: ['returned'], body: 'match', arg: 'id' } } } }] };
+    const r2 = renderGate([tasks, pinboard]);
     expect(r2).toHaveLength(2);
     expect(run(r2, 'returned the drill')).toEqual({ opId: 'markReturned', args: { id: 'the drill' } });
     expect(run(r2, 'add milk')).toEqual({ opId: 'addTask', args: { text: 'milk' } });

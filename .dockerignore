@@ -43,7 +43,7 @@ playwright-report
 # heavy mobile + demo + web apps (not part of any deployable backend service)
 apps/basis-mobile
 apps/folio-mobile
-apps/stoop-mobile
+apps/pinboard-mobile
 apps/tasks-mobile
 apps/sdk-smoke
 apps/mesh-demo

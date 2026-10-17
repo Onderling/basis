@@ -17,7 +17,7 @@ const oidcSession = fileURLToPath(new URL('./src/web/shims/oidcSession.js', impo
 // `node:*` shims with the NAMED exports the static-import call sites
 // reference (sync-engine fsNode/hashNode/PathMap/versions, pseudo-pod
 // NodeFsBackend, core PodExporter + A2ATransport + reference-manifest,
-// pod-client FileTombstones, stoop + tasks-v0 FilePersist).  Rollup
+// pod-client FileTombstones, pinboard + tasks-v0 FilePersist).  Rollup
 // fails the production build without proper named exports (the previous
 // empty-default shim for `node:crypto` was a known leak that the per-
 // file lazy-load workarounds papered over).  Methods throw at runtime
@@ -204,7 +204,7 @@ export default defineConfig({
       // breaks the build with 'X is not exported by empty.js'.  The
       // Node auth package stays shimmed (separate name).
       'openid-client':                        empty,
-      // `@onderling/relay` is a Node-only HTTP server package; stoop's
+      // `@onderling/relay` is a Node-only HTTP server package; pinboard's
       // Agent.js dynamic-imports WebPushSender which pulls in
       // `PushSender` from relay.  Browser code never instantiates
       // WebPushSender (no VAPID keys are passed in the browser

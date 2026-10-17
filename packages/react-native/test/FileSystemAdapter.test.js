@@ -1,5 +1,5 @@
 /**
- * FileSystemAdapter tests — mirrors apps/stoop's FilePersist tests
+ * FileSystemAdapter tests — mirrors apps/pinboard's FilePersist tests
  * but uses a stub `FileSystem` namespace.
  */
 

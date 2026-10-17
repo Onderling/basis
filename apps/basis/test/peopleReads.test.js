@@ -32,7 +32,7 @@ describe('the people reads', () => {
     const own = (a, o, x) => agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: own, t });
     for (const [w, n, r] of [[ANN, 'Ann', 'member'], [BERT, 'Bert', 'member'], [FRITS, 'Frits', 'admin']]) {
-      await own('stoop', 'addContact', { webid: w, channel: 'telegram', role: r, displayName: n });
+      await own('pinboard', 'addContact', { webid: w, channel: 'telegram', role: r, displayName: n });
       await agent.setDoorCaller(w, r);
     }
     await as(ANN)('lists', 'addToList', { list: 'Klusjes', text: 'lamp vervangen', assignee: 'mij', due: X });

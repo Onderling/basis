@@ -50,7 +50,7 @@ describe('a device without the general persona', () => {
     expect(listed.items.map((r) => r.agentId), 'Werk\'s own row is there').toContain(w);
     expect(listed.items.map((r) => r.agentId), 'no general-persona row made from this device').not.toContain('default');
     // a circle made here is the PRIMARY's: its self is Werk, it is filed under Werk, and still no general-persona row
-    const made = await laptop.callSkill('stoop', 'createGroupV2', { groupId: 'werkoverleg', name: 'Werkoverleg', rules: { text: 'w' } });
+    const made = await laptop.callSkill('pinboard', 'createGroupV2', { groupId: 'werkoverleg', name: 'Werkoverleg', rules: { text: 'w' } });
     expect(made?.ok ?? true, JSON.stringify(made)).not.toBe(false);
     expect(laptop.circleSelf('werkoverleg')?.webid, 'the circle\'s self is Werk').toBe(phone.persona(w).chatId.pubKey);
     const after = (await laptop.callSkill('agents', 'listAgents', {}))?.items ?? [];

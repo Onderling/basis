@@ -212,21 +212,21 @@ module.exports = withOnderlingPreset({
 });
 ```
 
-**Recurrence (2026-05-08, stoop-mobile Phase 40.7 / 40.10):** the
-same trap bit `apps/stoop-mobile/metro.config.js` for two subpaths:
+**Recurrence (2026-05-08, pinboard-mobile Phase 40.7 / 40.10):** the
+same trap bit `apps/pinboard-mobile/metro.config.js` for two subpaths:
 
 | Bare import                          | What we wanted                              | What Metro tried                        |
 |--------------------------------------|---------------------------------------------|-----------------------------------------|
-| `@onderling-app/stoop/lib/geo`        | `apps/stoop/src/lib/geo.js`                 | `apps/stoop/lib/geo` (404)              |
-| `@onderling-app/stoop/locales/en`     | `apps/stoop/locales/en.json`                | `apps/stoop/locales/en` (404 — no .js)  |
+| `@onderling-app/pinboard/lib/geo`        | `apps/pinboard/src/lib/geo.js`                 | `apps/pinboard/lib/geo` (404)              |
+| `@onderling-app/pinboard/locales/en`     | `apps/pinboard/locales/en.json`                | `apps/pinboard/locales/en` (404 — no .js)  |
 
-Adding `@onderling-app/stoop/lib/geo` to `extraNodeModules` looked
+Adding `@onderling-app/pinboard/lib/geo` to `extraNodeModules` looked
 correct but was silently shadowed by the parent-prefix
-`@onderling-app/stoop` entry. Vitest didn't catch it (Vite's alias
+`@onderling-app/pinboard` entry. Vitest didn't catch it (Vite's alias
 engine respects exact-match keys); only the on-device Metro bundle
 failed.
 
-The `extraSubpathResolvers` hook in `apps/stoop-mobile/metro.config.js`
+The `extraSubpathResolvers` hook in `apps/pinboard-mobile/metro.config.js`
 is the canonical fix; reuse the same pattern for any future
 workspace-sibling subpath import.
 
@@ -833,16 +833,16 @@ since each one's package id is distinct.
 
 ---
 
-### Trap 19 — `Unable to resolve "@onderling/relay" / "web-push"` from Stoop barrel
+### Trap 19 — `Unable to resolve "@onderling/relay" / "web-push"` from Pinboard barrel
 
-**Symptom (Stoop V3 mobile Phase 40.23, 2026-05-08):**
+**Symptom (Pinboard V3 mobile Phase 40.23, 2026-05-08):**
 
 ```
 Android Bundling failed 8041ms index.js (2063 modules)
-Unable to resolve "@onderling/relay" from "../stoop/src/lib/WebPushSender.js"
+Unable to resolve "@onderling/relay" from "../pinboard/src/lib/WebPushSender.js"
 ```
 
-**Cause:** `apps/stoop/src/Agent.js` does a **dynamic** `import()` of
+**Cause:** `apps/pinboard/src/Agent.js` does a **dynamic** `import()` of
 `./lib/WebPushSender.js` only when VAPID keys are configured.  At
 runtime the branch never fires on mobile (we use native Expo push).
 But Metro's static analyser walks dynamic `import()` calls during
@@ -862,7 +862,7 @@ extraNodeModules: {
 }
 ```
 
-Mobile apps that compose `@onderling-app/stoop` (the platform-shell
+Mobile apps that compose `@onderling-app/pinboard` (the platform-shell
 exception per the layering rule) inherit this fix automatically — no
 per-app metro config needed.
 
@@ -875,7 +875,7 @@ package in the preset's `extraNodeModules`.  Same fix as Traps 11
 
 ### Trap 20 — Per-bundle `core.Agent` (multi-group RN apps)
 
-**Symptom (Stoop V3 mobile, 2026-05-08):**
+**Symptom (Pinboard V3 mobile, 2026-05-08):**
 
 When the user has N joined groups, the relay broker logs:
 
@@ -902,24 +902,24 @@ mDNS service registrations / N WebSocket connections to the relay.
 The service-context owns ONE `core.Agent`. Per-group state
 (`ItemStore`, `MemberMap`, `SkillMatch`, mirror) lives in a
 group-scoped factory (`buildGroupState({meshAgent, ...})` for
-Stoop) on top of the shared agent. Skills register on the agent
+Pinboard) on top of the shared agent. Skills register on the agent
 ONCE with a `getBundle(args, ctx)` resolver that picks the right
 group from `args.groupId` / pubsub topic.
 
 Reference implementation:
-- `apps/stoop-mobile/src/lib/agentBundle.js` —
+- `apps/pinboard-mobile/src/lib/agentBundle.js` —
   `buildMeshAgent()` (one) + `buildGroupState({meshAgent, ...})`
   (per-group, no agent inside).
-- `apps/stoop-mobile/src/ServiceContext.js` — boots one agent,
+- `apps/pinboard-mobile/src/ServiceContext.js` — boots one agent,
   registers `buildSkills({getBundle})` once, builds GroupStates
   for each joined group.
-- `apps/stoop/src/Agent.js`'s `createNeighbourhoodAgent({
+- `apps/pinboard/src/Agent.js`'s `createNeighbourhoodAgent({
   registerSkills: false })` opt-out for the per-group registration
   path.
 
 Tasks-mobile (when it lands) inherits this pattern — see the
 "Tasks-app fix propagation" section in
-`Project Files/Stoop/single-agent-refactor-2026-05-08.md`.
+`Project Files/Pinboard/single-agent-refactor-2026-05-08.md`.
 
 ---
 

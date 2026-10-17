@@ -64,7 +64,7 @@ layout) — a single running file is lower-ceremony and reads as a history top-t
 **Context:** B's gate authorises `(verb × noun)` capabilities. `capabilitiesOf(manifest)` can get a manifest's
 capability set two ways: DECLARED (`manifest.nouns[noun].atoms`) and DERIVED (read off each op's verb + the noun
 it names via `appliesTo.type` or a `type`-enum param). Deriving from ops is convenient but noisy — a broad
-`appliesTo` mints phantom capabilities (basis `submit·nkn` / `List·en` from value-enum params; stoop
+`appliesTo` mints phantom capabilities (basis `submit·nkn` / `List·en` from value-enum params; pinboard
 `cancelRequest {type:'*'}` blasting `remove` onto internal itemTypes) that cluttered the freedom matrix.
 
 **Decision:** when a manifest DECLARES `nouns`, that declaration IS its member-facing capability surface — the
@@ -73,7 +73,7 @@ would derive but the author didn't declare is DROPPED. Without a `nouns` declara
 (derived) — the fallback for un-migrated manifests, so the gate works app-wide before every app declares nouns.
 
 **Alternatives / why:** over an additive UNION (declared ∪ derived) — the union can't curate: noise has to be
-chased per-op (as the stoop `cancelRequest` narrowing had to). Declared-authoritative lets the manifest author
+chased per-op (as the pinboard `cancelRequest` narrowing had to). Declared-authoritative lets the manifest author
 own the surface, and is inert at ship (household's nouns already equalled its derived set; the other real
 manifests have no `nouns` yet, so unchanged).
 
@@ -89,15 +89,15 @@ the freedom matrix (`buildCapabilityMatrix`) and the gate (`effectiveCapabilityK
 
 **Status:** settled + **implemented** (2026-07-08). `wireSkill(coreFn, manifestOp)` in `@onderling/sdk`; **household
 runs the uniform wired path by default — the legacy `HouseholdAgent` is retired** (cores registered via `wireSkill`
-on a dedicated in-process agent in `realAgent.js`). **Workstream B done:** `tasks-v0` and `stoop` now call their
+on a dedicated in-process agent in `realAgent.js`). **Workstream B done:** `tasks-v0` and `pinboard` now call their
 pure `(store,args,ctx)` cores directly on BOTH routes — the local route (`callSkill`) no longer builds a synthetic
-single-`DataPart` round-trip; wire and local share one `TASK_CORES`/`STOOP_CORES` registry, and the A2A wire route
+single-`DataPart` round-trip; wire and local share one `TASK_CORES`/`PINBOARD_CORES` registry, and the A2A wire route
 is byte-identical. The anti-drift guard the brief demanded ships as `@onderling/sdk/testing`'s `describeLocalWireFitness`
-(`local ≡ wire` equivalence + manifest-op⟷core⟷wire parity), driven for tasks-v0 and stoop. *Follow-up:* add a
+(`local ≡ wire` equivalence + manifest-op⟷core⟷wire parity), driven for tasks-v0 and pinboard. *Follow-up:* add a
 household fitness driver (its cores already run the uniform path).
 
 **Context:** functions were reachable two ways that had drifted apart — a legacy A2A/`defineSkill`/envelope **wire**
-route (tasks, stoop) and a direct in-process **store** route (household). An earlier framing proposed keeping *two
+route (tasks, pinboard) and a direct in-process **store** route (household). An earlier framing proposed keeping *two
 co-equal projections* of every function (a local caller + a wire wrapper), which invites drift and forces a
 synthetic self-to-self envelope round-trip for local calls.
 
@@ -115,7 +115,7 @@ both cheap and singular, so there is one code path to keep correct.
 **Consequences:** the inter-agent **wire is permanent** — it carries remote skill-acquisition, circle-sync, and
 the bot / remote-handler integration tiers (identity + permission live in the envelope); "apps dissolve into
 basis" is a **UI** consolidation, not removal of the serialization substrate. Follow-on: household regains a
-first-class wire route via the uniform route (retire the legacy household agent); tasks/stoop extract pure cores
+first-class wire route via the uniform route (retire the legacy household agent); tasks/pinboard extract pure cores
 over their stores (dropping the synthetic-envelope round-trip).
 
 ---
@@ -212,7 +212,7 @@ open/semantic queries over non-declared attributes are a separate, deferred, con
 
 **Status:** adopted direction (designed with the owner; not yet built). Minimal-first slice defined.
 
-**Context:** every in-process sub-agent (`cc-chat-id:` / `cc-stoop-id:` / …) currently has its own independent
+**Context:** every in-process sub-agent (`cc-chat-id:` / `cc-pinboard-id:` / …) currently has its own independent
 random 32-byte seed — no shared root — so "one phrase = whole agent" does not exist, and the existing web mnemonic
 reveal/restore is bound to a *different* sub-agent than the one a given feature (e.g. the feedback pseudonym) signs
 with. A phrase-based backup would restore the wrong identity. Three needs share this substrate: cross-device recovery
@@ -307,7 +307,7 @@ half; this decision fixes the vocabulary and the bridge's shape for when it land
 ## 2026-07-18 — The skill/offering rename is executed; the requestable bridge is live
 
 **Status:** settled and shipped (`packages/agent-registry`, `packages/identity-resolver`,
-`packages/offering-match`, `apps/basis`, `apps/stoop`).
+`packages/offering-match`, `apps/basis`, `apps/pinboard`).
 
 **Context:** the 2026-07-17 decision fixed the *vocabulary* (skill = the invocable/A2A capability; a
 person's "I can do X" is a disclosure-controlled **offering**, NL *aanbod*) but left the rename and the

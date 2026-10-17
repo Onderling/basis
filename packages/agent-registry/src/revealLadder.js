@@ -10,13 +10,13 @@
 // an explicit, separate choice (see drivers-matching note). This ladder is purely about WHO you are.
 //
 // ⚠ REUSES EXISTING INFRA — this is the UX-level VOCABULARY, NOT a new transport. The three rungs map
-// directly onto mechanisms stoop already ships; the drivers flow drives THOSE, never a new channel:
+// directly onto mechanisms pinboard already ships; the drivers flow drives THOSE, never a new channel:
 //   ephemeral → NO reveal record → `Resolver.resolve` renders the peer's `@handle` (the MemberMap
 //               pseudonym); the ephemeralHandle here is only a fallback label when no roster handle exists.
 //   persona   → `Reveals.setPeerReveal(peer, true)` → the peer renders your persona displayName.
 //   identity  → the existing `requestContactAdd` / pairwise contact exchange (out of this module).
 // The anonymous talk itself rides `packages/chat-p2p` (`chat.send`) — see `packages/identity-resolver/
-// src/Reveals.js` + `Resolver.js` + `apps/stoop` `requestReveal`/`respondToItem`. Keep this module pure
+// src/Reveals.js` + `Resolver.js` + `apps/pinboard` `requestReveal`/`respondToItem`. Keep this module pure
 // vocabulary + presentation so the UI can name the rungs consistently; do NOT reimplement the channel.
 //
 // Pure — web ≡ mobile, no I/O. Ephemeral handles are DETERMINISTIC from the talk id (stable within a

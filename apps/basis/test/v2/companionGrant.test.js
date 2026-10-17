@@ -18,7 +18,7 @@ async function setup() {
   const stranger = await ident();
   const bot = await ident();
   const contacts = [{ webid: companion.pubKey, peerAddr: companion.pubKey, serves: 'https://relay.example.org' }, { webid: stranger.pubKey, peerAddr: stranger.pubKey }];
-  const callSkill = async (app, op) => (app === 'stoop' && op === 'listContacts' ? { contacts } : null);
+  const callSkill = async (app, op) => (app === 'pinboard' && op === 'listContacts' ? { contacts } : null);
   const grants = createCompanionGrants({ vault: new VaultMemory(), self: () => bot.pubKey, callSkill });
   const both = async (issuer = companion, extra = {}) => ({
     subtype: COMPANION_GRANT_SUBTYPE,
@@ -138,7 +138,7 @@ describe('the picker, read through the waist', () => {
     expect(await loadCompanionGrantPicker({ callSkill, node: NODE, t })).toEqual({
       ok: true, targets: [{ key: BOT, label: 'Huishoudbot' }], choices: [{ id: 'agenda-files', label: 'agenda-bestanden plaatsen' }],
     });
-    expect(asked).toEqual(['household.companionGrantChoices', 'stoop.listContacts']);
+    expect(asked).toEqual(['household.companionGrantChoices', 'pinboard.listContacts']);
     expect(await loadCompanionGrantPicker({ callSkill, node: 'X'.repeat(43), t })).toEqual({ ok: false, message: 'niet van jou' });
     expect(companionGrantText({ ok: true }, t)).toBe('gegeven');
     expect(companionGrantText({ ok: false, outcome: 'whatever' }, t)).toBe('mislukt');

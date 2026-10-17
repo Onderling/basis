@@ -33,7 +33,7 @@ const CIRCLE = 'e2e-key-rotation';
  * `recipientAddrsFromRoster` now does on the production side.
  */
 async function sealingKeys(node, circleId) {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
   return (r?.members ?? [])
     .map((m) => {
       const stored = m?.sealingPublicKey ?? m?.sealingPubKey ?? m?.publicKey;
@@ -47,7 +47,7 @@ async function sealingKeys(node, circleId) {
 /** What the sink's OWN recipient resolver would return — the production fan, measured. */
 async function fanReach(node, circleId, event) {
   const { recipientAddrsFromRoster } = await import('@onderling/kring-host/keyEventLogSink');
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
   return recipientAddrsFromRoster(event, Array.isArray(r?.members) ? r.members : [],
     { deriveSealingKey: sealingPublicKeyFromNetworkKey });
 }

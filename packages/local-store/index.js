@@ -3,9 +3,9 @@
  *
  * **Layer:** substrate. Cross-platform.
  *
- * Lifted from `apps/stoop/src/lib/{CachingDataSource, SyncCadence,
+ * Lifted from `apps/pinboard/src/lib/{CachingDataSource, SyncCadence,
  * Settings}.js` 2026-05-08 (Tasks V1 = rule-of-two consumer; the
- * pattern was originally written for Stoop V1 Phase 4).
+ * pattern was originally written for Pinboard V1 Phase 4).
  *
  * Three exports:
  *

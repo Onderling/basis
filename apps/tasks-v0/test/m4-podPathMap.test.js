@@ -1,7 +1,7 @@
 /**
  * Tasks M4 — podPathMap classifier + reverseResolve.
  *
- * Analog of apps/stoop/test/podPathMapReverse.test.js, adapted for
+ * Analog of apps/pinboard/test/podPathMapReverse.test.js, adapted for
  * Tasks' `mem://tasks/circles/<circleId>/…` logical key space.
  *
  * Asserts the bijective property: classify(key) → storageFn+tail;

@@ -46,7 +46,7 @@ describe('selectLlmClient', () => {
 // 5.8 integration — the realAgent seam exposes whatever `llmProviders`
 // the host injected; the picker reads them off the live agent surface.
 describe('createRealHouseholdAgent — llmProviders seam', () => {
-  // realAgent boot composes the real tasks-v0 multi-circle runtime + stoop
+  // realAgent boot composes the real tasks-v0 multi-circle runtime + pinboard
   // + folio → ~5s on this box; bump the per-test timeout so the
   // integration round-trip stays robust under concurrent vitest workers.
   it('round-trips an injected providers map onto agent.llmProviders', async () => {

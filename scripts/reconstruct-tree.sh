@@ -75,4 +75,4 @@ ensure_link apps/basis/node_modules/nkn-sdk                 ../../../packages/tr
 # internal workspace dep used only by a test, declared but not always hoisted into the leaf:
 ensure_link packages/item-store/node_modules/@onderling/item-types  ../../../item-types
 
-echo "tree reconstructed — run a suite (e.g. 'cd apps/stoop && npx vitest run') to confirm."
+echo "tree reconstructed — run a suite (e.g. 'cd apps/pinboard && npx vitest run') to confirm."

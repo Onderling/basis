@@ -32,9 +32,9 @@ export const DEFAULT_ISSUER     = null;
 export const resolveIssuer      = notImplemented('resolveIssuer');
 
 // Phase 52.15.2 substrate (createSolidAuthNode + helpers).  Added to
-// the shim 2026-05-23 because stoop's `src/lib/podSignIn.js`
-// statically imports these via the new `@onderling-app/stoop/browser`
-// composition path (slice-2b integration).  Stoop only INVOKES them
+// the shim 2026-05-23 because pinboard's `src/lib/podSignIn.js`
+// statically imports these via the new `@onderling-app/pinboard/browser`
+// composition path (slice-2b integration).  Pinboard only INVOKES them
 // when signing into a pod (deferred until pod creds land); for
 // the smoke they just need to resolve at module-load time.
 export const createSolidAuthNode             = notImplemented('createSolidAuthNode');

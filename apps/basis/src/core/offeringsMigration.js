@@ -3,12 +3,12 @@
  * root persona (the truth layer). Phase D of the skills→property fold-in
  * (plans/NOTE-skills-properties-audit.md §3c).
  *
- * The roster (stoop `MemberMap.skills`) is per-circle and only reachable in
+ * The roster (pinboard `MemberMap.skills`) is per-circle and only reachable in
  * that circle's service-context, so migration is INCREMENTAL: each circle's
  * skills fold in the first time the Mij surface loads with that circle
  * active. A marker property on the default profile records which circles are
  * done, so re-runs are no-ops. The roster projection itself stays untouched
- * (matching keeps working; the stoop ops remain the projection writer).
+ * (matching keeps working; the pinboard ops remain the projection writer).
  *
  * NO-SILENT-RETRACTION (decision corollary): members of a circle already
  * SAW `categoryId` + `freeTags` on the roster — so migrated keys get
@@ -64,7 +64,7 @@ export async function migrateRosterOfferings({ callSkill, circleId, defaultId = 
   // this circle's roster: my own skills as every member of it already sees them
   let skills = [];
   try {
-    const r = await callSkill('stoop', 'listMyOfferings', {});
+    const r = await callSkill('pinboard', 'listMyOfferings', {});
     skills = Array.isArray(r?.skills) ? r.skills : [];
   } catch { skills = []; }
 

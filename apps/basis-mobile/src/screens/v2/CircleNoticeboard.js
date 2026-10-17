@@ -5,8 +5,8 @@
  * circle's NOTICEBOARD tab — an ask/offer/lend composer and the open-post list with
  * per-row actions. Self-contained: loads `listOpen` and dispatches `postRequest`/
  * `respondToItem`/`cancelRequest`/`reportPost`/`markReturned` via the injected
- * `callSkill` (the same already-wired stoop ops). Shows the shared circle's posts
- * (one stoop agent today); per-circle scoping arrives with the pod foundation.
+ * `callSkill` (the same already-wired pinboard ops). Shows the shared circle's posts
+ * (one pinboard agent today); per-circle scoping arrives with the pod foundation.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet, Image, Modal } from 'react-native';
@@ -16,7 +16,7 @@ import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
 // embeds[] — cross-object reference chips ("See also"), shared with web.
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
-import { isNoticeboardPost } from '../../../../basis/src/v2/circleStoopScope.js';
+import { isNoticeboardPost } from '../../../../basis/src/v2/circlePinboardScope.js';
 import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from '../../../../basis/src/v2/circleStream.js';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
@@ -31,7 +31,7 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
+export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onPinboardEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
@@ -68,9 +68,9 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
   const reload = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
     let who = myWebid;
-    if (who == null) { try { const r = await callSkill('stoop', 'whoAmI', {}); who = r?.webid ?? r?.webId ?? ''; } catch { who = ''; } setMyWebid(who); }
+    if (who == null) { try { const r = await callSkill('pinboard', 'whoAmI', {}); who = r?.webid ?? r?.webId ?? ''; } catch { who = ''; } setMyWebid(who); }
     try {
-      const res = await callSkill('stoop', 'listOpen', {});
+      const res = await callSkill('pinboard', 'listOpen', {});
       // Keep only real asks/offers — listOpen (no intent) also returns system items
       // (rules / membership) which aren't noticeboard posts.
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
@@ -114,9 +114,9 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
 
   // S6.4 — refresh when a recipient's requested attachment bytes arrive.
   useEffect(() => {
-    if (typeof onStoopEvent !== 'function') return undefined;
-    return onStoopEvent('stoop:attachment-fetched', () => { reload(); });
-  }, [onStoopEvent, reload]);
+    if (typeof onPinboardEvent !== 'function') return undefined;
+    return onPinboardEvent('pinboard:attachment-fetched', () => { reload(); });
+  }, [onPinboardEvent, reload]);
 
   // S5 — pick + encode an image into the inbound-attachment shape, held pending.
   const attachImage = useCallback(async () => {
@@ -133,7 +133,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     const pending = attachment;
     setText(''); setDueText(''); setError(false); setBusy(true);
     try {
-      await callSkill('stoop', 'postRequest', {
+      await callSkill('pinboard', 'postRequest', {
         intent, text: body,
         ...(Number.isFinite(dueAt) ? { dueAt } : {}),
         ...(pending ? { attachments: [pending] } : {}),
@@ -147,7 +147,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
 
   // Sealed media (2026-07-11): open the full-size image by unsealing the blob through THIS circle's
   // media gateway (`openFullImage` → openBlob, gated + decrypted client-side) — the SAME read path
-  // basis's own circle images use, and web's `noticeboardViewAttachment`. Stoop holds only the
+  // basis's own circle images use, and web's `noticeboardViewAttachment`. Pinboard holds only the
   // opaque sealed pointer (no plaintext byte round-trip). The sealed thumbnail (already opened for the
   // chip by the wrapper) stands in on a wrong key / denial.
   const viewAttachment = useCallback(async (post, att) => {
@@ -167,11 +167,11 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     try {
       if (action === 'respond') { setReplyingTo(post.id); setReplyText(''); return; }
       if (action === 'assign') { setAssigningTo(post.id); setAssignText(''); return; }
-      if (action === 'cancel') await callSkill('stoop', 'cancelRequest', { requestId: post.id });
+      if (action === 'cancel') await callSkill('pinboard', 'cancelRequest', { requestId: post.id });
       // §8 unification — a post report is now a governance report event (propagates + shows
       // in the governance Reports section), not the older reportPost item. Falls back if unwired.
-      else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('stoop', 'reportPost', { itemId: post.id }); }
-      else if (action === 'markReturned') await callSkill('stoop', 'markReturned', { requestId: post.id });
+      else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('pinboard', 'reportPost', { itemId: post.id }); }
+      else if (action === 'markReturned') await callSkill('pinboard', 'markReturned', { requestId: post.id });
       else if (action === 'mute' && post.addedBy) {
         // BLOCK the person — both halves, one act (web parity). Keyed on the webid, which is what
         // makes it a block of a PERSON rather than of one address.
@@ -197,7 +197,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
   const submitAssign = useCallback(async (post) => {
     const borrowerWebid = assignText.trim();
     if (!borrowerWebid) { setAssigningTo(null); return; }
-    try { await callSkill('stoop', 'assignLend', { itemId: post.id, borrowerWebid }); } catch { /* */ }
+    try { await callSkill('pinboard', 'assignLend', { itemId: post.id, borrowerWebid }); } catch { /* */ }
     setAssigningTo(null); setAssignText('');
     reload();
   }, [assignText, callSkill, reload]);

@@ -33,7 +33,7 @@ describe('the identity link in the person\'s app', () => {
     try { await relay?.close?.(); } catch { /* */ }
   });
 
-  const contacts = async () => (await web.agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? [];
+  const contacts = async () => (await web.agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? [];
   const props = async () => (await web.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};
   const myRoot = async () => [...new Set(Object.values(deviceDelegationsOf({ properties: await props() })).map((d) => d.by))][0];
   const said = (node, subtype) => node.received.filter((m) => m.payload?.subtype === subtype);

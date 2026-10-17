@@ -10,7 +10,7 @@
  * The template is partial: any capability the admin didn't touch takes DEFAULT_ROW (enabled, optional,
  * greyed) — default-on migration (ruling). `buildCapabilityMatrix` is what the wizard renders;
  * `effectiveCapabilityKeys` is the narrowed set the Slice-1 gate authorises — this is where the gate
- * finally drops BELOW app-level (an admin can disable `stoop add post` without disabling all of stoop).
+ * finally drops BELOW app-level (an admin can disable `pinboard add post` without disabling all of pinboard).
  */
 
 import { capabilitiesOf, capabilityKey } from './capabilities.js';

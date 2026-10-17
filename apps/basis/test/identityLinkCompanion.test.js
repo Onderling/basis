@@ -12,7 +12,7 @@ import { createIdentityLink, createLinkTombstones, linkedCompanionSkill } from '
 import { LINKED_COMPANION_OP, LINK_OPS } from '../src/v2/identityLink.js';
 import { feedCompanionOf } from '../src/v2/feedCompanion.js';
 import { BOT_SCREEN_NEVER } from '../src/v2/screenActing.js';
-import { encodeContactCard } from '@onderling-app/stoop/lib/contactCard';
+import { encodeContactCard } from '@onderling-app/pinboard/lib/contactCard';
 import { linkedPerson } from './support/linkedPerson.js';
 
 const t = (k, p) => (p ? `${k} ${JSON.stringify(p)}` : k);
@@ -35,8 +35,8 @@ async function bot() {
   });
   const doorCall = withAssistantOps({
     callSkill: async (app, op, args) => {
-      if (app === 'stoop' && op === 'addContactFromQr') { contacts.push(args.payload); return { contact: { webid: NODE } }; }
-      if (app === 'stoop' && op === 'listContacts') return { contacts: [] };
+      if (app === 'pinboard' && op === 'addContactFromQr') { contacts.push(args.payload); return { contact: { webid: NODE } }; }
+      if (app === 'pinboard' && op === 'listContacts') return { contacts: [] };
       return { ok: true, params: [] };
     },
     t, threads: { langOf: () => null },

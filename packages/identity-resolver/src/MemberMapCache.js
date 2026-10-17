@@ -3,12 +3,12 @@
  * `core.DataSource` (typically a `CachingDataSource` from
  * `@onderling/local-store`).
  *
- * **2026-05-08:** lifted from `apps/stoop/src/lib/MemberMapCache.js`
+ * **2026-05-08:** lifted from `apps/pinboard/src/lib/MemberMapCache.js`
  * (Tasks V1 = rule-of-two consumer per
- * `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
- * Stoop's `lib/MemberMapCache.js` is now a re-export shim.
+ * `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`).
+ * Pinboard's `lib/MemberMapCache.js` is now a re-export shim.
  *
- * Originally Stoop V1 Phase 11 (2026-05-06): profile + skills
+ * Originally Pinboard V1 Phase 11 (2026-05-06): profile + skills
  * auto-persist (functional design § A7).  No "save" button — every
  * `addMember` / `removeMember` event flushes through to the cache,
  * which itself either stays local-only or write-throughs to the

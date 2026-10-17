@@ -34,7 +34,7 @@ describe('the companion a bot\'s links are served by', () => {
 
   it('read through the waist, at the moment it is needed', async () => {
     const book = [];
-    const callSkill = async (app, op) => (app === 'stoop' && op === 'listContacts' ? { contacts: book } : null);
+    const callSkill = async (app, op) => (app === 'pinboard' && op === 'listContacts' ? { contacts: book } : null);
     expect(await loadFeedCompanion({ callSkill })).toBeNull();
     book.push({ webid: NODE, peerAddr: NODE, serves: 'https://relay.example.org' });
     expect(await loadFeedCompanion({ callSkill })).toEqual({ node: NODE, base: 'https://relay.example.org' });

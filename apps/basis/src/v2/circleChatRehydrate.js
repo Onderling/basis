@@ -3,7 +3,7 @@
  *
  * The circle view's CONVERSATION tab reads from `eventLog` which lives in
  * memory.  On page reload the log starts empty, so historical chats
- * (durable in stoop's itemStore from 's hybrid storage path)
+ * (durable in pinboard's itemStore from 's hybrid storage path)
  * wouldn't be visible until new chats arrived.
  *
  * Since ε.1, every circle-chat insert path routes through the shared
@@ -45,7 +45,7 @@ import { chatEnvelopeFromStoreItem, toEventLogItem } from '@onderling/item-store
  * @param {{warn?, info?, debug?}} [args.logger]
  * @returns {Promise<{rehydrated: number, skipped: number, error?: string}>}
  */
-export async function rehydrateCircleChatsFromStoop({
+export async function rehydrateCircleChatsFromPinboard({
   callSkill,
   inbox    = null,
   eventLog = null,
@@ -78,7 +78,7 @@ export async function rehydrateCircleChatsFromStoop({
 
   let res;
   try {
-    res = await callSkill('stoop', 'listCircleChats', { groupId, sinceTs, limit });
+    res = await callSkill('pinboard', 'listCircleChats', { groupId, sinceTs, limit });
   } catch (err) {
     logger.warn?.('[circle-chat] rehydrate failed:', err?.message ?? err);
     return { rehydrated: 0, skipped: 0, error: String(err?.message ?? err) };
@@ -99,7 +99,7 @@ export async function rehydrateCircleChatsFromStoop({
 }
 
 /**
- * Convert a stoop `listCircleChats` item into the NKN envelope shape
+ * Convert a pinboard `listCircleChats` item into the NKN envelope shape
  * the inbox expects.  Returns `null` for items that are missing
  * msgId / circleId / text so the caller counts them as skipped.
  *
@@ -166,7 +166,7 @@ export async function migrateCircleChatHistory({ callSkill, inbox, marker, logge
   let done = null;
   try { done = await marker.get(); } catch { done = null; }
   if (done) return { migrated: false, alreadyDone: true };
-  const res = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger });
+  const res = await rehydrateCircleChatsFromPinboard({ callSkill, inbox, logger });
   if (res?.error) {
     logger?.warn?.('[chat-migration] history pass failed — will retry next boot:', res.error);
     return { migrated: false, error: res.error };

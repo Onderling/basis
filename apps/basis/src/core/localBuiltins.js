@@ -95,7 +95,7 @@ export function createLocalBuiltins({
     // the person's own week overview, run by their clock while the app is open: the card of their coming week
     [PERSON_WEEK_OP]: async () => {
       if (typeof showPersonCard !== 'function') return { ok: false, reason: 'no-screen' };
-      const me = (await callSkill?.('stoop', 'whoAmI', {}).catch(() => null))?.webid ?? null;
+      const me = (await callSkill?.('pinboard', 'whoAmI', {}).catch(() => null))?.webid ?? null;
       const card = await personWeekCard({ callSkill, me, t, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
       showPersonCard(card);
       return { ok: true };
@@ -628,7 +628,7 @@ export async function securityStatus(_args, { agent, t }) {
  * addresses.  Persisted via the factory's muteListVaultKey opt.
  * (Internally the mechanism is `sa.mute`/op id `mute`; the user-facing
  * command + copy were renamed `/mute`→`/block` to free `/mute` for
- * stoop's local hide-only mute. See manifest.js.)
+ * pinboard's local hide-only mute. See manifest.js.)
  */
 async function muteHandler(args, { agent, t }) {
   const peer = String(args?.peer ?? args?._match ?? '').trim();
@@ -758,8 +758,8 @@ async function debugDump({ agent, t }) {
 
 /**
  * `/help-with <post-id>` — v0.7.cc.  Open (or activate) a thread
- * filtered on a stoop post.  Mirrors stoop's "Ik help" UX.  Pure
- * chat-shell: no stoop-side skill needed; filter targets the post
+ * filtered on a pinboard post.  Mirrors pinboard's "Ik help" UX.  Pure
+ * chat-shell: no pinboard-side skill needed; filter targets the post
  * via itemRef.id so any future event referencing that post lands
  * in this thread.
  */
@@ -777,7 +777,7 @@ async function helpWithPost(args, { threadStore, setActive, t }) {
     thread = threadStore.createThread({
       id,
       name: `Help with ${postId}`,
-      meta: { postRef: { app: 'stoop', type: 'post', id: postId } },
+      meta: { postRef: { app: 'pinboard', type: 'post', id: postId } },
       permissions: { allowCommands: true },
     });
   }
@@ -1163,7 +1163,7 @@ function parseDuration(text) {
  *                                  ("I'll handle this")
  *
  * Cross-peer P2P delivery rides on each app's existing chat surface
- * (e.g. stoop's sendChatMessage) — basis produces the
+ * (e.g. pinboard's sendChatMessage) — basis produces the
  * envelope; the source app delivers.  Not in basis's scope
  * to compose @onderling/chat-p2p directly (per v0.5.3 audit).
  */

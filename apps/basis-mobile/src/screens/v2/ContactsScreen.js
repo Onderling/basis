@@ -44,7 +44,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   // this screen is the other door onto the same list, so it reads through the same one.
   const contactNames = useMemo(() => makeContactNameStore(AsyncStorage), []);
 
-  // S1 #2 — the unified directory: PeerGraph bots/peers merged with the stoop
+  // S1 #2 — the unified directory: PeerGraph bots/peers merged with the pinboard
   // ContactBook (people the user added, with trust/tags). Same shared helpers as web.
   const reload = useCallback(async () => {
     // The one Contacten read (web parity): the graph less aliases and my own addresses, the book, merged, and every
@@ -70,7 +70,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       // A PeerGraph peer/bot (an agent-card URL or a peer address). Same precedence as web's addBotFromInput.
       await addBotToGraph({
         input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
-        // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one
+        // C13 fast rung — a onderling-contact:// card routes to pinboard's addContactFromQr (the one
         // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
         // …asking first what they will see of you (L125); closing the sheet adds nothing
         addContact: callSkill ? async (payload) => {

@@ -9,7 +9,7 @@
  * declarative `mockHouseholdManifest` that `realAgent.js` returns
  * as its `.manifest` field for chat-shell routing.
  *
- * Slash-binding manifests for tasks-v0 / stoop / folio used to
+ * Slash-binding manifests for tasks-v0 / pinboard / folio used to
  * live alongside this fixture; they moved to `mockManifests.js`
  * in the slice-4 polish pass (file was 60% manifest declarations).
  *
@@ -77,7 +77,7 @@ export const mockHouseholdManifest = {
     {
       id:        'markComplete',
       verb:      'complete',
-      appliesTo: { type: 'chore', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/stoop)
+      appliesTo: { type: 'chore', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/pinboard)
       params:    [{
         name: 'choreId', kind: 'string', required: true,
         // bare `/done` → list open chores; click row → done.
@@ -205,7 +205,7 @@ mockHouseholdManifest.operations.find((o) => o.id === 'markComplete')
   .surfaces.chat.embed = { cardSnapshotSkill: 'getChoreSnapshot' };
 
 // v0.7 — brief-summary decl on household's list op. /brief fans
-// across these to produce the morning brief. Stoop / folio +
+// across these to produce the morning brief. Pinboard / folio +
 // augmentations live in `mockManifests.js`.
 mockHouseholdManifest.operations.find((o) => o.id === 'listOpen')
   .surfaces.chat.brief = {

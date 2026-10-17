@@ -168,14 +168,14 @@ export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, 
   // item store's — a founder restored from the recovery file has the former and not yet the latter, and
   // was blind to her own devices in the circle she made until 2026-09-14), else the item store's.
   try {
-    circles = typeof circleIds === 'function' ? ((await circleIds()) ?? []) : ((await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []);
+    circles = typeof circleIds === 'function' ? ((await circleIds()) ?? []) : ((await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []);
   } catch { return []; }
   for (const c of circles) {
     // `listMyCircles` answers plain circle-id strings on this composition; other hosts answer rows.
     const circleId = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
     if (typeof circleId !== 'string' || !circleId) continue;
     let members = [];
-    try { members = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { continue; }
+    try { members = (await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { continue; }
     const mine = members.find((m) => m && (m.webid ?? m.addr ?? m.ref) === selfPubKey);
     if (!mine) continue;
     let own = null;

@@ -1,10 +1,10 @@
 /**
  * onboardingSkills — invite-link → group-token onboarding skills.
  *
- * **2026-05-08:** lifted from `apps/stoop/src/onboarding.js`
+ * **2026-05-08:** lifted from `apps/pinboard/src/onboarding.js`
  * (Tasks V1 = rule-of-two consumer per
- * `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
- * Stoop's `onboarding.js` is now a thin wrapper.
+ * `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`).
+ * Pinboard's `onboarding.js` is now a thin wrapper.
  *
  * Two skills + the spawn-on-redemption hook. Designed to work both
  * in-process (testbed: admin + N members in one process; the
@@ -22,7 +22,7 @@
  *      the member into the MemberMap.
  *
  * The skill names (`issueInvite`, `redeemInvite`) and signatures are
- * preserved verbatim from Stoop's V1 Phase 7 — apps that already
+ * preserved verbatim from Pinboard's V1 Phase 7 — apps that already
  * register these names continue to work after the lift.
  */
 import { defineSkill, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';

@@ -4,7 +4,7 @@
  * plans/NOTE-skills-properties-audit.md §4/). Mirrors locationMigration.js /
  * availabilityMigration.js: seed once, guarded by a marker, then never touch the old signal.
  *
- * Source: the stoop Layer-2 `getInterestProfile` snapshot — a TF-IDF profile learned from the
+ * Source: the pinboard Layer-2 `getInterestProfile` snapshot — a TF-IDF profile learned from the
  * bodies the user engaged with, exposed as `{ totalDocs, topTerms: [{term, weight}] }`. There is
  * NO user-declared interests list today; this learned bag-of-terms IS the current representation.
  * The audit decided interests are a driver KIND that "overlaps drivers tags" (§4), so we fold the
@@ -66,7 +66,7 @@ export async function migrateInterests({ callSkill, defaultId = 'default' } = {}
   // Source: the learned Layer-2 interest profile's strongest terms → tags on one interest driver.
   let tags = [];
   try {
-    const snap = await callSkill('stoop', 'getInterestProfile', {});
+    const snap = await callSkill('pinboard', 'getInterestProfile', {});
     tags = topInterestTerms(snap);
   } catch { /* */ }
 

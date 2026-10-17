@@ -1,5 +1,5 @@
 /**
- * `neighbourhood-job` type — Stoop's coordinated neighbourhood-job
+ * `neighbourhood-job` type — Pinboard's coordinated neighbourhood-job
  * lifecycle (paint the wall, clean the park). Tracks the
  * "someone needs help → people commit → work happens → done"
  * arc.

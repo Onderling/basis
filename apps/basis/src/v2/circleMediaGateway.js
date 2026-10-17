@@ -284,7 +284,7 @@ export async function createCircleMediaGateway({
  * `members.resolveByWebid(webid).pubKey`) and hands EXACTLY those keys to the blob-gate
  * `/grant` as the read-ACL. The media ACL keys on the capability-token SUBJECT — a
  * member's signing key (see `capabilityVerifier` → `{ webId: subject }`); a member whose
- * signing key was captured on redeem (stoop `redeemMembershipCode`) can therefore open
+ * signing key was captured on redeem (pinboard `redeemMembershipCode`) can therefore open
  * the sealed blob, and a member whose key is NOT yet captured is reported (never granted).
  *
  * Two mutually-exclusive modes, same gateway shape out (delegates to

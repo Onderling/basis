@@ -12,11 +12,11 @@ function goodRecipe() {
       note: { atoms: ['add', 'remove'] },
     },
     freedoms: {
-      'stoop add task': { enabled: true, freedom: 'optional', consequence: 'greyed' },
-      'stoop complete task': { enabled: false },
+      'pinboard add task': { enabled: true, freedom: 'optional', consequence: 'greyed' },
+      'pinboard complete task': { enabled: false },
     },
     settings: {
-      'stoop.digestFrequency': 'weekly',
+      'pinboard.digestFrequency': 'weekly',
       'household.remindersOn': true,
     },
     surfaces: {
@@ -33,8 +33,8 @@ describe('loadRecipe — happy path (object source, no verify)', () => {
     expect(res.warnings).toContain('unverified');
     // normalised bundle carries all four sections
     expect(res.recipe.capabilities.task.atoms).toEqual(['add', 'list', 'complete']);
-    expect(res.recipe.freedoms['stoop complete task']).toEqual({ enabled: false });
-    expect(res.recipe.settings['stoop.digestFrequency']).toBe('weekly');
+    expect(res.recipe.freedoms['pinboard complete task']).toEqual({ enabled: false });
+    expect(res.recipe.settings['pinboard.digestFrequency']).toBe('weekly');
     expect(res.recipe.surfaces).toEqual({ features: { chat: true, tasks: true, calendar: false }, view: 'screen' });
     expect(res.recipe.name).toBe('Circle starter');
   });
@@ -133,14 +133,14 @@ describe('loadRecipe / validateRecipe — malformed → coded issues', () => {
 
   it('freedom entry with out-of-enum freedom → bad-freedom', async () => {
     const bad = goodRecipe();
-    bad.freedoms = { 'stoop add task': { freedom: 'mandatory' } };
+    bad.freedoms = { 'pinboard add task': { freedom: 'mandatory' } };
     const res = await loadRecipe(bad);
     expect(res.error.issues.some((i) => i.code === ISSUE_CODES.BAD_FREEDOM)).toBe(true);
   });
 
   it('freedom key with a non-registry noun → bad-noun', async () => {
     const bad = goodRecipe();
-    bad.freedoms = { 'stoop add frobnicate': {} };
+    bad.freedoms = { 'pinboard add frobnicate': {} };
     const res = await loadRecipe(bad);
     expect(res.error.issues.some((i) => i.code === ISSUE_CODES.BAD_NOUN)).toBe(true);
   });

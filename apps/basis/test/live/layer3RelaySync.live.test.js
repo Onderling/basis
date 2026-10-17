@@ -52,7 +52,7 @@ async function buildRelayAgent(label) {
     chatVault:      new VaultMemory(),   // distinct identity per agent (two "devices")
     seedHousehold:  false,               // clean slate → we observe exactly the synced item
     seedTasks:      false,
-    seedStoopPosts: false,
+    seedPinboardPosts: false,
   });
   // Use the REAL app wiring: connectPeerTransport relay-only (no nknLib — the LAN no-pod path). Its
   // internal routedOnPeerMessage consumes household-item envelopes via handleInbound and pins

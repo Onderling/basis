@@ -1,6 +1,6 @@
 /**
  * Hiding a contact (L106, Frits 2026-09-19) — web ≡ mobile ≡ box, from ONE source. The mark lives on the book row
- * (stoop `setContactHidden`), the roster splits through the shared `splitShownHidden`, the channel's two seams
+ * (pinboard `setContactHidden`), the roster splits through the shared `splitShownHidden`, the channel's two seams
  * (`isHidden` / `onReturned`) bring a hidden contact back when they write, and both screens speak the same four
  * locale keys. A shell that keeps its own hidden set, decides the split itself, or paints a marker of its own
  * wording is the drift this test exists for.
@@ -26,7 +26,7 @@ describe('hide a contact — parity', () => {
       expect(src).toMatch(/onReturned:/);
     }
   });
-  it('the mark is the book\'s: every shell changes it through the ONE stoop op, never a set of its own', () => {
+  it('the mark is the book\'s: every shell changes it through the ONE pinboard op, never a set of its own', () => {
     for (const src of [webHost, mobileBundle, box]) expect(src).toMatch(/'setContactHidden'/);
     for (const src of [webHost, webRoster, webThread, mobileBundle, mobileRoster, mobileThread]) expect(src).not.toMatch(/hiddenContacts|hiddenSet|hiddenIds/);
   });

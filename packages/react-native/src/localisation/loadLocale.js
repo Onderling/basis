@@ -1,9 +1,9 @@
 /**
  * loadLocale — RN-friendly locale resolver factory.
  *
- * Lifted from apps/stoop-mobile/src/lib/localisation.js 2026-05-09 (Phase 41.0
+ * Lifted from apps/pinboard-mobile/src/lib/localisation.js 2026-05-09 (Phase 41.0
  * L7; Tasks-mobile is the second consumer). The original module
- * hardcoded Stoop's locale imports; the substrate factory takes the
+ * hardcoded Pinboard's locale imports; the substrate factory takes the
  * locale bundles as args so each app provides its own.
  *
  * Apps consume:

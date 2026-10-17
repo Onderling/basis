@@ -45,7 +45,7 @@ describe('FITNESS: manifest conformance (§6 standardisation)', () => {
     // Sanity: the scan actually found the fleet of app manifests (guards against
     // a broken glob silently checking nothing).
     expect(APPS.length).toBeGreaterThanOrEqual(6);
-    for (const expected of ['tasks-v0', 'stoop', 'household', 'calendar', 'folio', 'basis']) {
+    for (const expected of ['tasks-v0', 'pinboard', 'household', 'calendar', 'folio', 'basis']) {
       expect(APPS, `expected ${expected} among discovered app manifests`).toContain(expected);
     }
   });

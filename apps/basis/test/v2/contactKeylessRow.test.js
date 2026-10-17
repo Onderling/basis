@@ -3,8 +3,8 @@
  *
  * A household bot serves people over Telegram; each admitted person is a contact in the bot's one book — a row with a
  * door-shaped webid (`telegram:<uid>`), the door (`channel`), a role, and no key. The contact type declares that
- * shape (`KEYLESS_CONTACT_EXAMPLE`, `@onderling/item-types`); stoop's own test runs the book's methods over it. Here
- * every basis reader of the book runs over ONE such row in a real stoop contact book: the Contacten projection, the
+ * shape (`KEYLESS_CONTACT_EXAMPLE`, `@onderling/item-types`); pinboard's own test runs the book's methods over it. Here
+ * every basis reader of the book runs over ONE such row in a real pinboard contact book: the Contacten projection, the
  * share picker, the pair roster, the persona lens, delete, the persona backfill, the own-devices carry, the hop list.
  * Each works or refuses with a reason (`KEYLESS_REFUSAL`) — none throws, none invents a key or a pair circle for it.
  *
@@ -14,10 +14,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighbourhoodAgent } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent } from '@onderling-app/pinboard';
 import { KEYLESS_CONTACT_EXAMPLE, KEYLESS_REFUSAL, isKeylessContact } from '@onderling/item-types';
 import {
-  bookRowsOf, stoopContactToRow, loadBookRows, loadContactRoster, mergeContacts, splitShownHidden,
+  bookRowsOf, pinboardContactToRow, loadBookRows, loadContactRoster, mergeContacts, splitShownHidden,
 } from '../../src/v2/contactsSource.js';
 import { pickableRecipients, recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { createPairRoster, pairRouteFor } from '../../src/v2/pairRoster.js';
@@ -31,7 +31,7 @@ const K = KEYLESS_CONTACT_EXAMPLE;
 const admit = { webid: K.webid, displayName: K.displayName, channel: K.channel, role: K.role };
 
 /**
- * A real stoop contact book behind the waist: stoop ops go to the stoop agent's own skills; every other call (the
+ * A real pinboard contact book behind the waist: pinboard ops go to the pinboard agent's own skills; every other call (the
  * persona registry, the circle machinery a reader may reach for) is recorded and answered empty, so a test can see
  * what a reader TRIED on the keyless row.
  */
@@ -45,13 +45,13 @@ async function hostWithKeylessRow(self = 'anna-webid') {
   const calls = [];
   const callSkill = async (app, op, args = {}) => {
     calls.push({ app, op, args });
-    const skill = app === 'stoop' ? bundle.agent.skills.get(op) : null;
+    const skill = app === 'pinboard' ? bundle.agent.skills.get(op) : null;
     if (!skill || op === 'createGroupV2') return { ok: true };
     return skill.handler({ parts: [DataPart(args)], from: self, agent: bundle.agent, envelope: null });
   };
-  const added = await callSkill('stoop', 'addContact', admit);
+  const added = await callSkill('pinboard', 'addContact', admit);
   if (added?.error) throw new Error(`the keyless row did not go in: ${added.error}`);
-  const row = bookRowsOf(await callSkill('stoop', 'listContacts', {})).find((c) => c.webid === K.webid);
+  const row = bookRowsOf(await callSkill('pinboard', 'listContacts', {})).find((c) => c.webid === K.webid);
   calls.length = 0;
   return { self, bundle, callSkill, calls, row };
 }
@@ -65,14 +65,14 @@ describe('the row as the book holds it', () => {
   it('is the declared shape: door, role, no key — one row for the person', async () => {
     expect(h.row).toMatchObject({ webid: K.webid, channel: 'telegram', role: 'member', relation: 'contact' });
     expect(isKeylessContact(h.row)).toBe(true);
-    await h.callSkill('stoop', 'addContact', admit);   // admitted again
-    expect(bookRowsOf(await h.callSkill('stoop', 'listContacts', {})).filter((c) => c.webid === K.webid)).toHaveLength(1);
+    await h.callSkill('pinboard', 'addContact', admit);   // admitted again
+    expect(bookRowsOf(await h.callSkill('pinboard', 'listContacts', {})).filter((c) => c.webid === K.webid)).toHaveLength(1);
   });
 });
 
 describe('the Contacten projection', () => {
   it('maps the row by its webid, with no address to write to — and never a key', async () => {
-    const r = stoopContactToRow(h.row);
+    const r = pinboardContactToRow(h.row);
     expect(r).toMatchObject({ contactId: K.webid, name: K.displayName, peerAddr: null, isBot: false, source: 'contact' });
     expect(await loadBookRows(h.callSkill)).toEqual([r]);
     expect(mergeContacts([], [r])).toEqual([r]);
@@ -88,7 +88,7 @@ describe('the Contacten projection', () => {
 
 describe('the share picker', () => {
   it('leaves it out — there is no key to seal a share to — and resolves no sealing key for it', async () => {
-    const r = stoopContactToRow(h.row);
+    const r = pinboardContactToRow(h.row);
     expect(pickableRecipients([r, h.row])).toEqual([]);
     const sealingKeyFor = recipientSealingKeyResolver({ contacts: () => [r], deriveSealingKey: () => 'derived' });
     expect(await sealingKeyFor(K.webid)).toBeNull();
@@ -139,10 +139,10 @@ describe('the persona lens', () => {
 describe('hide and delete', () => {
   it('deleting hides the row and leaves no circle (there is none); the row stays keyless', async () => {
     expect(await deleteContact({ callSkill: h.callSkill, agent: null, contactWebid: K.webid, pairCircleId: null })).toEqual({ ok: true, left: false });
-    const row = bookRowsOf(await h.callSkill('stoop', 'listContacts', {})).find((c) => c.webid === K.webid);
+    const row = bookRowsOf(await h.callSkill('pinboard', 'listContacts', {})).find((c) => c.webid === K.webid);
     expect(row).toMatchObject({ hidden: true, channel: 'telegram' });
     expect(isKeylessContact(row)).toBe(true);
-    expect(splitShownHidden([stoopContactToRow(row)]).hidden).toHaveLength(1);
+    expect(splitShownHidden([pinboardContactToRow(row)]).hidden).toHaveLength(1);
   });
 });
 
@@ -150,7 +150,7 @@ describe('the persona backfill', () => {
   it('skips it — no pair circle, no fact to write from', async () => {
     const written = [];
     const setPersona = async (...a) => { written.push(a); };
-    for (const rows of [[h.row], [stoopContactToRow(h.row)]]) {
+    for (const rows of [[h.row], [pinboardContactToRow(h.row)]]) {
       const r = await backfillContactPersonas({ rows, selfWebid: h.self, setPersona });
       expect(r).toMatchObject({ written: 0, mismatched: 0 });
     }
@@ -166,7 +166,7 @@ describe('the own-devices carry', () => {
     expect(wire.contacts[0].pubKey).toBeUndefined();
     // …and the sibling's book takes it as the same row
     const sib = await hostWithKeylessRow('sib-webid');
-    const landed = await sib.callSkill('stoop', 'addContact', { ...wire.contacts[0], webid: 'telegram:5' });
+    const landed = await sib.callSkill('pinboard', 'addContact', { ...wire.contacts[0], webid: 'telegram:5' });
     expect(landed.contact).toMatchObject({ channel: 'telegram', role: 'member' });
     expect(isKeylessContact(landed.contact)).toBe(true);
   });

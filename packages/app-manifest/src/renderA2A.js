@@ -7,7 +7,7 @@
  * `PolicyEngine.checkInbound` → the handler). One declaration, one more projection.
  *
  * WHY THIS EXISTS. There was already a way for an agent to invoke another agent's skill, with capability
- * tokens and revocation, and basis already uses it in-process (`chatAgent.invoke(stoopAgent.address, …)`).
+ * tokens and revocation, and basis already uses it in-process (`chatAgent.invoke(pinboardAgent.address, …)`).
  * What was missing is narrow: no manifest op was ever REGISTERED as a kernel skill, so that path could not
  * reach the waist. A second envelope + a second gate got built beside it instead. This closes the gap the
  * way the architecture asks — a projection of the one declaration — so there is one gate for host, peer,

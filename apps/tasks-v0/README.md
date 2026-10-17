@@ -153,13 +153,13 @@ This app composes the following substrate packages
 
 | Package | Used for | Notes |
 |---|---|---|
-| `@onderling/item-store` (L1b) | Open/closed tasks with attribution + audit + per-field merge contracts + DoD lifecycle (`submitted`/`rejected` states); plugs `buildStandardRolePolicy(roles)` into the substrate's role-policy gate. | Phase 5 extended the substrate with the DoD lifecycle (used by Tasks V1; Stoop's lend-flow is the second consumer). |
+| `@onderling/item-store` (L1b) | Open/closed tasks with attribution + audit + per-field merge contracts + DoD lifecycle (`submitted`/`rejected` states); plugs `buildStandardRolePolicy(roles)` into the substrate's role-policy gate. | Phase 5 extended the substrate with the DoD lifecycle (used by Tasks V1; Pinboard's lend-flow is the second consumer). |
 | `@onderling/offering-match` (L1e) | Pubsub-of-skills claim flow when a skill-tagged task is added; composes a real `core.Agent` + `core.protocol.pubSub`. | Optional in V1 (skillMatch parameter to `createTasksAgent`). |
-| `@onderling/identity-resolver` (L1h) | `MemberMap` + `MemberMapCache` (auto-persist roster) + `buildOnboardingSkills` (issueInvite/redeemInvite) + `TAXONOMY` / `normaliseTag` / `matchesProfile` (skill canonicalisation). | Lifted from Stoop 2026-05-08 (rule of two). |
+| `@onderling/identity-resolver` (L1h) | `MemberMap` + `MemberMapCache` (auto-persist roster) + `buildOnboardingSkills` (issueInvite/redeemInvite) + `TAXONOMY` / `normaliseTag` / `matchesProfile` (skill canonicalisation). | Lifted from Pinboard 2026-05-08 (rule of two). |
 | `@onderling/notifier` (L1f) | `Notifier` for scheduled jobs (missed-deadline) + `InMemoryScheduleStore` + `NoopChannel`/`PushChannel` + `UsageMetrics` (Phase 9 counters). | Per-recipient `InAppInboxBridge` channels added at runtime via the shared `channels` map. |
 | `@onderling/agent-ui` (L1d) | `mountLocalUi(bundle.agent)` exposes skills over A2A's standard wire shape on `127.0.0.1`. | Web UI pages are static files in `web/`. |
-| `@onderling/local-store` (NEW) | `CachingDataSource` + `SyncCadence` (offline-first) + `createSettingsModule` (shared/per-device split). | Lifted from Stoop 2026-05-08; `LocalFileSource` is `core.FileSystemSource` reused. |
-| `@onderling/chat-p2p` (NEW) | `wireChat({...})` for the Phase 6 appeal flow (peer-to-peer chat thread between assignee and master). | Lifted from Stoop's `wireChat.js` 2026-05-08. |
+| `@onderling/local-store` (NEW) | `CachingDataSource` + `SyncCadence` (offline-first) + `createSettingsModule` (shared/per-device split). | Lifted from Pinboard 2026-05-08; `LocalFileSource` is `core.FileSystemSource` reused. |
+| `@onderling/chat-p2p` (NEW) | `wireChat({...})` for the Phase 6 appeal flow (peer-to-peer chat thread between assignee and master). | Lifted from Pinboard's `wireChat.js` 2026-05-08. |
 
 App-level glue is `~1100 LOC` of skills + bridges + observability +
 circle envelope, none of which duplicate substrate functionality.
@@ -179,11 +179,11 @@ one circle). When Tasks gains a mobile / multi-circle shell:
   ...})` factory. Skills register on the agent ONCE with a
   `getBundle` resolver picking the circle from `args.circleId` /
   topic.
-- Reference implementation: `apps/stoop-mobile`'s `ServiceContext`
+- Reference implementation: `apps/pinboard-mobile`'s `ServiceContext`
   + `buildGroupState`. Mirror the pattern.
 
 Full propagation plan (file-level deltas Tasks will need):
-`Project Files/Stoop/single-agent-refactor-2026-05-08.md`
+`Project Files/Pinboard/single-agent-refactor-2026-05-08.md`
 § "Tasks-app fix propagation". Project-wide convention:
 [`Project Files/conventions/single-agent.md`](../../docs/conventions/single-agent.md).
 
@@ -277,7 +277,7 @@ npm run ui -- \
 - `Project Files/Tasks App/advice-2026-05-07.md` — design + recommendations.
 - `Project Files/Tasks App/critique-2026-05-07.md` — honest design pushback (some items folded into V1; rest accepted as trade-offs).
 - `Project Files/Tasks App/coding-plan-2026-05-07.md` — phased build plan.
-- `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md` — Stoop-side migration for the lifted substrates.
+- `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md` — Pinboard-side migration for the lifted substrates.
 - [`apps/tasks-v0/CHANGELOG.md`](./CHANGELOG.md) — per-phase shipping log.
 
 ## Local-only mode (V0 + V1)
@@ -317,7 +317,7 @@ V1 (`createCircleAgent`, shipped 2026-05-08):
 - **Local-only mode** is a hard rule — works without a Solid pod connection.
 
 V1.5 (deferred, ~7 dev-days):
-- Push notification channel (`PushChannel` + `PushPolicy` promotion from Stoop).
+- Push notification channel (`PushChannel` + `PushPolicy` promotion from Pinboard).
 - Custom-role management UI (`core.Roles.registerCustomRole` already in core; UI is the missing piece).
 - Chat-bot bridge (Telegram via `chat-agent.TelegramBridge` already in core; ~2-3 days of `bot.*` skill wiring).
 - Calendar import-bridge (Google + Outlook listener; iCloud + CalDAV poll) in `apps/import-bridge-v0`.
@@ -327,7 +327,7 @@ V2+ (demand-driven):
 - Cross-circle dashboard.
 - Real-time collaboration on a deliverable doc (waits for project #1 OSS-doc-tool integration).
 - Compensated-role flag + invoicing primitives.
-- Cryptographic anonymity (waits for Stoop V2's Q-H5 unpark).
+- Cryptographic anonymity (waits for Pinboard V2's Q-H5 unpark).
 - Recurring tasks.
 - Multi-claim / co-assignment.
 
@@ -361,4 +361,4 @@ Plus the substrate-level item-store tests (`packages/item-store/test/ItemStore.d
 - `Project Files/Substrates/apps/H4-tasks.md` — substrate-composition sketch (V1 update).
 - `Project Files/Substrates/L1b-item-store.md` — primary substrate.
 - `Project Files/Substrates/policies.md` — rule-of-two methodology.
-- `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md` — Stoop-side migration log for the lifted substrates.
+- `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md` — Pinboard-side migration log for the lifted substrates.

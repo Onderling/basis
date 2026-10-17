@@ -32,21 +32,21 @@ test('5f.3 — does a role change reach the other device?', async ({ browser }) 
     await openCircleMatching(B.page, /rol.?kring/i);
     const gid = await activeCircle(A.page);
 
-    const before = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const before = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid });
     const bWebid = (before?.members ?? []).find((m) => m.role !== 'admin')?.webid ?? null;
     log('before', 'OBSERVED', `A sees ${JSON.stringify(roles(before))}`);
 
-    const r = await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: bWebid, role: 'admin' });
+    const r = await call(A.page, 'pinboard', 'setMemberRole', { groupId: gid, memberWebid: bWebid, role: 'admin' });
     log('setMemberRole', 'OBSERVED', JSON.stringify(r)?.slice(0, 120));
     await A.page.waitForTimeout(12000);
 
-    const aAfter = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
-    const bAfter = await call(B.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const aAfter = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid });
+    const bAfter = await call(B.page, 'pinboard', 'listGroupMembers', { groupId: gid });
     log('A after', 'OBSERVED', JSON.stringify(roles(aAfter)));
     log('B after', 'OBSERVED', JSON.stringify(roles(bAfter)));
 
     // The real question: can B now DO what an admin does?
-    const bCan = await call(B.page, 'stoop', 'getCurrentMembershipCode', { groupId: gid });
+    const bCan = await call(B.page, 'pinboard', 'getCurrentMembershipCode', { groupId: gid });
     log('promoted peer can act as admin', bCan?.error ? 'FINDING' : 'PASS',
       bCan?.error ? `refused: ${bCan.error} — the promotion did not reach them` : 'yes');
   } finally { await teardown(peers); }
@@ -70,14 +70,14 @@ test('DG1 — is an evicted member told, and can they still type into the circle
 
     // Does A even HOLD a per-circle address for B? The fan's refusal (`blocked-by-setting`) means
     // "no circle address and the global-key fallback is off" — so the question is which half is true.
-    const rosterRows = (await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [];
+    const rosterRows = (await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [];
     log('addresses A holds', 'OBSERVED', JSON.stringify(rosterRows.map((m) => ({
       who: String(m.webid).slice(0, 8), addr: m.circleAddress ? String(m.circleAddress).slice(0, 10) : null,
       proof: typeof m.circleAddressProof === 'string' && !!m.circleAddressProof,
     }))));
 
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-    const bWebid = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+    const bWebid = ((await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [])
       .map((m) => m.webid).find((w) => w !== me);
     // Capture BOTH sides across the eviction. `alsoTo: [evictedSubject]` says the removed member is
     // meant to be told; if they are not, the answer is in one of these two logs.
@@ -85,7 +85,7 @@ test('DG1 — is an evicted member told, and can they still type into the circle
     const grab = (into) => (m) => { const t = m.text(); if (/membership|evict|seal|refus|rotat|key|drop|hold|DIAG/i.test(t)) into.push(t.slice(0, 300)); };
     A.page.on('console', grab(aLog)); B.page.on('console', grab(bLog));
 
-    const ev = await call(A.page, 'stoop', 'removeMember', { groupId: gid, memberWebid: bWebid, reason: 'walk' });
+    const ev = await call(A.page, 'pinboard', 'removeMember', { groupId: gid, memberWebid: bWebid, reason: 'walk' });
     log('removeMember', 'OBSERVED', JSON.stringify(ev)?.slice(0, 140));
     await B.page.waitForTimeout(12000);
 
@@ -96,7 +96,7 @@ test('DG1 — is an evicted member told, and can they still type into the circle
       newLines.length ? JSON.stringify(newLines) : 'nothing new appeared on their screen');
 
     // 2 · does their own app still show them as a member?
-    const bView = await call(B.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const bView = await call(B.page, 'pinboard', 'listGroupMembers', { groupId: gid });
     log('B still sees a roster?', (bView?.members ?? []).length ? 'FINDING' : 'PASS',
       JSON.stringify(roles(bView)));
 
@@ -216,20 +216,20 @@ test('RC1a — the two roster reads must agree about who is in the circle', asyn
     const p = await pair(A, B, { name: 'Eens Kring', re: /eens.?kring/i });
     test.skip(!p.joined, 'pairing failed');
     const gid = await activeCircle(A.page);
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
 
     // THE DIFFERENCE ONLY SHOWS AFTER A SPINE EVENT. On a fresh circle the two agree, because the
     // founder's absence from the narrow read is just CALLER EXCLUSION — which is why comparing them
     // without accounting for it made me report a disagreement that was not there (2026-08-27).
     // `deriveRoster` folds the membership spine; `listCircleRoster` reads redemption rows only. So the
     // question is what each says after a ROLE CHANGE, which exists only on the spine.
-    const bWebid = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+    const bWebid = ((await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [])
       .find((m) => m.role !== 'admin')?.webid ?? null;
-    await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: bWebid, role: 'admin' });
+    await call(A.page, 'pinboard', 'setMemberRole', { groupId: gid, memberWebid: bWebid, role: 'admin' });
     await A.page.waitForTimeout(8000);
 
-    const roster  = await call(A.page, 'stoop', 'listGroupRoster',  { groupId: gid });
-    const members = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const roster  = await call(A.page, 'pinboard', 'listGroupRoster',  { groupId: gid });
+    const members = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid });
 
     // `listGroupRoster` answers the narrow `{addr, role}` question and EXCLUDES the caller — that
     // exclusion is load-bearing (personaPropsUpdate reads "no admin in the list" as "the admin is me").
@@ -268,11 +268,11 @@ test('L51 — a removed member is told, on their own screen', async ({ browser }
     await toChat(B.page);
 
     const before = await readBubbles(B.page);
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-    const bWebid = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+    const bWebid = ((await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [])
       .map((m) => m.webid).find((w) => w !== me);
 
-    await call(A.page, 'stoop', 'removeMember', { groupId: gid, memberWebid: bWebid, reason: 'walk' });
+    await call(A.page, 'pinboard', 'removeMember', { groupId: gid, memberWebid: bWebid, reason: 'walk' });
     await B.page.waitForTimeout(12000);
     await toChat(B.page);
 

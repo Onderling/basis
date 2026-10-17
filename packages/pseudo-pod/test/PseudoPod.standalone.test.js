@@ -106,14 +106,15 @@ describe('PseudoPod.standalone — round-trip', () => {
     expect(rec).toEqual({ uri, bytes: { text: 'paint' }, etag, _v: 1 });
   });
 
-  it('preserves caller-supplied etag', async () => {
+  it('a write\'s etag is an IF-MATCH: compared, never assigned — a stale one is a CONFLICT', async () => {
     const pod = mkPod();
-    const { etag } = await pod.write(
-      'pseudo-pod://laptop-anne/notes/1',
-      'hi',
-      '"caller-v3"',
-    );
-    expect(etag).toBe('"caller-v3"');
+    const uri = 'pseudo-pod://laptop-anne/notes/1';
+    const first = await pod.write(uri, 'hi');
+    const second = await pod.write(uri, 'hi again', first.etag);
+    expect(second.etag, 'a fresh etag every write').not.toBe(first.etag);
+    await expect(pod.write(uri, 'from a stale read', first.etag)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect((await pod.read(uri)).bytes, 'the stale write did not land').toBe('hi again');
+    await expect(pod.write('pseudo-pod://laptop-anne/notes/2', 'x', '"never-read"'), 'an if-match on a missing resource').rejects.toMatchObject({ code: 'CONFLICT' });
   });
 
   it('returns null for missing reads', async () => {
@@ -265,5 +266,26 @@ describe('PseudoPod — mode introspection', () => {
   it('flush is a no-op stub in V0', async () => {
     const pod = mkPod();
     await expect(pod.flush('pseudo-pod://laptop-anne/x')).resolves.toBeUndefined();
+  });
+});
+
+describe('the create race', () => {
+  it('an if-match of null ("I read nothing") lands only while there is still nothing', async () => {
+    const pod = createPseudoPod({ backend: createMemoryBackend(), mode: 'standalone', deviceId: 'laptop-anne' });
+    const uri = 'pseudo-pod://laptop-anne/notes/new';
+    await pod.write(uri, 'first creator', null);
+    await expect(pod.write(uri, 'second creator', null)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect((await pod.read(uri)).bytes).toBe('first creator');
+  });
+});
+
+describe('an options object is not an etag', () => {
+  it('`{ contentType }` writes unconditionally; `{ ifMatch }` is compared', async () => {
+    const pod = createPseudoPod({ backend: createMemoryBackend(), mode: 'standalone', deviceId: 'laptop-anne' });
+    const uri = 'pseudo-pod://laptop-anne/feed.ics';
+    const a = await pod.write(uri, 'v1', { contentType: 'text/calendar' });
+    await pod.write(uri, 'v2', { contentType: 'text/calendar' });
+    await expect(pod.write(uri, 'v3', { ifMatch: a.etag })).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect((await pod.read(uri)).bytes).toBe('v2');
   });
 });

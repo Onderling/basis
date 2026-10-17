@@ -131,6 +131,17 @@ export function createSealingBackend({ backend, getStrategy, onWarn = null } = {
       return backend.put(ref, s.seal(encode(bytes)), ...rest);
     },
 
+    /** The compare-and-swap write — sealed exactly as `put` (forwarding it verbatim would store plain text). */
+    async putIf(ref, bytes, ifMatch) {
+      const s = await strategy();
+      if (!s) throw new Error(`SealingBackend: refusing to store "${ref}" unsealed — no content key yet`);
+      const sealed = s.seal(encode(bytes));
+      if (typeof backend.putIf === 'function') return backend.putIf(ref, sealed, ifMatch);
+      const cur = await backend.get(ref);
+      if ((cur?.etag ?? null) !== ifMatch) return { conflict: true };
+      return backend.put(ref, sealed);
+    },
+
     /**
      * Open on the way out, leaving the rest of the record alone. Four cases:
      *   • a sealed value opens — the ordinary path;

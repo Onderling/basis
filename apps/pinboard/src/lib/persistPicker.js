@@ -21,6 +21,8 @@
  * just validates + lazy-loads.
  */
 
+import { moveRenamedStoreOnce } from './moveRenamedStore.js';
+
 /**
  * @param {object}  args
  * @param {string}  [args.path]                  → FilePersist (Node)
@@ -33,6 +35,13 @@
  *   Returns null when none is set (caller wanted in-memory only).
  */
 export async function pickPersist(args = {}) {
+  const picked = await buildPersist(args);
+  // the store was renamed with the app: a device updated from the build before moves its old store over, once
+  if (picked) await moveRenamedStoreOnce({ args, kind: picked.kind, persist: picked.persist, openLegacy: buildPersist }).catch(() => {});
+  return picked;
+}
+
+async function buildPersist(args = {}) {
   const hasFile  = typeof args.path === 'string' && args.path;
   const hasDb    = typeof args.dbName === 'string' && args.dbName;
   const hasAsync = !!args.asyncStorage;

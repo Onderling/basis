@@ -799,3 +799,11 @@ Each one produced an APK that did not carry the code it was built to test.
   then). Pass `-- --no-watchman` to `detox test`; Jest's node crawler is enough. Also: a screen's LOADING state may carry
   the same testID as the loaded one (`circle-availability`) — wait for a control of the loaded form, not the screen id.
 
+
+## The pinboard app moved directory (2026-10-17) — a copied `node_modules` still has the old layout
+The app formerly under another name now lives at `apps/pinboard` (`@onderling-app/pinboard`). A checkout or worktree
+whose `node_modules` predates the move (e.g. one made with `plans/tools/mk-worktree.sh`, which copies the source tree's
+`node_modules`) has the app's dependencies under the OLD app directory and the `@onderling-app/<old name>` links, so
+the box and the guards fail with `ERR_MODULE_NOT_FOUND` (`tweetnacl` from `apps/pinboard/src/…`, or the package itself).
+Fix by hand, never by reinstalling: move the old app directory's `node_modules` into `apps/pinboard/`, and in each
+`apps/*/node_modules/@onderling-app/` replace the old link with `pinboard -> ../../../pinboard`. CI installs fresh.

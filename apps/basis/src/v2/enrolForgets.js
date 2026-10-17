@@ -20,6 +20,7 @@
  * Every shell hands its own adapter (drop a named store, drop a key, list the keys, list the circle ids); no
  * shell decides WHAT is forgotten, only HOW its storage is reached.
  */
+import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
 
 /**
  * The stores and keys a former self wrote, and the ones that are this device's own.
@@ -168,7 +169,10 @@ export async function forgetThrowawaySelf({ listCircleIds, listKeys, dropStore, 
 
   const perCircle = circleIds.flatMap((id) => THROWAWAY_CONTENT.perCircleStores(id));
   // The per-circle stores go first: they are the ones the registry had to be alive to name.
-  const stores = [...new Set([...perCircle, ...THROWAWAY_CONTENT.stores])];
+  // …and each store's twin under the name it had before the pinboard rename: the one-shot move would otherwise bring
+  // the former self's store back on the first boot after this forget
+  const named = [...perCircle, ...THROWAWAY_CONTENT.stores];
+  const stores = [...new Set([...named, ...named.map((n) => renamedFrom({ dbName: n })?.dbName).filter(Boolean)])];
 
   // Keys are INTERSECTED with what is actually there when the storage can be listed, so the count this returns
   // is what was forgotten rather than what was attempted — a walk reads that number. Stores cannot be listed

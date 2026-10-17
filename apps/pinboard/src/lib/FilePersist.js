@@ -56,20 +56,22 @@ export class FilePersist {
    * @returns {Promise<Map<string, any>>}
    */
   async load() {
-    try {
-      const raw = await readFile(this.#path, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      this.#lastSerialised = raw;
-      return new Map(Object.entries(parsed));
-    } catch (err) {
-      if (err && err.code === 'ENOENT') return new Map();
-      // Corrupt file: surface via `error` event when wired through a
-      // CachingDataSource; standalone callers see no return value
-      // distinction (empty Map).  Apps that want strict mode can read
-      // the file themselves first.
-      return new Map();
-    }
+    try { return await this.loadStrict(); } catch { return new Map(); }   // corrupt / unreadable → empty (silent recovery)
+  }
+
+  /**
+   * Like `load`, but only an ABSENT file is empty: an unreadable or corrupt one throws. For the one-shot store move,
+   * which must never take a store it could not read for an empty one.
+   * @returns {Promise<Map<string, any>>}
+   */
+  async loadStrict() {
+    let raw;
+    try { raw = await readFile(this.#path, 'utf-8'); }
+    catch (err) { if (err && err.code === 'ENOENT') return new Map(); throw err; }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') throw new Error('FilePersist: not a store snapshot');
+    this.#lastSerialised = raw;
+    return new Map(Object.entries(parsed));
   }
 
   /**

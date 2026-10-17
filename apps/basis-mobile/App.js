@@ -485,7 +485,8 @@ export default function App() {
               listKeys: async () => { try { return await AsyncStorage.getAllKeys(); } catch { return []; } },
               dropStore: async (name) => {
                 const all = await AsyncStorage.getAllKeys().catch(() => []);
-                const mine = all.filter((k) => k === name || k.startsWith(`${name}:`) || k.startsWith(`${name}/`));
+                // `…<name>::state` is how a pinboard-style cache keys its one record (prefix + db name), so it is the store too
+                const mine = all.filter((k) => k === name || k.startsWith(`${name}:`) || k.startsWith(`${name}/`) || k.endsWith(`${name}::state`));
                 if (mine.length) await AsyncStorage.multiRemove(mine);
               },
               dropKey: async (key) => { await AsyncStorage.removeItem(key); },

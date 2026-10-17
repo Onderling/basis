@@ -184,7 +184,7 @@ export function createNodeFsBackend({ dir } = {}) {
     /**
      * Compare-and-swap across PROCESSES on this directory (the box runs more than one): compare and write under an
      * exclusive lock file (`open(…, 'wx')`), so two processes cannot both read the same etag and both write. A lock
-     * older than 10 s is a crashed holder's and is taken over.
+     * older than 10 s is a crashed holder's: moved aside atomically, then taken.
      */
     async putIf(key, bytes, ifMatch) {
       await ensureDir();
@@ -195,7 +195,9 @@ export function createNodeFsBackend({ dir } = {}) {
         try { fh = await open(lock, 'wx'); }
         catch (err) {
           if (err?.code !== 'EEXIST') throw err;
-          try { const st = await stat(lock); if (Date.now() - st.mtimeMs > 10_000) await unlink(lock).catch(() => {}); } catch { /* gone already */ }
+          // a crashed holder's lock is moved aside, not unlinked: rename is atomic, so of two contenders that both saw it
+          // stale only one moves it — the other's rename fails, and it never removes the winner's fresh lock
+          try { const st = await stat(lock); if (Date.now() - st.mtimeMs > 10_000) await rename(lock, `${lock}.stale.${process.pid}.${Date.now()}`).catch(() => {}); } catch { /* gone already */ }
           await new Promise((r) => setTimeout(r, 5 + Math.floor(Math.random() * 10)));
         }
       }

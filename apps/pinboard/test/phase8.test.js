@@ -31,7 +31,7 @@ describe('Pinboard V1 — localisation wrapper', () => {
   it('falls back to en for keys missing from nl (configured fallback)', async () => {
     await setLang('nl');
     // Every key in en must be in nl; pick one that we know exists in both.
-    expect(t('common.app_name')).toBe('Pinboard');
+    expect(t('common.app_name')).toBe('Prikbord');   // the Dutch word; the id stays pinboard
   });
 
   it('returns the key itself when the key is missing entirely', async () => {

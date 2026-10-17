@@ -18,8 +18,9 @@ import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { chunkBubble } from '../../../../basis/src/v2/chunkBubble.js';
 import { faceNoticeFor } from '../../../../basis/src/v2/nearbyRoomBinding.js';
-import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyFace, writeNearbyFace, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
-import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor, NEARBY_FACES } from '../../../../basis/src/v2/nearbyIdentity.js';
+import { readNearbyAllows, writeNearbyAllows, firstNearbyMineOpen, readNearbyRadio, writeNearbyRadio, readNearbySelf, writeNearbySelf } from '../../core/nearbyAllowsStore.js';
+import { nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../../../basis/src/v2/nearbyIdentity.js';
+import { NEARBY_LEVELS, nearbyLevelLabelKey } from '../../../../basis/src/v2/nearbyLevel.js';
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -5316,6 +5317,13 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     Promise.resolve(bundle?.nearbyRoom?.announceFace?.()).catch(() => {});
     Promise.resolve(bundle?.nearbyIdentity?.getDrivers?.()).catch(() => {});   // weighed as the new self
   }, [bundle]);
+  // the room self's level, read from ITS disclosure — re-read whenever the self changes
+  const [roomLevel, setRoomLevel] = useState(null);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve(bundle?.nearbyIdentity?.level?.()).then((l) => { if (live && l) setRoomLevel(l); }).catch(() => {});
+    return () => { live = false; };
+  }, [bundle, roomR]);
   // View state, not model state: whether THIS device currently has a text box open says nothing about
   // the room. `answering` holds the ask id being replied to.
   const [composing, setComposing] = useState(false);
@@ -5332,6 +5340,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
     getDrivers:         () => (bundle?.nearbyIdentity ? bundle.nearbyIdentity.getDrivers() : Promise.resolve({})),
     mySkills:           () => bundle?.nearbyIdentity?.mySkills?.() ?? [],
+    roomLevel:          () => (bundle?.nearbyIdentity ? bundle.nearbyIdentity.level() : Promise.resolve('handle')),   // `none` sends no card
     t,
     // Only what this host can actually carry out today. `request-join` needs the ask/invite exchange
     // (Nearby steps F + H) and is deliberately NOT offered until it works.
@@ -5430,9 +5439,13 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       onSubmitCard={submitCard}
       onSay={say}
       onInviteAction={inviteAction}
-      onFaceChange={async (v) => {
+      level={roomLevel}
+      onLevelChange={async (v) => {
+        const w = await bundle?.nearbyIdentity?.setLevel?.(v);
+        if (!w?.ok) { setNotice({ key: 'level_not_set' }); return; }
+        setRoomLevel(v);
         // Same as web: a face that resolves to nothing is announced as a retraction, and the person is
-        // told, because "my handle" with no handle looks exactly like "Nobody" from the inside.
+        // told, because "handle" with no handle looks exactly like "Nobody" from the inside.
         const r = await bundle?.nearbyRoom?.announceFace?.();
         setNotice(faceNoticeFor({ choice: v, result: r }));
       }}
@@ -5463,7 +5476,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, roomView = null, onPickRoomSelf = null, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, onFaceChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
+  answering, answeringAsk = null, onSubmitAnswer, onCancel, onToggleAllow, level = null, onLevelChange, onSetQuiet, onSetRadio, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
@@ -5484,7 +5497,6 @@ function NearbyScreen({
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
   const [bannerOpen, setBannerOpen] = useState(false);
-  const [faceChoice, setFaceChoice] = useState(() => readNearbyFace());
   // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   return (
@@ -5714,15 +5726,15 @@ function NearbyScreen({
         ) : null}
         <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.face_row')}</Text>
         <View style={styles.nearbyActions}>
-          {NEARBY_FACES.map((v) => (
+          {NEARBY_LEVELS.map((v) => (
             <Pressable
               key={v}
               accessibilityRole="button"
-              testID={`nearby-face-${v}`}
+              testID={`nearby-level-${v}`}
               style={styles.nearbyAction}
-              onPress={() => { writeNearbyFace(v); setFaceChoice(v); onFaceChange?.(v); }}
+              onPress={() => onLevelChange?.(v)}
             >
-              <Text style={styles.nearbyActionText}>{(faceChoice === v ? '● ' : '○ ') + t(`circle.nearbyScreen.face_${v}`)}</Text>
+              <Text style={styles.nearbyActionText}>{(level === v ? '● ' : '○ ') + t(nearbyLevelLabelKey(v))}</Text>
             </Pressable>
           ))}
         </View>

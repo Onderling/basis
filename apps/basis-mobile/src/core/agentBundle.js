@@ -60,7 +60,7 @@ import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
-import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
+import { readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -491,7 +491,6 @@ export async function bootAgentBundle(opts = {}) {
   const nearbyRoomSelfRef = { current: () => null };
   // what the room is told about me, and what an ask in it is weighed against (nearbyIdentity.js) — one per bundle
   const nearbyIdentity = createNearbyIdentity({
-    readChoice: readNearbyFace,
     callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
     relayUrl: () => resolveMobileRelayUrl(),
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,

@@ -3418,14 +3418,6 @@
       "text": "Toon hier als",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
     },
-    "face_name": {
-      "text": "Je naam",
-      "doc": "displayName (the default)."
-    },
-    "face_handle": {
-      "text": "Je handle",
-      "doc": "the handle."
-    },
     "face_none": {
       "text": "Niemand",
       "doc": "withhold the label; rows show the key fragment."

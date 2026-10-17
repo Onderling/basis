@@ -17,6 +17,24 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 
 ## `src/MdnsTransport.js`
 
+### `helloProof`
+
+**Kind:** function · **Import:** `helloProof` from `'@onderling/transports/mdns'`
+
+```js
+helloProof(nonce, prover, verifier)
+```
+
+The message one side signs to prove its key in the challenged hello — built here, never taken from the far end.
+
+**Parameters**
+
+- `nonce` `string` — the OTHER side's nonce
+- `prover` `string` — the pubKey doing the proving
+- `verifier` `string` — the pubKey it proves itself to
+
+**Returns:** `string`
+
 ### `SERVICE_TYPE`
 
 **Kind:** constant · **Import:** `SERVICE_TYPE` from `'@onderling/transports/mdns'`

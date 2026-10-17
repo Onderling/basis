@@ -38,6 +38,13 @@ import { b64Encode, b64Decode }       from './utils/base64.js';
  * on an older build is never keyed (both sides must ship this together).
  */
 const HELLO_DOMAIN = 'onderling-mdns-hello-v1';
+/**
+ * The message one side signs to prove its key in the challenged hello — built here, never taken from the far end.
+ * @param {string} nonce     the OTHER side's nonce
+ * @param {string} prover    the pubKey doing the proving
+ * @param {string} verifier  the pubKey it proves itself to
+ * @returns {string}
+ */
 export const helloProof = (nonce, prover, verifier) => `${HELLO_DOMAIN}|${nonce}|${prover}|${verifier}`;
 const HANDSHAKE_MS = 10_000;
 function freshNonce() {

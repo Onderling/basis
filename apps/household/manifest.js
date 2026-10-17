@@ -69,7 +69,8 @@ export const householdManifest = {
     'receive-personas': 'write',   // the picked personas' keys, into this install's sealed slots
     'pause-persona':    'write',   // a device entry: which held personas do not run here
     'resume-persona':   'write',
-    'remove-persona':   'write',   // this device's delegation under one persona, tombstoned; its keys here wiped
+    'remove-persona':   'write',
+    'set-nearby-level': 'write',   // a self's Nearby level, on its disclosure   // this device's delegation under one persona, tombstoned; its keys here wiped
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
@@ -484,6 +485,18 @@ export const householdManifest = {
       params: [
         { name: 'mnemonic',  kind: 'secret', required: true },
         { name: 'personaId', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'setNearbyLevel', group: 'device',
+      verb: 'set-nearby-level',
+      writes: { scope: 'person' },   // a self's disclosure under the reserved context `nearby` — travels with the persona
+      // WHAT THE NEARBY ROOM SEES OF A SELF: none · handle (the floor) · profile · full. The one writer of the `nearby`
+      // context (the general disclosure op refuses it). Reached from Nearby → "Jij hier"; no chat/slash surface.
+      params: [
+        { name: 'personaId', kind: 'string' },
+        { name: 'level',     kind: 'string', required: true },
       ],
       surfaces: {},
     },

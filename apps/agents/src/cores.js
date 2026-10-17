@@ -666,6 +666,9 @@ export async function getProfileProperties(store, args = {}) {
  * key + optional coarseness rung, persisted on the profile. The general (per-persona) version of the feedback
  * charter consent. Through the `profiles` collaborator (dependency-free cores). Degrades (ok:false) if unwired.
  */
+/** Disclosure contexts with one writer of their own (`nearby`: the room level — basis's `setNearbyLevel`). */
+export const RESERVED_CONTEXTS = Object.freeze(new Set(['nearby']));
+
 export async function setProfileDisclosure(store, args = {}) {
   const s = asStore(store);
   const id = typeof args?.id === 'string' ? args.id.trim() : '';
@@ -674,6 +677,8 @@ export async function setProfileDisclosure(store, args = {}) {
   if (typeof s.profiles?.setDisclosure !== 'function' || !id || !contextId || !key) {
     return { ok: false, reason: !id ? 'id-required' : (!contextId ? 'contextId-required' : (!key ? 'key-required' : 'profiles-unavailable')) };
   }
+  // a context with ONE writer of its own is refused here: the Nearby room's level is set only by its own op
+  if (RESERVED_CONTEXTS.has(contextId)) return { ok: false, reason: 'reserved-context' };
   // Three independent axes: disclosed(enabled)+rung · matchable · requestable.
   // Only forward an axis the caller actually passed, so a call touching one axis
   // doesn't clobber the others (the pure setDisclosure merges per-axis).

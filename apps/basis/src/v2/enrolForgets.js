@@ -127,7 +127,6 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc.relayUrl',
     'cc.userLlmDefault',
     'basis.theme',
-    'basis.nearbyFace',         // how the device PRESENTS itself, unlike the two `nearby` marks above
     'circle.app.lang',
     'cc.welcomed',              // the welcome screen is about the app, not about who is using it
   ]),

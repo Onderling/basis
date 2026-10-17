@@ -750,7 +750,7 @@ import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
-import { createNearbyIdentity, nearbyFaceChoice, NEARBY_FACES, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
+import { createNearbyIdentity, nearbyRoomSelf, nearbyRoomSelfView, roomSelfFor } from '../../src/v2/nearbyIdentity.js';
 import { createNearbyRoomBinding, faceNoticeFor } from '../../src/v2/nearbyRoomBinding.js';
 import { nearbyThreadDescriptor } from '../../src/v2/nearbyAsks.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
@@ -1601,7 +1601,6 @@ let   _nearbyIdentity      = null;   // what the room is told about me, and what
 function ensureNearbyRoom(agent = _peerAgent) {
   if (_nearbyRoom || !agent || typeof agent.sendPeerMessage !== 'function') return _nearbyRoom;
   _nearbyIdentity = createNearbyIdentity({
-    readChoice: readNearbyFace,
     callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
     relayUrl: () => (typeof CIRCLE_RELAY_URL === 'string' && CIRCLE_RELAY_URL ? CIRCLE_RELAY_URL : null),
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
@@ -3896,6 +3895,7 @@ function showNearby() {
     // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
     getDrivers: () => (_nearbyIdentity ? _nearbyIdentity.getDrivers() : Promise.resolve({})),
     mySkills:   () => _nearbyIdentity?.mySkills() ?? [],
+    roomLevel:  () => (_nearbyIdentity ? _nearbyIdentity.level() : Promise.resolve('handle')),   // `none` sends no card
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
@@ -3911,6 +3911,8 @@ function showNearby() {
   let composing = false;
   let notice = null;
   let lastAsk = null;
+  let roomLevel = null;   // the room self's level, read from its disclosure (re-read when the self changes)
+  const readRoomLevel = () => _nearbyIdentity?.level?.().then((l) => { roomLevel = l; draw(nearbyScreen.model()); }).catch(() => {});
   _unsubscribeNearbyHeard = _nearbyRoom?.subscribeToHeard?.(({ msgId, heard }) => {
     if (lastAsk && msgId === lastAsk.id && nearbyScreen) { notice = { key: 'ask_heard', vars: { heard, peers: lastAsk.peers } }; draw(nearbyScreen.model()); }
   }) ?? null;
@@ -3923,6 +3925,7 @@ function showNearby() {
       onPick: (id) => {
         writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model());
         _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});   // weighed as the new self
+        readRoomLevel();   // …and seen at ITS level
       },
     },
     onBack: () => { closeNearby(); showLauncher(); },
@@ -3940,10 +3943,12 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
-    face: readNearbyFace(),
-    onFaceChange: async (v) => {
-      writeNearbyFace(v);
-      // "My handle" with no handle set announces nothing and looks identical to "Nobody". The binding
+    level: roomLevel,
+    onLevelChange: async (v) => {
+      const w = await _nearbyIdentity?.setLevel?.(v);
+      if (!w?.ok) { notice = { key: 'level_not_set' }; draw(nearbyScreen.model()); return; }
+      roomLevel = v;
+      // "Handle" with no handle set announces nothing and looks identical to "Nobody". The binding
       // reports the label it actually sent, so say so rather than leaving the person to guess.
       const r = await ensureNearbyRoom()?.announceFace?.();
       notice = faceNoticeFor({ choice: v, result: r });
@@ -3994,6 +3999,7 @@ function showNearby() {
   nearbyScreen.open();
   // the room self's offerings, read once on open, so the shared-skills line has them before any ask arrives
   _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});
+  readRoomLevel();
   draw(nearbyScreen.model());
 }
 
@@ -4035,8 +4041,6 @@ function nearbyRoomSelfNow() {
   const view = nearbyRoomSelfView(r, _selfSet.held);
   return { r, view, self: roomSelfFor(r, _selfSet.held) };
 }
-function readNearbyFace() { try { return nearbyFaceChoice(localStorage.getItem('basis.nearbyFace')); } catch { return 'name'; } }
-function writeNearbyFace(v) { try { if (NEARBY_FACES.includes(v)) localStorage.setItem('basis.nearbyFace', v); } catch { /* best-effort */ } }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
 function readNearbyAllows() { try { const raw = localStorage.getItem('basis.nearbyAllows'); return raw ? JSON.parse(raw) : null; } catch { return null; } }
 function writeNearbyAllows(next) {

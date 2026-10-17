@@ -3434,6 +3434,10 @@
       "text": "Dat heb je nog niet ingesteld, dus niemand in de buurt ziet een naam — je sleutelfragment staat er.",
       "doc": "Nearby face picker: the chosen face (name or handle) resolves to nothing, so a retraction was announced."
     },
+    "level_not_set": {
+      "text": "Dat is niet veranderd — probeer het opnieuw.",
+      "doc": "Nearby: setting the room self's level (what the room sees of it) was refused or failed; nothing changed."
+    },
     "face_caveat": {
       "text": "Een vast gezicht maakt je herkenbaar op verschillende plekken, ook al wisselt je adres.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."

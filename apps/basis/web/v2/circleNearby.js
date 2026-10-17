@@ -43,6 +43,7 @@ export function renderCircleNearby(container, {
   onSubmitAsk = null,
   notice = null,
   level = null,          // the room self's Nearby level (null while it is being read)
+  firstUse = null,       // { onChoose(level), onLater() } — the once-per-self-per-device question, or null
   onLevelChange = null,
   onToggleAllow = null,
   onSubmitCard = null,
@@ -65,6 +66,36 @@ export function renderCircleNearby(container, {
   head.className = 'circle-nearby__title';
   head.textContent = tr('circle.nearbyScreen.title');
   container.appendChild(head);
+
+  // The first-use question, before anything else: what may this room see of the self entering it.
+  if (firstUse && typeof firstUse.onChoose === 'function') {
+    const fu = document.createElement('div');
+    fu.className = 'circle-nearby__first-use';
+    fu.setAttribute('role', 'group');
+    const fuTitle = document.createElement('div');
+    fuTitle.className = 'circle-nearby__first-use-title';
+    fuTitle.textContent = tr('circle.nearbyScreen.first_use_title');
+    fu.appendChild(fuTitle);
+    const fuBody = document.createElement('div');
+    fuBody.className = 'circle-nearby__first-use-body';
+    fuBody.textContent = tr('circle.nearbyScreen.first_use_body');
+    fu.appendChild(fuBody);
+    for (const v of NEARBY_LEVELS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `circle-nearby__first-use-option circle-nearby__first-use-option--${v}`;
+      b.textContent = tr(nearbyLevelLabelKey(v));
+      b.addEventListener('click', () => firstUse.onChoose(v));
+      fu.appendChild(b);
+    }
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'circle-nearby__first-use-later';
+    later.textContent = tr('circle.nearbyScreen.first_use_later');
+    later.addEventListener('click', () => firstUse.onLater?.());
+    fu.appendChild(later);
+    container.appendChild(fu);
+  }
 
   const safeModel = model && typeof model === 'object' ? model : { rows: [], counts: { total: 0, sharingAny: 0 }, ownProfile: {}, headerLabel: '' };
   const {

@@ -3418,6 +3418,18 @@
       "text": "Dat is een naam die je laat zien, geen apart adres: wie hier meekijkt, kan zien dat het van hetzelfde apparaat komt.",
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
+    "first_use_title": {
+      "text": "Wat mag deze ruimte van je zien?",
+      "doc": "Nearby first-use question (once per self per device): the room self's level."
+    },
+    "first_use_body": {
+      "text": "Je kiest dit per persona; het reist mee naar je andere apparaten. Je kunt het later wijzigen bij \"Toon hier als\".",
+      "doc": "Under the first-use question: the level is the persona's and syncs; where to change it later."
+    },
+    "first_use_later": {
+      "text": "Later (tot dan je handle)",
+      "doc": "Dismiss the first-use question; the self stays on the floor default (its handle) and is not asked again on this device."
+    },
     "face_row": {
       "text": "Toon hier als",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."

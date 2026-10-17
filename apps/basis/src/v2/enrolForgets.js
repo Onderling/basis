@@ -107,6 +107,8 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc.circleRecipePending.',
     'cc.screenBlocksCache.',
     'cc.circleOverride.',
+    'basis.nearby-asked:',      // the Nearby first-use question, asked per self on this device — the former selves'
+    'cc.nearby-asked:',
   ]),
 
   /**

@@ -7,6 +7,7 @@
  * sees the choice. Never fanned, never shared — it decides what THIS device shows and joins.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { nearbyAskedKey } from '../../../basis/src/v2/nearbyLevel.js';
 
 const KEY = 'cc.nearbyAllows';
 let cached = null;
@@ -65,4 +66,12 @@ export function writeNearbySelf(id) {
   if (typeof id !== 'string' || !id) return;
   roomSelf = id;
   AsyncStorage.setItem(SELF_KEY, id).catch(() => {});
+}
+
+/** The Nearby first-use question's device mark, per self (`nearbyAskedKey`): was this self asked on this device? */
+export async function readNearbyAsked(selfId) {
+  try { return (await AsyncStorage.getItem(`cc.${nearbyAskedKey(selfId)}`)) === '1'; } catch { return true; }
+}
+export function markNearbyAsked(selfId) {
+  AsyncStorage.setItem(`cc.${nearbyAskedKey(selfId)}`, '1').catch(() => {});
 }

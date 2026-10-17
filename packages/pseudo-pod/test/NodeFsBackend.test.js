@@ -147,3 +147,15 @@ describe('NodeFsBackend — OQ-2 acceptance: cache-mode queue survives restart',
     expect(await pp2.writeThroughPendingCount()).toBe(0);
   });
 });
+
+describe('NodeFsBackend — compare-and-swap across processes on one directory', () => {
+  it('two backends over one dir, eight writers from the same read: exactly one wins, no lock left behind', async () => {
+    const a = createNodeFsBackend({ dir });
+    const b = createNodeFsBackend({ dir });
+    const { etag: base } = await a.put('reg', { n: 0 });
+    const results = await Promise.all(Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).putIf('reg', { n: i + 1 }, base)));
+    expect(results.filter((r) => !r?.conflict)).toHaveLength(1);
+    const { readdir } = await import('node:fs/promises');
+    expect((await readdir(dir)).filter((f) => f.endsWith('.lock'))).toEqual([]);
+  });
+});

@@ -44,7 +44,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readFile, writeFile, rename, unlink, mkdir, readdir } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, mkdir, readdir, open, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const U8_TAG = '__pp_u8__';
@@ -112,7 +112,7 @@ export function createNodeFsBackend({ dir } = {}) {
 
   let etagCounter = 0;
   const nextEtag = () =>
-    `"fs-${Date.now().toString(36)}-${(++etagCounter).toString(36)}"`;
+    `"fs-${Date.now().toString(36)}-${(++etagCounter).toString(36)}-${Math.random().toString(36).slice(2, 8)}"`;   // random: two processes mint in one ms
 
   let dirReady = false;
   async function ensureDir() {
@@ -179,6 +179,41 @@ export function createNodeFsBackend({ dir } = {}) {
 
       _fanOut({ op: 'put', key, etag: finalEtag, _v: finalV });
       return { etag: finalEtag, _v: finalV };
+    },
+
+    /**
+     * Compare-and-swap across PROCESSES on this directory (the box runs more than one): compare and write under an
+     * exclusive lock file (`open(…, 'wx')`), so two processes cannot both read the same etag and both write. A lock
+     * older than 10 s is a crashed holder's and is taken over.
+     */
+    async putIf(key, bytes, ifMatch) {
+      await ensureDir();
+      const target = fileFor(dir, key);
+      const lock = `${target}.lock`;
+      let fh = null;
+      for (let i = 0; i < 200 && !fh; i++) {
+        try { fh = await open(lock, 'wx'); }
+        catch (err) {
+          if (err?.code !== 'EEXIST') throw err;
+          try { const st = await stat(lock); if (Date.now() - st.mtimeMs > 10_000) await unlink(lock).catch(() => {}); } catch { /* gone already */ }
+          await new Promise((r) => setTimeout(r, 5 + Math.floor(Math.random() * 10)));
+        }
+      }
+      if (!fh) throw Object.assign(new Error(`NodeFsBackend: could not lock "${key}"`), { code: 'LOCKED' });
+      try {
+        const prev = await _readRecord(key);
+        if ((prev?.etag ?? null) !== ifMatch) return { conflict: true };
+        const finalEtag = nextEtag();
+        const finalV = (prev && typeof prev.v === 'number' ? prev.v : 0) + 1;
+        const tmp = `${target}.${process.pid}.${(++etagCounter).toString(36)}.tmp`;
+        await writeFile(tmp, JSON.stringify({ key, etag: finalEtag, v: finalV, val: encodeValue(bytes) }), 'utf-8');
+        await rename(tmp, target);
+        _fanOut({ op: 'put', key, etag: finalEtag, _v: finalV });
+        return { etag: finalEtag, _v: finalV };
+      } finally {
+        await fh.close().catch(() => {});
+        await unlink(lock).catch(() => {});
+      }
     },
 
     async delete(key) {

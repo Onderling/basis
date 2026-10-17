@@ -34,3 +34,14 @@ describe('concurrent registry writes on one device', () => {
     for (const id of ['default', 'p-werk', 'p-buurt']) expect(await a.lookup(id), id).toBeTruthy();
   });
 });
+
+describe('two PROCESSES on one backend (two tabs on one IndexedDB)', () => {
+  it('two pseudo-pods over the same backend, a register each at once: both entries survive', async () => {
+    const mem = createMemoryBackend();
+    const backend = { ...mem, put: async (...a) => { await new Promise((r) => setTimeout(r, 5)); return mem.put(...a); } };
+    const tabA = createAgentRegistry({ pseudoPod: createPseudoPod({ backend, mode: 'standalone', deviceId: 'laptop-anne' }), deviceId: 'laptop-anne' });
+    const tabB = createAgentRegistry({ pseudoPod: createPseudoPod({ backend, mode: 'standalone', deviceId: 'laptop-anne' }), deviceId: 'laptop-anne' });
+    await Promise.all([tabA.register(entry('default')), tabB.register(entry('p-werk'))]);
+    for (const id of ['default', 'p-werk']) expect(await tabA.lookup(id), id).toBeTruthy();
+  });
+});

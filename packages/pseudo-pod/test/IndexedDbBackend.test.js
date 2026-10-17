@@ -145,3 +145,21 @@ describe('IndexedDbBackend — persistence across reload (restart-survival)', ()
     expect([...new Float32Array(rec.bytes.buffer)]).toEqual([...vec]);
   });
 });
+
+describe('IndexedDbBackend — compare-and-swap across tabs', () => {
+  it('two backends on ONE database (two tabs), both writing from the same read: exactly one wins', async () => {
+    const tabA = createIndexedDbBackend({ dbName });
+    const tabB = createIndexedDbBackend({ dbName });
+    const { etag: base } = await tabA.put('reg', { agents: [] });
+    const [a, b] = await Promise.all([tabA.putIf('reg', { agents: ['A'] }, base), tabB.putIf('reg', { agents: ['B'] }, base)]);
+    const wins = [a, b].filter((r) => !r?.conflict);
+    expect(wins, JSON.stringify([a, b])).toHaveLength(1);
+    expect((await tabA.get('reg')).etag, 'the winner minted a fresh etag').toBe(wins[0].etag);
+    expect(wins[0].etag).not.toBe(base);
+  });
+  it('null if-match = only while absent', async () => {
+    const b = createIndexedDbBackend({ dbName });
+    expect(await b.putIf('k', 1, null)).toMatchObject({ _v: 1 });
+    expect(await b.putIf('k', 2, null)).toEqual({ conflict: true });
+  });
+});

@@ -34,6 +34,11 @@ describe('who added a list entry', () => {
     const words = await ops.addToList({ list: 'Boodschappen', text: 'kaas', actor: 'person:forged', person: 'person:forged' });
     const store = stores.getStore('c1');
     expect((await store.get(theirs.itemId)).createdBy).toBe('person:ann');
+    // who ticked it: the same person, the same way
+    expect((await ops.markListItemDone({ list: 'Boodschappen', item: 'melk' }, { person: 'person:bert' })).ok).toBe(true);
+    expect((await ops.markListItemDone({ list: 'Boodschappen', item: 'brood', person: 'person:forged' })).ok).toBe(true);
+    expect((await store.get(theirs.itemId)).completedBy).toBe('person:bert');
+    expect((await store.get(own.itemId)).completedBy, 'the args set nobody').toBe('me');
     expect((await store.get(own.itemId)).createdBy).toBe('me');
     expect((await store.get(words.itemId)).createdBy, 'the args set nobody').toBe('me');
   });
@@ -81,9 +86,18 @@ describe('who added a list entry', () => {
       await own('lists', 'addToList', { list: 'Boodschappen', text: 'brood' });
       // and Ann's line on the shopping list: none of Bert's reads says who added it
       expect((await as(ANN)('lists', 'addToList', { list: 'Boodschappen', text: 'melk' })).ok).toBe(true);
+      // Ann ticks a line: the history says it was her — to her "you", to Bert a name or "someone" — and only there
+      expect((await as(ANN)('lists', 'addToList', { list: 'Boodschappen', text: 'kaas' })).ok).toBe(true);
+      expect((await as(ANN)('lists', 'markListItemDone', { list: 'Boodschappen', item: 'kaas' })).ok).toBe(true);
+      const hers = ((await as(ANN)('lists', 'listDone', { days: 1 })).items ?? []).find((i) => i.label === 'kaas');
+      expect(hers?.by, 'the ticker reads her own tick as "you"').toEqual({ you: true });
+      const seen = ((await as(BERT)('lists', 'listDone', { days: 1 })).items ?? []).find((i) => i.label === 'kaas');
+      expect(seen?.by?.you).toBeUndefined();
+      expect(seen?.by?.name ?? (seen?.by?.someone ? 'someone' : null), 'a name or someone').toBeTruthy();
       for (const [op, args] of [['listEntries', { list: 'Boodschappen' }], ['listEntries', { list: 'Klusjes' }], ['listLists', {}], ['shopVisit', { shop: 'Boodschappen' }], ['listDone', { days: 7 }]]) {
         const read = await as(BERT)('lists', op, args);
-        expect(JSON.stringify(read), `${op} names no maker`).not.toContain(ANN);
+        expect(JSON.stringify(read), `${op} names no maker or ticker`).not.toContain(ANN);
+        expect(JSON.stringify(read), `${op} carries no raw person field`).not.toMatch(/"(createdBy|completedBy|doneBy)"/);
       }
     }, 60_000);
   });

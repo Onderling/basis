@@ -220,7 +220,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // A chore is ticked by the chore's own verb (its rules, its state, its reply) — one entry point, the noun's verb
       // underneath — as the person asking.
       if (at.entry.type === 'task' && typeof completeChore === 'function') return completeChore({ circleId: at.circleId, entry: at.entry, ctx });
-      await svc.markDone(at.circleId, at.entry.id, localActor);
+      // who ticked it: the door's person, as who added it (the history read says it, through the door's ceiling only)
+      await svc.markDone(at.circleId, at.entry.id, personOf(ctx));
       // the reply names what was ticked — the entry found, not the words it was asked by
       return { ok: true, entry: at.entry.text ?? '', list: at.target?.text ?? null, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },

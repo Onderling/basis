@@ -105,7 +105,7 @@ test('step 0: link, claim the companion, give the bot the agenda files, the link
     // Expect: the bot says you are linked; in the app the bot is now a contact
     expect(said().join('\n'), 'the bot says you are linked').toMatch(/[Gg]ekoppeld/);
     await expect(sheet.locator('[data-identity-link="linked"]')).toBeVisible({ timeout: 60_000 });
-    const contact = await until(async () => ((await page.evaluate(() => window.onderlingCall('stoop', 'listContacts', {})))?.contacts ?? [])
+    const contact = await until(async () => ((await page.evaluate(() => window.onderlingCall('pinboard', 'listContacts', {})))?.contacts ?? [])
       .find((c) => c.webid === boxAddress && c.linkedRow) ?? null, { timeout: 60_000, step: 500 });
     expect(contact, 'the bot is a contact in the app').toMatchObject({ webid: boxAddress, linkedRow: `telegram:${ADMIN}` });
 

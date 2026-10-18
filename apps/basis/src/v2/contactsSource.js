@@ -51,15 +51,15 @@ export function bookRowsOf(reply) {
 }
 
 /**
- * One roster row from a stoop ContactBook entry (S1 #2 — member directory).
- * Stoop's `listContacts` returns MemberMap entries (`relation:'contact'`) with a
+ * One roster row from a pinboard ContactBook entry (S1 #2 — member directory).
+ * Pinboard's `listContacts` returns MemberMap entries (`relation:'contact'`) with a
  * webid + pubKey + displayName/handle + trustLevel + tags. These are PEOPLE the
  * user added; they merge into the same Contacten roster as the PeerGraph bots.
  *
- * @param {object} c  a stoop ContactBook member entry
+ * @param {object} c  a pinboard ContactBook member entry
  * @returns {object|null}
  */
-export function stoopContactToRow(c) {
+export function pinboardContactToRow(c) {
   if (!c) return null;
   const contactId = c.webid ?? c.pubKey;
   if (!contactId) return null;
@@ -111,17 +111,17 @@ function sortContactRows(rows) {
 }
 
 /**
- * Merge the PeerGraph roster (bots + discovered peers) with the stoop ContactBook
+ * Merge the PeerGraph roster (bots + discovered peers) with the pinboard ContactBook
  * (added people), de-duped by `contactId` (the PeerGraph entry wins so a bot's
  * skills survive). One unified Contacten roster — the S1 #2 reconciliation.
  *
  * @param {Array<object>} peerRows   from `listContacts(peerGraph)`
- * @param {Array<object>} stoopRows  from stoop `listContacts` → `stoopContactToRow`
+ * @param {Array<object>} pinboardRows  from pinboard `listContacts` → `pinboardContactToRow`
  * @returns {Array<object>}
  */
-export function mergeContacts(peerRows = [], stoopRows = []) {
+export function mergeContacts(peerRows = [], pinboardRows = []) {
   const byId = new Map();
-  for (const r of stoopRows) if (r?.contactId) byId.set(r.contactId, r);
+  for (const r of pinboardRows) if (r?.contactId) byId.set(r.contactId, r);
   for (const r of peerRows) {
     if (!r?.contactId) continue;
     // peer wins — but what only the contact book knows (the trust level, the pair roster) rides along, and so
@@ -229,8 +229,8 @@ export async function nameContactsFromRosters(rows = [], { rosterRow = null } = 
 export async function loadBookRows(callSkill) {
   if (typeof callSkill !== 'function') return [];
   try {
-    const res = await callSkill('stoop', 'listContacts', {});
-    return (Array.isArray(res?.contacts) ? res.contacts : []).map(stoopContactToRow).filter(Boolean);
+    const res = await callSkill('pinboard', 'listContacts', {});
+    return (Array.isArray(res?.contacts) ? res.contacts : []).map(pinboardContactToRow).filter(Boolean);
   } catch { return []; }
 }
 
@@ -257,7 +257,7 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
   if (typeof callSkill !== 'function') return withNameMarkers(merged, names);
   const rosters = new Map();   // circleId → the members read (one read per roster per call)
   const rosterRow = async (circleId, webid) => {
-    if (!rosters.has(circleId)) rosters.set(circleId, callSkill('stoop', 'listGroupMembers', { groupId: circleId }).then((r) => (Array.isArray(r?.members) ? r.members : [])).catch(() => []));
+    if (!rosters.has(circleId)) rosters.set(circleId, callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).then((r) => (Array.isArray(r?.members) ? r.members : [])).catch(() => []));
     return (await rosters.get(circleId)).find((m) => m?.webid === webid) ?? null;
   };
   return withNameMarkers(await nameContactsFromRosters(merged, { rosterRow }), names);

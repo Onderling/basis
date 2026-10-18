@@ -17,6 +17,8 @@
 //   {kind:'clarify',    opId, args, param, query, candidates}  a param matched MULTIPLE items → ask which
 //   {kind:'unresolved', opId, args, param, query}              a REQUIRED id-param matched nothing → ask for it
 
+import { bindMatchArg } from '../router.js';
+
 /**
  * @param {{opId:string, args:object}} command
  * @param {{catalogue:object, lookup:(listOp:string, query:string, scope:object)=>(any[]|Promise<any[]>), scope?:object}} deps
@@ -33,11 +35,13 @@ export async function clarifyCommandTargets({ opId, args, appOrigin }, { catalog
   const op = entry && entry.op ? entry.op : entry;
   // The op's owning app — passed to `lookup` so the picker's `listOp` resolves on the SAME app as the
   // op, not by probe-first-origin. Without it a shared op name (e.g. `listOpen`, declared by both
-  // stoop and tasks-v0) resolves to the wrong app — "done <task>" searched stoop's circle feed and
+  // pinboard and tasks-v0) resolves to the wrong app — "done <task>" searched pinboard's circle feed and
   // never found the task (device-verify 2026-06-11). Lookups ignoring the 4th arg keep prior behaviour.
   const entryOrigin = entry && entry.appOrigin ? entry.appOrigin : null;
   const params = (op && Array.isArray(op.params)) ? op.params : [];
-  const resolved = { ...(args || {}) };
+  // a typed slash body arrives as the parser's `_match`: bind it the way the router will (its first target param), so a
+  // name typed after the command is resolved here, as a label, instead of reaching the op as a raw string later
+  const resolved = op ? bindMatchArg({ ...(args || {}) }, op) : { ...(args || {}) };
 
   for (const p of params) {
     const listOp = p && p.pickerSource && p.pickerSource.listOp;

@@ -13,7 +13,7 @@
  * against `apps/<app>/manifest.js`, failing CI on drift.
  *
  * DESIGN: only rules that are TRUE of every already-conformant app manifest
- * (tasks-v0 · stoop · household · calendar · folio · basis) are encoded
+ * (tasks-v0 · pinboard · household · calendar · folio · basis) are encoded
  * here — so the check is GREEN on master and RED on a real regression. Rules
  * the codebase does NOT hold to universally (registry-canonical `itemTypes`
  * under `strictNouns`, the `strict` skillId cross-check) are deliberately

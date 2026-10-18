@@ -14,12 +14,12 @@ This is **L1h** in the substrate-first plan
 - **`MemberMap`** — H2/H4/H5 use this.  Maps webid ↔ external-id
   (`telegramUid`, `email`, ...) ↔ display name ↔ role.  Single household
   / single closed group.
-- **`Reveals` + `resolve()`** — Stoop / social-shaped apps.  Layer
+- **`Reveals` + `resolve()`** — Pinboard / social-shaped apps.  Layer
   *on top of* `MemberMap`: per-group + per-peer "show real name"
   state, plus a pure resolution function that returns the right
   rendered name for a (viewer, target, group?) tuple.  Powers
   Telegram-style "handle by default, displayName after a reveal
-  handshake".  See `Project Files/Stoop/advice-2026-05-05.md` §
+  handshake".  See `Project Files/Pinboard/advice-2026-05-05.md` §
   "Handle / nickname design" for the design.
 - **`PersonGraph`** — H7 uses this.  Aggregates identifiers across
   sources (Gmail, WhatsApp, iCloud, ...).  Auto-link on identifier
@@ -33,7 +33,7 @@ import { MemberMap } from '@onderling/identity-resolver';
 const map = new MemberMap();
 await map.addMember({
   webid:       'https://id.inrupt.com/anne',
-  handle:      'oosterpoort-bird-23',  // Stoop-shape: lowercase primary UI id
+  handle:      'oosterpoort-bird-23',  // Pinboard-shape: lowercase primary UI id
   displayName: 'Anne',                 // shown after reveal (see Reveals)
   avatarUrl:   'https://anne.example/avatar.jpg',
   externalIds: { telegramUid: '12345', email: 'anne@example.com' },
@@ -53,7 +53,7 @@ map.on('member-removed', ({webid}) => ...);
 **`handle` and `avatarUrl` are optional.**  Legacy consumers (H2/H4)
 that don't use them can omit them; absent fields normalise to `null`.
 
-> **Inbound substrate candidate (2026-05-06):** `apps/stoop` has a
+> **Inbound substrate candidate (2026-05-06):** `apps/pinboard` has a
 > small `hydrateItem` / `hydrateItems` helper that maps items'
 > `addedBy` / `completedBy` / `assignee` WebIDs through `resolve()`
 > into a `display` block.  When a second app needs the same shape,
@@ -63,7 +63,7 @@ that don't use them can omit them; absent fields normalise to `null`.
 
 ## Reveals + resolve() quick start
 
-For Stoop-shape apps where the UI shows `@<handle>` by default and
+For Pinboard-shape apps where the UI shows `@<handle>` by default and
 only surfaces `displayName` after a per-group or per-peer reveal:
 
 ```js

@@ -3,7 +3,7 @@
  *
  * Substrate-level promotion of the byte-near-identical wrappers
  * formerly at `apps/folio/src/auth/OidcSession.js` and
- * `apps/stoop/src/lib/OidcSession.js`. Phase 52.15.2 (2026-05-14).
+ * `apps/pinboard/src/lib/OidcSession.js`. Phase 52.15.2 (2026-05-14).
  *
  * Wraps `@inrupt/solid-client-authn-node`'s `Session` for the standard
  * Solid OIDC browser-redirect flow:

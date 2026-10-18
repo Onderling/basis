@@ -24,7 +24,7 @@ import { EventLog } from '../src/eventLog.js';
 const GROUP = 'circle-revoke-test';
 
 const rowFor = async (node, webid) => {
-  const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+  const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
   return (res?.members ?? []).find((m) => m.webid === webid) ?? null;
 };
 
@@ -46,7 +46,7 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     const bRef = {};
     const productionBinding = rosterBindingVerifier((app, op, args) => bRef.node.agent.callSkill(app, op, args));
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { agentOpts: { ...logOpts().agentOpts, stoopControlAgent: controlSpy } }),
+      bootRealAgentNode('A', { agentOpts: { ...logOpts().agentOpts, pinboardControlAgent: controlSpy } }),
       bootRealAgentNode('B', { agentOpts: logOpts().agentOpts, verifyChatBinding: productionBinding }),
     ]);
     bRef.node = B;
@@ -89,7 +89,7 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     for (const ann of [own, mine]) {
       for (const node of [A, B]) {
         // The whole announcement — it carries the CEREMONY COMMITMENT the revocation binds against.
-        const r = await node.agent.callSkill('stoop', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...ann });
+        const r = await node.agent.callSkill('pinboard', 'recordCircleAddressAnnouncement', { groupId: GROUP, memberWebid: A.pubKey, ...ann });
         expect(r?.ok).toBe(true);
       }
     }

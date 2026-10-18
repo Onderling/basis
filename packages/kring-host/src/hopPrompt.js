@@ -28,7 +28,7 @@ import { MAX_HOPS } from './circleHop.js';
  * @param {object} args
  * @param {number} [args.inCircleMatchCount=0]  count of skill-match hits within the user's circles
  * @param {number} [args.hopEligibleContactsCount=0]  count of contacts whose hopThrough flag permits relay
- * @param {boolean} [args.hopGloballyOn=true]  user's global hop stance (Stoop getHopMode().global)
+ * @param {boolean} [args.hopGloballyOn=true]  user's global hop stance (Pinboard getHopMode().global)
  * @param {boolean} [args.dismissedForSkill=false]  user already said "Skip" for this query in this session
  * @returns {{prompt: boolean, reason: string|null}}
  */

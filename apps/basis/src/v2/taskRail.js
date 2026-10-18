@@ -116,7 +116,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
       await store.put(item, { sync: false, origin: true });
       // A snapshot that LANDED (verified, merged) — the seam for anything that indexes what the store holds
-      // (the noticeboard bridge into stoop's index). Best-effort: an indexer must never fail the merge.
+      // (the noticeboard bridge into pinboard's index). Best-effort: an indexer must never fail the merge.
       if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item); } catch { /* indexed later by catch-up */ } }
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;

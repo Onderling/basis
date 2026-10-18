@@ -3,7 +3,7 @@
  * src/web/wizards/joinGroupWizard.js.
  *
  * 3-step flow:
- *   1. Rules — fetched from the invite or via stoop.getGroupRules
+ *   1. Rules — fetched from the invite or via pinboard.getGroupRules
  *   2. Privacy — acknowledge + mesh-consent toggle
  *   3. Handle — pick a circle handle with suggestions
  *

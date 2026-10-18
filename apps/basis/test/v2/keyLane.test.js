@@ -35,7 +35,7 @@ const evt = (version, extra = {}) => ({ kind: KEY_EVENT_KIND, version, sealed: `
 // every receiver while their removals went through — backward secrecy broken on a circle that looked
 // administered.
 const rosterSkill = (rows) => async (app, op, args) => {
-  if (app === 'stoop' && op === 'listGroupMembers') {
+  if (app === 'pinboard' && op === 'listGroupMembers') {
     if (args?.spineless === true) throw new Error('key lane must read the FOLDED roster — a caretaker exists only in the fold');
     return { members: rows };
   }

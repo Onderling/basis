@@ -33,7 +33,7 @@ describe('the person\'s own week overview', () => {
 
   it('its card is the coming week, and says it shows when the app is open', async () => {
     const callSkill = async (app, op) => {
-      if (app === 'stoop' && op === 'listMyCircles') return { circles: [] };
+      if (app === 'pinboard' && op === 'listMyCircles') return { circles: [] };
       if (app === 'calendar' && op === 'listEvents') return { ok: true, items: [{ id: 'e1', title: 'tandarts', startsAt: '2026-10-12T12:00:00.000Z' }] };
       return { ok: true, items: [] };
     };

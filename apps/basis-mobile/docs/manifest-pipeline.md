@@ -62,7 +62,7 @@ describes:
   Declares `/mine`, `markComplete`, etc.  Reads "mock" but is the
   real declaration that the *production* household agent (booted by
   realAgent.js) responds to.
-- `mockTasksManifest`, `mockStoopManifest`, `mockFolioManifest` —
+- `mockTasksManifest`, `mockPinboardManifest`, `mockFolioManifest` —
   `apps/basis/src/core/manifests/mockManifests.js`.  Same
   pattern: declarations live in basis's core, the actual
   skill implementations sit in `apps/<app>/src/browser.js`.
@@ -98,7 +98,7 @@ op + its appOrigin).  The default-included set is:
 1. `basisManifest`
 2. `mockHouseholdManifest`  (or override via `opts.householdManifest`)
 3. `mockTasksManifest`
-4. `mockStoopManifest`
+4. `mockPinboardManifest`
 5. `mockFolioManifest`
 6. `calendarManifest`
 
@@ -158,7 +158,7 @@ NavModel shape:
 `callSkill` is the dispatch's terminal.  It knows about:
 - household (built into realAgent itself)
 - tasks-v0 (via `createBrowserTasksAgent`)
-- stoop (via `createBrowserStoopAgent`)
+- pinboard (via `createBrowserPinboardAgent`)
 - folio (via `createBrowserFolioAgent`)
 - calendar — depends on whether the calendar browser-factory has
   been composed in; currently the calendar manifest is in the

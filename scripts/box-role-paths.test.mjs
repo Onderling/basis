@@ -20,9 +20,9 @@ describe('box-role-paths', () => {
     expect(reach).toEqual(['apps/other/', 'packages/third/']);
   });
 
-  it('the companion role names stoop (its card is stoop\'s codec)', () => {
+  it('the companion role names pinboard (its card is pinboard\'s codec)', () => {
     const yml = readFileSync(new URL('../deploy/roles/companion.yml', import.meta.url), 'utf8');
-    expect(pathsForRole('companion', yml)).toContain('apps/stoop/');
-    expect(readFileSync(new URL('../deploy/roles/companion.paths', import.meta.url), 'utf8').split('\n')).toContain('apps/stoop/');
+    expect(pathsForRole('companion', yml)).toContain('apps/pinboard/');
+    expect(readFileSync(new URL('../deploy/roles/companion.paths', import.meta.url), 'utf8').split('\n')).toContain('apps/pinboard/');
   });
 });

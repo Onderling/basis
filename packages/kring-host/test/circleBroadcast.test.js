@@ -65,7 +65,7 @@ describe('cardForCircleWire — the wire-boundary whitelist, per card variant', 
     expect(wire).not.toHaveProperty('stored');
   });
 
-  it('strips local-only fields at EVERY level (the stoop Phase-39 lesson pinned)', () => {
+  it('strips local-only fields at EVERY level (the pinboard Phase-39 lesson pinned)', () => {
     const embed = fullEmbed();
     // Simulated future local-only strap-ons a lazy caller might leave on the embed.
     embed.localPath          = '/data/user/0/app/cache/photo.jpg';
@@ -140,7 +140,7 @@ describe('broadcastCircleFanOut', () => {
     const rawCallSkill = vi.fn(async (app, op, args) => { calls.push([app, op, args]); return {}; });
     const onChange = vi.fn();
     await broadcastCircleFanOut({ ...base, rawCallSkill, deliveryStateMap: map, onChange, signStatement: signOk });
-    expect(calls[0]).toEqual(['stoop', 'broadcastCircleChatStatement', { groupId: 'c1', event: STATEMENT, msgId: 'm1', ts: 9 }]);
+    expect(calls[0]).toEqual(['pinboard', 'broadcastCircleChatStatement', { groupId: 'c1', event: STATEMENT, msgId: 'm1', ts: 9 }]);
     expect(map.get('m1')).toBe('maybe-received');
     expect(onChange).toHaveBeenCalledTimes(2);   // pending + sent
   });

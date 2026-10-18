@@ -92,7 +92,7 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
 
     // ── B's roster row for A becomes the SET — through the production receive side. ──
     const row = await until(async () => {
-      const res = await B.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
+      const res = await B.agent.callSkill('pinboard', 'listGroupMembers', { groupId: GROUP });
       const r = (res?.members ?? []).find((m) => m.webid === A.pubKey);
       return (r?.circleAddresses?.includes(addrA2) && r?.circleAddresses?.includes(addrA)) ? r : null;
     }, { timeout: 20000, step: 100 });

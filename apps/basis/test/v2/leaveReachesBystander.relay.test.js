@@ -28,7 +28,7 @@ describe('a leave whose copy to the bystander is lost', () => {
       return live?.(env);
     };
     expect(hasMember(await rosterOf(cato, CIRCLE), bram.pubKey)).toBe(true);
-    const left = await bram.agent.callSkill('stoop', 'leaveGroup', { groupId: CIRCLE, confirm: true });
+    const left = await bram.agent.callSkill('pinboard', 'leaveGroup', { groupId: CIRCLE, confirm: true });
     expect(left?.error, JSON.stringify(left)).toBeUndefined();
     expect(await untilTrue(async () => !hasMember(await rosterOf(anne, CIRCLE), bram.pubKey)), 'the admin learns of it').toBe(true);
     expect(dropped, 'the leaver\'s copy to the bystander was the one lost').toBeGreaterThan(0);

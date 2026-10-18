@@ -6,14 +6,14 @@
  * re-export of renderWeb (cross-surface equivalence is the killer
  * property per DESIGN-navmodel-sketch.md). The structural work
  * is already done; this test confirms the manifests basis
- * actually ships (mockTasks, mockStoop, mockFolio + household +
+ * actually ships (mockTasks, mockPinboard, mockFolio + household +
  * calendar) project cleanly without exceptions or empty output.
  *
  * If a manifest declares an `appliesTo` for an item-type not in
  * `itemTypes`, validate fails — that catches drift like the
  * subtask-request/subtask-proposal gap I had to fix in.
  *
- * Per the mobile roadmap: household → tasks-v0 → stoop →
+ * Per the mobile roadmap: household → tasks-v0 → pinboard →
  * folio lift order.  This file exercises each one.
  */
 import { describe, it, expect } from 'vitest';
@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { renderMobile } from '@onderling/app-manifest';
 
 import {
-  mockTasksManifest, mockStoopManifest, mockFolioManifest,
+  mockTasksManifest, mockPinboardManifest, mockFolioManifest,
 } from '../src/core/manifests/mockManifests.js';
 import { basisManifest } from '../src/index.js';
 import { calendarManifest } from '@onderling-app/calendar/manifest';
@@ -71,9 +71,9 @@ describe('#221 — renderMobile against basis manifests', () => {
     expect(allOpIds.has('addSubtask')).toBe(true);
   });
 
-  it('mockStoopManifest projects cleanly', () => {
-    const nav = renderMobile(mockStoopManifest);
-    assertValidNavModel(nav, mockStoopManifest);
+  it('mockPinboardManifest projects cleanly', () => {
+    const nav = renderMobile(mockPinboardManifest);
+    assertValidNavModel(nav, mockPinboardManifest);
   });
 
   it('mockFolioManifest projects cleanly', () => {

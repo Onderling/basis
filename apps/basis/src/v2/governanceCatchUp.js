@@ -125,7 +125,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
    */
   async function requestAll({ callSkill }) {
     let circles = [];
-    try { circles = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { return { requested: 0 }; }
+    try { circles = (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? []; } catch { return { requested: 0 }; }
     let requested = 0;
     for (const b of circles) {
       // `listMyCircles` answers with plain string ids. Reading `.groupId`/`.id` off a string yields

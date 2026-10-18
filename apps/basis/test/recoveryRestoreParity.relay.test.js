@@ -167,7 +167,7 @@ describe('a restored phone is still a member — the circles talk to it again', 
     // ── The rosters the file carried are already in: the import landed them through the seed's own
     //    ingest, so the new phone knows who is in each circle before it says a word. ───────────────
     for (const id of [HUIS, KOOR]) {
-      const r = await annaAgain.agent.callSkill('stoop', 'listGroupMembers', { groupId: id });
+      const r = await annaAgain.agent.callSkill('pinboard', 'listGroupMembers', { groupId: id });
       const webids = (r?.members ?? []).map((m) => m.webid);
       expect(webids, `${id}: the file's member list did not land`).toEqual(expect.arrayContaining([bea.pubKey, annaAgain.pubKey]));
     }
@@ -203,7 +203,7 @@ describe('a restored phone is still a member — the circles talk to it again', 
       // is FRESH — nobody's roster names it until it announces. (The first test's title predates this.)
       expect(addr, `${id}: the restored phone derives a new per-circle address`).not.toBe(oldAddr[id]);
       const grown = await until(async () => {
-        const r = await bea.agent.callSkill('stoop', 'listGroupMembers', { groupId: id });
+        const r = await bea.agent.callSkill('pinboard', 'listGroupMembers', { groupId: id });
         const mine = (r?.members ?? []).find((m) => m.webid === annaAgain.pubKey);
         return mine?.circleAddresses?.includes(addr) ? true : null;
       }, { timeout: 20_000, step: 100 });

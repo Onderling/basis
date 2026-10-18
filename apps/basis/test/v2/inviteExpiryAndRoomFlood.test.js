@@ -47,7 +47,7 @@ describe('J-A6 — an invite stops working when it says it will (FIXED 2026-07-3
       });
       expect(published.invite.expiresAt - Date.now()).toBeLessThanOrEqual(BROADCAST_INVITE_MAX_TTL_MS);
 
-      const redeem = (label, offset) => atClockOffset(offset, () => call('stoop', 'verifyMembershipCodeForPeer', {
+      const redeem = (label, offset) => atClockOffset(offset, () => call('pinboard', 'verifyMembershipCodeForPeer', {
         groupId, code, requesterWebid: `walker-${label}`, peerDisplay: `walker${label}`,
         rulesAccepted: '1',   // task #80 — these walkers simulate joiners who ticked the rules
       }));
@@ -75,7 +75,7 @@ describe('J-A6 — an invite stops working when it says it will (FIXED 2026-07-3
       const call = (app, op, args) => admin.agent.callSkill(app, op, args);
       const built = await buildCircleInviteUri({ callSkill: call, circleId: groupId, adminPeerAddr: admin.pubKey });
       const code = codeOf(built.uri);
-      const r = await call('stoop', 'verifyMembershipCodeForPeer', {
+      const r = await call('pinboard', 'verifyMembershipCodeForPeer', {
         groupId, code, requesterWebid: 'skew-walker', peerDisplay: 'skewwalker', rulesAccepted: '1',
       });
       expect(r.redemptionId).toBeTruthy();
@@ -103,19 +103,19 @@ describe('J-A8 — rotating the membership code kills the old one (FIXED 2026-07
       const built = await buildCircleInviteUri({ callSkill: call, circleId: groupId, adminPeerAddr: admin.pubKey });
       const oldCode = codeOf(built.uri);
 
-      const rotated = await call('stoop', 'rotateMyGroupCode', { groupId });
+      const rotated = await call('pinboard', 'rotateMyGroupCode', { groupId });
       expect(rotated.code).not.toBe(oldCode);
 
       // Rotation is the act an admin performs to close someone's way in, and it now does that. It used to
       // only add a newer row while the gate accepted any row inside `expiresAt + 24h` — so for a day after
       // rotating, the leaked code still admitted strangers.
-      const withOld = await call('stoop', 'verifyMembershipCodeForPeer', {
+      const withOld = await call('pinboard', 'verifyMembershipCodeForPeer', {
         groupId, code: oldCode, requesterWebid: 'holder-of-old-code', peerDisplay: 'oldholder', rulesAccepted: '1',
       });
       expect(withOld.error).toBe('invalid-or-expired-code');
 
       // …and the fresh code works, so "rotation removes" is not satisfied by breaking rotation.
-      const withNew = await call('stoop', 'verifyMembershipCodeForPeer', {
+      const withNew = await call('pinboard', 'verifyMembershipCodeForPeer', {
         groupId, code: rotated.code, requesterWebid: 'holder-of-new-code', peerDisplay: 'newholder', rulesAccepted: '1',
       });
       expect(withNew.redemptionId).toBeTruthy();

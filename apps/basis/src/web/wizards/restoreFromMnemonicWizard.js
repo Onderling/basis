@@ -4,9 +4,9 @@
  * basis — C3 restore-from-mnemonic wizard (2026-05-24).
  *
  * 3-step DESTRUCTIVE recovery wizard.  Mnemonic → confirmation →
- * actual restore.  Real skill: stoop.restoreFromMnemonic({mnemonic,
+ * actual restore.  Real skill: pinboard.restoreFromMnemonic({mnemonic,
  * confirm: true}) — overwrites the agent's seed in the vault + swaps
- * in a fresh AgentIdentity at runtime (per stoop Phase 31).
+ * in a fresh AgentIdentity at runtime (per pinboard Phase 31).
  *
  * High-stakes UX: the confirm step is a hard gate (user must check
  * "I understand this overwrites my current identity") + a second

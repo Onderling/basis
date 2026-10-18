@@ -96,7 +96,7 @@ export function createIndexedDbBackend({
 
   let etagCounter = 0;
   const nextEtag = () =>
-    `"${etagPrefix}-${Date.now().toString(36)}-${(++etagCounter).toString(36)}"`;
+    `"${etagPrefix}-${Date.now().toString(36)}-${(++etagCounter).toString(36)}-${Math.random().toString(36).slice(2, 8)}"`;   // random: two tabs mint in one ms
 
   /** Cached open-db promise (one connection per backend instance). */
   let dbPromise = null;
@@ -180,6 +180,33 @@ export function createIndexedDbBackend({
       await _tx('readwrite', (store) => store.put(record, key));
       _fanOut({ op: 'put', key, etag: finalEtag, _v: finalV });
       return { etag: finalEtag, _v: finalV };
+    },
+
+    /**
+     * Compare-and-swap: read, compare and write in ONE readwrite transaction, so two tabs on this database cannot both
+     * win — IndexedDB runs overlapping readwrite transactions on a store one after the other.
+     */
+    async putIf(key, bytes, ifMatch) {
+      const db = await _open();
+      const out = await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        let result = null;
+        const req = store.get(key);
+        req.onsuccess = () => {
+          const prev = req.result ?? null;
+          if ((prev?.etag ?? null) !== ifMatch) { result = { conflict: true }; return; }
+          const etag = nextEtag();
+          const v = (prev && typeof prev.v === 'number' ? prev.v : 0) + 1;
+          store.put({ etag, v, bytes }, key);
+          result = { etag, _v: v };
+        };
+        tx.oncomplete = () => resolve(result);
+        tx.onerror    = () => reject(tx.error);
+        tx.onabort    = () => reject(tx.error);
+      });
+      if (out && !out.conflict) _fanOut({ op: 'put', key, etag: out.etag, _v: out._v });
+      return out;
     },
 
     async delete(key) {

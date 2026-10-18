@@ -16,7 +16,7 @@ describe('embedChipsOf', () => {
     ]);
   });
 
-  it('reads stoop-legacy source.embeds when there is no top-level embeds', () => {
+  it('reads pinboard-legacy source.embeds when there is no top-level embeds', () => {
     const chips = embedChipsOf({ source: { embeds: [{ type: 'request', ref: 'P-solar' }] } });
     expect(chips).toEqual([{ type: 'request', ref: 'P-solar', icon: '🙋', label: null, resolved: false, locked: false }]);
   });

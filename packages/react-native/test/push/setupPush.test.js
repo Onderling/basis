@@ -1,6 +1,6 @@
 /**
  * setupPush — substrate-level coverage. Mirrors the orchestration
- * checks apps/stoop-mobile/test/push.test.js exercises through the
+ * checks apps/pinboard-mobile/test/push.test.js exercises through the
  * re-export shim.
  */
 

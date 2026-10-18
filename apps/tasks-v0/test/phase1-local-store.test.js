@@ -78,7 +78,7 @@ describe('Phase 1 — local-store wiring', () => {
     const fromCache = await bundle.cache.read(keys[0]);
     expect(fromCache).toBeTruthy();
     // The DataSource returns the same JSON shape ItemStore wrote — handle
-    // both raw-object and JSON-string shapes (Stoop writes objects).
+    // both raw-object and JSON-string shapes (Pinboard writes objects).
     const parsed = typeof fromCache === 'string' ? JSON.parse(fromCache) : fromCache;
     expect(parsed.text).toBe('Take out the trash');
   });

@@ -2,7 +2,7 @@
  * appStateBridge — connect React Native's AppState to a live agent
  * bundle's online cadence.
  *
- * Lifted from apps/stoop-mobile/src/lib/appStateBridge.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/appStateBridge.js 2026-05-09
  * (Phase 41.0 L2; Tasks-mobile is the second consumer).
  *
  * Foreground: agent stays connected; ticker drives `bundle.offeringMatch.tick`.

@@ -1,7 +1,7 @@
 /**
  * The companion as a CONTACT — the card its owner's app (and, through it, a household bot) adds it by.
  *
- * The same card a person hands out (`onderling-contact://…`, stoop's codec — the one encoder and the one decoder): the
+ * The same card a person hands out (`onderling-contact://…`, pinboard's codec — the one encoder and the one decoder): the
  * node's address as its id, key and peer address, the relay it is found on, and — when it holds people's agenda files —
  * `serves`: the public https address its links are served at. A node on a tablet has no port of its own, so that is
  * the RELAY's public address: the relay forwards `/feed/<node>/<id>.<k>.ics` to this node over its live session
@@ -9,7 +9,7 @@
  * `https://relay.example`); a node that dials its relay by an inside name (`ws://relay:8787` on the box) says its public
  * address explicitly (`publicUrl`, `COMPANION_PUBLIC_URL`). Everything on the card is public: an address, a relay.
  */
-import { encodeContactCard } from '../../stoop/src/lib/contactCard.js';
+import { encodeContactCard } from '../../pinboard/src/lib/contactCard.js';
 
 const CONTACT_SCHEME = 'onderling-contact://';
 

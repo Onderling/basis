@@ -39,8 +39,8 @@ describe('panelRefresh · itemRefFromReply', () => {
       .toEqual({ app: 'tasks', type: 'task', id: 'task-9' });
   });
   it('reads itemId + payload.app aliases', () => {
-    expect(itemRefFromReply({ payload: { itemId: 'p-2', app: 'stoop' } }))
-      .toEqual({ app: 'stoop', type: null, id: 'p-2' });
+    expect(itemRefFromReply({ payload: { itemId: 'p-2', app: 'pinboard' } }))
+      .toEqual({ app: 'pinboard', type: null, id: 'p-2' });
   });
   it('returns null for item-less / non-object / array payloads', () => {
     expect(itemRefFromReply({ payload: { ok: true } })).toBeNull();

@@ -43,7 +43,7 @@ export function circleChatMessageEvent({ msgId, ts, circleId, actor, text, butto
  * The snapshot fields each card VARIANT may put on the wire. A whitelist per variant, not one union:
  * the point of the list is that a caller cannot widen it by accident, and a union would let a photo's
  * fields ride an appointment. Absent stays absent; anything not named here is dropped at the boundary
- * (the stoop Phase-39 lesson: local-only fields must never ride a fan-out).
+ * (the pinboard Phase-39 lesson: local-only fields must never ride a fan-out).
  */
 const CARD_SNAPSHOT_FIELDS = Object.freeze({
   // A photo: the canonical `media` item fields (@onderling/item-types) + the manifest line (below).
@@ -103,9 +103,9 @@ function pickFields(src, names) {
 }
 
 /**
- * Best-effort fan-out of a circle chat message to the circle's members via stoop's
+ * Best-effort fan-out of a circle chat message to the circle's members via pinboard's
  * `broadcastCircleMessage`, tracking δ.2 delivery state (pending → sent | failed). Uses the RAW 3-arg
- * callSkill (app-targeted at stoop) — the 2-arg *resolving* callSkill arg-shifts (op→'stoop') and never
+ * callSkill (app-targeted at pinboard) — the 2-arg *resolving* callSkill arg-shifts (op→'pinboard') and never
  * delivers. Fire-and-forget for callers; returns the promise so tests can await it.
  *
  * @param {object} a
@@ -176,7 +176,7 @@ export function broadcastCircleFanOut({ rawCallSkill, circleId, msgId, text, ts,
         ? await Promise.resolve(signStatement(circleId, msgId)).catch(() => null)
         : null;
       if (!statement) throw new Error('no circle signing available — message not fanned');
-      return rawCallSkill('stoop', 'broadcastCircleChatStatement', {
+      return rawCallSkill('pinboard', 'broadcastCircleChatStatement', {
         groupId: circleId, event: statement, msgId, ts,
       });
     })

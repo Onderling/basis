@@ -172,7 +172,7 @@
  *                                         honoured). — `type` may be
  *                                         `'*'` (wildcard): matches every
  *                                         section regardless of itemType.
- *                                         Surfaced by stoop's `cancelRequest`
+ *                                         Surfaced by pinboard's `cancelRequest`
  *                                         spanning ask/offer/lend.
  * @property {object}   [prefilledParams]  same semantics as Affordance.prefilledParams
  *
@@ -203,7 +203,7 @@
  * ──── — `view.dataSource` explicit declaration (locked 2026-05-21)
  *
  * Surfaced by the CONVERGENT signal from B.2 (tasks-v0 mine.html) +
- * E.1 (stoop mine.html) + B.1 (tasks-v0 dag.html). rule (b) says
+ * E.1 (pinboard mine.html) + B.1 (tasks-v0 dag.html). rule (b) says
  * "list ops are the section's implicit data source — adapter calls
  * `listOpen({type, ...filter})`".  But many real sections need a
  * DIFFERENT list skill: `listMine`, `listMyMasteredTasks`,
@@ -244,7 +244,7 @@
  *
  * ──── — `appliesTo.type: '*'` wildcard (locked 2026-05-21)
  *
- * Surfaced by E.1: stoop's `cancelRequest` spans all 3 noticeboard
+ * Surfaced by E.1: pinboard's `cancelRequest` spans all 3 noticeboard
  * types (ask/offer/lend); `markReturned` only matches `lend` but
  * conceptually belongs on every per-row button. + F-SP3-a's
  * multi-type array helps but is manual per-op.
@@ -258,8 +258,8 @@
  *
  * ──── — `view.dataSource.argsFromContext` (locked 2026-05-21)
  *
- * Surfaced by E.2 + E.3: stoop's privacy.html needs a runtime `lang`
- * arg (browser-derived) and stoop's settings.html surfaced the
+ * Surfaced by E.2 + E.3: pinboard's privacy.html needs a runtime `lang`
+ * arg (browser-derived) and pinboard's settings.html surfaced the
  * adjacent need for context-bound args. `dataSource.args` is
  * static; runtime values forced consumers to bypass the manifest.
  *
@@ -270,7 +270,7 @@
  *
  * ──── — `view.shape: 'record'` (locked 2026-05-21)
  *
- * Surfaced by E.3: stoop's settings.html is a SINGLETON record
+ * Surfaced by E.3: pinboard's settings.html is a SINGLETON record
  * (`getSettings` returns `{settings: {...}}`), not a list.  NavModel
  * assumes sections are `Array<item>`. E.3 worked around by
  * treating the singleton as a 1-element list.
@@ -298,10 +298,10 @@
  *
  * ──── — `patch.argWrapper` for wrapped-patch shapes (locked 2026-05-22)
  *
- * Surfaced by the -adopt for stoop's settings (commit 9e7003b):
+ * Surfaced by the -adopt for pinboard's settings (commit 9e7003b):
  * 's flat `{opId, argName}` assumes the dispatch shape
  * `opId({[argName]: newValue})`.  But many real APIs use nested patch
- * shapes — e.g. stoop's `updateSettings({patch: {pollIntervalMs: 30000}})`.
+ * shapes — e.g. pinboard's `updateSettings({patch: {pollIntervalMs: 30000}})`.
  * The page-level adapter wrapped this ad-hoc; makes it explicit
  * in the substrate.
  *
@@ -310,7 +310,7 @@
  * preserved).  When a non-empty string, dispatch is WRAPPED:
  * `opId({[argWrapper]: {[argName]: newValue}})`.
  *
- * Example (stoop settings):
+ * Example (pinboard settings):
  *   patch: { opId: 'updateSettings', argName: 'pollIntervalMs',
  *            argWrapper: 'patch' }
  *   → updateSettings({patch: {pollIntervalMs: newValue}})
@@ -335,7 +335,7 @@
  *
  * ──── — `field.readSkill` for multi-skill records (locked 2026-05-20)
  *
- * Surfaced by E.4 (stoop profile): `holidayMode` is reachable two
+ * Surfaced by E.4 (pinboard profile): `holidayMode` is reachable two
  * ways — bulk via `getMyProfile()` (record-level dataSource) AND
  * dedicated `getHolidayMode` skill. has no slot for "this
  * field's current value comes from a different skill than the
@@ -379,7 +379,7 @@
  *
  * The substrate stays renderer-agnostic — projector passes `type`
  * through verbatim; rendering + transform are consumer concerns.
- * Surfaced by E.4 (stoop profile.html's avatar upload — `avatarUrl`
+ * Surfaced by E.4 (pinboard profile.html's avatar upload — `avatarUrl`
  * is a data-URL post client-side resize; no type fit it before).
  *
  * Forward-additive — adopting consumers extend their renderer-side
@@ -389,8 +389,8 @@
  *
  * Surfaced by the Tier C investigation (Project Files/Substrates/tier-c-proposals.md):
  * 14 destructive / side-effect-bearing surfaces across folio + tasks
- * + stoop already have hand-rolled confirm modals (folio's 3 custom
- * confirm modals + tasks-mobile's <ConfirmModal> + stoop's CLI
+ * + pinboard already have hand-rolled confirm modals (folio's 3 custom
+ * confirm modals + tasks-mobile's <ConfirmModal> + pinboard's CLI
  * confirm() prompts).  Severity hints are a tiny manifest-level
  * field that unlocks consistent cross-platform UX.
  *
@@ -421,7 +421,7 @@
  * ──── — `labelKey` localisation passthrough (locked 2026-05-20)
  *
  * Surfaced by C.3 closeout: manifest `label` strings are English while
- * stoop is Dutch-first and tasks-mobile RN screens already use an localisation
+ * pinboard is Dutch-first and tasks-mobile RN screens already use an localisation
  * function (`t(key, fallback)`).  Auto-rendered substrate UIs would
  * regress on localization.
  *

@@ -28,12 +28,12 @@ describe('#222 basis-mobile portable-core boot', () => {
     expect(apps).toContain('basis');
     expect(apps).toContain('household');   // 2026-05-26 — mockHouseholdManifest is now the default (was opts-only)
     expect(apps).toContain('tasks');
-    expect(apps).toContain('stoop');
+    expect(apps).toContain('pinboard');
     expect(apps).toContain('folio');
     expect(apps).toContain('calendar');
     // The merger aliases collisions deterministically (e.g.
-    // `startDm` lives on both basis + stoop, the latter is
-    // exposed as `stoop/startDm`).  These benign warnings are
+    // `startDm` lives on both basis + pinboard, the latter is
+    // exposed as `pinboard/startDm`).  These benign warnings are
     // fine; any UNEXPECTED warning should fail the test.
     const benign = /op-id collision: "\w+" also declared by/;
     const unexpected = (catalogue.warnings ?? []).filter((w) => !benign.test(w));
@@ -65,7 +65,7 @@ describe('#222 basis-mobile portable-core boot', () => {
     expect(apps[0]).toBe('basis');
     expect(apps).toContain('household');
     expect(apps).toContain('tasks');
-    expect(apps).toContain('stoop');
+    expect(apps).toContain('pinboard');
     expect(apps).toContain('folio');
     expect(apps).toContain('calendar');
     // Every NavModel must be JSON-serialisable (no circular refs).
@@ -82,7 +82,7 @@ describe('#222 basis-mobile portable-core boot', () => {
     expect(typeof bundle.callSkill).toBe('function');
     expect(bundle.agent).toBe(null);                  // no real factory ran
     expect(bundle.transport).toEqual({ kind: 'stub' });
-    const r = await bundle.callSkill('stoop', 'postRequest', { text: 'hi' });
+    const r = await bundle.callSkill('pinboard', 'postRequest', { text: 'hi' });
     expect(r.ok).toBe(true);
     expect(r.mockOp).toBe('postRequest');
   });

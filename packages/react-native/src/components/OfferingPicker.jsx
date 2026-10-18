@@ -1,7 +1,7 @@
 /**
  * OfferingPicker — categorised chip multi-select for the user's offerings.
  *
- * Lifted from apps/stoop-mobile/src/components/OfferingPicker.js
+ * Lifted from apps/pinboard-mobile/src/components/OfferingPicker.js
  * 2026-05-09 (Phase 41.0.b B4).
  *
  * Pure-controlled. Tapping a chip calls the right callback:

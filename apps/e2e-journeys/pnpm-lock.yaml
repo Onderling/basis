@@ -18,9 +18,9 @@ importers:
       '@onderling-app/companion-node':
         specifier: workspace:*
         version: link:../companion-node
-      '@onderling-app/stoop':
+      '@onderling-app/pinboard':
         specifier: workspace:*
-        version: link:../stoop
+        version: link:../pinboard
       '@onderling/app-manifest':
         specifier: workspace:*
         version: link:../../packages/app-manifest

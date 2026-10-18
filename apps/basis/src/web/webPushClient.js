@@ -1,17 +1,17 @@
 /**
  * webPushClient — S5 web-push subscription orchestration (web platform).
  *
- * The CLIENT half of stoop's Web Push tier: register the service worker, ask
- * permission, fetch the VAPID public key (`stoop.getVapidPublicKey`), subscribe
+ * The CLIENT half of pinboard's Web Push tier: register the service worker, ask
+ * permission, fetch the VAPID public key (`pinboard.getVapidPublicKey`), subscribe
  * via the browser `PushManager`, and forward the `PushSubscription` to
- * `stoop.subscribeWebPush`. The SERVER half (VAPID-signed delivery via
- * `WebPushSender`) lives in a Node-hosted stoop — in the browser-only bundle
+ * `pinboard.subscribeWebPush`. The SERVER half (VAPID-signed delivery via
+ * `WebPushSender`) lives in a Node-hosted pinboard — in the browser-only bundle
  * `@onderling/relay` is shimmed so `getVapidPublicKey` is null + delivery is a
  * no-op; the subscription is still registered against the in-process registry.
  *
  * The browser primitives (`navigator`, `Notification`) are injected so the
  * orchestration is unit-testable with fakes — we verify the RESULT (the exact
- * pushManager.subscribe options + the subscription forwarded to stoop), not just
+ * pushManager.subscribe options + the subscription forwarded to pinboard), not just
  * that a button fired.
  */
 
@@ -47,7 +47,7 @@ export async function getWebPushState({ nav = globalThis.navigator, notification
 }
 
 /**
- * Turn notifications ON: register SW → request permission → subscribe → tell stoop.
+ * Turn notifications ON: register SW → request permission → subscribe → tell pinboard.
  * Returns {ok, reason?}. `swUrl` defaults to the root-scoped '/sw.js'.
  */
 export async function enableWebPush({
@@ -63,7 +63,7 @@ export async function enableWebPush({
   await nav.serviceWorker.register(swUrl).catch(() => {});
   const reg = await nav.serviceWorker.ready;
 
-  const vapid = await callSkill('stoop', 'getVapidPublicKey', {});
+  const vapid = await callSkill('pinboard', 'getVapidPublicKey', {});
   const publicKey = vapid?.publicKey;
   if (!publicKey) return { ok: false, reason: 'push-disabled' };   // server has no VAPID keys (e.g. browser-only bundle)
 
@@ -75,12 +75,12 @@ export async function enableWebPush({
     });
   } catch (err) { return { ok: false, reason: 'subscribe-failed', error: err?.message ?? String(err) }; }
 
-  const res = await callSkill('stoop', 'subscribeWebPush', { subscription: sub.toJSON ? sub.toJSON() : sub });
+  const res = await callSkill('pinboard', 'subscribeWebPush', { subscription: sub.toJSON ? sub.toJSON() : sub });
   if (res?.error) return { ok: false, reason: 'register-failed', error: res.error };
   return { ok: true };
 }
 
-/** Turn notifications OFF: drop the browser subscription + deregister it at stoop. */
+/** Turn notifications OFF: drop the browser subscription + deregister it at pinboard. */
 export async function disableWebPush({ callSkill, nav = globalThis.navigator } = {}) {
   let endpoint = null;
   try {
@@ -88,7 +88,7 @@ export async function disableWebPush({ callSkill, nav = globalThis.navigator } =
     const sub = await reg.pushManager.getSubscription();
     if (sub) { endpoint = sub.endpoint; await sub.unsubscribe().catch(() => {}); }
   } catch { /* nothing to drop */ }
-  await callSkill('stoop', 'unsubscribeWebPush', endpoint ? { endpoint } : {}).catch(() => {});
+  await callSkill('pinboard', 'unsubscribeWebPush', endpoint ? { endpoint } : {}).catch(() => {});
   return { ok: true };
 }
 

@@ -2,7 +2,7 @@
  * followUp — step 4 single-field follow-up state machine.
  *
  * Captures the on-device bug from 2026-05-26: tapping `[Help with]`
- * on a stoop post produced a red "couldn't run that command" bubble
+ * on a pinboard post produced a red "couldn't run that command" bubble
  * because respondToItem requires both itemId AND body, but the
  * row-tap only synthesizes itemId → resolveDispatch returns
  * needsForm → the old `else` branch in ChatScreen produced a generic
@@ -21,7 +21,7 @@ function makeNeedsFormDispatch() {
   return {
     kind:         'needsForm',
     opId:         'respondToItem',
-    appOrigin:    'stoop',
+    appOrigin:    'pinboard',
     threadId:     null,
     replyShape:   'text',
     missing:      ['body'],
@@ -51,7 +51,7 @@ describe('#253 step 4 — beginFollowUp', () => {
     });
     expect(pending).toBeTruthy();
     expect(pending.opId).toBe('respondToItem');
-    expect(pending.appOrigin).toBe('stoop');
+    expect(pending.appOrigin).toBe('pinboard');
     expect(pending.missingParam).toBe('body');
     expect(pending.prefilledArgs).toEqual({ itemId: 'post-42' });
     expect(pending.originMessageId).toBe('m5');
@@ -85,7 +85,7 @@ describe('#253 step 4 — completeFollowUp', () => {
     const ready = completeFollowUp({ pending, text: 'I can lend my ladder' });
     expect(ready.kind).toBe('ready');
     expect(ready.opId).toBe('respondToItem');
-    expect(ready.appOrigin).toBe('stoop');
+    expect(ready.appOrigin).toBe('pinboard');
     expect(ready.threadId).toBeNull();
     expect(ready.replyShape).toBe('text');
     expect(ready.args).toEqual({
@@ -112,7 +112,7 @@ describe('#253 step 6 — beginFormFollowUp', () => {
     return {
       kind:         'needsForm',
       opId:         'composePost',
-      appOrigin:    'stoop',
+      appOrigin:    'pinboard',
       threadId:     null,
       replyShape:   'text',
       missing:      ['title', 'body'],
@@ -160,7 +160,7 @@ describe('#253 step 6 — completeMultiFieldFollowUp', () => {
     return {
       kind:         'multi',
       opId:         'composePost',
-      appOrigin:    'stoop',
+      appOrigin:    'pinboard',
       threadId:     null,
       replyShape:   'text',
       prefilledArgs:{ audience: 'circle' },

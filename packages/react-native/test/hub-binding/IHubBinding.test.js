@@ -104,8 +104,8 @@ describe('method delegation', () => {
   });
 
   it('declareCapabilities marshals to JSON', async () => {
-    await b.declareCapabilities({ caps: ['stoop'] });
-    expect(JSON.parse(native.calls[0].args.capabilitiesJson)).toEqual({ caps: ['stoop'] });
+    await b.declareCapabilities({ caps: ['pinboard'] });
+    expect(JSON.parse(native.calls[0].args.capabilitiesJson)).toEqual({ caps: ['pinboard'] });
   });
 
   it('rejects missing required args', async () => {

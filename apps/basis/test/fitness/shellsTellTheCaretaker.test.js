@@ -20,7 +20,7 @@
  *      check.
  *
  * The decision's own behaviour is proven against real folded rosters in `test/v2/caretakerNotice.test.js`
- * and the op in stoop's suite. What CANNOT be covered there is whether a shell bothered to call either:
+ * and the op in pinboard's suite. What CANNOT be covered there is whether a shell bothered to call either:
  * `circleApp.js` boots at import and `src/screens/**` has no runtime coverage at all, so for the wiring
  * these are source-text guards — the same trade `shellsShowAdminProvenance` makes next door.
  *
@@ -215,9 +215,9 @@ describe('FITNESS — both shells put the notice in front of the person', () => 
 
   it('the op the shells call is a real declared op that takes the circle', () => {
     // A shell calling an op that does not exist fails at the moment someone taps, months later.
-    const manifest = read('../../../stoop/manifest.js');
+    const manifest = read('../../../pinboard/manifest.js');
     const at = manifest.indexOf("id:   'acknowledgeCaretaker'");
-    expect(at, 'stoop no longer declares acknowledgeCaretaker').toBeGreaterThan(-1);
+    expect(at, 'pinboard no longer declares acknowledgeCaretaker').toBeGreaterThan(-1);
     expect(manifest.slice(at, at + 1600)).toMatch(/name:\s*'groupId'[^\n]*required:\s*true/);
   });
 });

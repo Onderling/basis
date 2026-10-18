@@ -17,6 +17,46 @@ README: [`packages/transports/README.md`](../../packages/transports/README.md) �
 
 ## `src/MdnsTransport.js`
 
+### `helloChallengeMessage`
+
+**Kind:** function · **Import:** `helloChallengeMessage` from `'@onderling/transports/mdns'`
+
+```js
+helloChallengeMessage(nD, nL, L, D)
+```
+
+The two messages of the challenged hello — built here, never taken from the far end. They differ by ROLE and both
+carry BOTH nonces, so a listener's challenge signature can never be replayed as a dialler's proof (or the reverse),
+under any nonce a relay picks.
+
+**Parameters**
+
+- `nD` `string` — the dialler's nonce
+- `nL` `string` — the listener's nonce
+- `L` `string` — the listener's pubKey (it signs the challenge)
+- `D` `string` — the dialler's pubKey
+
+**Returns:** `string`
+
+### `helloProofMessage`
+
+**Kind:** function · **Import:** `helloProofMessage` from `'@onderling/transports/mdns'`
+
+```js
+helloProofMessage(nD, nL, D, L)
+```
+
+The dialler's proof: signed by the dialler over both nonces (see `helloChallengeMessage`).
+
+**Parameters**
+
+- `nD` `string`
+- `nL` `string`
+- `D` `string` — the dialler's pubKey (it signs the proof)
+- `L` `string` — the listener's pubKey
+
+**Returns:** `string`
+
 ### `SERVICE_TYPE`
 
 **Kind:** constant · **Import:** `SERVICE_TYPE` from `'@onderling/transports/mdns'`

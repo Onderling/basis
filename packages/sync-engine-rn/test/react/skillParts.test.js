@@ -1,6 +1,6 @@
 /**
  * skillParts — pure-helper coverage. Mirrors the assertions
- * apps/stoop-mobile/test/useSkill.test.js exercises through the
+ * apps/pinboard-mobile/test/useSkill.test.js exercises through the
  * re-export shim.
  */
 

@@ -1,6 +1,6 @@
 /**
  * shareRecipients — the SHARED (web≡mobile) selector behind the out-of-circle recipient picker
- * (objective L · Phase 2). It turns the Contacten roster rows (`peerToContactRow` / `stoopContactToRow`
+ * (objective L · Phase 2). It turns the Contacten roster rows (`peerToContactRow` / `pinboardContactToRow`
  * from `contactsSource.js`) into the recipient rows the picker renders and `shareItemToPublishedKey`
  * targets — pure, no DOM/RN, imported by BOTH shells (invariants #1/#2).
  *
@@ -12,7 +12,7 @@
  *
  * A contact WITHOUT a network key (a URL-only A2A bot, say) can't be granted an in-place key — it is
  * EXCLUDED (there is nothing to derive a sealing key from). `recipient` (the ACP grant subject / WebID)
- * defaults to the contact's stable id (`contactId`), which is the WebID for a stoop ContactBook person.
+ * defaults to the contact's stable id (`contactId`), which is the WebID for a pinboard ContactBook person.
  */
 
 /** The published network key carried on a roster row, or null. Accepts either field name. */
@@ -86,7 +86,7 @@ export function pickableRecipients(contacts = []) {
     if (!c) continue;
     const recipientNetworkKey = networkKeyOf(c);
     if (!recipientNetworkKey) continue;                       // no network key → not grantable → excluded
-    // The ACP grant subject: the WebID when the contact is a stoop ContactBook person (contactId === webid),
+    // The ACP grant subject: the WebID when the contact is a pinboard ContactBook person (contactId === webid),
     // else the stable contact id (which, for a bare peer, IS the network key). Non-empty by construction.
     const id = c.contactId ?? c.id ?? recipientNetworkKey;
     if (seen.has(id)) continue;

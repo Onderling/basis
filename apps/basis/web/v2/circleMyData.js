@@ -1,11 +1,11 @@
 /**
  * basis v2 — "My data" screen (web DOM renderer, privacy + diagnostics).
  *
- * A read-only surface that retires stoop's privacy + metrics + data-location
+ * A read-only surface that retires pinboard's privacy + metrics + data-location
  * pages: WHERE your data lives (pod root / relay, `getDataLocation` +
  * `podSignInStatus`), the privacy disclosure (`getPrivacyNotice`), and a usage
  * snapshot (`getMetrics`). Pure render — the host (`circleApp.js` showMyData)
- * loads the stoop ops and passes the results. The key-management actions
+ * loads the pinboard ops and passes the results. The key-management actions
  * (back up · view recovery phrase · restore) are rendered when the host
  * injects the matching callbacks; each launches an existing wizard/skill.
  */

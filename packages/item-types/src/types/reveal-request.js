@@ -1,6 +1,6 @@
 /**
  * `reveal-request` type — bilateral real-name reveal handshake.
- * Stoop's two-sided reveal flow; not commercial-anything (no
+ * Pinboard's two-sided reveal flow; not commercial-anything (no
  * schema.org analogue).
  */
 

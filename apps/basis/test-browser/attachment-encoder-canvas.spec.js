@@ -5,7 +5,7 @@
  * plumbing with an INJECTED fake canvas (happy-dom has no real 2D context). This
  * spec closes that gap: it runs the ACTUAL `encodeImageFile` against a real
  * browser Canvas + Image decode, and asserts the output is the inbound shape
- * stoop.validateInboundAttachment accepts (real JPEG bytes + a JPEG thumbnail).
+ * pinboard.validateInboundAttachment accepts (real JPEG bytes + a JPEG thumbnail).
  *
  * User-run (per the project's Playwright-is-user-run cadence). Boots the dev
  * server via the shared config; imports the encoder from its vite-served path so

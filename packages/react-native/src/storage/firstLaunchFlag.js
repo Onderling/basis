@@ -2,7 +2,7 @@
  * firstLaunchFlag — pure helpers for an AsyncStorage-backed boolean
  * flag used by first-launch warning gates (privacy notice, T&Cs, etc.).
  *
- * Lifted from apps/stoop-mobile/src/lib/metadataWarning.js 2026-05-09
+ * Lifted from apps/pinboard-mobile/src/lib/metadataWarning.js 2026-05-09
  * (Phase 41.0.b A4; Tasks-mobile is the second consumer). The
  * substrate parameterizes the storage key + storage backend so each
  * gate (privacy, T&Cs, what's-new) gets its own flag without each

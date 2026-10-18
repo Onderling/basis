@@ -25,9 +25,9 @@ const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
-const myCircles = async (page) => ((await call(page, 'stoop', 'listMyCircles', {}))?.circles ?? [])
+const myCircles = async (page) => ((await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [])
   .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-const roster = async (page, circleId) => (await call(page, 'stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
+const roster = async (page, circleId) => (await call(page, 'pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [];
 /** A's row as `page` folds it: present? which name? which released place? */
 const aRowOn = async (page, circleId, aId) => {
   const m = (await roster(page, circleId)).find((x) => x.webid === aId);
@@ -51,7 +51,7 @@ test('a rename on one device and a disclosure on the other, each its first state
     expect(p.joined, `C joined: ${p.outcome}`).toBe(true);
     for (const peer of [A1, C]) peer.page.on('dialog', (d) => d.dismiss().catch(() => {}));
     const circle = (await myCircles(A1.page)).find((id) => !/^pair-|^cc-help$/.test(String(id)));
-    const aId = (await call(A1.page, 'stoop', 'whoAmI'))?.webid;
+    const aId = (await call(A1.page, 'pinboard', 'whoAmI'))?.webid;
     expect(circle, 'the circle').toBeTruthy();
 
     // ── A2 enrolled from A1, follows into the circle ─────────────────────────────────────────────────
@@ -69,7 +69,7 @@ test('a rename on one device and a disclosure on the other, each its first state
     await A2.page.reload({ waitUntil: 'domcontentloaded' });
     await expect.poll(() => A2.page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 60_000 }).toBe(true);
     await expect.poll(async () => (await myCircles(A2.page)).includes(circle), { timeout: 90_000, message: 'A2 is in the circle' }).toBe(true);
-    expect((await call(A2.page, 'stoop', 'whoAmI'))?.webid, 'A2 is the same person').toBe(aId);
+    expect((await call(A2.page, 'pinboard', 'whoAmI'))?.webid, 'A2 is the same person').toBe(aId);
     log('SETUP A1 + A2 + C in one circle', 'PASS', String(circle).slice(0, 10));
 
     // ── the two first statements, one per device, close together ─────────────────────────────────────

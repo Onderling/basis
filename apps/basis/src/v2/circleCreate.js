@@ -7,7 +7,7 @@
  * wizard would with default choices.
  *
  * `callSkill` here is the host's RAW 3-arg form `(appOrigin, opId, args)` — `finalSubmit` calls
- * `callSkill('stoop', 'createGroupV2', …)` itself.
+ * `callSkill('pinboard', 'createGroupV2', …)` itself.
  *
  * ── THE ID IS DERIVED FROM THE FOUNDER, NOT FROM THE NAME ────────────────────────────────────────────
  * It used to be `slugify(name)`. Two people who both call their circle "Proeftuin" — or "buurt", or

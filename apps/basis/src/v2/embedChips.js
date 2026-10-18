@@ -2,8 +2,8 @@
  * embedChips — surface the canonical cross-object `embeds:[{type,ref}]` field
  * (packages/item-types) as small display chips on a card.
  *
- * `embeds` lets any item reference any other (a stoop post → a task, a task → a
- * calendar event, …); it's live on tasks/stoop/folio. This is the read side for
+ * `embeds` lets any item reference any other (a pinboard post → a task, a task → a
+ * calendar event, …); it's live on tasks/pinboard/folio. This is the read side for
  * UI: normalize an item's embeds into display-ready chips. PURE + shared
  * web↔mobile (the shells render the chips with their own primitives).
  *
@@ -50,7 +50,7 @@ export function shortRef(ref) {
 }
 
 /**
- * Normalize an item's `embeds` (top-level OR stoop-legacy `source.embeds`) into
+ * Normalize an item's `embeds` (top-level OR pinboard-legacy `source.embeds`) into
  * display-ready chips. Drops malformed entries (need both `type` and `ref`).
  *
  * @param {object} item  a post/task/message carrying `embeds` or `source.embeds`

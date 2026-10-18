@@ -30,7 +30,7 @@ describe('resolveKeyPrefix', () => {
   });
   it('bare app-id grows into the canonical DCR prefix', () => {
     expect(resolveKeyPrefix('folio')).toBe('folio-dcr-client-id-');
-    expect(resolveKeyPrefix('stoop')).toBe('stoop-dcr-client-id-');
+    expect(resolveKeyPrefix('pinboard')).toBe('pinboard-dcr-client-id-');
   });
   it('full prefix passes through', () => {
     expect(resolveKeyPrefix('myapp-dcr-client-id-')).toBe('myapp-dcr-client-id-');
@@ -43,20 +43,20 @@ describe('issuerKey', () => {
     expect(k).toBe('folio-dcr-client-id-login.inrupt.com');
   });
   it('keeps host:port style intact via the prefix sanitiser', () => {
-    const k = issuerKey('http://localhost:3000/idp', 'stoop-dcr-client-id-');
-    expect(k).toBe('stoop-dcr-client-id-localhost_3000_idp');
+    const k = issuerKey('http://localhost:3000/idp', 'pinboard-dcr-client-id-');
+    expect(k).toBe('pinboard-dcr-client-id-localhost_3000_idp');
   });
 });
 
 describe('buildRegistrationBody', () => {
   it('produces a Solid-OIDC-shaped registration body', () => {
     const body = buildRegistrationBody({
-      redirectUri: 'stoop://auth/callback',
-      clientName:  'Stoop (mobile)',
+      redirectUri: 'pinboard://auth/callback',
+      clientName:  'Pinboard (mobile)',
       scopes:      ['openid', 'webid', 'offline_access'],
     });
-    expect(body.redirect_uris).toEqual(['stoop://auth/callback']);
-    expect(body.client_name).toBe('Stoop (mobile)');
+    expect(body.redirect_uris).toEqual(['pinboard://auth/callback']);
+    expect(body.client_name).toBe('Pinboard (mobile)');
     expect(body.application_type).toBe('native');
     expect(body.token_endpoint_auth_method).toBe('none');
     expect(body.grant_types).toContain('authorization_code');
@@ -80,8 +80,8 @@ describe('registerClient', () => {
     ));
     const out = await registerClient({
       discovery:   { registration_endpoint: 'https://idp/register' },
-      redirectUri: 'stoop://auth/callback',
-      clientName:  'Stoop',
+      redirectUri: 'pinboard://auth/callback',
+      clientName:  'Pinboard',
       fetchFn,
     });
     expect(out.client_id).toBe('CID');
@@ -96,7 +96,7 @@ describe('registerClient', () => {
     ));
     await expect(registerClient({
       discovery:   { registration_endpoint: 'https://idp/register' },
-      redirectUri: 'stoop://auth/callback',
+      redirectUri: 'pinboard://auth/callback',
       fetchFn,
     })).rejects.toMatchObject({ code: 'REGISTRATION_REJECTED', status: 400 });
   });
@@ -124,13 +124,13 @@ describe('loadOrRegisterClient', () => {
     const id = await loadOrRegisterClient({
       issuer:      'https://login.inrupt.com',
       discovery:   { registration_endpoint: 'https://idp/register' },
-      redirectUri: 'stoop://auth/callback',
+      redirectUri: 'pinboard://auth/callback',
       store,
-      keyPrefix:   'stoop',
+      keyPrefix:   'pinboard',
       fetchFn,
     });
     expect(id).toBe('NEW');
-    expect(store._peek()['stoop-dcr-client-id-login.inrupt.com']).toBe('NEW');
+    expect(store._peek()['pinboard-dcr-client-id-login.inrupt.com']).toBe('NEW');
     // folio's slot is untouched.
     expect(store._peek()['folio-dcr-client-id-login.inrupt.com']).toBeUndefined();
   });
@@ -140,10 +140,10 @@ describe('clearStoredClient', () => {
   it('deletes the prefix-scoped key', async () => {
     const store = buildStore({
       'folio-dcr-client-id-login.inrupt.com': 'F',
-      'stoop-dcr-client-id-login.inrupt.com': 'S',
+      'pinboard-dcr-client-id-login.inrupt.com': 'S',
     });
     await clearStoredClient('https://login.inrupt.com', store, 'folio');
     expect(store._peek()['folio-dcr-client-id-login.inrupt.com']).toBeUndefined();
-    expect(store._peek()['stoop-dcr-client-id-login.inrupt.com']).toBe('S');
+    expect(store._peek()['pinboard-dcr-client-id-login.inrupt.com']).toBe('S');
   });
 });

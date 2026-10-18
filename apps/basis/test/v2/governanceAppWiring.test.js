@@ -29,7 +29,7 @@ describe('readCircleMembers', () => {
     expect(members).toContainEqual({ ref: 'me', role: 'member' });
     expect(members).toContainEqual({ ref: 'admin0', role: 'admin' });
     expect(members).toHaveLength(3);
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'listGroupMembers', { groupId: 'c1' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'listGroupMembers', { groupId: 'c1' });
   });
 
   it('does NOT invent a seat: someone the roster omits is not a member, whoever is asking', async () => {
@@ -80,7 +80,7 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
     // admin0 is the circle's admin per the roster → any-admin removeMember enacts immediately
     const r = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm1', actor: { ref: 'admin0' } });
     expect(r.status).toBe(DECISION_STATUS.APPROVED);
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'removeMember', { groupId: 'c1', memberWebid: 'm1', policy: 'graceful' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm1', policy: 'graceful' });
     // the propose + resolve entries are in the log as SIGNED statements, scoped to the circle
     const govEntries = eventLog.query({}).filter((e) => e.type === 'governance' && e.circleId === 'c1');
     expect(govEntries.map((e) => e.payload.body.kind).sort()).toEqual(['propose', 'resolve']);

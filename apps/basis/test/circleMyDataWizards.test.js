@@ -5,7 +5,7 @@
  * (the slash/page renderers) rather than reimplementing them. This guards the
  * contract the host (`circleApp.js` showMyData → mountMyDataWizard) relies on:
  * the wizards render into an injected container and dispatch via the shared
- * `callSkill('stoop', opId, args)` shape — the same `rawCallSkill` basis
+ * `callSkill('pinboard', opId, args)` shape — the same `rawCallSkill` basis
  * passes everywhere else.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -13,9 +13,9 @@ import { renderEncryptedBackupWizard } from '../src/web/wizards/encryptedBackupW
 import { renderRestoreFromMnemonicWizard } from '../src/web/wizards/restoreFromMnemonicWizard.js';
 
 describe('My-data key-management wizards (reused renderers)', () => {
-  it('encrypted-backup wizard renders + dispatches stoop.encryptedBackup with the passphrase', async () => {
+  it('encrypted-backup wizard renders + dispatches pinboard.encryptedBackup with the passphrase', async () => {
     const callSkill = vi.fn(async (app, op) => {
-      expect(app).toBe('stoop');
+      expect(app).toBe('pinboard');
       expect(op).toBe('encryptedBackup');
       return { blob: '{"sealed":"yes"}' };
     });
@@ -31,10 +31,10 @@ describe('My-data key-management wizards (reused renderers)', () => {
     create.click();
     await Promise.resolve(); await Promise.resolve();
 
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'encryptedBackup', { passphrase: 'a-strong-passphrase' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'encryptedBackup', { passphrase: 'a-strong-passphrase' });
   });
 
-  it('restore wizard reaches stoop.restoreFromMnemonic after the destructive confirms', async () => {
+  it('restore wizard reaches pinboard.restoreFromMnemonic after the destructive confirms', async () => {
     const callSkill = vi.fn(async () => ({ newPubKey: 'pk-new' }));
     const container = document.createElement('div');
     renderRestoreFromMnemonicWizard({ container, doc: document, callSkill, onClose: () => {}, onDispatched: () => {} });
@@ -53,6 +53,6 @@ describe('My-data key-management wizards (reused renderers)', () => {
     [...container.querySelectorAll('button')].find((b) => /restore now/i.test(b.textContent)).click();
     await Promise.resolve(); await Promise.resolve();
 
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'restoreFromMnemonic', { mnemonic: phrase, confirm: true });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'restoreFromMnemonic', { mnemonic: phrase, confirm: true });
   });
 });

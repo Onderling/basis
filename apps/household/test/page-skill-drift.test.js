@@ -2,7 +2,7 @@
  * Household page skill drift canary (2026-05-21).
  *
  * Sibling of `apps/tasks-v0/test/page-skill-drift.test.js` and
- * `apps/stoop/test/page-skill-drift.test.js`.  Household has a tiny
+ * `apps/pinboard/test/page-skill-drift.test.js`.  Household has a tiny
  * web surface (one `main.js`) and a small skill registry, but the
  * canary closes the loop here too — any future page-side skill
  * reference must map to a real skill.

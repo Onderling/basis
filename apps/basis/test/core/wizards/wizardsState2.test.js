@@ -76,13 +76,13 @@ describe('conflictDisputeState', () => {
     expect(CD.formatDisputeText(state)).not.toMatch(/About:/);
   });
 
-  it('submitDispute happy-path: posts via stoop.postRequest', async () => {
+  it('submitDispute happy-path: posts via pinboard.postRequest', async () => {
     const state = CD.initialState();
     state.summary = 'something happened';
     state.proposal = 'an apology';
     const callSkill = vi.fn().mockResolvedValue({ ok: true, postId: 'dispute-1' });
     const { result } = await CD.submitDispute({ state, callSkill });
-    expect(callSkill.mock.calls[0][0]).toBe('stoop');
+    expect(callSkill.mock.calls[0][0]).toBe('pinboard');
     expect(callSkill.mock.calls[0][1]).toBe('postRequest');
     expect(callSkill.mock.calls[0][2].kind).toBe('dispute');
     expect(state.successResult).toBe(result);
@@ -122,7 +122,7 @@ describe('settingsState', () => {
   it('loadSettings populates profile + holiday + clears loading', async () => {
     const state = ST.initialState();
     const callSkill = vi.fn()
-      .mockResolvedValueOnce({ handle: 'h', displayName: 'D' })   // getStoopProfile
+      .mockResolvedValueOnce({ handle: 'h', displayName: 'D' })   // getPinboardProfile
       .mockResolvedValueOnce({ holidayMode: true });               // getHolidayMode
     await ST.loadSettings({ state, callSkill });
     expect(state.profile).toEqual({ handle: 'h', displayName: 'D' });
@@ -151,14 +151,14 @@ describe('settingsState', () => {
     const callSkill = vi.fn().mockResolvedValue({});
     const r = await ST.saveHandle({ callSkill, handle: '  anne  ' });
     expect(r.ok).toBe(true);
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'setMyHandle', { handle: 'anne' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'setMyHandle', { handle: 'anne' });
   });
 
   it('saveDisplayName parallels saveHandle', async () => {
     const callSkill = vi.fn().mockResolvedValue({});
     const r = await ST.saveDisplayName({ callSkill, displayName: 'Anne K' });
     expect(r.ok).toBe(true);
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'setMyDisplayName', { displayName: 'Anne K' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'setMyDisplayName', { displayName: 'Anne K' });
   });
 
   it('setHolidayMode returns the substrate-reported flag', async () => {
@@ -288,7 +288,7 @@ describe('joinGroupState', () => {
     state.invite = { groupId: 'b1' };  // no embedded rules
     const callSkill = vi.fn().mockResolvedValue({ rules: 'remote rules text' });
     await JG.fetchGroupRules({ state, callSkill });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'getGroupRules', { groupId: 'b1' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'getGroupRules', { groupId: 'b1' });
     expect(state.rulesText).toBe('remote rules text');
   });
 

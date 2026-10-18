@@ -1,6 +1,6 @@
 /**
  * `contact` type — a person the user knows. Shared across all
- * three apps (Tasks circle membership, Stoop contacts, Folio
+ * three apps (Tasks circle membership, Pinboard contacts, Folio
  * share recipients).
  *
  * A contact usually carries a key (`pubKey`, or on a book row the card's `peerAddr` / `personKey`). One shape has

@@ -56,8 +56,8 @@ describe('restoreFromMnemonicState', () => {
     // Step 1b — installs the owner root (default profile / feedback pseudonym) first,
     const trimmed = 'one two three four five six seven eight nine ten eleven twelve';
     expect(callSkill).toHaveBeenCalledWith('household', 'restoreOwnerPhrase', { mnemonic: trimmed });
-    // then runs the legacy stoop restore for pod reattachment.
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'restoreFromMnemonic', {
+    // then runs the legacy pinboard restore for pod reattachment.
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'restoreFromMnemonic', {
       mnemonic: trimmed,
       confirm:  true,
     });
@@ -109,7 +109,7 @@ describe('encryptedBackupState', () => {
 
   it('suggestedFilename produces a date-stamped .json.enc name', () => {
     const fn = EB.suggestedFilename(new Date('2026-05-24T15:30:45.000Z'));
-    expect(fn).toBe('stoop-backup-2026-05-24T15-30-45.json.enc');
+    expect(fn).toBe('pinboard-backup-2026-05-24T15-30-45.json.enc');
   });
 
   it('submitCreateBackup happy-path: advances to step 2, stores blob', async () => {
@@ -117,7 +117,7 @@ describe('encryptedBackupState', () => {
     state.passphrase = 'secret'; state.confirm = 'secret';
     const callSkill = vi.fn().mockResolvedValue({ blob: '{"encrypted":true}' });
     await EB.submitCreateBackup({ state, callSkill });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'encryptedBackup', { passphrase: 'secret' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'encryptedBackup', { passphrase: 'secret' });
     expect(state.blob).toBe('{"encrypted":true}');
     expect(state.step).toBe(2);
     expect(state.submitError).toBe(null);

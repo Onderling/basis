@@ -98,7 +98,7 @@ describe('createCirclePodProducer', () => {
 
     // before redeem: bob is NOT a recipient of the group key
     await expect(prod.controlAgent.sealingStrategy(bob.privateKey)).rejects.toThrow();
-    // redeem → stoop routes addMember(bob, groupId:rg) to this circle's producer
+    // redeem → pinboard routes addMember(bob, groupId:rg) to this circle's producer
     await router.addMember({ webId: 'did:bob', publicKey: bob.publicKey, role: 'member', groupId: 'rg' });
     // now bob can open content sealed by the circle (the local self identity)
     const self = await prod.sealingIdentity.ensure();

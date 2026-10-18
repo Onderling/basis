@@ -53,7 +53,7 @@ export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date
   const listeners = new Set();
   const emit = (e) => { for (const fn of listeners) { try { fn(e); } catch { /* a painter never breaks the link */ } } };
   const contacts = async () => {
-    const r = await callSkill('stoop', 'listContacts', {}).catch(() => null);
+    const r = await callSkill('pinboard', 'listContacts', {}).catch(() => null);
     return Array.isArray(r?.contacts) ? r.contacts : (Array.isArray(r?.items) ? r.items : []);
   };
 
@@ -69,14 +69,14 @@ export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date
     if (!st || st.bot !== from || typeof st.row !== 'string' || !st.row || !mine || st.root !== mine) return false;
     if (payload.unlinked) {
       if (!(await contacts()).some((c) => c?.webid === from && typeof c.linkedRow === 'string' && c.linkedRow)) return false;
-      await callSkill('stoop', 'addContact', { webid: from, linkedRow: null, linkedAt: now() });
+      await callSkill('pinboard', 'addContact', { webid: from, linkedRow: null, linkedAt: now() });
       emit({ bot: from, unlinked: true });
       return true;
     }
     const p = pending.get(from);
     if (!p) return false;
     pending.delete(from);
-    const r = await callSkill('stoop', 'addContact', {
+    const r = await callSkill('pinboard', 'addContact', {
       webid: from, pubKey: from, peerAddr: from, ...(p.botName ? { displayName: p.botName } : {}), linkedRow: st.row, linkedAt: now(),
     });
     if (r?.error) return false;

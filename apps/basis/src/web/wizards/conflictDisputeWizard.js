@@ -4,13 +4,13 @@
  * basis — C4 conflict-resolution dispute wizard (2026-05-24).
  *
  * 3-step dispute flow: raise → propose resolution → acceptance.  Per
- * stoop's S7 design.
+ * pinboard's S7 design.
  *
- * **Substrate gap**: stoop hasn't shipped the dedicated raiseDispute /
+ * **Substrate gap**: pinboard hasn't shipped the dedicated raiseDispute /
  * proposeResolution / acceptResolution skills yet (the Lamport
  * version-vector substrate exists but the user-facing dispute ops
  * don't).  V0 fallback per [[quality-over-cheap]]: persist as a
- * `kind: 'dispute'` stoop request via the existing `postRequest`
+ * `kind: 'dispute'` pinboard request via the existing `postRequest`
  * skill.  The circle feed becomes the V0 escalation surface; future
  * C4.5 slice swaps in the real escalation skills when they land.
  *

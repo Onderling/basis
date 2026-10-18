@@ -1,7 +1,7 @@
 /**
  * podPathMap — Tasks' `mem://tasks/circles/<circleId>/…` logical-key ↔
  * canonical storage-function classifier (Tasks M4 / Phase 3.3 parity
- * with Stoop's `apps/stoop/src/lib/podPathMap.js`).
+ * with Pinboard's `apps/pinboard/src/lib/podPathMap.js`).
  *
  * PURE + reversible. No pod-routing / identity / network here — the
  * attach-time glue (`attachTasksBundle`) composes `classify` + the
@@ -12,7 +12,7 @@
  * `storageFn` is a canonical pod-routing storage-function and `tail`
  * is the resource path within it (each segment percent-encoded by
  * upstream writers — this module passes segments through verbatim,
- * same as Stoop's convention). `circleId` is injected at classify-time.
+ * same as Pinboard's convention). `circleId` is injected at classify-time.
  *
  * Tasks logical key space (from ItemStore + per-skill writers):
  *
@@ -45,7 +45,7 @@
 // Each rule: `prefix` = logical prefix (or `exact` for single-path);
 // `family` = a stable injective key used by `reverseResolve`;
 // `fn(circleId)` = the pod-routing storage-function (same vocabulary
-// as Stoop — the shared `packages/pod-routing` README).
+// as Pinboard — the shared `packages/pod-routing` README).
 // `circle: true` rules require a circleId at classify-time.
 
 const RULES = [

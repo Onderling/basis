@@ -151,7 +151,7 @@ describe('the phone is lost, and there is a box', () => {
     // Bea's row for the person keeps ONLY the new phone's address.
     const mine = newPhone.agent.circleAddressFor(CIRCLE);
     const row = await until(async () => {
-      const rr = await bea.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+      const rr = await bea.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
       const me = (rr?.members ?? []).find((m) => m.webid === newPhone.pubKey);
       const set = me?.circleAddresses ?? [];
       return (set.includes(mine) && set.length === 1) ? me : null;
@@ -181,7 +181,7 @@ describe('the phone is lost, and there is a box', () => {
     // The new phone learns the re-enrolled box's address — its own row grows again.
     const mine = newPhone.agent.circleAddressFor(CIRCLE);
     const grown = await until(async () => {
-      const rr = await newPhone.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+      const rr = await newPhone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
       const me = (rr?.members ?? []).find((m) => m.webid === newPhone.pubKey);
       const others = (me?.circleAddresses ?? []).filter((a) => a !== mine);
       return others.length ? others : null;
@@ -200,7 +200,7 @@ describe('the phone is lost, and there is a box', () => {
       const onBox = await until(async () => walkLog(dataDir).find((e) => e.kind === 'contact-turn' && e.text === 'na de wissel: werkt het nog?') ?? null, { timeout: 30_000, step: 500 });
       expect(onBox, `the re-enrolled box did not take the feedback:\n${box.out.slice(-1200)}`).toBeTruthy();
       const onPhone = await until(async () => (newPhone.contactTurnsSeen.some((t) => t?.text === 'na de wissel: werkt het nog?') ? true : null), { timeout: 30_000, step: 250 });
-      expect(onPhone, `the new phone never got it from the box — refused: ${JSON.stringify(newPhone.contactTurnsRefused)}; thread: ${JSON.stringify(await textsIn(newPhone, person.pubKey))}; own address ${mine.slice(0, 12)}; my row: ${JSON.stringify(((await newPhone.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? []).find((m) => m.webid === newPhone.pubKey)?.circleAddresses?.map((a) => a.slice(0, 12)))}; circles: ${JSON.stringify((await newPhone.agent.callSkill('stoop', 'listMyCircles', {}))?.circles)}`).toBe(true);
+      expect(onPhone, `the new phone never got it from the box — refused: ${JSON.stringify(newPhone.contactTurnsRefused)}; thread: ${JSON.stringify(await textsIn(newPhone, person.pubKey))}; own address ${mine.slice(0, 12)}; my row: ${JSON.stringify(((await newPhone.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? []).find((m) => m.webid === newPhone.pubKey)?.circleAddresses?.map((a) => a.slice(0, 12)))}; circles: ${JSON.stringify((await newPhone.agent.callSkill('pinboard', 'listMyCircles', {}))?.circles)}`).toBe(true);
     } finally { await teardown(person); }
   }, 240_000);
 });

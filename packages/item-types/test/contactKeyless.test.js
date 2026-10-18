@@ -4,7 +4,7 @@
  * A person admitted through a door that carries no key (a Telegram user of a household bot) is a contact row with a
  * door-shaped id (`telegram:<uid>`), the door it came in by (`channel`), a role, and NO `pubKey`. The type names
  * that shape once (`KEYLESS_CONTACT_EXAMPLE`), and every reader of the book is tested over it in the package that
- * holds the reader (stoop's ContactBook, basis's projections): each works or refuses with a reason, none throws,
+ * holds the reader (pinboard's ContactBook, basis's projections): each works or refuses with a reason, none throws,
  * none invents a key.
  */
 import { describe, it, expect } from 'vitest';

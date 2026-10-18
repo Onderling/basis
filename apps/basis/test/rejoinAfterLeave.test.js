@@ -48,9 +48,9 @@ describe('a member who left joins again', () => {
     const back = await until(async () => ((await isOn(ann)) ? true : null), { timeout: 10_000, step: 100 });
     expect(back, `Bob is not back on Ann's roster: ${JSON.stringify((await readRoster(ann, CIRCLE)).map((m) => m.handle))}`).toBe(true);
     const bobBack = await until(async () => ((await isOn(bob)) ? true : null), { timeout: 10_000, step: 100 });
-    const mine = await bob.agent.callSkill('stoop', 'listMyCircles', {});
+    const mine = await bob.agent.callSkill('pinboard', 'listMyCircles', {});
     const stmts = (bob.deviceLog?.query?.({}) ?? []).filter((e) => e.circleId === CIRCLE).map((e) => [e.payload?.body?.kind, String(e.payload?.body?.subject ?? '').slice(0, 6), String(e.payload?.body?.author ?? '').slice(0, 6)]);
-    const red = ((await bob.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' }))?.items ?? []).filter((i) => i.source?.groupId === CIRCLE).map((i) => [String(i.source?.redeemedBy).slice(0, 6), i.source?.redeemedAt]);
+    const red = ((await bob.agent.callSkill('pinboard', 'listOpen', { type: 'membership-redemption' }))?.items ?? []).filter((i) => i.source?.groupId === CIRCLE).map((i) => [String(i.source?.redeemedBy).slice(0, 6), i.source?.redeemedAt]);
     expect(bobBack, `Bob does not see himself back. bob=${String(bob.pubKey).slice(0, 6)} circles=${JSON.stringify(mine?.circles)} left=${JSON.stringify(mine?.left)} log=${JSON.stringify(stmts)} redemptions=${JSON.stringify(red)} again=${JSON.stringify(again.joined)}`).toBe(true);
   }, 120_000);
 
@@ -73,7 +73,7 @@ describe('a member who left joins again', () => {
 
     // …the way back is a NEW invite: Cas joins on it, leaves, and joins again on that same invite — the LATEST exit is
     // the leave, so the earlier removal does not count against them any more
-    const rotated = await ann.agent.callSkill('stoop', 'rotateMyGroupCode', { groupId: CIRCLE });
+    const rotated = await ann.agent.callSkill('pinboard', 'rotateMyGroupCode', { groupId: CIRCLE });
     expect(rotated?.code, JSON.stringify(rotated)).toBeTruthy();
     const back = await joinExistingCircle(ann, cas, { groupId: CIRCLE, handle: 'cas' });
     expect(back.joined?.ok, JSON.stringify(back.joined)).toBe(true);

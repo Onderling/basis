@@ -44,8 +44,8 @@ describe('FITNESS — removal goes through the shared per-circle operation on bo
       // The raw skill records the exit and rotates the key. It does not, and cannot, re-record this
       // device's authorize snapshot — that is application state above the substrate. A shell reaching
       // past the shared operation is exactly how a removal becomes a UI change again.
-      expect(/callSkill\(\s*'stoop'\s*,\s*'removeMember'/.test(source),
-        `${name} calls stoop.removeMember directly instead of removeCircleMember`).toBe(false);
+      expect(/callSkill\(\s*'pinboard'\s*,\s*'removeMember'/.test(source),
+        `${name} calls pinboard.removeMember directly instead of removeCircleMember`).toBe(false);
     });
   }
 });
@@ -64,8 +64,8 @@ describe('FITNESS — leaving prunes the circle locally on both shells', () => {
     });
 
     it(`${name} does NOT call the raw \`leaveGroup\` skill directly`, () => {
-      expect(/callSkill\(\s*'stoop'\s*,\s*'leaveGroup'/.test(source),
-        `${name} calls stoop.leaveGroup directly instead of leaveCircleLocally`).toBe(false);
+      expect(/callSkill\(\s*'pinboard'\s*,\s*'leaveGroup'/.test(source),
+        `${name} calls pinboard.leaveGroup directly instead of leaveCircleLocally`).toBe(false);
     });
 
     it(`${name} de-registers the left circle's address on its transport (J-R4)`, () => {
@@ -98,7 +98,7 @@ describe('FITNESS — the invite ceiling reaches both create wizards', () => {
       // code does not provide — the B8 mistake, in a new place.
       expect(source.includes('INVITE_REDEMPTION_SYSTEM_CAP'),
         `${name} does not use the shared cap`).toBe(true);
-      expect(source.includes("@onderling-app/stoop/lib/inviteCeiling"),
+      expect(source.includes("@onderling-app/pinboard/lib/inviteCeiling"),
         `${name} does not import the cap from the module that enforces it (invariant 3)`).toBe(true);
     });
 
@@ -124,8 +124,8 @@ describe('FITNESS — the ceiling is enforced where it binds, not in the joiner\
   it('the refusal is produced by the ADMIN-side redeem validator', () => {
     // The enforceability test, as a guard. If this check ever moves out of
     // `verifyMembershipCodeForPeer`, it has stopped being a ceiling and become a request.
-    const stoop = read('../../../stoop/src/skills/index.js');
-    const validator = stoop.slice(stoop.indexOf("defineSkill('verifyMembershipCodeForPeer'"));
+    const pinboard = read('../../../pinboard/src/skills/index.js');
+    const validator = pinboard.slice(pinboard.indexOf("defineSkill('verifyMembershipCodeForPeer'"));
     const body = validator.slice(0, validator.indexOf("defineSkill('recordRemoteRedemption'"));
     expect(body).toContain('inviteRedemptionVerdict');
     expect(body).toContain('INVITE_LIMIT_REACHED');

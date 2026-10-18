@@ -2,7 +2,7 @@
 //
 // UI → op wiring for the admin "remove member" action. Renders the REAL admin-panel renderer
 // (renderCircleAdminPanel) and asserts that clicking a member's "remove" button dispatches the
-// production removal op — `callSkill('stoop', 'removeMember', { groupId, memberWebid, memberStableId })`
+// production removal op — `callSkill('pinboard', 'removeMember', { groupId, memberWebid, memberStableId })`
 // — with the exact args circleApp.js's showAdmin onRemove sends. This is the surface half of the no-pod
 // key-rotation trigger: this op is what ultimately drives the control-agent rotation + key-event fan
 // (proven end-to-end over real agents in appNoPodKeyRotationRealRemove.test.js). No browser, no circleApp
@@ -23,7 +23,7 @@ describe('circle admin panel — remove member → removeMember op', () => {
 
   // The dispatch circleApp.js's showAdmin onRemove performs, verbatim (the op-id + args shape).
   const dispatchRemove = (rawCallSkill) => (m) =>
-    rawCallSkill('stoop', 'removeMember', { groupId: circleId, memberWebid: m.webid, memberStableId: m.stableId });
+    rawCallSkill('pinboard', 'removeMember', { groupId: circleId, memberWebid: m.webid, memberStableId: m.stableId });
 
   it('clicking remove dispatches removeMember with the clicked member’s webid + stableId', () => {
     const rawCallSkill = vi.fn(async () => ({ ok: true }));
@@ -35,7 +35,7 @@ describe('circle admin panel — remove member → removeMember op', () => {
     rows[1].querySelector('.cc-admin__member-remove').click();
 
     expect(rawCallSkill).toHaveBeenCalledTimes(1);
-    expect(rawCallSkill).toHaveBeenCalledWith('stoop', 'removeMember', {
+    expect(rawCallSkill).toHaveBeenCalledWith('pinboard', 'removeMember', {
       groupId: circleId, memberWebid: 'w-bob', memberStableId: 's-bob',
     });
   });
@@ -44,7 +44,7 @@ describe('circle admin panel — remove member → removeMember op', () => {
     const rawCallSkill = vi.fn(async () => ({ ok: true }));
     const el = renderCircleAdminPanel(mount(), { t, members, viewerWebid: 'w-admin', onRemove: dispatchRemove(rawCallSkill) });   // as the ADMIN
     el.querySelectorAll('.cc-admin__member')[2].querySelector('.cc-admin__member-remove').click();
-    expect(rawCallSkill).toHaveBeenCalledWith('stoop', 'removeMember', {
+    expect(rawCallSkill).toHaveBeenCalledWith('pinboard', 'removeMember', {
       groupId: circleId, memberWebid: 'w-cara', memberStableId: 's-cara',
     });
   });

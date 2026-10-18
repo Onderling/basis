@@ -60,7 +60,7 @@ import { createMeshSurface } from '@onderling/core';
 import { createNearbyRoomBinding } from '../../../basis/src/v2/nearbyRoomBinding.js';
 import { createNearbyIdentity } from '../../../basis/src/v2/nearbyIdentity.js';
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../basis/src/v2/addressSharing.js';
-import { readNearbyFace, readNearbyRadio } from './nearbyAllowsStore.js';
+import { readNearbyRadio } from './nearbyAllowsStore.js';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -149,7 +149,7 @@ async function loadCreateRealHouseholdAgent() {
 import { DISCOVERABILITY } from '@onderling/core';
 import { DEFAULT_PERSONA } from '../../../basis/src/v2/contactPersona.js';
 
-async function loadMdnsTransport() {   // (batch 7) unused — kept one release for the stoop-mobile mirror; builder owns construction now
+async function loadMdnsTransport() {   // (batch 7) unused — kept one release for the pinboard-mobile mirror; builder owns construction now
   try {
     const mod = await import('../../../../packages/react-native/src/transport/MdnsTransport.js');
     return mod.MdnsTransport;
@@ -268,14 +268,14 @@ export async function bootAgentBundle(opts = {}) {
       : ownerRootVault ? new RootKeyStoreVault({ vault: ownerRootVault })
         : undefined);
 
-  // when asyncStorage is provided, also seed the stoop
-  // per-agent cache adapter so stoop's web-style boot survives app
+  // when asyncStorage is provided, also seed the pinboard
+  // per-agent cache adapter so pinboard's web-style boot survives app
   // reloads on Hermes.  createRealHouseholdAgent threads `opts.
-  // stoopPersistDb` into createBrowserStoopAgent (which delegates
-  // to apps/stoop/src/lib/persistPicker.js → AsyncStoragePersist).
-  const stoopPersistDb = opts.stoopPersistDb
+  // pinboardPersistDb` into createBrowserPinboardAgent (which delegates
+  // to apps/pinboard/src/lib/persistPicker.js → AsyncStoragePersist).
+  const pinboardPersistDb = opts.pinboardPersistDb
     ?? (opts.asyncStorage
-      ? { dbName: 'cc-stoop-cache', asyncStorage: opts.asyncStorage }
+      ? { dbName: 'cc-pinboard-cache', asyncStorage: opts.asyncStorage }
       : undefined);
 
   // Parallel synthesis for tasks-v0 — without this, the tasks
@@ -284,14 +284,14 @@ export async function bootAgentBundle(opts = {}) {
   // behind the `cc.firstBootSeeded.v1` flag in App.js).
   // createRealHouseholdAgent threads `opts.tasksPersistDb` into
   // createBrowserMultiCircleTasksAgent → buildBundle → tasks-v0's own
-  // persistPicker (mirrors stoop's three-adapter shape).
+  // persistPicker (mirrors pinboard's three-adapter shape).
   const tasksPersistDb = opts.tasksPersistDb
     ?? (opts.asyncStorage
       ? { dbName: 'cc-tasks-cache', asyncStorage: opts.asyncStorage }
       : undefined);
 
   // OBJ-2 S1e (mobile) — persist the household store across reloads, same shape
-  // as tasks/stoop. createRealHouseholdAgent threads `householdPersistDb` into
+  // as tasks/pinboard. createRealHouseholdAgent threads `householdPersistDb` into
   // new HouseholdStore({ dataSource }) → buildHouseholdDataSource → AsyncStoragePersist.
   const householdPersistDb = opts.householdPersistDb
     ?? (opts.asyncStorage
@@ -318,19 +318,19 @@ export async function bootAgentBundle(opts = {}) {
       hostVault,
       ownerRootVault,
       rootKeyStore,
-      stoopPersistDb,
+      pinboardPersistDb,
       tasksPersistDb,
       householdPersistDb,
       settingsPersistDb,
       // Held messages + the dead-address verdict survive a launch (AsyncStorage, like the settings cache).
       outboxPersistDb: opts.asyncStorage ? { dbName: 'cc-outbox-cache', asyncStorage: opts.asyncStorage } : undefined,
-      stoopControlAgent: opts.stoopControlAgent,   // S4 — multi-member sealing router (redeem/leave)
+      pinboardControlAgent: opts.pinboardControlAgent,   // S4 — multi-member sealing router (redeem/leave)
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId), RN
       // parity with web circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod +
       // fans a ref (pod-signal), and catch-up range-queries→opens it; a no-pod circle keeps fan-out-full /
       // local-mirror reads. App.js passes circlePods' lazy wrappers; absent → the pre-Phase-3 behaviour.
-      stoopCircleDataMove: opts.stoopCircleDataMove,
-      stoopPodWrite:       opts.stoopPodWrite,
+      pinboardCircleDataMove: opts.pinboardCircleDataMove,
+      pinboardPodWrite:       opts.pinboardPodWrite,
       // Cache-mode mirroring (RN parity with web circleApp): provision a pod-backed circle's store MEDIUM
       // (a cache-mode PseudoPod sealing→write-throughing to the pod). App.js passes circlePods'
       // `provisionCircleMedium`; absent → no cache media → shared local backing, unchanged.
@@ -380,7 +380,7 @@ export async function bootAgentBundle(opts = {}) {
       // on the tasks-v0 itemStore, realAgent's listOpen probe always
       // returns empty and re-runs 4 addTask + setMyHandle +
       // setMyDisplayName round-trips (~2.5s of the cold-boot wall
-      // clock).  Forward seedTasks / seedStoopProfile / seedStoopPosts
+      // clock).  Forward seedTasks / seedPinboardProfile / seedPinboardPosts
       // from the host so it can flip them based on its own first-boot
       // flag.  Default left undefined (truthy) so the first boot still
       // seeds.
@@ -389,8 +389,8 @@ export async function bootAgentBundle(opts = {}) {
       // the demo deploy + fixtures can enable it via the bundle.
       seedDemoData:     opts.seedDemoData,
       seedTasks:        opts.seedTasks,
-      seedStoopProfile: opts.seedStoopProfile,
-      seedStoopPosts:   opts.seedStoopPosts,
+      seedPinboardProfile: opts.seedPinboardProfile,
+      seedPinboardPosts:   opts.seedPinboardPosts,
       getActiveCircleId: getActiveCircle,   // per-circle store scoping — the active circle scopes chat ops
       // L3 — household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
@@ -467,7 +467,7 @@ export async function bootAgentBundle(opts = {}) {
   };
 
   // 5.9c — best-effort local mDNS discovery for the "Nearby" row on the
-  // circle launcher.  Mirrors stoop-mobile/agentBundle.js's wiring (look
+  // circle launcher.  Mirrors pinboard-mobile/agentBundle.js's wiring (look
   // for the `MdnsTransport.isAvailable()` block).  Fire-and-forget so
   // boot stays fast; if the native module is missing (vitest, iOS, Expo
   // Go) or the start times out (Wi-Fi off), `bundle.mdns` simply stays
@@ -487,11 +487,10 @@ export async function bootAgentBundle(opts = {}) {
   // The Nearby room's wire binding (nearbyRoomBinding.js): outbound over the agent's peer send to the
   // room's current peers, inbound through the shell's peer router (`...nearbyRoom.handlers`). Lazy on the
   // agent, like everything else here built before the agent lands.
-  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none: the general persona's face
+  // who this device enters the room as — the Nearby screen hands the getter in (`setNearbyRoomSelf`); none yet: no face (never the general persona by default)
   const nearbyRoomSelfRef = { current: () => null };
   // what the room is told about me, and what an ask in it is weighed against (nearbyIdentity.js) — one per bundle
   const nearbyIdentity = createNearbyIdentity({
-    readChoice: readNearbyFace,
     callSkill: (app, op, args) => agent.callSkill?.(app, op, args),
     relayUrl: () => resolveMobileRelayUrl(),
     shareNkn: () => agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) === true,
@@ -578,7 +577,7 @@ export async function bootAgentBundle(opts = {}) {
   // a bare `registerCirclePresence()` correct from any caller, which is what the post-join seam needs.
   const liveCircleIds = async () => {
     try {
-      const res = await agent.callSkill?.('stoop', 'listMyCircles', {});
+      const res = await agent.callSkill?.('pinboard', 'listMyCircles', {});
       const ids = (Array.isArray(res?.circles) ? res.circles : [])
         .map((b) => (typeof b === 'string' ? b : b?.id))
         .filter(Boolean);
@@ -721,7 +720,7 @@ export async function bootAgentBundle(opts = {}) {
   // the bundle for the Contacten screens + Detox.
   // Persist the roster so v2 Contacten survives a reload (AsyncStorage on RN);
   // the AsyncStorageAdapter implements the PeerGraph storageBackend interface
-  // (get/set/delete/list). Same pattern as stoop-mobile's agentBundle.
+  // (get/set/delete/list). Same pattern as pinboard-mobile's agentBundle.
   const peerGraph = new PeerGraph({
     storageBackend: new AsyncStorageAdapter({ prefix: 'cc-peers:' }),
   });
@@ -775,7 +774,7 @@ export async function bootAgentBundle(opts = {}) {
     onJoined: (a) => pairSeams.onJoined?.(a),
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid }),
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
-    myHandle: async () => { try { return (await agent.callSkill('stoop', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
+    myHandle: async () => { try { return (await agent.callSkill('pinboard', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     relayUrl: () => { try { return agent?.relays?.list?.()?.[0]?.url ?? _activeRelayUrl ?? null; } catch { return _activeRelayUrl ?? null; } },
     // the lens (web parity): the founder says on the new pair circle what this contact's persona discloses. No
     // picture reseal here — the picture reaches the pair circle by the next Mij share, where the launcher composes
@@ -797,16 +796,16 @@ export async function bootAgentBundle(opts = {}) {
     // the thread screen. Hiding is Contacten only: their circles, the thread and the pair roster never change.
     // For the seeded contact this is only ever a REPLY — the box never initiates.
     isHidden: async (contactId) => {
-      const rows = (await agent.callSkill('stoop', 'listContacts', {}))?.contacts ?? [];
+      const rows = (await agent.callSkill('pinboard', 'listContacts', {}))?.contacts ?? [];
       return rows.some((c) => (c.webid ?? c.pubKey) === contactId && c.hidden === true);
     },
-    onReturned: async (contactId) => { await agent.callSkill('stoop', 'setContactHidden', { webid: contactId, hidden: false }); },
+    onReturned: async (contactId) => { await agent.callSkill('pinboard', 'setContactHidden', { webid: contactId, hidden: false }); },
     // the first message to a contact carries MY card; a card that arrives (naming its sender) goes into the book, so
     // whoever writes to me is a named row on every device (web parity, 2026-09-21)
-    myCard: async (personaId = null) => { try { return (await agent.callSkill('stoop', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
+    myCard: async (personaId = null) => { try { return (await agent.callSkill('pinboard', 'getContactShareQr', personaId ? { persona: personaId } : {}))?.payload ?? null; } catch { return null; } },
     // web parity (circleApp's contactCardArrived): a card riding a message has no moment to choose in, so
     // the default is recorded EXPLICITLY rather than left absent — "not recorded" is a different fact.
-    onCard: async ({ card }) => { await agent.callSkill('stoop', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); },
+    onCard: async ({ card }) => { await agent.callSkill('pinboard', 'addContactFromQr', { payload: card, persona: DEFAULT_PERSONA }); },
     // the route (a contact with a pair roster) rides as send options (web parity)
     sendToPeer: (addr, payload, opts) =>
       (typeof agent.sendPeerMessage === 'function'

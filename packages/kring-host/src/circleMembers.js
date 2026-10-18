@@ -7,7 +7,7 @@
  * roster shapes kept in sync by copy-paste reshapers, and that drift was the
  * risk:
  *
- *   1. the RAW stoop roster row (`listGroupMembers` → `deriveRoster`)
+ *   1. the RAW pinboard roster row (`listGroupMembers` → `deriveRoster`)
  *        `{ webid, handle, displayName, role, sealingPublicKey, circleAddress, … }`
  *   2. the CHAT-SHELL projected item (`basis realAgent` `listGroupMembers`
  *      reshape → `{ id, type:'member', webid, label, handle, role, circleAddress? }`)
@@ -33,7 +33,7 @@
  * Placement (CLAUDE.md invariant 5): the canonical Member lives here in
  * `@onderling/kring-host` alongside `circleMembers.js` — the roster substrate
  * both basis shells (web + mobile) already depend on for `normalizeCircleMembers`.
- * The trail projection `deriveRoster` (stoop) births shape 1 and the chat-shell
+ * The trail projection `deriveRoster` (pinboard) births shape 1 and the chat-shell
  * reshape (basis) births shape 2; both now read the projector rather than
  * re-shaping a member by hand.
  *
@@ -275,7 +275,7 @@ export function circleMemberCount(result) {
  * without a live pod.
  *
  * Accepts either roster shape the target circle already holds:
- *   • stoop `listGroupMembers` → `[{ webid, sealingPublicKey }]` (the redemption trail — see
+ *   • pinboard `listGroupMembers` → `[{ webid, sealingPublicKey }]` (the redemption trail — see
  *     `listGroupMembersCore`), or
  *   • the circle control-agent roster → `[{ webId, publicKey }]` (the group-key recipient keys).
  *

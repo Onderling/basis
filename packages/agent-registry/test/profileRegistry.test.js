@@ -44,9 +44,9 @@ describe('registry — profile fields persist + drive own/inherit resolution', (
   });
 
   it('a later mutation (updateCapabilities) preserves the profile fields', async () => {
-    await reg.updateCapabilities('default', ['stoop', 'tasks']);
+    await reg.updateCapabilities('default', ['pinboard', 'tasks']);
     const d = await reg.lookup('default');
-    expect(d.capabilities).toEqual(['stoop', 'tasks']);
+    expect(d.capabilities).toEqual(['pinboard', 'tasks']);
     expect(d.ownerFingerprint).toBe('abcdef0123456789');       // NOT dropped by the spread-mutation
     expect(d.properties.relay).toEqual({ mode: 'own', value: 'wss://home' });
   });

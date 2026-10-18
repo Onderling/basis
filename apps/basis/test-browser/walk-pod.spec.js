@@ -54,17 +54,17 @@ test('story 9 (pod half) — a circle backed by a real Solid pod', async ({ brow
     const byId = new RegExp(`pod.?kring|${gid}`, 'i');
 
     // What does the app say the circle's storage is, before anyone changes it?
-    const before = await call(A.page, 'stoop', 'getCircleStoragePolicy', { groupId: gid });
+    const before = await call(A.page, 'pinboard', 'getCircleStoragePolicy', { groupId: gid });
     log('pod · the circle\'s storage posture out of the box', 'OBSERVED', JSON.stringify(before)?.slice(0, 160));
 
     // Point it at the pod. `shared` is the posture that needs a groupPodUri — the one rule the
     // vocabulary carries.
-    const set = await call(A.page, 'stoop', 'setCircleStoragePolicy', {
+    const set = await call(A.page, 'pinboard', 'setCircleStoragePolicy', {
       groupId: gid, storagePolicy: 'shared', groupPodUri: `${base}walk-owner/circles/${gid}/`,
     });
     log('pod · can a circle be pointed at a pod?', set?.error ? 'FINDING' : 'PASS', JSON.stringify(set)?.slice(0, 200));
 
-    const after = await call(A.page, 'stoop', 'getCircleStoragePolicy', { groupId: gid });
+    const after = await call(A.page, 'pinboard', 'getCircleStoragePolicy', { groupId: gid });
     log('pod · …and does it stick?', JSON.stringify(after ?? '').includes('shared') ? 'PASS' : 'FINDING',
       JSON.stringify(after)?.slice(0, 200));
 

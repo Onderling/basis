@@ -78,7 +78,7 @@ const PLATFORM_RN_VARIANTS = new Set(['polyfills']);
 // resolveRequest.  Rather than maintain per-package hardcoded lists
 // that silently drift from package.json (the class of omission that
 // broke `@onderling/react-native/theme`, then `@onderling/sync-engine-rn/
-// react`, for stoop-mobile 2026-05-16 — one rebuild surfaced the next
+// react`, for pinboard-mobile 2026-05-16 — one rebuild surfaced the next
 // each time), resolve through each package's own `exports` map: the
 // single source of truth.
 //
@@ -340,13 +340,13 @@ function withOnderlingPreset(options) {
       'express':                          SHIM_PATHS.nodeBuiltins,
       'systray2':                         SHIM_PATHS.nodeBuiltins,
       // `@onderling/relay` is the Node-side relay server (Web Push
-      // sender, mDNS discovery, the local-UI HTTP shim).  Stoop's
-      // `apps/stoop/src/lib/WebPushSender.js` does a dynamic import
+      // sender, mDNS discovery, the local-UI HTTP shim).  Pinboard's
+      // `apps/pinboard/src/lib/WebPushSender.js` does a dynamic import
       // of `@onderling/relay` when VAPID keys are configured — Metro
       // statically follows the dynamic `import()` and would fail
       // without this shim.  Mobile uses native Expo push instead;
       // the dynamic-import branch never fires at runtime.
-      // Stoop V3 mobile Phase 40.23 trap (2026-05-08).
+      // Pinboard V3 mobile Phase 40.23 trap (2026-05-08).
       '@onderling/relay':                  SHIM_PATHS.nodeBuiltins,
       // Same trap class: `web-push` is the Node Web-Push library
       // pulled by `WebPushSender`.  Mobile never reaches it.

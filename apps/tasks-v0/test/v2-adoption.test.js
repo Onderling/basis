@@ -55,12 +55,12 @@ describe('Tasks V2 — addTask embeds', () => {
       circleId: 'oss-tools',
       text:   'Paint the bench',
       embeds: [
-        { type: 'supply-offer', ref: 'https://anne.pod/sharing/stoop/abc' },
+        { type: 'supply-offer', ref: 'https://anne.pod/sharing/pinboard/abc' },
         { type: 'note',         ref: 'pseudo-pod://abc/notes/123' },
       ],
     });
     expect(r.task.embeds).toEqual([
-      { type: 'supply-offer', ref: 'https://anne.pod/sharing/stoop/abc' },
+      { type: 'supply-offer', ref: 'https://anne.pod/sharing/pinboard/abc' },
       { type: 'note',         ref: 'pseudo-pod://abc/notes/123' },
     ]);
   });

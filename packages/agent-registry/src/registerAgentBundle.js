@@ -8,10 +8,10 @@
  * issues. Re-registration is idempotent (CAS upsert keyed on
  * `agentId`).
  *
- * Standardisation Phase 52.10. Originally lived as a Stoop-internal
- * helper (`apps/stoop/src/substrateMirror.js#registerAgentInRegistry`);
+ * Standardisation Phase 52.10. Originally lived as a Pinboard-internal
+ * helper (`apps/pinboard/src/substrateMirror.js#registerAgentInRegistry`);
  * lifted here 2026-05-14 so Tasks-v0 and other adopting apps can use
- * the same shape without a cross-app dependency on Stoop.
+ * the same shape without a cross-app dependency on Pinboard.
  *
  * @param {object} args
  * @param {object} args.pseudoPod      — bundle's pseudoPod (write target)

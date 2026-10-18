@@ -12,11 +12,11 @@
  * an intermediary peer to reach a target). This module never touches routing;
  * it decides whether to ASK a contact to search one degree further.
  *
- * This board is UI around an existing Stoop primitive: the global stance is
+ * This board is UI around an existing Pinboard primitive: the global stance is
  * `getHopMode`/`setHopMode` (`bundle.settings.allowHopThrough`), and
- * per-contact `hopThrough` flags live in Stoop already. This module is the
+ * per-contact `hopThrough` flags live in Pinboard already. This module is the
  * pure glue: normalize the hop mode, model a 1-hop relay chain for the match
- * card, and shape the (anonymized) relay request. The host calls the Stoop
+ * card, and shape the (anonymized) relay request. The host calls the Pinboard
  * skills + sends.
  */
 
@@ -54,7 +54,7 @@ export function buildHopChain({ requester = {}, gates = [], target = {} } = {}) 
 
 /**
  * Shape an anonymized relay request to ask a gate to forward a skill query.
- * Pure — the host sends it over the existing Stoop hop path. Anonymized by
+ * Pure — the host sends it over the existing Pinboard hop path. Anonymized by
  * default: the gate sees the skill, not the requester's identity.
  */
 export function makeHopRelayRequest({ skill, gate = {}, anonymized = true } = {}) {

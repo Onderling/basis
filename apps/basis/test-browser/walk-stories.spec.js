@@ -31,7 +31,7 @@ const activeCircle = async (page) => (await surface(page))?.where?.circleId ?? n
  */
 async function waitForAgent(page, { tries = 30, every = 1000 } = {}) {
   for (let i = 0; i < tries; i += 1) {
-    const me = await page.evaluate(() => window.onderlingCall?.('stoop', 'whoAmI', {})).catch(() => null);
+    const me = await page.evaluate(() => window.onderlingCall?.('pinboard', 'whoAmI', {})).catch(() => null);
     if (me?.webid) return me;
     await page.waitForTimeout(every);
   }
@@ -62,7 +62,7 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
       posting.map((a) => `${a.opId}${a.needsArgs ? '*' : ''}${a.unavailable ? ':' + a.unavailable : ''}`).join(' · ') || 'nothing offered');
 
     // Ask for something, the way the story does.
-    const asked = await call(A.page, 'stoop', 'postAnnouncement', { groupId: gid, text: 'Heeft iemand een boormachine?' });
+    const asked = await call(A.page, 'pinboard', 'postAnnouncement', { groupId: gid, text: 'Heeft iemand een boormachine?' });
     log('story 4 · A asks the circle', asked?.error ? 'FINDING' : 'OBSERVED', JSON.stringify(asked)?.slice(0, 160));
 
     await B.page.waitForTimeout(9000);
@@ -73,7 +73,7 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
     // Read it the way a PERSON does: open the noticeboard tab. Two ops looked plausible from outside
     // and both misled — `listOpen` through the raw seam is not circle-scoped (it answered with the help
     // circle's items), and `listCirclePostsSince` is the catch-up read, not the board. The shell scopes
-    // `listOpen` through `stoopCall`, so the only honest instrument is the screen itself.
+    // `listOpen` through `pinboardCall`, so the only honest instrument is the screen itself.
     const boardText = async (page) => {
       await toChat(page);   // a circle opens in SCREEN mode by default; the tabs (the board among them) live in chat mode
       const t = page.locator('.circle-view__tab[data-tab="noticeboard"]');
@@ -88,8 +88,8 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
     const aTitle = await titleOf(A.page); const bTitle = await titleOf(B.page);
     // Where would the joiner LEARN the name? The rules item carries it on the creator's device; the
     // question is whether the joiner holds those rules at all, or whether the name simply never travels.
-    const aRules = await call(A.page, 'stoop', 'getGroupRules', { groupId: gid });
-    const bRules = await call(B.page, 'stoop', 'getGroupRules', { groupId: gid });
+    const aRules = await call(A.page, 'pinboard', 'getGroupRules', { groupId: gid });
+    const bRules = await call(B.page, 'pinboard', 'getGroupRules', { groupId: gid });
     log('story 4 · does the joiner hold the circle rules?', 'OBSERVED',
       `creator: ${JSON.stringify(aRules)?.slice(0, 90)} | joiner: ${JSON.stringify(bRules)?.slice(0, 90)}`);
     log('story 4 · does the circle show its NAME?',
@@ -180,15 +180,15 @@ test('story 7 — the same person, two circles', async ({ browser }) => {
     expect(leaked, 'a message from another circle must never appear here').toBe(false);
 
     // 2 · B must not be able to read the private circle's roster at all
-    const foreign = await call(B.page, 'stoop', 'listGroupRoster', { groupId: priv });
+    const foreign = await call(B.page, 'pinboard', 'listGroupRoster', { groupId: priv });
     const gotRoster = Array.isArray(foreign?.members) && foreign.members.length > 0;
     log('story 7 · can a non-member read the other roster?', gotRoster ? 'FINDING' : 'PASS',
       JSON.stringify(foreign)?.slice(0, 160));
 
     // 3 · unlinkability — A's address must differ per circle, or the relay can join them up
-    const inShared = await call(A.page, 'stoop', 'listGroupMembers', { groupId: shared });
-    const inPriv   = await call(A.page, 'stoop', 'listGroupMembers', { groupId: priv });
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const inShared = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: shared });
+    const inPriv   = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: priv });
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
     const addrIn = (r) => (r?.members ?? []).find((m) => m.webid === me)?.circleAddress ?? null;
     const a1 = addrIn(inShared); const a2 = addrIn(inPriv);
     log('story 7 · one person, two circle addresses', (a1 && a2 && a1 !== a2) ? 'PASS' : 'FINDING',
@@ -269,7 +269,7 @@ test('story 1 — the very first minutes, and are you still you afterwards?', as
       log('story 1 · what is the app WAITING for?', 'OBSERVED', JSON.stringify(seen));
     }
 
-    const mine = await call(A.page, 'stoop', 'listMyCircles', {});
+    const mine = await call(A.page, 'pinboard', 'listMyCircles', {});
     log('story 1 · what a fresh profile already contains', 'OBSERVED', JSON.stringify(mine)?.slice(0, 180));
 
     // Were they told about a recovery phrase, or shown one, or neither? The story's sharpest finding.
@@ -289,7 +289,7 @@ test('story 1 — the very first minutes, and are you still you afterwards?', as
       `before=${String(idBefore).slice(0, 12)} after=${String(after?.webid).slice(0, 12)}`);
     expect(after?.webid, 'an identity that does not survive a reopen is not an identity').toBe(idBefore);
 
-    const circlesAfter = await call(A.page, 'stoop', 'listMyCircles', {});
+    const circlesAfter = await call(A.page, 'pinboard', 'listMyCircles', {});
     log('story 1 · and is your stuff still there?',
       JSON.stringify(circlesAfter?.circles) === JSON.stringify(mine?.circles) ? 'PASS' : 'FINDING',
       `${JSON.stringify(mine?.circles)} → ${JSON.stringify(circlesAfter?.circles)}`);
@@ -313,23 +313,23 @@ test('story 5 — handing a circle over, and the last admin walking out', async 
     await C.page.waitForTimeout(6000);
 
     const gid = await activeCircle(A.page);
-    const roster = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const roster = await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid });
     const who = (roster?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}=${m.role}${m.adminVia ? '/' + m.adminVia : ''}`);
     log('story 5 · three in the circle?', (roster?.members ?? []).length >= 2 ? 'OBSERVED' : 'BLOCKED', JSON.stringify(who));
 
     // Hand it over: make someone else an admin, then step back yourself.
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
     const other = (roster?.members ?? []).find((m) => m.webid !== me && m.role !== 'admin')?.webid ?? null;
-    const promoted = await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: other, role: 'admin' });
+    const promoted = await call(A.page, 'pinboard', 'setMemberRole', { groupId: gid, memberWebid: other, role: 'admin' });
     log('story 5 · promote someone else', promoted?.error ? 'FINDING' : 'PASS', JSON.stringify(promoted)?.slice(0, 100));
     await A.page.waitForTimeout(8000);
 
-    const stepBack = await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: me, role: 'member' });
+    const stepBack = await call(A.page, 'pinboard', 'setMemberRole', { groupId: gid, memberWebid: me, role: 'member' });
     log('story 5 · and step back yourself', stepBack?.error ? 'FINDING' : 'PASS', JSON.stringify(stepBack)?.slice(0, 100));
     await A.page.waitForTimeout(8000);
 
     for (const [peer, label] of [[A, 'A(was admin)'], [B, 'B'], [C, 'C']]) {
-      const r = await call(peer.page, 'stoop', 'listGroupMembers', { groupId: gid });
+      const r = await call(peer.page, 'pinboard', 'listGroupMembers', { groupId: gid });
       log(`story 5 · ${label} now sees`, 'OBSERVED',
         JSON.stringify((r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}=${m.role}${m.adminVia ? '/' + m.adminVia : ''}`)));
     }
@@ -347,27 +347,27 @@ test('story 5 — handing a circle over, and the last admin walking out', async 
     // The sharper version from the story: the LAST admin leaves the circle entirely. The fold is
     // supposed to hand it to somebody, and that somebody is supposed to be told — the one authority
     // change nobody performs.
-    const nowAdmin = (await call(B.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [];
+    const nowAdmin = (await call(B.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [];
     const lastAdmin = nowAdmin.find((m) => m.role === 'admin')?.webid ?? null;
     const asB = lastAdmin && lastAdmin !== me;
     if (asB) {
       // The confirm gate is RIGHT and worth keeping — but read what it says to a person:
       // "Re-run with --confirm=true to proceed." That is CLI vocabulary in a circle.
-      const guarded = await call(B.page, 'stoop', 'leaveGroup', { groupId: gid });
+      const guarded = await call(B.page, 'pinboard', 'leaveGroup', { groupId: gid });
       log('story 5 · what the confirm gate SAYS', 'OBSERVED', JSON.stringify(guarded)?.slice(0, 140));
-      const left = await call(B.page, 'stoop', 'leaveGroup', { groupId: gid, confirm: true });
+      const left = await call(B.page, 'pinboard', 'leaveGroup', { groupId: gid, confirm: true });
       log('story 5 · the last admin walks out', left?.error ? 'FINDING' : 'OBSERVED', JSON.stringify(left)?.slice(0, 140));
       await A.page.waitForTimeout(12000);
       for (const [peer, label] of [[A, 'A'], [C, 'C']]) {
-        const r = await call(peer.page, 'stoop', 'listGroupMembers', { groupId: gid });
+        const r = await call(peer.page, 'pinboard', 'listGroupMembers', { groupId: gid });
         log(`story 5 · who runs it now, per ${label}`, 'OBSERVED',
           JSON.stringify((r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}=${m.role}${m.adminVia ? '/' + m.adminVia : ''}`)));
       }
       // WHICH device is the caretaker? The notice is addressed to the ONE person it happened to, so
       // reading the wrong screen would report "nobody was told" for a notice that was working.
-      const fold = (await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [];
+      const fold = (await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [];
       const caretaker = fold.find((m) => String(m.adminVia ?? '').startsWith('caretaker:'))?.webid ?? null;
-      const whoIs = async (peer) => (await call(peer.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+      const whoIs = async (peer) => (await call(peer.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
       const aId = await whoIs(A); const cId = await whoIs(C);
       const target = caretaker === aId ? A : (caretaker === cId ? C : null);
       log('story 5 · who became the caretaker', target ? 'OBSERVED' : 'BLOCKED',
@@ -473,9 +473,9 @@ test('story 6 — someone has to go, and the island holds', async ({ browser }) 
     const bBefore = await readBubbles(B.page);
     expect(bBefore.some((t) => /VOOR-JE-VERTREK/.test(t)), 'the baseline must cross').toBe(true);
 
-    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-    const bId = (await call(B.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
-    const removal = await call(A.page, 'stoop', 'removeMember', { groupId: gid, memberWebid: bId, reason: 'walk' });
+    const me = (await call(A.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+    const bId = (await call(B.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
+    const removal = await call(A.page, 'pinboard', 'removeMember', { groupId: gid, memberWebid: bId, reason: 'walk' });
     log('story 6 · the removal', 'OBSERVED', JSON.stringify(removal)?.slice(0, 120));
     await B.page.waitForTimeout(12000);
 
@@ -544,7 +544,7 @@ test('story 2 — a circle exists because two people are in it', async ({ browse
 
     // 2 · BOTH devices show the same two people
     await openCircleMatching(B.page, byId).catch(() => {});
-    const rosterOf = async (peer) => ((await call(peer.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+    const rosterOf = async (peer) => ((await call(peer.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [])
       .map((m) => ({ who: String(m.webid).slice(0, 8), role: m.role, handle: m.handle ?? null, name: m.displayName ?? null }));
     const rA = await rosterOf(A); const rB = await rosterOf(B);
     log('story 2 · A sees', 'OBSERVED', JSON.stringify(rA));
@@ -617,9 +617,9 @@ test('corpus 2.2 — joining while the admin is offline', async ({ browser }) =>
     await A.context.setOffline(false);
     await A.page.waitForTimeout(20000);
 
-    const rosterA = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+    const rosterA = ((await call(A.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [])
       .map((m) => String(m.webid).slice(0, 8));
-    const rosterB = ((await call(B.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+    const rosterB = ((await call(B.page, 'pinboard', 'listGroupMembers', { groupId: gid }))?.members ?? [])
       .map((m) => String(m.webid).slice(0, 8));
     log('corpus 2.2 · after the admin returns, A sees', 'OBSERVED', JSON.stringify(rosterA));
     log('corpus 2.2 · and B sees', 'OBSERVED', JSON.stringify(rosterB));
@@ -642,15 +642,15 @@ test('corpus 6.1 — one person, two devices', async ({ browser }) => {
     await createCircle(phone.page, 'Twee Apparaten');
     await openCircleMatching(phone.page, /twee.?apparaten/i);
     const gid = await activeCircle(phone.page);
-    const annaOnPhone = (await call(phone.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const annaOnPhone = (await call(phone.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
 
     // …and takes her recovery phrase to the laptop. This is the only route one person has to two devices.
-    const m = await call(phone.page, 'stoop', 'getMnemonicOnce', {});
+    const m = await call(phone.page, 'pinboard', 'getMnemonicOnce', {});
     log('corpus 6.1 · can she get her recovery phrase?', m?.mnemonic ? 'PASS' : 'FINDING',
       m?.mnemonic ? `${String(m.mnemonic).split(' ').length} words` : JSON.stringify(m));
     test.skip(!m?.mnemonic, 'no mnemonic to carry to the second device');
 
-    const restored = await call(laptop.page, 'stoop', 'restoreFromMnemonic', { mnemonic: m.mnemonic, confirm: true });
+    const restored = await call(laptop.page, 'pinboard', 'restoreFromMnemonic', { mnemonic: m.mnemonic, confirm: true });
     log('corpus 6.1 · restoring it on the laptop', restored?.error ? 'FINDING' : 'OBSERVED',
       JSON.stringify(restored)?.slice(0, 140));
     await laptop.page.waitForTimeout(8000);
@@ -662,7 +662,7 @@ test('corpus 6.1 — one person, two devices', async ({ browser }) => {
       `phone=${String(annaOnPhone).slice(0, 12)} laptop=${String(annaOnLaptop).slice(0, 12)}`);
 
     // Does the laptop know about the circle she made on the phone?
-    const laptopCircles = await call(laptop.page, 'stoop', 'listMyCircles', {});
+    const laptopCircles = await call(laptop.page, 'pinboard', 'listMyCircles', {});
     log('corpus 6.1 · does the laptop see her circle?',
       (laptopCircles?.circles ?? []).includes(gid) ? 'PASS' : 'FINDING',
       JSON.stringify(laptopCircles?.circles));

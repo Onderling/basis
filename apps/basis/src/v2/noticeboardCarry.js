@@ -1,18 +1,18 @@
 /**
  * ONE carry for noticeboard posts — the circle's store and its task lane (option B, Frits 2026-08-30).
  *
- * A post is written by stoop into its own index (claims, reveals, offering-match live there). Until now it
+ * A post is written by pinboard into its own index (claims, reveals, offering-match live there). Until now it
  * reached the other members by a SECOND sync implementation — a `circle-post` envelope fanned to the roster
  * — which is exactly what produced W1-shaped bugs. Now the author's post is ALSO put into the circle's
  * store, and the store's own mirror carries it: a signed snapshot on the task lane, fanned, catch-up served,
  * verified against the roster on landing. On the receiving device the landed snapshot is bridged into
- * stoop's index through the same `ingestRemotePost` door the envelope used, so stoop's verbs (respond,
+ * pinboard's index through the same `ingestRemotePost` door the envelope used, so pinboard's verbs (respond,
  * claim, report) keep working. Two stores remain (the index is derived); there is one carry.
  */
 import { isNoticeboardPostType } from '@onderling/item-types';
 import { noticeboardFanPayload } from './noticeboardFan.js';
 
-/** The circle store's registry requires the canonical base fields + a `body`; stoop writes `text`. */
+/** The circle store's registry requires the canonical base fields + a `body`; pinboard writes `text`. */
 export function toCircleStorePost(item, { from, now = () => new Date().toISOString() } = {}) {
   const createdAt = typeof item.createdAt === 'string' ? item.createdAt
     : (typeof item.addedAt === 'number' ? new Date(item.addedAt).toISOString() : now());
@@ -34,7 +34,7 @@ export function isLandedNoticeboardPost(item, { self = null } = {}) {
 }
 
 /**
- * The receiving side: feed a landed post to the shell's `handleCirclePost` (ingest into stoop's index,
+ * The receiving side: feed a landed post to the shell's `handleCirclePost` (ingest into pinboard's index,
  * driver match → notification) exactly as the envelope used to — same handler, different door.
  */
 export function landedNoticeboardHandler({ handleCirclePost, self = null } = {}) {

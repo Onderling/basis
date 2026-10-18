@@ -4,18 +4,18 @@
  * The circle item store holds more than asks/offers: the membership lifecycle + rules documents
  * (internal bookkeeping) and the circle CHAT lines (stored purely so a conversation survives a
  * reload) live beside the real posts, and `listOpen` with no intent returns them all. Every surface
- * that shows "posts" — the noticeboard tab, the recipe blocks, stoop's own brief — must filter
+ * that shows "posts" — the noticeboard tab, the recipe blocks, pinboard's own brief — must filter
  * through THIS gate, or chat lines surface as withdrawable "requests" (found live on the
  * noticeboard 2026-07-x, and again in `/brief` on 2026-07-31).
  *
- * It lived in basis (`circleStoopScope.js`) while stoop needed it too and could not import an app —
+ * It lived in basis (`circlePinboardScope.js`) while pinboard needed it too and could not import an app —
  * so `/brief` kept the leak for a month with a note saying why (fixing it in place would have meant
  * a second literal type-string in a second app, which the duplication invariant forbids). One home
  * here now; both apps import it.
  */
 
 /**
- * Stoop item types that are NOT user-facing noticeboard posts — the membership lifecycle + rules
+ * Pinboard item types that are NOT user-facing noticeboard posts — the membership lifecycle + rules
  * documents, and the circle chat lines.
  *
  * `circle-chat-message` earns its place here for the same reason the others do, but the symptom was
@@ -28,8 +28,8 @@ export const NOTICEBOARD_POST_TYPES = Object.freeze(['request', 'offer', 'announ
 
 /**
  * The BOARD's own vocabulary: the three words a person picks between when posting, and the three the
- * badge on a post can say. Distinct from the canonical `{type, kind}` a post is STORED as — stoop
- * translates one into the other on the way in (`STOOP_TYPE_MAPPING`), and `noticeboardIntentOf`
+ * badge on a post can say. Distinct from the canonical `{type, kind}` a post is STORED as — pinboard
+ * translates one into the other on the way in (`PINBOARD_TYPE_MAPPING`), and `noticeboardIntentOf`
  * translates back on the way out.
  *
  * It lives here, with the other board vocabulary, because both shells need it and neither may import
@@ -44,7 +44,7 @@ export const NOTICEBOARD_INTENTS = Object.freeze(['ask', 'offer', 'lend']);
  * the badge its KIND — and `borrow` is a kind, not an intent, so the board printed the untranslated
  * locale key `CIRCLE.NOTICEBOARD.INTENT.BORROW` at every asker (walked on a phone, both shells).
  * The two vocabularies are not interchangeable and this is the one place that converts between them;
- * stoop's forward map and this reverse are pinned to each other by a round-trip test.
+ * pinboard's forward map and this reverse are pinned to each other by a round-trip test.
  */
 export function noticeboardIntentOf(item) {
   const declared = item?.intent;
@@ -59,19 +59,19 @@ export function noticeboardIntentOf(item) {
 }
 
 /** Item types the noticeboard holds that are system documents (rules, membership), never posts. */
-export const SYSTEM_STOOP_TYPES = new Set([
+export const SYSTEM_PINBOARD_TYPES = new Set([
   'group-rules', 'membership-code', 'membership-redemption', 'circle-chat-message',
 ]);
 
 /** True when `item` is a real noticeboard post (an ask/offer), not a system item. */
 export function isNoticeboardPost(item) {
-  if (SYSTEM_STOOP_TYPES.has(item?.type)) return false;
-  // The local-first substrate/pseudo-pod collapses every stoop item to `type:'post'`,
+  if (SYSTEM_PINBOARD_TYPES.has(item?.type)) return false;
+  // The local-first substrate/pseudo-pod collapses every pinboard item to `type:'post'`,
   // losing the semantic type — but the original `source` shape survives. Recognise the
   // membership lifecycle + rules documents by their distinctive source fields so they
   // don't surface as noticeboard posts even when the type is flattened.
   //
-  // This is not a belt-and-braces branch: basis's own `adaptStoopReply` (realAgent.js)
+  // This is not a belt-and-braces branch: basis's own `adaptPinboardReply` (realAgent.js)
   // rewrites `type: 'post'` onto EVERY `listOpen` row, so on the live path the type
   // check above never fires and the recognisers below are the whole filter.
   const src = item?.source;
@@ -79,7 +79,7 @@ export function isNoticeboardPost(item) {
     if (src.rules != null) return false;                          // group-rules
     if (typeof src.code === 'string' && src.code) return false;   // membership-code
     if (src.redeemedBy != null) return false;                     // membership-redemption
-    // circle-chat-message — the only stoop item keyed by a message id (stoop's
+    // circle-chat-message — the only pinboard item keyed by a message id (pinboard's
     // `broadcastCircleMessage` local mirror + `ingestCircleMessage` receive mirror are
     // the only writers of `source.msgId`; the other circle broadcasts put theirs on the
     // wire `extras`, never on a stored item).

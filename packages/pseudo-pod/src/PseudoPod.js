@@ -434,7 +434,23 @@ export function createPseudoPod({
       if (prior) await _captureDisplaced(uri, prior.bytes);
     }
 
-    const { etag: newEtag, _v: newV } = await backend.put(key, bytes, etag);
+    // `etag` is the caller's IF-MATCH: the etag it read. Compared, never assigned — assigning it kept the etag the
+    // same across writes, so no writer could ever see that another had written in between. A fresh one is minted.
+    // `null` = "I read nothing": the write lands only while there is still nothing (or a record without an etag);
+    // leaving it out (`undefined`) is an unconditional write.
+    // An options object is not an etag (callers pass `{ contentType }` here); `{ ifMatch }` is honoured.
+    const ifMatch = (typeof etag === 'string' || etag === null) ? etag
+      : (etag && typeof etag === 'object' && 'ifMatch' in etag ? etag.ifMatch : undefined);
+    let written;
+    if (ifMatch !== undefined) {
+      written = typeof backend.putIf === 'function'
+        ? await backend.putIf(key, bytes, ifMatch)
+        : (((await backend.get(key))?.etag ?? null) === ifMatch ? await backend.put(key, bytes) : { conflict: true });
+      if (written?.conflict) throw Object.assign(new Error(`pseudo-pod: ${uri} changed since it was read`), { code: 'CONFLICT' });
+    } else {
+      written = await backend.put(key, bytes);
+    }
+    const { etag: newEtag, _v: newV } = written;
 
     if (effectiveMode === 'replication-ring') {
       const recipients = getPeers().filter(p => typeof p === 'string' && p.length > 0);

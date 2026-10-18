@@ -11,7 +11,7 @@ describe('replyToPost', () => {
     const callSkill = vi.fn(async () => ({ ok: true, threadId: 'post-1', itemId: 'chat-item-9', toPubKey: 'poster-A' }));
     const contactChannel = { persistOutbound: vi.fn(async () => ({ itemId: 'x' })) };
     const r = await replyToPost({ callSkill, contactChannel, itemId: 'post-1', body: 'ik kan helpen' });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'respondToItem', { itemId: 'post-1', body: 'ik kan helpen' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'respondToItem', { itemId: 'post-1', body: 'ik kan helpen' });
     expect(contactChannel.persistOutbound).toHaveBeenCalledWith(expect.objectContaining({
       contactId: 'poster-A', peerAddr: 'poster-A', text: 'ik kan helpen', replyTo: 'post-1', messageId: 'post-reply-chat-item-9',
     }));

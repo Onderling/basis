@@ -74,7 +74,7 @@ allowlist tightens that further to apps the user has explicitly
 trusted at install time.
 
 ```xml
-<!-- in the bundle (Tasks / Stoop / Folio) AndroidManifest.xml -->
+<!-- in the bundle (Tasks / Pinboard / Folio) AndroidManifest.xml -->
 <uses-permission android:name="org.onderling.hub.PERMISSION_BIND" />
 ```
 

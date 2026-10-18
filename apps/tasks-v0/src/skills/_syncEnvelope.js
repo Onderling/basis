@@ -5,7 +5,7 @@
  * consumes for staleness hints.
  *
  * Mirrors `apps/folio/src/browser.js:73`'s `simulateSync` + the
- * decorate-with-lastSync pattern stoop adopted in the same pass.
+ * decorate-with-lastSync pattern pinboard adopted in the same pass.
  * Plain JS, no deps; safe for both browser + node runtimes.
  *
  * Phase 1 scope: list ops emit `_sync` on the reply envelope, AND

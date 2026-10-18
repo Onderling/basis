@@ -2,7 +2,7 @@
  * basis v2 — the person's own basics (web DOM renderer): handle + display name, and the coarse location. Painted at
  * the top of the person's own editor (`openAboutMePanel`), where Mij's "Edit" door leads; Mij itself is the declared
  * screen (name, readings, devices) and lists no section by hand. Pure render — the host loads `getMyProfile` and
- * dispatches the stoop mutations behind the callbacks.
+ * dispatches the pinboard mutations behind the callbacks.
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
 

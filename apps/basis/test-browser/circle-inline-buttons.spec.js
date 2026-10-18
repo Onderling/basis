@@ -135,7 +135,7 @@ test('Theme B — the guided-setup chatbot walks the basics + pre-fills the sett
   await page.waitForTimeout(800);
 
   // A fresh circle composes ALL apps (policy.apps = null) → every app box is checked.
-  await expect(page.locator('input[data-app="stoop"]')).toBeChecked();
+  await expect(page.locator('input[data-app="pinboard"]')).toBeChecked();
 
   await page.locator('.circle-settings__guided').click();              // open the chatbot
   await expect(page.locator('.cc-guided')).toBeVisible({ timeout: 5000 });
@@ -153,5 +153,5 @@ test('Theme B — the guided-setup chatbot walks the basics + pre-fills the sett
   // Hand-off: panel closed, settings form PRE-FILLED — apps narrowed to just Tasks.
   await expect(page.locator('.cc-guided')).toHaveCount(0);
   await expect(page.locator('input[data-app="tasks"]')).toBeChecked({ timeout: 5000 });
-  await expect(page.locator('input[data-app="stoop"]')).not.toBeChecked();
+  await expect(page.locator('input[data-app="pinboard"]')).not.toBeChecked();
 });

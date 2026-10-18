@@ -106,7 +106,7 @@ export class MemberMap extends Emitter {
    * @param {string} m.webid
    * @param {string} [m.handle]
    *   Lowercase, user-set primary UI identifier (e.g. 'oosterpoort-bird-23').
-   *   Stoop-shape addition: when present, apps render `@<handle>` rather
+   *   Pinboard-shape addition: when present, apps render `@<handle>` rather
    *   than `displayName` until a reveal happens.  Optional; legacy
    *   consumers (H2/H4) leave this absent.
    * @param {string} [m.displayName]
@@ -115,7 +115,7 @@ export class MemberMap extends Emitter {
    * @param {string} [m.avatarUrl]    the LOCAL display cache (private, never travels)
    *   Optional avatar image URL.
    * @param {string} [m.stableId]
-   *   Stoop V1 Phase 11 (2026-05-06): the SDK-level stable user
+   *   Pinboard V1 Phase 11 (2026-05-06): the SDK-level stable user
    *   identifier (`@onderling/core/identity/AgentIdentity.stableId`).
    *   Survives handle changes, network-pubkey rotations, pod-less
    *   users, and pod migrations.  Apps key mute / ban / report on
@@ -181,7 +181,7 @@ export class MemberMap extends Emitter {
   }
 
   /**
-   * Resolve by `stableId` (Stoop V1 Phase 11).  Returns the first
+   * Resolve by `stableId` (Pinboard V1 Phase 11).  Returns the first
    * member whose `stableId` matches.  O(N) scan — fine for the
    * hundreds-of-members closed-group case.
    *
@@ -246,7 +246,7 @@ export class MemberMap extends Emitter {
       // L114: when this contact was DELETED (hidden + the pair circle left) — kept after a return, so the thread
       // can say "you had deleted this contact". Null for a contact never deleted.
       deletedAt:   Number.isFinite(m.deletedAt) ? m.deletedAt : null,
-      // stableId: SDK-level "this person" key (Stoop V1 Phase 11).
+      // stableId: SDK-level "this person" key (Pinboard V1 Phase 11).
       // Survives handle changes + network-pubkey rotations.  Apps
       // key mute / ban / report on this.  Optional.
       stableId:    m.stableId ?? null,
@@ -266,7 +266,7 @@ export class MemberMap extends Emitter {
       // migrated. Optional — consumers without offerings leave it absent (= null).
       offerings:   _normaliseOfferings(m.offerings ?? m.skills),
       // Transitional read-alias — legacy field name, same data. Remove once
-      // all readers (stoop profile ops, the mobile profile UIs) move to
+      // all readers (pinboard profile ops, the mobile profile UIs) move to
       // `offerings`.
       skills:      _normaliseOfferings(m.offerings ?? m.skills),
       // availability: the UNIFIED person-level reachability state
@@ -276,8 +276,8 @@ export class MemberMap extends Emitter {
       // whose availability is 'away'.  Optional — absent reads as available.
       availability: (m.availability === 'open' || m.availability === 'limited' || m.availability === 'away')
         ? m.availability : null,
-      // holidayMode: legacy cross-device flag (Stoop V2 Phase 23.4), now the
-      // 'away' value of `availability` above. Kept mirrored so the old stoop
+      // holidayMode: legacy cross-device flag (Pinboard V2 Phase 23.4), now the
+      // 'away' value of `availability` above. Kept mirrored so the old pinboard
       // setHolidayMode/getHolidayMode ops + the UI banner keep working (thin
       // shim). Optional — defaults to false.
       holidayMode: m.holidayMode === true,
@@ -335,7 +335,7 @@ export class MemberMap extends Emitter {
       personKey:   (m.personKey && Number.isInteger(m.personKey.version) && typeof m.personKey.pubKey === 'string')
         ? { version: m.personKey.version, pubKey: m.personKey.pubKey, ...((typeof m.personKey.linkKeyPub === 'string' && m.personKey.linkKeyPub) ? { linkKeyPub: m.personKey.linkKeyPub } : {}) }
         : null,
-      // ── Stoop V2 Phase 24: contact-graph fields (additive) ──
+      // ── Pinboard V2 Phase 24: contact-graph fields (additive) ──
       // relation: distinguishes group members (default for back-compat
       //   with V1 callers) from 1:1 contacts.  5.6 (basis v2) added
       //   `'agent'` for members whose own WebID is an LLM-backed peer
@@ -346,7 +346,7 @@ export class MemberMap extends Emitter {
       relation:    m.relation === 'contact' ? 'contact'
                  : m.relation === 'agent'   ? 'agent'
                  : 'group-member',
-      // trustLevel: per-contact trust gradient. Two levels in Stoop V2;
+      // trustLevel: per-contact trust gradient. Two levels in Pinboard V2;
       //   apps may extend.  Null when not set (e.g. for 'group-member').
       trustLevel:
         m.trustLevel === 'bekend' || m.trustLevel === 'vertrouwd'

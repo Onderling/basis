@@ -23,7 +23,7 @@
  *     web and mobile cannot drift on what proximity entitles a stranger to.
  */
 
-import { NEARBY_FACES } from '../../src/v2/nearbyIdentity.js';
+import { NEARBY_LEVELS, nearbyLevelLabelKey } from '../../src/v2/nearbyLevel.js';
 import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
 } from '../../src/v2/nearbyScreen.js';
@@ -42,10 +42,12 @@ export function renderCircleNearby(container, {
   composing = false,
   onSubmitAsk = null,
   notice = null,
-  face = 'name',
-  onFaceChange = null,
+  level = null,          // the room self's Nearby level (null while it is being read)
+  firstUse = null,       // { onChoose(level), onLater() } — the once-per-self-per-device question, or null
+  onLevelChange = null,
   onToggleAllow = null,
   onSubmitCard = null,
+  onPrefillCard = null,   // async () => ({label?}) — only what the room self's level releases
   onSay = null,
   onInviteAction = null,
 } = {}) {
@@ -64,6 +66,36 @@ export function renderCircleNearby(container, {
   head.className = 'circle-nearby__title';
   head.textContent = tr('circle.nearbyScreen.title');
   container.appendChild(head);
+
+  // The first-use question, before anything else: what may this room see of the self entering it.
+  if (firstUse && typeof firstUse.onChoose === 'function') {
+    const fu = document.createElement('div');
+    fu.className = 'circle-nearby__first-use';
+    fu.setAttribute('role', 'group');
+    const fuTitle = document.createElement('div');
+    fuTitle.className = 'circle-nearby__first-use-title';
+    fuTitle.textContent = tr('circle.nearbyScreen.first_use_title');
+    fu.appendChild(fuTitle);
+    const fuBody = document.createElement('div');
+    fuBody.className = 'circle-nearby__first-use-body';
+    fuBody.textContent = tr('circle.nearbyScreen.first_use_body');
+    fu.appendChild(fuBody);
+    for (const v of NEARBY_LEVELS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `circle-nearby__first-use-option circle-nearby__first-use-option--${v}`;
+      b.textContent = tr(nearbyLevelLabelKey(v));
+      b.addEventListener('click', () => firstUse.onChoose(v));
+      fu.appendChild(b);
+    }
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'circle-nearby__first-use-later';
+    later.textContent = tr('circle.nearbyScreen.first_use_later');
+    later.addEventListener('click', () => firstUse.onLater?.());
+    fu.appendChild(later);
+    container.appendChild(fu);
+  }
 
   const safeModel = model && typeof model === 'object' ? model : { rows: [], counts: { total: 0, sharingAny: 0 }, ownProfile: {}, headerLabel: '' };
   const {
@@ -452,22 +484,22 @@ export function renderCircleNearby(container, {
     rs.appendChild(cav);
     mine.appendChild(rs);
   }
-  // The room face: the SAME faces a circle offers — name, handle, or nobody.
-  if (typeof onFaceChange === 'function') {
+  // What the room sees of the self entering it — its level, kept on that self (so it travels with the persona).
+  if (typeof onLevelChange === 'function') {
     const faceBlock = document.createElement('div');
     faceBlock.className = 'circle-nearby__face';
     const faceTitle = document.createElement('div');
     faceTitle.className = 'circle-nearby__face-title';
     faceTitle.textContent = tr('circle.nearbyScreen.face_row');
     faceBlock.appendChild(faceTitle);
-    for (const v of NEARBY_FACES) {
+    for (const v of NEARBY_LEVELS) {
       const lbl = document.createElement('label');
       lbl.className = `circle-nearby__face-option circle-nearby__face-option--${v}`;
       const radio = document.createElement('input');
-      radio.type = 'radio'; radio.name = 'nearby-face'; radio.value = v; radio.checked = face === v;
-      radio.addEventListener('change', () => onFaceChange(v));
+      radio.type = 'radio'; radio.name = 'nearby-level'; radio.value = v; radio.checked = level === v;
+      radio.addEventListener('change', () => onLevelChange(v));
       lbl.appendChild(radio);
-      lbl.appendChild(document.createTextNode(tr(`circle.nearbyScreen.face_${v}`)));
+      lbl.appendChild(document.createTextNode(tr(nearbyLevelLabelKey(v))));
       faceBlock.appendChild(lbl);
     }
     const caveat = document.createElement('div');
@@ -500,6 +532,20 @@ export function renderCircleNearby(container, {
     line.maxLength = CARD_MAX_LINE;
     line.placeholder = tr('circle.nearbyScreen.card_line');
     form.appendChild(line);
+
+    // "Fill in" from what this room may see of the self entering it — the person still reads and sends it.
+    if (typeof onPrefillCard === 'function') {
+      const fill = document.createElement('button');
+      fill.type = 'button';
+      fill.className = 'circle-nearby__card-prefill';
+      fill.textContent = tr('circle.nearbyScreen.card_prefill');
+      fill.addEventListener('click', async () => {
+        let got = {};
+        try { got = (await onPrefillCard()) ?? {}; } catch { got = {}; }
+        if (typeof got.label === 'string' && got.label) label.value = got.label.slice(0, CARD_MAX_LABEL);
+      });
+      form.appendChild(fill);
+    }
 
     // The consequence, next to the fields. "Everyone in this room" is not obvious from a text box.
     const who = document.createElement('div');

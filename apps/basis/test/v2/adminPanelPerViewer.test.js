@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighbourhoodAgent } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent } from '@onderling-app/pinboard';
 import { removeControlFor, announceControlFor, policySaveControlFor } from '../../src/v2/circleRoleControl.js';
 import { foldPolicyUpdates } from '../../src/v2/policyUpdateLane.js';
 
@@ -31,7 +31,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
   return agent.skills.get(skillId).handler({ parts: args === undefined ? [] : [DataPart(args)], from: fromWebid, agent, envelope: null });
 }
 
-/** A device holding a REAL circle (the same shape stoop's own gate tests use): Anne made it, Bob and Carla joined. */
+/** A device holding a REAL circle (the same shape pinboard's own gate tests use): Anne made it, Bob and Carla joined. */
 async function buildCircle() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);

@@ -19,7 +19,7 @@
  * by construction, not by a glob that misses the ones declared outside `apps/<app>/manifest.js`.
  */
 import { basisManifest } from '../../manifest.js';
-import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
+import { mockTasksManifest, mockPinboardManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
 import { householdManifest } from '../../../household/manifest.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { listsManifest } from '../../../lists/manifest.js';
@@ -46,7 +46,7 @@ export function catalogueManifests({ householdManifest: injected } = {}) {
     basisManifest,
     mockTasksManifest,
     injected ?? householdManifest,
-    mockStoopManifest,
+    mockPinboardManifest,
     mockFolioManifest,
     calendarManifest,
     listsManifest,
@@ -74,7 +74,7 @@ export function allManifests() {
 }
 
 /**
- * Does a manifest the app runs declare this op? `qualified` names the app (`stoop.listOpen`); a bare id counts only
+ * Does a manifest the app runs declare this op? `qualified` names the app (`pinboard.listOpen`); a bare id counts only
  * when exactly ONE app declares it (as the bot's door map reads it — two declarers is ambiguous, refused); a generic op
  * (`__generic__:app:atom:noun`) counts when its app declares the noun. A door reaches declared ops only — its role
  * widens which of them a person reaches, never the set itself.

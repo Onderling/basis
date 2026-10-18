@@ -70,6 +70,7 @@ export const householdManifest = {
     'pause-persona':    'write',   // a device entry: which held personas do not run here
     'resume-persona':   'write',
     'remove-persona':   'write',   // this device's delegation under one persona, tombstoned; its keys here wiped
+    'set-nearby-level': 'write',   // a self's Nearby level, on its disclosure
     'revoke-device': 'write',
     'claim-companion': 'write',
     'stash-enroll-offer': 'write',   // keeps an add-device offer on this device for the ceremony
@@ -271,7 +272,7 @@ export const householdManifest = {
       id:        'claim',
       verb:      'claim',
       writes: { scope: 'circle' },
-      appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/stoop)
+      appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/pinboard)
       // DECLARATION LAYER (#34) — grabbing a household task writes `assignee` under the CLAIM policy
       // (first-wins). Same declared (task, assignee)→claim the receiver enforces for every app's task.
       resolves: [{ field: 'assignee', policy: 'claim' }],
@@ -355,7 +356,7 @@ export const householdManifest = {
       // a bare address). The circle is PICKED from the person's own circles — the form paints the pick-list from the
       // param's pickerSource, skipped when there is only one. Reached from Me → Scan.
       params: [
-        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'stoop' } },
+        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'pinboard' } },
         { name: 'addr',   kind: 'string', required: true },
       ],
       surfaces: {},
@@ -488,12 +489,25 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'setNearbyLevel', group: 'device',
+      verb: 'set-nearby-level',
+      writes: { scope: 'person' },   // a self's disclosure under the reserved context `nearby` — travels with the persona
+      // WHAT THE NEARBY ROOM SEES OF A SELF: none · handle (the floor) · profile · full. The one writer of the `nearby`
+      // context (the general disclosure op refuses it). Reached from Nearby → "Jij hier"; no chat/slash surface.
+      params: [
+        { name: 'personaId', kind: 'string' },
+        { name: 'level',     kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
       id:   'listPersonasHere', group: 'device',
       verb: 'list',
       // THE PERSONAS ON THIS DEVICE — every self it holds, running or paused, and which is its primary (the self it
-      // speaks as). Reached from My data → "Persona's op dit apparaat"; no chat/slash surface.
+      // speaks as). Reached from My data → "Persona's op dit apparaat", and typed as `/hier` (this device's own line —
+      // a device op is on no bot's door and never delegable).
       params: [],
-      surfaces: {},
+      surfaces: { slash: { command: '/hier' } },
     },
     {
       id:   'pausePersona', group: 'device',
@@ -501,17 +515,18 @@ export const householdManifest = {
       writes: { scope: 'device' },   // a device entry: which held personas do not run here
       // PAUSE A PERSONA ON THIS DEVICE — local and reversible, no phrase: from the next boot it does not run here (its
       // circles not reopened or served, out of the switcher); its keys and data stay, nothing reaches the registry or a
-      // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`).
-      params: [ { name: 'personaId', kind: 'string', required: true } ],
-      surfaces: {},
+      // peer. The primary cannot be paused (`primary`), nor a self not held here (`not-held`). Typed by NAME (`/pauze Werk`):
+      // the name resolves over this device's own list; two selves with that name → the question, never a guess.
+      params: [ { name: 'personaId', kind: 'string', required: true, pickerSource: { listOp: 'listPersonasHere' } } ],
+      surfaces: { slash: { command: '/pauze' } },   // the positional body binds to personaId; no gate words (typed only)
     },
     {
       id:   'resumePersona', group: 'device',
       verb: 'resume-persona',
       writes: { scope: 'device' },
-      // The inverse: from the next boot the persona runs here again.
-      params: [ { name: 'personaId', kind: 'string', required: true } ],
-      surfaces: {},
+      // The inverse: from the next boot the persona runs here again. Typed by name too (`/hervat Werk`).
+      params: [ { name: 'personaId', kind: 'string', required: true, pickerSource: { listOp: 'listPersonasHere' } } ],
+      surfaces: { slash: { command: '/hervat' } },
     },
     {
       id:   'receivePersonas', group: 'device',

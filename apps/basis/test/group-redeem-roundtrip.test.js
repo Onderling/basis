@@ -20,9 +20,9 @@
  *
  * Strategy: same loopback NKN hub as file-share-roundtrip — two real
  * createSecureAgent instances, real SecurityLayer + bilateral HI, the
- * real peer-router dispatching by subtype.  Only the stoop substrate
+ * real peer-router dispatching by subtype.  Only the pinboard substrate
  * call (`verifyMembershipCodeForPeer`) is stubbed, since this test is
- * about the envelope round-trip, not stoop's code-vault internals.
+ * about the envelope round-trip, not pinboard's code-vault internals.
  */
 import { describe, it, expect, vi } from 'vitest';
 import 'fake-indexeddb/auto';

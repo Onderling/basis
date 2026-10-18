@@ -1,7 +1,7 @@
 /**
  * Governance host factory (Phase 4 §5, L4) — the shared wiring both shells use.
  *
- * Locks: each action maps to the REAL op (removeMember → stoop removeMember, changeRule →
+ * Locks: each action maps to the REAL op (removeMember → pinboard removeMember, changeRule →
  * editGroupRules); the admin gate (Decision A) lets an admin device enact but not a member
  * device; and view() projects the current fold for the shell.
  */
@@ -37,18 +37,18 @@ function host({ governance = {}, localActorRef = 'admin0' } = {}) {
 }
 
 describe('makeCircleGovernance — enact routing', () => {
-  it('an admin removing a member (any-admin) calls stoop removeMember with the target', async () => {
+  it('an admin removing a member (any-admin) calls pinboard removeMember with the target', async () => {
     const { gov, callSkill } = host({ governance: { removeMember: 'any-admin' } });
     const r = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', actor: { ref: 'admin0' } });
     expect(r.status).toBe(DECISION_STATUS.APPROVED);
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
   });
 
   it('changeRule enacts via editGroupRules with the rules subject', async () => {
     const { gov, callSkill } = host({ governance: { changeRule: 'any-admin' } });
     const rules = { name: 'Huisregels', quietHours: '22-07' };
     await gov.propose({ circleId: 'c1', action: 'changeRule', subject: rules, actor: { ref: 'admin0' } });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'editGroupRules', { groupId: 'c1', rules });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'editGroupRules', { groupId: 'c1', rules });
   });
 });
 
@@ -60,7 +60,7 @@ describe('the admin enact gate (Decision A)', () => {
     await asMember.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     const tip = await asMember.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });  // 3/4 → approved
     expect(tip).toMatchObject({ status: DECISION_STATUS.APPROVED, awaitingEnactment: true });
-    expect(asMember.callSkill).not.toHaveBeenCalledWith('stoop', 'removeMember', expect.anything());
+    expect(asMember.callSkill).not.toHaveBeenCalledWith('pinboard', 'removeMember', expect.anything());
 
     // admin device, same votes → enacts
     const asAdmin = host({ governance: { removeMember: 'member-vote' }, localActorRef: 'admin0' });
@@ -68,7 +68,7 @@ describe('the admin enact gate (Decision A)', () => {
     await asAdmin.gov.vote({ circleId: 'c1', proposalId: p2.proposalId, voter: 'm0', choice: 'yes' });
     const tip2 = await asAdmin.gov.vote({ circleId: 'c1', proposalId: p2.proposalId, voter: 'm1', choice: 'yes' });
     expect(tip2).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
-    expect(asAdmin.callSkill).toHaveBeenCalledWith('stoop', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
+    expect(asAdmin.callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
   });
 });
 

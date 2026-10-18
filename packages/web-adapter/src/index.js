@@ -16,7 +16,7 @@
  * never touch DOM/`window`.
  *
  * Forward direction (Slice C — tasks-mobile / renderMobile adapter,
- * stoop web): the same helpers feed renderMobile's
+ * pinboard web): the same helpers feed renderMobile's
  * appliesTo predicate (it would reinvent the same gate). When that
  * lands, `itemMatchesAppliesTo` + `deriveItemState` + `applyPrefilledParams`
  * stay device-independent (per Platform Parity); only `callSkill`

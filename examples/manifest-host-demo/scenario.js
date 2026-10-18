@@ -34,20 +34,20 @@ import {
   createTasksMountable,
 }                                              from '@canopy-app/tasks-v0';
 
-// SP-11b — stoop as a 3rd mounted app.  Stoop's manifest + LLM-chat
+// SP-11b — pinboard as a 3rd mounted app.  Pinboard's manifest + LLM-chat
 // skill-registry builder are NOT on its package `exports` map (the
 // public surface is `src/index.js`), so we reach them by relative path
-// into `apps/stoop/` — exactly the file the task names, "mount
-// apps/stoop/manifest.js".  Relative imports resolve stoop's own deps
-// from `apps/stoop/node_modules`, so the heavy substrate wires itself.
-import stoopManifest                          from '../../apps/stoop/manifest.js';
-import { createNeighbourhoodCluster }          from '../../apps/stoop/src/index.js';
-import { buildStoopSkillRegistry }            from '../../apps/stoop/src/chat/llmChat.js';
+// into `apps/pinboard/` — exactly the file the task names, "mount
+// apps/pinboard/manifest.js".  Relative imports resolve pinboard's own deps
+// from `apps/pinboard/node_modules`, so the heavy substrate wires itself.
+import pinboardManifest                          from '../../apps/pinboard/manifest.js';
+import { createNeighbourhoodCluster }          from '../../apps/pinboard/src/index.js';
+import { buildPinboardSkillRegistry }            from '../../apps/pinboard/src/chat/llmChat.js';
 
-/* ─── stoop mount constants ──────────────────────────────────────── */
+/* ─── pinboard mount constants ──────────────────────────────────────── */
 
-const STOOP_GROUP = 'oosterpoort';
-const STOOP_ACTOR = 'https://id.example/anne';
+const PINBOARD_GROUP = 'oosterpoort';
+const PINBOARD_ACTOR = 'https://id.example/anne';
 
 /* ─── scripted LLM responses ─────────────────────────────────────── */
 
@@ -95,17 +95,17 @@ export function buildSystemPrompt(perAppSystemPrompts) {
   ].join('\n');
 }
 
-/* ─── stoop-as-3rd-app mountable (SP-11b) ────────────────────────── */
+/* ─── pinboard-as-3rd-app mountable (SP-11b) ────────────────────────── */
 
 /**
- * Build a stoop mountable for `host.mount('stoop', stoopManifest, …)`.
+ * Build a pinboard mountable for `host.mount('pinboard', pinboardManifest, …)`.
  *
- * Stoop is a heavy closed-group substrate (identity, MemberMap,
+ * Pinboard is a heavy closed-group substrate (identity, MemberMap,
  * SkillMatch, ItemStore).  `createNeighbourhoodCluster` boots one
  * in-memory bundle with a fresh identity + InternalBus — no pods, no
- * network — the same headless path stoop's own `chat-llm` test uses.
- * `buildStoopSkillRegistry` then walks `stoopManifest.operations` and
- * binds each op to the live agent's SDK skill (via stoop's own SDK→
+ * network — the same headless path pinboard's own `chat-llm` test uses.
+ * `buildPinboardSkillRegistry` then walks `pinboardManifest.operations` and
+ * binds each op to the live agent's SDK skill (via pinboard's own SDK→
  * renderChat adapter), so the mount is REAL skills, not a stub.
  *
  * Returns the mount `opts` (`{skillRegistry, toSkillCtx}`) plus the
@@ -117,22 +117,22 @@ export function buildSystemPrompt(perAppSystemPrompts) {
  *   teardown: () => Promise<void>,
  * }>}
  */
-export async function createStoopMountable() {
+export async function createPinboardMountable() {
   const cluster = await createNeighbourhoodCluster({
     groups: [{
-      groupId:    STOOP_GROUP,
-      localActor: STOOP_ACTOR,
-      members:    [{ webid: STOOP_ACTOR }],
+      groupId:    PINBOARD_GROUP,
+      localActor: PINBOARD_ACTOR,
+      members:    [{ webid: PINBOARD_ACTOR }],
     }],
-    label: 'recombination-demo-stoop',
+    label: 'recombination-demo-pinboard',
   });
-  const bundle = cluster.groups.get(STOOP_GROUP);
+  const bundle = cluster.groups.get(PINBOARD_GROUP);
 
-  const { skillRegistry, missing } = buildStoopSkillRegistry(bundle);
+  const { skillRegistry, missing } = buildPinboardSkillRegistry(bundle);
 
   const mountable = {
     skillRegistry,
-    // stoop skills key on `senderWebid` for the actor (mirrors stoop's
+    // pinboard skills key on `senderWebid` for the actor (mirrors pinboard's
     // own `createLlmChat` toSkillCtx).
     toSkillCtx: (toolCtx) => ({
       senderWebid: toolCtx?.actorWebid,
@@ -154,14 +154,14 @@ export async function createStoopMountable() {
  *
  * @param {object} [args]
  * @param {Array} [args.llmScript=DEMO_LLM_SCRIPT]
- * @param {boolean} [args.mountStoop=false]  SP-11b — also mount
- *   `apps/stoop/manifest.js` as a 3rd app.  Off by default so the
+ * @param {boolean} [args.mountPinboard=false]  SP-11b — also mount
+ *   `apps/pinboard/manifest.js` as a 3rd app.  Off by default so the
  *   original two-app scenario (index.js + the SP-11 assertions) is
  *   unchanged; the SP-11b cross-surface assertions pass `true`.
  */
 export async function setupRecombinationDemo({
   llmScript  = DEMO_LLM_SCRIPT,
-  mountStoop = false,
+  mountPinboard = false,
 } = {}) {
   // (1) household — InMemoryStore + the mountable that captures it in
   //     the toSkillCtx closure.
@@ -183,13 +183,13 @@ export async function setupRecombinationDemo({
   host.mount('household', householdManifest, householdMountable);
   host.mount('tasks',     tasksManifest,     tasksMountable);
 
-  // (3b) SP-11b — stoop as an optional 3rd mount.  Composition stays
+  // (3b) SP-11b — pinboard as an optional 3rd mount.  Composition stays
   //      collision-free: tool ids are `appId.opId`-namespaced and the
   //      three apps' slash-command menus don't overlap.
-  let stoop = null;
-  if (mountStoop) {
-    stoop = await createStoopMountable();
-    host.mount('stoop', stoopManifest, stoop.mountable);
+  let pinboard = null;
+  if (mountPinboard) {
+    pinboard = await createPinboardMountable();
+    host.mount('pinboard', pinboardManifest, pinboard.mountable);
   }
 
   const composed = host.compose();
@@ -213,10 +213,10 @@ export async function setupRecombinationDemo({
   return {
     host, composed, chatAgent, bridge,
     householdStore, tasksRuntime,
-    stoop,                      // SP-11b — null unless mountStoop:true
+    pinboard,                      // SP-11b — null unless mountPinboard:true
     async teardown() {
       await chatAgent.stop();
-      if (stoop) await stoop.teardown();
+      if (pinboard) await pinboard.teardown();
     },
   };
 }
@@ -252,14 +252,14 @@ export async function demoCrossAppEmbed(runtime, {
   // (1) create the referenced task in tasks-v0.
   const [task] = await tasksStore.addItems(
     [{ type: 'task', text: taskText }],
-    { actor: STOOP_ACTOR },
+    { actor: PINBOARD_ACTOR },
   );
 
   // (2) create a household item that EMBEDS it by canonical ref.
   const ref = `urn:dec:item:${task.id}`;
   const [householdItem] = await householdStore.addItems(
     [{ type: 'shopping', text: noteText, embeds: [{ type: 'task', ref }] }],
-    { actor: STOOP_ACTOR },
+    { actor: PINBOARD_ACTOR },
   );
 
   // (3) walk the household item; resolve the external ref against the

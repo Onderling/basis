@@ -230,7 +230,7 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   to change both, or to decide on purpose that they differ.
 - **New functionality = add a manifest + projectors**, not a new app silo. Most apps dissolve into basis —
   their `manifest.js` stays the source of truth and the app *name* becomes a nav label. **The test is whether
-  it needs its own interaction model** (Frits, 2026-07-28): stoop and tasks do not, so they reduce to close
+  it needs its own interaction model** (Frits, 2026-07-28): pinboard and tasks do not, so they reduce to close
   to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
 - **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
 - **The verification ladder — which check runs when.** Rungs 0–2 (the one red-first test · the package suite +

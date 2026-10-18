@@ -122,7 +122,7 @@ export async function run({ relayUrl }) {
     check('a device enrolled with ANOTHER person\'s phrase joins THAT account', asBram?.ok === true,
       JSON.stringify(asBram)?.slice(0, 120));
     // …and that is exactly why the interesting question is what it can reach: nothing of Anne's.
-    const reach = await impostor.agent.callSkill('stoop', 'listGroupRoster', { groupId: CIRCLE });
+    const reach = await impostor.agent.callSkill('pinboard', 'listGroupRoster', { groupId: CIRCLE });
     check('…and reaches nothing of the FIRST person\'s circle',
       !!reach?.error || (reach?.members ?? []).length === 0,
       JSON.stringify(reach)?.slice(0, 140));

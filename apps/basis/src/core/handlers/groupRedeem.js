@@ -6,7 +6,7 @@
  * Two paired flows:
  *
  *   - `makeHandleGroupRedeemRequest` (ADMIN side) — verifies a
- *     joiner's membership code via `stoop.verifyMembershipCodeForPeer`
+ *     joiner's membership code via `pinboard.verifyMembershipCodeForPeer`
  *     + replies with `group-redeem-response`.  On success, fires
  *     `propagateMeshIntros` so newly-consenting members see each
  *     other's addresses.  The reply also carries the ADMIN's OWN
@@ -42,7 +42,7 @@ export async function ownDisplayInCircle(groupId, { callSkill, circleAddressFor 
   try {
     const own = typeof circleAddressFor === 'function' ? circleAddressFor(groupId) : null;
     if (!own) return null;
-    const r = await callSkill('stoop', 'listGroupMembers', { groupId });
+    const r = await callSkill('pinboard', 'listGroupMembers', { groupId });
     const rows = Array.isArray(r?.members) ? r.members : [];
     const me = rows.find((m) => m?.circleAddress === own
       || (Array.isArray(m?.circleAddresses) && m.circleAddresses.includes(own)));
@@ -72,7 +72,7 @@ export function makeHandleGroupRedeemRequest({
     }
     let reply;
     try {
-      const result = await callSkill('stoop', 'verifyMembershipCodeForPeer', {
+      const result = await callSkill('pinboard', 'verifyMembershipCodeForPeer', {
         groupId, code,
         requesterWebid: fromAddr,
         requesterKey: (typeof identityOf === 'function' ? identityOf(fromAddr) : null) || fromAddr,
@@ -130,7 +130,7 @@ export function makeHandleGroupRedeemRequest({
         sentAt:  Date.now(),
       });
       publishEvent?.({
-        app: 'stoop', type: 'notification',
+        app: 'pinboard', type: 'notification',
         payload: {
           message: reply.ok
             ? `📥 ${String(fromAddr).slice(0, 16)}… joined ${groupId} (peer-confirmed)`

@@ -48,7 +48,7 @@ function wireMembershipReceiver(node) {
   };
 }
 
-const members = async (n) => (await n.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+const members = async (n) => (await n.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
 /** The circle's CURRENT rules version as THIS device knows it — stamped on every roster row from
  *  the device's own local `group-rules` head (deriveRoster), which is exactly what the stale
  *  banner reads. 0 = the device holds no local doc. */
@@ -58,7 +58,7 @@ const currentVersionOn = async (n) => {
   return v != null ? Number.parseInt(v, 10) : 0;
 };
 /** The rules TEXT the getGroupRules surface renders on this composition (the display reshape). */
-const rulesTextOn = async (n) => String((await n.agent.callSkill('stoop', 'getGroupRules', { groupId: CIRCLE }))?.rules ?? '');
+const rulesTextOn = async (n) => String((await n.agent.callSkill('pinboard', 'getGroupRules', { groupId: CIRCLE }))?.rules ?? '');
 
 describe('rules-update propagation — the doc travels the governance lane, pod-free', () => {
   let A; let B; let C; let bus;
@@ -83,7 +83,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     expect(await currentVersionOn(B)).toBe(0);
 
     // The admin raises the rules to v2. The doc + version now RIDE THE FAN — no pod anywhere.
-    const edited = await A.agent.callSkill('stoop', 'editGroupRules', {
+    const edited = await A.agent.callSkill('pinboard', 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'v2: be kind, now with feeling', purpose: 'v2: be kind, now with feeling', agreements: 'be kind', version: 1 },
     });
     expect(edited.version).toBe(2);
@@ -103,7 +103,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
 
   it('an offline member reconciles: the missed statement lands through the same gate and applies', async () => {
     await goOffline(B);
-    const edited = await A.agent.callSkill('stoop', 'editGroupRules', {
+    const edited = await A.agent.callSkill('pinboard', 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'v3: quiet hours after ten', purpose: 'v3: quiet hours after ten', agreements: 'be kind', version: 2 },
     });
     expect(edited.version).toBe(3);
@@ -148,7 +148,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     // test that MATTERS, and why it stays first. What changed is that a member is no longer told a
     // version landed when the circle will never take it; the op reads the circle's folded roster and
     // says so at the door.
-    const localEdit = await B.agent.callSkill('stoop', 'editGroupRules', {
+    const localEdit = await B.agent.callSkill('pinboard', 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'my house my rules', purpose: 'my house my rules', version: 3 },
     });
     expect(localEdit.error, 'a member\'s rules edit is refused at the op').toBe('admin-only');
@@ -160,7 +160,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
   it('the final setting is never deletable: a member offline past the lane\'s audit window still converges from the preserved head', async () => {
     // The writer's head preserves the ORIGINAL signed statement (never re-signed).
     const aCall = (app, op, args) => A.agent.callSkill(app, op, args);
-    const preserved = await aCall('stoop', 'getGroupRulesUpdateStatement', { groupId: CIRCLE });
+    const preserved = await aCall('pinboard', 'getGroupRulesUpdateStatement', { groupId: CIRCLE });
     expect(preserved?.statement?.body?.kind, 'the admin\'s head carries the signed statement').toBe('rules-update');
     expect(preserved.statement.body.payload?.version).toBe(3);
 
@@ -225,7 +225,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     expect(await rulesTextOn(C)).toContain('v3: quiet hours after ten');
 
     // …and C's own mirror preserves the statement in turn: ANY member can serve the head onward.
-    const onC = await cCall('stoop', 'getGroupRulesUpdateStatement', { groupId: CIRCLE });
+    const onC = await cCall('pinboard', 'getGroupRulesUpdateStatement', { groupId: CIRCLE });
     expect(onC?.statement?.body?.hash).toBe(preserved.statement.body.hash);
   }, 90_000);
 });

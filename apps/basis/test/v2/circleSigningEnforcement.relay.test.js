@@ -123,7 +123,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
     // proven address from the waist's `createGroupV2` post-step stopped the membership spine emitting
     // `join` and `rules-accept` entirely — the fold saw only `create`, so a joiner landed on the trail
     // but their signed acceptance folded nowhere. Isolated to that change by disabling it; the likely
-    // mechanism is a reentrant `callSkill` into stoop while a stoop op is still in flight, which was
+    // mechanism is a reentrant `callSkill` into pinboard while a pinboard op is still in flight, which was
     // not confirmed. Whoever tries again: start there, and watch these two tests plus
     // `rulesAcceptance.journey.test.js`.
     const own = rowFor(await readRoster(admin, CIRCLE_A), admin.pubKey);

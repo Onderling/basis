@@ -15,8 +15,8 @@ describe('egress gate at the dispatch waist', () => {
   it('passes a NON-external op through unchanged (inert for local/pod ops)', async () => {
     const inner = vi.fn(async () => ({ ok: true }));
     const gated = wrapCallSkillWithEgressGate(inner, { isExternalEgress: new Set(['menu.match']), gateInputs: () => null });
-    await gated('stoop', 'postRequest', { text: 'hi' });
-    expect(inner).toHaveBeenCalledWith('stoop', 'postRequest', { text: 'hi' });   // untouched
+    await gated('pinboard', 'postRequest', { text: 'hi' });
+    expect(inner).toHaveBeenCalledWith('pinboard', 'postRequest', { text: 'hi' });   // untouched
   });
 
   it('gates an external op: only the released coarse payload travels + a receipt is surfaced', async () => {
@@ -63,7 +63,7 @@ describe('egress gate at the dispatch waist', () => {
 
 describe('router-detection for external egress (§10a)', () => {
   it('every local app-origin is NOT external → gate inert today', () => {
-    for (const o of ['household', 'tasks', 'stoop', 'folio', 'calendar', 'agents']) expect(isExternalEgressOp(o)).toBe(false);
+    for (const o of ['household', 'tasks', 'pinboard', 'folio', 'calendar', 'agents']) expect(isExternalEgressOp(o)).toBe(false);
   });
   it('an UNKNOWN origin is treated as external (fail-safe: an unrecognised target is gated, not trusted)', () => {
     expect(isExternalEgressOp('some-mcp-tool')).toBe(true);
@@ -77,8 +77,8 @@ describe('router-detection for external egress (§10a)', () => {
       gateInputs: () => ({ request, released: {}, contextType: 'employment' }),
       vocabulary: vocab,
     });
-    await gated('stoop', 'postRequest', { text: 'hi' });          // local → passthrough, untouched
-    expect(inner).toHaveBeenCalledWith('stoop', 'postRequest', { text: 'hi' });
+    await gated('pinboard', 'postRequest', { text: 'hi' });          // local → passthrough, untouched
+    expect(inner).toHaveBeenCalledWith('pinboard', 'postRequest', { text: 'hi' });
     const res = await gated('some-external-service', 'send', {}); // external + forbidden → blocked
     expect(res).toMatchObject({ ok: false, error: 'egress-blocked' });
   });

@@ -1,7 +1,7 @@
 /**
  * mnemonic helpers — pure-fn validation for the OnboardRestore /
  * Profile-recovery screens. Lifted from
- * apps/stoop-mobile/src/lib/mnemonic.js 2026-05-09 (Phase 41.0 L5;
+ * apps/pinboard-mobile/src/lib/mnemonic.js 2026-05-09 (Phase 41.0 L5;
  * Tasks-mobile is the second consumer).
  *
  * BIP-39 wordlist validation lives in the SDK

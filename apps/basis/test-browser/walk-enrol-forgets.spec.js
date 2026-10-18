@@ -27,7 +27,7 @@ const call = (page, app, op, args = {}) => page.evaluate(([a, o, g]) => window.o
 // ids come back as STRINGS in practice and as rows in some paths — normalise both, as every consumer in the
 // app does. A `.map((c) => c.id)` here returned nothing and sent the first run of this walk chasing a circle
 // that had been made perfectly well.
-const myCircles = async (page) => ((await call(page, 'stoop', 'listMyCircles', {}))?.circles ?? [])
+const myCircles = async (page) => ((await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [])
   .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
 
 /** The exact warning the unopenable rows produce. One place, so the assertion and the report cannot drift. */
@@ -60,7 +60,7 @@ test.describe('the add-a-device ceremony leaves nothing of the former self', () 
       return ids.find((id) => id && id !== 'cc-help') ?? null;
     });
     expect(gid, 'A made a circle').toBeTruthy();
-    const aWho = await call(A.page, 'stoop', 'whoAmI', {});
+    const aWho = await call(A.page, 'pinboard', 'whoAmI', {});
 
     // ── A SECOND DEVICE, which first boots as NOBODY and writes its own content ───────────────────────
     // This is the state the whole fix is about: an unenrolled install with a registry record, a member map
@@ -74,7 +74,7 @@ test.describe('the add-a-device ceremony leaves nothing of the former self', () 
     await createCircle(A2.page, 'Throwaway circle');
     const throwaway = await until(async () => ((await myCircles(A2.page)).length ? await myCircles(A2.page) : null));
     expect(throwaway.length, 'the throwaway self really is in circles of its own').toBeGreaterThan(0);
-    const throwawayWho = await call(A2.page, 'stoop', 'whoAmI', {});
+    const throwawayWho = await call(A2.page, 'pinboard', 'whoAmI', {});
     expect(throwawayWho?.webid, 'and it is a different person from A').not.toBe(aWho?.webid);
 
     // ── THE CEREMONY, through the op — the way a walk enrols, and the path the first fix missed ───────
@@ -105,7 +105,7 @@ test.describe('the add-a-device ceremony leaves nothing of the former self', () 
     // (1) IT CAME BACK WHOLE — the half that matters more than the warnings.
     const inCircle = await until(async () => ((await myCircles(A2.page)).includes(gid) ? true : null), { timeout: 90_000 });
     expect(inCircle, "the enrolled device consumed the offer and is in A's circle").toBe(true);
-    const a2Who = await call(A2.page, 'stoop', 'whoAmI', {});
+    const a2Who = await call(A2.page, 'pinboard', 'whoAmI', {});
     expect(a2Who?.webid, 'and it is the SAME person as A now').toBe(aWho?.webid);
 
     // (2) THE FORMER SELF IS GONE. This line is the load-bearing one: sabotaging the clear (2026-09-23,

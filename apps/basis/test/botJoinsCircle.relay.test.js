@@ -18,7 +18,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown, createCircle
 import { bindCircleAddressKeysFor } from '../src/v2/householdRosterPairing.js';
 import { buildCircleInviteUri } from '../src/v2/circleInvite.js';
 import { removeCircleMember } from '../src/v2/circleMembershipHygiene.js';
-import { decodeContactCard as decodeCardBody } from '@onderling-app/stoop/lib/contactCard';
+import { decodeContactCard as decodeCardBody } from '@onderling-app/pinboard/lib/contactCard';
 import { addBoxCard } from './support/addBoxCard.js';
 
 const RUNNER = fileURLToPath(new URL('../bin/device-runner.mjs', import.meta.url));

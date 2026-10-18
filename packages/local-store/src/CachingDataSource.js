@@ -2,12 +2,12 @@
  * CachingDataSource — local-first DataSource that wraps an optional
  * remote / pod-backed DataSource with a Map cache + write queue.
  *
- * **2026-05-08:** lifted from `apps/stoop/src/lib/CachingDataSource.js`
+ * **2026-05-08:** lifted from `apps/pinboard/src/lib/CachingDataSource.js`
  * (Tasks V1 = rule-of-two consumer per
- * `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
- * Stoop's `lib/CachingDataSource.js` is now a re-export shim.
+ * `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`).
+ * Pinboard's `lib/CachingDataSource.js` is now a re-export shim.
  *
- * Rationale (originally Stoop V1 Phase 4 — 2026-05-06):
+ * Rationale (originally Pinboard V1 Phase 4 — 2026-05-06):
  *   - The pod is the source of truth, the local cache is reality
  *     (per the project-wide rule in
  *     `Project Files/projects/README.md`).
@@ -49,9 +49,9 @@
  * **Phase 33+34 (2026-05-06):** the constructor now accepts
  * `localOnlyPrefixes: string[]` — write/delete to a path matching
  * any prefix mutates only the local Map, never queues for the
- * inner.  Bulk-sync also skips those paths.  Stoop uses this for:
- *   - `mem://stoop/settings/devices/`         (per-install settings)
- *   - `mem://stoop/settings/.migrated-from-v2` (one-shot marker)
+ * inner.  Bulk-sync also skips those paths.  Pinboard uses this for:
+ *   - `mem://pinboard/settings/devices/`         (per-install settings)
+ *   - `mem://pinboard/settings/.migrated-from-v2` (one-shot marker)
  */
 
 import { Emitter } from '@onderling/core';
@@ -97,7 +97,7 @@ export class CachingDataSource extends DataSource {
    * @param {string[]} [opts.localOnlyPrefixes]
    *   Paths matching ANY of these prefixes are never enqueued for
    *   the inner DataSource and are skipped during bulk-sync.  Used
-   *   by Stoop to keep per-device settings + the migration marker
+   *   by Pinboard to keep per-device settings + the migration marker
    *   off the pod.
    * @param {{toInner:(p:string)=>string, fromInner:(u:string)=>string}} [opts.innerKeyMap]
    *   Optional logical-key ↔ inner-URI mapper (Phase 1 pod-routing
@@ -122,7 +122,7 @@ export class CachingDataSource extends DataSource {
       : [];
     // Phase 1 (pod-routing seam): translate ONLY at the #inner
     // boundary.  Local cache + queue stay keyed by the app's logical
-    // keys.  Default identity keeps Tasks / Stoop-no-pod byte-identical.
+    // keys.  Default identity keeps Tasks / Pinboard-no-pod byte-identical.
     if (innerKeyMap
         && typeof innerKeyMap.toInner === 'function'
         && typeof innerKeyMap.fromInner === 'function') {

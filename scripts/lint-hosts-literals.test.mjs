@@ -52,8 +52,8 @@ describe('lint-hosts-literals', () => {
   it('the app walk finds the real apps and their manifests (it cannot go blind silently)', async () => {
     const apps = await appsWithManifests();
     const byDir = Object.fromEntries(apps.map((a) => [a.dir, a]));
-    for (const d of ['basis', 'household', 'stoop', 'tasks-v0', 'folio']) expect(byDir[d], d).toBeTruthy();
-    expect(byDir.stoop.hosts).toContain('nominatim.openstreetmap.org');
+    for (const d of ['basis', 'household', 'pinboard', 'tasks-v0', 'folio']) expect(byDir[d], d).toBeTruthy();
+    expect(byDir.pinboard.hosts).toContain('nominatim.openstreetmap.org');
     // basis-mobile is a shell of basis: its source counts against basis's hosts.
     expect(byDir.basis.roots.some((r) => r.includes('basis-mobile'))).toBe(true);
   });

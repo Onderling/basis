@@ -164,7 +164,7 @@ bundle; house web-specific keys at the top level.
 
 Mobile passes `appKey: 'tasks'`, `platform: 'expo'`.  Desktop
 deferred; schema accommodates it. Multi-app per-webid map
-prevents Stoop and Tasks clobbering each other's tokens.
+prevents Pinboard and Tasks clobbering each other's tokens.
 
 ### 5. Chat skills for appeal threads
 **File:** `apps/tasks-v0/src/skills/chat.js:4–22`
@@ -199,7 +199,7 @@ with both shells.
 
 > "Pod provisioning: Tasks does not have its own provisioner yet."
 
-Stoop has a provisioner; Tasks reuses it (rule-of-two lift deferred).
+Pinboard has a provisioner; Tasks reuses it (rule-of-two lift deferred).
 Callers inject a `provision` callback; absent → step skipped
 (byte-neutral).  **No known blockers.**
 

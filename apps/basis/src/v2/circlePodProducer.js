@@ -1,7 +1,7 @@
 /**
  * basis v2 — per-circle pod producer (S4 pod foundation, the structural slice).
  *
- * REMAINING-WORK §4 E2's blocker was: "basis builds one shared stoop agent,
+ * REMAINING-WORK §4 E2's blocker was: "basis builds one shared pinboard agent,
  * not per-circle; nothing detects storagePosture ∈ {p2,p3}, creates member sealing
  * identities, instantiates createControlAgent, or wraps the circle pod-client." This
  * is that producer: for ONE circle it composes the S4 sealing substrate into a
@@ -11,7 +11,7 @@
  *     pod-client — bootstrapped, holding the recipient-wrapped group key, ready to
  *     grant/seal on join and revoke/rotate on leave (forward secrecy).
  *
- * It's the per-SCOPE producer that lives OUTSIDE the single stoop agent (one agent
+ * It's the per-SCOPE producer that lives OUTSIDE the single pinboard agent (one agent
  * per service-context; per-scope state outside — CLAUDE.md invariant #6). The app
  * keeps one of these per open circle, keyed by circle id.
  *
@@ -125,7 +125,7 @@ export async function createCirclePodProducer({
   // persist the group-key resource to the vault too: RESTORE it into the fresh pod BEFORE
   // bootstrap (which then finds it + no-ops, keeping the SAME group key), and SAVE it after.
   // Result: a sealed circle's group key survives a reload, so previously-sealed content
-  // (the posts live in the durable stoop store) stays decryptable. Use a durable vault
+  // (the posts live in the durable pinboard store) stays decryptable. Use a durable vault
   // (VaultIndexedDB on web, VaultAsyncStorage on mobile) for cross-session durability.
   const savedRes = await vault.get(groupKeyVaultKey);
   if (savedRes) {
@@ -161,11 +161,11 @@ export async function createCirclePodProducer({
 }
 
 /**
- * A control-agent ROUTER for the single stoop agent: stoop fires one `controlAgent`'s
+ * A control-agent ROUTER for the single pinboard agent: pinboard fires one `controlAgent`'s
  * `addMember`/`removeMember` on every membership event (carrying `groupId`), and this
  * routes each to the matching per-circle producer's control agent + persists the rotated
  * group key. This is how MULTI-member sealed circles grow: redeem → the joiner's sealing
- * public key is wrapped into that circle's group key; leave → revoked + rotated. One stoop
+ * public key is wrapped into that circle's group key; leave → revoked + rotated. One pinboard
  * agent, N per-circle control agents (CLAUDE.md invariant #6).
  *
  * @param {(circleId:string) => (object|Promise<object|null>)} getProducer  resolve a circle's producer.
@@ -232,7 +232,7 @@ export async function seedCircleRoster({ callSkill, circleId, router, deriveSeal
   if (typeof callSkill !== 'function' || !circleId || typeof router?.addMember !== 'function') return 0;
   let members = [];
   try {
-    const res = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    const res = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
     members = Array.isArray(res?.members) ? res.members : [];
   } catch { return 0; }
   let n = 0;

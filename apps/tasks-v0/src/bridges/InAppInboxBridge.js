@@ -43,7 +43,7 @@
  * mirrored to their pod when one is attached, automatic via
  * `local-store.CachingDataSource`'s write-through queue).
  *
- * **Substrate-candidate flag**: when a 2nd consumer (Stoop V2,
+ * **Substrate-candidate flag**: when a 2nd consumer (Pinboard V2,
  * Household, future) wants the same shape, lift this into
  * `@onderling/chat-agent` as `InAppInboxBridge` alongside
  * `TelegramBridge` + `InMemoryBridge`. Tracked per the

@@ -801,11 +801,11 @@ export async function createCircleAgent({
     } catch (_err) { /* best-effort; addTask still works locally */ }
   }
 
-  // Phase 52.2.x (mirror of Stoop A2, 2026-05-14) — register
+  // Phase 52.2.x (mirror of Pinboard A2, 2026-05-14) — register
   // `fetch-resource` skill with a `groupCheck` callback that admits
   // only current circle peers. Defensive: nothing in Tasks calls
   // fetch-resource against another Tasks peer today, but cross-app
-  // refs (e.g. a Stoop post embedding a Tasks task) + future
+  // refs (e.g. a Pinboard post embedding a Tasks task) + future
   // envelope-only mode both want this gate in place. Multi-circle
   // single-agent setups: first circle wins; subsequent attaches see
   // the skill already registered and skip. The skill reads from

@@ -4,7 +4,7 @@
  * Verifies the RESULT of the client half (not just that a button fired): enable
  * registers the SW, requests permission, fetches the VAPID key, calls
  * pushManager.subscribe with the right application server key, and forwards the
- * subscription JSON to stoop.subscribeWebPush; disable drops + deregisters it.
+ * subscription JSON to pinboard.subscribeWebPush; disable drops + deregisters it.
  * Browser primitives are injected as fakes.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -12,7 +12,7 @@ import {
   urlBase64ToUint8Array, webPushSupported, getWebPushState, enableWebPush, disableWebPush,
 } from '../src/web/webPushClient.js';
 
-// A valid base64url VAPID public key (65 bytes uncompressed P-256, as stoop emits).
+// A valid base64url VAPID public key (65 bytes uncompressed P-256, as pinboard emits).
 const VAPID = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8';
 
 function fakeNav({ subscription = null } = {}) {
@@ -49,7 +49,7 @@ describe('webPushSupported', () => {
 });
 
 describe('enableWebPush', () => {
-  it('subscribes with the VAPID key + forwards the subscription to stoop', async () => {
+  it('subscribes with the VAPID key + forwards the subscription to pinboard', async () => {
     const nav = fakeNav();
     const notification = fakeNotification();
     const callSkill = vi.fn(async (app, op) => {
@@ -69,8 +69,8 @@ describe('enableWebPush', () => {
     expect(subOpts.userVisibleOnly).toBe(true);
     expect(subOpts.applicationServerKey).toBeInstanceOf(Uint8Array);
 
-    // the subscription JSON reached stoop
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'subscribeWebPush', {
+    // the subscription JSON reached pinboard
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'subscribeWebPush', {
       subscription: { endpoint: 'https://push.example/abc', keys: { p256dh: 'x', auth: 'y' } },
     });
   });
@@ -95,14 +95,14 @@ describe('enableWebPush', () => {
 });
 
 describe('disableWebPush', () => {
-  it('unsubscribes the browser sub + deregisters the endpoint at stoop', async () => {
+  it('unsubscribes the browser sub + deregisters the endpoint at pinboard', async () => {
     const existing = { endpoint: 'https://push.example/abc', unsubscribe: vi.fn(async () => true) };
     const nav = fakeNav({ subscription: existing });
     const callSkill = vi.fn(async () => ({ ok: true }));
     const res = await disableWebPush({ callSkill, nav });
     expect(res).toEqual({ ok: true });
     expect(existing.unsubscribe).toHaveBeenCalled();
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'unsubscribeWebPush', { endpoint: 'https://push.example/abc' });
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'unsubscribeWebPush', { endpoint: 'https://push.example/abc' });
   });
 });
 

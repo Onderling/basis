@@ -6,7 +6,7 @@ on every feature PR, on the release PR, and again after each merge, the same byt
 
 | Tier | Jobs | Runs on | Blocks |
 | --- | --- | --- | --- |
-| **the gate** | `guards + doc lint` · every package/app suite (`core`, `basis`, `basis-mobile`, `stoop`, …) · `live-pod integration` · `e2e journeys` | every pull request · every push to `development` and `live` · by hand | merging (mark these required in branch protection — still a manual GitHub step) |
+| **the gate** | `guards + doc lint` · every package/app suite (`core`, `basis`, `basis-mobile`, `pinboard`, …) · `live-pod integration` · `e2e journeys` | every pull request · every push to `development` and `live` · by hand | merging (mark these required in branch protection — still a manual GitHub step) |
 | **the tail** | `browser (shard n/8)` — the only jobs that test a SHELL COMPOSITION | a push to `development` or `live` (i.e. after a merge) · by hand (`workflow_dispatch`) — **never on a PR** | the next **release**, not the next merge |
 
 Feature branches run nothing until a PR is opened (a branch per feature ends in a PR anyway). A newer push

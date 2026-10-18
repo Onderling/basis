@@ -71,7 +71,7 @@ function makeOnRemove({ id, members, circleIds, rawCallSkill, revokeAllForMember
   return async (m) => {
     let removed = false;
     try {
-      const r = await rawCallSkill('stoop', 'removeMember', { groupId: id, memberWebid: m.webid, memberStableId: m.stableId });
+      const r = await rawCallSkill('pinboard', 'removeMember', { groupId: id, memberWebid: m.webid, memberStableId: m.stableId });
       if (r?.error) setNotice(t('circle.admin.refused'));
       else removed = true;
     } catch { setNotice(t('circle.admin.refused')); }

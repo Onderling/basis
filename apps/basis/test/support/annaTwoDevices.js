@@ -48,7 +48,7 @@ export async function bootAnnaTwoDevices({ group, agentOpts = {} }) {
   await announce(A, A2);
   await announce(A2, B);
   const knows = (node, webid, otherAddr) => until(async () => {
-    const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: group });
+    const res = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: group });
     const row = (res?.members ?? []).find((m) => m.webid === webid);
     return row?.circleAddresses?.includes(otherAddr) ? row : null;
   }, { timeout: 20000, step: 100 });
@@ -58,7 +58,7 @@ export async function bootAnnaTwoDevices({ group, agentOpts = {} }) {
   const seedRequest = await A2.agent.rosterSeed.buildRequest(group, A2.agent.circleAddressFor(group));
   await A2.agent.sendPeerMessage(A.agent.circleAddressFor(group), seedRequest, SEND);
   expect(await until(async () => {
-    const res = await A2.agent.callSkill('stoop', 'listGroupMembers', { groupId: group });
+    const res = await A2.agent.callSkill('pinboard', 'listGroupMembers', { groupId: group });
     return (res?.members ?? []).some((m) => m.webid === B.pubKey) ? true : null;
   }, { timeout: 20000, step: 100 }), 'the always-on device never received the roster seed').toBe(true);
   return { relay, A, B, A2, logs, phrase, close: async () => { await teardown(A, B, A2); await relay?.close?.(); } };

@@ -7,9 +7,9 @@ import { expect } from '@playwright/test';
 import { gotoCircles, sendDirectMessage, waitForContactMessageDetailed } from './peerHarness.js';
 
 export const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
-export const circleIds = async (page) => ((await call(page, 'stoop', 'listMyCircles', {}))?.circles ?? [])
+export const circleIds = async (page) => ((await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [])
   .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-export const whoAmI = async (page) => (await call(page, 'stoop', 'whoAmI'))?.webid ?? null;
+export const whoAmI = async (page) => (await call(page, 'pinboard', 'whoAmI'))?.webid ?? null;
 
 /** Name this app's person under Mij (the display name field + save). */
 export async function nameMe(page, name) {
@@ -25,7 +25,7 @@ export async function pairCircleWith(page, otherWebid) {
   const ids = (await circleIds(page)).filter((id) => String(id).startsWith('pair-'));
   if (!otherWebid || ids.length <= 1) return ids[0] ?? null;
   for (const id of ids) {
-    const members = (await call(page, 'stoop', 'listGroupMembers', { groupId: id }))?.members ?? [];
+    const members = (await call(page, 'pinboard', 'listGroupMembers', { groupId: id }))?.members ?? [];
     if (members.some((m) => m.webid === otherWebid)) return id;
   }
   return null;

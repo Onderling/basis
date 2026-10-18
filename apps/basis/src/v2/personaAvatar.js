@@ -29,7 +29,7 @@ export async function loadPersonaAvatar({ callSkill, profileId = 'default', name
   let name = profileId === 'default' ? null : given;
   let picture = null;
   if (profileId === 'default') {
-    try { const p = await callSkill('stoop', 'getMyProfile', {}); name = p?.entry?.displayName || p?.entry?.handle || null; } catch { /* nameless */ }
+    try { const p = await callSkill('pinboard', 'getMyProfile', {}); name = p?.entry?.displayName || p?.entry?.handle || null; } catch { /* nameless */ }
   }
   try { picture = pictureRefOf((await callSkill('agents', 'getProfileProperties', { id: profileId }))?.properties); } catch { /* no picture */ }
   return { name, initials: initialsOf(name), picture };

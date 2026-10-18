@@ -24,7 +24,7 @@ package is the RN-only wiring:
 
 ### `./react` — React hooks for skill invocation
 
-Lifted from `apps/stoop-mobile/src/lib/{useSkill, useAgentEvent, useSkillResult, skillParts}.js`
+Lifted from `apps/pinboard-mobile/src/lib/{useSkill, useAgentEvent, useSkillResult, skillParts}.js`
 on **2026-05-09** (Tasks-mobile is the second consumer — Phase 41.0 L1).
 The hooks are produced by a factory so the consumer's app-specific
 ServiceContext shape stays app-local:
@@ -42,7 +42,7 @@ re-exported.
 ## Origins
 
 Lifted from `apps/folio-mobile/src/lib/{serviceBuilder, bgRunOnce}.js`
-on **2026-05-08** as part of Stoop V3 Phase 40.2 (the rule-of-two
+on **2026-05-08** as part of Pinboard V3 Phase 40.2 (the rule-of-two
 consumer of the same pattern). The Folio app pre-dates this substrate
 and was the pattern source; folio-mobile has been migrated to consume
 this package.
@@ -127,7 +127,7 @@ podClient: null, detach: …}` — apps render their sign-in screen.
 
 When `podCfg` is omitted, the bootstrap skips the PodClient step and
 calls `buildEngine({ podClient: null, oidc })` — supports
-local-only mode (Stoop V3's default until pod sign-in lands at
+local-only mode (Pinboard V3's default until pod sign-in lands at
 Phase 40.3).
 
 ## Boundary with `@onderling/sync-engine` (the cross-platform substrate)

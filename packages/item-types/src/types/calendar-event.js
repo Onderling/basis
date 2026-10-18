@@ -1,6 +1,6 @@
 /**
  * `calendar-event` type — a time-bounded event. Cross-app
- * (Tasks's lend-due reminders, Stoop's group events, Folio's
+ * (Tasks's lend-due reminders, Pinboard's group events, Folio's
  * future calendar notes).
  */
 

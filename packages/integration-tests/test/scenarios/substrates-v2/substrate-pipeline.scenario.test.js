@@ -177,7 +177,7 @@ describe('substrates-v2 substrate-pipeline — end-to-end composition', () => {
       role:         'device',
       name:         'Anne (laptop)',
       deviceId:     DEVICE_ID,
-      capabilities: ['stoop', 'tasks'],
+      capabilities: ['pinboard', 'tasks'],
     });
     // Sanity-check the registry has the entry we wrote.
     const allAgents = await registry.list();
@@ -404,7 +404,7 @@ describe('substrates-v2 substrate-pipeline — end-to-end composition', () => {
       role:         'device',
       name:         'Anne',
       deviceId:     DEVICE_ID,
-      capabilities: ['stoop'],
+      capabilities: ['pinboard'],
     });
 
     const { createAgentRegistryMemberMap } = await import('@onderling/identity-resolver');
@@ -415,7 +415,7 @@ describe('substrates-v2 substrate-pipeline — end-to-end composition', () => {
       pubKey:      'pub-anne',
       stableId:    DEVICE_ID,
       displayName: 'Anne',
-      capabilities: ['stoop'],
+      capabilities: ['pinboard'],
     });
   });
 });

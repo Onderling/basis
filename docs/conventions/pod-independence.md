@@ -25,7 +25,7 @@ design preserves it.
 
 | Today's capability | Tomorrow's mechanism |
 |---|---|
-| Stoop's `groupMirror` — group state across member devices, no pod needed | Pseudo-pod replication ring + `notify-envelope` full-payload fan-out (Phase 52.2 + 52.4); Phase 52.9.2 retired `groupMirror` cleanly with parity-tested substitute |
+| Pinboard's `groupMirror` — group state across member devices, no pod needed | Pseudo-pod replication ring + `notify-envelope` full-payload fan-out (Phase 52.2 + 52.4); Phase 52.9.2 retired `groupMirror` cleanly with parity-tested substitute |
 | Tasks's relay-fan-out — task ledger across circle, no pod needed | Same substrate (`notify-envelope` + `pseudo-pod`); no-pod circle policy is one of four §II.2 policies |
 | Try-the-app-for-a-week-before-pod | Pseudo-pod **standalone mode** (Phase 52.2 V0); apps work fully against the local pseudo-pod without ever provisioning a Solid pod |
 | BLE-only campsite circles (no internet) | Pseudo-pod replication ring travels over BLE skill calls — no relay needed; substrate is transport-agnostic |
@@ -109,7 +109,7 @@ verified by parity tests. The retirement passed the audit.
 - `Project Files/standardisation-plan-restructured-2026-05-10.md`
   §II.7 — pseudo-pod's three modes (standalone / replication-ring
   / cache)
-- `Project Files/Stoop/conflict-resolution-design-2026-05-14.md` —
+- `Project Files/Pinboard/conflict-resolution-design-2026-05-14.md` —
   Q-D's version-vector design (pod-independent convergence)
 - `Project Files/Substrates/substrates-v2-coding-plan-2026-05-11.md`
   §Phase 52.9.2 + §Phase 52.14 — worked examples of the principle

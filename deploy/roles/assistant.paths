@@ -10,7 +10,7 @@ apps/calendar/
 apps/folio/
 apps/household/
 apps/lists/
-apps/stoop/
+apps/pinboard/
 apps/tasks-v0/
 deploy/assistant/
 deploy/roles/assistant.

@@ -49,7 +49,7 @@ export async function run({ relayUrl }) {
   try {
     circle = await bootAppCircle({ relayUrl, circleId: CIRCLE, handles: ['anne', 'bram', 'cato'] });
     const [anne, bram, cato] = circle.people;
-    const call = (node, op, args) => node.agent.callSkill('stoop', op, args);
+    const call = (node, op, args) => node.agent.callSkill('pinboard', op, args);
 
     // The admin's OWN view is correct, which is what makes the rest a projection bug rather than a
     // roster that is simply wrong everywhere.

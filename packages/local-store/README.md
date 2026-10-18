@@ -1,9 +1,9 @@
 # `@onderling/local-store`
 
 > **Layer:** substrate. Cross-platform.
-> Lifted from `apps/stoop/src/lib/{CachingDataSource, SyncCadence, Settings}.js`
+> Lifted from `apps/pinboard/src/lib/{CachingDataSource, SyncCadence, Settings}.js`
 > on 2026-05-08 as Tasks V1 = the rule-of-two consumer (per
-> `Project Files/Stoop/migration-tasks-v1-lifts-2026-05-08.md`).
+> `Project Files/Pinboard/migration-tasks-v1-lifts-2026-05-08.md`).
 
 Local-first storage for agent-SDK apps. Three exports:
 
@@ -18,7 +18,7 @@ A `DataSource` (per `@onderling/core`) that wraps an optional inner
 - `attachInner(pod)` — swap inner mid-flight; bulk-syncs queued
   writes.
 - `localOnlyPrefixes` — paths matching any prefix never sync to
-  the inner (Stoop V2.5 uses this for per-device settings).
+  the inner (Pinboard V2.5 uses this for per-device settings).
 
 Events: `online`, `offline`, `queued`, `flushed`, `pulled`,
 `error`, `bulk-sync-started`, `bulk-sync-progress`,
@@ -39,7 +39,7 @@ Per-app factory for the shared/device-split settings pattern (per
 import { createSettingsModule } from '@onderling/local-store';
 
 const m = createSettingsModule({
-  appId:        'stoop',
+  appId:        'pinboard',
   sharedFields: ['broadcastable', 'defaultShareLocation'],
   deviceFields: ['pollIntervalMs', 'onlineWindow', 'allowHopThrough'],
   defaults:     { /* ... */ },
@@ -70,13 +70,13 @@ simple `typeof === typeof def` check; apps with rich rules (e.g.
 
 ## Origins
 
-Stoop V1 Phase 4 invented `CachingDataSource` and `SyncCadence`.
-Stoop V2.5 Phase 23.5 added `Settings`. Phase 33 split it into the
+Pinboard V1 Phase 4 invented `CachingDataSource` and `SyncCadence`.
+Pinboard V2.5 Phase 23.5 added `Settings`. Phase 33 split it into the
 shared/device shape. Tasks V1 implementation needs the same three
 primitives (per
 `Tasks App/coding-plan-2026-05-07.md`
 Phase 1), so the rule-of-two trigger fires and the substrate is
-extracted here. Stoop's three lib files become re-export shims.
+extracted here. Pinboard's three lib files become re-export shims.
 
 ## Tests
 
@@ -85,6 +85,6 @@ cd packages/local-store
 npm test
 ```
 
-Substrate-side tests cover the factory's contract; Stoop's existing
-phase23/phase33/phase34 tests in `apps/stoop/test/` exercise the
+Substrate-side tests cover the factory's contract; Pinboard's existing
+phase23/phase33/phase34 tests in `apps/pinboard/test/` exercise the
 end-to-end behaviour against the lifted code.

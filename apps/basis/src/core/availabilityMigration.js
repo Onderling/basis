@@ -43,12 +43,12 @@ export async function migrateAvailability({ callSkill, defaultId = 'default' } =
   // most-restrictive existing signal → 'away' vs 'open'
   let away = false;
   try {
-    const hm = await callSkill('stoop', 'getHolidayMode', {});
+    const hm = await callSkill('pinboard', 'getHolidayMode', {});
     if (hm?.holidayMode === true) away = true;
   } catch { /* */ }
   if (!away) {
     try {
-      const r = await callSkill('stoop', 'listMyOfferings', {});
+      const r = await callSkill('pinboard', 'listMyOfferings', {});
       const skills = Array.isArray(r?.skills) ? r.skills : [];
       // any legacy per-skill availability that meant "not fully open"
       if (skills.some((s) => s?.availability != null && s.availability !== '' && s.availability !== 'open')) away = true;

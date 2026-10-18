@@ -12,7 +12,7 @@
  *
  * This module is framework-agnostic (it takes `{ describe, it, expect }` so
  * `@onderling/sdk` needn't depend on a test runner) and **parameterized by app**,
- * so household / stoop / tasks-v0 each drive it with a tiny config. It asserts:
+ * so household / pinboard / tasks-v0 each drive it with a tiny config. It asserts:
  *
  *   1. EQUIVALENCE — for each representative case, running it via the LOCAL
  *      invoker and via the WIRE invoker yields the same result once volatile

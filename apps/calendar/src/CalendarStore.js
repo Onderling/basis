@@ -7,7 +7,7 @@
  * task/post/claim fields it knows about — calendar-event's custom
  * fields (`startsAt`, `endsAt`, `attendees`, `rsvp`, `location`)
  * get stripped on persist.  The architectural mismatch: ItemStore
- * is for items with the household/tasks/stoop shape, not arbitrary
+ * is for items with the household/tasks/pinboard shape, not arbitrary
  * typed items.
  *
  * For v0.7.10 we use `@onderling/pseudo-pod` DIRECTLY: each event is

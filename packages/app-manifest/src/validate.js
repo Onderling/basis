@@ -222,7 +222,7 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // B · Layer 1 — `manifest.domainVerbs` names the NON-atom (domain-specific) verbs this manifest ships
-  // (folio `sync`, stoop `report`, household `register`/`help`, …) and classifies each one: a map
+  // (folio `sync`, pinboard `report`, household `register`/`help`, …) and classifies each one: a map
   // `{ verb: 'read' | 'write' }`. The atom catalogue knows whether an atom writes; a domain verb's own
   // manifest is the only place that can say. Validated whenever present; the atom-discipline cross-check
   // (op.verb ∈ atoms ∪ keys of domainVerbs) only fires under `opts.atoms`.

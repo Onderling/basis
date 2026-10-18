@@ -4,7 +4,7 @@
  * Wraps each pure core in `AGENT_CORES` with `wireSkill(coreFn, op,
  * { storeFor })` — the manifest op stays the single contract; the
  * `defineSkill`-shaped handler is DERIVED from it (same generator
- * tasks-v0 / stoop use).  `storeFor` resolves the scope store from the
+ * tasks-v0 / pinboard use).  `storeFor` resolves the scope store from the
  * skill context; for this single-user surface the store is the injected
  * `{ registry, tokens? }` pair regardless of ctx:
  *   • `registry` — the `@onderling/agent-registry` instance (mirror truth).

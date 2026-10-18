@@ -1,6 +1,6 @@
 /**
  * mnemonic helpers — pure-fn coverage. Mirrors the assertions
- * apps/stoop-mobile/test/mnemonic.test.js exercises through the
+ * apps/pinboard-mobile/test/mnemonic.test.js exercises through the
  * re-export shim.
  */
 

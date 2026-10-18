@@ -22,7 +22,7 @@ Exit `0` = every journey fully green · `1` = a failure · `2` = usage error.
 | `offline`   | store-and-forward: offline peer's messages are held + flushed in order on reconnect |
 | `multi-party` | a 4-person circle, one member offline during a broadcast, no loss / no self-delivery |
 | `sealed`    | M2 durable sealed inbox on a companion node — sealed-only, owner-gated drain, ciphertext at rest |
-| `j-circle`   | the stoop neighbourhood flow: invite → admin-verified join → prikbord post → private 1:1 chat |
+| `j-circle`   | the pinboard neighbourhood flow: invite → admin-verified join → prikbord post → private 1:1 chat |
 | `j-companion` | **[needs a real pod]** device delegates scoped pod access → companion acts on a REAL CSS via proxy (holds no secret) → out-of-scope denied → revoke denies |
 | `task-claim` | **[hermetic]** the hard distributed case: mesh splits → both halves claim the same task → reconverge → the double-claim is surfaced as a conflict (never a silent overwrite), no work lost |
 | `j-security` | **[hermetic]** adversarial: forge / privilege-escalate / impersonate / steal a capability token, and read another's sealed mail — each DEFENDED by the real PolicyEngine verifier + nacl.box sealing |
@@ -38,7 +38,7 @@ Exit `0` = every journey fully green · `1` = a failure · `2` = usage error.
 Each journey uses fresh identities, so they can share one relay without collision.
 `two-party` / `offline` / `multi-party` are SDK-level (relay only). `sealed` spins up
 a real `@onderling-app/companion-node` with the inbox enabled. `j-circle` drives two
-real `@onderling-app/stoop` `createNeighbourhoodAgent` instances with the substrate mirror.
+real `@onderling-app/pinboard` `createNeighbourhoodAgent` instances with the substrate mirror.
 `task-claim` is **hermetic** — it uses the in-process partitionable transport (you
 cannot tell a real relay to partition on command), so it ignores the relay URL and
 reuses the real tasks-v0 claim + substrate-mirror conflict machinery.
@@ -96,14 +96,14 @@ refuses the global-key fallback. `help` lists the commands.
 - `deploy/smoke/smoke.mjs` — a portable, `ws`-only **wire-protocol** smoke test of a
   *deployed* relay (no workspace checkout). Coarser; checks reachability + brokering.
 - **This harness** — the full **SDK/app-level** journeys (real `Agent`, sealing,
-  stoop). Richer; needs the workspace.
+  pinboard). Richer; needs the workspace.
 - `packages/**/test`, `apps/*/test` — the hermetic unit/integration suites.
 
 ## Two compositions — pick the right one for what you are asserting
 
 Journeys here can boot either of two stacks, and the choice decides what a result *means*.
 
-| | **stoop + substrate mirror** (the original journeys) | **the APP composition** (`journeys/_app.mjs`) |
+| | **pinboard + substrate mirror** (the original journeys) | **the APP composition** (`journeys/_app.mjs`) |
 |---|---|---|
 | what it is | `createNeighbourhoodAgent` + `attachSubstrateMirror` | `createRealHouseholdAgent` — the same factory the web and mobile shells boot |
 | has a device log | ✗ | ✓ |
@@ -122,7 +122,7 @@ import { bootAppCircle, rosterOf, hasMember, untilTrue } from './_app.mjs';
 
 const circle = await bootAppCircle({ relayUrl, circleId: 'my-journey', handles: ['anne', 'bram'] });
 const [anne, bram] = circle.people;
-// …drive real ops through the waist: anne.agent.callSkill('stoop', 'listGroupMembers', { groupId })
+// …drive real ops through the waist: anne.agent.callSkill('pinboard', 'listGroupMembers', { groupId })
 await circle.close();
 ```
 

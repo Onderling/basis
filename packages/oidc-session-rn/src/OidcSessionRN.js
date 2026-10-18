@@ -21,12 +21,12 @@
  * layer DPoP via `@inrupt/solid-client-authn-browser` if needed.
  *
  * **Storage key prefix:** the canonical apps each have their own —
- * folio uses `folio-oidc-*`, Stoop uses `stoop-oidc-*`. This is
+ * folio uses `folio-oidc-*`, Pinboard uses `pinboard-oidc-*`. This is
  * configurable via the `appId` constructor arg so a single device
  * running both apps doesn't get its keys clobbered.
  *
  * Lifted from `apps/folio-mobile/src/auth/OidcSessionRN.js` 2026-05-08
- * (Stoop V3 Phase 40.3). Folio's static keys stay stable for migration:
+ * (Pinboard V3 Phase 40.3). Folio's static keys stay stable for migration:
  * `appId: 'folio'` produces the legacy `folio-oidc-*` keys.
  */
 
@@ -37,7 +37,7 @@ export const DEFAULT_APP_ID = 'oidc';
  * expo-secure-store's `[A-Za-z0-9._-]+` pattern.
  *
  * @param {string} appId  Short string used as a key prefix.
- *                          Examples: 'folio', 'stoop'.
+ *                          Examples: 'folio', 'pinboard'.
  * @returns {{
  *   ACCESS_TOKEN: string,
  *   REFRESH_TOKEN: string,
@@ -99,7 +99,7 @@ export class OidcSessionRN {
    * @param {SecureStore} args.store  Typically the namespace import of
    *                                   `expo-secure-store`.
    * @param {string} [args.appId]     Storage-key prefix.  Examples:
-   *                                   'folio' (legacy), 'stoop' (new).
+   *                                   'folio' (legacy), 'pinboard' (new).
    *                                   Defaults to 'oidc'.
    */
   constructor({ store, appId = DEFAULT_APP_ID } = {}) {

@@ -2,11 +2,11 @@
  * **Platform: RN**.  Mobile parity for
  * src/web/wizards/settingsWizard.js.
  *
- * NOT a stepper — a settings panel.  Reads stoop profile +
+ * NOT a stepper — a settings panel.  Reads pinboard profile +
  * holiday-mode via loadSettings, then exposes:
- *   - handle save (stoop.setMyHandle)
- *   - display-name save (stoop.setMyDisplayName)
- *   - holiday-mode toggle (stoop.setHolidayMode)
+ *   - handle save (pinboard.setMyHandle)
+ *   - display-name save (pinboard.setMyDisplayName)
+ *   - holiday-mode toggle (pinboard.setHolidayMode)
  *
  * Shares src/core/wizards/settingsState.js with web.
  *
@@ -206,7 +206,7 @@ export default function SettingsWizardModal({
           testID="settings-wizard"
         >
           <ScrollView style={styles.scroll}>
-            <Body title="Settings" intro="Stoop profile + holiday mode.">
+            <Body title="Settings" intro="Pinboard profile + holiday mode.">
               {state.loading ? (
                 <Text style={styles.loading}>Loading…</Text>
               ) : (

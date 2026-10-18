@@ -43,7 +43,7 @@ import { announceOwnCircleAddressIfChanged } from './circleAddressAnnounce.js';
 export async function knownCircleIds({ agent } = {}) {
   if (typeof agent?.callSkill !== 'function') return [];
   try {
-    const res = await agent.callSkill('stoop', 'listMyCircles', {});
+    const res = await agent.callSkill('pinboard', 'listMyCircles', {});
     return (Array.isArray(res?.circles) ? res.circles : [])
       .map((b) => (typeof b === 'string' ? b : b?.id))
       .filter(Boolean);

@@ -405,7 +405,7 @@ WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
 consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, card? }`.
 
 This replaces the two hand-maintained reshapers that read a stored item's
-`source` and re-emit the envelope — `stoop getMessagesSince`'s `.map(...)`
+`source` and re-emit the envelope — `pinboard getMessagesSince`'s `.map(...)`
 and `basis circleChatRehydrate.itemToEnvelope`. They differ only in their
 leniency toward malformed items, expressed here as one explicit flag rather
 than as two silently-drifting copies:
@@ -491,7 +491,7 @@ toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, card })
 ```
 
 `toWire` — project the canonical fields onto the peer fan-out WIRE
-envelope that `stoop broadcastCircleMessage` sends over the reliable
+envelope that `pinboard broadcastCircleMessage` sends over the reliable
 transport:
   `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
 
@@ -539,7 +539,7 @@ pointer); this projector neither interprets nor resolves it.
 NOTE (honest degrade): the live send path degrades pod-signal to a
 full-body `toWireEnvelope` fan until the real shared-pod write is wired,
 so this shape is defined + unit-tested now but not yet fanned on the
-live path. It plugs in at the stoop `broadcastToCircle` pod seam.
+live path. It plugs in at the pinboard `broadcastToCircle` pod seam.
 
 **Parameters**
 
@@ -958,7 +958,7 @@ async itemTreeFor({ itemId, getById, pseudoPodRead, podFetch } = {})
 The whole `getItemTree` op body, once — walk an item's embeds/deps tree and materialise the
 cross-pod refs in it.
 
-This existed TWICE, in stoop's skills and in tasks' workspace, the second copied from the first
+This existed TWICE, in pinboard's skills and in tasks' workspace, the second copied from the first
 (its comment said so) along with a test described as an "analog" of the other. The two were
 identical but for which store they read, which is exactly the difference a parameter is for. Two
 copies of a decentralised READ path is a bad thing to let drift: it is the executable half of the
@@ -1169,7 +1169,7 @@ May an entry of this kind wake an offline device?
 
 `payload` is consulted ONLY for kinds whose table entry is not the whole story — today just `governance`,
 where a decision opening wakes and the votes that follow do not. Keeping that exception here, next to the
-table, is what lets stoop and basis stop each deriving it.
+table, is what lets pinboard and basis stop each deriving it.
 
 **Parameters**
 

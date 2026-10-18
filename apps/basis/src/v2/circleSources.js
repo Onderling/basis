@@ -3,7 +3,7 @@
  *
  * Maps the host's dispatch onto the `loadCircles` fetchers, reusing
  * EXISTING ops only — `getMyCircles` (tasks circles, shape
- * `{circles:[{circleId,name,kind,counts}]}`) and `getCurrentGroup` (the stoop
+ * `{circles:[{circleId,name,kind,counts}]}`) and `getCurrentGroup` (the pinboard
  * circle record behind `/groups`) — plus an optional `@onderling/circles`
  * store. No new ops are invented; the host injects `callSkill` (web: its
  * dispatch; mobile: hostOps) so the same adapter drives both launchers.
@@ -52,7 +52,7 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
     // (removed 2026-08-03).
     //
     // Not re-wired on purpose. Standing up `createCirclesStore` here would create a SECOND circle registry
-    // beside stoop's `getMyCircles`/`listMyCircles`, which is the confusion the planned stoop→circles
+    // beside pinboard's `getMyCircles`/`listMyCircles`, which is the confusion the planned pinboard→circles
     // extraction exists to remove — see `DESIGN-ops-flows-nav` §8c. The list of circles has one home.
   };
 }
@@ -67,7 +67,7 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
 // any other app: without it the "+" cannot offer a list entry, the bot cannot put milk on the shopping
 // list, and a slash command resolves to nothing. Its ops all declare `requires: ['lists']`, so a circle
 // with the feature switched off still offers none of them — the feature gate does that work, not this list.
-export const DEFAULT_CIRCLE_ORIGINS = ['stoop', 'tasks', 'household', 'calendar', 'folio', 'agents', 'lists'];
+export const DEFAULT_CIRCLE_ORIGINS = ['pinboard', 'tasks', 'household', 'calendar', 'folio', 'agents', 'lists'];
 
 // Perf #2 (2026-05-30) — does `catalogue` declare `opId` on `origin`?
 // The merged catalogue stores ops under either the bare `opId` (then
@@ -136,7 +136,7 @@ export function makeResolvingCallSkill(rawCallSkill, origins = DEFAULT_CIRCLE_OR
     // the op — but ONLY when the catalogue positively knows the op on SOME origin
     // (an "aspirational op" like getFeed/listNotes declared elsewhere). Essential
     // circle-source ops that are AGENT skills, not manifest ops — `getMyCircles`
-    // (tasks), `listMyCircles` (stoop) — appear on NO origin in the catalogue, so the
+    // (tasks), `listMyCircles` (pinboard) — appear on NO origin in the catalogue, so the
     // per-origin gate used to skip them everywhere → loadCircles returned nothing →
     // "No circles yet" on every reload. When the op is unknown to the catalogue, try
     // all origins (the gate is a perf hint, not a hard filter).

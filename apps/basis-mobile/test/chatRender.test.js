@@ -29,12 +29,12 @@ import {
 import { composeManifests } from '../src/core/composeManifests.js';
 import { t, initLocalisation } from '../src/core/localisation.js';
 
-// basis's mockStoopManifest is the closest thing to a "real"
+// basis's mockPinboardManifest is the closest thing to a "real"
 // list-shape op (postRequest → list of posts with per-row buttons).
 // We import it directly so we can build manifestsByOrigin from a
 // known reference.
 import {
-  mockTasksManifest, mockStoopManifest, mockFolioManifest,
+  mockTasksManifest, mockPinboardManifest, mockFolioManifest,
 } from '../../basis/src/core/manifests/mockManifests.js';
 import { mockHouseholdManifest } from '../../basis/src/core/agent/mockAgent.js';
 import { calendarManifest } from '../../calendar/manifest.js';
@@ -49,7 +49,7 @@ function makeManifestsByOrigin() {
     'basis': basisManifest,
     'household':   mockHouseholdManifest,
     'tasks':    mockTasksManifest,
-    'stoop':       mockStoopManifest,
+    'pinboard':       mockPinboardManifest,
     'folio':       mockFolioManifest,
     'calendar':    calendarManifest,
   };

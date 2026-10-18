@@ -1,7 +1,7 @@
 import { isKeylessContact } from '@onderling/item-types';
 /**
  * `createCircleFanOut(deps)` — the ONE circle-broadcast fan the whole
- * `broadcastCircle*` family rides. Lifted verbatim out of stoop's `buildSkills`
+ * `broadcastCircle*` family rides. Lifted verbatim out of pinboard's `buildSkills`
  * so the roster-fan, transport choice, delivery-state accounting, the
  * data-move (pod) branch, and the `{sent, attempted, errors}` return contract
  * live once, in the circles substrate, and cannot drift across the callers
@@ -25,9 +25,9 @@ import { isKeylessContact } from '@onderling/item-types';
  *                             the roster skill — injected, not owned here).
  *   - `readCircleExits`       the circle's exit set (shared — injected).
  *   - `isExited`              exit predicate (shared — injected).
- *   - `fanOutViaReliableSend` the reliable-sender fan (stoop keeps it — it
+ *   - `fanOutViaReliableSend` the reliable-sender fan (pinboard keeps it — it
  *                             closes over the member-address resolver).
- *   - `fanOutToMembers`       the bus-local `chat.send` fan (stoop keeps it).
+ *   - `fanOutToMembers`       the bus-local `chat.send` fan (pinboard keeps it).
  *   - `toWireRefEnvelope`     the pod-ref envelope projector (from
  *                             `@onderling/item-store` — injected so this
  *                             package needs no item-store dependency).

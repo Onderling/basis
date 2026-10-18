@@ -731,11 +731,11 @@
       },
       "request": {
         "text": "Request",
-        "doc": "embeds[] chip type label — stoop request."
+        "doc": "embeds[] chip type label — pinboard request."
       },
       "offer": {
         "text": "Offer",
-        "doc": "embeds[] chip type label — stoop offer."
+        "doc": "embeds[] chip type label — pinboard offer."
       },
       "note": {
         "text": "Note",
@@ -2197,9 +2197,9 @@
         "text": "Chat",
         "doc": "B/Q3 — app label (basis) for the capability freedom-matrix header."
       },
-      "stoop": {
+      "pinboard": {
         "text": "Neighbourhood",
-        "doc": "S6.C — app label (stoop)."
+        "doc": "S6.C — app label (pinboard)."
       },
       "tasks": {
         "text": "Tasks",
@@ -2229,15 +2229,15 @@
     "storage_err": {
       "generic": {
         "text": "Couldn't update the circle's storage location — your local settings were still saved.",
-        "doc": "§4 — storage-policy bridge: fallback when stoop rejects setCircleStoragePolicy."
+        "doc": "§4 — storage-policy bridge: fallback when pinboard rejects setCircleStoragePolicy."
       },
       "admin-only": {
         "text": "Only a circle admin can change the storage location.",
-        "doc": "§4 — storage-policy bridge: stoop admin-only rejection."
+        "doc": "§4 — storage-policy bridge: pinboard admin-only rejection."
       },
       "storage-policy-downgrade-not-supported": {
         "text": "Storage can't be turned back off once it's on (this is one-way by design).",
-        "doc": "§4 — storage-policy bridge: stoop one-way downgrade guard."
+        "doc": "§4 — storage-policy bridge: pinboard one-way downgrade guard."
       }
     },
     "feat": {
@@ -2642,7 +2642,7 @@
     },
     "global_label": {
       "text": "Let trusted contacts relay my requests one hop",
-      "doc": "Global hop-mode toggle (Stoop allowHopThrough)."
+      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
     },
     "explain": {
       "text": "When you ask for something no one nearby has, a contact who allows it can pass your request one step further — to their contacts. Max one hop, and the relay is anonymized.",
@@ -3154,6 +3154,10 @@
       "text": "One line about why you are here",
       "doc": "Card line field — optional."
     },
+    "card_prefill": {
+      "text": "Fill in from what this room may see of you",
+      "doc": "Nearby card form: fill the name field from the room self's Nearby level (its release under the reserved nearby context) — nothing more; the person still sends it."
+    },
     "card_visible_to": {
       "text": "Everyone in this room can see this.",
       "doc": "Shown with the card composer. \"Everyone in this room\" is not obvious from a text field."
@@ -3414,17 +3418,21 @@
       "text": "That is a name you show, not a separate address: whoever is looking here can tell it comes from the same device.",
       "doc": "Nearby → You here: who this device enters the room as (follows the switcher's set; a label until the room has an address per self)."
     },
+    "first_use_title": {
+      "text": "What may this room see of you?",
+      "doc": "Nearby first-use question (once per self per device): the room self's level."
+    },
+    "first_use_body": {
+      "text": "You choose this per persona; it goes with it to your other devices. You can change it later under \"Show here as\".",
+      "doc": "Under the first-use question: the level is the persona's and syncs; where to change it later."
+    },
+    "first_use_later": {
+      "text": "Later (your handle until then)",
+      "doc": "Dismiss the first-use question; the self stays on the floor default (its handle) and is not asked again on this device."
+    },
     "face_row": {
       "text": "Show here as",
       "doc": "L63: the face picker inside \"You here\" — the same faces a circle offers."
-    },
-    "face_name": {
-      "text": "Your name",
-      "doc": "displayName (the default)."
-    },
-    "face_handle": {
-      "text": "Your handle",
-      "doc": "the handle."
     },
     "face_none": {
       "text": "Nobody",
@@ -3433,6 +3441,10 @@
     "face_empty": {
       "text": "You have not set that yet, so nobody nearby sees a name — your key fragment shows instead.",
       "doc": "Nearby face picker: the chosen face (name or handle) resolves to nothing, so a retraction was announced."
+    },
+    "level_not_set": {
+      "text": "That did not change — try again.",
+      "doc": "Nearby: setting the room self's level (what the room sees of it) was refused or failed; nothing changed."
     },
     "face_caveat": {
       "text": "A stable face re-identifies you across places, even though your address rotates.",
@@ -5827,7 +5839,7 @@
     },
     "profile_title": {
       "text": "Your noticeboard profile",
-      "doc": "Heading of the record /stoop-profile returns."
+      "doc": "Heading of the record /pinboard-profile returns."
     }
   },
   "profile": {
@@ -7381,6 +7393,8 @@
     "done_remove_reload": "Done. {{name}} was taken off this device. Restart the app.",
     "remove_key_holder": "This device speaks as this persona; it cannot be taken off.",
     "remove_paused": "Resume this persona first: to retire its addresses it must still be able to speak.",
+    "slash_row": "• {{name}}",
+    "slash_row_state": "• {{name}} — {{state}}",
     "here_title": "On this device",
     "primary": "this device speaks as this persona",
     "paused": "paused on this device",
@@ -8202,38 +8216,38 @@
         "doc": "Row-action button for household:claim, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       }
     },
-    "stoop": {
+    "pinboard": {
       "respondToItem": {
         "text": "Respond",
-        "doc": "Row-action button for stoop:respondToItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:respondToItem, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "cancelRequest": {
         "text": "Withdraw",
-        "doc": "Row-action button for stoop:cancelRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:cancelRequest, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "markReturned": {
         "text": "Returned",
-        "doc": "Row-action button for stoop:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "reportPost": {
         "text": "Report",
-        "doc": "Row-action button for stoop:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Message",
-        "doc": "Row-action button for stoop:startDm, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:startDm, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "setContactHidden": {
         "text": "Hide",
-        "doc": "Row-action button for stoop:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
+        "doc": "Row-action button for pinboard:setContactHidden (the manifest's ui surface). The thread header uses circle.contacts.hide / unhide."
       },
       "setContactPersona": {
         "text": "Who you are to this contact",
-        "doc": "Row-action / page button for stoop:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
+        "doc": "Row-action / page button for pinboard:setContactPersona (L125). The thread header paints circle.contacts.lens.*."
       },
       "conflictDisputeWizard": {
         "text": "Dispute",
-        "doc": "Row-action button for stoop:conflictDisputeWizard, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+        "doc": "Row-action button for pinboard:conflictDisputeWizard, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       }
     },
     "folio": {

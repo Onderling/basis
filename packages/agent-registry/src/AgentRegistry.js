@@ -16,7 +16,7 @@ import {
   emptyResource,
   RESOURCE_VERSION,
 } from './resource.js';
-import { withCAS } from './concurrency.js';
+import { withCAS as withCASUnserialised } from './concurrency.js';
 import { normalizeExposure } from './skillExposure.js';
 
 /**
@@ -25,6 +25,35 @@ import { normalizeExposure } from './skillExposure.js';
  */
 // whose a profile is: the member kinds a roster row can say (one list, the kernel's)
 export const PROFILE_KINDS = MEMBER_KINDS;
+
+/**
+ * ONE MUTATION AT A TIME per (pseudo-pod, resource). The registry is one resource holding every entry, each mutation a
+ * read → change one entry → write the whole body; the pseudo-pod does not compare-and-swap, so two mutations in flight
+ * at once would each read the body without the other's entry and the later write would drop the earlier one (a persona
+ * created while the boot wrote the general row lost its record). Keyed on the pseudo-pod itself, so two registry
+ * handles over one pod queue together too. Across devices it stays the carrier's business.
+ */
+const _mutationQueues = new WeakMap();   // pseudoPod → Map<uri, Promise>
+/**
+ * Run `run` in the registry's mutation queue for this resource — for a writer OUTSIDE the registry handle (the carrier
+ * pulling the pod copy over the local one), so its read-then-write cannot interleave with a register.
+ * @template T
+ * @param {object} pseudoPod
+ * @param {string} uri
+ * @param {() => Promise<T>} run
+ * @returns {Promise<T>}
+ */
+export function withRegistryWriteLock(pseudoPod, uri, run) { return _serialised(pseudoPod, uri, run); }
+function _serialised(pseudoPod, uri, run) {
+  let perPod = _mutationQueues.get(pseudoPod);
+  if (!perPod) { perPod = new Map(); _mutationQueues.set(pseudoPod, perPod); }
+  const prior = perPod.get(uri) ?? Promise.resolve();
+  const next = prior.then(run, run);
+  const tail = next.then(() => {}, () => {});
+  perPod.set(uri, tail);
+  tail.then(() => { if (perPod.get(uri) === tail) perPod.delete(uri); });
+  return next;
+}
 
 /**
  * Build the live agent-registry handle over an injected pseudo-pod: etag-CAS reads/writes of the
@@ -68,6 +97,7 @@ export function createAgentRegistry({
     );
   }
   const uri = resourceUri ?? registryResourceUri({ anchorPodUri, deviceId, preferPodUri });
+  const withCAS = (args) => _serialised(pseudoPod, uri, () => withCASUnserialised(args));
 
   async function _readCurrent() {
     const rec = await pseudoPod.read(uri);

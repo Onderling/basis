@@ -7,7 +7,7 @@
  * `PolicyEngine.checkInbound` → the handler). One declaration, one more projection.
  *
  * WHY THIS EXISTS. There was already a way for an agent to invoke another agent's skill, with capability
- * tokens and revocation, and basis already uses it in-process (`chatAgent.invoke(stoopAgent.address, …)`).
+ * tokens and revocation, and basis already uses it in-process (`chatAgent.invoke(pinboardAgent.address, …)`).
  * What was missing is narrow: no manifest op was ever REGISTERED as a kernel skill, so that path could not
  * reach the waist. A second envelope + a second gate got built beside it instead. This closes the gap the
  * way the architecture asks — a projection of the one declaration — so there is one gate for host, peer,
@@ -46,7 +46,7 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   'household.exportRecoveryFile', 'household.importRecoveryFile', 'household.listRecoveryCircles',
   'household.restoreStatus', 'household.restoreSource', 'household.restoreIntent',
   'household.listReceivablePersonas', 'household.receivePersonas',
-  'household.listPersonasHere', 'household.pausePersona', 'household.resumePersona', 'household.removePersonaHere',
+  'household.listPersonasHere', 'household.pausePersona', 'household.resumePersona', 'household.removePersonaHere', 'household.setNearbyLevel',
   // …and what that node lets another agent do there: granting it, or reading its choices, has THIS device sign a
   // statement for the person's node — a peer must not get the person's device to sign for it.
   'household.grantCompanion',

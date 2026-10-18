@@ -60,13 +60,13 @@ const arrives = (node, circleId, text, why) => until(async () => (chatIn(node, c
 const textsIn = async (node, contactId) => ((await node.contactThreadChannel.rehydrate(contactId)) ?? []).map((t) => t.text);
 /** A member's proven address set for the person, as one node's roster has it. */
 async function addressesOf(node, webid) {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
   const row = (r?.members ?? []).find((m) => m.webid === webid);
   return row?.circleAddresses ?? [];
 }
 /** One node's roster of the circle, compact enough for a failure message. */
 async function rosterView(node) {
-  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE });
+  const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE });
   return JSON.stringify((r?.members ?? []).map((m) => ({ who: m.webid.slice(0, 8), set: (m.circleAddresses ?? []).map((x) => x.slice(0, 8)) })));
 }
 /** The other devices on a node's registry, live and tombstoned. */
@@ -90,7 +90,7 @@ describe('the box is revoked while it holds the address', () => {
   const webVaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
   const webRegistry = createMemoryBackend();
   const webLog = new EventLog({ initial: [], muted: [] });
-  const webKeeps = { ...webVaults, registryBackend: webRegistry, deviceLog: webLog, stoopPersistDb: { path: path.join(webDir, 'stoop-state.json') } };
+  const webKeeps = { ...webVaults, registryBackend: webRegistry, deviceLog: webLog, pinboardPersistDb: { path: path.join(webDir, 'pinboard-state.json') } };
   const beaRef = {};
   const productionBinding = (ref) => rosterBindingVerifier((app, op, args) => ref.node.agent.callSkill(app, op, args));
   /** The web app, booted on its own vaults, on the relay, in its circle — what a shell does on connect: prime,

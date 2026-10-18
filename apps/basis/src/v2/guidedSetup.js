@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS_TEMPLATE = Object.freeze({
       kind: 'multiselect',
       sets: 'apps',
       options: [
-        { value: 'stoop',    label: 'Neighbourhood' },
+        { value: 'pinboard',    label: 'Neighbourhood' },
         { value: 'tasks',    label: 'Tasks' },
         { value: 'calendar', label: 'Calendar' },
         { value: 'folio',    label: 'Files' },

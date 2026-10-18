@@ -118,7 +118,7 @@ export function createComposerCommands(ctx = {}) {
       if (!hit) return null;
       // ARGS, where the declaration says how to read them. `parseSlash` applies the op's own `body`
       // rule (`flags` → `--key=value` + positionals, `argline` → the whole line), which is the same
-      // reading the chat shell has always done — so `/block alice` and `/logs --app=stoop` mean here
+      // reading the chat shell has always done — so `/block alice` and `/logs --app=pinboard` mean here
       // exactly what they meant there. A shell that only got `rest` had to re-invent that per command,
       // which is how five hand-parsed builtins came to be the only typeable ops.
       const cat = hit.appOrigin === 'basis' ? BASIS_CATALOGUE : ctx.catalogue;

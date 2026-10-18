@@ -1,7 +1,7 @@
 /**
- * Substrate-side smoke for createSettingsModule.  Stoop's existing
- * phase33 + phase34 tests in apps/stoop/test exercise the
- * Stoop-bound module end-to-end; this file verifies the factory's
+ * Substrate-side smoke for createSettingsModule.  Pinboard's existing
+ * phase33 + phase34 tests in apps/pinboard/test exercise the
+ * Pinboard-bound module end-to-end; this file verifies the factory's
  * own contract (path prefixing, schema partition, validator hook).
  */
 

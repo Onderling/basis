@@ -52,11 +52,11 @@ async function bot({ people = true } = {}) {
   const own = (a, o, x, ctx) => agent.callSkill(a, o, x, ctx);
   await ensureHouseholdLists({ callSkill: (a, o, x) => agent.callSkill(a, o, x), t });
   // the admin is in the gate before anything (the door does this for whoever writes; an import restores the rest)
-  await own('stoop', 'addContact', { webid: ADMIN, channel: 'telegram', role: 'admin', displayName: 'Anne' });
+  await own('pinboard', 'addContact', { webid: ADMIN, channel: 'telegram', role: 'admin', displayName: 'Anne' });
   await agent.setDoorCaller(ADMIN, 'admin');
   if (people) {
     for (const p of PEOPLE.filter((x) => x.id !== ADMIN)) {
-      await own('stoop', 'addContact', { webid: p.id, channel: p.channel, role: p.role, displayName: p.displayName });
+      await own('pinboard', 'addContact', { webid: p.id, channel: p.channel, role: p.role, displayName: p.displayName });
       await agent.setDoorCaller(p.id, p.role);
     }
   }
@@ -216,7 +216,7 @@ describe('importing onto a bot that already has a household', () => {
     const tier = (id, role) => b.agent.setDoorCaller(id, role);
     expect((await importHousehold(file, { call: b.own, tier })).ok).toBe(true);
     // Bert was made an observer after the export; a second import of the same file
-    await b.own('stoop', 'addContact', { webid: BERT, channel: 'telegram', role: 'observer', displayName: 'Bert' });
+    await b.own('pinboard', 'addContact', { webid: BERT, channel: 'telegram', role: 'observer', displayName: 'Bert' });
     const again = await importHousehold(file, { call: b.own, tier });
     expect(again.ok).toBe(true);
     const items = await b.agent.householdItems();

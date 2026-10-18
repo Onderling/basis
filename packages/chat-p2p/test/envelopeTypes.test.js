@@ -1,7 +1,7 @@
 /**
  * Substrate-side smoke for chat-p2p's envelope-type config.
- * The original Stoop wireChat tests cover the end-to-end behaviour
- * via apps/stoop/test/phase14.test.js + phase27.test.js. These
+ * The original Pinboard wireChat tests cover the end-to-end behaviour
+ * via apps/pinboard/test/phase14.test.js + phase27.test.js. These
  * tests pin the substrate's specific contract: configurable
  * accept/emit envelope types, mixed-version interop.
  */
@@ -59,7 +59,7 @@ function buildHarness({ acceptedEnvelopeTypes, emitEnvelopeType }) {
 describe('chat-p2p — envelope type config', () => {
   it('emits the configured envelope type', async () => {
     const h = buildHarness({
-      acceptedEnvelopeTypes: ['p2p-chat', 'stoop-chat'],
+      acceptedEnvelopeTypes: ['p2p-chat', 'pinboard-chat'],
       emitEnvelopeType:      'p2p-chat',
     });
     await h.ctrl.send({
@@ -72,16 +72,16 @@ describe('chat-p2p — envelope type config', () => {
     expect(data.subtype).toBe('chat-message');
   });
 
-  it('accepts both p2p-chat AND stoop-chat by default', async () => {
+  it('accepts both p2p-chat AND pinboard-chat by default', async () => {
     const h = buildHarness({
-      acceptedEnvelopeTypes: ['p2p-chat', 'stoop-chat'],
+      acceptedEnvelopeTypes: ['p2p-chat', 'pinboard-chat'],
       emitEnvelopeType:      'p2p-chat',
     });
-    // Inject a legacy 'stoop-chat' envelope.
+    // Inject a legacy 'pinboard-chat' envelope.
     const legacyEnv = {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
-        type:     'stoop-chat',
+        type:     'pinboard-chat',
         subtype:  'chat-message',
         threadId: 't1',
         body:     'legacy hello',
@@ -129,16 +129,16 @@ describe('chat-p2p — envelope type config', () => {
     expect(h.itemStore.addItems).not.toHaveBeenCalled();
   });
 
-  it('Stoop-style config: emit stoop-chat, accept both', async () => {
+  it('Pinboard-style config: emit pinboard-chat, accept both', async () => {
     const h = buildHarness({
-      acceptedEnvelopeTypes: ['p2p-chat', 'stoop-chat'],
-      emitEnvelopeType:      'stoop-chat',          // Stoop's back-compat sender
+      acceptedEnvelopeTypes: ['p2p-chat', 'pinboard-chat'],
+      emitEnvelopeType:      'pinboard-chat',          // Pinboard's back-compat sender
     });
     await h.ctrl.send({
       toPubKey: 'peer-1', threadId: 't1', body: 'hi',
       subtype: 'chat-message',
     });
-    expect(h.oneWayCalls[0].env.parts[0].data.type).toBe('stoop-chat');
+    expect(h.oneWayCalls[0].env.parts[0].data.type).toBe('pinboard-chat');
   });
 
   it('default config emits p2p-chat + accepts both', async () => {
@@ -155,7 +155,7 @@ describe('chat-p2p — envelope type config', () => {
     await h.messageHandlers[0]({
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
-        type: 'stoop-chat', subtype: 'chat-message', threadId: 't1',
+        type: 'pinboard-chat', subtype: 'chat-message', threadId: 't1',
         body: 'legacy', fromWebid: 'urn:p', nonce: 'nz',
       }}],
     });

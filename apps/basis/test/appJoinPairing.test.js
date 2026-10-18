@@ -30,7 +30,7 @@ describe('app-level circle join between two real agents over a shared InternalBu
   afterAll(async () => { await teardown(A, B); });
 
   it('B redeems A\'s invite; both rosters show 2 members; the mandate WIE resolves peer B', async () => {
-    // Boot two full app agents (each: chat secure-mesh + host + tasks + stoop + folio + agents).
+    // Boot two full app agents (each: chat secure-mesh + host + tasks + pinboard + folio + agents).
     [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B')]);
     expect(A.pubKey).not.toBe(B.pubKey);   // distinct identities (fresh in-memory vaults)
 

@@ -1,4 +1,4 @@
-// basis-mobile metro.config.js — mirrors stoop-mobile + folio-mobile.
+// basis-mobile metro.config.js — mirrors pinboard-mobile + folio-mobile.
 //
 // The @onderling/react-native metro-preset handles:
 //   - NODE_BUILTINS shimming + `node:` prefix stripping
@@ -13,12 +13,12 @@
 //   - extraNodeModules aliases for the workspace packages that are NOT
 //     declared in package.json deps (e.g. @onderling/vault, pulled in
 //     transitively by realAgent.js → secure-agent)
-//   - extraSubpathResolvers for `@onderling-app/{tasks,stoop,folio}/browser`
+//   - extraSubpathResolvers for `@onderling-app/{tasks,pinboard,folio}/browser`
 //     (Trap 2 — overlapping `extraNodeModules` prefixes; shorter prefix
 //     wins, so Metro would otherwise try apps/<app>/browser instead of
 //     apps/<app>/src/browser.js)
-//   - The same stoop /lib + /locales resolvers stoop-mobile uses, since
-//     the realAgent.js chain transitively reaches stoop's app-internal
+//   - The same pinboard /lib + /locales resolvers pinboard-mobile uses, since
+//     the realAgent.js chain transitively reaches pinboard's app-internal
 //     subpaths.
 
 const path = require('path');
@@ -32,13 +32,13 @@ const _cfg = withOnderlingPreset({
   repoRoot,
 
   // Composition shell — realAgent.js imports the browser factories of
-  // tasks-v0 / stoop / folio + the calendar app barrel + basis's
+  // tasks-v0 / pinboard / folio + the calendar app barrel + basis's
   // own core/web sources via relative paths.  Each app's source dir
   // needs to be in the Metro watch graph.
   watchFolders: [
     path.resolve(repoRoot, 'apps/basis'),
     path.resolve(repoRoot, 'apps/tasks-v0'),
-    path.resolve(repoRoot, 'apps/stoop'),
+    path.resolve(repoRoot, 'apps/pinboard'),
     path.resolve(repoRoot, 'apps/folio'),
     path.resolve(repoRoot, 'apps/calendar'),
     // The composable LISTS feature's manifest (2026-09-01) — composeManifests.js imports it across the
@@ -74,7 +74,7 @@ const _cfg = withOnderlingPreset({
   // @inrupt/solid-client in packages/core/node_modules/.pnpm) intact.
   extraBlockListRegExps: [
     new RegExp(
-      `^(${['basis', 'tasks-v0', 'stoop', 'folio', 'calendar']
+      `^(${['basis', 'tasks-v0', 'pinboard', 'folio', 'calendar']
         .map((a) => path.resolve(repoRoot, `apps/${a}/node_modules`).replace(/[/\\]/g, '[/\\\\]'))
         .join('|')}).*`,
     ),
@@ -84,7 +84,7 @@ const _cfg = withOnderlingPreset({
   ],
 
   // Pin React / RN / native modules to this app's node_modules so the
-  // monorepo can't pull in conflicting versions.  Mirrors stoop-mobile.
+  // monorepo can't pull in conflicting versions.  Mirrors pinboard-mobile.
   pinToAppModules: [
     'react',
     'react-native',
@@ -109,7 +109,7 @@ const _cfg = withOnderlingPreset({
     // (/browser) — those go through extraSubpathResolvers below.
     '@onderling-app/basis': path.resolve(repoRoot, 'apps/basis'),
     '@onderling-app/tasks':    path.resolve(repoRoot, 'apps/tasks-v0'),
-    '@onderling-app/stoop':       path.resolve(repoRoot, 'apps/stoop'),
+    '@onderling-app/pinboard':       path.resolve(repoRoot, 'apps/pinboard'),
     '@onderling-app/folio':       path.resolve(repoRoot, 'apps/folio'),
     '@onderling-app/calendar':    path.resolve(repoRoot, 'apps/calendar'),
     // realAgent.js's skill wiring (added 2026-07-09). Bare import → the `.` export (src/cores.js); the
@@ -138,18 +138,18 @@ const _cfg = withOnderlingPreset({
 
   // Subpath resolvers — Trap 2 escape hatch.
   //
-  // `@onderling-app/{tasks,stoop,folio}/browser` resolve to
+  // `@onderling-app/{tasks,pinboard,folio}/browser` resolve to
   // `apps/<app>/src/browser.js` per each app's package.json `exports`
   // map; Metro can't see those because the preset disables
   // unstable_enablePackageExports.
   //
-  // The stoop /lib + /locales resolvers mirror stoop-mobile's config —
+  // The pinboard /lib + /locales resolvers mirror pinboard-mobile's config —
   // the realAgent chain transitively reaches those subpaths.
   extraSubpathResolvers: [
     (moduleName /*, repoRootArg */) => {
       // 1. /browser subpath for the three composed app bundles.
       const browserMatch = moduleName.match(
-        /^@onderling-app\/(tasks|stoop|folio)\/browser$/,
+        /^@onderling-app\/(tasks|pinboard|folio)\/browser$/,
       );
       if (browserMatch) {
         // The `tasks` package specifier still lives in the apps/tasks-v0
@@ -162,20 +162,20 @@ const _cfg = withOnderlingPreset({
         };
       }
 
-      // 2. Stoop's @onderling-app/stoop/lib/* — real files live in src/lib/.
-      if (moduleName.startsWith('@onderling-app/stoop/lib/')) {
-        const sub = moduleName.slice('@onderling-app/stoop/lib/'.length);
+      // 2. Pinboard's @onderling-app/pinboard/lib/* — real files live in src/lib/.
+      if (moduleName.startsWith('@onderling-app/pinboard/lib/')) {
+        const sub = moduleName.slice('@onderling-app/pinboard/lib/'.length);
         return {
-          filePath: path.resolve(repoRoot, 'apps/stoop/src/lib', sub + '.js'),
+          filePath: path.resolve(repoRoot, 'apps/pinboard/src/lib', sub + '.js'),
           type:     'sourceFile',
         };
       }
 
-      // 3. Stoop's locales — exports map points to apps/stoop/locales/{en,nl}.json.
-      if (moduleName.startsWith('@onderling-app/stoop/locales/')) {
-        const sub = moduleName.slice('@onderling-app/stoop/locales/'.length);
+      // 3. Pinboard's locales — exports map points to apps/pinboard/locales/{en,nl}.json.
+      if (moduleName.startsWith('@onderling-app/pinboard/locales/')) {
+        const sub = moduleName.slice('@onderling-app/pinboard/locales/'.length);
         return {
-          filePath: path.resolve(repoRoot, 'apps/stoop/locales', sub + '.json'),
+          filePath: path.resolve(repoRoot, 'apps/pinboard/locales', sub + '.json'),
           type:     'sourceFile',
         };
       }

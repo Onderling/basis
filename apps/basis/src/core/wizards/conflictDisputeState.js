@@ -2,12 +2,12 @@
  * conflictDispute — state-machine helpers lifted from
  * src/web/wizards/conflictDisputeWizard.js (2026-05-24).
  *
- * Zero DOM, zero RN.  Wraps the V0 substrate gap (stoop hasn't
+ * Zero DOM, zero RN.  Wraps the V0 substrate gap (pinboard hasn't
  * shipped raiseDispute / proposeResolution / acceptResolution yet
  * — see the web wizard's preamble); the dispute is filed as a
  * `kind: 'dispute'` postRequest with a structured text body.
  *
- * Mobile parity: when stoop ships the dedicated dispute skills,
+ * Mobile parity: when pinboard ships the dedicated dispute skills,
  * `submitDispute` swaps its call site without the wizard layers
  * needing to know.
  */
@@ -53,14 +53,14 @@ export function labelOf(options, id) {
 }
 
 /**
- * Lazy-load the post text via stoop.listFeed so the UI can show
+ * Lazy-load the post text via pinboard.listFeed so the UI can show
  * "Disputing: <text>" instead of a raw ulid.  Mutates state in
  * place; resolves silently on failure (UI falls back to id).
  */
 export async function loadAboutPostText({ state, callSkill }) {
   if (!state.aboutPostId) return state;
   try {
-    const reply = await callSkill('stoop', 'listFeed', {});
+    const reply = await callSkill('pinboard', 'listFeed', {});
     const items = reply?.items ?? [];
     const hit = items.find((p) =>
       p?.id === state.aboutPostId
@@ -73,7 +73,7 @@ export async function loadAboutPostText({ state, callSkill }) {
 
 /**
  * Format the dispute as a structured text body for the V0 substrate
- * gap (stoop.postRequest with kind:'dispute').  Pure function so
+ * gap (pinboard.postRequest with kind:'dispute').  Pure function so
  * both web + RN wizards format identically + the future real
  * dispute skill can re-parse it for migration if needed.
  */
@@ -83,14 +83,14 @@ export function formatDisputeText(state) {
 }
 
 /**
- * File the dispute via callSkill('stoop', 'postRequest', ...).
+ * File the dispute via callSkill('pinboard', 'postRequest', ...).
  * Mutates state in place; returns `{result?, state}`.
  */
 export async function submitDispute({ state, callSkill }) {
   state.submitting  = true;
   state.submitError = null;
   try {
-    const result = await callSkill('stoop', 'postRequest', {
+    const result = await callSkill('pinboard', 'postRequest', {
       text: formatDisputeText(state),
       kind: 'dispute',
     });

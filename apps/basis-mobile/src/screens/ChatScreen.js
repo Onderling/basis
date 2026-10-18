@@ -452,7 +452,7 @@ export default function ChatScreen({
   const buildPeerWiring = useCallback(({ bundle, agent, callSkill, contactChannel, pendingPeerRedeems, sharedWithMeStore }) => {
     const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
     // A noticeboard post from another member LANDS in the circle store through the task lane (one carry,
-    // web parity); the shell bridges it into stoop's index + the notification through the same handler.
+    // web parity); the shell bridges it into pinboard's index + the notification through the same handler.
     agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
       // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
       handleCirclePost: makeHandleCirclePost({ callSkill, publishEvent, profileIdOf: (cid) => agent.profileIdOf?.(cid) ?? 'default' }),
@@ -520,7 +520,7 @@ export default function ChatScreen({
         deliveryMap: deliveryStateMap,
         eventLog:    eventLogRef.current,
         listCircleMembers: async (circleId) => {
-          const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
           return Array.isArray(r?.members) ? r.members : [];
         },
         // Receipt-keyed outbox removal (web parity): their app confirmed the message arrived, so the
@@ -852,7 +852,7 @@ export default function ChatScreen({
           globalThis.__onderlingPodChatCatchUpKicked = true;
           setTimeout(async () => {
             try {
-              const r = await bundle.callSkill('stoop', 'listMyCircles', {});
+              const r = await bundle.callSkill('pinboard', 'listMyCircles', {});
               const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
               await podChatCatchUp.catchUpAll(ids);
             } catch { /* best-effort — the next launch retries */ }
@@ -873,7 +873,7 @@ export default function ChatScreen({
           wireBackgroundSync({
             runOnce: async () => {
               try {
-                const r = await bundle.callSkill('stoop', 'listMyCircles', {});
+                const r = await bundle.callSkill('pinboard', 'listMyCircles', {});
                 const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
                 if (podChatCatchUp) await podChatCatchUp.catchUpAll(ids);
                 if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });
@@ -1553,7 +1553,7 @@ export default function ChatScreen({
       (async () => {
         let finalText;
         try {
-          const result = await bootState.bundle.callSkill('stoop', 'acceptResponder', {
+          const result = await bootState.bundle.callSkill('pinboard', 'acceptResponder', {
             requestId:      intercept.requestId,
             responderWebid: intercept.responderAddr,
           });
@@ -1955,7 +1955,7 @@ export default function ChatScreen({
 
       {/* QR scanner (2026-05-27).  /scan-qr opens this; the modal
           classifies the scanned text and routes by kind:
-          - 'contact' → callSkill('stoop','addContactFromQr',{payload})
+          - 'contact' → callSkill('pinboard','addContactFromQr',{payload})
           - 'invite'  → setPendingWizard({opId:'joinGroup', args:{invite:payload}}) */}
       {contactLens.sheet}
       <QrScannerModal
@@ -1995,7 +1995,7 @@ export default function ChatScreen({
     }
     const payload = res.payload;
     if (res.kind === 'contact') {
-      // Call the stoop substrate skill that decodes the URL + adds the
+      // Call the pinboard substrate skill that decodes the URL + adds the
       // contact in one round-trip.  Then synthesise a confirmation bubble.
       try {
         // …after the sheet (L125): what they will see of you, prefilled; closing it adds nothing. This path recorded

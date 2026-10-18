@@ -78,7 +78,7 @@ describe('the door caller gate', () => {
     expect(await users.roleOf('telegram:111')).toBe('member');
     expect(await users.roleOf('telegram:222')).toBe('admin');
     // they are rows of the contact book, with no key
-    const book = await agent.callSkill('stoop', 'listContacts', {});
+    const book = await agent.callSkill('pinboard', 'listContacts', {});
     const rows = (book?.contacts ?? book ?? []).filter((c) => String(c.webid).startsWith('telegram:'));
     expect(rows.map((r) => r.webid).sort()).toEqual(['telegram:111', 'telegram:222']);
     for (const r of rows) expect(r.pubKey ?? null).toBeNull();

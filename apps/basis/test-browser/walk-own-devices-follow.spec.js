@@ -19,9 +19,9 @@ const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
-const myCircles = async (page) => ((await call(page, 'stoop', 'listMyCircles', {}))?.circles ?? [])
+const myCircles = async (page) => ((await call(page, 'pinboard', 'listMyCircles', {}))?.circles ?? [])
   .map((c) => (typeof c === 'string' ? c : (c?.groupId ?? c?.id))).filter(Boolean);
-const bookRow = async (page, webid) => ((await call(page, 'stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
+const bookRow = async (page, webid) => ((await call(page, 'pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
 const hasPair = async (page) => (await myCircles(page)).some((id) => String(id).startsWith('pair-'));
 async function nameMe(page, name) {
   await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1200);
@@ -53,7 +53,7 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
     await createCircle(A1.page, 'Thuis');
     await expect.poll(async () => (await myCircles(A1.page)).find((id) => !before.has(id)) ?? null, { timeout: 30_000 }).toBeTruthy();
     const thuis = (await myCircles(A1.page)).find((id) => !before.has(id));
-    const aId = (await call(A1.page, 'stoop', 'whoAmI'))?.webid;
+    const aId = (await call(A1.page, 'pinboard', 'whoAmI'))?.webid;
 
     A2 = await bootPeer(browser, 'A2');
     A2.page.on('dialog', (d) => d.dismiss().catch(() => {}));
@@ -69,7 +69,7 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
     await A2.page.reload({ waitUntil: 'domcontentloaded' });
     await expect.poll(() => A2.page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 60_000 }).toBe(true);
     await expect.poll(async () => (await myCircles(A2.page)).includes(thuis), { timeout: 90_000, message: 'A2 is in Thuis' }).toBe(true);
-    expect((await call(A2.page, 'stoop', 'whoAmI'))?.webid, 'A2 is the same person').toBe(aId);
+    expect((await call(A2.page, 'pinboard', 'whoAmI'))?.webid, 'A2 is the same person').toBe(aId);
     // A DEVICE ADDED FROM AN OFFER is an add, not a restore: no "finish your restore" screen, and never the
     // one that told a person their circles were gone — while its launcher shows the circle the offer named.
     await gotoCircles(A2.page);
@@ -90,7 +90,7 @@ test('one person, two devices: the put-away mark, the contact lens and a delete 
     B = await bootPeer(browser, 'B');
     B.page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await gotoCircles(B.page); await nameMe(B.page, 'Bea');
-    const bId = (await call(B.page, 'stoop', 'whoAmI'))?.webid;
+    const bId = (await call(B.page, 'pinboard', 'whoAmI'))?.webid;
     await B.page.locator('[data-tab="mij"]').first().click(); await B.page.waitForTimeout(1200);
     await B.page.locator('.cc-profile__share-contact').click();
     const link = await B.page.locator('.cc-share__link input').inputValue();

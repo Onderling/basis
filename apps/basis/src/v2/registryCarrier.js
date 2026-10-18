@@ -31,7 +31,7 @@
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { hashHex } from '@onderling/core';
-import { registryResourceUri } from '@onderling/agent-registry';
+import { registryResourceUri, withRegistryWriteLock } from '@onderling/agent-registry';
 import { probeSettingsMediumDetailed } from './settingsRestoreGate.js';
 
 const NAME_DOMAIN = 'onderling-registry-name-v1';
@@ -75,6 +75,41 @@ const updatedAtOf = (body) => {
  * @param {(msg: string) => void} [a.warn]
  * @returns {{ pseudoPod: object, resourceUri: string, attach: () => Promise<object>, status: () => object }}
  */
+/**
+ * TOMBSTONES ARE MONOTONE across the person's devices: the carrier is otherwise resource-level last-write-wins, and a
+ * device that never saw a revoke (its own copy has the record live) would put the revoked device back by writing for
+ * any reason. So every device-delegation record that is `revoked: true` on EITHER side stays revoked in the result;
+ * nothing else merges (the rest of `into` is kept as it is). An agent `into` does not carry is not added back.
+ * @param {object|null} into  the registry body about to be kept or uploaded
+ * @param {object|null} from  the other side's body
+ * @returns {object|null}
+ */
+export function unionTombstones(into, from) {
+  if (!into || !Array.isArray(into.agents) || !from || !Array.isArray(from.agents)) return into;
+  const dead = new Map();   // agentId → { wire: record }
+  for (const a of from.agents) {
+    const map = a?.properties?.deviceDelegations?.mode === 'own' ? a.properties.deviceDelegations.value : null;
+    if (!map || typeof map !== 'object') continue;
+    for (const [wire, rec] of Object.entries(map)) if (rec?.revoked === true) dead.set(a.agentId, { ...(dead.get(a.agentId) ?? {}), [wire]: rec });
+  }
+  if (!dead.size) return into;
+  let changed = false;
+  const agents = into.agents.map((a) => {
+    const gone = dead.get(a?.agentId);
+    if (!gone) return a;
+    const cur = a?.properties?.deviceDelegations;
+    const map = cur?.mode === 'own' && cur.value && typeof cur.value === 'object' ? cur.value : {};
+    const next = { ...map };
+    for (const [wire, rec] of Object.entries(gone)) {
+      if (next[wire]?.revoked === true) continue;
+      next[wire] = next[wire] ? { ...next[wire], revoked: true } : rec;
+      changed = true;
+    }
+    return { ...a, properties: { ...(a.properties ?? {}), deviceDelegations: { mode: 'own', value: next } } };
+  });
+  return changed ? { ...into, agents } : into;
+}
+
 export function createRegistryCarrier({ backend, deviceId, medium = null, name = null, onKeyMismatch = null, warn = null } = {}) {
   if (typeof deviceId !== 'string' || !deviceId) throw new Error('createRegistryCarrier: deviceId is required');
   if (medium && !name) throw new Error('createRegistryCarrier: a pod name is required with a medium');
@@ -88,7 +123,13 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
     deviceId,
     // Cache-mode deps, used only once attach() flips this URI to cache mode. The uploader and fetcher
     // ignore the pseudo-pod URI: the pod path is the opaque name, one resource, sealed by the medium.
-    podUploader: async (_uri, bytes) => { await medium.write(name, JSON.stringify(bytes)); return {}; },
+    // every upload keeps the pod's tombstones (a write from a device that never saw a revoke must not undo it)
+    podUploader: async (_uri, bytes) => {
+      let onPod = null;
+      try { const cur = await medium.read(name); onPod = cur == null ? null : JSON.parse(cur); } catch { onPod = null; }
+      await medium.write(name, JSON.stringify(unionTombstones(bytes, onPod)));
+      return {};
+    },
     podFetcher: async () => {
       const s = await medium.read(name);
       return s == null ? null : { bytes: JSON.parse(s) };
@@ -109,17 +150,26 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
       warn?.('[registry-carrier] could not reach the pod to verify the registry — staying local this session.');
       return { ...state };
     }
-    const localRec = await pseudoPod.read(resourceUri);
-    if (status === 'openable') {
-      let podBody = null;
-      try { podBody = typeof value === 'string' ? JSON.parse(value) : value; } catch { podBody = null; }
-      // Resource-level last-write-wins: the pod copy is newer (another device wrote it, or this device
-      // was wiped) → it becomes the local copy. Otherwise the local copy is pushed up below.
-      if (podBody && (!localRec || updatedAtOf(podBody) >= updatedAtOf(localRec.bytes))) {
-        await pseudoPod.write(resourceUri, podBody);
-        state.pulled = true;
+    // the read-then-write runs in the registry's own mutation queue, so a register in flight cannot interleave with it
+    const localRec = await withRegistryWriteLock(pseudoPod, resourceUri, async () => {
+      const localRec = await pseudoPod.read(resourceUri);
+      if (status === 'openable') {
+        let podBody = null;
+        try { podBody = typeof value === 'string' ? JSON.parse(value) : value; } catch { podBody = null; }
+        // Resource-level last-write-wins: the pod copy is newer (another device wrote it, or this device
+        // was wiped) → it becomes the local copy. Otherwise the local copy is pushed up below.
+        if (podBody && (!localRec || updatedAtOf(podBody) >= updatedAtOf(localRec.bytes))) {
+          // the pulled copy keeps this device's tombstones too
+          await pseudoPod.write(resourceUri, unionTombstones(podBody, localRec?.bytes ?? null));
+          state.pulled = true;
+        } else if (podBody && localRec) {
+          // …and the copy pushed up below keeps the pod's
+          const merged = unionTombstones(localRec.bytes, podBody);
+          if (merged !== localRec.bytes) await pseudoPod.write(resourceUri, merged);
+        }
       }
-    }
+      return localRec;
+    });
     pseudoPod.setMode(resourceUri, 'cache');
     state.mode = 'cache';
     if (!state.pulled && localRec) {

@@ -20,7 +20,7 @@ import { gateEgress } from '@onderling/agent-registry';
 // When a real external route lands (an MCP tool, a remote A2A agent), its origin is simply not in this set and
 // the gate activates for it. NOTE: per §10a the live callSkill is NOT wrapped until such an op exists — this
 // classifier + wrapCallSkillWithEgressGate compose the ready-to-install seam.
-export const LOCAL_APP_ORIGINS = Object.freeze(new Set(['household', 'tasks', 'stoop', 'folio', 'calendar', 'agents']));
+export const LOCAL_APP_ORIGINS = Object.freeze(new Set(['household', 'tasks', 'pinboard', 'folio', 'calendar', 'agents']));
 
 export function isExternalEgressOp(appOrigin /*, opId */) {
   return typeof appOrigin === 'string' && appOrigin.length > 0 && !LOCAL_APP_ORIGINS.has(appOrigin);

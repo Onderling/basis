@@ -4,7 +4,7 @@
 > is SUPERSEDED — those param differences are **NOT bugs**. The runtime path is mock → **realAgent adapter**
 > → real skill, and the adapter bridges the chat vocabulary: `rejectTask reason→note` (realAgent.js:809),
 > `markReturned itemId→requestId` (:980), `submitTask` note-default (:817); and some real skills accept the
-> chat vocab directly (stoop `postRequest` takes both `kind`+`intent`). So the mock params are correct for
+> chat vocab directly (pinboard `postRequest` takes both `kind`+`intent`). So the mock params are correct for
 > the runtime path; **aligning them would break the bridges.** The real Part-G hard part is the **adapter
 > layer** (who bridges chat→skill vocab after a merge), not the param names. See PLAN Part G.
 
@@ -13,7 +13,7 @@ basis's chat-shell surface for the REAL apps; they've **drifted** from `apps/<ap
 calendar (used directly, no mock) is the target model.
 
 ## Bundle blocker assessment — NONE
-All four real manifests (`apps/{tasks-v0,stoop,folio,household}/manifest.js`) are **pure data**
+All four real manifests (`apps/{tasks-v0,pinboard,folio,household}/manifest.js`) are **pure data**
 (household imports one sibling string file). **All bundle cleanly in basis's web build** → using
 the real manifests directly (calendar-style) is feasible. This is the green light for the dissolve.
 
@@ -21,7 +21,7 @@ the real manifests directly (calendar-style) is feasible. This is the green ligh
 | app | real ops | mock ops | shared | mock-only | real-only |
 |---|---|---|---|---|---|
 | tasks-v0 | 24 | 33 | 15 | ~14 | ~8 |
-| stoop | 17 | 36 | 14 | ~19 | ~4 |
+| pinboard | 17 | 36 | 14 | ~19 | ~4 |
 | folio | 7 | 9 | 2 | ~5 | ~5 |
 | household | 10 | 8 | 2 | ~3 | ~5 |
 
@@ -30,14 +30,14 @@ These mean the chat surface and the real handler disagree — a dispatch can fai
 - **tasks `addTask`**: mock params `assignee,requiredSkill` vs real `notes,dueAt,definitionOfDone` — *entirely different*.
 - **tasks `rejectTask`**: mock `reason` (optional) vs real `note` (**required**) — chat can dispatch without it → real skill fails.
 - **tasks `approveTask`**: real has optional `note`, mock omits it.
-- **stoop `postRequest`**: mock `kind` enum (ask/borrow/share/report/event) vs real `intent` enum (ask/offer/lend) — *different values*.
-- **stoop `markReturned`**: mock `itemId` vs real `requestId` (param rename).
-- **stoop `leaveGroup`**: mock optional `confirm` vs real required `groupId`.
+- **pinboard `postRequest`**: mock `kind` enum (ask/borrow/share/report/event) vs real `intent` enum (ask/offer/lend) — *different values*.
+- **pinboard `markReturned`**: mock `itemId` vs real `requestId` (param rename).
+- **pinboard `leaveGroup`**: mock optional `confirm` vs real required `groupId`.
 - **household `markComplete`**: mock `choreId`(pickerSource) vs real `match`(string).
-- **itemTypes** diverge in every app (e.g. stoop mock `[post,contact,…]` vs real `[ask,offer,lend,…]`).
+- **itemTypes** diverge in every app (e.g. pinboard mock `[post,contact,…]` vs real `[ask,offer,lend,…]`).
 
 ## Duplicated slash (declared in BOTH real + mock — free to diverge)
-- **stoop**: `/post`, `/lend-return`, `/report` in both.
+- **pinboard**: `/post`, `/lend-return`, `/report` in both.
 - **household**: `/mine`, `/done` in both.
 - (tasks-v0 + folio real manifests omit slash — the intended split; calendar declares its own.)
 
@@ -52,13 +52,13 @@ These mean the chat surface and the real handler disagree — a dispatch can fai
      bridges (rejectTask reason→note, submitTask note-default) were REMOVED. The SEMANTIC aliases
      (`listMine`/`getMyTasks`→`listOpen`, `myInbox`→`listMyInbox`) + `adaptTasksReply` were KEPT — intentional
      product behaviour, not drift. web `b12aca7e` + mobile `7f3fbcd7`; tasks-v0 703 / basis 2693 green.
-2. **stoop + household** (slash duplicated + param drift):
-   - **stoop — ✅ DONE 2026-06-17 (`e488df9a`).** Same pattern as tasks (one manifest + kept adapter); NO app-origin
-     migration (both `app:'stoop'`). Merged the two slash grammars with **richer-slash-wins**; real param vocab
+2. **pinboard + household** (slash duplicated + param drift):
+   - **pinboard — ✅ DONE 2026-06-17 (`e488df9a`).** Same pattern as tasks (one manifest + kept adapter); NO app-origin
+     migration (both `app:'pinboard'`). Merged the two slash grammars with **richer-slash-wins**; real param vocab
      (`postRequest`→`intent`, `markReturned`→`requestId`); `/reveal` collision resolved to `setPeerReveal` (dropped
      `revealPeer`); 17 mock-only ops relocated; itemTypes += post/contact/member. Removed ONLY the redundant
      `markReturned itemId→requestId` rename; KEPT the i18n/value transforms (they're not drift). 33 ops, no dup
-     commands (fitness-asserted). stoop 710 / basis 2693 green.
+     commands (fitness-asserted). pinboard 710 / basis 2693 green.
    - **household — ✅ DONE 2026-06-18 (`b2d6040a`, Option B — architectural rewire).** NOT a manifest re-export: the
      mock was a chore-vocab agent built INLINE in realAgent.js; `apps/household/` is a separate richer app basis
      never consumed. Rewired basis's household dispatch onto the real `apps/household` skills + `householdManifest`,

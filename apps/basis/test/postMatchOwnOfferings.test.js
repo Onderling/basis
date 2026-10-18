@@ -1,15 +1,15 @@
 /**
  * "A post matches what I offer" is judged on MY device against MY truth: the drivers of kind 'offering' of the self I
  * am in that circle (a persona's circle is the persona's), never the roster's member row (no shell writes that list
- * any more). A local source the agent hands to stoop — reachable by no op and no wire.
+ * any more). A local source the agent hands to pinboard — reachable by no op and no wire.
  */
 import { describe, it, expect } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
-import { stoopManifest } from '../../stoop/manifest.js';
+import { pinboardManifest } from '../../pinboard/manifest.js';
 
 const boot = () => createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() });
-const score = (a, args) => a.callSkill('stoop', 'scorePostRelevance', { text: 'iemand?', ...args });
+const score = (a, args) => a.callSkill('pinboard', 'scorePostRelevance', { text: 'iemand?', ...args });
 
 describe('a post matched against my own offerings', () => {
   it('the default\'s offering matches a post outside any persona\'s circle', async () => {
@@ -53,7 +53,7 @@ describe('a post matched against my own offerings', () => {
   }, 60_000);
 
   it('the SOURCE (the drivers it reads) is returned by no op — the verdict is, by one op, local-only (scorePostRelevance refuses a peer)', () => {
-    const ids = (stoopManifest.operations ?? []).map((o) => o.id);
+    const ids = (pinboardManifest.operations ?? []).map((o) => o.id);
     for (const gone of ['addMyOffering', 'removeMyOffering', 'setMyOfferings', 'myOfferings', 'myOfferingsFor']) expect(ids, gone).not.toContain(gone);
   });
 });

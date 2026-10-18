@@ -3,7 +3,7 @@
  * → registration flow, surfacing `{status, token, error, request,
  * teardown}` for the consumer's Settings screen.
  *
- * Plan (Phase 41.0 L6): Tasks-mobile + Stoop-mobile both consume.
+ * Plan (Phase 41.0 L6): Tasks-mobile + Pinboard-mobile both consume.
  * The hook stays agent-agnostic — the consumer passes the live agent
  * (after bootstrap) and a token-change callback.
  *

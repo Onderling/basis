@@ -1,5 +1,5 @@
 /**
- * Roster read — the roster-facing reads lifted verbatim out of stoop's `buildSkills`, so the roster access
+ * Roster read — the roster-facing reads lifted verbatim out of pinboard's `buildSkills`, so the roster access
  * gate lives once in the circles substrate and cannot drift across callers (invariant 3 — logic lives once).
  * (The persona-property write and the roster-updated fan stood here too until 2026-09-22; what a member
  * discloses is their own `member-props` statement on the circle's membership lane now.)
@@ -10,11 +10,11 @@
  * is injected instead, keeping the package dep surface minimal, exactly as the
  * fan-out core injects `toWireRefEnvelope` rather than depending on item-store).
  *
- * The shared helpers `readCircleExits`/`isExited` (stoop's `lib/circleExits.js`)
- * and `rosterCallerIsForeign` (stoop's `lib/rosterAccessGate.js`) are used by many
- * skills — including ones that stay in stoop — so they are INJECTED here rather than
+ * The shared helpers `readCircleExits`/`isExited` (pinboard's `lib/circleExits.js`)
+ * and `rosterCallerIsForeign` (pinboard's `lib/rosterAccessGate.js`) are used by many
+ * skills — including ones that stay in pinboard — so they are INJECTED here rather than
  * moved, keeping the package's dependency surface minimal and avoiding a
- * bidirectional stoop↔package coupling.
+ * bidirectional pinboard↔package coupling.
  */
 
 /**
@@ -178,13 +178,13 @@ export async function listCircleRoster(
  *      NARROW what a release shows. The peer allowlist (gate 1) is the release rule for
  *      a foreign member.
  *
- * Pure DI lift out of stoop's `listGroupMembersCore` — behaviour and wire strings are
+ * Pure DI lift out of pinboard's `listGroupMembersCore` — behaviour and wire strings are
  * byte-identical. The per-circle membership PROJECTION (`projectCircleRoster`), the
  * shared exit helpers (`readCircleExits`/`isExited`), and the foreign-caller + allowlist
  * gate helpers (`rosterCallerIsForeign`/`gateRosterReplyForPeer`) are INJECTED — the same
- * helpers stay in stoop for skills that do not move (and the gate has stoop + basis test
+ * helpers stay in pinboard for skills that do not move (and the gate has pinboard + basis test
  * consumers by path), so injecting keeps the package's dependency surface minimal and
- * avoids a bidirectional stoop↔package coupling, exactly as `listCircleRoster` does.
+ * avoids a bidirectional pinboard↔package coupling, exactly as `listCircleRoster` does.
  *
  * @param {object} deps
  * @param {object} deps.store                   the circle's ItemStore.

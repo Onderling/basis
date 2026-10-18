@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { rehydrateCircleChatsFromStoop } from '../../src/v2/circleChatRehydrate.js';
+import { rehydrateCircleChatsFromPinboard } from '../../src/v2/circleChatRehydrate.js';
 
 function fakeEventLog() {
   const events = [];
@@ -23,9 +23,9 @@ function item(over = {}) {
 
 const silentLogger = { warn: () => {}, info: () => {}, debug: () => {} };
 
-describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
+describe('rehydrateCircleChatsFromPinboard · SP-13.2.2 boot rehydrator', () => {
   it('returns an error shape when callSkill is missing', async () => {
-    const r = await rehydrateCircleChatsFromStoop({
+    const r = await rehydrateCircleChatsFromPinboard({
       eventLog: fakeEventLog(), logger: silentLogger,
     });
     expect(r.error).toMatch(/callSkill/);
@@ -33,7 +33,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
   });
 
   it('returns an error shape when eventLog.append is missing', async () => {
-    const r = await rehydrateCircleChatsFromStoop({
+    const r = await rehydrateCircleChatsFromPinboard({
       callSkill: async () => ({ items: [] }),
       logger: silentLogger,
     });
@@ -46,9 +46,9 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
       item({ msgId: 'mA', text: 'first',  ts: 100 }),
       item({ msgId: 'mB', text: 'second', ts: 200 }),
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, eventLog, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, eventLog, logger: silentLogger });
 
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'listCircleChats', expect.any(Object));
+    expect(callSkill).toHaveBeenCalledWith('pinboard', 'listCircleChats', expect.any(Object));
     expect(r.rehydrated).toBe(2);
     expect(eventLog.events).toHaveLength(2);
     expect(eventLog.events[0].id).toBe('mA');
@@ -63,7 +63,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
 
   it('passes groupId / sinceTs / limit through to the skill', async () => {
     const callSkill = vi.fn(async () => ({ items: [] }));
-    await rehydrateCircleChatsFromStoop({
+    await rehydrateCircleChatsFromPinboard({
       callSkill, eventLog: fakeEventLog(),
       groupId: 'oosterpoort', sinceTs: 999, limit: 50, logger: silentLogger,
     });
@@ -79,7 +79,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
       item({ msgId: 'mA' }),
       item({ msgId: 'mB' }),
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, eventLog, dedup, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, eventLog, dedup, logger: silentLogger });
     expect(r.rehydrated).toBe(1);
     expect(r.skipped).toBe(1);
     expect(dedup.has('mB')).toBe(true);
@@ -95,7 +95,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
       item({ msgId: '',  text: 'bad msgId' }),
       item({ circleId: '', msgId: 'no-circle' }),
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, eventLog, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, eventLog, logger: silentLogger });
     expect(r.rehydrated).toBe(1);
     expect(r.skipped).toBe(4);
     expect(eventLog.events).toHaveLength(1);
@@ -103,7 +103,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
 
   it('returns an error shape on callSkill failure without throwing', async () => {
     const callSkill = vi.fn(async () => { throw new Error('callSkill down'); });
-    const r = await rehydrateCircleChatsFromStoop({
+    const r = await rehydrateCircleChatsFromPinboard({
       callSkill, eventLog: fakeEventLog(),
       logger: { warn: () => {}, info: () => {}, debug: () => {} },
     });
@@ -114,7 +114,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
   it('handles an empty result without appending anything', async () => {
     const eventLog = fakeEventLog();
     const callSkill = vi.fn(async () => ({ items: [] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, eventLog, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, eventLog, logger: silentLogger });
     expect(r.rehydrated).toBe(0);
     expect(eventLog.events).toHaveLength(0);
   });
@@ -133,7 +133,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
       item({ msgId: 'mA', text: 'a', ts: 1 }),
       item({ msgId: 'mB', text: 'b', ts: 2 }),
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, inbox, logger: silentLogger });
     expect(r.rehydrated).toBe(2);
     expect(inbox.ingestChatMessage).toHaveBeenCalledTimes(2);
     expect(inboxCalls[0].opts.source).toBe('rehydrator');
@@ -159,7 +159,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
       item({ msgId: 'plain', text: 'hoi', ts: 1 }),
       item({ msgId: 'photo', text: '📷 photo.jpg', ts: 2, source: { card } }),
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, inbox, logger: silentLogger });
     expect(r.rehydrated).toBe(2);
     expect(inboxCalls[0].env).not.toHaveProperty('card');    // a plain message → no card key
     expect(inboxCalls[1].env.card).toEqual(card);            // the card survives the reload
@@ -172,7 +172,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     const callSkill = vi.fn(async () => ({ items: [
       item({ msgId: 'mA' }), item({ msgId: 'mB' }),
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, inbox, logger: silentLogger });
     expect(r.rehydrated).toBe(0);
     expect(r.skipped).toBe(2);
   });
@@ -180,7 +180,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
   /* ── the relaunch journey: my own history must come back as MINE ── */
 
   it('re-attributes MY stored messages to me on a relaunch, and leaves the others alone', async () => {
-    // End-to-end over the real pieces the boot path wires: stoop's stored items → the strict
+    // End-to-end over the real pieces the boot path wires: pinboard's stored items → the strict
     // envelope projection → the real inbox → the real per-circle self-check. Before the fix every
     // one of these events came back with `actor: 'webid:me'`, so a relaunch rendered your own side
     // of the conversation left-aligned, sender-labelled and reportable.
@@ -197,10 +197,10 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     });
     const callSkill = vi.fn(async () => ({ items: [
       item({ msgId: 'm1', text: 'hoi allemaal', fromActor: 'webid:anne' }),
-      item({ msgId: 'm2', text: 'zie ik je zaterdag?', fromActor: 'webid:me' }),     // stoop's local mirror
+      item({ msgId: 'm2', text: 'zie ik je zaterdag?', fromActor: 'webid:me' }),     // pinboard's local mirror
       item({ msgId: 'm3', text: 'en zondag ook', fromActor: 'addr-in-g1' }),         // per-circle address
     ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, inbox, logger: silentLogger });
 
     expect(r.rehydrated).toBe(3);
     expect(eventLog.events.map((e) => e.actor)).toEqual(['webid:anne', 'me', 'me']);
@@ -224,7 +224,7 @@ describe('rehydrateCircleChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     const eventLog = new EventLog({ initial: [] });
     const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
     const callSkill = vi.fn(async () => ({ items: [ item({ msgId: 'mShared', text: 'rehydrated' }) ] }));
-    const r = await rehydrateCircleChatsFromStoop({ callSkill, inbox, logger: silentLogger });
+    const r = await rehydrateCircleChatsFromPinboard({ callSkill, inbox, logger: silentLogger });
     expect(r.rehydrated).toBe(1);
 
     const senderCid = await AgentIdentity.generate(new VaultMemory());

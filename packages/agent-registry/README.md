@@ -31,7 +31,7 @@ await registry.register({
   role:         'device',
   name:         'Anne (laptop)',
   deviceId:     'laptop-anne',
-  capabilities: ['stoop', 'tasks'],
+  capabilities: ['pinboard', 'tasks'],
 });
 
 await registry.lookup('<base64>');                  // by pubKey
@@ -61,7 +61,7 @@ Lives at `<anchor-pod>/private/agent-registry` (or
       "role":      "device",
       "name":      "Anne (laptop)",
       "deviceId":  "laptop-anne",
-      "capabilities": ["stoop", "tasks"],
+      "capabilities": ["pinboard", "tasks"],
       "signedAt":  "2026-05-11T10:00:00Z",
       "revokedAt": null
     }

@@ -26,7 +26,7 @@ split into:
 - **Folio-mobile is a UI stub** (#220.3) — biggest concentrated gap;
   needs a slice-level decision (build it now vs. defer until
   basis-mobile under #222 carries the load).
-- **Semantic mismatch** (#220.5 revealPeer, #220.6 stoop profile
+- **Semantic mismatch** (#220.5 revealPeer, #220.6 pinboard profile
   shape) — small cleanup slices.
 - **Architecture-level deferrals** (#220.6 mesh fan-out, #220.7
   catch-up, #220.4 calendar) — out of scope for per-app screens;
@@ -52,16 +52,16 @@ split into:
 | 13 | Invites (issue/redeem) | `issueInvite`, `redeemInvite` | realAgent.js:854 | `OnboardIssueScreen.jsx:51`, `OnboardScanScreen.jsx:45` | ✅ | — |
 | 14 | Availability | `getMyAvailability`, `setMyAvailability` | realAgent.js:854 | `tasks-mobile/src/screens/AvailabilityScreen.jsx:33-34` | ✅ | — |
 | 15 | Planner: suggest/acceptSchedule | `suggestSchedule`, `acceptSchedule` | realAgent.js:854 | `PlannerCards.jsx` (uses `useNativeCalendarLiveSync`) | ⚠️ different | **#220.4** |
-| **Stoop** |
-| 16 | postRequest / postOffer / postReport | `postRequest` (web stub for offer/report) | realAgent.js:975-1085 | `stoop-mobile/src/screens/PostComposeScreen.jsx:85` | ⚠️ partial | mobile only `postRequest`; web also stubs offer/report |
+| **Pinboard** |
+| 16 | postRequest / postOffer / postReport | `postRequest` (web stub for offer/report) | realAgent.js:975-1085 | `pinboard-mobile/src/screens/PostComposeScreen.jsx:85` | ⚠️ partial | mobile only `postRequest`; web also stubs offer/report |
 | 17 | listFeed / listOpen / listMyRequests | `listOpen` (aliased) | realAgent.js:884, 1550-1570 | `FeedScreen.jsx:46`, `MineScreen.jsx:31` | ✅ | — |
-| 18 | respondToItem (Help with) | `respondToItem` | realAgent.js:854 | `stoop-mobile/src/screens/ItemDetailScreen.js:44` | ✅ | — |
-| 19 | markReturned | `markReturned` | realAgent.js:900-901 | `stoop-mobile/src/screens/ItemDetailScreen.js:47` | ✅ | — |
+| 18 | respondToItem (Help with) | `respondToItem` | realAgent.js:854 | `pinboard-mobile/src/screens/ItemDetailScreen.js:44` | ✅ | — |
+| 19 | markReturned | `markReturned` | realAgent.js:900-901 | `pinboard-mobile/src/screens/ItemDetailScreen.js:47` | ✅ | — |
 | 20 | ContactBook (list/add/remove/setTrust) | `listContacts`, `addContact`, `removeContact`, `setContactTrust` | realAgent.js:914-1657 | `ContactsScreen.js:34-35`, `ContactScreen.js:60-64` | ✅ | — |
 | 21 | Holiday mode | `setHolidayMode`, `getHolidayMode` | realAgent.js:903-1612 | `ProfileMineScreen.js` (set only) | ⚠️ partial | `getHolidayMode` not exposed in mobile UI |
 | 22 | Groups (create/join/list/leave/members) | `createGroupV2`, `listGroupMembers`, `leaveGroup` | realAgent.js:941-974, 1672-1742 | `CreateGroupScreen.js:41`, `GroupScreen.js:33-36` | ✅ | — |
 | 23 | revealPeer (bilateral) | `revealPeer`→`setPeerReveal` (toggle) | realAgent.js:658, 887-895 | `ChatThreadScreen.js:49` (uses `requestReveal`) | ⚠️ different | **#220.5** |
-| 24 | getStoopProfile / setStoopProfile | `getStoopProfile`→`getMyProfile` alias | realAgent.js:658, 1574-1581 | `ProfileMineScreen.js:36` (`getMyProfile`) | ⚠️ shape drift | **#220.5** (related: setStoopProfile shape) |
+| 24 | getPinboardProfile / setPinboardProfile | `getPinboardProfile`→`getMyProfile` alias | realAgent.js:658, 1574-1581 | `ProfileMineScreen.js:36` (`getMyProfile`) | ⚠️ shape drift | **#220.5** (related: setPinboardProfile shape) |
 | **Folio** |
 | 25 | shareFolder | `shareFolder` | realAgent.js:1089-1098 | **not found** | ✗ | **#220.3** |
 | 26 | saveToMyPod | `saveToMyPod` | realAgent.js:1089-1098 | **not found** | ✗ | **#220.3** |
@@ -71,9 +71,9 @@ split into:
 | 29 | Calendar invite (cross-peer) | `calendar_addEvent` via registerCalendarSkills | realAgent.js:179-188 | (native calendar only) | ✗ | **#220.4** |
 | 30 | RSVP (accept/decline) | inferred from `calendar_*` skills | realAgent.js:179-188 | **not found** | ✗ | **#220.4** |
 | **Cross-cutting** |
-| 31 | DM threads (P2P chat) | `sendChatMessage`, `getChatThread` | realAgent.js:854 | tasks-mobile `ChatThreadScreen.jsx:46-48`; stoop-mobile `ChatThreadScreen.js:48-50` | ✅ (per-app context) | — |
+| 31 | DM threads (P2P chat) | `sendChatMessage`, `getChatThread` | realAgent.js:854 | tasks-mobile `ChatThreadScreen.jsx:46-48`; pinboard-mobile `ChatThreadScreen.js:48-50` | ✅ (per-app context) | — |
 | 32 | Mesh post fan-out (cross-instance) | `postRequest` → `sa.peer.sendTo()` + `listGroupRoster` | realAgent.js:995-1085 | **not implemented** | ✗ | **#220.6** (blocked on #223 NKN-on-RN) |
-| 33 | Catch-up on reconnect (backfill) | `agent.on('item-arrive')` listener path | (substrate-side) | stoop-mobile `FeedScreen.js` has stub comment | ⚠️ unverified | **#220.7** |
+| 33 | Catch-up on reconnect (backfill) | `agent.on('item-arrive')` listener path | (substrate-side) | pinboard-mobile `FeedScreen.js` has stub comment | ⚠️ unverified | **#220.7** |
 
 ## Gaps (candidate follow-ups)
 
@@ -118,7 +118,7 @@ shared composition, avoids two separate folio UIs.
 ### #220.4 — Calendar substrate path on mobile
 
 Web uses `registerCalendarSkills` from `@onderling-app/calendar`
-(`calendar_addEvent` + RSVP). Mobile (tasks-mobile, stoop-mobile)
+(`calendar_addEvent` + RSVP). Mobile (tasks-mobile, pinboard-mobile)
 uses native calendar sync only (`useNativeCalendarLiveSync` etc.) —
 no cross-peer invite/RSVP path.
 
@@ -127,19 +127,19 @@ BOTH native calendar (for personal scheduling) AND substrate
 calendar (for cross-peer invites). Defer to a dedicated slice.
 **Est:** ~1.5 days (per-app design + screens).
 
-### #220.5 — revealPeer + Stoop profile shape drift
+### #220.5 — revealPeer + Pinboard profile shape drift
 
-Two related semantic mismatches on stoop-mobile:
+Two related semantic mismatches on pinboard-mobile:
 - `revealPeer` on web is a bilateral toggle (`setPeerReveal`);
   mobile uses unilateral `requestReveal`. UX implication: web
   semantics ("if I reveal AND you reveal, we both see") differ
   from mobile semantics ("I ask you to reveal").
-- `getStoopProfile`/`setStoopProfile` shapes differ between web's
-  `getMyProfile` alias and stoop-mobile's direct calls; web has no
-  matching `setStoopProfile` (uses `setMyHandle`/`setMyDisplayName`
+- `getPinboardProfile`/`setPinboardProfile` shapes differ between web's
+  `getMyProfile` alias and pinboard-mobile's direct calls; web has no
+  matching `setPinboardProfile` (uses `setMyHandle`/`setMyDisplayName`
   pair instead).
 
-**Slice fit:** alignment slice on stoop-mobile. Touches
+**Slice fit:** alignment slice on pinboard-mobile. Touches
 `ChatThreadScreen.js` (reveal) + `ProfileMineScreen.js` (profile).
 **Est:** ~4h.
 
@@ -154,7 +154,7 @@ Don't file as separate task.
 
 ### #220.7 — Catch-up backfill on mobile (verify or implement)
 
-`stoop-mobile/src/screens/FeedScreen.js:5` comments an
+`pinboard-mobile/src/screens/FeedScreen.js:5` comments an
 `agent.on('item-arrive', ...)` listener but I didn't verify the
 full backfill loop on reconnect. May be implemented further down
 in the agent bundle (`agentBundle.js`).
@@ -189,7 +189,7 @@ The hard work is:
 - Reply-shape adapters in realAgent.js:1113–1280 — these are
   web-basis conventions, not mobile concerns directly. They
   belong in the `src/core/` lift under #221.5.
-- Pod sign-in flows — folio-mobile and stoop-mobile both have OIDC
+- Pod sign-in flows — folio-mobile and pinboard-mobile both have OIDC
   flows that differ from basis-web's. Onderling-mobile
   reuses one of those (open question).
 

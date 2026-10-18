@@ -42,6 +42,7 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { b64Encode } from '../src/utils/base64.js';
 import { MdnsTransport } from '../src/transport/MdnsTransport.js';
+import { helloChallengeMessage, helloProofMessage } from '@onderling/transports/mdns';
 
 /** Fire a native emitter event into every registered listener. */
 function fireMdns(event, payload) {
@@ -52,13 +53,34 @@ function fireMdns(event, payload) {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 const b64json = (obj) => b64Encode(new TextEncoder().encode(JSON.stringify(obj)));
+const unb64json = (b64) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))));
+const sentOn = (connId) => h.native.send.mock.calls.filter(([c]) => c === connId).map(([, d]) => unb64json(d));
+const until = async (fn) => { for (let i = 0; i < 200; i++) { const v = fn(); if (v) return v; await flush(); } return null; };
+
+/** We dialled `remote` on `connId`: answer our hello with a challenge `remote` really signed. */
+async function proveListener(self, remote, connId = 'conn-1') {
+  const hello = await until(() => sentOn(connId).find((f) => f._mdns_hello));
+  const sig = b64Encode(remote.sign(helloChallengeMessage(hello.nonce, 'n-remote', remote.pubKey, self.pubKey)));
+  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_challenge: true, _from: remote.pubKey, nonce: 'n-remote', sig }) });
+  return hello;
+}
+
+/** `remote` dialled us on `connId`: hello, then answer our challenge with a proof `remote` really signed. */
+async function proveDialler(self, remote, connId) {
+  fireMdns('MdnsClientConnected', { connectionId: connId });
+  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_hello: true, _from: remote.pubKey, nonce: `n-${connId}` }) });
+  const challenge = await until(() => sentOn(connId).find((f) => f._mdns_challenge));
+  const sig = b64Encode(remote.sign(helloProofMessage(`n-${connId}`, challenge.nonce, remote.pubKey, self.pubKey)));
+  fireMdns('MdnsDataReceived', { connectionId: connId, data: b64json({ _mdns_proof: true, sig }) });
+  return challenge;
+}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('MdnsTransport', () => {
   let transport, identity;
   // A proper prefix of self sorts BEFORE self; self+char sorts AFTER self.
-  let remoteHigher, remoteLower;
+  let remoteHigher, remoteLower, hiId, loId;
 
   beforeEach(async () => {
     h.native.start.mockClear();
@@ -69,8 +91,11 @@ describe('MdnsTransport', () => {
     h.listeners.clear();
     identity     = await AgentIdentity.generate(new VaultMemory());
     transport    = new MdnsTransport({ identity });
-    remoteHigher = identity.pubKey + 'Z';          // self < remote → self initiates
-    remoteLower  = identity.pubKey.slice(0, -1);   // self > remote → self waits
+    // real remote identities — a hello is now proven by a signature, so a made-up key cannot answer
+    do { hiId = await AgentIdentity.generate(new VaultMemory()); } while (!(hiId.pubKey > identity.pubKey));
+    do { loId = await AgentIdentity.generate(new VaultMemory()); } while (!(loId.pubKey < identity.pubKey));
+    remoteHigher = hiId.pubKey;   // self < remote → self initiates
+    remoteLower  = loId.pubKey;   // self > remote → self waits
   });
 
   afterEach(async () => {
@@ -129,21 +154,32 @@ describe('MdnsTransport', () => {
     expect(discovered).toHaveLength(0);
   });
 
-  it('initiator path: lower-keyed peer dials out, sends hello, emits peer-discovered', async () => {
+  it('initiator path: lower-keyed peer dials out, sends a hello with a nonce, keys the peer only on its proof', async () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
     fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
-    expect(await discovered).toBe(remoteHigher);
-
+    const hello = await until(() => sentOn('conn-1').find((f) => f._mdns_hello));
     expect(h.native.connect).toHaveBeenCalledWith('192.168.1.5', 8080);
-    // First send on the new conn is the hello frame.
-    const [connId, helloB64] = h.native.send.mock.calls[0];
-    expect(connId).toBe('conn-1');
-    const hello = JSON.parse(new TextDecoder().decode(
-      Uint8Array.from(atob(helloB64), (c) => c.charCodeAt(0)),
-    ));
-    expect(hello).toEqual({ _mdns_hello: true, _from: identity.pubKey });
+    expect(hello).toMatchObject({ _mdns_hello: true, _from: identity.pubKey });
+    expect(typeof hello.nonce).toBe('string');
+    expect(transport._hasPeer(remoteHigher), 'the TXT key is a claim until it is proven').toBe(false);
+    await proveListener(identity, hiId);
+    expect(await discovered).toBe(remoteHigher);
     expect(transport._hasPeer(remoteHigher)).toBe(true);
+    // and we proved ourselves back, over the listener's nonce
+    const proof = await until(() => sentOn('conn-1').find((f) => f._mdns_proof));
+    expect(AgentIdentity.verify(helloProofMessage(hello.nonce, 'n-remote', identity.pubKey, remoteHigher), proof.sig, identity.pubKey)).toBe(true);
+  });
+
+  it('a listener that cannot sign as the key it advertised is never keyed, and the socket is closed', async () => {
+    await transport.connect();
+    fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
+    const hello = await until(() => sentOn('conn-1').find((f) => f._mdns_hello));
+    const sig = b64Encode(loId.sign(helloChallengeMessage(hello.nonce, 'x', remoteHigher, identity.pubKey)));   // the wrong key signs
+    fireMdns('MdnsDataReceived', { connectionId: 'conn-1', data: b64json({ _mdns_challenge: true, _from: remoteHigher, nonce: 'x', sig }) });
+    await until(() => h.native.close.mock.calls.length > 0);
+    expect(transport._hasPeer(remoteHigher)).toBe(false);
+    expect(h.native.close).toHaveBeenCalledWith('conn-1');
   });
 
   it('initiator path: the peer we just dialled is REACHABLE — dialling is activity', async () => {
@@ -152,6 +188,7 @@ describe('MdnsTransport', () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
     fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
+    await proveListener(identity, hiId);
     await discovered;
     expect(transport.canReach(remoteHigher)).toBe(true);
     expect(transport.connectedPeers()).toEqual([remoteHigher]);
@@ -160,12 +197,13 @@ describe('MdnsTransport', () => {
   it('an idle connection stays reachable — the socket is the truth, silence is only "stale"', async () => {
     // The 30 s freshness window used to gate canReach(): a Nearby peer listed for a minute without a word
     // was "unreachable", the router chose NKN for the first ask, and the ask timed out on the wrong network.
+    await transport.connect();
+    const discovered = new Promise((res) => transport.once('peer-discovered', res));
+    fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
+    await proveListener(identity, hiId);
+    await discovered;
     vi.useFakeTimers();
     try {
-      await transport.connect();
-      const discovered = new Promise((res) => transport.once('peer-discovered', res));
-      fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
-      await discovered;
       vi.advanceTimersByTime(5 * 60_000);
       expect(transport.canReach(remoteHigher)).toBe(true);
       expect(transport.isStale(remoteHigher)).toBe(true);
@@ -175,16 +213,34 @@ describe('MdnsTransport', () => {
     } finally { vi.useRealTimers(); }
   });
 
-  it('inbound connection identified by a hello frame → peer-discovered', async () => {
+  it('inbound: a hello is challenged, and the connection is keyed only on a proof the claimed key signed', async () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
     fireMdns('MdnsClientConnected', { connectionId: 'in-1' });
-    fireMdns('MdnsDataReceived', {
-      connectionId: 'in-1',
-      data: b64json({ _mdns_hello: true, _from: remoteLower }),
-    });
+    fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n-in-1' }) });
+    const challenge = await until(() => sentOn('in-1').find((f) => f._mdns_challenge));
+    expect(transport._hasPeer(remoteLower), 'a hello is a claim').toBe(false);
+    // we proved OUR key over the dialler's nonce
+    expect(AgentIdentity.verify(helloChallengeMessage('n-in-1', challenge.nonce, identity.pubKey, remoteLower), challenge.sig, identity.pubKey)).toBe(true);
+    const sig = b64Encode(loId.sign(helloProofMessage('n-in-1', challenge.nonce, remoteLower, identity.pubKey)));
+    fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_proof: true, sig }) });
     expect(await discovered).toBe(remoteLower);
     expect(transport._hasPeer(remoteLower)).toBe(true);
+  });
+
+  it('inbound: a hello claiming a key, proven by ANOTHER key, is refused — no row, no route', async () => {
+    await transport.connect();
+    const discovered = [];
+    transport.on('peer-discovered', (k) => discovered.push(k));
+    fireMdns('MdnsClientConnected', { connectionId: 'in-9' });
+    fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_hello: true, _from: remoteLower, nonce: 'n' }) });
+    const challenge = await until(() => sentOn('in-9').find((f) => f._mdns_challenge));
+    const sig = b64Encode(hiId.sign(helloProofMessage('n', challenge.nonce, remoteLower, identity.pubKey)));   // a squatter signs
+    fireMdns('MdnsDataReceived', { connectionId: 'in-9', data: b64json({ _mdns_proof: true, sig }) });
+    await until(() => h.native.close.mock.calls.length > 0);
+    expect(transport._hasPeer(remoteLower)).toBe(false);
+    expect(transport.canReach(remoteLower)).toBe(false);
+    expect(discovered).toEqual([]);
   });
 
   it('a fresh hello from a peer we still map to an OLD connection re-maps to the new one', async () => {
@@ -192,14 +248,13 @@ describe('MdnsTransport', () => {
     // hello left the live connection unmapped: their envelopes arrived, every reply went to the dead
     // socket ("no connection to …"). Story 8, the companion restarted under the phone.
     await transport.connect();
-    fireMdns('MdnsClientConnected', { connectionId: 'in-1' });
-    fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_hello: true, _from: remoteLower }) });
-    await new Promise((r) => setTimeout(r, 0));
+    await proveDialler(identity, loId, 'in-1');
+    await until(() => transport._hasPeer(remoteLower));
     expect(transport._hasPeer(remoteLower)).toBe(true);
 
-    fireMdns('MdnsClientConnected', { connectionId: 'in-2' });
-    fireMdns('MdnsDataReceived', { connectionId: 'in-2', data: b64json({ _mdns_hello: true, _from: remoteLower }) });
-    await new Promise((r) => setTimeout(r, 0));
+    await proveDialler(identity, loId, 'in-2');
+    await until(() => sentOn('in-2').length > 0);
+    await flush();
     const env = { _v: 1, _p: 'OW', _id: 'x', _from: identity.pubKey, _to: remoteLower, _ts: Date.now(), _sig: null, payload: null };
     await transport._put(remoteLower, env);
     const lastSend = h.native.send.mock.calls.at(-1);
@@ -223,6 +278,7 @@ describe('MdnsTransport', () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
     fireMdns('MdnsServiceDiscovered', { host: '192.168.1.9', port: 9090, pubKey: remoteHigher });
+    await proveListener(identity, hiId);
     await discovered;
     h.native.send.mockClear();
 
@@ -238,6 +294,7 @@ describe('MdnsTransport', () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
     fireMdns('MdnsServiceDiscovered', { host: '192.168.1.7', port: 8081, pubKey: remoteHigher });
+    await proveListener(identity, hiId);
     await discovered;
     expect(transport._hasPeer(remoteHigher)).toBe(true);
 

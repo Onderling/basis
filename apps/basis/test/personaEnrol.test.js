@@ -12,7 +12,7 @@ import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { parseEnrollOffer, openOfferPersonas } from '../src/v2/enrollOffer.js';
 
-const quickCircle = async (agent, id) => agent.callSkill('stoop', 'createGroupV2', { groupId: id, name: id, rules: { text: id } });
+const quickCircle = async (agent, id) => agent.callSkill('pinboard', 'createGroupV2', { groupId: id, name: id, rules: { text: id } });
 
 describe('enrol hands over the chosen personas', () => {
   it('the offer seals the persona list; the new device runs exactly the personas it picked, as the same persona', async () => {

@@ -466,3 +466,43 @@ describe('circles advertised in the room (step H)', () => {
   });
 });
 
+
+describe('the card prefill', () => {
+  it('fills the name field with what the shell hands back (the room self\'s release) — nothing is sent until the person sends it', async () => {
+    const sent = [];
+    const el = render(model({ allows: { card: true, chat: false } }), { onPrefillCard: async () => ({ label: 'Werk' }), onSubmitCard: (f) => sent.push(f) });
+    const fill = el.querySelector('.circle-nearby__card-prefill');
+    expect(fill, 'the button is offered').not.toBe(null);
+    fill.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(el.querySelector('.circle-nearby__card-label').value).toBe('Werk');
+    expect(sent, 'filling is not sending').toEqual([]);
+  });
+  it('an empty release leaves the field as it was', async () => {
+    const el = render(model({ allows: { card: true, chat: false } }), { onPrefillCard: async () => ({}) });
+    el.querySelector('.circle-nearby__card-label').value = 'mine';
+    el.querySelector('.circle-nearby__card-prefill').click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(el.querySelector('.circle-nearby__card-label').value).toBe('mine');
+  });
+});
+
+describe('the first-use question', () => {
+  it('asks before anything else, offers every level, and hands the choice back', () => {
+    const chosen = [];
+    let later = 0;
+    const el = render(model(), { firstUse: { onChoose: (v) => chosen.push(v), onLater: () => { later += 1; } } });
+    const block = el.querySelector('.circle-nearby__first-use');
+    expect(block, 'the question is shown').not.toBe(null);
+    expect(el.querySelector('.circle-nearby__title').nextElementSibling).toBe(block);
+    const opts = [...block.querySelectorAll('.circle-nearby__first-use-option')];
+    expect(opts.map((b) => b.textContent)).toEqual(['circle.nearbyScreen.face_none', 'circle.reveal.preset.handle', 'circle.reveal.preset.profile', 'circle.reveal.preset.full']);
+    opts[2].click();
+    expect(chosen).toEqual(['profile']);
+    block.querySelector('.circle-nearby__first-use-later').click();
+    expect(later).toBe(1);
+  });
+  it('is absent when the shell does not ask', () => {
+    expect(render(model()).querySelector('.circle-nearby__first-use')).toBe(null);
+  });
+});

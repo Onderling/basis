@@ -65,7 +65,7 @@ const journeyOps = new Map();   // "app:op" → the journey files that drive it
 for (const f of walk(path.join(ROOT, JOURNEYS))) {
   const text = readFileSync(f, 'utf8');
   // The helper's app origin, read from the helper itself rather than assumed.
-  const app = /callSkill\(\s*['"]([\w-]+)['"]\s*,\s*op\b/.exec(text)?.[1] ?? 'stoop';
+  const app = /callSkill\(\s*['"]([\w-]+)['"]\s*,\s*op\b/.exec(text)?.[1] ?? 'pinboard';
   for (const op of opsIn(text, app)) {
     if (!journeyOps.has(op)) journeyOps.set(op, []);
     journeyOps.get(op).push(path.relative(ROOT, f));

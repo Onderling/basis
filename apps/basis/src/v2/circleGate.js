@@ -11,7 +11,7 @@
 // past the host into `@onderling/app-manifest/src/renderGate.js`; it consumes the substrate's public API,
 // exactly as `manifestMerge.js` already consumes `createManifestHost`.
 //
-// Part C (2026-06-11): projects the circle apps' manifests so the gate covers tasks/stoop/folio/
+// Part C (2026-06-11): projects the circle apps' manifests so the gate covers tasks/pinboard/folio/
 // calendar user-action verbs. Cross-app verb collisions (share/accept/reject/cancel) were resolved at
 // the manifest level (each verb has one owner; losers dropped the bare token). renderGate is
 // first-match-wins across the flattened rules, preserving each op's verb order (multiword before bare).
@@ -22,7 +22,7 @@
 // household TG-bot surface (its real manifest), not the circle.
 
 import { createGate } from '@onderling/manifest-host';
-import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
+import { mockTasksManifest, mockPinboardManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
 import { readDayAndTime } from '../forms/parseDate.js';
@@ -55,7 +55,7 @@ export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
     }),
     ...createGate([
       mockTasksManifest,
-      mockStoopManifest,
+      mockPinboardManifest,
       mockFolioManifest,
       calendarManifest,
     ], { locale: loc, trailLexicon: CIRCLE_GATE_TRAIL }).rules,

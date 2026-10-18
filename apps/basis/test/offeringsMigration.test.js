@@ -22,7 +22,7 @@ function makeHost({ rosterSkills = [], markerValue, legacyMarkerValue } = {}) {
     if (origin === 'agents' && opId === 'setProfileProperty') { props[args.key] = { mode: 'own', value: args.value }; return { ok: true }; }
     if (origin === 'agents' && opId === 'setProfileDriver') { props[args.key] = { mode: 'own', value: { kind: args.kind, text: args.text, tags: args.tags, categoryId: args.categoryId } }; return { ok: true }; }
     if (origin === 'agents' && opId === 'setProfileDisclosure') return { ok: true };
-    if (origin === 'stoop' && (opId === 'listMyOfferings' || opId === 'listMySkills')) return { skills: rosterSkills };
+    if (origin === 'pinboard' && (opId === 'listMyOfferings' || opId === 'listMySkills')) return { skills: rosterSkills };
     return { ok: false, reason: `unstubbed ${origin}.${opId}` };
   };
   return { callSkill, calls, props };

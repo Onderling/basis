@@ -60,7 +60,7 @@ const VALUE_L10N = Object.freeze({ [AVAILABILITY_KEY]: AVAILABILITY_L10N });
 export function valueL10nFor(key) { return VALUE_L10N[key] ?? null; }
 
 /* ── location — the folded-in coarse PLACE property (audit §4, design's canonical ladder) ──
- * Not a charter key: a person-level property that folds the bespoke stoop `profile.location`
+ * Not a charter key: a person-level property that folds the bespoke pinboard `profile.location`
  * geo field into ONE disclosure-controlled property on the truth layer. Rendered like `place`
  * — an OPEN coarse label (free-text editor; the value is a real place name, so no value
  * l10n) — while being wired like availability for everything else (migration + disclosure +

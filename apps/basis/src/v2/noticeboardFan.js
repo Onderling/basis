@@ -1,7 +1,7 @@
 /**
  * What the circle fans when a noticeboard item is WRITTEN — derived from the item, never from the op.
  *
- * A request, an offer and an announcement are different ops in stoop, and for a long time only the first
+ * A request, an offer and an announcement are different ops in pinboard, and for a long time only the first
  * of them reached anyone: the fan hung off `postRequest` by name, so an announcement was stored locally
  * and went nowhere (the walk's "a noticeboard post reaches nobody but its author"). The data plane's rule
  * is the other way round — "whatever the store holds is what syncs" — so the fan reads the ITEM the
@@ -30,7 +30,7 @@ export function noticeboardFanPayload(item, { from, groupId = null } = {}) {
     : (groupId ? [{ kind: 'group', groupId }] : []);
   return {
     requestId:      item.id,
-    text:           item.text ?? item.body ?? '',   // a circle-store row carries `body` (canonical), stoop's index `text`
+    text:           item.text ?? item.body ?? '',   // a circle-store row carries `body` (canonical), pinboard's index `text`
     from,
     type:           item.type ?? 'request',
     kind:           item.kind ?? null,

@@ -17,9 +17,9 @@ import { call, circleIds, whoAmI } from './contactsWalk.js';
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-const onRoster = async (page, circleId, webid) => ((await call(page, 'stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
+const onRoster = async (page, circleId, webid) => ((await call(page, 'pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
   .some((m) => m.webid === webid);
-const roleOf = async (page, circleId, webid) => ((await call(page, 'stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
+const roleOf = async (page, circleId, webid) => ((await call(page, 'pinboard', 'listGroupMembers', { groupId: circleId }))?.members ?? [])
   .find((m) => m.webid === webid)?.role ?? null;
 
 test('a promoted admin re-admits someone who left: they are back on every roster', async ({ browser }) => {
@@ -42,12 +42,12 @@ test('a promoted admin re-admits someone who left: they are back on every roster
     }
     log('SETUP A founds, B + C in', 'PASS', String(circle).slice(0, 10));
 
-    const promoted = await call(A.page, 'stoop', 'setMemberRole', { groupId: circle, memberWebid: bId, role: 'admin' });
+    const promoted = await call(A.page, 'pinboard', 'setMemberRole', { groupId: circle, memberWebid: bId, role: 'admin' });
     expect(promoted?.error ?? null, JSON.stringify(promoted)).toBeNull();
     await expect.poll(() => roleOf(B.page, circle, bId), { timeout: 60_000, message: 'B knows B is an admin' }).toBe('admin');
     log('STEP1 A promotes B', 'PASS', '');
 
-    const left = await call(C.page, 'stoop', 'leaveGroup', { groupId: circle, confirm: true });
+    const left = await call(C.page, 'pinboard', 'leaveGroup', { groupId: circle, confirm: true });
     expect(left?.error ?? null, JSON.stringify(left)).toBeNull();
     for (const [label, peer] of [['A', A], ['B', B]]) {
       await expect.poll(() => onRoster(peer.page, circle, cId), { timeout: 60_000, message: `${label} dropped C` }).toBe(false);

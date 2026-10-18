@@ -6,7 +6,7 @@ import { toCircleStorePost, isLandedNoticeboardPost, landedNoticeboardHandler } 
 const post = (over = {}) => ({ id: 'p1', type: 'request', text: 'boormachine?', addedAt: 1_700_000_000_000, visibility: 'household', source: { targets: [{ kind: 'group', groupId: 'k1' }] }, ...over });
 
 describe('one carry for noticeboard posts — the circle store and its lane', () => {
-  it('a stoop post becomes a row the circle store\'s registry ACCEPTS (body + the base fields), for every post kind', async () => {
+  it('a pinboard post becomes a row the circle store\'s registry ACCEPTS (body + the base fields), for every post kind', async () => {
     const stores = createCircleStores({ dataSource: memoryDataSource(), registry: householdRegistry() });
     const store = stores.getStore('k1');
     for (const type of ['request', 'offer', 'announcement']) {
@@ -15,7 +15,7 @@ describe('one carry for noticeboard posts — the circle store and its lane', ()
     }
     const stored = await store.get('p-request');
     expect(stored.body).toBe('boormachine?');
-    expect(stored.text, 'stoop\'s own field rides along (additionalProperties)').toBe('boormachine?');
+    expect(stored.text, 'pinboard\'s own field rides along (additionalProperties)').toBe('boormachine?');
     expect(stored.createdBy).toBe('webid:ada');
     expect(stored.source.from).toBe('webid:ada');
   });

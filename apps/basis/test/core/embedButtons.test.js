@@ -34,7 +34,7 @@ describe('computeEmbedButtons', () => {
 
   it('returns [] when manifest for the embed.appOrigin is missing', () => {
     const out = computeEmbedButtons({
-      manifestsByOrigin: { stoop: {} },
+      manifestsByOrigin: { pinboard: {} },
       embed: { appOrigin: 'folio', snapshot: { id: 'f1', type: 'file' } },
     });
     expect(out).toEqual([]);

@@ -1,21 +1,15 @@
 /**
  * WHAT THE NEARBY ROOM IS TOLD ABOUT YOU — decided once, for both shells (the box has no room).
  *
- * The FACE: the same faces a circle offers — your display name (the default), your handle, or nobody — chosen per device
- * in "You here"; a label only, never an identity. The ADDRESSES ("share how to reach me", all-or-nothing by Frits'
+ * The FACE: derived from the room self's LEVEL (nearbyLevel.js — the person's, on the self's disclosure, not the
+ * device's); a label only, never an identity. The ADDRESSES ("share how to reach me", all-or-nothing by Frits'
  * call): the relay this device rides, and the NKN address only when the publication lock allows it (the same lock the
- * invite QR honours). A shell hands in only where its choice is stored and how it finds its relay and NKN address.
+ * invite QR honours). A shell hands in only how it finds its relay and NKN address.
  */
-
-/** The faces a device may show in the room. */
-export const NEARBY_FACES = Object.freeze(['name', 'handle', 'none']);
-
-/** A stored face choice, read: one of `NEARBY_FACES`; anything else is the default, your name. */
-export function nearbyFaceChoice(raw) { return NEARBY_FACES.includes(raw) ? raw : 'name'; }
+import { nearbyLevelFrom, nearbyLevelIsSet, NEARBY_CONTEXT } from './nearbyLevel.js';
 
 /**
  * @param {object} a
- * @param {() => string|null} a.readChoice                  the stored face choice (a shell's device-local store)
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill
  * @param {() => Promise<string|null>|string|null} [a.relayUrl]   the relay this device rides
  * @param {() => boolean} [a.shareNkn]                      the publication lock (true = the NKN address may be shared)
@@ -23,7 +17,7 @@ export function nearbyFaceChoice(raw) { return NEARBY_FACES.includes(raw) ? raw 
  * @param {() => ({id: string, name?: string|null}|null)} [a.roomSelf]  the self this device enters the room as (`nearbyRoomSelf`)
  * @returns {{ myFace: () => Promise<{label: string}|null>, myAddresses: () => Promise<object> }}
  */
-export function createNearbyIdentity({ readChoice, callSkill, relayUrl = () => null, shareNkn = () => false, nknAddress = () => null, roomSelf = () => null } = {}) {
+export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNkn = () => false, nknAddress = () => null, roomSelf = () => null } = {}) {
   // the room self's offerings as last read (the screen's shared-skills line reads them synchronously)
   let offeringsNow = [];
   return {
@@ -43,19 +37,60 @@ export function createNearbyIdentity({ readChoice, callSkill, relayUrl = () => n
     },
     /** The room self's offerings, as the shared-skills line shows them (from the last `getDrivers`). */
     mySkills() { return offeringsNow; },
+    /** The room self's Nearby level (its disclosure under `nearby`; nothing set → `handle`). While the room asks: none. */
+    async level() { return (await this.levelState()).level; },
+    /** The level and whether the self chose one (`set`) — the first-use question asks only when it did not. */
+    async levelState() {
+      const self = roomSelf?.() ?? null;
+      // no self entering (none held, or the room still asks): nothing is shown — never the general persona by default
+      if (!self?.id || self.asking === true) return { level: 'none', set: false };
+      try {
+        const disclosure = (await callSkill?.('agents', 'getProfileDisclosure', { id: self.id }))?.disclosure;
+        return { level: nearbyLevelFrom(disclosure), set: nearbyLevelIsSet(disclosure) };
+      } catch { return { level: 'handle', set: false }; }
+    },
+    /**
+     * Set the room self's level — through the one writer (`setNearbyLevel`), for THAT self. While the room asks who
+     * enters there is no self to set it for.
+     * @returns {Promise<{ok: boolean, reason?: string}>}
+     */
+    async setLevel(level) {
+      const self = roomSelf?.() ?? null;
+      if (self?.asking === true) return { ok: false, reason: 'asking' };
+      if (!self?.id) return { ok: false, reason: 'not-a-self-here' };
+      try { return (await callSkill?.('household', 'setNearbyLevel', { personaId: self.id, level })) ?? { ok: false, reason: 'no-answer' }; }
+      catch (err) { return { ok: false, reason: String(err?.message ?? err) }; }
+    },
+    /**
+     * THE FACE the room is told — derived from the room self's level, never from anything else the app knows: `none` →
+     * none; a PERSONA → its own name (its pseudonym) at every level; the general persona → its handle at `handle`, its
+     * presented name above it. While the room asks who enters: none.
+     */
     async myFace() {
       try {
-        const choice = nearbyFaceChoice(readChoice?.());
-        if (choice === 'none') return null;
-        // while the room ASKS who enters (several selves ticked, none chosen), no face: the question first — never the
-        // general persona's name by default. A PERSONA shows its own name (it has no handle of the general persona's).
         const self = roomSelf?.() ?? null;
         if (self?.asking === true) return null;
+        const level = await this.level();
+        if (level === 'none') return null;
         if (self && self.id !== 'default') return self.name ? { label: String(self.name) } : null;
-        const e = (await callSkill?.('stoop', 'getMyProfile', {}))?.entry ?? {};
-        const label = choice === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
+        const e = (await callSkill?.('pinboard', 'getMyProfile', {}))?.entry ?? {};
+        const label = level === 'handle' ? (e.handle ?? null) : (e.displayName ?? e.handle ?? null);
         return label ? { label: String(label) } : null;
       } catch { return null; }
+    },
+    /**
+     * A card PREFILL from the room self ("vul in vanuit <naam>"): ONLY what its `nearby` release gives — nothing of
+     * another self, never a marker key. The person sees it and sends it (the card itself stays typed: authored).
+     * @returns {Promise<{label?: string}>}
+     */
+    async cardPrefill() {
+      const self = roomSelf?.() ?? null;
+      if (!self?.id || self.asking === true) return {};
+      let released = {};
+      try { released = (await callSkill?.('agents', 'getPersonaRelease', { id: self.id, contextId: NEARBY_CONTEXT }))?.released ?? {}; } catch { released = {}; }
+      const pick = (k) => (typeof released?.[k] === 'string' && released[k].trim() ? released[k].trim() : (typeof released?.[k]?.value === 'string' ? released[k].value : null));
+      const label = pick('realName') ?? pick('handle');
+      return label ? { label } : {};
     },
     async myAddresses() {
       const out = {};

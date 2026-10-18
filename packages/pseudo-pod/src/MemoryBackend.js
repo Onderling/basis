@@ -85,6 +85,17 @@ export function createMemoryBackend() {
       return { etag: finalEtag, _v: finalV };
     },
 
+    /** Compare-and-swap: write only while the stored etag is still `ifMatch` (a fresh etag is minted). */
+    async putIf(key, bytes, ifMatch) {
+      if ((store.get(key)?.etag ?? null) !== ifMatch) return { conflict: true };
+      const finalEtag = nextEtag();
+      const finalV = (versionByKey.get(key) ?? 0) + 1;
+      store.set(key, { bytes, etag: finalEtag });
+      versionByKey.set(key, finalV);
+      _fanOut({ op: 'put', key, etag: finalEtag, _v: finalV });
+      return { etag: finalEtag, _v: finalV };
+    },
+
     async delete(key) {
       if (store.has(key)) {
         store.delete(key);

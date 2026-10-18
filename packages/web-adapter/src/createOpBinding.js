@@ -7,14 +7,14 @@
  * still reads labels / severities / confirm messages from its app's
  * manifest. Pre- the pages did this manually:
  *
- *     const op = stoopManifest.operations.find(o => o.id === 'signOutOfPod');
+ *     const op = pinboardManifest.operations.find(o => o.id === 'signOutOfPod');
  *     if (!confirm(op.surfaces.ui.confirm.message)) return;
  *     await callSkill('signOutOfPod', {});
  *
  * With `createOpBinding`:
  *
  *     import { createOpBinding } from '/lib/web-adapter/createOpBinding.js';
- *     const binding = createOpBinding({ manifest: stoopManifest, callSkill });
+ *     const binding = createOpBinding({ manifest: pinboardManifest, callSkill });
  *     await binding.confirmAndCall('signOutOfPod');
  *
  * Returns `{ findOp, confirmAndCall, labelFor }`.  See JSDoc on each.

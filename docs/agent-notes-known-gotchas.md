@@ -104,7 +104,7 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   another. *Concrete (2026-07-08):* feedback-split F1 added `@onderling/{core,pod-client,pseudo-pod}` to
   `apps/feedback-pipeline`; links were materialized by hand pending the next install. *Concrete (2026-07-09):* the
   versioning/agents work hand-materialized `@onderling/versioning` into `apps/basis`, `apps/basis-mobile`,
-  and `packages/substrate-stack`; `@onderling/substrate-stack` into `apps/{stoop,tasks-v0,household}`; and
+  and `packages/substrate-stack`; `@onderling/substrate-stack` into `apps/{pinboard,tasks-v0,household}`; and
   `@onderling-app/agents` + `@onderling/agent-registry` into `apps/basis` — all pending the next real install.
   *Concrete (2026-08-06):* the `sa.audit` retention derivation added `@onderling/item-store` to
   `packages/secure-agent` (it now reads the shared `entryKinds` retention window); hand-materialized
@@ -240,7 +240,7 @@ when the mobile app boots or its Vitest suite runs. RN-bundle-safe: the barrel p
 failed (`Unable to resolve "@onderling-app/agents/wireSkills"`). The mobile app had been un-bundleable via Metro
 since then. **Fix (2026-07-13):** added `@onderling-app/agents` to `metro.config.js` `extraNodeModules` +
 `extraSubpathResolvers` cases mapping `/wireSkills`→`apps/agents/src/wireSkills.js`, `/defaultCatalogue`,
-`/cores`, and `/manifest`→`apps/agents/manifest.js` (mirrors the existing stoop/llm-client subpath resolvers).
+`/cores`, and `/manifest`→`apps/agents/manifest.js` (mirrors the existing pinboard/llm-client subpath resolvers).
 **Tell:** a bare `@onderling-app/<app>/<subpath>` import that resolves in vite/web but throws in Metro → it needs
 an `extraSubpathResolvers` case (package-exports stays disabled). (Added 2026-07-13, mobile feedback parity.)
 
@@ -318,7 +318,7 @@ run the install and check the totals of the neighbouring suites immediately. And
 `file:` workspace deps as **symlinks** — verify with `ls -la apps/<app>/node_modules/@onderling/core`; a real
 directory there means the tree is broken.
 
-*(A silver lining: running the relink also fixed pre-existing breakage — `apps/stoop-mobile` went from 3
+*(A silver lining: running the relink also fixed pre-existing breakage — `apps/pinboard-mobile` went from 3
 failing test files to 940/940, and it had been that way for a while.)*
 
 ## Mobile screens have NO test coverage — `vitest` excludes `src/screens/**`
@@ -551,11 +551,11 @@ Background: `plans/DESIGN-boundary-authentication.md` §7.
 
 `apps/basis-mobile/node_modules/@onderling-app/basis` is a real-directory COPY (not a symlink), and it is
 missing transitive deps under vitest — so importing anything that reaches `@onderling-app/basis/src/index.js`
-fails one dep at a time: first `@onderling-app/stoop`, then `@onderling-app/folio` (missing app symlinks
+fails one dep at a time: first `@onderling-app/pinboard`, then `@onderling-app/folio` (missing app symlinks
 under `@onderling-app/`), then `@onderling/pod-routing` (a missing package dep of the copy). This is the
 "tree does not survive" fragility (see CLAUDE.md "NEVER rm -rf node_modules"), NOT a code problem — a mobile
 change can be correct-by-parity and parse-clean while its vitest still cannot load.
-- **Partial fix applied:** `ln -s ../../../stoop` and `ln -s ../../../folio` under
+- **Partial fix applied:** `ln -s ../../../pinboard` and `ln -s ../../../folio` under
   `apps/basis-mobile/node_modules/@onderling-app/`. `@onderling/pod-routing` (and likely more) still missing.
 - **Do not** `rm -rf` / reinstall to fix this — it will expose latent version conflicts and not come back.
   Either symlink each missing dep from the source, or run the equivalent test on the `apps/basis` (web) side
@@ -799,3 +799,11 @@ Each one produced an APK that did not carry the code it was built to test.
   then). Pass `-- --no-watchman` to `detox test`; Jest's node crawler is enough. Also: a screen's LOADING state may carry
   the same testID as the loaded one (`circle-availability`) — wait for a control of the loaded form, not the screen id.
 
+
+## The pinboard app moved directory (2026-10-17) — a copied `node_modules` still has the old layout
+The app formerly under another name now lives at `apps/pinboard` (`@onderling-app/pinboard`). A checkout or worktree
+whose `node_modules` predates the move (e.g. one made with `plans/tools/mk-worktree.sh`, which copies the source tree's
+`node_modules`) has the app's dependencies under the OLD app directory and the `@onderling-app/<old name>` links, so
+the box and the guards fail with `ERR_MODULE_NOT_FOUND` (`tweetnacl` from `apps/pinboard/src/…`, or the package itself).
+Fix by hand, never by reinstalling: move the old app directory's `node_modules` into `apps/pinboard/`, and in each
+`apps/*/node_modules/@onderling-app/` replace the old link with `pinboard -> ../../../pinboard`. CI installs fresh.

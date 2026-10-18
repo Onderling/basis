@@ -25,7 +25,7 @@ const cara = { webid: 'w-cara', handle: 'cara', role: 'member' };
 
 /**
  * The dispatch circleApp.js's showAdmin onSetRole performs, verbatim: the op's own confirm gate in
- * front, then the same `callSkill('stoop', …)` its neighbours in this panel use. `present` stands in
+ * front, then the same `callSkill('pinboard', …)` its neighbours in this panel use. `present` stands in
  * for the web dialog and records what it was asked to show.
  */
 function wire(rawCallSkill, { accept = true } = {}) {
@@ -37,7 +37,7 @@ function wire(rawCallSkill, { accept = true } = {}) {
       request: roleChangeConfirm({ control, name, t }),
       present,
       execute: async () => {
-        await rawCallSkill('stoop', 'setMemberRole', {
+        await rawCallSkill('pinboard', 'setMemberRole', {
           groupId: circleId, memberWebid: m.webid, role: control.role,
         });
       },
@@ -85,7 +85,7 @@ describe('circle admin panel — the control dispatches setMemberRole', () => {
 
     controlIn(rowsOf(el)[2]).click();       // cara, not bob
     await vi.waitFor(() => expect(rawCallSkill).toHaveBeenCalled());
-    expect(rawCallSkill).toHaveBeenCalledWith('stoop', 'setMemberRole', {
+    expect(rawCallSkill).toHaveBeenCalledWith('pinboard', 'setMemberRole', {
       groupId: circleId, memberWebid: 'w-cara', role: 'admin',
     });
   });
@@ -98,7 +98,7 @@ describe('circle admin panel — the control dispatches setMemberRole', () => {
 
     controlIn(rowsOf(el)[1]).click();
     await vi.waitFor(() => expect(rawCallSkill).toHaveBeenCalled());
-    expect(rawCallSkill).toHaveBeenCalledWith('stoop', 'setMemberRole', {
+    expect(rawCallSkill).toHaveBeenCalledWith('pinboard', 'setMemberRole', {
       groupId: circleId, memberWebid: 'w-bob', role: 'member',
     });
   });

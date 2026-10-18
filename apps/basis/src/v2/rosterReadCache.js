@@ -1,11 +1,11 @@
 /**
- * basis v2 — one read-through cache for the roster reads at the `stoop` waist.
+ * basis v2 — one read-through cache for the roster reads at the `pinboard` waist.
  *
  * Found on the phone (2026-08-30, story 8 → N8/N9): at boot every lane walks every circle's roster on its
  * own — the governance, membership, key and grants catch-ups each call `listMyCircles` then a roster read
  * per circle, the frontier replays do the same, the pairing check again, and the membership verifier reads
  * the roster per statement it binds. ~45 roster reads a minute at rest, each a signed envelope round trip
- * to the stoop agent over the internal bus plus the per-member work in the handler. That saturated the JS
+ * to the pinboard agent over the internal bus plus the per-member work in the handler. That saturated the JS
  * thread for the first two minutes after launch — native mDNS promises resolved 20–80 s late — and it is
  * battery all day.
  *
@@ -29,10 +29,10 @@ export const ROSTER_READ_TTL_MS = param({
   key: 'rosterRead.ttlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000,
 });
 
-/** The stoop ops this cache answers. Everything else through the waist is treated as a potential write. */
+/** The pinboard ops this cache answers. Everything else through the waist is treated as a potential write. */
 export const ROSTER_READ_OPS = Object.freeze(['listGroupMembers', 'listGroupRoster', 'listMyCircles']);
 
-/** Stoop ops that only read something else — they do not touch the roster, so they must not invalidate. */
+/** Pinboard ops that only read something else — they do not touch the roster, so they must not invalidate. */
 const NON_ROSTER_READS = new Set([
   'listFeed', 'listPosts', 'searchPosts', 'whoAmI', 'getCurrentGroup', 'listSkills', 'getProfile',
   'listGroupChatHistory', 'listMyHandle', 'getGroupInvite', 'listGrants', 'getPolicy', 'briefSummary',
@@ -77,7 +77,7 @@ export function createRosterReadCache({ ttlMs = ROSTER_READ_TTL_MS, now = () => 
       promise.catch(() => { if (entries.get(key)?.promise === promise) entries.delete(key); });
       return promise;
     },
-    /** A stoop op that may have changed a roster went through the waist: forget everything. */
+    /** A pinboard op that may have changed a roster went through the waist: forget everything. */
     afterWrite(opId) {
       if (isRosterRead(opId) || NON_ROSTER_READS.has(opId)) return;
       invalidateAll();

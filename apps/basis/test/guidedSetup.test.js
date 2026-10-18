@@ -29,8 +29,8 @@ describe('guided-setup run (default template)', () => {
     s = r.state;
     expect(stepOf(T, s).ask).toMatch(/which apps/i);
 
-    r = submitGuidedStep(T, s, ['stoop', 'tasks']);  // apps (multiselect)
-    expect(r.applied).toEqual({ key: 'apps', value: ['stoop', 'tasks'] });
+    r = submitGuidedStep(T, s, ['pinboard', 'tasks']);  // apps (multiselect)
+    expect(r.applied).toEqual({ key: 'apps', value: ['pinboard', 'tasks'] });
     s = r.state;
     expect(stepOf(T, s).sets).toBe('storagePosture');
 
@@ -48,14 +48,14 @@ describe('guided-setup run (default template)', () => {
   it('the collected answers build a valid circle-policy patch', () => {
     let s = startGuidedSetup(DEFAULT_SETTINGS_TEMPLATE);
     s = submitGuidedStep(DEFAULT_SETTINGS_TEMPLATE, s, undefined).state;
-    s = submitGuidedStep(DEFAULT_SETTINGS_TEMPLATE, s, ['stoop']).state;
+    s = submitGuidedStep(DEFAULT_SETTINGS_TEMPLATE, s, ['pinboard']).state;
     s = submitGuidedStep(DEFAULT_SETTINGS_TEMPLATE, s, 'p2').state;
     s = submitGuidedStep(DEFAULT_SETTINGS_TEMPLATE, s, 'user').state;
     const patch = guidedPolicyPatch(s);
-    expect(patch).toEqual({ apps: ['stoop'], storagePosture: 'p2', llmTool: 'user' });
+    expect(patch).toEqual({ apps: ['pinboard'], storagePosture: 'p2', llmTool: 'user' });
     // and it normalizes onto a real policy
     const policy = mergeCirclePolicy({}, patch);
-    expect(policy.apps).toEqual(['stoop']);
+    expect(policy.apps).toEqual(['pinboard']);
     expect(policy.storagePosture).toBe('p2');
     expect(policy.llmTool).toBe('user');
   });

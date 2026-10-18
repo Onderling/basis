@@ -3,8 +3,8 @@
  * provide their own presets per use case (chat thumbnail, avatar,
  * noticeboard post, deliverable photo, …).
  *
- * Lifted from apps/stoop-mobile/src/lib/imagePicker.js 2026-05-09
- * (Phase 41.0 L3; Tasks-mobile is the second consumer). Stoop's
+ * Lifted from apps/pinboard-mobile/src/lib/imagePicker.js 2026-05-09
+ * (Phase 41.0 L3; Tasks-mobile is the second consumer). Pinboard's
  * three presets stay there (re-exported through the shim); generic
  * presets live here so apps that just want a sensible default can
  * import directly.

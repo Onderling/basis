@@ -5,8 +5,8 @@
  * builders directly via the harness's `removeAndRotate`. This test proves the WIRING: that removing a member
  * through the production op path actually FIRES that mechanism. The path exercised end-to-end is
  *
- *   admin.callSkill('stoop','removeMember')  →  stoop removeMember skill (revokePodAccess)
- *     →  the per-circle control-agent ROUTER (stoopControlAgent)
+ *   admin.callSkill('pinboard','removeMember')  →  pinboard removeMember skill (revokePodAccess)
+ *     →  the per-circle control-agent ROUTER (pinboardControlAgent)
  *       →  the circle producer's control agent (createControlAgent.removeMember → emitKeyEvent)
  *         →  the injected keyEventLog SINK  →  records the admin's copy + FANS the rotation key-event
  *            to the REMAINING members only, over the real InternalBus transport.
@@ -47,7 +47,7 @@ describe('no-pod key rotation fired by the REAL removeMember op (three real agen
     ]);
     await connectNodesOverBus([A, B, C]);
 
-    // A creates ONE circle; B and C both join it (real join → membership trail + stoop MemberMap).
+    // A creates ONE circle; B and C both join it (real join → membership trail + pinboard MemberMap).
     await createCircle(A, { groupId: GID, name: 'Sealed Circle' });
     await joinExistingCircle(A, B, { groupId: GID, handle: 'bee' });
     await joinExistingCircle(A, C, { groupId: GID, handle: 'cee' });
@@ -67,8 +67,8 @@ describe('no-pod key rotation fired by the REAL removeMember op (three real agen
     expect(readSealed(C, beforeEnv, GID)).toBe(before);
 
     // ── A removes C through the REAL op (the exact call the admin panel's onRemove makes). ──
-    // The stoop skill → control-agent router → producer control agent → emitKeyEvent → sink → fan.
-    const res = await A.agent.callSkill('stoop', 'removeMember', { groupId: GID, memberWebid: C.pubKey });
+    // The pinboard skill → control-agent router → producer control agent → emitKeyEvent → sink → fan.
+    const res = await A.agent.callSkill('pinboard', 'removeMember', { groupId: GID, memberWebid: C.pubKey });
     expect(res?.error, `removeMember refused: ${res?.error}`).toBeFalsy();
 
     // The rotation key-event (v2) reached B (a remaining member) and NOT C (the departed). B holds it because

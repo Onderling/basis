@@ -2,7 +2,7 @@
  * QrScannerModal — full-screen camera + barcode-scan path for
  * basis-mobile (2026-05-27).
  *
- * Reuses the proven shape from apps/stoop-mobile's OnboardScanScreen:
+ * Reuses the proven shape from apps/pinboard-mobile's OnboardScanScreen:
  *   - useCameraPermissions for runtime grant
  *   - CameraView with barcodeScannerSettings:{barcodeTypes:['qr']}
  *   - scanLock so one barcode = one onResult call

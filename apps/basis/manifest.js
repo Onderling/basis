@@ -64,7 +64,7 @@ export const basisManifest = {
         slash: { command: '/help-with' },
         chat:  {
           reply: 'text',
-          hint:  'open a private thread on a stoop post',
+          hint:  'open a private thread on a pinboard post',
         },
       },
     },
@@ -87,10 +87,10 @@ export const basisManifest = {
 
     /**
      * `/help-with <post-id>` — v0.7.cc.  Spawn (or activate) a chat
-     * thread whose filter targets a specific stoop post.  The user
+     * thread whose filter targets a specific pinboard post.  The user
      * who tapped "Ik help" on Anne's post ends up in a private
      * thread on that post — DEMO.md §1.  Chat-shell builtin (no
-     * stoop-side skill needed: filters on itemRef.id).
+     * pinboard-side skill needed: filters on itemRef.id).
      */
 
 
@@ -102,7 +102,7 @@ export const basisManifest = {
     /**
      * `/dm <webid>`. Slash-only entry in the
      * basis manifest; the per-row [DM] button is declared in
-     * stoop's mock manifest because that's where the 'contact' and
+     * pinboard's mock manifest because that's where the 'contact' and
      * 'member' item types live (appliesTo validates against
      * itemTypes).  Chat-shell-internal — main.js intercepts the
      * button + localBuiltins handles the slash.
@@ -679,7 +679,7 @@ export const basisManifest = {
      * Persisted across reloads.
      *
      * Slash dedup (2026-06-19): renamed `/mute` → `/block` so it no longer
-     * collides with stoop's `/mute` (a LOCAL, hide-only mute that does NOT
+     * collides with pinboard's `/mute` (a LOCAL, hide-only mute that does NOT
      * block). `/block` is also the accurate verb — this drops the peer's
      * messages AND refuses to send. The op id stays `mute` (skill + its
      * "muted" wording unchanged), so only the user-facing command moved.

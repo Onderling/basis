@@ -1,7 +1,7 @@
 /**
  * AvatarCircle — round avatar for users.
  *
- * Lifted from apps/stoop-mobile/src/components/AvatarCircle.js
+ * Lifted from apps/pinboard-mobile/src/components/AvatarCircle.js
  * 2026-05-09 (Phase 41.0.b B1; Tasks-mobile is the second consumer).
  *
  * Renders the photo when `uri` is provided, otherwise a circle with

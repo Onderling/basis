@@ -2,11 +2,11 @@
  * basis v2 — circle invite/join glue (OBJ-2 membership, no-pod).
  *
  * v2 builds ON the classic shell: this module is THIN glue over the already-shared
- * membership core (`src/core/wizards/*State.js`) + stoop skills, so web and mobile
+ * membership core (`src/core/wizards/*State.js`) + pinboard skills, so web and mobile
  * surface the SAME two operations without re-implementing any logic:
  *
  *   - buildCircleInviteUri  — an admin reads the circle's current membership code
- *     (`stoop.getCurrentMembershipCode`), stamps its peer address, and encodes a
+ *     (`pinboard.getCurrentMembershipCode`), stamps its peer address, and encodes a
  *     `onderling-invite://…` URI (the QR payload) via the classic `encodeMembershipCodeUrl`.
  *   - joinCircleFromInvite  — a joiner decodes a scanned/pasted invite and runs the
  *     classic `finalSubmit` chain (local redeem → peer-bridge fallback). No pod.
@@ -53,12 +53,12 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
   let res;
   // An invite for ONE person: a fresh code bound to their key, for one use (never the circle's shared code).
   if (typeof boundTo === 'string' && boundTo) {
-    try { res = await callSkill('stoop', 'rotateMyGroupCode', { groupId: circleId, boundTo, inviteExpiresInHours: boundForHours }); }
+    try { res = await callSkill('pinboard', 'rotateMyGroupCode', { groupId: circleId, boundTo, inviteExpiresInHours: boundForHours }); }
     catch (err) { res = { error: err?.message || 'rotate-failed' }; }
     if (!res?.code) return { error: res?.error || 'no-code' };
     res = { ...res, redemptionsUsed: 0 };
   } else {
-    try { res = await callSkill('stoop', 'getCurrentMembershipCode', { groupId: circleId }); }
+    try { res = await callSkill('pinboard', 'getCurrentMembershipCode', { groupId: circleId }); }
     catch (err) { res = { error: err?.message || 'code-fetch-failed' }; }
   }
   let code = res?.code;
@@ -73,7 +73,7 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     // surfaces 'admin-only' itself if the caller can't). So an invite always works for an admin.
     if (res?.error && res.error !== 'no-code') return { error: res.error };
     let rot;
-    try { rot = await callSkill('stoop', 'rotateMyGroupCode', { groupId: circleId }); }
+    try { rot = await callSkill('pinboard', 'rotateMyGroupCode', { groupId: circleId }); }
     catch (err) { rot = { error: err?.message || 'rotate-failed' }; }
     if (!rot?.code) return { error: rot?.error || 'no-code' };
     code = rot.code; expiresAt = rot.expiresAt;
@@ -97,13 +97,13 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
   // rendered summary there — which is why the first live invite carried neither.
   let name = null;
   try {
-    const mine = await callSkill('stoop', 'listMyCircles', {});
+    const mine = await callSkill('pinboard', 'listMyCircles', {});
     const n = mine?.names?.[circleId] ?? mine?.names?.get?.(circleId) ?? null;
     name = typeof n === 'string' && n.trim() ? n.trim() : null;
   } catch { name = null; }
   let rules = null;
   try {
-    const res = await callSkill('stoop', 'getGroupRules', { groupId: circleId });
+    const res = await callSkill('pinboard', 'getGroupRules', { groupId: circleId });
     const doc = res?.doc ?? res?.rules?.source?.rules ?? null;
     rules = doc && typeof doc === 'object' ? doc : null;
   } catch { rules = null; }

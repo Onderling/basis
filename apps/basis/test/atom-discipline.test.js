@@ -6,7 +6,7 @@
  * the moment a new noun-specific verb is added without either mapping it to an atom or
  * naming it as domain-specific — the drift guard `PLAN-capability-arc.md` Layer 1 calls for.
  *
- * (The `mockManifests.js` trio — tasks/stoop/folio chat-shell surfaces — is a KNOWN-DRIFT
+ * (The `mockManifests.js` trio — tasks/pinboard/folio chat-shell surfaces — is a KNOWN-DRIFT
  * concern reconciled separately; it is intentionally NOT covered here.)
  */
 import { describe, it, expect } from 'vitest';
@@ -16,7 +16,7 @@ import { householdManifest }  from '../../household/manifest.js';
 import { calendarManifest }   from '../../calendar/manifest.js';
 import { tasksManifest }      from '../../tasks-v0/manifest.js';
 import { folioManifest }      from '../../folio/manifest.js';
-import { stoopManifest }      from '../../stoop/manifest.js';
+import { pinboardManifest }      from '../../pinboard/manifest.js';
 import { agentsManifest }     from '../../agents/manifest.js';
 import { basisManifest } from '../manifest.js';
 
@@ -25,7 +25,7 @@ const MANIFESTS = [
   ['calendar',    calendarManifest],
   ['tasks-v0',    tasksManifest],
   ['folio',       folioManifest],
-  ['stoop',       stoopManifest],
+  ['pinboard',       pinboardManifest],
   ['agents',      agentsManifest],
   ['basis', basisManifest],
 ];

@@ -73,7 +73,7 @@ describe('createMockHouseholdAgent — markComplete', () => {
 describe('createMockHouseholdAgent — error paths', () => {
   it('throws on unknown appOrigin', async () => {
     const a = createMockHouseholdAgent();
-    await expect(a.callSkill('stoop', 'listOpen', {})).rejects.toThrow(
+    await expect(a.callSkill('pinboard', 'listOpen', {})).rejects.toThrow(
       /unknown appOrigin/,
     );
   });

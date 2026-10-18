@@ -21,7 +21,7 @@ describe('who holds which chore', () => {
     const own = (a, o, x, c) => agent.callSkill(a, o, x, c);
     await ensureHouseholdLists({ callSkill: (a, o, x) => own(a, o, x), t });
     for (const [w, n, r] of [['telegram:1', 'Ann', 'member'], ['telegram:2', 'Bert', 'member'], ['telegram:9', 'Frits', 'admin']]) {
-      await own('stoop', 'addContact', { webid: w, channel: 'telegram', role: r, displayName: n });
+      await own('pinboard', 'addContact', { webid: w, channel: 'telegram', role: r, displayName: n });
       await agent.setDoorCaller(w, r);
     }
     await own('lists', 'addToList', { list: 'Klusjes', text: 'ramen', assignee: 'mij' }, { caller: 'telegram:1' });

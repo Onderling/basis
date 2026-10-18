@@ -40,7 +40,7 @@ describe('makeCalendarOutboundHook — pass-through', () => {
   it('no-ops for non-calendar appOrigins', async () => {
     const d = deps();
     const hook = makeCalendarOutboundHook(d);
-    await hook('stoop', 'postRequest', {}, { ok: true });
+    await hook('pinboard', 'postRequest', {}, { ok: true });
     expect(d.callSkill).not.toHaveBeenCalled();
     expect(d.sendPeer).not.toHaveBeenCalled();
   });

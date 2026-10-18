@@ -1,6 +1,6 @@
 /**
  * cadence — substrate-level coverage. The same scenarios live in
- * apps/stoop-mobile/test/activeCadence.test.js, which now reaches
+ * apps/pinboard-mobile/test/activeCadence.test.js, which now reaches
  * this code through the re-export shim — running both proves the
  * lift is back-compat.
  */

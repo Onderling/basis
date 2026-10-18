@@ -10,7 +10,7 @@ import {
   INTERESTS_MIGRATION_KEY, INTERESTS_DRIVER_KEY, INTERESTS_MAX_TERMS,
 } from '../src/core/interestsMigration.js';
 
-/** A callSkill stub over a tiny in-memory profile + a stoop interest-profile snapshot. */
+/** A callSkill stub over a tiny in-memory profile + a pinboard interest-profile snapshot. */
 function makeHost({ topTerms = [], markerDone = false } = {}) {
   const calls = [];
   const props = {};
@@ -21,7 +21,7 @@ function makeHost({ topTerms = [], markerDone = false } = {}) {
     if (origin === 'agents' && opId === 'getProfileProperties') return { ok: true, properties: { ...props } };
     if (origin === 'agents' && opId === 'setProfileProperty') { props[args.key] = { mode: 'own', value: args.value }; return { ok: true }; }
     if (origin === 'agents' && opId === 'setProfileDriver') { drivers[args.key] = { ...args }; return { ok: true, id: args.id, key: args.key }; }
-    if (origin === 'stoop' && opId === 'getInterestProfile') return { totalDocs: topTerms.length, topTerms };
+    if (origin === 'pinboard' && opId === 'getInterestProfile') return { totalDocs: topTerms.length, topTerms };
     return { ok: false, reason: `unstubbed ${origin}.${opId}` };
   };
   return { callSkill, calls, props, drivers };

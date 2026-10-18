@@ -6,7 +6,7 @@
  * WebID, real client credentials, root container 401s to an unauthenticated PUT — it is a genuine,
  * access-controlled pod). Two REAL basis agents (`bootRealAgentNode`) were paired over a real
  * `InternalTransport` on a shared bus, and the circle was created + joined through the production op
- * path (`createGroupState.finalSubmit` → `stoop.createGroupV2`, then `buildCircleInviteUri` →
+ * path (`createGroupState.finalSubmit` → `pinboard.createGroupV2`, then `buildCircleInviteUri` →
  * `joinCircleFromInvite` → `joinGroupState.finalSubmit` → the real group-redeem peer bridge).
  *
  * The assertions below are network-free so they run in CI, but every one of them was first observed on
@@ -15,7 +15,7 @@
  *
  * Not pinned here because they are not walkable at all (see plans/DRAFT-S4-pod-results.md):
  *   - J-NP4 (last admin leaves → caretaker can still grant pod access): `governanceCaretaker.js` has
- *     NO production call site. `stoop.leaveGroup` does not appoint anyone.
+ *     NO production call site. `pinboard.leaveGroup` does not appoint anyone.
  *   - J-NP5 (no internet ⇒ reads local + says it is not syncing): there is no "not syncing" surface for
  *     a pod-backed circle anywhere in the locale bundle or the renderers.
  */

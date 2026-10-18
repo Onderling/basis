@@ -3,7 +3,7 @@
  * The e2e contact fixture: a SECOND person's contact card, made by the app's own encoder — never written by hand.
  *
  * A fixed test identity (a deterministic 32-byte seed, so the card is the same on every run) → its public key through
- * the same derivation the app uses (`AgentIdentity.pubKeyFromSeed`) → a card through stoop's `encodeContactCard` (the
+ * the same derivation the app uses (`AgentIdentity.pubKeyFromSeed`) → a card through pinboard's `encodeContactCard` (the
  * codec the app writes with and the companion's card.js imports) → the `onderling-contact://` string a person would
  * scan or paste. Written to contactCard.fixture.json; `test/e2eContactCardFixture.test.js` regenerates it, checks the
  * committed file is identical, and reads it back through the app's own decoder.
@@ -13,7 +13,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AgentIdentity } from '@onderling/core';
-import { encodeContactCard } from '../../../stoop/src/lib/contactCard.js';
+import { encodeContactCard } from '../../../pinboard/src/lib/contactCard.js';
 
 export const FIXTURE_NAME = 'Testa';
 const SEED = new Uint8Array(32).map((_, i) => (i * 7 + 13) & 0xff);   // fixed: the same card every run

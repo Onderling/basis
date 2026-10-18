@@ -18,7 +18,7 @@ const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
 const call = (page, app, op, args = {}) => page.evaluate(([a, o, x]) => window.onderlingCall(a, o, x), [app, op, args]);
-const bookRow = async (page, webid) => ((await call(page, 'stoop', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
+const bookRow = async (page, webid) => ((await call(page, 'pinboard', 'listContacts', {}))?.contacts ?? []).find((c) => c.webid === webid) ?? null;
 async function nameMe(page, name) {
   await page.locator('[data-tab="mij"]').first().click(); await page.waitForTimeout(1200);
   await page.locator('.circle-screen__identity-edit').click(); await page.locator('.cc-profile__display').fill(name); await page.locator('.cc-profile__save').click(); await page.waitForTimeout(1500); await page.locator('.cc-screen-panel__close').click();
@@ -44,15 +44,15 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     for (const p of [A, B]) p.page.on('dialog', (d) => d.dismiss().catch(() => {}));
     await gotoCircles(A.page); await nameMe(A.page, 'Anna');
     await gotoCircles(B.page); await nameMe(B.page, 'Bea');
-    const aId = (await call(A.page, 'stoop', 'whoAmI'))?.webid;
-    const bId = (await call(B.page, 'stoop', 'whoAmI'))?.webid;
+    const aId = (await call(A.page, 'pinboard', 'whoAmI'))?.webid;
+    const bId = (await call(B.page, 'pinboard', 'whoAmI'))?.webid;
 
     // ── L122 + L126: the create wizard ─────────────────────────────────────────────────────────────
     const made = await call(A.page, 'agents', 'createProfile', { name: 'Buurt' });
     const buurt = made?.id;   // a persona's id is minted, never its name
     expect(made?.error ?? made?.ok === false ? String(made?.error ?? made?.reason) : 'ok', 'setup: a second persona').toBe('ok');
     await gotoCircles(A.page);
-    const idsOf = async () => ((await call(A.page, 'stoop', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
+    const idsOf = async () => ((await call(A.page, 'pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
     const before = new Set(await idsOf());
     await A.page.locator('.circle-launcher__new').click();
     const picker = A.page.locator('[data-testid="create-founder-persona"]');
@@ -111,7 +111,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     expect(sent.sent, `B could not write: ${sent.why}`).toBe(true);
     const got = await waitForContactMessageDetailed(A.page, first);
     expect(got.found ?? got, 'A sees B\'s message').toBeTruthy();
-    await expect.poll(async () => ((await call(B.page, 'stoop', 'listMyCircles', {}))?.circles ?? []).some((c) => String(typeof c === 'string' ? c : c?.groupId ?? c?.id).startsWith('pair-')),
+    await expect.poll(async () => ((await call(B.page, 'pinboard', 'listMyCircles', {}))?.circles ?? []).some((c) => String(typeof c === 'string' ? c : c?.groupId ?? c?.id).startsWith('pair-')),
       { timeout: 40_000, message: 'the pair circle forms' }).toBe(true);
     log('STEP4 the pair circle', 'PASS', '');
 
@@ -131,7 +131,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     await B.page.locator('.cc-confirm__accept').click();
     await expect.poll(async () => { const r = await bookRow(B.page, aId); return r ? { hidden: r.hidden, deleted: Number.isFinite(r.deletedAt) } : null; },
       { timeout: 20_000, message: 'deleted: hidden, with the deletion on record' }).toEqual({ hidden: true, deleted: true });
-    await expect.poll(async () => ((await call(B.page, 'stoop', 'listMyCircles', {}))?.circles ?? []).some((c) => String(typeof c === 'string' ? c : c?.groupId ?? c?.id).startsWith('pair-')),
+    await expect.poll(async () => ((await call(B.page, 'pinboard', 'listMyCircles', {}))?.circles ?? []).some((c) => String(typeof c === 'string' ? c : c?.groupId ?? c?.id).startsWith('pair-')),
       { timeout: 20_000, message: 'B left the pair circle' }).toBe(false);
     log('STEP6 L114 delete', 'PASS', 'hidden + left');
 
@@ -141,7 +141,7 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     await expect.poll(async () => (await bookRow(B.page, aId))?.hidden ?? null, { timeout: 40_000, message: 'the row comes back' }).toBe(false);
     await openThread(B.page, aId);
     await expect(B.page.locator('.cc-cthread__system').first(), 'the marker says the contact had been deleted').toContainText(/verwijderd|deleted/i, { timeout: 15_000 });
-    await expect.poll(async () => ((await call(B.page, 'stoop', 'listMyCircles', {}))?.circles ?? []).some((c) => String(typeof c === 'string' ? c : c?.groupId ?? c?.id).startsWith('pair-')),
+    await expect.poll(async () => ((await call(B.page, 'pinboard', 'listMyCircles', {}))?.circles ?? []).some((c) => String(typeof c === 'string' ? c : c?.groupId ?? c?.id).startsWith('pair-')),
       { timeout: 40_000, message: 'the SAME pair circle is re-joined' }).toBe(true);
     log('STEP7 L114 the return', 'PASS', 'shown again, marked, re-joined');
   } finally {

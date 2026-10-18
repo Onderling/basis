@@ -131,6 +131,10 @@
     "cancelReminder": {
       "text": "Haal één eigen herinnering op een tijd weg (een die dit lid zette met remindMe who: me): which = het nummer uit /gepland, of woorden ervan — voor 'die herinnering over de gootsteen hoeft niet meer'.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "assistant-feedback": {
+      "text": "De persoon geeft FEEDBACK over de app of de bot zelf (een wens, een klacht, een idee voor de makers): roep dit aan. Het zegt waar feedback over de app heen gaat. Je kunt jezelf niet veranderen — beloof nooit een verandering.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "tasks": {

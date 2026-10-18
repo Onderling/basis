@@ -95,6 +95,8 @@ const COLUMNS = {
     'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'sayReminder', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
     // who is in the household (names as the household allows): anyone in it may ask
     'assistant-people',
+    // feedback about the app: anyone gets the one honest line naming where it goes
+    'assistant-feedback',
     // the household's notes (weetjes), written by people — household's note noun, its generic ops (the noun is people-
     // written: the model reads, never writes; removing is the maker's or an admin's, the op refuses anyone else)
     ...NOTE_OPS,
@@ -103,7 +105,7 @@ const COLUMNS = {
   ],
   admin: ['reassignTask', 'removeTask', 'editTask'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
+  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned', 'assistant-feedback'],
 };
 
 /** The bot app that declares this op id, when exactly one does. */

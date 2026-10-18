@@ -118,6 +118,8 @@ const GATE_RULES = [
     const lang = greetingLang(lettersOnly(text));
     return { opId: 'assistant-hello', args: lang ? { lang } : {}, appOrigin: 'assistant' };
   } },
+  // "feedback voor Frits: …": app feedback gets its one honest hand-off line — before the model, which would promise
+  { id: 'assistant.feedback', name: 'assistant:feedback(handoff)', build: (m) => (String(m.text ?? '').trim() ? { opId: 'assistant-feedback', args: {}, appOrigin: 'assistant' } : null) },
   // "herinner iedereen om 19:45: eten": a reminder for the whole household at a time — the household says it, to everyone
   { id: 'assistant.remindMe.everyone', name: 'assistant:remindMe(everyone-at)', build: (m) => {
     const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();

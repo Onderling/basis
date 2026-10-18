@@ -4211,6 +4211,34 @@
     "done_named_many": {
       "text": "{{count}} ticked off: {{text}}.",
       "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "removed_to_trash": {
+      "text": "Taken off {{name}}: {{text}}. Whoever added it (or an admin) can put it back with /prullenbak.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "removed_to_trash_many": {
+      "text": "{{count}} taken off {{name}}: {{text}}. Whoever added them (or an admin) can put them back with /prullenbak.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_none": {
+      "text": "Nothing in the trash that you can put back.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_offer": {
+      "text": "In the trash (kept {{days}} days) — tap one to put it back:",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_not_found": {
+      "text": "\"{{item}}\" is not in the trash, or it is not yours to put back.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_list_gone": {
+      "text": "\"{{item}}\" can't go back: its list \"{{list}}\" is gone. Put the list back first (/list-restore).",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_restored": {
+      "text": "\"{{item}}\" is back on {{list}}.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
     }
   },
   "share": {
@@ -4518,7 +4546,7 @@
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off · /huishouden feedback <link or @handle>|off",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_announce_none_here": {
@@ -5153,7 +5181,9 @@
           "createList": "a new list",
           "restoreList": "put a removed list back (within 30 days)",
           "removeList": "throw away a whole list",
-          "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)"
+          "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)",
+          "listDone": "what was done in the last days (say: what was done this week)",
+          "restoreEntry": "what was taken off someone else's list, to put back (/prullenbak)"
         },
         "tasks": {
           "listMine": "your own chores, or someone else's (or say: what does Bob have to do)",
@@ -5211,7 +5241,8 @@
           "assistant-circles": "the circles the bot is in",
           "remindMe": "a reminder of your own: at a time (\"in 10 minutes: …\"), for an appointment or chore, or one for everyone",
           "assistant-planned": "what I will send you this week (reminders, the week overview)",
-          "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)"
+          "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)",
+          "assistant-feedback": "where feedback about the app goes (start with \"feedback:\")"
         },
         "household": {
           "__generic__:household:add:note": "write a note for everyone (or say: remember that the bins go out on Tuesday)",
@@ -5306,7 +5337,9 @@
     "welcome_notes_read": {
       "text": "\"What notes are there\" shows what the household wrote down.",
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
-    }
+    },
+    "feedback_handoff": "Feedback about the app goes to its makers: {{channel}}. I can't change myself and I don't keep it — please send it there.",
+    "feedback_no_channel": "Feedback about the app goes to its makers, but this bot has no feedback channel set. Ask the admin to set one (/huishouden feedback <link>). I can't change myself and I don't keep it."
   },
   "op": {
     "admin_only": {
@@ -9115,6 +9148,42 @@
     "day_none": {
       "text": "Nothing on {{when}}.",
       "doc": "One day's read: no appointments and no chores that day."
+    },
+    "history_head": {
+      "text": "Done in the last {{days}} days:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_head_today": {
+      "text": "Done today:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row_by": {
+      "text": "• {{title}} ({{list}}) — {{who}}, {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none": {
+      "text": "Nothing was ticked off in the last {{days}} days.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none_today": {
+      "text": "Nothing has been ticked off today yet.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "trash_head": {
+      "text": "In the trash:",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
+    },
+    "trash_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
+    },
+    "trash_row_by": {
+      "text": "• {{title}} ({{list}}) — taken off by {{who}}, {{when}}",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
     }
   },
   "notes": {

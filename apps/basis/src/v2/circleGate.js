@@ -107,6 +107,9 @@ const greetingLang = (text) => {
   return langs.length === 1 ? langs[0] : null;
 };
 
+/** A line's announcing lead before an appointment's title, in the bot's languages: "nieuwe afspraak:", "new appointment:". */
+const APPOINTMENT_LEAD = /^(?:(?:nieuwe|new)\s+)?(?:afspraak|appointment)\s*:\s*/i;
+
 /** What each of the household's word rules does, in order (the first that builds a command wins). */
 const GATE_RULES = [
   // a greeting and nothing else: the bot's greeting line, never the model ("hoi", "goedemorgen 👋", "hello"); a greeting
@@ -115,6 +118,8 @@ const GATE_RULES = [
     const lang = greetingLang(lettersOnly(text));
     return { opId: 'assistant-hello', args: lang ? { lang } : {}, appOrigin: 'assistant' };
   } },
+  // "feedback voor Frits: …": app feedback gets its one honest hand-off line — before the model, which would promise
+  { id: 'assistant.feedback', name: 'assistant:feedback(handoff)', build: (m) => (String(m.text ?? '').trim() ? { opId: 'assistant-feedback', args: {}, appOrigin: 'assistant' } : null) },
   // "herinner iedereen om 19:45: eten": a reminder for the whole household at a time — the household says it, to everyone
   { id: 'assistant.remindMe.everyone', name: 'assistant:remindMe(everyone-at)', build: (m) => {
     const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
@@ -127,6 +132,12 @@ const GATE_RULES = [
     const text = String(m.text ?? '').replace(/[.!?]+$/, '').trim();
     const when = [m.day, m.time ?? m.span].filter(Boolean).join(' ');
     return (m.time || m.span) && text ? { opId: 'remindMe', args: { who: 'me', item: text, rules: when }, appOrigin: 'assistant' } : null;
+  } },
+  // "wat is er deze week gedaan": the history — today, yesterday (two days) or the week
+  { id: 'lists.listDone.history', name: 'lists:listDone(history)', build: (_m, text) => {
+    const w = String(text).toLowerCase();
+    const days = /\b(vandaag|today)\b/.test(w) ? 1 : /\bgisteren\b/.test(w) ? 2 : 7;
+    return { opId: 'listDone', args: { days }, appOrigin: 'lists' };
   } },
   // "wat moet Bob doen" / "welke klusjes heeft Ann": someone's own chores, by their name — before the list read, which
   // would take "klusjes" for the list; "ik", "je" and the like name nobody (the plain rule below, or the model)
@@ -149,7 +160,8 @@ const GATE_RULES = [
   { id: 'lists.addToList.named', name: 'lists:addToList(named-list)', build: (m, _t, { listFor }) => {
     const list = listFor(m.list);
     const items = splitItems(m.items);
-    if (!list || !items.length) return null;
+    // what is ONE item is the model's call (Frits 2026-10-18: "de afwas, maar eerst de pannen" is one): a comma line is its
+    if (!list || items.length !== 1) return null;
     return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((x) => ({ opId: 'addToList', args: { list, text: x } })) } : {}) };
   } },
   { id: 'lists.listEntries.named', name: 'lists:listEntries(named-list-read)', build: (m, _t, { listFor, holdsEvents }) => {
@@ -214,6 +226,10 @@ const GATE_RULES = [
   { id: 'calendar.addEvent.dayTime', name: 'calendar:addEvent(day-and-time)', build: (_m, text) => {
     const read = readDayAndTime(text);
     if (!read || !read.time || !read.rest) return null;
+    // the words that ANNOUNCE an appointment are not its title ("nieuwe afspraak: koekhappen …" is "koekhappen")
+    const rest = read.rest.replace(APPOINTMENT_LEAD, '').trim();
+    if (!rest) return null;
+    read.rest = rest;
     const words = read.rest.split(' ');
     if (words.length > 4 || words.some((w) => PERSON_WORDS.has(w))) return null;
     return { opId: 'addEvent', args: { title: caseOf(text, read.rest), when: `${read.day}T${read.time}` }, appOrigin: 'calendar' };
@@ -278,7 +294,8 @@ const CIRCLE_RULES = [
   { id: 'circle.addItem.typed', name: 'household:addItem(typed-list)', build: (m) => {
     const type = householdListType(m.list);
     const items = splitItems(m.items);
-    if (!type || !items[0]) return null;
+    // a comma line is the model's to read (what is one item is its call, not a rule's)
+    if (!type || items.length !== 1) return null;
     return { opId: 'addItem', args: { type, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addItem', args: { type, text: t } })) } : {}) };
   } },
   // "voeg toe: spruiten kopen" (always ours, never a task) · "voeg melk toe" (no list named → the shell asks which)

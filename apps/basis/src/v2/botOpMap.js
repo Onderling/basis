@@ -82,7 +82,9 @@ const bareOf = (qualified) => String(qualified ?? '').slice(String(qualified ?? 
 const COLUMNS = {
   member: [
     // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
-    'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    // the trash: anyone may look; what they see and may put back is their own (an admin: all of it) — the op decides
+    'restoreEntry',
     // the reminders everyone gets for an entry: whoever may edit it may set them
     'entryReminders',
     // a line becomes a chore when someone says who does it or when: anyone who may add may say that
@@ -95,6 +97,8 @@ const COLUMNS = {
     'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'sayReminder', 'assistant-overview', 'weekOverview', 'sendWeekOverview',
     // who is in the household (names as the household allows): anyone in it may ask
     'assistant-people',
+    // feedback about the app: anyone gets the one honest line naming where it goes
+    'assistant-feedback',
     // the household's notes (weetjes), written by people — household's note noun, its generic ops (the noun is people-
     // written: the model reads, never writes; removing is the maker's or an admin's, the op refuses anyone else)
     ...NOTE_OPS,
@@ -103,7 +107,7 @@ const COLUMNS = {
   ],
   admin: ['reassignTask', 'removeTask', 'editTask'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned'],
+  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'listDone', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned', 'assistant-feedback'],
 };
 
 /** The bot app that declares this op id, when exactly one does. */

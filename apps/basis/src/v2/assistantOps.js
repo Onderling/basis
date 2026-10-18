@@ -8,7 +8,7 @@ import { personNamed, linkedKeyOf } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, CALENDAR_FEED_KEY, CALENDAR_FEED_MODES, calendarFeedFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { FEEDBACK_CHANNEL_KEY, isFeedbackChannel, feedbackChannelFrom, REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, CALENDAR_FEED_KEY, CALENDAR_FEED_MODES, calendarFeedFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLayerFromWords, leadOf, withLead, describeRules } from './reminderWords.js';
 import { layeredRules, reminderOccurrences } from './reminderOccurrences.js';
 import { upcoming } from './intentions.js';
@@ -216,6 +216,8 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (op === 'assistant-exports') return exportsOp();
       if (op === 'assistant-export') return exportNowOp();
       if (op === 'assistant-import') return importOp(args?.file ?? args?._match, { preview: args?.preview === true });
+      // feedback about the app: ONE honest line naming where it goes — nothing stored, nothing sent, nothing promised
+      if (op === 'assistant-feedback') return feedbackOp(caller ?? ctx?.threadId);
       const threadId = typeof ctx?.threadId === 'string' && ctx.threadId ? ctx.threadId : null;
       if (!threadId) return { ok: false, error: 'no-thread' };
       // a person's own op answers in their language (`/taal`, set after this call for the language op itself)
@@ -575,6 +577,18 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       .map((spec) => tp(`circle.bot.planned_${spec.label.replace(/-/g, '_')}`)).join(', ');
   }
 
+  /**
+   * Feedback about the APP, told to the household bot: the line says where such feedback goes (the channel the admin set)
+   * or that this bot has none. It carries the channel and nothing else — never the person's words, never an id; it
+   * stores nothing and sends nothing (everything feedback is the feedback repo's).
+   */
+  async function feedbackOp(person) {
+    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
+    const channel = feedbackChannelFrom((r?.params ?? []).find((p) => p.key === FEEDBACK_CHANNEL_KEY)?.value);
+    const tp = person ? personT(person) : t;
+    return { ok: true, message: channel ? tp('circle.bot.feedback_handoff', { channel }) : tp('circle.bot.feedback_no_channel') };
+  }
+
   async function settingsOp(change, person, caller, ctx) {
     const current = async () => {
       const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
@@ -623,6 +637,12 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!row) return { ok: false, error: { code: 'not-here', message: t('circle.bot.settings_announce_none_here') } };
       try { await (mode === 'off' ? book.cancel(row.id) : book.reopen(row.id)); } catch { return { ok: false, error: { code: 'not-saved', message: t('circle.bot.settings_failed') } }; }
       return { ok: true, message: `${personT(person)('circle.bot.settings_saved')}\n\n${await current()}` };
+    }
+    // where app feedback goes: a link or an @handle, or `off`
+    if (what === 'feedback') {
+      if (value === 'off') return set(FEEDBACK_CHANNEL_KEY, '');
+      if (!isFeedbackChannel(value) || more.length) return usage;
+      return set(FEEDBACK_CHANNEL_KEY, value);
     }
     if (what === 'quiet') {
       if (!isQuietHours(value)) return usage;
@@ -1105,6 +1125,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         quickReplies: [{ label: tp('circle.bot.stepup_yes'), slash: '/inapp ja' }, { label: tp('circle.bot.stepup_no'), slash: '/inapp nee' }],
       };
     }
+    if (r.ok && r.already) return { ok: true, message: tp('circle.bot.link_already') };
     if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
     const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing', revoked: 'link_revoked' }[r.reason] ?? 'link_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };

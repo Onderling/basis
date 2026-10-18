@@ -12,8 +12,9 @@
  *   - (no longer hidden: the screens tab came back on 2026-10-15 as VANDAAG, the home — the person's own pages with
  *     a few capped blocks, decided with Frits on 2026-10-10; the screens manager it was hidden for is not painted as
  *     a tab bar of its own: pages show as sub-tabs only when there is more than one);
- *   - In de buurt — a browser cannot discover (no mDNS; Web Bluetooth cannot scan or advertise), so on the
- *     web it is a page that says it cannot do anything, and the native app is not in the store yet;
+ *   - (In de buurt is no longer hidden outright since 2026-10-18 — Frits: "only on mobile for now": it is painted on a
+ *     device with a local mesh (`MESH_TABS`); a browser has none — no mDNS, Web Bluetooth cannot scan or advertise —
+ *     so the web shows no tab until it gets a local node);
  *   - the chat ↔ scherm pill inside a circle — the scherm view is a stub that says it "komt in een
  *     vervolg-slice"; it was meant as the GUI twin of the chat and is not that yet.
  */
@@ -25,18 +26,22 @@ export const ALPHA_TABS = Object.freeze(['screens', 'circles', 'contacten', 'mij
 export const ALPHA_VIEW_MODES = Object.freeze(['chat']);
 
 /** The manifest tab ids that exist but are not painted, so a test can say so by name. */
-export const HIDDEN_TABS = Object.freeze(['nearby']);
+export const HIDDEN_TABS = Object.freeze([]);
+
+/** Tabs painted only on a device with a local mesh (it discovers and is discovered nearby): the phone, not the browser. */
+export const MESH_TABS = Object.freeze(['nearby']);
 
 /** Drop the hidden tabs; everything else a manifest declares is painted, in the manifest's order. A
  *  deny-list, not an allow-list: the alpha HIDES named things, it does not decide what every manifest may
  *  show — so a different manifest (a test's, a derived app's) keeps its own tabs. */
-export function alphaTabs(tabs) {
-  return (Array.isArray(tabs) ? tabs : []).filter((tab) => !HIDDEN_TABS.includes(tab?.id));
+export function alphaTabs(tabs, { hasMesh = false } = {}) {
+  return (Array.isArray(tabs) ? tabs : []).filter((tab) => isAlphaTab(tab?.id, { hasMesh }));
 }
 
-/** Whether a top-level tab id is painted in the alpha. */
-export function isAlphaTab(id) {
-  return !HIDDEN_TABS.includes(id);
+/** Whether a top-level tab id is painted in the alpha — a mesh tab only where the shell says it has a mesh. */
+export function isAlphaTab(id, { hasMesh = false } = {}) {
+  if (HIDDEN_TABS.includes(id)) return false;
+  return hasMesh === true || !MESH_TABS.includes(id);
 }
 
 /** The view modes a circle header may offer; a shell paints the pill only when there are two or more. */

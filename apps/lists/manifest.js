@@ -38,6 +38,8 @@ export const listsManifest = {
       names: { nl: { one: 'ding op de lijst', other: 'op de lijsten' }, en: { one: 'list item', other: 'on the lists' } } },
   },
   verbs:     [],
+  // the verbs no standard atom names: a read of what was done
+  domainVerbs: { 'list-done': 'read' },
   operations: [
     {
       id:        'createList',
@@ -98,7 +100,7 @@ export const listsManifest = {
       ],
       surfaces: {
         slash: { command: '/add-to-list', body: 'flags' },
-        chat:  { reply: 'text', hint: 'Add something to a list — a plain entry, or any kind that list accepts.' },
+        chat:  { reply: 'text', hint: 'ONE call per thing to add — several things are several calls; a sentence (even one with a comma, like \"the dishes, but the pans first\") is ONE thing. Add something to a list — a plain entry, or any kind that list accepts.' },
         attach: { label: 'circle.attach.list_item', group: 'create' },
       },
     },
@@ -200,6 +202,21 @@ export const listsManifest = {
       },
     },
     {
+      // what was done in the last days ("wat is er deze week gedaan"): the ticked and completed entries, on one list or
+      // all — what, which list, when; who did it as the household's names setting lets the reader see (the door says)
+      id:        'listDone', group: 'data',
+      verb:      'list-done',
+      requires:  ['lists'],
+      params: [
+        { name: 'days', kind: 'number', required: false },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/gedaan', body: 'argline' },
+        chat:  { reply: 'text', hint: 'What was DONE (ticked off or completed) in the last days, on all lists or one: "wat is er deze week gedaan", "what got done today". days = how far back (1 = today, 2 = since yesterday — "yesterday" needs 2, 7 = this week, at most 31).' },
+      },
+    },
+    {
       id:        'removeFromList', group: 'compose',
       verb:      'remove',
       writes:    { scope: 'circle' },
@@ -246,7 +263,22 @@ export const listsManifest = {
       ],
       surfaces: {
         slash: { command: '/list-restore', body: 'argline' },
-        chat:  { reply: 'text', hint: 'Put a removed list back, with everything that was on it (within 30 days).' },
+        chat:  { reply: 'text', hint: 'Put a removed list back, with everything that was on it (for as long as it is kept).' },
+      },
+    },
+    {
+      // The trash: an entry someone took off ANOTHER person's list comes back (within the keep window: 30 days on a
+      // household bot) — put back by its maker or an admin. Without words: what this person may put back, a button each.
+      id:        'restoreEntry', group: 'compose',
+      verb:      'unarchive',
+      writes:    { scope: 'circle' },
+      requires:  ['lists'],
+      params: [
+        { name: 'item', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/prullenbak', body: 'argline' },
+        chat:  { reply: 'text', hint: 'The trash: entries someone took off another person\'s list, to look at or put back (its maker or an admin, for as long as it is kept). item = the entry\'s words to put back; none = show the trash.' },
       },
     },
     {

@@ -84,7 +84,12 @@ describe('the household bot says one line per op family', () => {
     return bridge.outbox.map((m) => m.text);
   };
 
-  it('the gate: three things added are one line, naming the list and the things', async () => {
+  it('three things added (the model reads a comma list, one add each) are one line, naming the list and the things', async () => {
+    script.set('melk, brood en kaas', [
+      { id: 'addToList', args: { list: 'boodschappen', text: 'melk' } },
+      { id: 'addToList', args: { list: 'boodschappen', text: 'brood' } },
+      { id: 'addToList', args: { list: 'boodschappen', text: 'kaas' } },
+    ]);
     expect(await say('zet melk, brood en kaas op de boodschappen')).toEqual(['3 toegevoegd aan Boodschappen: melk, brood en kaas.']);
   });
 

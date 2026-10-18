@@ -405,5 +405,34 @@
       "forget it",
       "forget everything"
     ]
+  },
+  "assistant.feedback": {
+    "doc": "Feedback about the app itself (\"feedback voor Frits: …\"): the bot says where app feedback goes, without the model — it never stores or forwards it.",
+    "patterns": [
+      "feedback for {person}: {text}",
+      "feedback: {text}",
+      "feedback {text}"
+    ],
+    "examples": [
+      "Feedback for Frits: the button does nothing",
+      "feedback: the list does not refresh"
+    ],
+    "not": [
+      "what do you think of the feedback"
+    ]
+  },
+  "lists.listDone.history": {
+    "doc": "What was done in the last days (\"wat is er deze week gedaan\"): the household's history of ticked and completed things; today, yesterday or the week.",
+    "patterns": [
+      "what (was|has been|got) done (today|this week)?",
+      "what did we do (today|this week)?"
+    ],
+    "examples": [
+      "what was done this week",
+      "what got done today"
+    ],
+    "not": [
+      "what needs to be done"
+    ]
   }
 }

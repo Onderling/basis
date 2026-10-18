@@ -73,7 +73,7 @@ describe('a follow-up after a read', () => {
 
   it('the list just read is in what the model sees the next turn — its title and its lines', async () => {
     await say('/help');   // the welcome, out of the way
-    await say('zet melk, kaas en eieren op de boodschappen');
+    for (const w of ['melk', 'kaas', 'eieren']) await say(`zet ${w} op de boodschappen`);   // one thing a line: the word rule's
     const read = await say('wat staat er op de boodschappen');
     expect(read.join('\n')).toMatch(/melk/);
     await say('en nu?');

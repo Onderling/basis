@@ -51,7 +51,7 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "addToList": {
-      "text": "Zet iets op een lijst (list = de naam, text = het ding). Eén aanroep per ding.",
+      "text": "ÉÉN aanroep per ding — meerdere dingen zijn meerdere aanroepen; een zin (ook met een komma, zoals \"de afwas, maar eerst de pannen\") is ÉÉN ding. Zet iets op een lijst (list = de naam, text = het ding). Eén aanroep per ding.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "listLists": {
@@ -83,15 +83,23 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "removeList": {
-      "text": "Verwijder een hele lijst en alles wat erop staat (list = de naam). Alleen voor een lijst die weg moet; hij kan 30 dagen terug.",
+      "text": "Verwijder een hele lijst en alles wat erop staat (list = de naam). Alleen voor een lijst die weg moet; hij kan een tijd terug.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "restoreList": {
-      "text": "Zet een weggehaalde lijst terug, met alles wat erop stond (list = de naam; zonder naam: welke terug kunnen). Kan tot 30 dagen na het weghalen.",
+      "text": "Zet een weggehaalde lijst terug, met alles wat erop stond (list = de naam; zonder naam: welke terug kunnen). Kan zolang hij bewaard wordt.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "entryReminders": {
       "text": "De herinneringen die iedereen krijgt voor één regel (een afspraak of een klusje met een datum), in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om ze weg te halen. Voor één persoon alleen: remindMe.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listDone": {
+      "text": "Wat er de afgelopen dagen GEDAAN is (afgevinkt of afgerond), op alle lijsten of één: \"wat is er deze week gedaan\", \"wat is er vandaag gedaan\". days = hoe ver terug (1 = vandaag, 2 = sinds gisteren — \"gisteren\" vraagt 2, 7 = deze week, hooguit 31).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "restoreEntry": {
+      "text": "De prullenbak: wat iemand van andermans lijst haalde, om te bekijken of terug te zetten (door wie het erop zette of een beheerder, zolang het bewaard wordt). item = de woorden van wat terug moet; geen = laat de prullenbak zien.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
@@ -130,6 +138,10 @@
     },
     "cancelReminder": {
       "text": "Haal één eigen herinnering op een tijd weg (een die dit lid zette met remindMe who: me): which = het nummer uit /gepland, of woorden ervan — voor 'die herinnering over de gootsteen hoeft niet meer'.",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "assistant-feedback": {
+      "text": "De persoon geeft FEEDBACK over de app of de bot zelf (een wens, een klacht, een idee voor de makers): roep dit aan. Het zegt waar feedback over de app heen gaat. Je kunt jezelf niet veranderen — beloof nooit een verandering.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },

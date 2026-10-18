@@ -4211,6 +4211,34 @@
     "done_named_many": {
       "text": "{{count}} afgevinkt: {{text}}.",
       "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "removed_to_trash": {
+      "text": "Van {{name}} gehaald: {{text}}. Wie het erop zette (of een beheerder) kan het terugzetten met /prullenbak.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "removed_to_trash_many": {
+      "text": "{{count}} van {{name}} gehaald: {{text}}. Wie ze erop zette (of een beheerder) kan ze terugzetten met /prullenbak.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_none": {
+      "text": "Er ligt niets in de prullenbak dat jij kunt terugzetten.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_offer": {
+      "text": "In de prullenbak ({{days}} dagen bewaard) — tik er een aan om hem terug te zetten:",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_not_found": {
+      "text": "\"{{item}}\" ligt niet in de prullenbak, of is niet aan jou om terug te zetten.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_list_gone": {
+      "text": "\"{{item}}\" kan niet terug: de lijst \"{{list}}\" is weg. Zet eerst de lijst terug (/list-restore).",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_restored": {
+      "text": "\"{{item}}\" staat weer op {{list}}.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
     }
   },
   "share": {
@@ -4518,7 +4546,7 @@
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off · /huishouden feedback <link of @naam>|off",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_announce_none_here": {
@@ -5153,7 +5181,9 @@
           "createList": "een nieuwe lijst",
           "restoreList": "een weggehaalde lijst terugzetten (binnen 30 dagen)",
           "removeList": "een hele lijst weggooien",
-          "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)"
+          "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)",
+          "listDone": "wat er de afgelopen dagen gedaan is (zeg: wat is er deze week gedaan)",
+          "restoreEntry": "wat van andermans lijst gehaald is, om terug te zetten (/prullenbak)"
         },
         "tasks": {
           "listMine": "je eigen klusjes, of die van een ander (of zeg: wat moet Bob doen)",
@@ -5211,7 +5241,8 @@
           "assistant-circles": "de kringen waar de bot in zit",
           "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
-          "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
+          "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)",
+          "assistant-feedback": "zeg waar feedback over de app heen gaat (begin met \"feedback:\")"
         },
         "household": {
           "__generic__:household:add:note": "een weetje voor iedereen opschrijven (of zeg: onthoud dat de vuilnis dinsdag buiten gaat)",
@@ -5306,7 +5337,9 @@
     "welcome_notes_read": {
       "text": "\"Welke weetjes zijn er\" laat zien wat het huishouden heeft opgeschreven.",
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
-    }
+    },
+    "feedback_handoff": "Feedback over de app gaat naar de makers: {{channel}}. Ik kan mezelf niet veranderen en bewaar het niet — stuur het daarheen.",
+    "feedback_no_channel": "Feedback over de app gaat naar de makers, maar deze bot heeft geen feedbackkanaal. Vraag de beheerder er een in te stellen (/huishouden feedback <link>). Ik kan mezelf niet veranderen en bewaar het niet."
   },
   "op": {
     "admin_only": {
@@ -9115,6 +9148,42 @@
     "day_none": {
       "text": "Op {{when}} staat er niets.",
       "doc": "One day's read: no appointments and no chores that day."
+    },
+    "history_head": {
+      "text": "Gedaan de afgelopen {{days}} dagen:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_head_today": {
+      "text": "Vandaag gedaan:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row_by": {
+      "text": "• {{title}} ({{list}}) — {{who}}, {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none": {
+      "text": "De afgelopen {{days}} dagen is er niets afgevinkt.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none_today": {
+      "text": "Vandaag is er nog niets afgevinkt.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "trash_head": {
+      "text": "In de prullenbak:",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
+    },
+    "trash_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
+    },
+    "trash_row_by": {
+      "text": "• {{title}} ({{list}}) — weggehaald door {{who}}, {{when}}",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
     }
   },
   "notes": {

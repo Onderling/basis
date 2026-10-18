@@ -22,6 +22,7 @@ export const LOG_PROJECTED = Object.freeze({ 'chat-message': 'the event-log proj
 /** Never shown in a merged view, by design: a removed list is kept aside and offered back by `restoreList` only. */
 export const NOT_MERGED = Object.freeze({
   'removed-list': 'kept aside; offered back by /list-restore, never merged into a view',
+  'removed-entry': 'the trash; offered back by /prullenbak (its maker or an admin), never merged into a view',
   // an intention is never a chore, an item or a reminder: what is planned is read by `upcoming` (intentions.js) only
   intention: 'pending work; read by `upcoming` only, never merged into chores, "Mijn dingen" or reminders',
   // a device-link is the person's private device map (own-devices scope, read by the revoke ceremony) — never shown

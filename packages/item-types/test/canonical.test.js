@@ -60,6 +60,7 @@ describe('Canonical types — registration via default registry', () => {
       'neighbourhood-job',
       'note',
       'offer',
+      'removed-entry',
       'removed-list',
       'request',
       'reveal-request',
@@ -112,6 +113,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'shared-ref':        { sourceCircle: 'circle-a', sourceId: 'dec:item/task/abc' },
     // a whole list kept aside so it can be put back for a while.
     'removed-list':      { listId: 'list-1', name: 'Feest', removedAt: 1, items: [] },
+    // an entry taken off someone else's list: the trash, kept aside for its maker or an admin.
+    'removed-entry':     { entryId: 'e-1', listId: 'list-1', name: 'melk', removedAt: 1, items: [] },
     // Media Phase 1 (2026-07-09): pointer-only media item.
     'media':             { source: { type: 'blob', ref: 'blob://abc123' } },
     // The subtask negotiation's noun — `kind` is what it waits for, and is required.

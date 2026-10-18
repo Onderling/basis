@@ -106,6 +106,7 @@ export const WELCOME_LEAVES = Object.freeze({
   listEntries: "part of the lists line: reading a list is said there",
   markListItemDone: "part of the lists line (\"melk is gekocht\")",
   removeFromList: "part of the lists line; /help has it",
+  restoreEntry: "said when it matters: taking someone else's entry off a list says /prullenbak; /help lists it",
   editEntry: "a refinement of the lists line; /help has it",
   completeTask: "part of the chores line (\"de ramen zijn klaar\")",
   listMine: "part of the chores line; /help has it",

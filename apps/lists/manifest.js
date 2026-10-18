@@ -267,6 +267,21 @@ export const listsManifest = {
       },
     },
     {
+      // The trash: an entry someone took off ANOTHER person's list comes back (within the keep window: 30 days on a
+      // household bot) — put back by its maker or an admin. Without words: what this person may put back, a button each.
+      id:        'restoreEntry', group: 'compose',
+      verb:      'unarchive',
+      writes:    { scope: 'circle' },
+      requires:  ['lists'],
+      params: [
+        { name: 'item', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/prullenbak', body: 'argline' },
+        chat:  { reply: 'text', hint: 'The trash: entries someone took off another person\'s list, to look at or put back (its maker or an admin, within 30 days). item = the entry\'s words to put back; none = show the trash.' },
+      },
+    },
+    {
       id:        'editEntry', group: 'compose',
       verb:      'edit',
       writes:    { scope: 'circle' },

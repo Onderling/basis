@@ -16,7 +16,7 @@ import { reminderLayerFromWords, describeRules } from './reminderWords.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
-import { childIdsOf, deleteContainer, contain, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { childIdsOf, deleteContainer, contain, RETAIN, retentionWindowFor } from '@onderling/item-store';
 
 /**
  * @param {object} a
@@ -30,8 +30,9 @@ import { childIdsOf, deleteContainer, contain, param, PARAM_SCOPE, PARAM_KIND } 
  *        list is ticked: the chore's own verb (a household bot's tasks); absent → a plain tick
  * @returns {Record<string, (args: object, ctx?: object) => Promise<object>>} opId → handler
  */
-/** How long a removed list can be put back (Frits 2026-10-05: 30 days); after that it is dropped. */
-export const REMOVED_LIST_KEEP_DAYS = param({ key: 'lists.removedKeepDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
+/** How long a removed list or an entry in the trash can be put back, in days: the shared table's keep-aside window. */
+const KEEP_ASIDE_MS = retentionWindowFor(RETAIN.KEEP_ASIDE);
+export const KEEP_ASIDE_DAYS = Math.round(KEEP_ASIDE_MS / 86_400_000);
 
 /** Who holds a chore (contact ids — data; the door words them as far as the names setting lets the asker see). */
 const holdersOf = (c) => {
@@ -60,7 +61,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
   const removedOf = async (circleId, type = 'removed-list') => ((await storeFor(circleId).listByType(type)) ?? []);
   // one sweep for everything kept aside — a removed list and an entry in the trash — past the one keep window
   const dropExpired = async (circleId) => {
-    const keep = REMOVED_LIST_KEEP_DAYS * 86_400_000;
+    const keep = KEEP_ASIDE_MS;
     for (const type of ['removed-list', 'removed-entry']) {
       for (const r of await removedOf(circleId, type)) if (now() - (Number(r.removedAt) || 0) >= keep) await storeFor(circleId).delete(r.id);
     }
@@ -336,7 +337,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       }, { by: ctx?.caller ?? localActor });
       for (const id of removing) await deleteContainer(store, id);
       await dropExpired(circleId);
-      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref, days: REMOVED_LIST_KEEP_DAYS }), vars };
+      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref, days: KEEP_ASIDE_DAYS }), vars };
     },
 
     /**
@@ -385,7 +386,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         }, { by: deleter });
         await svc.remove(at.circleId, stored.id);
         await dropExpired(at.circleId);
-        return { ok: true, trashed: true, entry: said.text, list: said.name, message: t('circle.lists.removed_to_trash', { ...said, days: REMOVED_LIST_KEEP_DAYS }) };
+        return { ok: true, trashed: true, entry: said.text, list: said.name, message: t('circle.lists.removed_to_trash', { ...said, days: KEEP_ASIDE_DAYS }) };
       }
       await svc.remove(at.circleId, at.entry.id);
       return { ok: true, entry: said.text, list: said.name, message: t('circle.lists.removed', said) };
@@ -408,7 +409,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
         if (!mine.length) return { ok: true, message: t('circle.lists.trash_none'), items: [], quickReplies: [] };
         return {
           ok: true,
-          message: t('circle.lists.trash_offer', { days: REMOVED_LIST_KEEP_DAYS }),
+          message: t('circle.lists.trash_offer', { days: KEEP_ASIDE_DAYS }),
           items: mine.map((r) => ({ id: r.id, label: r.name, list: r.listName, removedAt: new Date(r.removedAt).toISOString(), ...(r.removedBy ? { removedBy: r.removedBy } : {}) })),
           quickReplies: mine.map((r) => ({ label: r.name, slash: `/prullenbak ${r.name}` })),
         };

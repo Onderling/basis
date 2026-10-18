@@ -85,6 +85,19 @@ describe('the trash', () => {
     expect(await store.listByType('removed-entry'), 'dropped by the sweep').toEqual([]);
   });
 
+  it('/list-restore never offers an entry from the trash, and the trash never offers a list', async () => {
+    const { ops } = world();
+    await ops.createList({ text: 'Boodschappen' });
+    await ops.createList({ text: 'Feest' });
+    await ops.addToList({ list: 'Boodschappen', text: 'brood' }, as('ann'));
+    await ops.removeFromList({ list: 'Boodschappen', item: 'brood' }, as('bert'));
+    await ops.removeList({ list: 'Feest' }, as('ann'));
+    expect((await ops.restoreList({})).quickReplies.map((q) => q.slash)).toEqual(['/list-restore Feest']);
+    expect((await ops.restoreList({ list: 'brood' })).code).toBe('not-found');
+    expect((await ops.restoreEntry({}, as('ann', 'admin'))).items.map((r) => r.label)).toEqual(['brood']);
+    expect((await ops.restoreEntry({ item: 'Feest' }, as('ann', 'admin'))).code).toBe('not-found');
+  });
+
   it('an entry whose list is gone does not come back on its own', async () => {
     const { ops } = world();
     await ops.createList({ text: 'Feest' });

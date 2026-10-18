@@ -40,6 +40,9 @@ export const RETAIN = Object.freeze({
   // the device log — dropping them is data destruction, "pod kwijt = ongemak, geen verlies"). Consequence,
   // named: record-class lanes grow without bound, which is the trigger for the log's storage-structure work.
   RECORD: 'record',
+  // Not a log class — a STORE row kept aside so it can be put back for a while (a removed list, an entry in the trash)
+  // and dropped unread past its window. One window for every keep-aside (30 days to restore, Frits on 2026-10-05).
+  KEEP_ASIDE: 'keepAside',
 });
 
 /*
@@ -186,6 +189,7 @@ export const RETENTION_DEFAULTS = Object.freeze({
   [RETAIN.SHORT]: param({ key: 'retention.short', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),    // pure plumbing — roster pings, delivery state
   [RETAIN.CHAT]:  param({ key: 'retention.chat',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // content whose durable head lives elsewhere
   [RETAIN.AUDIT]: param({ key: 'retention.audit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // governance, reports, the agent trail — DETAIL window (key events moved to RECORD — the chain never drops)
+  [RETAIN.KEEP_ASIDE]: param({ key: 'retention.keepAside', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 24 * 60 * 60 * 1000 }),   // a removed list or an entry in the trash, restorable, then dropped by the lists' sweep
 });
 
 /** The retention window (ms) for a RETAIN class (falls back to CHAT for an unknown class).

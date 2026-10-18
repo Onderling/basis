@@ -102,12 +102,17 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
       // it is removed from, or it is skipped as "not joined" and the content stays on this box for good.
       await store.put({ id: p.circleId, name: p.name, handle: h, joinedAt: now(), by: person });
       const r = await join({ inviteUri: p.inviteUri, handle: h, rulesAccepted: true });
-      if (!r?.ok || !r.circleId) {
+      // the record is the invite's circle: a join that answers for another is no join of it
+      if (!r?.ok || !r.circleId || r.circleId !== p.circleId) {
         await store.remove(p.circleId);
-        return { ok: false, reason: r?.reason ?? r?.error ?? 'join-failed', name: p.name };
+        return { ok: false, reason: r?.ok && r.circleId ? 'joined-another-circle' : (r?.reason ?? r?.error ?? 'join-failed'), name: p.name };
       }
-      // removed while the join was finishing: forgotten already, not brought back
-      if (!(await store.get(p.circleId))) return { ok: true, joined: true, removed: true, name: p.name, circleId: r.circleId };
+      // removed while the join was finishing: not brought back — and what the join's tail wrote after that removal's
+      // forget is forgotten too (the forget is idempotent): removed means nothing of the circle on this box, in any order
+      if (!(await store.get(p.circleId))) {
+        await forget(p.circleId);
+        return { ok: true, joined: true, removed: true, name: p.name, circleId: r.circleId };
+      }
       return { ok: true, joined: true, name: p.name, circleId: r.circleId };
     },
 

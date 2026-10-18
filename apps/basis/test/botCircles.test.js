@@ -38,8 +38,18 @@ describe('the bot joins a circle on its admin\'s word', () => {
     const id = d.asked[0].buttons[0].id.split(' ').pop();
     await d.circles.answer('admin', true, id, { isPrivate: true });
     expect(during, 'the removal found the circle').toMatchObject({ ok: true });
-    expect(d.forgot).toEqual(['circle-1']);
+    // the removal's forget, and once more after the join's tail: nothing of the circle is left, whatever landed last
+    expect(d.forgot).toEqual(['circle-1', 'circle-1']);
     expect(await d.circles.isJoined('circle-1'), 'the finished join did not put it back').toBe(false);
+  });
+
+  it('a join that answers for another circle than the invite named is no join: no record, the reason said', async () => {
+    const d = make({ joinResult: { ok: true, circleId: 'circle-OTHER' } });
+    await d.circles.offered('admin', invite(), d.question, { isPrivate: true });
+    const id = d.asked[0].buttons[0].id.split(' ').pop();
+    expect(await d.circles.answer('admin', true, id, { isPrivate: true })).toMatchObject({ ok: false, reason: 'joined-another-circle' });
+    expect(await d.circles.isJoined('circle-1')).toBe(false);
+    expect(await d.circles.isJoined('circle-OTHER')).toBe(false);
   });
 
   it('a join that fails leaves no record', async () => {

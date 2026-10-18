@@ -164,7 +164,7 @@ describe('the bot joins a circle on its admin\'s word', () => {
     const GREEN = 'huize-groen';
     await createCircle(ann, { groupId: GREEN, name: 'Huize Groen', purpose: 'de derde kring' });
     const bj = await joinExistingCircle(ann, bob, { groupId: GREEN, handle: 'bob' });
-    expect(bj.joined?.ok).toBe(true);
+    expect(bj.joined?.ok, `Bob's join into the third circle: ${JSON.stringify(bj)}`).toBe(true);
     await bindCircleAddresses([ann, bob], GREEN);
     await Promise.all([ann, bob].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: GREEN })));
     const invite = await buildCircleInviteUri({ callSkill: (a, o, x) => ann.agent.callSkill(a, o, x), circleId: GREEN, adminPeerAddr: ann.pubKey });

@@ -95,7 +95,7 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "listDone": {
-      "text": "Wat er de afgelopen dagen GEDAAN is (afgevinkt of afgerond), op alle lijsten of één: \"wat is er deze week gedaan\", \"wat is er vandaag gedaan\". days = hoe ver terug (1 = vandaag, 7 = deze week, hooguit 31).",
+      "text": "Wat er de afgelopen dagen GEDAAN is (afgevinkt of afgerond), op alle lijsten of één: \"wat is er deze week gedaan\", \"wat is er vandaag gedaan\". days = hoe ver terug (1 = vandaag, 2 = sinds gisteren — \"gisteren\" vraagt 2, 7 = deze week, hooguit 31).",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },

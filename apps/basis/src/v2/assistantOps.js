@@ -1105,6 +1105,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
         quickReplies: [{ label: tp('circle.bot.stepup_yes'), slash: '/inapp ja' }, { label: tp('circle.bot.stepup_no'), slash: '/inapp nee' }],
       };
     }
+    if (r.ok && r.already) return { ok: true, message: tp('circle.bot.link_already') };
     if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.link_declined') };
     const key = { 'not-private': 'link_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'link_nothing', revoked: 'link_revoked' }[r.reason] ?? 'link_failed';
     return { ok: false, error: { code: r.reason ?? 'failed', message: tp(`circle.bot.${key}`) } };

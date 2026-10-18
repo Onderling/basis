@@ -154,6 +154,22 @@ describe('the identity link through the door', () => {
     expect(d.toApp).toEqual([{ key: ann.webid, payload: expect.objectContaining({ subtype: IDENTITY_LINK_SUBTYPE, statement: expect.objectContaining({ bot: BOT, row: ANN, root: ann.root }) }) }]);
   });
 
+  it('the same code button tapped again after the link: "already linked", never "no link is waiting"', async () => {
+    // the household's log: after a success the person tapped the same code button ten more times, told each time
+    // that no link was waiting — as if it had failed
+    const d = await door();
+    const { offer, nonce } = ann.offer('phone', BOT);
+    await d.call('assistant', 'assistant-link', { offer }, PRIVATE);
+    const real = await linkCode(ann.root, nonce);
+    expect((await d.call('assistant', 'assistant-link-confirm', { answer: real }, PRIVATE)).message).toContain('circle.bot.link_done');
+    const again = await d.call('assistant', 'assistant-link-confirm', { answer: real }, PRIVATE);
+    expect(again).toMatchObject({ ok: true });
+    expect(again.message).toContain('circle.bot.link_already');
+    // someone with no link and nothing pending is still told nothing is waiting
+    const bert = await d.call('assistant', 'assistant-link-confirm', { answer: real }, { caller: 'telegram:7', threadId: 'telegram:7', chatId: '7' });
+    expect(JSON.stringify(bert)).toContain('circle.bot.link_nothing');
+  });
+
   it('the code from a group does not link; a wrong code or "geen" drops the offer', async () => {
     const d = await door();
     const { offer, nonce } = ann.offer('phone', BOT);

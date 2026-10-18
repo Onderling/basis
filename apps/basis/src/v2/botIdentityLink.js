@@ -121,7 +121,11 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
     /** `/koppel-code <code>`, from the private door only: the right code links; anything else drops the offer. */
     async confirm(person, answer, { isPrivate = false } = {}) {
       const p = pending.get(person);
-      if (!p) return { ok: false, reason: 'nothing-pending' };
+      if (!p) {
+        // a code button tapped again after the link succeeded: say it is linked, never that nothing is waiting
+        const row = (await users.list()).find((r) => r.id === person);
+        return row?.linkedRoot ? { ok: true, already: true } : { ok: false, reason: 'nothing-pending' };
+      }
       if (!isPrivate) return { ok: false, reason: 'not-private' };
       pending.delete(person);   // answered (or late): gone either way
       if (p.until < now()) return { ok: false, reason: 'expired' };

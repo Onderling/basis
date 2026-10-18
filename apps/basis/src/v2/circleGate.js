@@ -107,6 +107,9 @@ const greetingLang = (text) => {
   return langs.length === 1 ? langs[0] : null;
 };
 
+/** A line's announcing lead before an appointment's title, in the bot's languages: "nieuwe afspraak:", "new appointment:". */
+const APPOINTMENT_LEAD = /^(?:(?:nieuwe|new)\s+)?(?:afspraak|appointment)\s*:\s*/i;
+
 /** What each of the household's word rules does, in order (the first that builds a command wins). */
 const GATE_RULES = [
   // a greeting and nothing else: the bot's greeting line, never the model ("hoi", "goedemorgen 👋", "hello"); a greeting
@@ -214,6 +217,10 @@ const GATE_RULES = [
   { id: 'calendar.addEvent.dayTime', name: 'calendar:addEvent(day-and-time)', build: (_m, text) => {
     const read = readDayAndTime(text);
     if (!read || !read.time || !read.rest) return null;
+    // the words that ANNOUNCE an appointment are not its title ("nieuwe afspraak: koekhappen …" is "koekhappen")
+    const rest = read.rest.replace(APPOINTMENT_LEAD, '').trim();
+    if (!rest) return null;
+    read.rest = rest;
     const words = read.rest.split(' ');
     if (words.length > 4 || words.some((w) => PERSON_WORDS.has(w))) return null;
     return { opId: 'addEvent', args: { title: caseOf(text, read.rest), when: `${read.day}T${read.time}` }, appOrigin: 'calendar' };

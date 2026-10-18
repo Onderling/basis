@@ -1,14 +1,16 @@
 /**
- * A COMMA LIST IS SEVERAL LINES, whoever adds it. The gate already split "A, B en C" into one add each; the model calls
- * `addToList` once with the whole text, and the household's log shows it stored "balkondeur isoleren, gangdeur
- * isoleren" as ONE chore — and the person's "dat zijn er twee" then failed to remove the joined text. The op itself now
- * reads a comma list as its lines (the same rule the gate uses), so every route agrees.
+ * WHAT IS ONE ITEM IS THE MODEL'S CALL, not a comma rule's (Frits 2026-10-18: "dishes need to be done, but pans should
+ * be done first" is ONE thing; a rule of exceptions would never be right). So the deterministic gate leaves a line with
+ * a comma list to the model, the op stores what it is given as one line, and the model's tool says: one call per thing,
+ * a sentence stays one.
  */
 import { describe, it, expect } from 'vitest';
 import { createCircleStores, memoryDataSource } from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
 import { makeListsOps } from '../../src/v2/listsOps.js';
-import { replyLine } from '../../src/v2/replyLine.js';
+import { listsGateRules } from '../../src/v2/circleGate.js';
+import { templateLists } from '../../src/v2/householdTemplate.js';
+import { listsManifest } from '../../../lists/manifest.js';
 
 function listsWorld() {
   const registry = createRegistry();
@@ -18,29 +20,24 @@ function listsWorld() {
   return makeListsOps({ storeFor: (cid) => stores.getStore(cid), t, activeCircle: () => 'c1' });
 }
 const texts = async (ops, list) => ((await ops.listEntries({ list }))?.items ?? []).map((i) => i.text ?? i.label).sort();
+const names = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
+const rules = listsGateRules('nl', templateLists((k) => names[k] ?? k));
+const take = (text) => { for (const r of rules) { const c = r.command(text); if (c) return c; } return null; };
 
-describe('a comma list added in one call', () => {
-  it('becomes one line per item — on a chores list and a shopping list alike', async () => {
+describe('one item or several — the model decides', () => {
+  it('the op stores what it is given as one line — a sentence with a comma stays one', async () => {
     const ops = listsWorld();
     await ops.createList({ text: 'Klusjes', defaultChild: 'task' });
-    await ops.createList({ text: 'Boodschappen' });
-    const r = await ops.addToList({ list: 'Klusjes', text: 'balkondeur isoleren, gangdeur isoleren' });
-    expect(r).toMatchObject({ ok: true, entries: ['balkondeur isoleren', 'gangdeur isoleren'], list: 'Klusjes' });
-    expect(await texts(ops, 'Klusjes')).toEqual(['balkondeur isoleren', 'gangdeur isoleren']);
-    await ops.addToList({ list: 'Boodschappen', text: 'melk, brood en eieren' });
-    expect(await texts(ops, 'Boodschappen')).toEqual(['brood', 'eieren', 'melk']);
+    await ops.addToList({ list: 'Klusjes', text: 'de afwas moet gedaan, maar eerst de pannen' });
+    expect(await texts(ops, 'Klusjes')).toEqual(['de afwas moet gedaan, maar eerst de pannen']);
   });
-  it('one item stays one (no comma: "brood en eieren" is the person\'s pair)', async () => {
-    const ops = listsWorld();
-    await ops.createList({ text: 'Boodschappen' });
-    await ops.addToList({ list: 'Boodschappen', text: 'brood en eieren' });
-    expect(await texts(ops, 'Boodschappen')).toEqual(['brood en eieren']);
+  it('the gate leaves a comma line to the model; a single thing it still takes', () => {
+    expect(take('zet melk, brood en eieren op de boodschappen'), 'a comma list is the model\'s').toBe(null);
+    expect(take('zet melk op de boodschappen')).toMatchObject({ opId: 'addToList', args: { text: 'melk' } });
   });
-  it('the reply names every line added, in one line', async () => {
-    const ops = listsWorld();
-    await ops.createList({ text: 'Klusjes', defaultChild: 'task' });
-    const r = await ops.addToList({ list: 'Klusjes', text: 'A, B' });
-    const t = (k, v) => `${k} ${JSON.stringify(v ?? {})}`;
-    expect(replyLine(r, { opId: 'addToList', t })).toMatch(/added_many/);
+  it('the model is told: one call per thing, a sentence stays one', () => {
+    const hint = listsManifest.operations.find((o) => o.id === 'addToList')?.surfaces?.chat?.hint ?? '';
+    expect(hint).toMatch(/one call per/i);
+    expect(hint).toMatch(/sentence/i);
   });
 });

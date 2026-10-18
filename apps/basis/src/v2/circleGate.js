@@ -154,7 +154,8 @@ const GATE_RULES = [
   { id: 'lists.addToList.named', name: 'lists:addToList(named-list)', build: (m, _t, { listFor }) => {
     const list = listFor(m.list);
     const items = splitItems(m.items);
-    if (!list || !items.length) return null;
+    // what is ONE item is the model's call (Frits 2026-10-18: "de afwas, maar eerst de pannen" is one): a comma line is its
+    if (!list || items.length !== 1) return null;
     return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((x) => ({ opId: 'addToList', args: { list, text: x } })) } : {}) };
   } },
   { id: 'lists.listEntries.named', name: 'lists:listEntries(named-list-read)', build: (m, _t, { listFor, holdsEvents }) => {
@@ -287,7 +288,8 @@ const CIRCLE_RULES = [
   { id: 'circle.addItem.typed', name: 'household:addItem(typed-list)', build: (m) => {
     const type = householdListType(m.list);
     const items = splitItems(m.items);
-    if (!type || !items[0]) return null;
+    // a comma line is the model's to read (what is one item is its call, not a rule's)
+    if (!type || items.length !== 1) return null;
     return { opId: 'addItem', args: { type, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((t) => ({ opId: 'addItem', args: { type, text: t } })) } : {}) };
   } },
   // "voeg toe: spruiten kopen" (always ours, never a task) · "voeg melk toe" (no list named → the shell asks which)

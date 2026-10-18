@@ -5211,7 +5211,8 @@
           "assistant-circles": "the circles the bot is in",
           "remindMe": "a reminder of your own: at a time (\"in 10 minutes: …\"), for an appointment or chore, or one for everyone",
           "assistant-planned": "what I will send you this week (reminders, the week overview)",
-          "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)"
+          "cancelReminder": "drop a reminder of your own (its number in /gepland, or a word of it)",
+          "assistant-feedback": "where feedback about the app goes (start with \"feedback:\")"
         },
         "household": {
           "__generic__:household:add:note": "write a note for everyone (or say: remember that the bins go out on Tuesday)",

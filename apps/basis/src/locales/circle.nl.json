@@ -5211,7 +5211,8 @@
           "assistant-circles": "de kringen waar de bot in zit",
           "remindMe": "een eigen herinnering: op een tijd (\"over 10 minuten: …\"), voor een afspraak of klusje, of één voor iedereen",
           "assistant-planned": "wat ik je komende week stuur (herinneringen, het weekoverzicht)",
-          "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)"
+          "cancelReminder": "een eigen herinnering weghalen (het nummer uit /gepland, of een woord ervan)",
+          "assistant-feedback": "zeg waar feedback over de app heen gaat (begin met \"feedback:\")"
         },
         "household": {
           "__generic__:household:add:note": "een weetje voor iedereen opschrijven (of zeg: onthoud dat de vuilnis dinsdag buiten gaat)",

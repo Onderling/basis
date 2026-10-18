@@ -23,7 +23,7 @@ export const assistantManifest = {
   hosts:     [],
   itemTypes: ['chat-thread'],
   domainVerbs: {
-    'set-memory': 'write', 'forget-conversation': 'write', greet: 'read', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'say-reminder': 'read', 'cancel-reminder': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
+    'set-memory': 'write', 'forget-conversation': 'write', greet: 'read', 'hand-off-feedback': 'read', 'week-overview': 'read', 'send-week-overview': 'read', 'announce-change': 'read', 'remind-me': 'write', 'say-reminder': 'read', 'cancel-reminder': 'write', 'invite-to-app': 'write', 'list-people': 'read', 'list-planned': 'read', 'set-reminders': 'write', 'set-overview': 'write', 'set-language': 'write', 'set-apps': 'write', 'set-settings': 'write', 'set-role': 'write', status: 'read', 'list-users': 'read',
     'open-cohort': 'write', invite: 'write', rotate: 'write', 'revoke-user': 'write', 'list-exports': 'read', 'export-household': 'write', 'import-household': 'write',
     'connect-screen': 'write', 'agenda-link': 'write', 'manage-screens': 'write', 'show-settings': 'read', 'show-usage': 'read', 'set-quiet': 'write', 'set-view': 'write', 'confirm-screen': 'write', 'paste-screen': 'write', 'approve-screen': 'write', 'link-identity': 'write', 'confirm-link': 'write', 'unlink-identity': 'write', 'set-companion': 'write', 'set-export-key': 'write', 'unlock-export-key': 'write', 'join-circle': 'write', 'list-circles': 'read',
   },

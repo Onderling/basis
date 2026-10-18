@@ -39,11 +39,12 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
     expect(rule.command('doe broccoli erbij', { memoryTurns: 0 })).toEqual({ opId: 'addItem', args: { text: 'broccoli' } });
   });
 
-  it('a typed add naming several items → one command per item (more)', async () => {
+  it('a typed add with a comma list is the model\'s (what is ONE item is its call — Frits 2026-10-18)', async () => {
     const r = await route('zet stokbrood, melk en eieren op de boodschappenlijst');
-    expect(r.command.args).toEqual({ type: 'shopping', text: 'stokbrood' });
-    expect(r.command.more.map((m) => m.args.text)).toEqual(['melk', 'eieren']);
-    expect((await route('zet brood en eieren op de boodschappen')).command.more).toBeUndefined();
+    expect(r.command?.opId === 'addItem' && r.command?.args?.text === 'stokbrood', JSON.stringify(r)).toBe(false);
+    expect(r.command?.more).toBeUndefined();
+    // no comma: one thing, the gate's as before
+    expect((await route('zet brood en eieren op de boodschappen')).command).toMatchObject({ opId: 'addItem', args: { type: 'shopping', text: 'brood en eieren' } });
   });
 
   it('the colon form "voeg toe: X" / "add: X" is an add of X — never a task named "toe: X" (walk 3)', async () => {

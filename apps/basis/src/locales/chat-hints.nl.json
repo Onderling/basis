@@ -51,7 +51,7 @@
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "addToList": {
-      "text": "Zet iets op een lijst (list = de naam, text = het ding). Eén aanroep per ding.",
+      "text": "ÉÉN aanroep per ding — meerdere dingen zijn meerdere aanroepen; een zin (ook met een komma, zoals \"de afwas, maar eerst de pannen\") is ÉÉN ding. Zet iets op een lijst (list = de naam, text = het ding). Eén aanroep per ding.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
     "listLists": {

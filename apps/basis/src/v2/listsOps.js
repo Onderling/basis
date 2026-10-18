@@ -16,7 +16,6 @@ import { reminderLayerFromWords, describeRules } from './reminderWords.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
-import { splitItems } from './circleGate.js';
 import { childIdsOf, deleteContainer, contain, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
@@ -149,18 +148,6 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // An appointment needs a time: a bare add to a list whose entries are events (the Agenda) goes through the
       // calendar's own add, which asks when — never as an event with no date.
       if ((kind ?? target.defaultChild) === 'calendar-event') return { ok: false, error: t('circle.calendar.say_when', { name: target.text ?? ref }) };
-      // A comma list is several lines, whoever sends it — the gate splits it before calling; the model sends it whole
-      // (the household's log: two chores stored as one). Each line is added on its own, then said in one reply.
-      const lines = splitItems(text);
-      if (lines.length > 1) {
-        const added = [];
-        for (const line of lines) {
-          const r = await ops.addToList({ ...args, text: line });
-          if (!r?.ok) return added.length ? { ok: true, entries: added, list: target.text ?? ref, partial: r?.error ?? true } : r;
-          if (!r.duplicate) added.push(line);
-        }
-        return { ok: true, entries: added, list: target.text ?? ref, message: t('circle.lists.added_many', { count: added.length, text: added.join(', '), name: target.text ?? ref }) };
-      }
       // The same words already open on this list: not a second entry (the walk: "lamp vervangen" twice on Klusjes).
       const same = (await entriesOf(circleId, target.id)).find((c) => String(c.text ?? '').trim().toLowerCase() === text.toLowerCase());
       if (same) return { ok: true, itemId: same.id, duplicate: true, message: t('circle.lists.already_there', { item: same.text ?? text, list: target.text ?? ref }) };

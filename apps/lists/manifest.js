@@ -98,7 +98,7 @@ export const listsManifest = {
       ],
       surfaces: {
         slash: { command: '/add-to-list', body: 'flags' },
-        chat:  { reply: 'text', hint: 'Add something to a list — a plain entry, or any kind that list accepts.' },
+        chat:  { reply: 'text', hint: 'ONE call per thing to add — several things are several calls; a sentence (even one with a comma, like \"the dishes, but the pans first\") is ONE thing. Add something to a list — a plain entry, or any kind that list accepts.' },
         attach: { label: 'circle.attach.list_item', group: 'create' },
       },
     },

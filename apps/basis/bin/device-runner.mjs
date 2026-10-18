@@ -689,7 +689,10 @@ if (relayUrl) {
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
       }),
     },
-    defaultHandler: (from, payload) => walkLog({ kind: 'unrouted', from: String(from).slice(0, 12), subtype: payload?.subtype ?? null, type: payload?.type ?? null }),
+    // TESTING ONLY (`ONDERLING_WALK_SHAPES=1`, an environment variable, off in every release config): the frame's key
+    // NAMES, so an unrouted frame can be identified — never a value, an address, a key or a length
+    defaultHandler: (from, payload) => walkLog({ kind: 'unrouted', from: String(from).slice(0, 12), subtype: payload?.subtype ?? null, type: payload?.type ?? null,
+      ...(process.env.ONDERLING_WALK_SHAPES === '1' ? { keys: frameKeyNames(payload) } : {}) }),
     logger: { info: () => {}, warn: console.warn, error: console.error, debug: () => {} },
   });
 
@@ -1485,3 +1488,15 @@ const stop = async () => {
 };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
+
+/** A frame's key names, two levels deep (`a`, `b.c`) — names only, for the testing-only shape log. */
+function frameKeyNames(payload) {
+  if (!payload || typeof payload !== 'object') return [];
+  const out = [];
+  for (const k of Object.keys(payload).sort()) {
+    out.push(k);
+    const v = payload[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) for (const k2 of Object.keys(v).sort()) out.push(`${k}.${k2}`);
+  }
+  return out.slice(0, 40);
+}

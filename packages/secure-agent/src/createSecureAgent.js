@@ -1449,7 +1449,9 @@ export async function createSecureAgent(opts = {}) {
       // A kernel task request (another agent's `invoke`), when this composition takes them: to the kernel's own
       // gated dispatch, answered on this transport. Otherwise it stays an ordinary peer message, as before.
       if (peerSkillCalls && env?.payload?.type === 'task') { await peerSkillCalls(env, tx); return; }
-      if (typeof onPeerMessageFn === 'function') {
+      // A greeting is this channel's own handshake — answered above and told as `peer` — never a message for the app:
+      // handed on, its payload (no subtype, no type) reached every router as a frame it could not route.
+      if (typeof onPeerMessageFn === 'function' && env?._p !== 'HI') {
         try {
           onPeerMessageFn({
             from:    env._from,

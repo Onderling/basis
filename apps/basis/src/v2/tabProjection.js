@@ -34,11 +34,11 @@ import { alphaTabs } from './alphaSurface.js';
  * @param {Function} [renderer] — the pure projector (`renderWeb` | `renderMobile`)
  * @returns {Array<{id: string, labelKey: string, icon?: string, target: object}>}
  */
-export function circleTabs(manifest, renderer = renderWeb) {
+export function circleTabs(manifest, renderer = renderWeb, { hasMesh = false } = {}) {
   const nav = renderer(manifest);
   // The alpha paints a subset (alphaSurface.js); the manifest keeps declaring every tab. Filtering HERE,
   // in the one projection both shells consume, is what keeps web ≡ mobile without a shell knowing why.
-  return alphaTabs(Array.isArray(nav.tabs) ? nav.tabs : []);
+  return alphaTabs(Array.isArray(nav.tabs) ? nav.tabs : [], { hasMesh });
 }
 
 /** Every tab the manifest declares, hidden ones included — for tests and the guard, never for a shell. */
@@ -55,6 +55,6 @@ export function allManifestTabs(manifest, renderer = renderWeb) {
  * @param {object} manifest
  * @returns {Array<{id: string, labelKey: string, icon?: string, target: object}>}
  */
-export function circleTabsMobile(manifest) {
-  return circleTabs(manifest, renderMobile);
+export function circleTabsMobile(manifest, { hasMesh = false } = {}) {
+  return circleTabs(manifest, renderMobile, { hasMesh });
 }

@@ -50,6 +50,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
   // A call names its circle, or means the one the person is looking at. Named wins: an agent or a
   // journey acts on a circle it is not "in", and must be able to say which.
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
+  // the person a write records: the door's (`ctx.person`, set by the host from who is asking), else this device's own
+  const personOf = (ctx) => (typeof ctx?.person === 'string' && ctx.person ? ctx.person : localActor);
   // the lists removed in this circle that can still come back, and dropping those past the keep window
   const removedOf = async (circleId) => ((await storeFor(circleId).listByType('removed-list')) ?? []);
   const dropExpired = async (circleId) => {
@@ -134,7 +136,7 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, itemId: made?.id ?? null, message: t('circle.lists.made', { name: text }) };
     },
 
-    addToList: async (args) => {
+    addToList: async (args, ctx) => {
       const circleId = circleOf(args);
       const text = String(args?.text ?? '').trim();
       const ref = String(args?.list ?? '').trim();
@@ -151,7 +153,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // The same words already open on this list: not a second entry (the walk: "lamp vervangen" twice on Klusjes).
       const same = (await entriesOf(circleId, target.id)).find((c) => String(c.text ?? '').trim().toLowerCase() === text.toLowerCase());
       if (same) return { ok: true, itemId: same.id, duplicate: true, message: t('circle.lists.already_there', { item: same.text ?? text, list: target.text ?? ref }) };
-      const made = await svc.addItem(circleId, target.id, text, localActor, kind ? { hint: kind } : undefined);
+      // who added it: the door's person (the id the tasks record — the bot's own key is nobody), else this device's own
+      const made = await svc.addItem(circleId, target.id, text, personOf(ctx), kind ? { hint: kind } : undefined);
       if (!made) return { ok: false, error: t('circle.lists.not_accepted', { name: target.text ?? ref }) };
       return {
         ok: true, itemId: made.id ?? null, kind: made.type ?? null,
@@ -217,7 +220,8 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       // A chore is ticked by the chore's own verb (its rules, its state, its reply) — one entry point, the noun's verb
       // underneath — as the person asking.
       if (at.entry.type === 'task' && typeof completeChore === 'function') return completeChore({ circleId: at.circleId, entry: at.entry, ctx });
-      await svc.markDone(at.circleId, at.entry.id, localActor);
+      // who ticked it: the door's person, as who added it (the history read says it, through the door's ceiling only)
+      await svc.markDone(at.circleId, at.entry.id, personOf(ctx));
       // the reply names what was ticked — the entry found, not the words it was asked by
       return { ok: true, entry: at.entry.text ?? '', list: at.target?.text ?? null, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },

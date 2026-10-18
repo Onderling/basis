@@ -125,7 +125,8 @@ export function makeCircleLists({ storeFor, dataSource, manifests, rootPrefix } 
     },
     async markDone(circleId, itemId, by) {
       const it = await s(circleId).get(itemId);
-      return it ? s(circleId).put({ ...it, completedAt: Date.now() }, { by }) : null;
+      // who ticked it, as the tasks record who completed one (`completedBy`): the write's person
+      return it ? s(circleId).put({ ...it, completedAt: Date.now(), ...(by ? { completedBy: by } : {}) }, { by }) : null;
     },
     remove:    (circleId, itemId) => s(circleId).delete(itemId),
     listLists: (circleId) => s(circleId).listByType('list'),

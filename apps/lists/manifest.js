@@ -213,7 +213,7 @@ export const listsManifest = {
       ],
       surfaces: {
         slash: { command: '/gedaan', body: 'argline' },
-        chat:  { reply: 'text', hint: 'What was DONE (ticked off or completed) in the last days, on all lists or one: "wat is er deze week gedaan", "what got done today". days = how far back (1 = today, 7 = this week, at most 31).' },
+        chat:  { reply: 'text', hint: 'What was DONE (ticked off or completed) in the last days, on all lists or one: "wat is er deze week gedaan", "what got done today". days = how far back (1 = today, 2 = since yesterday — "yesterday" needs 2, 7 = this week, at most 31).' },
       },
     },
     {

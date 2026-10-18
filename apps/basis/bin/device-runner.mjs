@@ -140,7 +140,6 @@ import { makeCirclePolicyLane, makePolicyHeadStore, adminsOfViaSkill } from '../
 import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
-import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
 
 const { values } = parseArgs({ options: {
   'data-dir':   { type: 'string',  default: path.join(homedir(), '.basis-device') },
@@ -238,9 +237,6 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-settings-cache': contentPaths.settings,
     'cc-pinboard-state': contentPaths.pinboard,
     'cc-pinboard-cache': contentPaths.pinboard,
-    // the pinboard store under its name before the rename (the forget names that twin too)
-    [renamedFrom({ dbName: 'cc-pinboard-state' }).dbName]: renamedFrom({ path: contentPaths.pinboard }).path,
-    [renamedFrom({ dbName: 'cc-pinboard-cache' }).dbName]: renamedFrom({ path: contentPaths.pinboard }).path,
     'cc-household-state': contentPaths.household,
     'cc-household-cache': contentPaths.household,
     'cc-tasks-cache': contentPaths.tasks,

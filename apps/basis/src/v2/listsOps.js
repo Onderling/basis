@@ -222,6 +222,36 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, entry: at.entry.text ?? '', list: at.target?.text ?? null, message: t('circle.lists.done_named', { text: at.entry.text ?? '' }) };
     },
 
+    /**
+     * What was DONE in the last days ("wat is er deze week gedaan"): every ticked or completed entry of the window, on
+     * one list or all — what, which list, when, and the doer's id when a person did it (the door's ceiling turns that
+     * into words a reader may see; never a name from here). A done entry stays in the store: the "passed" setting hides
+     * it from the list, and this reads it.
+     */
+    listDone: async (args) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      const days = Math.min(31, Math.max(1, Math.round(Number(args?.days) || 7)));
+      const since = now() - days * 86_400_000;
+      const ref = String(args?.list ?? '').trim();
+      const containers = await svc.listContainers(circleId);
+      const lists = ref ? containers.filter((c) => c.id === ref || String(c.text ?? '').toLowerCase() === ref.toLowerCase()) : containers;
+      if (ref && !lists.length) return { ok: false, error: t('circle.lists.no_such_list', { name: ref }) };
+      const items = [];
+      for (const list of lists) {
+        const tree = await svc.tree(circleId, list.id);
+        for (const c of (Array.isArray(tree?.children) ? tree.children : [])) {
+          if (!c?.completedAt || c.state === 'cancelled') continue;
+          const at = new Date(c.completedAt).getTime();
+          if (!Number.isFinite(at) || at < since) continue;
+          const by = typeof c.completedBy === 'string' && c.completedBy && c.completedBy !== localActor ? c.completedBy : null;
+          items.push({ id: c.id, label: c.text ?? c.id, type: c.type, list: list.text ?? null, doneAt: new Date(at).toISOString(), ...(by ? { doneBy: by } : {}) });
+        }
+      }
+      items.sort((a, b) => String(b.doneAt).localeCompare(String(a.doneAt)));
+      return { ok: true, days, ...(ref ? { list: lists[0].text ?? ref } : {}), items };
+    },
+
     listEntries: async (args) => {
       const circleId = circleOf(args);
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };

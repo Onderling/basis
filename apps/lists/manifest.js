@@ -38,6 +38,8 @@ export const listsManifest = {
       names: { nl: { one: 'ding op de lijst', other: 'op de lijsten' }, en: { one: 'list item', other: 'on the lists' } } },
   },
   verbs:     [],
+  // the verbs no standard atom names: a read of what was done
+  domainVerbs: { 'list-done': 'read' },
   operations: [
     {
       id:        'createList',
@@ -197,6 +199,21 @@ export const listsManifest = {
       surfaces: {
         slash: { command: '/list-entries', body: 'argline' },
         chat:  { reply: 'list', hint: 'What is on one list (the open entries).' },
+      },
+    },
+    {
+      // what was done in the last days ("wat is er deze week gedaan"): the ticked and completed entries, on one list or
+      // all — what, which list, when; who did it as the household's names setting lets the reader see (the door says)
+      id:        'listDone', group: 'data',
+      verb:      'list-done',
+      requires:  ['lists'],
+      params: [
+        { name: 'days', kind: 'number', required: false },
+        { name: 'list', kind: 'string', required: false, pickerSource: { listOp: 'listLists', appOrigin: 'lists' } },
+      ],
+      surfaces: {
+        slash: { command: '/gedaan', body: 'argline' },
+        chat:  { reply: 'text', hint: 'What was DONE (ticked off or completed) in the last days, on all lists or one: "wat is er deze week gedaan", "what got done today". days = how far back (1 = today, 7 = this week, at most 31).' },
       },
     },
     {

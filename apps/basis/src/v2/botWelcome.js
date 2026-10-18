@@ -98,6 +98,7 @@ export const WELCOME_LEAVES = Object.freeze({
   sayReminder: "not typed: the host's runner says a person's own reminder to them at its moment",
   remindMe: "asked in words ('herinner me een uur van tevoren aan de tandarts'); the reminders line says how to change your own",
   sendWeekOverview: "not typed: the host's runner sends it to whoever switched the overview on (said on the overview line)",
+  listDone: "asked in words (\"wat is er deze week gedaan\"), not a command to learn first; /help lists it",
   'assistant-feedback': "not a command people need to know: the gate answers any line that starts with \"feedback\" with where app feedback goes",
   'assistant-hello': "not typed: the gate answers a greeting (\"hoi\") with the welcome's own first line",
   announceChange: "not typed: the host's runner calls it, as the household, when an appointment or a chore changes (the people it concerns hear it)",

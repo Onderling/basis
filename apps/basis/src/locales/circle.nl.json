@@ -5153,7 +5153,8 @@
           "createList": "een nieuwe lijst",
           "restoreList": "een weggehaalde lijst terugzetten (binnen 30 dagen)",
           "removeList": "een hele lijst weggooien",
-          "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)"
+          "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)",
+          "listDone": "wat er de afgelopen dagen gedaan is (zeg: wat is er deze week gedaan)"
         },
         "tasks": {
           "listMine": "je eigen klusjes, of die van een ander (of zeg: wat moet Bob doen)",
@@ -9118,6 +9119,30 @@
     "day_none": {
       "text": "Op {{when}} staat er niets.",
       "doc": "One day's read: no appointments and no chores that day."
+    },
+    "history_head": {
+      "text": "Gedaan de afgelopen {{days}} dagen:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_head_today": {
+      "text": "Vandaag gedaan:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row_by": {
+      "text": "• {{title}} ({{list}}) — {{who}}, {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none": {
+      "text": "De afgelopen {{days}} dagen is er niets afgevinkt.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none_today": {
+      "text": "Vandaag is er nog niets afgevinkt.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
     }
   },
   "notes": {

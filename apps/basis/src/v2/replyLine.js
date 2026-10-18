@@ -62,6 +62,8 @@ export const REPLY_FAMILY = Object.freeze({
   listPersonasHere: 'persona',
   pausePersona: 'persona',
   resumePersona: 'persona',
+  // what was done in the last days ("wat is er deze week gedaan"): one row per thing, who did it as the reader may see
+  listDone: 'history',
   // the people reads
   listOpen: 'who',
   listMine: 'mine',
@@ -111,6 +113,8 @@ export function replyFact(result, { opId, args = {} } = {}) {
       return choreOpFact(id, result, args) ?? own;
     case 'persona':
       return personaFact(id, result);
+    case 'history':
+      return historyFact(result);
     case 'who':
       return whoFact(result, args);
     case 'mine':
@@ -208,6 +212,25 @@ function whoFact(result, args) {
   if (!rows.length) return { family, key: 'circle.reply.who_none', vars: { text: words } };
   if (rows.length === 1) return { family, ...choreOf(rows[0], 'circle.reply.who_held', 'circle.reply.who_open') };
   return { family, key: 'circle.reply.who_several', vars: { count: rows.length, text: words }, rows: rows.map((r) => choreOf(r, 'circle.reply.who_row_held', 'circle.reply.who_row_open')) };
+}
+
+/** "wat is er deze week gedaan": a head and a row per thing done — its words, its list, its day, and who (when known). */
+function historyFact(result) {
+  const rows = Array.isArray(result?.items) ? result.items : null;
+  if (!rows) return null;
+  const days = Number(result?.days) || 7;
+  const family = 'history';
+  if (!rows.length) return { family, key: days === 1 ? 'circle.reply.history_none_today' : 'circle.reply.history_none', vars: { days } };
+  const head = { key: days === 1 ? 'circle.reply.history_head_today' : 'circle.reply.history_head', vars: { days } };
+  return {
+    family,
+    lines: [head, ...rows.map((r) => ({
+      key: r?.by ? 'circle.reply.history_row_by' : 'circle.reply.history_row',
+      vars: { title: titleOf(r), list: r?.list ?? '' },
+      ...(r?.by ? { who: [r.by] } : {}),
+      when: { at: r?.doneAt ?? null, dayOnly: true },
+    }))],
+  };
 }
 
 /** "wat moet Bob doen": the chores of the person named (the read says whose); one's own stays the list. */

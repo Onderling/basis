@@ -59,3 +59,22 @@ describe('alphaSurface', () => {
     expect(isAdvancedSetting('control:wake-nudges')).toBe(true);
   });
 });
+
+describe('Nearby is painted where the device has a local mesh (Frits 2026-10-18: mobile only, for now)', () => {
+  it('no mesh (the browser today): no Nearby tab; a deep link lands on circles', async () => {
+    const { MESH_TABS } = await import('../../src/v2/alphaSurface.js');
+    expect(MESH_TABS).toContain('nearby');
+    expect(alphaTabs([{ id: 'nearby' }, { id: 'circles' }]).map((t) => t.id)).toEqual(['circles']);
+    expect(isAlphaTab('nearby')).toBe(false);
+  });
+  it('a device with a mesh (the phone): the Nearby tab is there', () => {
+    expect(alphaTabs([{ id: 'nearby' }, { id: 'circles' }], { hasMesh: true }).map((t) => t.id)).toEqual(['nearby', 'circles']);
+    expect(isAlphaTab('nearby', { hasMesh: true })).toBe(true);
+  });
+  it('the mobile tab projection carries it when the shell says it has a mesh', async () => {
+    const { circleTabsMobile } = await import('../../src/v2/tabProjection.js');
+    const { basisManifest } = await import('../../src/index.js');
+    expect(circleTabsMobile(basisManifest).map((t) => t.id)).not.toContain('nearby');
+    expect(circleTabsMobile(basisManifest, { hasMesh: true }).map((t) => t.id)).toContain('nearby');
+  });
+});

@@ -19,12 +19,13 @@ import { basisManifest } from '../../../../basis/src/index.js';
 import { useTheme } from './themeContext.js';
 
 // `badges` — a count per tab id (2026-09-21: Contacten's unread, summed; web parity with circleTabBar.js).
-export default function CircleTabBar({ active, onSelect, badges = {} }) {
+// `hasMesh` — this device discovers and is discovered nearby (the phone's mDNS): the Nearby tab is painted only then
+export default function CircleTabBar({ active, onSelect, badges = {}, hasMesh = false }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
     <View style={styles.bar} testID="circle-tabbar">
-      {circleTabsMobile(basisManifest).map((tab) => {
+      {circleTabsMobile(basisManifest, { hasMesh }).map((tab) => {
         const on = active === tab.id;
         const n = Number(badges?.[tab.id]) || 0;
         return (

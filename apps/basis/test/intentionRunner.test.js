@@ -19,7 +19,7 @@ async function world({ now = SUN_1930, run } = {}) {
   let at = now;
   const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), actor: 'bot', now: () => at });
   await book.load();
-  const log = new EventLog({ initial: [], muted: [] });
+  const log = new EventLog({ initial: [], muted: [], now: () => at });
   const calls = [];
   const fired = [];
   const runner = createIntentionRunner({
@@ -115,7 +115,7 @@ describe('a row that lands in a circle store later', () => {
     let at = SUN_1930;
     const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot', now: () => at });
     await book.load();
-    const log = new EventLog({ initial: [], muted: [] });
+    const log = new EventLog({ initial: [], muted: [], now: () => at });
     const calls = [];
     const runner = createIntentionRunner({ book, log, tz: TZ, now: () => at, run: async (o) => { calls.push(o); return { ok: true }; }, mayRun: () => true, claimAs: 'host-a' });
     await runner.pass();
@@ -135,7 +135,7 @@ describe('who a circle row may act as', () => {
     const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: 'bot', now: () => SUN_1930 });
     const calls = [];
     const fired = [];
-    const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => SUN_1930, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e), claimAs: 'host-a', ...(mayRun ? { mayRun } : {}) });
+    const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [], now: () => SUN_1930 }), tz: TZ, now: () => SUN_1930, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e), claimAs: 'host-a', ...(mayRun ? { mayRun } : {}) });
     // any member can write a row naming anyone: the store does not prove who wrote it
     await home.put({ type: 'intention', ...weekly('telegram:admin'), state: 'open', createdAt: '2026-10-05T10:00:00.000Z' }, { by: 'member' });
     return { runner, calls, fired, book };
@@ -168,7 +168,7 @@ describe('two hosts holding one circle row', () => {
       const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), circles: async () => [{ scope: 'c-home', store: home }], actor: name, now: () => at });
       const calls = [];
       const fired = [];
-      const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => at, claimAs: name, mayRun: () => true, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e) });
+      const runner = createIntentionRunner({ book, log: new EventLog({ initial: [], muted: [], now: () => at }), tz: TZ, now: () => at, claimAs: name, mayRun: () => true, run: async (o) => { calls.push(o); return { ok: true }; }, onFired: (e) => fired.push(e) });
       return { calls, fired, runner };
     };
     const a = host('host-a');
@@ -224,7 +224,7 @@ describe('what a fired row writes', () => {
     const book = createIntentionBook({ store: createOwnDevicesStore({ dataSource: memoryDataSource() }), actor: 'bot', now: () => SUN_1930 });
     await book.load();
     const runner = createIntentionRunner({
-      book, log: new EventLog({ initial: [], muted: [] }), tz: TZ, now: () => SUN_1930,
+      book, log: new EventLog({ initial: [], muted: [], now: () => SUN_1930 }), tz: TZ, now: () => SUN_1930,
       withOrigin: (origin, fn) => running.run(origin, fn),
       run: async () => { await Promise.resolve(); seen.push(running.getStore() ?? null); return { ok: true }; },
     });

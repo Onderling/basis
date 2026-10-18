@@ -97,10 +97,17 @@ export function createBotCircles({ store, join, leave, forget, ask, handle, now 
       if (!yes) return { ok: true, declined: true, name: p.name };
       // the handle the question named
       const h = p.handle;
+      // The record goes in BEFORE the join: the bot is on the circle's roster as soon as the redeem takes, while the join
+      // still tells the members its kind (a fan that can take seconds) — a removal in that window must find the circle
+      // it is removed from, or it is skipped as "not joined" and the content stays on this box for good.
+      await store.put({ id: p.circleId, name: p.name, handle: h, joinedAt: now(), by: person });
       const r = await join({ inviteUri: p.inviteUri, handle: h, rulesAccepted: true });
-      if (!r?.ok || !r.circleId) return { ok: false, reason: r?.reason ?? r?.error ?? 'join-failed', name: p.name };
-      // the handle it joined under: the names that address it there
-      await store.put({ id: r.circleId, name: p.name, handle: h, joinedAt: now(), by: person });
+      if (!r?.ok || !r.circleId) {
+        await store.remove(p.circleId);
+        return { ok: false, reason: r?.reason ?? r?.error ?? 'join-failed', name: p.name };
+      }
+      // removed while the join was finishing: forgotten already, not brought back
+      if (!(await store.get(p.circleId))) return { ok: true, joined: true, removed: true, name: p.name, circleId: r.circleId };
       return { ok: true, joined: true, name: p.name, circleId: r.circleId };
     },
 

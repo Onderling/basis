@@ -640,14 +640,18 @@ if (relayUrl) {
   });
   // Still in it? Not when this device left it, and not when the circle's folded roster no longer carries this device's
   // per-circle address (an eviction the membership lane folded). A read that fails is not a removal.
-  circleSeams.stillIn = async (circleId) => {
+  // `why` says which branch answered (a removal skipped as "still in" names its reason in the walk log).
+  circleSeams.stillIn = async (circleId, why = null) => {
+    const say = (reason, v) => { if (why) why.reason = reason; return v; };
     const mine = await callSkill('pinboard', 'listMyCircles', {}).catch(() => null);
-    if ((mine?.left ?? []).includes(circleId)) return false;
+    if ((mine?.left ?? []).includes(circleId)) return say('left', false);
     const me = agent.circleAddressFor?.(circleId) ?? null;
     const roster = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null);
     const members = Array.isArray(roster?.members) ? roster.members : null;
-    if (!me || !members?.length) return true;
-    return members.some((m) => m?.circleAddress === me || (m?.circleAddresses ?? []).includes(me));
+    if (!me) return say('no-own-address', true);
+    if (!members?.length) return say(roster ? 'empty-roster' : 'roster-unread', true);
+    const listed = members.some((m) => m?.circleAddress === me || (m?.circleAddresses ?? []).includes(me));
+    return say(listed ? 'still-listed' : 'not-listed', listed);
   };
 
   const router = makePeerRouter({
@@ -1200,7 +1204,9 @@ if (tgToken || inboxDoor.bridge) {
   if (botCircles) {
     circleSeams.removed = async (circleId) => {
       try {
-        if (!(await botCircles.isJoined(circleId)) || (await circleSeams.stillIn(circleId))) return;
+        if (!(await botCircles.isJoined(circleId))) { walkLog({ kind: 'circle-removal-skipped', circleId: String(circleId).slice(0, 12), reason: 'not-joined' }); return; }
+        const why = {};
+        if (await circleSeams.stillIn(circleId, why)) { walkLog({ kind: 'circle-removal-skipped', circleId: String(circleId).slice(0, 12), reason: why.reason ?? null }); return; }
         const r = await botCircles.removed(circleId);
         walkLog({ kind: 'circle-removed', circleId: String(circleId).slice(0, 12), ok: r.ok });
       } catch (err) { console.warn(`device-runner: a removal from a circle was not handled: ${err?.message ?? err}`); }

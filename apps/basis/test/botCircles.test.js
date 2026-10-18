@@ -14,11 +14,11 @@ function memRows() {
   return { get: async (id) => m.get(id) ?? null, put: async (row) => { m.set(row.id, { ...row }); return row; }, list: async () => [...m.values()], remove: async (id) => { m.delete(id); } };
 }
 
-function make({ joinResult = { ok: true, circleId: 'circle-1' }, onLeave = null } = {}) {
+function make({ joinResult = { ok: true, circleId: 'circle-1' }, onLeave = null, duringJoin = null } = {}) {
   const asked = []; const joins = []; const left = []; const forgot = [];
   const circles = createBotCircles({
     store: memRows(),
-    join: async (a) => { joins.push(a); return joinResult; },
+    join: async (a) => { joins.push(a); if (duringJoin) await duringJoin(circles); return joinResult; },
     leave: async (circleId) => { left.push(circleId); if (onLeave) await onLeave(circles); return { ok: true }; },
     forget: async (circleId) => { forgot.push(circleId); return { ok: true, rows: 3, entries: 5 }; },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
@@ -29,6 +29,27 @@ function make({ joinResult = { ok: true, circleId: 'circle-1' }, onLeave = null 
 }
 
 describe('the bot joins a circle on its admin\'s word', () => {
+  it('removed while the join is still finishing: the removal finds the circle and forgets it, and the join does not bring it back', async () => {
+    // the household walk: the bot is on the roster (the redeem took) while the join still tells the members its kind;
+    // the admin removes it in that window, and the removal found no record — skipped as "not joined", for good
+    let during = null;
+    const d = make({ duringJoin: async (c) => { during = await c.removed('circle-1'); } });
+    await d.circles.offered('admin', invite(), d.question, { isPrivate: true });
+    const id = d.asked[0].buttons[0].id.split(' ').pop();
+    await d.circles.answer('admin', true, id, { isPrivate: true });
+    expect(during, 'the removal found the circle').toMatchObject({ ok: true });
+    expect(d.forgot).toEqual(['circle-1']);
+    expect(await d.circles.isJoined('circle-1'), 'the finished join did not put it back').toBe(false);
+  });
+
+  it('a join that fails leaves no record', async () => {
+    const d = make({ joinResult: { ok: false, reason: 'refused' } });
+    await d.circles.offered('admin', invite(), d.question, { isPrivate: true });
+    const id = d.asked[0].buttons[0].id.split(' ').pop();
+    expect((await d.circles.answer('admin', true, id, { isPrivate: true })).ok).toBe(false);
+    expect(await d.circles.isJoined('circle-1')).toBe(false);
+  });
+
   it('the invite pasted: the question names the circle and its rules; nothing joined before the yes', async () => {
     const d = make();
     const r = await d.circles.offered('admin', invite(), d.question, { isPrivate: true });

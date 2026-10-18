@@ -31,7 +31,7 @@ export const VOCABULARIES = [
   {
     name: 'retention-classes',
     home: 'packages/item-store/src/entryKinds.js',
-    keys: ['audit', 'chat', 'named', 'record', 'short'],   // the RETAIN classes (the home's literal keys — computed-key TABLES over them are references, not copies)
+    keys: ['audit', 'chat', 'keep_aside', 'named', 'record', 'short'],   // the RETAIN classes (the home's literal keys — computed-key TABLES over them are references, not copies)
   },
   {
     name: 'circle-storage-postures',

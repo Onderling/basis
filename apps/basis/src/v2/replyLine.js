@@ -64,6 +64,8 @@ export const REPLY_FAMILY = Object.freeze({
   resumePersona: 'persona',
   // what was done in the last days ("wat is er deze week gedaan"): one row per thing, who did it as the reader may see
   listDone: 'history',
+  // the trash (`/prullenbak`): what can be put back, and who took it off as the reader may see them; a restore in its own words
+  restoreEntry: 'trash',
   // the people reads
   listOpen: 'who',
   listMine: 'mine',
@@ -106,9 +108,15 @@ export function replyFact(result, { opId, args = {} } = {}) {
       return what ? { family, key: 'circle.lists.done_named', vars: {}, item: what, fold: 'done' } : own;
     }
     case 'removed':
+      // someone else's entry went to the trash (its maker or an admin can put it back): said so, folded the same way
+      if (result.trashed && result.entry && result.list) {
+        return { family, key: 'circle.lists.removed_to_trash', vars: { name: result.list }, item: result.entry, fold: `trashed:${result.list}` };
+      }
       return result.entry && result.list
         ? { family, key: 'circle.lists.removed', vars: { name: result.list }, item: result.entry, fold: `removed:${result.list}` }
         : own;
+    case 'trash':
+      return trashFact(result) ?? own;
     case 'chore':
       return choreOpFact(id, result, args) ?? own;
     case 'persona':
@@ -215,6 +223,20 @@ function whoFact(result, args) {
 }
 
 /** "wat is er deze week gedaan": a head and a row per thing done — its words, its list, its day, and who (when known). */
+function trashFact(result) {
+  const rows = Array.isArray(result?.items) ? result.items : null;
+  if (!rows || !rows.length) return null;
+  return {
+    family: 'trash',
+    lines: [{ key: 'circle.reply.trash_head', vars: {} }, ...rows.map((r) => ({
+      key: r?.by ? 'circle.reply.trash_row_by' : 'circle.reply.trash_row',
+      vars: { title: titleOf(r), list: r?.list ?? '' },
+      ...(r?.by ? { who: [r.by] } : {}),
+      when: { at: r?.removedAt ?? null, dayOnly: true },
+    }))],
+  };
+}
+
 function historyFact(result) {
   const rows = Array.isArray(result?.items) ? result.items : null;
   if (!rows) return null;

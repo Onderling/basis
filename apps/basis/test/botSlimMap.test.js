@@ -18,7 +18,7 @@ import { bootRealAgentNode, teardown } from './support/pairRealAgents.js';
 const nodes = [];
 afterAll(() => teardown(nodes));
 
-const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-feedback', '__generic__:household:list:note', 'assistant-planned'];
+const MEMBER = ['listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry', 'restoreEntry', 'entryReminders', 'makeChore', 'shopVisit', 'listMine', 'listOpen', 'claimTask', 'completeTask', 'addEvent', 'listEvents', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative', 'cancelEvent', 'assistant-memory', 'assistant-language', 'assistant-reminders', 'remindMe', 'cancelReminder', 'assistant-overview', 'weekOverview', 'assistant-people', 'assistant-feedback', '__generic__:household:list:note', 'assistant-planned'];
 const ADMIN_EXTRA = ['reassignTask', 'removeTask', 'editTask'];
 
 describe('the bot\'s slim map', () => {

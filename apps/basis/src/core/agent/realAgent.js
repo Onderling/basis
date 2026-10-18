@@ -6151,16 +6151,21 @@ export async function createRealHouseholdAgent(opts = {}) {
       // as the internal id the tasks record (`actorOf`), in the context and never the args: no model's words can set it
       const doorPerson = typeof ctx?.caller === 'string' && ctx.caller ? actorOf(ctx) : null;
       const { person: _unvouched, ...ctxOwn } = ctx ?? {};
-      const result = await handler(args ?? {}, doorPerson ? { ...ctxOwn, person: doorPerson } : ctxOwn);
+      // …with their role, asked only by an op that needs it (the trash: an admin sees all of it) and from the same roster
+      const personRole = doorPerson ? async () => (await peopleBook(doorPerson, doorCircleOf(ctx))).roles[doorPerson] ?? null : undefined;
+      const { personRole: _unvouchedRole, ...ctxClean } = ctxOwn;
+      const result = await handler(args ?? {}, doorPerson ? { ...ctxClean, person: doorPerson, personRole } : ctxClean);
       // A door's read of a chores list says who holds each chore — as far as the names setting lets the asker see names
       if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
         return { ...result, items: await withChoreHolders(result.items, actorOf(ctx), doorCircleOf(ctx)) };
       }
-      // …and a door's read of what was done says who did it the same way — `{you}` · `{name}` · `{someone}`, never an id
-      if (appOrigin === 'lists' && opId === 'listDone' && Array.isArray(result?.items)) {
+      // …and a door's read of what was done — or of what is in the trash — says who did it the same way: `{you}` ·
+      // `{name}` · `{someone}`, never an id (the field is dropped for any other caller)
+      const personField = appOrigin === 'lists' ? ({ listDone: 'doneBy', restoreEntry: 'removedBy' })[opId] : null;
+      if (personField && Array.isArray(result?.items)) {
         const reader = typeof ctx?.caller === 'string' && ctx.caller ? actorOf(ctx) : null;
         const nameOf = reader ? await readerNamer(reader, doorCircleOf(ctx)) : null;
-        return { ...result, items: result.items.map(({ doneBy, ...row }) => (doneBy && nameOf ? { ...row, by: nameOf(doneBy) } : row)) };
+        return { ...result, items: result.items.map(({ [personField]: who, ...row }) => (who && nameOf ? { ...row, by: nameOf(who) } : row)) };
       }
       return result;
     }

@@ -16,7 +16,7 @@ import { reminderLayerFromWords, describeRules } from './reminderWords.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
-import { childIdsOf, deleteContainer, contain, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { childIdsOf, deleteContainer, contain, RETAIN, retentionWindowFor } from '@onderling/item-store';
 
 /**
  * @param {object} a
@@ -30,8 +30,9 @@ import { childIdsOf, deleteContainer, contain, param, PARAM_SCOPE, PARAM_KIND } 
  *        list is ticked: the chore's own verb (a household bot's tasks); absent → a plain tick
  * @returns {Record<string, (args: object, ctx?: object) => Promise<object>>} opId → handler
  */
-/** How long a removed list can be put back (Frits 2026-10-05: 30 days); after that it is dropped. */
-export const REMOVED_LIST_KEEP_DAYS = param({ key: 'lists.removedKeepDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
+/** How long a removed list or an entry in the trash can be put back, in days: the shared table's keep-aside window. */
+const KEEP_ASIDE_MS = retentionWindowFor(RETAIN.KEEP_ASIDE);
+export const KEEP_ASIDE_DAYS = Math.round(KEEP_ASIDE_MS / 86_400_000);
 
 /** Who holds a chore (contact ids — data; the door words them as far as the names setting lets the asker see). */
 const holdersOf = (c) => {
@@ -52,11 +53,18 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
   // the person a write records: the door's (`ctx.person`, set by the host from who is asking), else this device's own
   const personOf = (ctx) => (typeof ctx?.person === 'string' && ctx.person ? ctx.person : localActor);
+  // the door's person, or nobody (this device's own call)
+  const doorPersonOf = (ctx) => (typeof ctx?.person === 'string' && ctx.person ? ctx.person : null);
+  // may this caller see and restore every entry in the trash: an admin, or this device's own call (no door person)
+  const seesAllTrash = async (ctx) => !doorPersonOf(ctx) || (typeof ctx?.personRole === 'function' && (await ctx.personRole()) === 'admin');
   // the lists removed in this circle that can still come back, and dropping those past the keep window
-  const removedOf = async (circleId) => ((await storeFor(circleId).listByType('removed-list')) ?? []);
+  const removedOf = async (circleId, type = 'removed-list') => ((await storeFor(circleId).listByType(type)) ?? []);
+  // one sweep for everything kept aside — a removed list and an entry in the trash — past the one keep window
   const dropExpired = async (circleId) => {
-    const keep = REMOVED_LIST_KEEP_DAYS * 86_400_000;
-    for (const r of await removedOf(circleId)) if (now() - (Number(r.removedAt) || 0) >= keep) await storeFor(circleId).delete(r.id);
+    const keep = KEEP_ASIDE_MS;
+    for (const type of ['removed-list', 'removed-entry']) {
+      for (const r of await removedOf(circleId, type)) if (now() - (Number(r.removedAt) || 0) >= keep) await storeFor(circleId).delete(r.id);
+    }
   };
 
   /** A person types a list's NAME; an id is what the app uses. Accept either. */
@@ -325,11 +333,11 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       const whole = (await Promise.all(removing.map((id) => store.get(id)))).filter(Boolean);
       await store.put({
         id: `removed-list-${target.id}`, type: 'removed-list', listId: target.id, name: String(target.text ?? ref),
-        removedAt: now(), removedBy: ctx?.caller ?? null, items: whole, keptIds: [...kept],
+        removedAt: now(), removedBy: doorPersonOf(ctx), items: whole, keptIds: [...kept],
       }, { by: ctx?.caller ?? localActor });
       for (const id of removing) await deleteContainer(store, id);
       await dropExpired(circleId);
-      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref, days: REMOVED_LIST_KEEP_DAYS }), vars };
+      return { ok: true, message: t('circle.lists.list_removed', { name: target.text ?? ref, days: KEEP_ASIDE_DAYS }), vars };
     },
 
     /**
@@ -361,11 +369,60 @@ export function makeListsOps({ storeFor, t, activeCircle, localActor = 'me', pas
       return { ok: true, message: t('circle.lists.list_restored', { name: rec.name, count: rec.items.length - 1 }) };
     },
 
-    removeFromList: async (args) => {
+    removeFromList: async (args, ctx) => {
       const at = await locate(args);
       if (at.error) return { ok: false, error: at.error, ...(at.notFound ? { code: 'not-found' } : {}) };
+      const store = svc.storeFor(at.circleId);
+      const stored = await store.get(at.entry.id);
+      const deleter = doorPersonOf(ctx);
+      const said = { text: at.entry.text ?? '', name: at.target.text ?? '' };
+      // someone else's entry goes to the trash: kept aside, whole, out of every read, for its creator or an admin to put
+      // back (`restoreEntry`) — the same keep-aside, window and sweep as a removed list. One's own (or this device's own
+      // call): gone, as before.
+      if (stored && deleter && deleter !== stored.createdBy) {
+        await store.put({
+          id: `removed-entry-${stored.id}`, type: 'removed-entry', entryId: stored.id, listId: at.target.id, listName: String(at.target.text ?? ''),
+          name: String(stored.text ?? stored.title ?? ''), removedAt: now(), removedBy: deleter, createdBy: stored.createdBy ?? null, items: [stored],
+        }, { by: deleter });
+        await svc.remove(at.circleId, stored.id);
+        await dropExpired(at.circleId);
+        return { ok: true, trashed: true, entry: said.text, list: said.name, message: t('circle.lists.removed_to_trash', { ...said, days: KEEP_ASIDE_DAYS }) };
+      }
       await svc.remove(at.circleId, at.entry.id);
-      return { ok: true, entry: at.entry.text ?? '', list: at.target.text ?? '', message: t('circle.lists.removed', { text: at.entry.text ?? '', name: at.target.text ?? '' }) };
+      return { ok: true, entry: said.text, list: said.name, message: t('circle.lists.removed', said) };
+    },
+
+    /**
+     * The trash (`/prullenbak`): an entry someone took off another person's list. Without words: what the caller may put
+     * back — an admin all of it, anyone else what they made — a button each, and who took it off (the door words it).
+     * With words: that entry back on its list, under its own id. Past the keep window it is gone for good.
+     */
+    restoreEntry: async (args, ctx) => {
+      const circleId = circleOf(args);
+      if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
+      await dropExpired(circleId);
+      const me = doorPersonOf(ctx);
+      const all = await seesAllTrash(ctx);
+      const mine = (await removedOf(circleId, 'removed-entry')).filter((r) => all || r.createdBy === me).sort((a, b) => b.removedAt - a.removedAt);
+      const ref = String(args?.item ?? '').trim();
+      if (!ref) {
+        if (!mine.length) return { ok: true, message: t('circle.lists.trash_none'), items: [], quickReplies: [] };
+        return {
+          ok: true,
+          message: t('circle.lists.trash_offer', { days: KEEP_ASIDE_DAYS }),
+          items: mine.map((r) => ({ id: r.id, label: r.name, list: r.listName, removedAt: new Date(r.removedAt).toISOString(), ...(r.removedBy ? { removedBy: r.removedBy } : {}) })),
+          quickReplies: mine.map((r) => ({ label: r.name, slash: `/prullenbak ${r.name}` })),
+        };
+      }
+      const want = ref.toLowerCase();
+      const rec = mine.find((r) => r.id === ref) ?? mine.find((r) => r.name.toLowerCase() === want) ?? mine.find((r) => r.name.toLowerCase().includes(want));
+      if (!rec) return { ok: false, error: t('circle.lists.trash_not_found', { item: ref }), code: 'not-found' };
+      const store = svc.storeFor(circleId);
+      if (!(await store.get(rec.listId))) return { ok: false, error: t('circle.lists.trash_list_gone', { item: rec.name, list: rec.listName }) };
+      for (const item of rec.items) await store.put(item, { by: personOf(ctx) });
+      await contain(store, rec.listId, rec.entryId);
+      await store.delete(rec.id);
+      return { ok: true, entry: rec.name, list: rec.listName, message: t('circle.lists.trash_restored', { item: rec.name, list: rec.listName }) };
     },
 
     editEntry: async (args, ctx) => {

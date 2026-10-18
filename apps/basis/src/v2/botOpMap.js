@@ -83,6 +83,8 @@ const COLUMNS = {
   member: [
     // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
     'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    // the trash: anyone may look; what they see and may put back is their own (an admin: all of it) — the op decides
+    'restoreEntry',
     // the reminders everyone gets for an entry: whoever may edit it may set them
     'entryReminders',
     // a line becomes a chore when someone says who does it or when: anyone who may add may say that

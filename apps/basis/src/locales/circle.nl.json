@@ -4211,6 +4211,34 @@
     "done_named_many": {
       "text": "{{count}} afgevinkt: {{text}}.",
       "doc": "A reply line folding several items of one act into one: the count, then each item as a separate one (joined with the language's 'and')."
+    },
+    "removed_to_trash": {
+      "text": "Van {{name}} gehaald: {{text}}. Wie het erop zette (of een beheerder) kan het terugzetten met /prullenbak.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "removed_to_trash_many": {
+      "text": "{{count}} van {{name}} gehaald: {{text}}. Wie ze erop zette (of een beheerder) kan ze terugzetten met /prullenbak.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_none": {
+      "text": "Er ligt niets in de prullenbak dat jij kunt terugzetten.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_offer": {
+      "text": "In de prullenbak ({{days}} dagen bewaard) — tik er een aan om hem terug te zetten:",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_not_found": {
+      "text": "\"{{item}}\" ligt niet in de prullenbak, of is niet aan jou om terug te zetten.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_list_gone": {
+      "text": "\"{{item}}\" kan niet terug: de lijst \"{{list}}\" is weg. Zet eerst de lijst terug (/list-restore).",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
+    },
+    "trash_restored": {
+      "text": "\"{{item}}\" staat weer op {{list}}.",
+      "doc": "Someone else's entry taken off a list goes to the trash: kept 30 days for its maker or an admin to put back (/prullenbak)."
     }
   },
   "share": {
@@ -5154,7 +5182,8 @@
           "restoreList": "een weggehaalde lijst terugzetten (binnen 30 dagen)",
           "removeList": "een hele lijst weggooien",
           "entryReminders": "de herinneringen die iedereen krijgt voor één afspraak of klusje (60 · ochtend · avond · ook … · gewoon)",
-          "listDone": "wat er de afgelopen dagen gedaan is (zeg: wat is er deze week gedaan)"
+          "listDone": "wat er de afgelopen dagen gedaan is (zeg: wat is er deze week gedaan)",
+          "restoreEntry": "wat van andermans lijst gehaald is, om terug te zetten (/prullenbak)"
         },
         "tasks": {
           "listMine": "je eigen klusjes, of die van een ander (of zeg: wat moet Bob doen)",
@@ -9143,6 +9172,18 @@
     "history_none_today": {
       "text": "Vandaag is er nog niets afgevinkt.",
       "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "trash_head": {
+      "text": "In de prullenbak:",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
+    },
+    "trash_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
+    },
+    "trash_row_by": {
+      "text": "• {{title}} ({{list}}) — weggehaald door {{who}}, {{when}}",
+      "doc": "The trash read (/prullenbak): the head, then a row per entry (who took it off as the reader may see them)."
     }
   },
   "notes": {

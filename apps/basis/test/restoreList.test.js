@@ -31,7 +31,7 @@ describe('removing a list, and putting it back', () => {
     await ops.createList({ text: 'Feest' });
     await ops.addToList({ list: 'Feest', text: 'slingers' });
     await ops.addToList({ list: 'Feest', text: 'taart' });
-    const gone = await ops.removeList({ list: 'Feest' }, { caller: 'telegram:7' });
+    const gone = await ops.removeList({ list: 'Feest' }, { person: 'telegram:7' });
     expect(gone.ok, JSON.stringify(gone)).toBe(true);
     expect(await names(ops)).toEqual(['Boodschappen']);
     expect((await ops.listEntries({ list: 'Feest' })).ok).toBe(false);

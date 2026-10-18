@@ -8,7 +8,7 @@ import { createBotScreens, parseScreenLink, screenCode, codeChoices, screenLabel
 import { createBotThreads, memoryThreadStore } from '../../src/v2/botThreads.js';
 import { EventLog } from '../../src/eventLog.js';
 
-function setup() {
+function setup({ tellRefused = null } = {}) {
   let clock = 1_000_000;
   const threads = createBotThreads({ eventLog: new EventLog({ initial: [], muted: [] }), store: memoryThreadStore(), now: () => clock });
   const grants = [];
@@ -28,7 +28,7 @@ function setup() {
     listGrants: async () => grants.map((g) => ({ viewPubKey: g.viewPubKey, label: g.label, ops: g.ops, actingAs: g.actingAs })),
     notify: (person, key, params) => { told.push({ person, key, params }); },
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
-    tellRefused: async (k) => { refused.push(k); },
+    tellRefused: tellRefused ?? (async (k) => { refused.push(k); }),
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: 'BOT', relayUrl: 'wss://relay.example' }),
     now: () => clock,
   });
@@ -44,6 +44,24 @@ const connect = async (ctx, v, person = 'telegram:1') => {
 const nonceOf = (text) => parseScreenLink(/https?:\/\/\S+/.exec(text)[0]).nonce;
 
 describe('a person connects a screen to the bot', () => {
+  it('telling a screen it was refused never holds the reply: a screen that does not answer costs the person nothing', async () => {
+    // a send to a key that does not greet back runs the 23 s handshake ladder; the person's reply must not wait on it
+    let release;
+    const held = new Promise((r) => { release = r; });
+    const late = [];
+    const ctx = setup({ tellRefused: async (k) => { await held; late.push(k); } });
+    const quick = (p) => Promise.race([p, new Promise((_, no) => { setTimeout(() => no(new Error('the reply waited for the screen')), 500); })]);
+    const n1 = nonceOf(await start(ctx));
+    await ctx.screens.offer({ from: 'V', viewPubKey: 'V', nonce: n1 });
+    const n2 = nonceOf(await start(ctx));
+    expect(await quick(ctx.screens.offer({ from: 'W', viewPubKey: 'W', nonce: n2 }))).toMatchObject({ ok: true, pending: true });
+    expect(await quick(ctx.screens.confirm('telegram:1', 'NOPE', { isPrivate: true }))).toMatchObject({ ok: true, declined: true });
+    expect(late).toEqual([]);
+    release();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(late, 'both screens are still told').toEqual(['V', 'W']);
+  });
+
   it('the SAME screen offering again (a reload, a second /scherm) is not refused by its own earlier offer; another screen is', async () => {
     const ctx = setup();
     const n1 = nonceOf(await start(ctx));

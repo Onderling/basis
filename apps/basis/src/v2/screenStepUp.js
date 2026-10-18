@@ -39,7 +39,8 @@ const newId = () => { const b = new Uint8Array(4); globalThis.crypto.getRandomVa
 export function createScreenStepUp({ ask, tell, now = Date.now, makeId = newId, setTimer = (fn, ms) => { const h = setTimeout(fn, ms); h?.unref?.(); return h; } }) {
   const pending = new Map();   // person → { id, app, op, args, viewPubKey, until, timer }
   const gone = new Map();      // person → Map(id → 'replaced' | 'expired'): a late tap on an old question is told why
-  const told = async (req, outcome) => { try { await tell?.(req.viewPubKey, { outcome, op: req.op }); } catch { /* the screen hears nothing; the person sees the chat */ } };
+  // never awaited: a screen that does not greet back must not hold the person's reply (the 23 s handshake ladder)
+  const told = (req, outcome) => { Promise.resolve().then(() => tell?.(req.viewPubKey, { outcome, op: req.op })).catch(() => { /* the screen hears nothing; the person sees the chat */ }); };
   const forget = (person, req, why) => {
     const m = gone.get(person) ?? new Map();
     m.set(req.id, why);

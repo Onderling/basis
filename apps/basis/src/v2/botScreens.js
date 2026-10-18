@@ -187,13 +187,17 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
     return { ok: true, person, ops };
   }
 
+  // A screen is told it was refused, never awaited: a screen that does not greet back would hold the person's reply
+  // for the handshake ladder (23 s); best-effort — the screen times out on its own.
+  const refuseSoon = (viewPubKey) => { Promise.resolve().then(() => tellRefused?.(viewPubKey)).catch(() => {}); };
+
   /** The question, for an offer from either route: the code to pick from three, in the person's private door. */
   async function askAbout(person, { viewPubKey, nonce, label }) {
     if (typeof ask !== 'function') return { ok: false, reason: 'no-private-door' };
     const previous = threads.screenOfferOf(person);   // a second offer drops the first, and its screen is told —
     // unless it IS this screen (a reload, a second /scherm on the same browser): the screen asking now must not be the
     // one told it was refused, or it gives up on the offer it just made
-    if (previous && previous.viewPubKey !== viewPubKey) { try { await tellRefused?.(previous.viewPubKey); } catch { /* the screen times out on its own */ } }
+    if (previous && previous.viewPubKey !== viewPubKey) refuseSoon(previous.viewPubKey);
     const code = await screenCode(viewPubKey, nonce);
     threads.setScreenOffer(person, { viewPubKey, nonce, label: screenLabel(label) ?? 'scherm', until: now() + SCREEN_LINK_TTL_MS });
     const asked = await ask(person, { codes: codeChoices(code, rand), replaced: Boolean(previous) });
@@ -269,7 +273,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (!offer) return { ok: false, reason: 'nothing-pending' };
       if (!isPrivate) return { ok: false, reason: 'not-private' };
       threads.setScreenOffer(person, null);   // answered (or late): the offer is gone either way
-      const refuse = async () => { try { await tellRefused?.(offer.viewPubKey); } catch { /* the screen times out on its own */ } };
+      const refuse = async () => { refuseSoon(offer.viewPubKey); };
       if (offer.until < now()) { await refuse(); return { ok: false, reason: 'expired' }; }
       // only the code the screen shows grants: a wrong code, "none of these", or a bare yes drops the offer
       const real = await screenCode(offer.viewPubKey, offer.nonce);
@@ -288,7 +292,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (typeof viewPubKey !== 'string' || !viewPubKey || viewPubKey !== from) return { ok: false, reason: 'wrong-sender' };
       if (typeof nonce !== 'string' || !nonce) return { ok: false, reason: 'no-nonce' };
       if (typeof verifyLaunch !== 'function' || typeof personOfTelegram !== 'function') return { ok: false, reason: 'no-launch-route' };
-      const refuse = async (reason) => { try { await tellRefused?.(viewPubKey); } catch { /* the screen times out on its own */ } return { ok: false, reason }; };
+      const refuse = async (reason) => { refuseSoon(viewPubKey); return { ok: false, reason }; };
       const v = await verifyLaunch(initData);
       if (!v?.ok) return refuse(v?.reason ?? 'bad-launch');
       if (!spend(v.hash)) return refuse('used');

@@ -435,5 +435,22 @@
       "vergeet alles",
       "haal melk van de boodschappen"
     ]
+  },
+  "assistant.feedback": {
+    "doc": "Feedback about the app itself (\"feedback voor Frits: …\"): the bot says where app feedback goes, without the model — it never stores or forwards it.",
+    "patterns": [
+      "feedback voor {person}: {text}",
+      "feedback: {text}",
+      "feedback {text}"
+    ],
+    "examples": [
+      "Feedback voor Frits: scheidingsteken voor meerdere items?",
+      "feedback: de knop doet niets",
+      "Feedback de lijst ververst niet"
+    ],
+    "not": [
+      "wat vind je van de feedback",
+      "geef feedback aan de buren"
+    ]
   }
 }

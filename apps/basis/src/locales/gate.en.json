@@ -405,5 +405,20 @@
       "forget it",
       "forget everything"
     ]
+  },
+  "assistant.feedback": {
+    "doc": "Feedback about the app itself (\"feedback voor Frits: …\"): the bot says where app feedback goes, without the model — it never stores or forwards it.",
+    "patterns": [
+      "feedback for {person}: {text}",
+      "feedback: {text}",
+      "feedback {text}"
+    ],
+    "examples": [
+      "Feedback for Frits: the button does nothing",
+      "feedback: the list does not refresh"
+    ],
+    "not": [
+      "what do you think of the feedback"
+    ]
   }
 }

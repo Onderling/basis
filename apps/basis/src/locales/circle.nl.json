@@ -4518,7 +4518,7 @@
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off · /huishouden feedback <link of @naam>|off",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_announce_none_here": {
@@ -5306,7 +5306,9 @@
     "welcome_notes_read": {
       "text": "\"Welke weetjes zijn er\" laat zien wat het huishouden heeft opgeschreven.",
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
-    }
+    },
+    "feedback_handoff": "Feedback over de app gaat naar de makers: {{channel}}. Ik kan mezelf niet veranderen en bewaar het niet — stuur het daarheen.",
+    "feedback_no_channel": "Feedback over de app gaat naar de makers, maar deze bot heeft geen feedbackkanaal. Vraag de beheerder er een in te stellen (/huishouden feedback <link>). Ik kan mezelf niet veranderen en bewaar het niet."
   },
   "op": {
     "admin_only": {

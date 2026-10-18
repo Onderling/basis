@@ -75,7 +75,8 @@ export const assistantManifest = {
       // channel), never a promise, nothing stored or sent. The gate takes "feedback …" lines; the model has it as a tool.
       id:     'assistant-feedback',
       verb:   'hand-off-feedback',
-      params: [{ name: 'text', kind: 'string', required: false }],
+      // no params: the op carries none of the person's words, so it asks for none
+      params: [],
       surfaces: {
         chat: { reply: 'text', hint: 'The person gives FEEDBACK about the app or the bot itself (a wish, a complaint, an idea for its makers): call this. It answers where app feedback goes. You cannot change yourself — never promise a change.' },
       },

@@ -41,7 +41,7 @@ describe('feedback about the app', () => {
 
   it('no channel set: says so, stores nothing, promises nothing', async () => {
     const { call, calls } = await bot();
-    const r = await call('assistant', 'assistant-feedback', { text: 'de knop doet niets' }, { threadId: 'telegram:1' });
+    const r = await call('assistant', 'assistant-feedback', {}, { threadId: 'telegram:1' });
     expect(r).toMatchObject({ ok: true, message: 'circle.bot.feedback_no_channel' });
     expect(calls.filter((c) => !c.startsWith('params.list')), 'it writes nothing anywhere').toEqual([]);
   });
@@ -50,7 +50,7 @@ describe('feedback about the app', () => {
     const { call, stored } = await bot();
     expect((await call('assistant', 'assistant-settings', { change: 'feedback @onderling_feedback_bot' })).ok).toBe(true);
     expect(stored.get('assistant.feedbackChannel')).toBe('@onderling_feedback_bot');
-    const r = await call('assistant', 'assistant-feedback', { text: 'de knop doet niets' }, { threadId: 'telegram:1' });
+    const r = await call('assistant', 'assistant-feedback', {}, { threadId: 'telegram:1' });
     expect(r.message).toBe('circle.bot.feedback_handoff {"channel":"@onderling_feedback_bot"}');
     expect(r.message, 'the person\'s words are not echoed or sent anywhere').not.toContain('knop');
     // a channel that is neither a link nor a handle is refused
@@ -63,5 +63,6 @@ describe('feedback about the app', () => {
     const op = assistantManifest.operations.find((o) => o.id === 'assistant-feedback');
     expect(op?.surfaces?.chat?.hint).toMatch(/feedback/i);
     expect(op.surfaces.chat.hint).toMatch(/never promise/i);
+    expect(op.params, 'it asks for none of the person\'s words').toEqual([]);
   });
 });

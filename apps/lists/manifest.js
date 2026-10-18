@@ -263,7 +263,7 @@ export const listsManifest = {
       ],
       surfaces: {
         slash: { command: '/list-restore', body: 'argline' },
-        chat:  { reply: 'text', hint: 'Put a removed list back, with everything that was on it (within 30 days).' },
+        chat:  { reply: 'text', hint: 'Put a removed list back, with everything that was on it (for as long as it is kept).' },
       },
     },
     {
@@ -278,7 +278,7 @@ export const listsManifest = {
       ],
       surfaces: {
         slash: { command: '/prullenbak', body: 'argline' },
-        chat:  { reply: 'text', hint: 'The trash: entries someone took off another person\'s list, to look at or put back (its maker or an admin, within 30 days). item = the entry\'s words to put back; none = show the trash.' },
+        chat:  { reply: 'text', hint: 'The trash: entries someone took off another person\'s list, to look at or put back (its maker or an admin, for as long as it is kept). item = the entry\'s words to put back; none = show the trash.' },
       },
     },
     {

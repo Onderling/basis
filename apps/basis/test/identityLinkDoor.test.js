@@ -34,7 +34,7 @@ function memVault() { const m = new Map(); return { get: async (k) => m.get(k) ?
 const body = (offer) => JSON.parse(Buffer.from(offer.slice(LINK_OFFER_SCHEME.length).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
 const encode = (b) => LINK_OFFER_SCHEME + Buffer.from(JSON.stringify(b)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-async function door() {
+async function door({ tellApp = null } = {}) {
   const users = createBotUsers({ store: memStore() });
   await users.admit({ channel: 'telegram', uid: '42', displayName: 'Ann' });
   await users.admit({ channel: 'telegram', uid: '7', displayName: 'Bert' });
@@ -45,7 +45,7 @@ async function door() {
     users, botAddress: () => BOT, tombstones,
     ask: async (person, q) => { asked.push({ person, ...q }); return { ok: true }; },
     sendPrivately: async (person, text) => { sentPrivately.push({ person, text }); return { ok: true }; },
-    tellApp: async (key, payload) => { toApp.push({ key, payload }); },
+    tellApp: tellApp ?? (async (key, payload) => { toApp.push({ key, payload }); }),
     listGrants: async () => grants,
     revokeView: async (viewPubKey) => { revoked.push(viewPubKey); grants = grants.filter((g) => g.viewPubKey !== viewPubKey); return true; },
     where: () => ({ appUrl: 'https://basis.example/app', botAddress: BOT, relayUrl: 'wss://r', botName: '@bot' }),
@@ -152,6 +152,26 @@ describe('the identity link through the door', () => {
     expect(await d.users.find('web', ann.webid)).toBeNull();
     expect((await d.users.find('web', ann.webid, { linkedRoot: ann.root }))?.id).toBe(ANN);
     expect(d.toApp).toEqual([{ key: ann.webid, payload: expect.objectContaining({ subtype: IDENTITY_LINK_SUBTYPE, statement: expect.objectContaining({ bot: BOT, row: ANN, root: ann.root }) }) }]);
+  });
+
+  it('an app that does not answer never holds the reply: link, relink and unlink answer at once, the app is told after', async () => {
+    // the household's log: every link step took 23 s — the bot waited for the app's device before it answered
+    let release;
+    const held = new Promise((r) => { release = r; });
+    const told = [];
+    const d = await door({ tellApp: async (key, payload) => { await held; told.push({ key, payload }); } });
+    const quick = (p) => Promise.race([p, new Promise((_, no) => { setTimeout(() => no(new Error('the reply waited for the app')), 500); })]);
+    const { offer, nonce } = ann.offer('phone', BOT);
+    await d.call('assistant', 'assistant-link', { offer }, PRIVATE);
+    const done = await quick(d.call('assistant', 'assistant-link-confirm', { answer: await linkCode(ann.root, nonce) }, PRIVATE));
+    expect(done.message).toContain('circle.bot.link_done');
+    const again = await quick(d.call('assistant', 'assistant-link', { offer: ann.offer('laptop', BOT).offer }, PRIVATE));
+    expect(again.message).toContain('circle.bot.link_already');
+    expect((await quick(d.call('assistant', 'assistant-unlink', {}, PRIVATE))).ok).toBe(true);
+    expect(told, 'nothing told while the app is away').toEqual([]);
+    release();
+    await new Promise((r) => { setTimeout(r, 0); });
+    expect(told.map((x) => Boolean(x.payload.unlinked))).toEqual([false, false, true]);
   });
 
   it('the same code button tapped again after the link: "already linked", never "no link is waiting"', async () => {

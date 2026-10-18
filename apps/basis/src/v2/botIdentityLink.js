@@ -81,7 +81,9 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
     node: botAddress(), op, args, root, isRevoked: (r, deviceId) => tombstones.has(r, deviceId), nonces: seen, now,
     ...(windowMs ? { windowMs } : {}),
   });
-  const tell = (key, payload) => Promise.resolve(tellApp(key, payload)).catch(() => { /* the link stands; the app hears it on its next offer */ });
+  // never awaited: an app's device that is away must not hold the person's reply (the household's link steps took 23 s,
+  // the send waiting on a device that was not there)
+  const tell = (key, payload) => Promise.resolve().then(() => tellApp(key, payload)).catch(() => { /* the link stands; the app hears it on its next offer */ });
   return {
     /** `/koppel` alone: the link the person's Basis app opens, to their private door. */
     async start(person, text) {
@@ -106,7 +108,7 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
       const row = rows.find((r) => r.id === person);
       if (!row) return { ok: false, reason: 'not-admitted' };
       if (row.linkedRoot === o.root) {
-        await tell(o.webid, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: person, root: o.root, at: now() } });
+        void tell(o.webid, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: person, root: o.root, at: now() } });
         return { ok: true, already: true };
       }
       if (rows.some((r) => r.id !== person && (r.linkedRoot === o.root || r.id === o.webid || r.pubKey === o.webid))) return { ok: false, reason: 'key-on-another-row' };
@@ -134,7 +136,7 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
       const r = await users.linkKey(person, { root: p.root, webid: p.webid });
       if (!r.ok) return r;
       // the bot's statement to the app (the envelope is signed by the bot): which bot, which row, which root — it grants nothing
-      await tell(p.webid, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: person, root: p.root, at: now() } });
+      void tell(p.webid, { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: person, root: p.root, at: now() } });
       return { ok: true, linked: true };
     },
 
@@ -147,7 +149,7 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
         for (const g of (await listGrants().catch(() => [])) ?? []) {
           if (g?.viewPubKey === r.key) { try { await revokeView(r.key); } catch { /* the grant's TTL ends it */ } }
         }
-        await tell(r.key, { subtype: IDENTITY_LINK_SUBTYPE, unlinked: true, statement: { bot: botAddress(), row: person, root: r.root, at: now() } });
+        void tell(r.key, { subtype: IDENTITY_LINK_SUBTYPE, unlinked: true, statement: { bot: botAddress(), row: person, root: r.root, at: now() } });
       }
       return { ok: true };
     },
@@ -161,7 +163,7 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
      */
     async admittedWith(row, who) {
       if (!row?.linkedRoot || !who?.uid) return;
-      await tell(String(who.uid), { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: row.id, root: row.linkedRoot, at: now() } });
+      void tell(String(who.uid), { subtype: IDENTITY_LINK_SUBTYPE, statement: { bot: botAddress(), row: row.id, root: row.linkedRoot, at: now() } });
     },
 
     /**

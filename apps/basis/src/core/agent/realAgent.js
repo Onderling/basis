@@ -6147,8 +6147,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       // journey, and "true by accident of ordering" is how a fan-out path quietly stops being one.
       const inCircle = typeof args?.circleId === 'string' && args.circleId ? args.circleId : null;
       if (inCircle) await ensureCircleSync(inCircle);
-      // the person asking rides along (a handler that acts as them — a chore's tick — passes it on)
-      const result = await handler(args ?? {}, ctx);
+      // the person asking rides along (a handler that acts as them — a chore's tick — passes it on); a door's person
+      // as the internal id the tasks record (`actorOf`), in the context and never the args: no model's words can set it
+      const doorPerson = typeof ctx?.caller === 'string' && ctx.caller ? actorOf(ctx) : null;
+      const { person: _unvouched, ...ctxOwn } = ctx ?? {};
+      const result = await handler(args ?? {}, doorPerson ? { ...ctxOwn, person: doorPerson } : ctxOwn);
       // A door's read of a chores list says who holds each chore — as far as the names setting lets the asker see names
       if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
         return { ...result, items: await withChoreHolders(result.items, actorOf(ctx), doorCircleOf(ctx)) };

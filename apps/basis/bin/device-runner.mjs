@@ -872,7 +872,8 @@ if (tgToken || inboxDoor.bridge) {
   const built = await buildAssistantLlm({
     model: process.env.PRIVATEMODE_MODEL,
     // One retry on the fallback model after a timeout — said in the walk log, so a slow route is visible.
-    onFallback: (e) => walkLog({ kind: 'llm-fallback', ...e }),
+    // Stamped, so a week's fallbacks can be counted and set beside the turns (their op and ms) to confirm the timeout.
+    onFallback: (e) => walkLog({ kind: 'llm-fallback', at: new Date().toISOString(), ...e }),
     // a provider error reaches the model watch (an account over its limit is told to the admin)
     onProviderError: (err) => modelWatch.ref?.providerError(err),
     // the prompt cache (a cache per person), and every call's counts in the walk log: how much of the prompt came

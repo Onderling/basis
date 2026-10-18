@@ -133,6 +133,12 @@ const GATE_RULES = [
     const when = [m.day, m.time ?? m.span].filter(Boolean).join(' ');
     return (m.time || m.span) && text ? { opId: 'remindMe', args: { who: 'me', item: text, rules: when }, appOrigin: 'assistant' } : null;
   } },
+  // "wat is er deze week gedaan": the history — today, yesterday (two days) or the week
+  { id: 'lists.listDone.history', name: 'lists:listDone(history)', build: (_m, text) => {
+    const w = String(text).toLowerCase();
+    const days = /\b(vandaag|today)\b/.test(w) ? 1 : /\bgisteren\b/.test(w) ? 2 : 7;
+    return { opId: 'listDone', args: { days }, appOrigin: 'lists' };
+  } },
   // "wat moet Bob doen" / "welke klusjes heeft Ann": someone's own chores, by their name — before the list read, which
   // would take "klusjes" for the list; "ik", "je" and the like name nobody (the plain rule below, or the model)
   { id: 'tasks.listMine.who', name: 'tasks:listMine(who)', build: (m) => {

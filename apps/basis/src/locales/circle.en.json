@@ -5153,7 +5153,8 @@
           "createList": "a new list",
           "restoreList": "put a removed list back (within 30 days)",
           "removeList": "throw away a whole list",
-          "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)"
+          "entryReminders": "the reminders everyone gets for one appointment or chore (60 · morning · evening · also … · usual)",
+          "listDone": "what was done in the last days (say: what was done this week)"
         },
         "tasks": {
           "listMine": "your own chores, or someone else's (or say: what does Bob have to do)",
@@ -9118,6 +9119,30 @@
     "day_none": {
       "text": "Nothing on {{when}}.",
       "doc": "One day's read: no appointments and no chores that day."
+    },
+    "history_head": {
+      "text": "Done in the last {{days}} days:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_head_today": {
+      "text": "Done today:",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row": {
+      "text": "• {{title}} ({{list}}), {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_row_by": {
+      "text": "• {{title}} ({{list}}) — {{who}}, {{when}}",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none": {
+      "text": "Nothing was ticked off in the last {{days}} days.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
+    },
+    "history_none_today": {
+      "text": "Nothing has been ticked off today yet.",
+      "doc": "The household's history ('what was done this week'): the head, a row per thing done (who as the reader may see them), or none."
     }
   },
   "notes": {

@@ -452,5 +452,22 @@
       "wat vind je van de feedback",
       "geef feedback aan de buren"
     ]
+  },
+  "lists.listDone.history": {
+    "doc": "What was done in the last days (\"wat is er deze week gedaan\"): the household's history of ticked and completed things; today, yesterday or the week.",
+    "patterns": [
+      "wat is er (deze week|vandaag|gisteren)? (allemaal)? gedaan",
+      "wat (is|werd) er (allemaal)? (deze week|vandaag|gisteren)? gedaan",
+      "wie heeft er (deze week|vandaag)? wat gedaan"
+    ],
+    "examples": [
+      "Wat is er deze week allemaal gedaan",
+      "wat is er gedaan",
+      "wat is er vandaag gedaan"
+    ],
+    "not": [
+      "wat moet er gedaan worden",
+      "wat moet ik doen"
+    ]
   }
 }

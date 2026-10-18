@@ -420,5 +420,19 @@
     "not": [
       "what do you think of the feedback"
     ]
+  },
+  "lists.listDone.history": {
+    "doc": "What was done in the last days (\"wat is er deze week gedaan\"): the household's history of ticked and completed things; today, yesterday or the week.",
+    "patterns": [
+      "what (was|has been|got) done (today|this week)?",
+      "what did we do (today|this week)?"
+    ],
+    "examples": [
+      "what was done this week",
+      "what got done today"
+    ],
+    "not": [
+      "what needs to be done"
+    ]
   }
 }

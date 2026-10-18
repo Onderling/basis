@@ -82,7 +82,7 @@ const bareOf = (qualified) => String(qualified ?? '').slice(String(qualified ?? 
 const COLUMNS = {
   member: [
     // making, removing and putting back a list are everyone's (Frits 2026-10-05: a removed list can come back 30 days)
-    'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
+    'listLists', 'createList', 'removeList', 'restoreList', 'listEntries', 'listDone', 'addToList', 'markListItemDone', 'removeFromList', 'editEntry',
     // the reminders everyone gets for an entry: whoever may edit it may set them
     'entryReminders',
     // a line becomes a chore when someone says who does it or when: anyone who may add may say that
@@ -105,7 +105,7 @@ const COLUMNS = {
   ],
   admin: ['reassignTask', 'removeTask', 'editTask'],
   // An observer READS (core's role word: they look, they do not change): the member's reads and their own thread.
-  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned', 'assistant-feedback'],
+  observer: [encodeGenericOpId('household', 'list', 'note'), 'listLists', 'listEntries', 'listDone', 'shopVisit', 'listMine', 'listOpen', 'listEvents', 'assistant-hello', 'assistant-memory', 'assistant-forget', 'assistant-language', 'assistant-overview', 'weekOverview', 'sendWeekOverview', 'assistant-screen', 'assistant-screens', 'assistant-screen-confirm', 'assistant-screen-paste', 'assistant-menu', 'assistant-view', 'assistant-link', 'assistant-link-confirm', 'assistant-unlink', 'assistant-inapp', 'assistant-people', 'assistant-planned', 'assistant-feedback'],
 };
 
 /** The bot app that declares this op id, when exactly one does. */

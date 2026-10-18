@@ -6153,6 +6153,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
         return { ...result, items: await withChoreHolders(result.items, actorOf(ctx), doorCircleOf(ctx)) };
       }
+      // …and a door's read of what was done says who did it the same way — `{you}` · `{name}` · `{someone}`, never an id
+      if (appOrigin === 'lists' && opId === 'listDone' && Array.isArray(result?.items)) {
+        const reader = typeof ctx?.caller === 'string' && ctx.caller ? actorOf(ctx) : null;
+        const nameOf = reader ? await readerNamer(reader, doorCircleOf(ctx)) : null;
+        return { ...result, items: result.items.map(({ doneBy, ...row }) => (doneBy && nameOf ? { ...row, by: nameOf(doneBy) } : row)) };
+      }
       return result;
     }
     throw new Error(`realAgent: unknown appOrigin "${appOrigin}"`);

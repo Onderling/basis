@@ -93,6 +93,10 @@
     "entryReminders": {
       "text": "De herinneringen die iedereen krijgt voor één regel (een afspraak of een klusje met een datum), in woorden: \"60\" (minuten van tevoren), \"ochtend\", \"avond\" (de avond ervoor), \"7:30\", \"ook …\" om toe te voegen aan de gewone, \"gewoon\" om ze weg te halen. Voor één persoon alleen: remindMe.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "listDone": {
+      "text": "Wat er de afgelopen dagen GEDAAN is (afgevinkt of afgerond), op alle lijsten of één: \"wat is er deze week gedaan\", \"wat is er vandaag gedaan\". days = hoe ver terug (1 = vandaag, 7 = deze week, hooguit 31).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "assistant": {

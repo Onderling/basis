@@ -1985,10 +1985,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // which devices are mine.
   // The GENERAL persona's siblings: none on a device that does not hold it — never backed by the primary (this device's
   // first held self speaks for the device, it does not stand in for the general persona).
+  // an address this device answers at (any self's, any circle's) is never one of its siblings
+  const isOwnAddress = (addr) => Boolean(sa.agent.security?.selfIdentityFor?.(addr));
   const ownDeviceSiblingRows = async () => (!personas.has('default') ? [] : siblingDevices({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
     selfPubKey: chatId.pubKey,
     circleAddressFor,
+    isOwnAddress,
     // Both sources of "my circles", as the enrol offer reads them: the registry's memberships (what a
     // restore brings back) and the item store's (what a join or a create wrote here).
     circleIds: async () => {
@@ -2098,6 +2101,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       callSkill: (...a) => callSkill(...a),
       selfPubKey: rt.chatId.pubKey,
       circleAddressFor,
+      isOwnAddress,
       circleIds: async () => {
         const ids = new Set(Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})));
         try {

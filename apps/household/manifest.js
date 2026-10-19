@@ -114,7 +114,10 @@ export const householdManifest = {
     // what the household's people want everyone to know, in their own words ("de vuilnis gaat dinsdag buiten"): written by
     // PEOPLE, never the model (no tool to write or remove one), changed or removed only by its maker or an admin
     note:     { atoms: ['add', 'list', 'get', 'update', 'remove'], writtenBy: 'people',
-      presents: { label: 'text', moment: 'updatedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
+      // the person's own "+" (Vandaag): an own note, in the own store (the own route answers the declared `add`)
+      attach: { label: 'circle.vandaag.plus_own', scopes: ['own'],
+        fields: [{ name: 'body', kind: 'text', labelKey: 'circle.vandaag.plus_note_ph' }] },
+      presents: { primary: 'edit', label: 'text', moment: 'updatedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { one: 'notitie', other: 'notities' }, en: { one: 'note', other: 'notes' } } },
   },
 

@@ -6462,7 +6462,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // changed and cancelled the person's own appointments) — it falls to the circle's calendar below, as a door's note
     // falls to the circle's notes
     const calendarDoorCall = typeof ctx?.caller === 'string' && !!ctx.caller;
-    if (appOrigin === 'calendar' && personNode && !args?.circleId && !calendarDoorCall) {
+    // (the own scope named as the circle is the same own agenda — the person's "+" names it for every own entry alike)
+    if (appOrigin === 'calendar' && personNode && (!args?.circleId || args.circleId === OWN_DEVICES_SCOPE) && !calendarDoorCall) {
       ownCalendarReady ??= (async () => {
         ownCalendarStore = await getOwnStore();
         const tr = agentT;
@@ -8260,7 +8261,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     reminderSources: async () => {
       const store = householdService.stores.getStore(homeCircleId);
       const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
-      return { chores: chores ?? [], events: events ?? [] };
+      // …and the rows of every installed extension's SCHEDULED noun (its declared moment is its reminder anchor)
+      const manifests = [...installedExtensions.values()];
+      const scheduled = manifests.flatMap((m) => Object.entries(m?.nouns ?? {}).filter(([, n]) => n?.presents?.order === 'asc' && n?.presents?.moment).map(([noun]) => noun));
+      const others = (await Promise.all(scheduled.map((noun) => store.listByType(noun).catch(() => [])))).flat();
+      return { chores: chores ?? [], events: events ?? [], others, manifests };
     },
     /**
      * Whose profile this node runs: a PERSON's (their devices keep their inbox; nothing answers it) or a FUNCTION's

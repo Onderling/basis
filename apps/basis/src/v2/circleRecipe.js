@@ -68,6 +68,8 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   agents:        { order: 10, emoji: '🤝', places: ['mij'],    config: () => ({}) },
   // the notes across the page's circles — filterable by label (notes carry tags)
   notes:         { order: 11, emoji: '🗒️', places: ['mij'],    noun: 'note',    config: () => ({ limit: 5, labels: [] }) },
+  // the first steps on a new device: your handle, what Basis is, begin — the cards go as each is done
+  onboarding:    { order: 12, emoji: '👋', places: ['mij'],    config: () => ({}) },
 });
 for (const [type, d] of Object.entries(BLOCK_DESCRIPTORS)) {
   d.labelKey = `circle.recipe.block.${type}`;

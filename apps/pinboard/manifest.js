@@ -133,10 +133,10 @@ export const pinboardManifest = {
     post:          { atoms: ['add', 'list', 'claim', 'remove'] },
     ask:           { atoms: ['remove'] },
     // an offer or a request in a merged view: newest first; mine when I placed it (still open is the read's own filter)
-    offer:         { atoms: ['remove'], presents: { label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
+    offer:         { atoms: ['remove'], presents: { primary: 'open', label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { other: 'aanbod' }, en: { one: 'offer', other: 'offers' } } },
     lend:          { atoms: ['complete', 'reassign', 'remove'] },
-    request:       { atoms: ['remove'], presents: { label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
+    request:       { atoms: ['remove'], presents: { primary: 'open', label: 'title', moment: 'createdAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { one: 'vraag', other: 'vragen' }, en: { one: 'request', other: 'requests' } } },
     'group-leave': { atoms: ['remove'] },
     // No `remove` (retired 2026-09-22): dropping the book row is not deleting a contact — the row is the MemberMap

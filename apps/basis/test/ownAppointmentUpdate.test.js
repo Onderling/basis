@@ -8,6 +8,7 @@ import { memoryDataSource } from '@onderling/item-store';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { PERSON_NODE_STORE_OPTS } from '../src/v2/personNodeStore.js';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
+import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 
 const boot = async (ds) => createRealHouseholdAgent({ seedHousehold: false, ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
 const ownEvents = async (ds) => (await createOwnDevicesStore({ dataSource: ds }).listByType('calendar-event'));
@@ -51,5 +52,20 @@ describe("a person's own appointment can be changed", () => {
     const [after] = await ownEvents(ds);
     expect(after.title).toBe('van mij');
     expect(after.state ?? 'open').not.toBe('cancelled');
+  });
+
+  it("the own scope NAMED by a door's caller reaches no own appointment either (the sheet names it for every own act)", async () => {
+    const ds = memoryDataSource();
+    const a = await boot(ds);
+    const made = await a.callSkill('calendar', 'addEvent', { circleId: OWN_DEVICES_SCOPE, title: 'van mij', when: '2026-11-07T10:00:00.000Z' });
+    expect(made?.ok, 'the device itself reaches its own agenda with the own scope named').toBe(true);
+    const [ev] = await ownEvents(ds);
+    await a.setDoorCaller('door-person', 'admin');
+    const via = { caller: 'door-person', threadId: 'door-person', via: 'screen' };
+    await a.callSkill('calendar', 'updateEvent', { circleId: OWN_DEVICES_SCOPE, id: ev.id, title: 'overschreven' }, via).catch(() => null);
+    await a.callSkill('calendar', 'cancelEvent', { circleId: OWN_DEVICES_SCOPE, id: ev.id }, via).catch(() => null);
+    await a.callSkill('calendar', 'addEvent', { circleId: OWN_DEVICES_SCOPE, title: 'van de deur', when: '2026-11-08T10:00:00.000Z' }, via).catch(() => null);
+    const after = await ownEvents(ds);
+    expect(after.map((e) => [e.title, e.state ?? 'open'])).toEqual([['van mij', 'open']]);
   });
 });

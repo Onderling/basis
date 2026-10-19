@@ -108,13 +108,8 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
 
     /** CATCH-UP: ask every sibling for its current key; any one answer at or above mine is enough. */
     async requestFromSiblings() {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
-      let requested = 0;
-      for (const addr of addrs) {
-        try { await sendToPeer(addr, { subtype: PERSON_KEY_CATCHUP_SUBTYPES.request, subject: selfPubKey }, { guarantee: 'hold-forward' }); requested += 1; } catch { /* next sibling */ }
-      }
-      return { requested };
+      const r = await carry({ subtype: PERSON_KEY_CATCHUP_SUBTYPES.request, subject: selfPubKey }, { quiet: true });
+      return { requested: r.outcomes.filter((o) => !o.error).length };
     },
 
     handlers: {

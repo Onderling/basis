@@ -1383,6 +1383,122 @@
     "plus_as": {
       "text": "As whom?",
       "doc": "Vandaag → '+': several selves are ticked in the header — which one this is written as."
+    },
+    "plus_edit": {
+      "text": "Change",
+      "doc": "The \"+\" sheet's title when opened on an own row (change it or take it away)."
+    },
+    "plus_remove": {
+      "text": "Remove",
+      "doc": "The \"+\" sheet's button that takes an own note/appointment away."
+    },
+    "plus_line_ph": {
+      "text": "Say what you want — \"note: milk\", \"appointment tomorrow 14:00 dentist\"",
+      "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
+    },
+    "plus_line_unread": {
+      "text": "I could not read that — fill in the fields below.",
+      "doc": "The free line could not be read: the person fills the fields."
+    },
+    "act_done": {
+      "text": "Done",
+      "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
+    },
+    "act_edit": {
+      "text": "Change",
+      "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
+    },
+    "act_open": {
+      "text": "Open",
+      "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
+    },
+    "group_now": {
+      "text": "Now",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_soon": {
+      "text": "Soon",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_later": {
+      "text": "Later today",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_tomorrow": {
+      "text": "Tomorrow",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_after": {
+      "text": "After that",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "tasks_done": {
+      "text": "Done ({{count}})",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "at_time": {
+      "text": "at {{time}}",
+      "doc": "A card's moment today on Vandaag: the time of day (\"om 14:00\")."
+    },
+    "group_past": {
+      "text": "Earlier",
+      "doc": "Vandaag's day shape: appointments that started more than two hours ago, folded last."
+    },
+    "onboarding_handle_title": {
+      "text": "What you are called here",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_hint": {
+      "text": "Your name for people in your circles. You can change it later in Me.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_ph": {
+      "text": "a short name",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_save": {
+      "text": "Save",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_empty": {
+      "text": "Type a name first.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_title": {
+      "text": "New to Basis?",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_1": {
+      "text": "Your messages are encrypted.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_2": {
+      "text": "You need no account.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_3": {
+      "text": "A circle is the people you know: a household, a street, a club.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_more": {
+      "text": "Read more",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_dismiss": {
+      "text": "Got it",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_title": {
+      "text": "Begin",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_create": {
+      "text": "Make a circle",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_join": {
+      "text": "I have an invitation",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     }
   },
   "screens": {
@@ -1500,6 +1616,10 @@
       "notes": {
         "text": "Notes",
         "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "onboarding": {
+        "text": "First steps",
+        "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       }
     },
     "block_desc": {
@@ -1550,6 +1670,10 @@
       "notes": {
         "text": "The notes in your circles, optionally only those with certain labels.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "onboarding": {
+        "text": "Your handle, what Basis is, and how to begin — each card goes once it is done.",
+        "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       }
     },
     "editor": {

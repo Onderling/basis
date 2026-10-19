@@ -24,6 +24,7 @@
  * be refused. The offline half: the answer to "which circles are you in" names what the answerer LEFT as well, so a
  * device that slept through the leave leaves on connect; a carry never re-joins a circle a sibling has left.
  */
+import { makeSiblingCarry } from './siblingCarry.js';
 
 export const CIRCLE_FOLLOW_SUBTYPES = Object.freeze({
   carry:   'device-circle-joined',    // "I am in this circle now" — the entry a sibling can join from
@@ -59,6 +60,8 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     return addrs.includes(fromAddr);
   };
   const wire = (circle) => ({ subtype: CIRCLE_FOLLOW_SUBTYPES.carry, circle });
+  // the ONE sibling carry (siblingCarry.js): a circle's entry to the devices holding that circle's self (its nested id)
+  const { carry } = makeSiblingCarry({ siblings: (p) => siblings(p?.circle?.id), sendToPeer, onWarn: () => {} });
   // NESTED, like the carry's `circle`: a top-level `circleId` is what the sibling send reads as the circle to SPEAK IN,
   // and the circle just left is the one circle it must not speak in (the sibling table names the ones still shared).
   const leftWire = (circleId) => ({ subtype: CIRCLE_FOLLOW_SUBTYPES.left, circle: { id: circleId } });
@@ -124,12 +127,9 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
       try { entries = (await myEntries()) ?? []; } catch { return { attempted: 0 }; }
       const circle = entries.find((e) => e?.id === circleId);
       if (!validEntry(circle)) return { attempted: 0 };
-      let addrs = [];
-      // the siblings of the circle's own self (a persona's circle: only the devices holding that persona)
-      try { addrs = (await siblings(circleId)) ?? []; } catch { return { attempted: 0 }; }
-      let attempted = 0;
-      await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, wire(circle), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
-      return { attempted };
+      // to the siblings of the circle's own self (a persona's circle: only the devices holding that persona); one that
+      // misses it asks on connect
+      return { attempted: (await carry(wire(circle))).attempted };
     },
 
     /** LIVE: the person put `circleId` away here, or took it out — the entry carries the new mark to every sibling. */
@@ -138,23 +138,13 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     /** LIVE: this device just left `circleId` — tell every sibling. */
     async fanLeft(circleId) {
       if (typeof circleId !== 'string' || !circleId) return { attempted: 0 };
-      let addrs = [];
-      // the siblings of the circle's own self (a persona's circle: only the devices holding that persona)
-      try { addrs = (await siblings(circleId)) ?? []; } catch { return { attempted: 0 }; }
-      let attempted = 0;
-      await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, leftWire(circleId), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
-      return { attempted };
+      return { attempted: (await carry(leftWire(circleId))).attempted };
     },
 
     /** CATCH-UP: ask every sibling which circles it is in; each answers with one carry per circle, then one left per circle left. */
     async requestFromSiblings() {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
-      let requested = 0;
-      for (const to of addrs) {
-        try { await sendToPeer(to, { subtype: CIRCLE_FOLLOW_SUBTYPES.request }, { holdKey: CIRCLE_FOLLOW_SUBTYPES.request }); requested += 1; } catch { /* next sibling */ }
-      }
-      return { requested };
+      const r = await carry({ subtype: CIRCLE_FOLLOW_SUBTYPES.request }, { sendOpts: { holdKey: CIRCLE_FOLLOW_SUBTYPES.request }, quiet: true });
+      return { requested: r.outcomes.filter((o) => !o.error).length };
     },
 
     handlers: {

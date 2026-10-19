@@ -14,7 +14,7 @@
  * Today's rhythm is `householdRules(lead)`: the morning, the evening before (early appointments), and `before:<lead>`.
  */
 import { wallClockInTz, utcInstantForWallClock } from '@onderling/notifier';
-import { parseReminderRule } from '@onderling/item-types';
+import { parseReminderRule, timeAnchorOf } from '@onderling/item-types';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** The evening before is only for an appointment starting before this, the next morning (an earlier one than the 08:00 message). */
@@ -133,6 +133,8 @@ function momentOf(parsed, layer, item, tz, eveningBeforeUntil) {
  * @param {object} a
  * @param {object[]} [a.chores]   tasks with a `dueAt`
  * @param {object[]} [a.events]   appointments with a `startsAt`
+ * @param {object[]} [a.others]   rows of any other type whose moment its declaration names (`timeAnchorOf`)
+ * @param {object[]} [a.manifests]  the declarations those types come from
  * @param {Array<{id: string}>} [a.people]  the household (an appointment that names no one is for everyone)
  * @param {number} a.now
  * @param {string} a.tz
@@ -140,12 +142,28 @@ function momentOf(parsed, layer, item, tz, eveningBeforeUntil) {
  * @param {number} [a.horizon]   how far ahead to list (planned); 0 = only what is due now
  * @param {string} [a.eveningBeforeUntil]
  */
-export function reminderOccurrences({ chores = [], events = [], people = [], now, tz, rulesFor = () => householdRules(0), horizon = 0, eveningBeforeUntil = EVENING_BEFORE_UNTIL } = {}) {
+export function reminderOccurrences({ chores = [], events = [], others = [], manifests = [], people = [], now, tz, rulesFor = () => householdRules(0), horizon = 0, eveningBeforeUntil = EVENING_BEFORE_UNTIL } = {}) {
+  // every item's moment is its type's TIME ANCHOR (`timeAnchorOf`): the frozen table for appointments and chores, a
+  // declared scheduled noun's own moment for any other — no reminder code per type
+  const EVENT_AT = timeAnchorOf('calendar-event');
+  const CHORE_AT = timeAnchorOf('task');
+  const declared = (type) => (manifests ?? []).map((m) => m?.nouns?.[type]?.presents).find(Boolean) ?? null;
   const items = [
-    ...events.filter((e) => e && e.state !== 'cancelled' && !e.completedAt && Number.isFinite(ms(e.startsAt)))
-      .map((e) => ({ id: e.id, kind: 'event', text: e.title ?? '', anchor: ms(e.startsAt), anchorIso: e.startsAt, createdAt: e.createdAt, to: remindedFor(e, people), source: e })),
-    ...chores.filter((c) => c && !c.completedAt && Number.isFinite(ms(c.dueAt)))
-      .map((c) => ({ id: c.id, kind: 'chore', text: c.text ?? c.title ?? '', anchor: ms(c.dueAt), anchorIso: c.dueAt, createdAt: c.createdAt, to: [...new Set([...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter(Boolean))], source: c })),
+    ...events.filter((e) => e && e.state !== 'cancelled' && !e.completedAt && Number.isFinite(ms(e[EVENT_AT])))
+      .map((e) => ({ id: e.id, kind: 'event', text: e.title ?? '', anchor: ms(e[EVENT_AT]), anchorIso: e[EVENT_AT], createdAt: e.createdAt, to: remindedFor(e, people), source: e })),
+    ...chores.filter((c) => c && !c.completedAt && Number.isFinite(ms(c[CHORE_AT])))
+      .map((c) => ({ id: c.id, kind: 'chore', text: c.text ?? c.title ?? '', anchor: ms(c[CHORE_AT]), anchorIso: c[CHORE_AT], createdAt: c.createdAt, to: [...new Set([...(Array.isArray(c.assignees) ? c.assignees : []), c.assignee].filter(Boolean))], source: c })),
+    // a declared noun's rows: worded by its label, for the people its `mine` fields name (none named → everyone), not
+    // once it is done; reminded like a chore (an appointment's evening-before is an appointment's)
+    ...(others ?? []).flatMap((r) => {
+      const at = r && typeof r.type === 'string' ? timeAnchorOf(r.type, { manifests }) : null;
+      if (!at || !Number.isFinite(ms(r[at])) || r.completedAt) return [];
+      const p = declared(r.type) ?? {};
+      if (p.done?.field && (Array.isArray(p.done.values) ? p.done.values.includes(r[p.done.field]) : Boolean(r[p.done.field]))) return [];
+      const named = (Array.isArray(p.mine) ? p.mine : []).flatMap((k) => (Array.isArray(r[k]) ? r[k] : [r[k]])).map((x) => x?.webid ?? x).filter((x) => typeof x === 'string' && x);
+      const text = String((p.label ? r[p.label] : null) ?? r.title ?? r.text ?? r.body ?? '');
+      return [{ id: r.id, kind: 'item', text, anchor: ms(r[at]), anchorIso: r[at], createdAt: r.createdAt, to: named.length ? [...new Set(named)] : people.map((x) => x.id), source: r }];
+    }),
   ];
   const out = [];
   for (const item of items) {

@@ -19,6 +19,7 @@
  * like any of them — nothing on a relay binds it to the choice. The window after a revoke for a card-only contact
  * (alpha plan W4) closes with a per-contact channel, not here.
  */
+import { makeSiblingCarry } from './siblingCarry.js';
 
 export const PRIMARY_DEVICE_VAULT_KEY = 'primary-device';
 export const PRIMARY_DEVICE_SUBTYPES = Object.freeze({
@@ -49,6 +50,8 @@ export function claimSupersedes(next, cur) {
  * @param {() => number} [a.now]
  */
 export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, sendToPeer, onChanged = null, now = () => Date.now() } = {}) {
+  // the ONE sibling carry (siblingCarry.js) for the claim and the ask; an answer to one device is a reply
+  const { carry } = makeSiblingCarry({ siblings: () => siblings(), sendToPeer, onWarn: () => {} });
   if (typeof siblings !== 'function') throw new Error('primaryDevice: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('primaryDevice: `sendToPeer` is required');
   let claim = null;
@@ -91,18 +94,14 @@ export function createPrimaryDeviceChoice({ vault, myDeviceId = null, siblings, 
       await store(next);
       changed(was);
       let attempted = 0;
-      try {
-        const addrs = (await siblings()) ?? [];
-        await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, wire(next), { guarantee: 'hold-forward' }); } catch { /* follows by request */ } }));
-      } catch { /* no siblings reachable now; they ask on connect */ }
+      // the ONE sibling carry; a sibling that misses it follows by request
+      try { attempted = (await carry(wire(next))).attempted; } catch { /* no siblings reachable now; they ask on connect */ }
       return { ok: true, claim: next, attempted };
     },
     /** A fresh device asks its siblings for the current claim. */
     async requestFromSiblings() {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { attempted: 0 }; }
-      await Promise.all(addrs.map((to) => sendToPeer(to, { subtype: PRIMARY_DEVICE_SUBTYPES.request }, { holdKey: PRIMARY_DEVICE_SUBTYPES.request }).catch(() => {})));
-      return { attempted: addrs.length };
+      const r = await carry({ subtype: PRIMARY_DEVICE_SUBTYPES.request }, { sendOpts: { holdKey: PRIMARY_DEVICE_SUBTYPES.request }, quiet: true });
+      return { attempted: r.attempted };
     },
     handlers: {
       [PRIMARY_DEVICE_SUBTYPES.carry]: async (fromAddr, payload) => {

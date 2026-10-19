@@ -63,7 +63,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       }
     };
     if (s.reminders === 'off') { await sayHeldAlone(); return { sent: 0 }; }
-    const { chores = [], events = [] } = (await sources()) ?? {};
+    const { chores = [], events = [], others = [], manifests = [] } = (await sources()) ?? {};
     const people = rows.map((r) => ({ id: r.id, role: r.role ?? null, revoked: Boolean(r.hidden), remindersOff: !threads.remindersOn(r.id), quiet: threads.quietOf?.(r.id) ?? null }));
     const said = Object.fromEntries(rows.map((r) => [r.id, threads.saidOf(r.id)]));
     // the rules per person per item: the household's list, then their own default, the item's own, their own for it
@@ -72,7 +72,7 @@ export function createReminderTick({ sources, users, threads, reach, t, tz, sett
       household, personDefault: threads.reminderDefaultOf?.(personId) ?? null,
       item: item?.reminders ?? null, personItem: threads.reminderExtraOf?.(personId, item?.id) ?? null,
     });
-    const due = dueReminders({ chores, events, people, said, done: marks.ids(), now: at, tz, rulesFor, ...(s.quiet ? { quiet: s.quiet } : {}) });
+    const due = dueReminders({ chores, events, others, manifests, people, said, done: marks.ids(), now: at, tz, rulesFor, ...(s.quiet ? { quiet: s.quiet } : {}) });
     let sent = 0;
     for (const { personId, items } of due) {
       const first = !threads.remindedOnce(personId);

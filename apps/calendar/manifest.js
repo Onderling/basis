@@ -220,6 +220,22 @@ export const calendarManifest = {
       },
     },
 
+    // An own appointment shared with a CONTACT: a copy in their pair circle (title, when, length), re-shared on a move
+    // or a cancel. A person's own act: a button, no chat tool — the model never decides what crosses to a contact.
+    {
+      id:    'shareEvent',
+      verb:  'share',
+      writes: { scope: 'circle' },
+      appliesTo: { type: 'calendar-event', state: ['open'] },
+      params: [
+        { name: 'id',   kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },
+        { name: 'with', kind: 'string', required: true },
+      ],
+      surfaces: {
+        ui: { control: 'button', labelKey: 'circle.button.calendar.shareEvent', label: 'Share with…' },
+      },
+    },
+
     /* ──── Snapshot + search ──── */
     /**
      * `getEventSnapshot(id)` — cardSnapshotSkill for /embed-time.

@@ -8201,7 +8201,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     reminderSources: async () => {
       const store = householdService.stores.getStore(homeCircleId);
       const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
-      return { chores: chores ?? [], events: events ?? [] };
+      // …and the rows of every installed extension's SCHEDULED noun (its declared moment is its reminder anchor)
+      const manifests = [...installedExtensions.values()];
+      const scheduled = manifests.flatMap((m) => Object.entries(m?.nouns ?? {}).filter(([, n]) => n?.presents?.order === 'asc' && n?.presents?.moment).map(([noun]) => noun));
+      const others = (await Promise.all(scheduled.map((noun) => store.listByType(noun).catch(() => [])))).flat();
+      return { chores: chores ?? [], events: events ?? [], others, manifests };
     },
     /**
      * Whose profile this node runs: a PERSON's (their devices keep their inbox; nothing answers it) or a FUNCTION's

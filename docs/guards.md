@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 53
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 54
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -52,6 +52,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `retired-modules` | — | a RETIRED module must stay dead (the legacy-deletion-after-cutover discipline) |
 | `revocation-resolver` | — | a revocation resolver is taken at CONSTRUCTION; nothing may replace one later |
 | `scope-leaks` | — | no CROSS-SCOPE REFERENCE LEAKS in the RN shell screens |
+| `screen-sections` | — | a hand-painted screen whose sections are DECLARED (`apps/basis/src/v2/screenSections.js`) is |
 | `sealed-at-rest` | — | every local store a shell builds is sealed on the way to disk |
 | `searchable-sources` | — | every source file must be findable by search |
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |

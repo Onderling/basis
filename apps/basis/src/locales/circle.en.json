@@ -1387,6 +1387,18 @@
     "plus_line_unread": {
       "text": "I could not read that — fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."
+    },
+    "act_done": {
+      "text": "Done",
+      "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
+    },
+    "act_edit": {
+      "text": "Change",
+      "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
+    },
+    "act_open": {
+      "text": "Open",
+      "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
     }
   },
   "screens": {

@@ -4365,6 +4365,10 @@ function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
   // an own row (no circle): the "+" sheet opened on it — change it or take it away
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
+  // a card's one action that IS an op (a chore done): through the waist, then the page repaints
+  else if (action?.kind === 'row-op' && action.op?.app && action.op?.opId) {
+    Promise.resolve(rawCallSkill(action.op.app, action.op.opId, action.op.args ?? {})).catch(() => null).then(() => _showVandaag());
+  }
 }
 
 // (Batch 5) `showStream` is GONE — the cross-circle Stream VIEW retired (α.3 already removed its tab;

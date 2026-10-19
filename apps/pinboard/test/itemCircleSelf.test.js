@@ -33,7 +33,7 @@ describe("an item's circle decides the device's self on it", () => {
   });
   it("acceptResponder in a persona's circle records the persona", async () => {
     const { store, call } = skills();
-    const item = await seed(store, 'circle:werk', PERSONA, { type: 'request', kind: undefined });
+    const item = await seed(store, 'circle:werk', PERSONA, { type: 'request', kind: undefined, source: { groupId: 'circle:werk', responders: ['webid:mel'] } });
     const r = await call('acceptResponder', { requestId: item.id, responderWebid: 'webid:mel' });
     expect(r.request.completedBy).toBe(PERSONA);
   });
@@ -57,7 +57,7 @@ describe('only the poster completes their post', () => {
   });
   it('acceptResponder: a co-member, an admin → not-the-poster; the poster → accepted, the responder as the claim', async () => {
     const { store, call } = skills();
-    const req = await seed(store, 'circle:werk', PERSONA, { type: 'request', kind: undefined });
+    const req = await seed(store, 'circle:werk', PERSONA, { type: 'request', kind: undefined, source: { groupId: 'circle:werk', responders: ['webid:mel'] } });
     expect((await call('acceptResponder', { requestId: req.id, responderWebid: 'webid:mel' }, 'webid:bram')).error).toBe('not-the-poster');
     expect((await call('acceptResponder', { requestId: req.id, responderWebid: 'webid:mel' }, 'webid:admin')).error).toBe('not-the-poster');
     expect((await store.getById(req.id)).completedAt ?? null).toBe(null);

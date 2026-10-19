@@ -57,4 +57,16 @@ describe('makeHandleThreadedChat', () => {
     const d = deps({ deliverToThread: vi.fn(() => { throw new Error('store down'); }) });
     expect(() => makeHandleThreadedChat(d)('peer-B', { body: 'hi' })).not.toThrow();
   });
+
+  it("an answer threaded under a request tells the agent WHO sent it — the door's sender address, never the body's", async () => {
+    const d = deps({ noteAnswer: vi.fn(async () => ({ recorded: true })) });
+    makeHandleThreadedChat(d)('addr-B-in-circle', { body: 'ja', threadId: 'req-1', fromWebid: 'webid:someone-else' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(d.noteAnswer).toHaveBeenCalledWith('addr-B-in-circle', 'req-1');
+    expect(d.deliverToThread).toHaveBeenCalled();   // the DM still lands, threaded under the request
+    const plain = deps({ noteAnswer: vi.fn() });
+    makeHandleThreadedChat(plain)('addr-B', { body: 'hoi' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(plain.noteAnswer).not.toHaveBeenCalled();
+  });
 });

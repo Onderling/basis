@@ -9179,6 +9179,7 @@ async function boot() {
             },
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+            noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.

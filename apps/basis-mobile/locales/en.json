@@ -154,46 +154,6 @@
     },
     "nav": {}
   },
-  "responder": {
-    "header_offer_of_help": {
-      "text": "📩 Offer of help on your post",
-      "doc": "Header of the responder-card bubble (inbound help-with-response, #271)"
-    },
-    "btn_accept": {
-      "text": "Accept",
-      "doc": "[Accept] button on responder card"
-    },
-    "btn_decline": {
-      "text": "Decline",
-      "doc": "[Decline] button on responder card"
-    },
-    "btn_counter": {
-      "text": "Counter",
-      "doc": "[Counter] button on responder card — opens an inline counter-offer prompt"
-    },
-    "accepting": {
-      "text": "Accepting…",
-      "doc": "Pending bubble while acceptResponder is in flight"
-    },
-    "accepted": {
-      "text": "✓ Accepted — both sides notified",
-      "doc": "Bot bubble after Accept succeeds + help-with-accepted envelope sent"
-    },
-    "accept_failed": {
-      "text": "Accept failed: {{error}}",
-      "doc": "Bot bubble when acceptResponder substrate call rejects"
-    },
-    "declined": {
-      "text": "✗ Declined",
-      "doc": "Bot bubble after Decline (no substrate call; fires help-with-declined envelope)"
-    }
-  },
-  "dm": {
-    "counter_prompt": {
-      "text": "Reply with a counter-offer in this DM.",
-      "doc": "Inline prompt bubble shown after [Counter] tap on responder-card (#271)"
-    }
-  },
   "nav": {
     "chat": {
       "text": "Chat",

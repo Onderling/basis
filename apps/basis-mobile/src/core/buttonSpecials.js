@@ -45,7 +45,7 @@
  * @param {string}   args.buttonLabel
  * @param {function} args.t            localiser
  * @param {object} [args.embed] item.embed forwarded from the rendered list-row (followup-1)
- * @param {object} [args.extra] Bundle H Phase 4 — extra context attached by the bubble (e.g. responder-card forwards `{fromAddr}` on its Accept/Decline/Counter taps so the intercept knows whom to address)
+ * @param {object} [args.extra] extra context a bubble attaches to its tap
  * @returns {InterceptResult}
  */
 export function interceptButtonTap({ opId, itemId, buttonLabel, t, embed, extra, peerAddr }) {
@@ -117,45 +117,6 @@ export function interceptButtonTap({ opId, itemId, buttonLabel, t, embed, extra,
       kind:    'inline-text',
       userBubble: t('chat.button_tap', { label: buttonLabel, item: itemId }),
       text:    t('chat.download_not_wired', { fileId: itemId }),
-    };
-  }
-
-  // responder-card taps. The card surfaces
-  // when an inbound `help-with-response` envelope arrives in a DM
-  // thread (someone offered to help with your post).  Three button
-  // intercepts plus the corresponding peer-message side-effects:
-  //
-  //   [Accept]  → callSkill('pinboard','acceptResponder',{requestId, responderWebid})
-  //               + send 'help-with-accepted' envelope back over NKN
-  //   [Decline] → send 'help-with-declined' envelope back over NKN
-  //   [Counter] → append an inline counter-prompt bubble in the DM
-  //
-  // The intercept ONLY produces the action shape; ChatScreen's
-  // applyButtonSpecial executes it (callSkill + sendPeer happen there).
-  if (opId === 'acceptResponder') {
-    return {
-      handled: true,
-      kind:    'accept-responder',
-      userBubble: t('chat.button_tap', { label: buttonLabel, item: itemId }),
-      requestId: itemId,
-      responderAddr: extra?.fromAddr ?? null,
-    };
-  }
-  if (opId === 'declineResponder') {
-    return {
-      handled: true,
-      kind:    'decline-responder',
-      userBubble: t('chat.button_tap', { label: buttonLabel, item: itemId }),
-      requestId: itemId,
-      responderAddr: extra?.fromAddr ?? null,
-    };
-  }
-  if (opId === 'counterResponder') {
-    return {
-      handled: true,
-      kind:    'counter-responder',
-      userBubble: t('chat.button_tap', { label: buttonLabel, item: itemId }),
-      text:    t('dm.counter_prompt'),
     };
   }
 

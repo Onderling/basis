@@ -39,13 +39,11 @@ const MOBILE = readFileSync(dir('../../../basis-mobile/src/screens/ChatScreen.js
  * now route). Adding here is a decision about parity, not a way to make the test green.
  */
 const KNOWN_DIFFERENCES = {
-  // Mobile-only, all four from the retired `tasks-mobile` salvage: the peer-intro handshake and the
-  // `help-with-*` subtypes have no web sender or receiver at all (`circle-post` DID have a shared sender —
-  // realAgent fans it on postRequest — and web now receives it too). Deleting them from
-  // mobile is the parity move; until someone does, they are recorded here rather than hidden.
+  // Mobile-only, from the retired `tasks-mobile` salvage: the peer-intro handshake has no web sender or receiver at
+  // all (`circle-post` DID have a shared sender — realAgent fans it on postRequest — and web now receives it too; the
+  // `help-with-*` card route was deleted 2026-10-19: the poster accepts on the request). Deleting it from mobile is the
+  // parity move; until someone does, it is recorded here rather than hidden.
   'circle-peer-intro':    'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
-  'help-with-accepted':   'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
-  'help-with-response':   'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
 };
 
 /** The handler-map region of each composition: from the router/builder start to `defaultHandler`. */

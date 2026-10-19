@@ -4,12 +4,12 @@
  * without a bespoke projection is listed and reachable here — no-arg ops run through
  * the waist, arg-taking ops point at their chat form — plus the register's settable
  * values through the one kind-gated `set-param`. The rows come from the SHARED
- * projections (`advancedOpRows` / `advancedParamRows`); this component only paints.
+ * projections (`advancedOpRows` / `settingsProjection`); this component only paints.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { advancedOpRows, advancedParamRows } from '@onderling-app/basis';
+import { advancedOpRows, settingsProjection } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import OpPageModal from './OpPageModal.js';
@@ -20,7 +20,6 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const ops = useMemo(() => advancedOpRows({ manifests: Object.values(manifestsByOrigin) }), [manifestsByOrigin]);
   const [params, setParams] = useState([]);
-  const [drafts, setDrafts] = useState({});
   const [flash, setFlash] = useState({});
   // An argument-taking op opens as a FORM of its own (the shared page paint) — never only "in chat".
   const [openRow, setOpenRow] = useState(null);
@@ -34,18 +33,25 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
     (async () => {
       try {
         const r = await callSkill?.('params', 'list-user-params', {});
-        if (alive) setParams(advancedParamRows(r));
+        if (alive) setParams(Array.isArray(r?.params) ? r.params : []);
       } catch { /* register absent → ops only */ }
     })();
     return () => { alive = false; };
   }, [callSkill]);
 
-  const saveParam = async (p) => {
-    const raw = drafts[p.key] ?? JSON.stringify(p.value ?? p.default);
-    let value; try { value = JSON.parse(raw); } catch { value = raw; }
-    const r = await callSkill?.('params', 'set-param', { key: p.key, value }).catch(() => ({ ok: false }));
-    setFlash((f) => ({ ...f, [p.key]: r?.ok ? '✓' : '✗' }));
-    setTimeout(() => setFlash((f) => ({ ...f, [p.key]: null })), 1200);
+  // projected from the register (labels, a control per kind, grouped by scope); a change is the one `set-param` op
+  const settings = useMemo(() => settingsProjection(params), [params]);
+  const setParam = async (row, input) => {
+    const value = settings.valueFor(row, input);
+    let said;
+    if (value && typeof value === 'object' && !Array.isArray(value) && value.error) said = t(value.error);
+    else {
+      const r = await callSkill?.('params', 'set-param', { key: row.key, value }).catch(() => ({ ok: false }));
+      said = r?.ok ? '✓' : t('circle.params.save_failed');
+      if (r?.ok) setParams((ps) => ps.map((p) => (p.key === row.key ? { ...p, value } : p)));
+    }
+    setFlash((f) => ({ ...f, [row.key]: said }));
+    setTimeout(() => setFlash((f) => ({ ...f, [row.key]: null })), 1500);
   };
 
   const runOp = async (o) => {
@@ -66,20 +72,43 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
 
       <Text style={styles.section}>{t('circle.advanced.params_title')}</Text>
       <Text style={styles.hint}>{t('circle.advanced.params_hint')}</Text>
-      {params.map((p) => (
-        <View key={p.key} style={styles.row}>
-          <Text style={styles.code}>{p.key} ({p.scope})</Text>
-          <View style={styles.controls}>
-            <TextInput
-              style={styles.input}
-              defaultValue={JSON.stringify(p.value ?? p.default)}
-              onChangeText={(v) => setDrafts((d) => ({ ...d, [p.key]: v }))}
-              testID={`advanced-param-${p.key}`}
-            />
-            <Pressable style={styles.btn} onPress={() => saveParam(p)}>
-              <Text style={styles.btnText}>{flash[p.key] ?? t('circle.advanced.save')}</Text>
-            </Pressable>
-          </View>
+      {settings.groups.map((g) => (
+        <View key={g.scope} testID={`settings-group-${g.scope}`}>
+          <Text style={styles.group}>{t(g.labelKey)}</Text>
+          {g.rows.map((row) => (
+            <View key={row.key} style={styles.row} testID={`settings-row-${row.key}`}>
+              <Text style={styles.label}>{t(row.labelKey)}</Text>
+              <View style={styles.controls}>
+                {row.control.kind === 'switch' ? (
+                  <Switch value={row.value === true} onValueChange={(v) => setParam(row, v)} testID={`settings-param-${row.key}`} />
+                ) : row.control.kind === 'choice' ? (
+                  <View style={styles.chips}>
+                    {row.control.options.map((o) => (
+                      <Pressable key={String(o.value)} onPress={() => setParam(row, o.value)} accessibilityRole="button"
+                        style={[styles.chip, o.value === row.value ? styles.chipOn : null]} testID={`settings-param-${row.key}-${o.value}`}>
+                        <Text style={styles.chipText}>{t(o.labelKey)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : (
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      defaultValue={String(row.shown ?? '')}
+                      keyboardType={row.control.kind === 'number' || row.control.kind === 'duration' ? 'numeric' : 'default'}
+                      onEndEditing={(e) => setParam(row, e.nativeEvent.text)}
+                      testID={`settings-param-${row.key}`}
+                    />
+                    {row.control.kind === 'duration' ? <Text style={styles.hint}>{t(`circle.params.unit_${row.control.unit}`)}</Text> : null}
+                    {row.control.kind === 'list' ? <Text style={styles.hint}>{t('circle.params.list_hint')}</Text> : null}
+                  </>
+                )}
+                {flash[row.key] ? <Text style={styles.hint}>{flash[row.key]}</Text> : null}
+              </View>
+              {/* the raw key, small: a value whose label is missing stays findable */}
+              <Text style={styles.code}>{row.key}</Text>
+            </View>
+          ))}
         </View>
       ))}
 
@@ -147,7 +176,12 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   hint:     { fontSize: 12, color: theme.color.inkSoft },
   group:    { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: theme.color.inkSoft, marginTop: 18, marginBottom: 4 },
   row:      { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
-  code:     { fontSize: 13, color: theme.color.ink, fontFamily: 'monospace' },
+  code:     { fontSize: 10, color: theme.color.inkSoft, fontFamily: 'monospace', marginTop: 2 },
+  label:    { fontSize: 14, color: theme.color.ink, marginBottom: 4 },
+  chips:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
+  chip:     { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, borderColor: theme.color.line },
+  chipOn:   { borderColor: theme.color.accent, backgroundColor: theme.color.paper2 },
+  chipText: { fontSize: 13, color: theme.color.ink },
   controls: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 },
   input:    { flex: 1, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, padding: 6, color: theme.color.ink, fontSize: 13 },
   opRight: { alignItems: 'flex-end', gap: 4 },

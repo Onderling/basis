@@ -67,7 +67,7 @@ export async function run({ relayUrl }) {
       const t = await g.tally({ circleId: CIRCLE, proposalId }).catch(() => null);
       return t ?? null;
     };
-    // The vote responses carry the tally, which is the shape a caller actually gets back.
+    // The vote responses carry the tally, which is the shape a caller actually gets back (pending, approved or rejected alike).
     const tallies = [proposal, bramVote, catoVote].map((r) => r?.tally ?? null);
     check('every vote came back with a tally', tallies.every(Boolean), JSON.stringify(tallies)?.slice(0, 200));
 

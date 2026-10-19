@@ -64,7 +64,7 @@ describe('the admin enact gate (Decision A)', () => {
     expect(tip).toMatchObject({ status: DECISION_STATUS.PENDING });                                 // 2/4
     asMember.events.push(voteEvent({ proposalId, voter: 'm1', choice: 'yes' }));
     const tip1 = await asMember.gov.tally({ circleId: 'c1', proposalId });                            // 3/4 → approved
-    expect(tip1).toMatchObject({ status: DECISION_STATUS.APPROVED, awaitingEnactment: true });
+    expect(tip1).toMatchObject({ status: DECISION_STATUS.APPROVED, awaitingEnactment: true, tally: { yes: 3, of: 4 } });   // every reply carries the count
     expect(asMember.callSkill).not.toHaveBeenCalledWith('pinboard', 'removeMember', expect.anything());
 
     // admin device, same votes (both members' arrive as their events) → its tally enacts

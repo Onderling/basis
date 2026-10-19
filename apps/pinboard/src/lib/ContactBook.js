@@ -75,6 +75,20 @@ export function createContactBook({ members, dataSource }) {
 
   /* ── Contact CRUD ──────────────────────────────────────────── */
 
+  // ONE WRITE AT A TIME PER CONTACT. Every writer below reads the row, merges, and writes it back; two at once (a card's
+  // name and the person key their hello brings) both read the old row, and the later write put that row's stale fields
+  // back over the earlier one's. In turn, each reads what the one before it wrote. A failed write does not stop the next.
+  const turns = new Map();
+  const inTurn = (fn) => (webid, ...rest) => {
+    const key = typeof webid === 'object' && webid ? webid.webid : webid;
+    const prev = turns.get(key) ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(() => fn(webid, ...rest));
+    const settled = run.catch(() => {});
+    turns.set(key, settled);
+    settled.then(() => { if (turns.get(key) === settled) turns.delete(key); });
+    return run;
+  };
+
   /**
    * Upsert a contact.  Sets `relation: 'contact'` on their MemberMap
    * entry plus any supplied flags.  Idempotent.
@@ -352,15 +366,15 @@ export function createContactBook({ members, dataSource }) {
   }
 
   return {
-    // contact CRUD
-    addContact,
-    setTrustLevel,
-    setHidden,
-    setPersona,
-    forgetContact,
+    // contact CRUD — the writers one at a time per contact
+    addContact:    inTurn(addContact),
+    setTrustLevel: inTurn(setTrustLevel),
+    setHidden:     inTurn(setHidden),
+    setPersona:    inTurn(setPersona),
+    forgetContact: inTurn(forgetContact),
     listRefiled,
-    setTags,
-    setFlag,
+    setTags:       inTurn(setTags),
+    setFlag:       inTurn(setFlag),
     listContacts,
     listContactsByTag,
     listContactsByMinTrust,

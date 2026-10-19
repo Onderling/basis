@@ -1431,6 +1431,62 @@
     "group_past": {
       "text": "Earlier",
       "doc": "Vandaag's day shape: appointments that started more than two hours ago, folded last."
+    },
+    "onboarding_handle_title": {
+      "text": "What you are called here",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_hint": {
+      "text": "Your name for people in your circles. You can change it later in Me.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_ph": {
+      "text": "a short name",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_save": {
+      "text": "Save",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_empty": {
+      "text": "Type a name first.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_title": {
+      "text": "New to Basis?",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_1": {
+      "text": "Your messages are encrypted.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_2": {
+      "text": "You need no account.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_3": {
+      "text": "A circle is the people you know: a household, a street, a club.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_more": {
+      "text": "Read more",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_dismiss": {
+      "text": "Got it",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_title": {
+      "text": "Begin",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_create": {
+      "text": "Make a circle",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_join": {
+      "text": "I have an invitation",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     }
   },
   "screens": {
@@ -1548,6 +1604,10 @@
       "notes": {
         "text": "Notes",
         "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "onboarding": {
+        "text": "First steps",
+        "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       }
     },
     "block_desc": {
@@ -1598,6 +1658,10 @@
       "notes": {
         "text": "The notes in your circles, optionally only those with certain labels.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "onboarding": {
+        "text": "Your handle, what Basis is, and how to begin — each card goes once it is done.",
+        "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       }
     },
     "editor": {

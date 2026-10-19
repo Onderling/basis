@@ -146,6 +146,8 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       + (block.error ? ` — ${block.error}` : '');
     return section;
   }
+  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
+  if (block.type === 'onboarding' && block.status === 'empty') { section.hidden = true; return section; }
   if (block.status === 'empty') {
     section.classList.add('circle-screen__block--empty');
     section.textContent = tr('circle.screen.block_empty', { type: blockName(block, tr) });
@@ -168,6 +170,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       break;
     case 'rules':        renderRules(section, block, tr);        break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
+    case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
     case 'identityLine': renderIdentityLine(section, block, tr, onAction); break;
     case 'agents':       renderAgents(section, block, tr, onAction);       break;
     default:
@@ -422,6 +425,58 @@ function openableOwn(li, item, noun, onAction) {
   const open = () => onAction({ kind: 'edit-own', noun, item });
   li.addEventListener('click', open);
   li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+}
+
+// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+function renderOnboarding(section, block, tr, onAction) {
+  const act = (a) => { if (typeof onAction === 'function') onAction(a); };
+  const btn = (labelKey, a, cls = '') => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `circle-screen__onb-btn${cls}`;
+    b.textContent = tr(labelKey);
+    b.addEventListener('click', () => act(a));
+    return b;
+  };
+  for (const c of block.content?.cards ?? []) {
+    const card = document.createElement('div');
+    card.className = 'circle-screen__onb-card';
+    card.dataset.card = c.id;
+    const h = document.createElement('h4');
+    h.textContent = tr(`circle.vandaag.onboarding_${c.id}_title`);
+    card.appendChild(h);
+    if (c.id === 'handle') {
+      const p = document.createElement('p');
+      p.textContent = tr('circle.vandaag.onboarding_handle_hint');
+      card.appendChild(p);
+      const form = document.createElement('form');
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'circle-screen__onb-handle';
+      input.placeholder = tr('circle.vandaag.onboarding_handle_ph');
+      input.setAttribute('aria-label', tr('circle.vandaag.onboarding_handle_title'));
+      form.appendChild(input);
+      const save = document.createElement('button');
+      save.type = 'submit';
+      save.className = 'circle-screen__onb-btn';
+      save.textContent = tr('circle.vandaag.onboarding_handle_save');
+      form.appendChild(save);
+      form.addEventListener('submit', (e) => { e.preventDefault(); if (input.value.trim()) act({ kind: 'set-handle', value: input.value }); });
+      card.appendChild(form);
+    } else if (c.id === 'intro') {
+      for (const k of ['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3']) {
+        const p = document.createElement('p');
+        p.textContent = tr(`circle.vandaag.${k}`);
+        card.appendChild(p);
+      }
+      card.appendChild(btn('circle.vandaag.onboarding_intro_more', { kind: 'intro-more' }));
+      card.appendChild(btn('circle.vandaag.onboarding_intro_dismiss', { kind: 'intro-seen' }, ' circle-screen__onb-btn--quiet'));
+    } else if (c.id === 'begin') {
+      card.appendChild(btn('circle.vandaag.onboarding_begin_create', { kind: 'create-circle' }));
+      card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }, ' circle-screen__onb-btn--quiet'));
+    }
+    section.appendChild(card);
+  }
 }
 
 function renderItems(section, block, tr, onAction) {

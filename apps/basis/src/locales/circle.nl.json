@@ -1431,6 +1431,62 @@
     "group_past": {
       "text": "Voorbij",
       "doc": "Vandaag's day shape: appointments that started more than two hours ago, folded last."
+    },
+    "onboarding_handle_title": {
+      "text": "Zo heet je hier",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_hint": {
+      "text": "Je naam voor mensen in je kringen. Later te veranderen in Mij.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_ph": {
+      "text": "een korte naam",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_save": {
+      "text": "Opslaan",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_handle_empty": {
+      "text": "Typ eerst een naam.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_title": {
+      "text": "Nieuw bij Basis?",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_1": {
+      "text": "Je berichten zijn versleuteld.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_2": {
+      "text": "Je hebt geen account nodig.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_3": {
+      "text": "Een kring zijn de mensen die je kent: je huishouden, je straat, een club.",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_more": {
+      "text": "Lees meer",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_intro_dismiss": {
+      "text": "Begrepen",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_title": {
+      "text": "Begin",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_create": {
+      "text": "Maak een kring",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_begin_join": {
+      "text": "Ik heb een uitnodiging",
+      "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
     }
   },
   "screens": {
@@ -1548,6 +1604,10 @@
       "notes": {
         "text": "Notities",
         "doc": "Block palette label (Mij / Vandaag)."
+      },
+      "onboarding": {
+        "text": "Eerste stappen",
+        "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       }
     },
     "block_desc": {
@@ -1598,6 +1658,10 @@
       "notes": {
         "text": "De notities in je kringen, eventueel alleen die met bepaalde labels.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "onboarding": {
+        "text": "Je naam hier, wat Basis is, en hoe je begint — elke kaart gaat weg als het gedaan is.",
+        "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
       }
     },
     "editor": {

@@ -29,6 +29,7 @@
 import { acrossCircles } from './acrossCircles.js';
 import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
 import { primaryActionFor } from './rowPrimary.js';
+import { materializeOnboarding } from './onboardingStrip.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
 import { carriesLabels, normLabel } from './itemLabels.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -122,6 +123,10 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       // the circles with news: each circle's unread lines (another person's, since this device last looked), newest first
       case 'circlesUnread':
         return materializeCirclesUnread(block, activeCircleIds, hostOps);
+
+      // the first steps on this device: the cards left (handle · what Basis is · begin)
+      case 'onboarding':
+        return materializeOnboarding(block, hostOps);
 
       // Me's own blocks: the name with the readings its config names, and the person's agents and devices
       case 'identityLine':

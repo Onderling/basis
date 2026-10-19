@@ -18,23 +18,24 @@ test('opens on Vandaag; a block moved in "Pas aan" stays moved after a reload', 
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag').toBeVisible({ timeout: 20_000 });
   await expect(page.locator('[data-tab="screens"]').first()).toBeVisible();
-  // the seeded page: the coming week and my tasks (both painted as the cross-circle items block), the circles with news
-  await expect.poll(() => blockTypes(page), { timeout: 20_000 }).toEqual(['items', 'items', 'circlesUnread']);
-  const [a, b, c] = await blockIds(page);
+  // the seeded page: the first steps (the onboarding strip), the coming week and my tasks (both painted as the
+  // cross-circle items block), the circles with news
+  await expect.poll(() => blockTypes(page), { timeout: 20_000 }).toEqual(['onboarding', 'items', 'items', 'circlesUnread']);
+  const [a, b, c, d] = await blockIds(page);
 
   // "Pas aan": move the first block down — a screen op (kept, logged, undoable)
   await page.locator('.circle-vandaag__customise').click();
   await page.locator('.vandaag-customise [data-act="down"]').first().click();
   await page.locator('.vandaag-customise [data-act="done"]').click();
-  await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([b, a, c]);
+  await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([b, a, c, d]);
   await page.reload();
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
-  await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([b, a, c]);
+  await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([b, a, c, d]);
   // …and "Ongedaan maken" puts it back
   await page.locator('.circle-vandaag__customise').click();
   await page.locator('.vandaag-customise [data-act="undo"]').click();
   await page.locator('.vandaag-customise [data-act="done"]').click();
-  await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([a, b, c]);
+  await expect.poll(() => blockIds(page), { timeout: 20_000 }).toEqual([a, b, c, d]);
   expect(errs).toEqual([]);
 });
 
@@ -52,7 +53,7 @@ test('"meer" opens one block whole, and back returns to the page', async ({ page
   await expect(page.locator('.circle-vandaag__back')).toBeVisible();
   await expect(page.locator('.circle-screen__block')).toHaveCount(1);
   await page.locator('.circle-vandaag__back').click();
-  await expect.poll(() => blockTypes(page), { timeout: 20_000 }).toHaveLength(3);
+  await expect.poll(() => blockTypes(page), { timeout: 20_000 }).toHaveLength(4);
 });
 
 test('a notes block added in "Pas aan" takes a labels filter, kept after a reload', async ({ page }) => {

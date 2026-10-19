@@ -1462,4 +1462,12 @@
 .circle-screen__group { margin: 6px 0; }
 .circle-screen__group > summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); padding: 4px 0; }
 .circle-screen__agenda-moment { flex: 0 0 auto; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+/* Vandaag's onboarding strip: a card per first step, gone once it is done */
+.circle-screen__onb-card { padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.circle-screen__onb-card h4 { margin: 0 0 6px; font-size: 15px; color: var(--ink); }
+.circle-screen__onb-card p { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
+.circle-screen__onb-card form { display: flex; gap: 6px; margin-top: 6px; }
+.circle-screen__onb-handle { flex: 1 1 auto; min-width: 0; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); }
+.circle-screen__onb-btn { font: inherit; font-size: 13px; padding: 5px 10px; margin: 6px 6px 0 0; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-contrast); cursor: pointer; }
+.circle-screen__onb-btn--quiet { border-color: var(--line); background: var(--paper); color: var(--ink); }
 

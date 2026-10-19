@@ -14,6 +14,8 @@
 
 export const HELP_CIRCLE_PROVISIONED_KEY = 'cc.helpCircleProvisioned';
 export const ONBOARDING_DONE_KEY = 'cc.onboardingDone';
+/** Vandaag's onboarding strip: the "Nieuw bij Basis?" card was seen (read or put away) on this device. */
+export const INTRO_CARD_SEEN_KEY = 'cc.introCardSeen';
 
 /**
  * A boolean-flag store over an injectable io (`{ get(key), set(key, '1') }`). `get`
@@ -33,6 +35,8 @@ export function createOnboardingFlags(io = {}) {
     markHelpCircleProvisioned: () => write(HELP_CIRCLE_PROVISIONED_KEY),
     isOnboardingDone: () => read(ONBOARDING_DONE_KEY),
     markOnboardingDone: () => write(ONBOARDING_DONE_KEY),
+    isIntroSeen: () => read(INTRO_CARD_SEEN_KEY),
+    markIntroSeen: () => write(INTRO_CARD_SEEN_KEY),
   };
 }
 

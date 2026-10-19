@@ -24,7 +24,7 @@
  */
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
 import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
@@ -105,6 +105,8 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       </View>
     );
   }
+  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
+  if (block.type === 'onboarding' && block.status === 'empty') return null;
   if (block.status === 'empty') {
     return (
       <View style={[...baseStyle, styles.blockEmpty]} testID={`screen-block-${block.blockId}`}>
@@ -130,6 +132,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       break;
     case 'rules':        body = renderRules(block, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
+    case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
     case 'identityLine': body = renderIdentityLine(block, onAction, styles); break;
     case 'agents':       body = renderAgents(block, onAction, styles); break;
     default:
@@ -308,6 +311,48 @@ const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, c
     </Pressable>
   );
 });
+
+// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+// Web twin: circleScreen.js `renderOnboarding`.
+function OnboardingCards({ block, onAction, styles }) {
+  const [handle, setHandle] = useState('');
+  const act = (a) => { if (typeof onAction === 'function') onAction(a); };
+  const Btn = ({ labelKey, a, quiet = false, testID }) => (
+    <Pressable style={quiet ? styles.onbBtnQuiet : styles.onbBtn} onPress={() => act(a)} accessibilityRole="button" testID={testID}>
+      <Text style={quiet ? styles.onbBtnQuietText : styles.onbBtnText}>{t(labelKey)}</Text>
+    </Pressable>
+  );
+  return (
+    <View>
+      {(block.content?.cards ?? []).map((c) => (
+        <View key={c.id} style={styles.onbCard} testID={`onb-card-${c.id}`}>
+          <Text style={styles.onbTitle}>{t(`circle.vandaag.onboarding_${c.id}_title`)}</Text>
+          {c.id === 'handle' ? (
+            <View>
+              <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_handle_hint')}</Text>
+              <TextInput style={styles.onbInput} value={handle} onChangeText={setHandle} placeholder={t('circle.vandaag.onboarding_handle_ph')}
+                accessibilityLabel={t('circle.vandaag.onboarding_handle_title')} testID="onb-handle" />
+              <Btn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
+            </View>
+          ) : c.id === 'intro' ? (
+            <View>
+              {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
+              <View style={styles.onbRow}>
+                <Btn labelKey="circle.vandaag.onboarding_intro_more" a={{ kind: 'intro-more' }} testID="onb-intro-more" />
+                <Btn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} quiet testID="onb-intro-seen" />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.onbRow}>
+              <Btn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
+              <Btn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} quiet testID="onb-join" />
+            </View>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
 
 // A folded group (the day's shape): its heading with the count, open or folded by a tap. Web twin: <details>.
 function Group({ label, open: openAtFirst, styles, testID, children }) {
@@ -509,6 +554,15 @@ const makeStyles = (theme) => StyleSheet.create({
   agendaLabelCompact:  { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
   taskRow:             { paddingVertical: 8, paddingHorizontal: 10, marginVertical: 3, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  onbCard:             { padding: 12, marginVertical: 4, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card },
+  onbTitle:            { fontSize: 15, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },
+  onbLine:             { fontSize: 13, color: theme.color.inkSoft, marginBottom: 4 },
+  onbInput:            { fontSize: 14, paddingVertical: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, backgroundColor: theme.color.paper, marginVertical: 6 },
+  onbRow:              { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  onbBtn:              { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, backgroundColor: theme.color.accent, alignSelf: 'flex-start' },
+  onbBtnText:          { fontSize: 13, color: theme.color.accentContrast },
+  onbBtnQuiet:         { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, alignSelf: 'flex-start' },
+  onbBtnQuietText:     { fontSize: 13, color: theme.color.ink },
   groupHead:           { fontSize: 13, color: theme.color.inkSoft, paddingVertical: 4 },
   agendaMoment:        { fontSize: 13, color: theme.color.inkSoft },
   rowAct:              { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, marginLeft: 'auto' },

@@ -172,6 +172,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead } from '../../src/v2/vandaagPlus.js';
+import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -4271,6 +4272,8 @@ async function _showVandaag() {
         seenAt: readSeenAt(), myRefs: unreadMyRefs,
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: mySelfIn,
+        // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
+        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(),
       },
     });
   } catch (err) {
@@ -4367,6 +4370,16 @@ function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
   // an own row (no circle): the "+" sheet opened on it — change it or take it away
   else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
+  // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin
+  else if (action?.kind === 'set-handle') {
+    const op = handleOp(action.value);
+    if (op.error) return;
+    Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch(() => null).then(() => _showVandaag());
+  }
+  else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
+  else if (action?.kind === 'create-circle') openCreateCircleWizard();
+  else if (action?.kind === 'join-circle') showJoinCircle();
   // a card's one action that IS an op (a chore done): through the waist, then the page repaints
   else if (action?.kind === 'row-op' && action.op?.app && action.op?.opId) {
     Promise.resolve(rawCallSkill(action.op.app, action.op.opId, action.op.args ?? {})).catch(() => null).then(() => _showVandaag());

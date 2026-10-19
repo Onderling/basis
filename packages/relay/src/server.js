@@ -317,6 +317,9 @@ const MIME = {
  *   stop: () => Promise<void>,
  * }>}
  */
+/** How long `stop()` waits for open sockets to close before ending them outright. */
+const STOP_GRACE_MS = 1_000;
+
 export async function startRelay(opts = {}) {
   const {
     port            = DEFAULT_PORT,
@@ -1144,8 +1147,17 @@ export async function startRelay(opts = {}) {
     if (feedSeat) await feedSeat.stop();
     for (const [, s] of clients) { try { s.close(); } catch {} }
     clients.clear();
-    await new Promise(r => wss.close(() => r()));
-    await new Promise(r => httpServer.close(() => r()));
+    // Both closes wait for every open socket. A clean stop finishes at once; one held open — a client that never
+    // registered, or never answers a close — would hold it forever, so after a grace it is ended outright.
+    const graceOver = (p) => Promise.race([p.then(() => false), new Promise(r => setTimeout(() => r(true), STOP_GRACE_MS))]);
+    const endAll = () => {
+      for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
+      try { httpServer.closeAllConnections?.(); } catch {}
+    };
+    const wssClosed = new Promise(r => wss.close(() => r()));
+    if (await graceOver(wssClosed)) { endAll(); await wssClosed; }
+    const httpClosed = new Promise(r => httpServer.close(() => r()));
+    if (await graceOver(httpClosed)) { endAll(); await httpClosed; }
     try { await mrQueue.close(); } catch {}
   }
 

@@ -370,7 +370,6 @@ export async function handleTaskRequest(agent, envelope) {
   // envelope._transport is tagged by Transport._receive(); fall back to routing
   // only if the tag is missing (e.g. unit tests that bypass Transport._receive).
   const t = envelope._transport ?? await agent.transportFor(envelope._from);
-  console.log(`[handleTaskRequest] ${skillId} from ${envelope._from?.slice(0,12)} via ${t?.constructor?.name}`);
 
   // The gate + regular-handler path lives in runGatedSkill (shared with the
   // B★ in-process fast-path so semantics + error strings stay identical). The

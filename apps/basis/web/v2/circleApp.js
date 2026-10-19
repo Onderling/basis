@@ -9285,6 +9285,8 @@ async function boot() {
         agent.knownPeersSync?.requestFromSiblings().catch(() => {});
         // The person key a ceremony rotated on another device while this one was off.
         agent.personKeySync?.requestFromSiblings().catch(() => {});
+        // …and each profile's facts (properties + disclosure), from the devices holding the same self
+        agent.profileFactsSync?.requestFromSiblings().catch(() => {});
         // The person's own store (their own appointments, their planned rows) as their other devices hold it.
         agent.ownStoreSync?.requestFromSiblings().catch(() => {});
         // …and which of the person's devices is primary for direct messages (sync-policy §12).

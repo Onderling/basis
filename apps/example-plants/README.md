@@ -41,3 +41,4 @@ cd apps/basis && npx vitest run test/extensionNoun.test.js test/extensionNounSyn
 | Rows sync to a member with the extension; a member without it holds none (said once) | built, tested |
 | Shows on Vandaag / Gepland (presenter) | not yet — the shells' catalogue does not take extensions |
 | Reminders at `waterAt` | not yet — reminders are written for appointments and chores only |
+| A person's own scope (no circle) | refused for now — an extension type lives in a circle's store only |

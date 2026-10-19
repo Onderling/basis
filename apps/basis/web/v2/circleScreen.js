@@ -23,6 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
+import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
@@ -342,10 +343,7 @@ function renderAgenda(section, block, tr, highlightRef, onAction) {
   title.className = 'circle-screen__block-title';
   title.textContent = tr(block.titleKey ?? 'circle.recipe.block.calendar');
   section.appendChild(title);
-
-  const list = document.createElement('ul');
-  list.className = 'circle-screen__agenda-list';
-  for (const ev of block.content?.items ?? []) {
+  const rowOf = (ev) => {
     const li = document.createElement('li');
     li.className = 'circle-screen__agenda-row';
     li.dataset.eventId = ev.id ?? '';
@@ -356,9 +354,16 @@ function renderAgenda(section, block, tr, highlightRef, onAction) {
       tag.textContent = whereTag(ev, tr);
       li.appendChild(tag);
     }
+    // the moment in words inside its group ("om 14:00"), then the words — or the merged label as it was stamped
+    if (ev.moment) {
+      const m = document.createElement('span');
+      m.className = 'circle-screen__agenda-moment';
+      m.textContent = ev.moment;
+      li.appendChild(m);
+    }
     const lbl = document.createElement('span');
     lbl.className = 'circle-screen__agenda-label';
-    lbl.textContent = ev.label ?? '';
+    lbl.textContent = (ev.moment ? ev.title : null) || ev.label || '';
     li.appendChild(lbl);
     // S6.B — a chip-tap that referenced this event flashes its row + scrolls to it.
     if (matchesHighlight(ev.id, highlightRef)) {
@@ -367,9 +372,23 @@ function renderAgenda(section, block, tr, highlightRef, onAction) {
     }
     openableOwn(li, ev, 'calendar-event', onAction);
     primaryButton(li, ev, 'calendar-event', tr, onAction);
-    list.appendChild(li);
+    return li;
+  };
+  // THE DAY'S SHAPE: now · soon · later today · tomorrow · after — the first group open, the rest folded
+  for (const g of agendaGroups(block.content?.items ?? [], { t: tr, locale: dateLocaleOf(tr) })) {
+    const det = document.createElement('details');
+    det.className = 'circle-screen__group';
+    det.dataset.group = g.key;
+    if (g.open) det.open = true;
+    const sum = document.createElement('summary');
+    sum.textContent = `${tr(g.labelKey)} (${g.items.length})`;
+    det.appendChild(sum);
+    const list = document.createElement('ul');
+    list.className = 'circle-screen__agenda-list';
+    for (const ev of g.items) list.appendChild(rowOf(ev));
+    det.appendChild(list);
+    section.appendChild(det);
   }
-  section.appendChild(list);
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */
@@ -440,7 +459,11 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction) {
 
   const list = document.createElement('ul');
   list.className = 'circle-screen__tasks-list';
-  for (const task of block.content?.items ?? []) {
+  // open chores first; the done ones folded under "gedaan (n)"
+  const { open: openTasks, done: doneTasks } = taskGroups(block.content?.items ?? []);
+  const doneList = document.createElement('ul');
+  doneList.className = 'circle-screen__tasks-list';
+  for (const task of [...openTasks, ...doneTasks]) {
     const li = document.createElement('li');
     li.className = 'circle-screen__tasks-row';
     li.dataset.taskId = task.id ?? '';
@@ -482,9 +505,18 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction) {
       li.appendChild(wrap);
     }
     primaryButton(li, task, 'task', tr, onAction);
-    list.appendChild(li);
+    (task.done ? doneList : list).appendChild(li);
   }
   section.appendChild(list);
+  if (doneTasks.length) {
+    const det = document.createElement('details');
+    det.className = 'circle-screen__group circle-screen__group--done';
+    const sum = document.createElement('summary');
+    sum.textContent = tr('circle.vandaag.tasks_done', { count: doneTasks.length });
+    det.appendChild(sum);
+    det.appendChild(doneList);
+    section.appendChild(det);
+  }
 }
 
 function renderRules(section, block, tr) {

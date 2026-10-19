@@ -22,7 +22,8 @@
  * Empty `blocks` array → top-level empty state ("admin hasn't set up
  * a screen yet").
  */
-import React, { useMemo } from 'react';
+import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
@@ -308,32 +309,52 @@ const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, c
   );
 });
 
+// A folded group (the day's shape): its heading with the count, open or folded by a tap. Web twin: <details>.
+function Group({ label, open: openAtFirst, styles, testID, children }) {
+  const [open, setOpen] = useState(!!openAtFirst);
+  return (
+    <View testID={testID}>
+      <Pressable onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+        <Text style={styles.groupHead}>{`${open ? '▾' : '▸'} ${label}`}</Text>
+      </Pressable>
+      {open ? children : null}
+    </View>
+  );
+}
+
 function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles, onAction = null) {
-  const items = block.content?.items ?? [];
   const isCompact = block.config?.compact === true;
   const rowStyle   = isCompact ? styles.agendaRowCompact   : styles.agendaRow;
   const labelStyle = isCompact ? styles.agendaLabelCompact : styles.agendaLabel;
+  const rowOf = (ev) => {
+    // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
+    // it.  The hit row carries the parent's ref + fires onHighlightLayout once
+    // native layout settles; the panel measures the ref and scrolls to it.
+    const hit = matchesHighlight(ev.id, highlightRef);
+    return (
+      <OwnRow
+        key={ev.id ?? Math.random().toString(36)}
+        item={ev} noun="calendar-event" onAction={onAction}
+        ref={hit ? highlightRowRef : undefined}
+        onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
+        style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
+      >
+        {ev.moment ? <Text style={styles.agendaMoment}>{ev.moment}</Text> : null}
+        <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{(ev.moment ? ev.title : null) || ev.label || ''}</Text>
+        <PrimaryButton item={ev} noun="calendar-event" onAction={onAction} styles={styles} />
+      </OwnRow>
+    );
+  };
+  // THE DAY'S SHAPE: now · soon · later today · tomorrow · after — the first group open, the rest folded
+  const groups = agendaGroups(block.content?.items ?? [], { t, locale: dateLocaleOf(t) });
   return (
     <View>
       <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.calendar')}</Text>
-      {items.map((ev) => {
-        // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
-        // it.  The hit row carries the parent's ref + fires onHighlightLayout once
-        // native layout settles; the panel measures the ref and scrolls to it.
-        const hit = matchesHighlight(ev.id, highlightRef);
-        return (
-          <OwnRow
-            key={ev.id ?? Math.random().toString(36)}
-            item={ev} noun="calendar-event" onAction={onAction}
-            ref={hit ? highlightRowRef : undefined}
-            onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
-            style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
-          >
-            <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{ev.label ?? ''}</Text>
-            <PrimaryButton item={ev} noun="calendar-event" onAction={onAction} styles={styles} />
-          </OwnRow>
-        );
-      })}
+      {groups.map((g) => (
+        <Group key={g.key} label={`${t(g.labelKey)} (${g.items.length})`} open={g.open} styles={styles} testID={`agenda-group-${g.key}`}>
+          {g.items.map(rowOf)}
+        </Group>
+      ))}
     </View>
   );
 }
@@ -363,7 +384,7 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
   return (
     <View>
       <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.tasks')}</Text>
-      {items.map((task) => {
+      {taskGroups(items).open.map((task) => {
         const embeds = embedChipsOf(task);
         // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
         // it.  The hit row carries the parent's ref + fires onHighlightLayout once
@@ -404,6 +425,16 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
           </View>
         );
       })}
+      {/* the done chores, folded under "gedaan (n)" */}
+      {taskGroups(items).done.length ? (
+        <Group label={t('circle.vandaag.tasks_done', { count: taskGroups(items).done.length })} open={false} styles={styles} testID="tasks-done">
+          {taskGroups(items).done.map((task) => (
+            <View key={task.id ?? Math.random().toString(36)} style={rowStyle}>
+              <Text style={textStyle}>{task.text ?? ''}</Text>
+            </View>
+          ))}
+        </Group>
+      ) : null}
     </View>
   );
 }
@@ -478,6 +509,8 @@ const makeStyles = (theme) => StyleSheet.create({
   agendaLabelCompact:  { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
   taskRow:             { paddingVertical: 8, paddingHorizontal: 10, marginVertical: 3, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  groupHead:           { fontSize: 13, color: theme.color.inkSoft, paddingVertical: 4 },
+  agendaMoment:        { fontSize: 13, color: theme.color.inkSoft },
   rowAct:              { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, marginLeft: 'auto' },
   rowActText:          { fontSize: 13, color: theme.color.ink },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },

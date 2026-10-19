@@ -1458,4 +1458,8 @@
 .circle-screen__row-act { margin-left: auto; flex: 0 0 auto; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
 .circle-screen__row-act:hover { border-color: var(--accent); color: var(--accent-ink); }
 .circle-screen__row--own { cursor: pointer; }
+/* Vandaag's day shape: a group per moment (the first open), the done chores folded */
+.circle-screen__group { margin: 6px 0; }
+.circle-screen__group > summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); padding: 4px 0; }
+.circle-screen__agenda-moment { flex: 0 0 auto; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 

@@ -13,6 +13,10 @@
  * DECLARED — a row in `docs/conventions/web-mobile-exceptions.md` that names the key or its prefix in backticks
  * (`circle.firstRun.*`) — or be in the BASELINE below, which only shrinks: red on a NEW one-sided key, red on a
  * baselined key that is no longer one-sided (remove it). Keys built at run time (`circle.scope.${x}`) are not seen.
+ *
+ * Its limit, stated: a key used only by SHARED code (`apps/basis/src` outside `web/` and `rn/`) counts for BOTH shells,
+ * even when one shell never paints the shared function that says it. That blind spot is the declared screen sections'
+ * job (`screenSections.js`, `lint-screen-sections`), not this guard's.
  */
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

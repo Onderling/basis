@@ -94,55 +94,10 @@ describe('#253 step 7 — interceptButtonTap', () => {
     expect(interceptButtonTap({ opId: 'markReturned',  itemId: 'p', buttonLabel: 'Returned', t: stubT }).handled).toBe(false);
   });
 
-  // responder-card intercepts.
-  it('acceptResponder emits an accept-responder action with the responder addr', () => {
-    const r = interceptButtonTap({
-      opId: 'acceptResponder',
-      itemId: 'post-1',
-      buttonLabel: 'Accept',
-      t: stubT,
-      extra: { fromAddr: 'app.bob123' },
-    });
-    expect(r.handled).toBe(true);
-    expect(r.kind).toBe('accept-responder');
-    expect(r.requestId).toBe('post-1');
-    expect(r.responderAddr).toBe('app.bob123');
-  });
-
-  it('declineResponder emits a decline-responder action', () => {
-    const r = interceptButtonTap({
-      opId: 'declineResponder',
-      itemId: 'post-1',
-      buttonLabel: 'Decline',
-      t: stubT,
-      extra: { fromAddr: 'app.bob123' },
-    });
-    expect(r.handled).toBe(true);
-    expect(r.kind).toBe('decline-responder');
-    expect(r.requestId).toBe('post-1');
-    expect(r.responderAddr).toBe('app.bob123');
-  });
-
-  it('counterResponder emits a counter-responder action with the prompt text', () => {
-    const r = interceptButtonTap({
-      opId: 'counterResponder',
-      itemId: 'post-1',
-      buttonLabel: 'Counter',
-      t: stubT,
-    });
-    expect(r.handled).toBe(true);
-    expect(r.kind).toBe('counter-responder');
-    expect(r.text).toContain('dm.counter_prompt');
-  });
-
-  it('responder intercepts gracefully handle missing extra.fromAddr', () => {
-    const r = interceptButtonTap({
-      opId: 'acceptResponder',
-      itemId: 'post-1',
-      buttonLabel: 'Accept',
-      t: stubT,
-    });
-    expect(r.handled).toBe(true);
-    expect(r.responderAddr).toBeNull();
+  // acceptResponder is an ordinary op: the poster's board calls it (no card, no envelope, no intercept).
+  it('acceptResponder / declineResponder / counterResponder are not intercepted', () => {
+    for (const opId of ['acceptResponder', 'declineResponder', 'counterResponder']) {
+      expect(interceptButtonTap({ opId, itemId: 'post-1', buttonLabel: 'x', t: stubT, extra: { fromAddr: 'a' } }).handled).toBe(false);
+    }
   });
 });

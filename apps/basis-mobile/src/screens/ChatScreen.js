@@ -96,8 +96,6 @@ import {
 } from '../../../basis/src/core/handlers/groupRedeem.js';
 // profile-update propagation — the roster "pull-me" signal (announce on a real roster write;
 // receive → record the silent stream entry + re-read). Web parity (circleApp.js).
-import { makeHandleHelpWithAccepted, makeHandleHelpWithResponse }
-                               from '../../../basis/src/core/handlers/helpWith.js';
 import { makeHandleCalendarInvite }
                                from '../../../basis/src/core/handlers/calendarInvite.js';
 import { makeHandleFileShare } from '../../../basis/src/core/handlers/fileShare.js';
@@ -592,36 +590,6 @@ export default function ChatScreen({
       'group-redeem-response': makeHandleGroupRedeemResponse({
         // OBJ-2 — the BUNDLE's shared map (so a v2-launcher join correlates here too); ref is the fallback.
         pendingMap: pendingPeerRedeems ?? pendingPeerRedeemsRef.current,
-      }),
-      // profile-update propagation — record the roster owner's silent "pull-me" onto the shared
-      // eventLog (never a bubble, never a wake); the launcher's roster view re-reads on it.
-      'help-with-accepted':    makeHandleHelpWithAccepted({
-        ensureDmThread:    handleDmThreadOpen,
-        appendBubble,
-        updatePeerDisplay: renamePeer,
-        t,
-      }),
-      // inbound 'help-with-response' produces
-      // a structured responder-card bubble (Accept / Decline / Counter).
-      'help-with-response':    makeHandleHelpWithResponse({
-        ensureDmThread:        handleDmThreadOpen,
-        appendResponderCard:   (threadId, data) => {
-          setThreadState((prev) => updateMessages(prev, threadId, (msgs) => [
-            ...msgs,
-            { id: mkId(), role: 'bot', pending: false, rendered: {
-              kind:           'responder-card',
-              messageId:      null,
-              threadId:       null,
-              lifecycleState: 'live',
-              itemId:         data.itemId,
-              fromAddr:       data.fromAddr,
-              postText:       data.postText,
-              body:           data.body,
-              senderDisplay:  data.senderDisplay,
-            }},
-          ]));
-        },
-        updatePeerDisplay:     renamePeer,
       }),
       // embed-card bubbles (time-card +
       // file-card).  Calendar invites land as time-card with RSVP
@@ -1532,90 +1500,6 @@ export default function ChatScreen({
         ));
       })();
     }
-    // responder-card Accept / Decline /
-    // Counter taps.  Accept fires acceptResponder + sends help-with-
-    // accepted; Decline sends help-with-declined; Counter inline-
-    // prompts the user.  All three drop the user bubble first, then
-    // run the side-effect async, then drop a result bubble.
-    if (intercept.kind === 'accept-responder') {
-      const userMsgId = mkId();
-      const botMsgId  = mkId();
-      setThreadState((prev) => updateMessages(prev, sourceThreadId, (msgs) => [
-        ...msgs,
-        { id: userMsgId, role: 'user', text: userBubbleText },
-        { id: botMsgId,  role: 'bot', pending: true, rendered: {
-          kind: 'text',
-          messageId: botMsgId,
-          threadId: null,
-          lifecycleState: 'live',
-          text: t('responder.accepting'),
-        }},
-      ]));
-      (async () => {
-        let finalText;
-        try {
-          const result = await bootState.bundle.callSkill('pinboard', 'acceptResponder', {
-            requestId:      intercept.requestId,
-            responderWebid: intercept.responderAddr,
-          });
-          if (result?.error) throw new Error(result.error);
-          finalText = t('responder.accepted');
-          // Fire help-with-accepted envelope.  Fail soft — the local
-          // accept succeeded regardless.
-          if (intercept.responderAddr) {
-            try {
-              await bootState.bundle.agent.sendPeerMessage(intercept.responderAddr, {
-                type: 'p2p-chat', subtype: 'help-with-accepted',
-                itemId: intercept.requestId,
-                sentAt: Date.now(),
-              });
-            } catch { /* swallow — user sees the local success */ }
-          }
-        } catch (err) {
-          finalText = t('responder.accept_failed', { error: err?.message ?? String(err) });
-        }
-        setThreadState((prev) => updateMessages(prev, sourceThreadId, (msgs) =>
-          msgs.map((m) => m.id === botMsgId
-            ? { ...m, pending: false, rendered: { ...m.rendered, text: finalText, lifecycleState: 'closed' } }
-            : m,
-          ),
-        ));
-      })();
-    }
-    if (intercept.kind === 'decline-responder') {
-      setThreadState((prev) => updateMessages(prev, sourceThreadId, (msgs) => [
-        ...msgs,
-        { id: mkId(), role: 'user', text: userBubbleText },
-        { id: mkId(), role: 'bot', pending: false, rendered: {
-          kind: 'text',
-          messageId: null,
-          threadId: null,
-          lifecycleState: 'closed',
-          text: t('responder.declined'),
-        }},
-      ]));
-      // Fire help-with-declined fire-and-forget.
-      if (intercept.responderAddr && bootState.kind === 'ready') {
-        bootState.bundle.agent.sendPeerMessage(intercept.responderAddr, {
-          type: 'p2p-chat', subtype: 'help-with-declined',
-          itemId: intercept.requestId,
-          sentAt: Date.now(),
-        }).catch(() => { /* swallow */ });
-      }
-    }
-    if (intercept.kind === 'counter-responder') {
-      setThreadState((prev) => updateMessages(prev, sourceThreadId, (msgs) => [
-        ...msgs,
-        { id: mkId(), role: 'user', text: userBubbleText },
-        { id: mkId(), role: 'bot', pending: false, rendered: {
-          kind: 'text',
-          messageId: null,
-          threadId: null,
-          lifecycleState: 'closed',
-          text: intercept.text,
-        }},
-      ]));
-    }
   }, [t, bootState]);
 
   /**
@@ -2275,20 +2159,6 @@ function MessageBubble({ msg, onButtonTap, onFollowUpTap, onQuickReplyTap, onFor
       </View>
     );
   }
-  // responder-card from inbound
-  // help-with-response.  Three buttons: Accept (substrate call +
-  // help-with-accepted envelope), Decline (help-with-declined),
-  // Counter (inline prompt).  Tap routes via onButtonTap →
-  // buttonSpecials → applyButtonSpecial.
-  if (r.kind === 'responder-card') {
-    return (
-      <ResponderCardBubble
-        msg={msg}
-        rendered={r}
-        onButtonTap={onButtonTap}
-      />
-    );
-  }
   // (feedback-extension) — curation before/after bubble. Mirrors the
   // web `kind:'curation'` render from the SAME shared view model (renderer
   // emits { changed, sides:{before,after}, changedPaths }).  Presentational
@@ -2370,64 +2240,6 @@ function MessageBubble({ msg, onButtonTap, onFollowUpTap, onQuickReplyTap, onFor
           ))}
         </View>
       )}
-    </View>
-  );
-}
-
-function ResponderCardBubble({ msg, rendered, onButtonTap }) {
-  const enabled = rendered.lifecycleState !== 'disabled' && typeof onButtonTap === 'function';
-  const itemId = rendered.itemId;
-  const fromAddr = rendered.fromAddr;
-  const tap = (opId, label) => onButtonTap?.({
-    opId, itemId,
-    buttonLabel: label,
-    originMessageId: msg.id,
-    extra: { fromAddr },
-  });
-  return (
-    <View
-      style={[styles.bubble, styles.bubbleBot, styles.bubbleResponderCard]}
-      testID={`bubble-bot-responder-${msg.id}`}
-    >
-      <Text style={styles.responderHeader}>
-        {t('responder.header_offer_of_help')}
-      </Text>
-      {rendered.postText ? (
-        <Text style={styles.responderContext}>{rendered.postText}</Text>
-      ) : null}
-      <Text style={styles.responderBody}>{rendered.body}</Text>
-      <View style={styles.responderButtons}>
-        <TouchableOpacity
-          onPress={() => tap('acceptResponder', t('responder.btn_accept'))}
-          disabled={!enabled}
-          style={[styles.responderBtn, styles.responderBtnPrimary, !enabled && styles.embedBtnDisabled]}
-          accessibilityRole="button"
-          accessibilityLabel={t('responder.btn_accept')}
-          testID={`responder-btn-accept-${itemId}`}
-        >
-          <Text style={styles.embedBtnText}>{t('responder.btn_accept')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => tap('declineResponder', t('responder.btn_decline'))}
-          disabled={!enabled}
-          style={[styles.responderBtn, !enabled && styles.embedBtnDisabled]}
-          accessibilityRole="button"
-          accessibilityLabel={t('responder.btn_decline')}
-          testID={`responder-btn-decline-${itemId}`}
-        >
-          <Text style={styles.embedBtnText}>{t('responder.btn_decline')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => tap('counterResponder', t('responder.btn_counter'))}
-          disabled={!enabled}
-          style={[styles.responderBtn, !enabled && styles.embedBtnDisabled]}
-          accessibilityRole="button"
-          accessibilityLabel={t('responder.btn_counter')}
-          testID={`responder-btn-counter-${itemId}`}
-        >
-          <Text style={styles.embedBtnText}>{t('responder.btn_counter')}</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -2691,14 +2503,6 @@ const styles = StyleSheet.create({
   embedBtnDisabled:{ backgroundColor: '#ccc' },
   embedBtnText:    { color: '#fff', fontSize: 12, fontWeight: '600' },
 
-  // responder-card.
-  bubbleResponderCard:  { paddingVertical: 8, paddingHorizontal: 10, borderLeftWidth: 3, borderLeftColor: '#f57c00' },
-  responderHeader:      { fontSize: 14, fontWeight: '600', color: '#222' },
-  responderContext:     { fontSize: 12, color: '#666', marginTop: 4, fontStyle: 'italic' },
-  responderBody:        { fontSize: 14, color: '#222', marginTop: 6, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: '#ddd' },
-  responderButtons:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 6 },
-  responderBtn:         { backgroundColor: '#888', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
-  responderBtnPrimary:  { backgroundColor: '#1e88e5' },
 
   // A3 follow-up (2026-05-27) — brief render branch.
   briefSectionLabel:    { fontSize: 13, fontWeight: '600', color: '#444', marginBottom: 2 },

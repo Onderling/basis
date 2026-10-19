@@ -154,46 +154,6 @@
     },
     "nav": {}
   },
-  "responder": {
-    "header_offer_of_help": {
-      "text": "📩 Iemand biedt hulp aan op je bericht",
-      "doc": "Header van responder-card bubble (inbound help-with-response, #271)"
-    },
-    "btn_accept": {
-      "text": "Accepteer",
-      "doc": "[Accept] knop op responder card"
-    },
-    "btn_decline": {
-      "text": "Wijs af",
-      "doc": "[Decline] knop op responder card"
-    },
-    "btn_counter": {
-      "text": "Tegenvoorstel",
-      "doc": "[Counter] knop op responder card"
-    },
-    "accepting": {
-      "text": "Bezig met accepteren…",
-      "doc": "Pending bubble tijdens acceptResponder"
-    },
-    "accepted": {
-      "text": "✓ Geaccepteerd — beide kanten genotificeerd",
-      "doc": "Bot bubble na succesvolle accept"
-    },
-    "accept_failed": {
-      "text": "Accepteren mislukt: {{error}}",
-      "doc": "Bot bubble bij accept-fout"
-    },
-    "declined": {
-      "text": "✗ Afgewezen",
-      "doc": "Bot bubble na afwijzen"
-    }
-  },
-  "dm": {
-    "counter_prompt": {
-      "text": "Stuur je tegenvoorstel in deze DM.",
-      "doc": "Inline prompt na [Counter] op responder-card (#271)"
-    }
-  },
   "nav": {
     "chat": {
       "text": "Chat",

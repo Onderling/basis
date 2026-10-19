@@ -5,6 +5,9 @@
  * Component + screen styles live in web/v2/circle.css. */
 
 :root {
+  /* the browser draws its NATIVE controls (select menus, date pickers, dialogs, scrollbars) in the page's scheme —
+     without this they stay light in a dark app */
+  color-scheme: light dark;
   --ink: #17181a;
   --ink-soft: #5b5d55;
   --paper: #f7f7f4;
@@ -41,6 +44,7 @@
 /* dark — follows the OS unless data-theme overrides (set by the shell) */
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --ink: #eceade;
     --ink-soft: #9a9d90;
     --paper: #161713;
@@ -67,6 +71,7 @@
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --ink: #eceade;
   --ink-soft: #9a9d90;
   --paper: #161713;
@@ -92,6 +97,7 @@
   --white: #1e1f1a;
 }
 :root[data-theme="light"] {
+  color-scheme: light;
   --ink: #17181a;
   --ink-soft: #5b5d55;
   --paper: #f7f7f4;

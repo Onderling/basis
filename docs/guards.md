@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 51
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 52
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -56,6 +56,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
+| `theme-tokens` | — | the web design system's drift guards, in the aggregate (`npm run guards`) |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |
 | `unbound-names` | — | a Node entry point uses no name that nothing defines |
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |

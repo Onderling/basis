@@ -16,7 +16,7 @@ import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import {
-  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, DEFAULT_CIRCLE_ORIGINS,
+  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, policyPatch, DEFAULT_CIRCLE_ORIGINS,
 } from '@onderling-app/basis';
 // the shared manifest-driven settings form + per-skill freedom matrix (web≡mobile).
 import { buildSettingsForm, buildCapabilityMatrix, FREEDOM_LEVELS, OPT_OUT_CONSEQUENCES } from '@onderling/app-manifest';
@@ -46,6 +46,7 @@ import { resolveControlEnablement, settingsControlsFromManifest } from '../../..
 import { isAdvancedSetting } from '../../../../basis/src/v2/alphaSurface.js';
 import { settingsChangeNeedsProposal } from '../../../../basis/src/v2/circlePolicy.js';
 import { policySaveControlFor } from '../../../../basis/src/v2/circleRoleControl.js';
+import { policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../../../basis/src/v2/governanceAppWiring.js';
 
 // Phase 4 §9 — the Connection & transport controls, read once from the static basisManifest.
 const SETTINGS_CONTROLS = settingsControlsFromManifest(basisManifest);
@@ -72,6 +73,10 @@ const SETTINGS_PAGE = pageForOpMobile(basisManifest, 'settings');
 
 export default function CircleSettingsScreen({
   store, onProposePolicy, circleId, onBack,
+  // the circle's OPEN policy proposals (`openPolicyProposals` over the host's governance handle): their state shows under the fields
+  loadPolicyProposals = null,
+  // an admin's answer to an open proposal (the governance vote): `(circleId, proposalId, 'yes'|'no')`
+  onAnswerPolicyProposal = null,
   // the self this device is in a circle (a persona's circle is the persona's) — whose row the save control reads as mine
   selfIn = null,
   // §4 storage-policy bridge — the host injects the agent's raw callSkill so a
@@ -119,11 +124,19 @@ export default function CircleSettingsScreen({
     return () => { alive = false; };
   }, [callSkill, circleId]);
   const saveControl = policySaveControlFor(saveRoster);
+  // the open proposal's state ("proposed by … · waiting on …"), read on entry and after a proposal is filed
+  const [policyProposals, setPolicyProposals] = useState([]);
+  const refreshPolicyProposals = useCallback(async () => {
+    if (typeof loadPolicyProposals !== 'function' || !circleId) return;
+    try { const r = await loadPolicyProposals(circleId); setPolicyProposals(Array.isArray(r?.proposals) ? r.proposals : []); } catch { /* none shown */ }
+  }, [loadPolicyProposals, circleId]);
+  useEffect(() => { refreshPolicyProposals(); }, [refreshPolicyProposals]);
   // the alpha's "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS) — closed until tapped; web parity
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [guidedOpen, setGuidedOpen] = useState(false);   // Theme B — guided-setup chatbot modal
   const [storageNote, setStorageNote] = useState(null);  // §4 — pinboard storage-policy rejection note
   const baselinePodRef = useRef(undefined);              // §4 — pod tier at load (push only on change)
+  const entryPolicyRef = useRef(null);
 
   // B · consent-card — REVIEWED apply-recipe state (source input → review model → native consent card).
   const [recipeSource, setRecipeSource] = useState('');
@@ -148,6 +161,7 @@ export default function CircleSettingsScreen({
       if (!live) return;
       setWorking(p);
       baselinePodRef.current = p?.pod;   // baseline for this editing session
+      entryPolicyRef.current = p;        // a proposal carries only what changed from it (`policyPatch`)
     });
     return () => { live = false; };
   }, [store, circleId]);
@@ -231,11 +245,15 @@ export default function CircleSettingsScreen({
 
   const onSave = useCallback(async () => {
     if (!working) return;
-    if (consensusActive) {
-      // Multi-admin consensus → a GOVERNANCE proposal (changePolicy) on the log, raised by the parent's
-      // governance handle: it fans to the other admins, they vote in the governance panel, and on
-      // approval the wired setPolicy enactor applies the patch. The side-store is retired.
-      await onProposePolicy?.(circleId, working);
+    if (consensusActive || saveControl.propose) {
+      // A member's change, or an admin's under multi-admin consensus → a GOVERNANCE proposal (changePolicy) on the
+      // log, raised by the parent's governance handle: it fans to the admins, they answer it in the governance
+      // panel, and on approval the wired setPolicy enactor applies the patch. The side-store is retired.
+      // only what changed (applied over the policy as it is when an admin accepts it); nothing changed → nothing to propose
+      const patch = policyPatch(entryPolicyRef.current, working);
+      if (Object.keys(patch).length === 0) { onBack?.(); return; }
+      await onProposePolicy?.(circleId, patch, { asMember: saveControl.propose === true });
+      await refreshPolicyProposals();
     } else {
       await store.update(circleId, working);
       // §4 storage-policy bridge — when the pod tier changed, drive pinboard's
@@ -255,7 +273,7 @@ export default function CircleSettingsScreen({
       }
     }
     onBack?.();
-  }, [working, consensusActive, store, onProposePolicy, circleId, onBack, callSkill]);
+  }, [working, consensusActive, saveControl.propose, refreshPolicyProposals, store, onProposePolicy, circleId, onBack, callSkill]);
 
   if (!working) {
     return (
@@ -678,11 +696,38 @@ export default function CircleSettingsScreen({
         ) : null}
       </ScrollView>
 
+      {(() => {
+        // an open proposal this admin has not answered: what it changes, and take it over or turn it down
+        const a = typeof onAnswerPolicyProposal === 'function' ? policyProposalForAdmin({ proposals: policyProposals, roster: saveRoster.members, myRef: saveRoster.myRef }) : null;
+        if (!a) return null;
+        const answer = async (choice) => {
+          await Promise.resolve(onAnswerPolicyProposal(circleId, a.proposalId, choice)).catch(() => null);
+          const p = await store.get(circleId).catch(() => null);
+          if (p) { setWorking(p); entryPolicyRef.current = p; }
+          await refreshPolicyProposals();
+        };
+        return (
+          <View style={styles.proposal} testID="circle-settings-proposal">
+            <Text style={styles.note}>{t('circle.settings.proposal_from', { who: a.who, what: policyChangeText(a.changes, t) })}</Text>
+            <View style={styles.proposalRow}>
+              <Pressable style={styles.proposalBtn} onPress={() => answer('yes')} accessibilityRole="button" testID="circle-settings-proposal-yes">
+                <Text style={styles.saveText}>{t('circle.settings.proposal_accept')}</Text>
+              </Pressable>
+              <Pressable style={styles.proposalBtn} onPress={() => answer('no')} accessibilityRole="button" testID="circle-settings-proposal-no">
+                <Text style={styles.saveText}>{t('circle.settings.proposal_decline')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      })()}
+      {policyProposalNote({ proposals: policyProposals, roster: saveRoster.members }).map((l) => (
+        <Text key={l.key} style={styles.saveReason} testID={`circle-settings-${l.key.split('.').pop()}`}>{t(l.key, l.params)}</Text>
+      ))}
       {saveControl.disabled && saveControl.reasonKey ? <Text style={styles.saveReason}>{t(saveControl.reasonKey)}</Text> : null}
       <Pressable style={[styles.save, saveControl.disabled ? { opacity: 0.45 } : null]} onPress={onSave} disabled={saveControl.disabled}
         accessibilityRole="button" accessibilityState={{ disabled: saveControl.disabled }} testID="circle-settings-save">
         <Text style={styles.saveText}>
-          {consensusActive ? t('circle.settings.send_proposal') : t('circle.settings.save')}
+          {saveControl.propose ? t(saveControl.labelKey) : consensusActive ? t('circle.settings.send_proposal') : t('circle.settings.save')}
         </Text>
       </Pressable>
     </View>
@@ -755,6 +800,10 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   save:        { marginTop: 8, marginBottom: 12, padding: 13, borderRadius: 8, backgroundColor: theme.color.accent, alignItems: 'center' },
   saveReason:  { fontSize: 12, color: theme.color.inkSoft, textAlign: 'center', marginBottom: 6 },
   saveText:    { color: theme.color.white, fontSize: 15, fontWeight: '700' },
+  // an open proposal an admin answers here
+  proposal:    { marginTop: 8, padding: 10, borderLeftWidth: 3, borderLeftColor: theme.color.accent, backgroundColor: theme.color.paper2 },
+  proposalRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  proposalBtn: { flex: 1, padding: 10, borderRadius: 8, backgroundColor: theme.color.accent, alignItems: 'center' },
   guided:      { marginTop: 4, marginBottom: 4, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.color.accent, backgroundColor: theme.color.card, alignItems: 'center' },
   guidedText:  { color: theme.color.accent, fontSize: 14, fontWeight: '600' },
   // B · consent-card — apply-recipe source input + button

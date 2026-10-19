@@ -72,6 +72,19 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await expect(changed, 'the change shows').toBeVisible({ timeout: 20_000 });
   await changed.click();
   await page.locator('.circle-vandaag-plus__remove').click();
+
+  // an own NOTE's row opens the sheet on its words too (a listed note carries them as its text)
+  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag-plus__line').fill('notitie: band plakken');
+  await page.locator('.circle-vandaag-plus__line').press('Enter');
+  await page.locator('.circle-vandaag-plus__save').click();
+  const note = page.locator('.circle-screen__items-row').filter({ hasText: 'band plakken' });
+  await expect(note).toBeVisible({ timeout: 20_000 });
+  await note.click();
+  await expect(page.locator('.circle-vandaag-plus__body'), 'the note opens on its words').toHaveValue('band plakken');
+  await page.locator('.circle-vandaag-plus__body').fill('band en ketting');
+  await page.locator('.circle-vandaag-plus__save').click();
+  await expect(page.locator('.circle-screen__items-row').filter({ hasText: 'band en ketting' }), 'the note changed').toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.circle-screen__agenda-row').filter({ hasText: 'kapper Jan' }), 'taken away').toHaveCount(0, { timeout: 20_000 });
   expect(errs).toEqual([]);
 });

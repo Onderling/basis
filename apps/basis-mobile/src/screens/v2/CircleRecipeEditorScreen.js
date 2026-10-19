@@ -255,7 +255,7 @@ function RecipeRow({ recipe, isActive, onOpenRecipe, onRenameRecipe, onRemoveRec
       t('circle.recipe.editor.delete'),
       t('circle.recipe.editor.delete_confirm', { name: recipe.name || '' }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('circle.confirm.cancel'), style: 'cancel' },
         { text: t('circle.recipe.editor.delete'), style: 'destructive', onPress: () => onRemoveRecipe?.(recipe.id) },
       ],
     );
@@ -522,7 +522,7 @@ function LimitField({ block, configKey, labelKeySuffix, emit }) {
 function promptForName(title, defaultValue, onValue) {
   if (Platform.OS === 'ios' && typeof Alert.prompt === 'function') {
     Alert.prompt(title, undefined, [
-      { text: 'Cancel', style: 'cancel' },
+      { text: t('circle.confirm.cancel'), style: 'cancel' },
       { text: 'OK', onPress: (value) => onValue?.(value ?? '') },
     ], 'plain-text', defaultValue ?? '');
     return;
@@ -531,7 +531,7 @@ function promptForName(title, defaultValue, onValue) {
   // A proper inline input row would be a follow-up.  For V0, just preserve
   // the original name — better than blocking the action entirely.
   Alert.alert(title, '', [
-    { text: 'Cancel', style: 'cancel' },
+    { text: t('circle.confirm.cancel'), style: 'cancel' },
     { text: 'OK', onPress: () => onValue?.(defaultValue ?? '') },
   ]);
 }

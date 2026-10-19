@@ -1606,7 +1606,7 @@ export default function CircleLauncherScreen({
       t('circle.tile.menu.leave'),
       t('circle.tile.menu.leave_confirm', { name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('circle.confirm.cancel'), style: 'cancel' },
         {
           text: t('circle.tile.menu.leave'),
           style: 'destructive',

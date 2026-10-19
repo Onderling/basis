@@ -1427,6 +1427,10 @@
     "at_time": {
       "text": "at {{time}}",
       "doc": "A card's moment today on Vandaag: the time of day (\"om 14:00\")."
+    },
+    "group_past": {
+      "text": "Earlier",
+      "doc": "Vandaag's day shape: appointments that started more than two hours ago, folded last."
     }
   },
   "screens": {

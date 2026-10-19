@@ -1,19 +1,20 @@
 /**
  * THE DAY'S SHAPE on Vandaag — one model both shells paint.
  *   • appointments in groups by their moment: now (started within the last two hours) · soon (the next two hours) ·
- *     later today · tomorrow · after; only the groups that have any, in that order, the first one open and the rest
- *     folded;
+ *     later today · tomorrow · after · and, last, past (started longer ago); only the groups that have any, in that
+ *     order, the first one open (never past) and the rest folded;
  *   • chores: the open ones first, the done ones folded under "gedaan (n)".
  */
 
 import { whenWords, timeWords } from './whenWords.js';
 
 const HOUR = 3_600_000;
-const GROUPS = Object.freeze(['now', 'soon', 'later', 'tomorrow', 'after']);
+const GROUPS = Object.freeze(['now', 'soon', 'later', 'tomorrow', 'after', 'past']);
 
 function groupOf(when, now) {
   if (!Number.isFinite(when) || when <= 0) return 'after';
-  if (when <= now) return when > now - 2 * HOUR ? 'now' : 'after';
+  // started more than two hours ago: past, folded last — never read as a future one
+  if (when <= now) return when > now - 2 * HOUR ? 'now' : 'past';
   if (when <= now + 2 * HOUR) return 'soon';
   const endOfToday = new Date(now); endOfToday.setHours(24, 0, 0, 0);
   if (when < endOfToday.getTime()) return 'later';
@@ -34,7 +35,9 @@ export function agendaGroups(items, { now = Date.now(), t = null, locale } = {})
     by.get(key).push(typeof t === 'function' ? { ...it, moment: momentWords(it?.when, key, { t, locale }) } : it);
   }
   const out = GROUPS.filter((k) => by.get(k).length).map((k) => ({ key: k, labelKey: `circle.vandaag.group_${k}`, open: false, items: by.get(k) }));
-  if (out.length) out[0].open = true;
+  // the first group that has any is open — never the past one
+  const first = out.find((g) => g.key !== 'past');
+  if (first) first.open = true;
   return out;
 }
 
@@ -57,6 +60,7 @@ export function momentWords(when, key, { t, locale } = {}) {
   if (!Number.isFinite(when) || when <= 0) return '';
   if (key === 'now' || key === 'soon' || key === 'later') return t('circle.vandaag.at_time', { time: timeWords(when) });
   if (key === 'tomorrow') return timeWords(when);
+  // past and after: the day and the time
   return whenWords(when, { locale, dayOnly: 'auto' });
 }
 

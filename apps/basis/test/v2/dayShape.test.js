@@ -29,6 +29,14 @@ describe('agendaGroups', () => {
   });
 });
 
+describe('a past appointment', () => {
+  it('is folded under its own last group ("voorbij"), never open — never read as a future one', () => {
+    const g = agendaGroups([{ id: 'old', when: at(6, 0) }, { id: 'later', when: at(9, 0, 5) }], { now });
+    expect(g.map((x) => [x.key, x.items.map((i) => i.id), x.open])).toEqual([['after', ['later'], true], ['past', ['old'], false]]);
+    expect(agendaGroups([{ id: 'old', when: at(6, 0) }], { now }).map((x) => [x.key, x.open])).toEqual([['past', false]]);
+  });
+});
+
 describe('taskGroups', () => {
   it('open first; the done ones folded with their count', () => {
     const r = taskGroups([{ id: 'x', done: true }, { id: 'y' }, { id: 'z', done: false }]);

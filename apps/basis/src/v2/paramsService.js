@@ -21,7 +21,7 @@
  * Only kind:user params are declared into the register (a kind:internal param is immutable by construction —
  * decision E — so it has no settable value and is never here). `set-param` refuses everything else.
  */
-import { ASSISTANT_MEMORY_DEFAULT_KEY, DEFAULT_MEMORY_MODE } from './botThreads.js';
+import { ASSISTANT_MEMORY_DEFAULT_KEY, DEFAULT_MEMORY_MODE, MEMORY_MODES } from './botThreads.js';
 import { createParamRegistry, setParam, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { createSettingsModule } from '@onderling/local-store';
 // The default VALUE is imported from the declaration site, so there is one source of truth for the number;
@@ -29,13 +29,13 @@ import { createSettingsModule } from '@onderling/local-store';
 import { ASK_DEFAULT_TTL_MS } from './nearbyAsks.js';
 import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
 import { DEFAULT_SHARE_NKN_ADDRESS, SHARE_NKN_ADDRESS_PARAM_KEY } from './addressSharing.js';
-import { SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, DEFAULT_SILO_HOLD, DEFAULT_FILE_BYTES } from './syncSelection.js';
-import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
+import { SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY, DEFAULT_SILO_HOLD, DEFAULT_FILE_BYTES, FILE_BYTES_MODES } from './syncSelection.js';
+import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY, SURFACE_PREFS } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
-import { DEFAULT_THEME_PREF } from './themePref.js';
+import { DEFAULT_THEME_PREF, THEME_PREFS } from './themePref.js';
 import { ASSISTANT_APPS } from './assistantApps.js';
-import { START_SCREEN } from './startScreen.js';
-import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, FEEDBACK_CHANNEL_KEY, FEEDBACK_CHANNEL_DEFAULT, QUIET_KEY, QUIET_DEFAULT, USAGE_VISIBLE_KEY, USAGE_VISIBLE, MONTHLY_TOKEN_LIMIT_KEY, MONTHLY_TOKEN_LIMIT, ROLES_KEY, ROLES_PRESET, HOUSEHOLD_IN_APP_KEY, IN_APP_MODE, CALENDAR_FEED_KEY, CALENDAR_FEED_MODE } from './botSettings.js';
+import { START_SCREEN, START_SCREEN_CHOICES } from './startScreen.js';
+import { ASSIGN_POLICY, ASSIGN_POLICY_KEY, NAMES_KEY, NAMES_POLICY, PASSED_KEY, PASSED_POLICY, PASSED_DAYS_KEY, PASSED_KEEP_DAYS, CANCEL_KEY, CANCEL_POLICY, REMINDERS_KEY, REMINDERS_DEFAULT, FEEDBACK_CHANNEL_KEY, FEEDBACK_CHANNEL_DEFAULT, QUIET_KEY, QUIET_DEFAULT, USAGE_VISIBLE_KEY, USAGE_VISIBLE, MONTHLY_TOKEN_LIMIT_KEY, MONTHLY_TOKEN_LIMIT, ROLES_KEY, ROLES_PRESET, HOUSEHOLD_IN_APP_KEY, IN_APP_MODE, CALENDAR_FEED_KEY, CALENDAR_FEED_MODE, ASSIGN_POLICIES, NAMES_POLICIES, PASSED_POLICIES, CANCEL_POLICIES, REMINDERS_MODES, USAGE_VISIBILITY, ROLES_PRESETS, IN_APP_MODES, CALENDAR_FEED_MODES } from './botSettings.js';
 import { REMINDER_RULES_KEY, REMINDER_RULES_PARAM } from './reminderWords.js';
 
 /**
@@ -48,6 +48,13 @@ import { REMINDER_RULES_KEY, REMINDER_RULES_PARAM } from './reminderWords.js';
  * through the ordinary set-param path until the register-projected settings surface exists.
  */
 export const DEVELOPER_PARAM_KEY = 'app.developer';
+
+/** The app's language: the device's own (empty), or one the person picks. */
+const APP_LANG_CHOICES = Object.freeze([
+  Object.freeze({ value: '', labelKey: 'circle.params.opt.lang_device' }),
+  Object.freeze({ value: 'nl', labelKey: 'circle.params.opt.nl' }),
+  Object.freeze({ value: 'en', labelKey: 'circle.params.opt.en' }),
+]);
 
 export const BASIS_USER_PARAMS = [
   { key: 'nearby.ask.defaultTtlMs', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: ASK_DEFAULT_TTL_MS },
@@ -83,54 +90,54 @@ export const BASIS_USER_PARAMS = [
   { key: SYNC_SILO_PARAM_KEYS.tasks,            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SILO_HOLD },
   { key: SYNC_SILO_PARAM_KEYS.contacts,         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SILO_HOLD },
   { key: SYNC_KRINGEN_OFF_PARAM_KEY,            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
-  { key: SYNC_FILE_BYTES_PARAM_KEY,             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_FILE_BYTES },
+  { key: SYNC_FILE_BYTES_PARAM_KEY,             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_FILE_BYTES, choices: FILE_BYTES_MODES },
   // The bot-reply surface preference (inline / screen / chat) — consolidated from the bare
   // cc.surfacePref key; both shells' stores ride registerSurfacePrefIo.
-  { key: SURFACE_PREF_PARAM_KEY,                scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SURFACE_PREF },
+  { key: SURFACE_PREF_PARAM_KEY,                scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SURFACE_PREF, choices: SURFACE_PREFS },
   // The device transport mode — consolidated from THREE write-only homes (web localStorage,
   // mobile AsyncStorage, the classic builtin's vault key), none of which was ever read back at
   // boot: the chosen mode silently reset to the default on every restart. realAgent now applies
   // the register value at boot AND on a live set-param.
-  { key: 'transport.mode',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: TRANSPORT_MODES[0] },
+  { key: 'transport.mode',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: TRANSPORT_MODES[0], choices: TRANSPORT_MODES },
   // The three BOOT-ENTANGLED prefs (the consolidation's last keys). Each keeps its bare key as a
   // PRE-BOOT CACHE (the pre-paint theme hook, i18n init, and the transport connect all run before
   // the agent exists); the register is the AUTHORITY: every set writes through here, and the
   // shells reconcile cache←register once the agent is up (register wins; the live apply follows).
-  { key: 'display.theme',                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_THEME_PREF },
-  { key: 'app.lang',                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
+  { key: 'display.theme',                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_THEME_PREF, choices: THEME_PREFS },
+  { key: 'app.lang',                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '', choices: APP_LANG_CHOICES },
   { key: 'relay.url',                           scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
   { key: DEVELOPER_PARAM_KEY,                   scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: false },
   // Which apps a door's assistant may act in when the door is not a circle (the box's Telegram chat). Set by the
   // owner, read at the door's boot; the model never sets it.
   { key: 'assistant.apps',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSISTANT_APPS },
   // where the app opens on this device: Vandaag (default) · the circles list · the tab last used (startScreen.js)
-  { key: 'home.startScreen',                    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: START_SCREEN },
+  { key: 'home.startScreen',                    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: START_SCREEN, choices: START_SCREEN_CHOICES },
   // How much a door's assistant remembers of a person's conversation when they have not chosen (off · short · long);
   // the person's own choice on their thread wins. Set by the bot's admin.
-  { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE },
+  { key: ASSISTANT_MEMORY_DEFAULT_KEY,          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_MEMORY_MODE, choices: MEMORY_MODES },
   // Whether a household bot's roles decide who may give a chore to someone else (roles · anyone · self). Set by the
   // bot's admin; enforced at the waist, never by the model.
-  { key: ASSIGN_POLICY_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSIGN_POLICY },
+  { key: ASSIGN_POLICY_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ASSIGN_POLICY, choices: ASSIGN_POLICIES },
   // Who may see the others' names on a household bot (members · assigners · admin · none): the household's ceiling.
-  { key: NAMES_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: NAMES_POLICY },
+  { key: NAMES_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: NAMES_POLICY, choices: NAMES_POLICIES },
   // What happens to what is done or has passed on a household bot (keep · hide · delete), and how long `hide` shows it.
-  { key: PASSED_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_POLICY },
+  { key: PASSED_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_POLICY, choices: PASSED_POLICIES },
   { key: PASSED_DAYS_KEY,                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: PASSED_KEEP_DAYS },
   // Who may cancel an appointment on a household bot (own · admin).
-  { key: CANCEL_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CANCEL_POLICY },
+  { key: CANCEL_KEY,                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CANCEL_POLICY, choices: CANCEL_POLICIES },
   // Reminders on a household bot (on · off) and the hours nothing is sent ("21:00-08:00").
-  { key: REMINDERS_KEY,                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDERS_DEFAULT },
+  { key: REMINDERS_KEY,                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDERS_DEFAULT, choices: REMINDERS_MODES },
   { key: FEEDBACK_CHANNEL_KEY,                  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: FEEDBACK_CHANNEL_DEFAULT },
   { key: QUIET_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: QUIET_DEFAULT },
   // The household's reminder rules (`morning,evening-before,before:5` — today's rhythm); its `before:` is the lead.
   { key: REMINDER_RULES_KEY,                    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: REMINDER_RULES_PARAM },
   // Who sees the household's model use (admin · members), and the monthly limit it is shown against.
-  { key: USAGE_VISIBLE_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: USAGE_VISIBLE },
+  { key: USAGE_VISIBLE_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: USAGE_VISIBLE, choices: USAGE_VISIBILITY },
   { key: MONTHLY_TOKEN_LIMIT_KEY,               scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: MONTHLY_TOKEN_LIMIT },
   // What each role may do on the bot: standard | flat (the admin's).
-  { key: ROLES_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ROLES_PRESET },
-  { key: HOUSEHOLD_IN_APP_KEY,                  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: IN_APP_MODE },
-  { key: CALENDAR_FEED_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CALENDAR_FEED_MODE },
+  { key: ROLES_KEY,                             scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: ROLES_PRESET, choices: ROLES_PRESETS },
+  { key: HOUSEHOLD_IN_APP_KEY,                  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: IN_APP_MODE, choices: IN_APP_MODES },
+  { key: CALENDAR_FEED_KEY,                     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: CALENDAR_FEED_MODE, choices: CALENDAR_FEED_MODES },
 ];
 
 /**

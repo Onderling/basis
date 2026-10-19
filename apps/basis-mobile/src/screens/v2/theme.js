@@ -14,11 +14,11 @@
  * subscribeLang idiom. `resolveTheme` is the pure pref→theme map (the decision
  * itself is the shared, off-platform-testable `resolveThemeName`).
  *
- * SEAM (invariant #1): most v2 screens still build their StyleSheets at MODULE
- * load from this singleton, so they capture the boot-time palette; screens that
- * read the theme through `useTheme()` at render time (My-data) recolour live the
- * moment the toggle flips. Converting the remaining module-level StyleSheets to
- * render-time is the tracked follow-up in docs/conventions/web-mobile-exceptions.md.
+ * Every v2 screen reads the theme through `useTheme()` at render and builds its
+ * styles with `makeStyles(theme)`, so a systeem/licht/donker flip repaints at once.
+ * What stays light are NATIVE pieces the theme does not reach (`Alert`, the date
+ * picker, a `Modal` without a themed backdrop) and the three pre-v2 onboarding
+ * screens (docs/conventions/web-mobile-exceptions.md).
  *
  * Bulletin design: headings are bold SYSTEM sans (undefined fontFamily =
  * RN system default); Source Serif is gone with the linen theme.

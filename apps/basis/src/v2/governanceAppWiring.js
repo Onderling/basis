@@ -14,6 +14,8 @@ import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
+import { memberLabel } from './mandate.js';
+import { SETTINGS_ENUM_AXES } from './circlePolicy.js';
 
 /** The statement kinds the governance lane carries — DERIVED from the manifest's declared `appends` rows
  *  (the declared route: the manifest is the source; the rail enforces it at append AND ingest). They are the
@@ -199,3 +201,69 @@ export async function openPolicyProposals(gov, circleId, { now = Date.now() } = 
     members: ctx.members,
   };
 }
+
+/**
+ * What the settings screen says under its fields about the open proposal (the first one): who proposed it, and the
+ * admins whose answer it still waits on — as `{key, params}` lines each shell translates. Names by the roster
+ * (`listGroupMembers` rows), an unknown ref as itself. Nothing open → no lines.
+ * @param {{proposals: Array<{by?: string, votes?: Array<{voter: string}>}>, roster: object[]}} a
+ * @returns {Array<{key: string, params: object}>}
+ */
+export function policyProposalNote({ proposals = [], roster = [] } = {}) {
+  const first = proposals[0];
+  if (!first) return [];
+  const refOf = (m) => m?.webid ?? m?.pubKey ?? m?.ref ?? null;
+  const nameOf = (ref) => { const m = roster.find((r) => refOf(r) === ref); return (m && memberLabel({ ...m, webid: refOf(m) })) || ref; };
+  const voted = new Set((first.votes ?? []).map((v) => v.voter));
+  const waiting = roster.filter((m) => m?.role === 'admin' && !voted.has(refOf(m))).map((m) => nameOf(refOf(m)));
+  return [
+    ...(first.by ? [{ key: 'circle.settings.proposed_by', params: { who: nameOf(first.by) } }] : []),
+    ...(waiting.length ? [{ key: 'circle.settings.pending_waiting', params: { who: waiting.join(', ') } }] : []),
+  ];
+}
+
+/**
+ * What a policy proposal changes, in words: a feature on or off, an axis set to an option (the settings screen's own
+ * labels, as locale keys the shell translates in `params`), and the rest counted.
+ * @param {object} patch   the proposal's subject (a `policyPatch`)
+ * @returns {Array<{key: string, params: object}>}
+ */
+export function policyChangeLines(patch = {}) {
+  const lines = [];
+  let other = 0;
+  for (const [k, v] of Object.entries(patch ?? {})) {
+    if (k === 'features' && v && typeof v === 'object') {
+      for (const [f, on] of Object.entries(v)) lines.push({ key: on ? 'circle.settings.change_on' : 'circle.settings.change_off', params: { whatKey: `circle.settings.feat.${f}` } });
+    } else if (SETTINGS_ENUM_AXES.includes(k) && typeof v === 'string') {
+      lines.push({ key: 'circle.settings.change_set', params: { whatKey: `circle.settings.${k}`, toKey: `circle.settings.opt.${v}` } });
+    } else other += 1;
+  }
+  if (other) lines.push({ key: 'circle.settings.change_other', params: { n: other } });
+  return lines;
+}
+
+/**
+ * The open policy proposal an ADMIN viewer still has to answer — on their own settings screen ("Bea stelt voor: … ·
+ * Overnemen / Afwijzen", the same governance vote) — or null (not an admin, nothing open, already answered).
+ * @param {{proposals: object[], roster: object[], myRef: string}} a
+ * @returns {{proposalId: string, who: string, changes: Array<{key: string, params: object}>}|null}
+ */
+export function policyProposalForAdmin({ proposals = [], roster = [], myRef = null } = {}) {
+  const refOf = (m) => m?.webid ?? m?.pubKey ?? m?.ref ?? null;
+  const me = roster.find((m) => refOf(m) === myRef);
+  if (!myRef || me?.role !== 'admin') return null;
+  const p = proposals.find((x) => !(x.votes ?? []).some((v) => v.voter === myRef));
+  if (!p) return null;
+  const by = roster.find((m) => refOf(m) === p.by);
+  return { proposalId: p.proposalId, who: (by && memberLabel({ ...by, webid: refOf(by) })) || p.by, changes: policyChangeLines(p.subject) };
+}
+
+/** The change lines as one sentence in the viewer's words (`t` the shell's translator). */
+export function policyChangeText(lines = [], t = (k) => k) {
+  return lines.map((l) => t(l.key, {
+    ...l.params,
+    ...(l.params?.whatKey ? { what: t(l.params.whatKey) } : {}),
+    ...(l.params?.toKey ? { to: t(l.params.toKey) } : {}),
+  })).join(', ');
+}
+

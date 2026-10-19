@@ -92,11 +92,13 @@ describe('Circle settings\' Save, per viewer — the fold first, then the paint'
   // The circle policy is an ADMIN's signed statement on the governance lane, and every device folds only admins'.
   const stmt = (author, version, policy) => ({ kind: 'policy-update', author, hash: `${author}-${version}`, payload: { policy, version } });
 
-  it('a member\'s policy statement is dropped by the fold — so a member\'s Save is greyed, with the reason', async () => {
+  it('a member\'s policy statement is dropped by the fold — so a member\'s Save becomes a PROPOSAL (the admins decide)', async () => {
     const { members } = await buildCircle();
     const admins = new Set(members.filter((m) => m.role === 'admin').map((m) => m.webid));
     expect(foldPolicyUpdates([stmt(BOB, 2, { features: { tasks: true } })], { admins })).toBeNull();
-    expect(policySaveControlFor({ members, myRef: BOB })).toMatchObject({ disabled: true, reasonKey: 'circle.op.admin_only' });
+    expect(policySaveControlFor({ members, myRef: BOB })).toMatchObject({ disabled: false, propose: true, labelKey: 'circle.settings.propose' });
+    // a viewer the roster does not know yet: closed, as before
+    expect(policySaveControlFor({ members, myRef: 'nobody' })).toMatchObject({ disabled: true, reasonKey: 'circle.op.admin_only' });
   });
 
   it('the admin\'s statement is folded — so her Save is open', async () => {
@@ -104,6 +106,7 @@ describe('Circle settings\' Save, per viewer — the fold first, then the paint'
     const admins = new Set(members.filter((m) => m.role === 'admin').map((m) => m.webid));
     expect(foldPolicyUpdates([stmt(ANNE, 2, { features: { tasks: true } })], { admins })?.version).toBe(2);
     expect(policySaveControlFor({ members, myRef: ANNE })).toMatchObject({ disabled: false });
+    expect(policySaveControlFor({ members, myRef: ANNE }).propose).toBeFalsy();
   });
 
   for (const [shell, rel] of [['web', '../../web/v2/circleApp.js'], ['mobile', '../../../basis-mobile/src/screens/v2/CircleSettingsScreen.js']]) {

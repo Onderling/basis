@@ -277,6 +277,7 @@ import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead } from '../../../../basis/src/v2/vandaagPlus.js';
+import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
@@ -1276,7 +1277,9 @@ export default function CircleLauncherScreen({
           hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs,
             ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
             // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
-            selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } } },
+            selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
+            // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
+            allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen() },
         });
         if (!alive) return;
         setScreenViewBlocks(blocks);
@@ -1912,6 +1915,15 @@ export default function CircleLauncherScreen({
                 if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); }
                 // an own row (no circle): the "+" sheet opened on it — change it or take it away
                 else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
+                // the onboarding strip's acts: the handle through the profile op, the intro card seen here, begin
+                else if (a?.kind === 'set-handle') {
+                  const op = handleOp(a.value);
+                  if (!op.error) Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch(() => null).then(() => refreshScreensBook());
+                }
+                else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
+                else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });
+                else if (a?.kind === 'create-circle') setCreating(true);
+                else if (a?.kind === 'join-circle') setJoinScanOpen(true);
                 // a card's one action that IS an op (a chore done): through the waist, then the page repaints
                 else if (a?.kind === 'row-op' && a.op?.app && a.op?.opId) {
                   Promise.resolve(bundle?.callSkill?.(a.op.app, a.op.opId, a.op.args ?? {})).catch(() => null).then(() => refreshScreensBook());

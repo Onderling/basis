@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { makeCircleGovernance } from '../../src/v2/governanceHost.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
+import { voteEvent } from '../../src/v2/governanceLog.js';
 
 const members = [
   { ref: 'admin0', role: 'admin' },
@@ -54,21 +55,34 @@ describe('makeCircleGovernance — enact routing', () => {
 
 describe('the admin enact gate (Decision A)', () => {
   it('a member device does not enact an approved vote; an admin device does', async () => {
+    // Another member's vote arrives as THEIR event (a device votes only as its own self); this device then casts its own.
     // member device
     const asMember = host({ governance: { removeMember: 'member-vote' }, localActorRef: 'm0' });
-    const { proposalId } = await asMember.gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', actor: { ref: 'admin0' }, deadline: 100 });
-    await asMember.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
-    const tip = await asMember.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });  // 3/4 → approved
-    expect(tip).toMatchObject({ status: DECISION_STATUS.APPROVED, awaitingEnactment: true });
+    const { proposalId } = await asMember.gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', deadline: 100 });  // m0's own yes
+    asMember.events.push(voteEvent({ proposalId, voter: 'admin0', choice: 'yes' }));
+    const tip = await asMember.gov.vote({ circleId: 'c1', proposalId, choice: 'yes' });
+    expect(tip).toMatchObject({ status: DECISION_STATUS.PENDING });                                 // 2/4
+    asMember.events.push(voteEvent({ proposalId, voter: 'm1', choice: 'yes' }));
+    const tip1 = await asMember.gov.tally({ circleId: 'c1', proposalId });                            // 3/4 → approved
+    expect(tip1).toMatchObject({ status: DECISION_STATUS.APPROVED, awaitingEnactment: true, tally: { yes: 3, of: 4 } });   // every reply carries the count
     expect(asMember.callSkill).not.toHaveBeenCalledWith('pinboard', 'removeMember', expect.anything());
 
-    // admin device, same votes → enacts
+    // admin device, same votes (both members' arrive as their events) → its tally enacts
     const asAdmin = host({ governance: { removeMember: 'member-vote' }, localActorRef: 'admin0' });
     const p2 = await asAdmin.gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', actor: { ref: 'admin0' }, deadline: 100 });
-    await asAdmin.gov.vote({ circleId: 'c1', proposalId: p2.proposalId, voter: 'm0', choice: 'yes' });
-    const tip2 = await asAdmin.gov.vote({ circleId: 'c1', proposalId: p2.proposalId, voter: 'm1', choice: 'yes' });
+    asAdmin.events.push(voteEvent({ proposalId: p2.proposalId, voter: 'm0', choice: 'yes' }), voteEvent({ proposalId: p2.proposalId, voter: 'm1', choice: 'yes' }));
+    const tip2 = await asAdmin.gov.tally({ circleId: 'c1', proposalId: p2.proposalId });
     expect(tip2).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
     expect(asAdmin.callSkill).toHaveBeenCalledWith('pinboard', 'removeMember', { groupId: 'c1', memberWebid: 'm2@id', policy: 'graceful' });
+  });
+
+  it('a device votes only as its own self — a caller-named voter does not decide', async () => {
+    const asMember = host({ governance: { removeMember: 'member-vote' }, localActorRef: 'm0' });
+    const { proposalId } = await asMember.gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', actor: { ref: 'admin0' }, deadline: 100 });
+    await asMember.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });
+    const voters = asMember.events.filter((e) => e.event === 'vote').map((e) => e.voter);
+    expect(voters.length).toBeGreaterThan(0);
+    expect(new Set(voters)).toEqual(new Set(['m0']));
   });
 });
 

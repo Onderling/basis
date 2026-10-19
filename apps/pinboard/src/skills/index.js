@@ -1418,8 +1418,8 @@ export function buildSkills({
   // THE RESPONSE IS THE CARRIER of "who answered": a responder's answer (`respondToItem`) reaches the poster as a DM
   // threaded under the poster's request id, and the host hands this device's pinboard the envelope's VERIFIED sender
   // address with it (`recordResponse`, below — the host's own call only). The responder is recorded on THIS device's
-  // copy of the request: the webid the circle's roster binds that address to (a proven per-circle address), never a
-  // name in the body, and only on a request this device posted, as its self in that circle. `acceptResponder` accepts
+  // copy of the request: the webid the circle's roster binds that address to (a proven per-circle address, or the
+  // member's own key), never a name in the body, and only on a request this device posted, as its self in that circle. `acceptResponder` accepts
   // only someone recorded here.
   const recordResponse = async ({ threadId, fromPubKey } = {}) => {
     if (typeof threadId !== 'string' || !threadId || typeof fromPubKey !== 'string' || !fromPubKey) return { recorded: false, reason: 'no-ids' };
@@ -1435,8 +1435,11 @@ export function buildSkills({
     const self = localActorIn(circle);
     if (item.addedBy !== self) return drop('not-my-request');
     const roster = (await listGroupMembersCore(scope, { groupId: circle }, { from: self }).catch(() => null))?.members ?? [];
+    // The roster's own ladder: the member's proven per-circle address first, else the member's own key (in basis' binding a
+    // member's webid IS their chat key — and a 1:1 answer travels from it, not from a circle address).
     const row = roster.find((m) => m && (m.circleAddress === fromPubKey
-      || (Array.isArray(m.circleAddresses) && m.circleAddresses.some((p) => p?.address === fromPubKey && typeof p?.proof === 'string' && p.proof))));
+      || (Array.isArray(m.circleAddresses) && m.circleAddresses.some((p) => p?.address === fromPubKey && typeof p?.proof === 'string' && p.proof))))
+      ?? roster.find((m) => m && (m.webid === fromPubKey || m.pubKey === fromPubKey));
     const webid = typeof row?.webid === 'string' && row.webid ? row.webid : null;
     if (!webid) return drop('sender-not-on-roster');
     const prior = Array.isArray(item.source?.responders) ? item.source.responders : [];

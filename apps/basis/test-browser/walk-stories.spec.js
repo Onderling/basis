@@ -146,6 +146,24 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
       aLanded ? `found under Contacten (${nRows} row(s))${/prikbord/i.test(aThread) ? ' + the reply-to-post marker' : ' (no marker)'}` : `${nRows} contact row(s), none holds the reply`);
     expect(bOpened, "the reply must open the asker's thread on the replier's side").toBe(true);
     expect(aLanded, 'the asker must find the reply in a contact thread').toBe(true);
+
+    // …and the asker ACCEPTS the one who answered, on the request itself: the reply recorded who it came from on A's
+    // copy (the answer's verified sender, over the roster), so A's post now offers one Accept per responder.
+    await gotoCircles(A.page);
+    await openCircleMatching(A.page, /prikbord.?kring/i);
+    await toChat(A.page);
+    const nbTab = A.page.locator('.circle-view__tab[data-tab="noticeboard"]');
+    if (await nbTab.count()) { await nbTab.first().click(); await A.page.waitForTimeout(2500); }
+    const accept = A.page.locator('.cc-noticeboard__chip[data-action="accept"]');
+    const nAccept = await accept.count();
+    log('story 4 · the asker can accept the one who answered, on the post', nAccept === 1 ? 'PASS' : 'FINDING',
+      nAccept ? `"${(await accept.first().textContent())?.trim()}"` : 'no accept chip on the post');
+    expect(nAccept, 'one Accept, for the one person who answered').toBe(1);
+    await accept.first().click();
+    await A.page.waitForTimeout(3000);
+    const stillOpen = /boormachine/i.test(await A.page.evaluate(() => document.querySelector('.cc-noticeboard')?.innerText ?? ''));
+    log('story 4 · accepting closes the ask', stillOpen ? 'FINDING' : 'PASS', stillOpen ? 'the ask is still on the board' : 'off the open board');
+    expect(stillOpen, 'an accepted ask is off the open board').toBe(false);
   } finally { await teardown(peers); }
 });
 

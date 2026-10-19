@@ -316,14 +316,17 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     const own = isAgenda
       ? await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; })
       : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE }).catch((err) => { ownError = String(err?.message ?? err); return null; });
-    let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true }));
+    // the self that made each own item (it is changed as that self, never another): its maker's webid among this
+    // device's selves; no maker, or 'me' (an own appointment is made as 'me'), is the default's; a webid no self here
+    // holds is a self not run on this device — null, so the row stays read-only
+    const byWebid = new Map((selfSet?.held ?? []).filter((x) => x?.webid).map((x) => [x.webid, x.id]));
+    const makerOf = (e) => byWebid.get(e.createdBy) ?? (!selfSet || e.createdBy == null || e.createdBy === 'me' ? 'default' : null);
+    let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true, maker: makerOf(e) }));
     if (scope === 'mine') mine = mine.filter((e) => presenter.isMine(e, selfIn(null)));
-    // the switcher's set: an own item shows when the self that made it is on — its maker's webid among this device's
-    // selves; any other maker (an own appointment is made as 'me') is the default's
+    // the switcher's set: an own item shows when the self that made it is on; one no self here made shows with the default
     if (selfSet && Array.isArray(selfSet.on) && selfSet.on.length) {
-      const byWebid = new Map((selfSet.held ?? []).filter((x) => x?.webid).map((x) => [x.webid, x.id]));
       const on = new Set(selfSet.on);
-      mine = mine.filter((e) => on.has(byWebid.get(e.createdBy) ?? 'default'));
+      mine = mine.filter((e) => on.has(e.maker ?? 'default'));
     }
     const sign = presenter.order === 'asc' ? 1 : -1;
     rows = [...rows, ...mine].filter((e) => !isAgenda || !presenter.when(e) || presenter.when(e) <= until)
@@ -356,6 +359,7 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     // the row's ONE action, declared by its noun (`presents.primary`): done · open the sheet on it · open its circle
     ...((() => { const p = primaryActionFor(row, noun); return p ? { primary: p } : {}; })()),
     // an own row's own words, as made (the "+" sheet opens on them to change or remove it)
+    ...(row.own ? { maker: row.maker ?? null } : {}),
     ...(row.own ? { fields: { ...((row.body ?? row.text) != null ? { body: row.body ?? row.text } : {}), ...(row.title != null ? { title: row.title } : {}), ...(row.startsAt ? { when: row.startsAt } : {}) } } : {}),
   }));
   return { blockId: block.id, type: 'items', status: items.length ? 'ok' : 'empty', content: { noun, scope, items } };

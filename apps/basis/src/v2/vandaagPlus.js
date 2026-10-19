@@ -87,11 +87,14 @@ export function plusOp(actId, values = {}, { acts = PLUS_ACTS } = {}) {
 /**
  * A row on Vandaag opening the sheet on itself: its act (by the row's noun), its words as made, its id — for an OWN
  * row only (a circle's row opens the circle's own actions; the sheet never edits a circle's item as if it were yours).
- * @param {{id: string, own?: boolean, circleId?: string|null, fields?: object}} row
+ * @param {{id: string, own?: boolean, circleId?: string|null, fields?: object, maker?: string|null}} row
  * @param {string} noun
+ * @returns {{act: object, id: string, values: object, asSelf: string}|null}   `asSelf`: the self it is changed as
  */
 export function plusEditFor(row, noun, { acts = PLUS_ACTS } = {}) {
   if (!row?.id || row.circleId || row.own === false) return null;
+  // changed AS the self that made it: a row whose maker is not run here stays read-only
+  if (row.maker === null) return null;
   const act = acts.find((a) => a.noun === noun) ?? null;
   if (!act || !act.edit) return null;
   const values = {};
@@ -102,7 +105,7 @@ export function plusEditFor(row, noun, { acts = PLUS_ACTS } = {}) {
     if (f.kind === 'datetime') { const d = new Date(v); if (!Number.isNaN(d.getTime())) { const p = (n) => String(n).padStart(2, '0'); values[f.name] = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; continue; } }
     values[f.name] = String(v);
   }
-  return { act, id: row.id, values };
+  return { act, id: row.id, values, asSelf: row.maker ?? 'default' };
 }
 
 /** The change of an own item: the act's edit op with what was filled in — or `{error}`. */

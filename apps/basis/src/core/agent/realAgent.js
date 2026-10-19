@@ -2211,6 +2211,19 @@ export async function createRealHouseholdAgent(opts = {}) {
   // on first need (a persona can be created in this session). Its key lands in ITS vault and becomes ITS identity; a
   // carry for it is admitted only under its own root (the router binds the subject by that, never by the claim).
   const personaKeySyncs = new Map();   // personaId → its sync
+  /** A persona's new person key: kept in ITS vault (monotonic), then its identity — the old one forgotten. */
+  const adoptPersonaKey = async (pid, rt, k) => {
+    const landed = await storePersonKey(rt.vault, k);
+    if (landed) {
+      const now = (await loadPersonKey(rt.vault)) ?? k;   // the merged entry: chain + older seeds
+      const old = rt.personIdentity?.pubKey ?? null;
+      rt.personKey = now;
+      rt.personIdentity = await AgentIdentity.fromSeed(now.seed, new VaultMemory());
+      if (old && old !== rt.personIdentity.pubKey) { try { secureAgentRef.current?.forgetSelfIdentity?.(old); } catch { /* best-effort */ } }
+      await registerPersonaIdentities(pid, rt);
+    }
+    return landed;
+  };
   const personaKeySyncFor = (pid, rt) => {
     if (personaKeySyncs.has(pid)) return personaKeySyncs.get(pid);
     if (!rt?.chatId?.pubKey || !rt.vault) return null;
@@ -2218,18 +2231,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       siblings: () => personaSiblings(pid),
       sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
       current: () => rt.personKey ?? null,
-      store: async (k) => {
-        const landed = await storePersonKey(rt.vault, k);
-        if (landed) {
-          const now = (await loadPersonKey(rt.vault)) ?? k;   // the merged entry: chain + older seeds
-          const old = rt.personIdentity?.pubKey ?? null;
-          rt.personKey = now;
-          rt.personIdentity = await AgentIdentity.fromSeed(now.seed, new VaultMemory());
-          if (old && old !== rt.personIdentity.pubKey) { try { secureAgentRef.current?.forgetSelfIdentity?.(old); } catch { /* best-effort */ } }
-          await registerPersonaIdentities(pid, rt);
-        }
-        return landed;
-      },
+      store: (k) => adoptPersonaKey(pid, rt, k),
       selfPubKey: rt.chatId.pubKey,
       ownCommitmentFor: (circleId) => (rt.authorityPubKeyB64 ? ceremonyCommitment(rt.authorityPubKeyB64, circleId) : null),
       onLanded: ({ version }) => console.info(`[person-key] a persona's version ${version} arrived from one of its devices`),
@@ -3125,6 +3127,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       // each persona's wire id for it, tombstones it on that persona's record (minted already revoked when absent, as the
       // default's is), and retires its addresses in that persona's circles as that persona.
       const revokedUnder = holdsGeneral || generalRowTombstoned ? { default: deviceId } : {};
+      const personaKeyVersions = {};   // personaId → the person-key version it rotated to here
+      const personaKeysUndone = [];    // personas the lost device held that this device could not rotate (another holds them)
+      const personaKeysAlone = [];     // personas only the lost device held: its key lived there alone, nothing to rotate
       try {
         const internalId = linkedInternalId;
         const entries = internalId ? ((await bounded(agentsRegistryRef?.list?.())) ?? []) : [];
@@ -3137,6 +3142,9 @@ export async function createRealHouseholdAgent(opts = {}) {
           // reached this device must not leave a live id behind). Generation 0 is minted already revoked when absent, as
           // before; the device-map row is a hint for nothing here.
           let pWire = personaWireAt(pSeed, internalId, 0);
+          // did the lost device HOLD this persona — a live record for it on the persona's row? (a record minted here,
+          // already revoked, is not holding it: its key never lived there, so nothing of it needs to rotate)
+          let heldLive = false;
           try {
             let props = entry.properties ?? {};
             for (let gen = 0; gen < 64; gen++) {
@@ -3148,6 +3156,7 @@ export async function createRealHouseholdAgent(opts = {}) {
                 const minted = signDeviceDelegation(root.deriveProfileAuthority(pid), { profileId: pid, deviceId: wireAt, pubKey: deviceDelegationPubKey(seedAt) });
                 props = registrySetDeviceDelegation(props, wireAt, { ...minted, revoked: true });
               } else if (rec.revoked !== true) {
+                heldLive = true;
                 props = registrySetDeviceDelegation(props, wireAt, { revoked: true });
               }
               pWire = wireAt;   // the last one the device had under this persona — the one its circles know
@@ -3159,6 +3168,49 @@ export async function createRealHouseholdAgent(opts = {}) {
           const pCircles = Object.keys(circleMembershipsOf(entry));
           if (pCircles.length) {
             revokedIn.push(...await retireAddresses({ root, circleIds: pCircles, addressFor: (cid) => deriveCircleAddress(pDeviceSeed, cid) }));
+          }
+          // THE PERSONA'S PERSON KEY ROTATES TOO, when the lost device held it live — and only here when THIS device runs
+          // the persona (it adopts the new key and hands it on). Otherwise it is said: no surviving device holds it (its
+          // key lived on the lost device alone — nothing to rotate), or another device does (this one can neither adopt
+          // nor hand over: partial, the persona named).
+          if (heldLive) {
+            const rt = personas.get(pid);
+            const liveElsewhere = Object.values(deviceDelegationsOf((await bounded(agentsRegistryRef?.lookup?.(pid))) ?? entry)).some((d) => d && d.revoked !== true);
+            if (!rt?.chatId?.pubKey || !rt.vault) {
+              if (liveElsewhere) personaKeysUndone.push(pid); else personaKeysAlone.push(pid);
+            } else {
+              try {
+                const self = rt.chatId.pubKey;
+                const nextVersion = (rt.personKey?.version ?? 0) + 1;
+                const nextSeed = derivePersonKeySeed(pSeed, nextVersion);
+                const pubKey = personKeyPubKeyB64(nextSeed);
+                const linkSeed = derivePersonLinkKeySeed(pSeed);
+                const linkKeyPub = personKeyPubKeyB64(linkSeed);
+                const authority = root.deriveProfileAuthority(pid);
+                const reveals = {};
+                for (const circleId of pCircles) {
+                  reveals[circleId] = signCeremonyReveal(authority, { circleId, kind: PERSON_KEY_CARRY, subject: self, authorRef: self, facts: personKeyFacts({ version: nextVersion, pubKey }) });
+                }
+                const link = rt.personKey ? signPersonKeyLink(linkSeed, { version: nextVersion, pubKey, prevVersion: rt.personKey.version }) : null;
+                const previous = rt.personKey ? [...(rt.personKey.previous ?? []), { version: rt.personKey.version, seed: rt.personKey.seed }] : [];
+                await adoptPersonaKey(pid, rt, { version: nextVersion, seed: nextSeed, reveals, links: link ? [link] : [], previous, linkKeyPub });
+                personaKeyVersions[pid] = nextVersion;
+                // announced in THIS persona's circles only, root-revealed by the persona's own authority
+                if (typeof membershipEmit === 'function') {
+                  for (const circleId of pCircles) {
+                    try {
+                      const reveal = signCeremonyReveal(authority, { circleId, kind: PERSON_KEY_KIND, subject: self, authorRef: self, facts: personKeyFacts({ version: nextVersion, pubKey }) });
+                      await membershipEmit({ kind: PERSON_KEY_KIND, circleId, subject: self, payload: { version: nextVersion, pubKey, reveal }, actor: self });
+                    } catch (err) { console.warn(`[ceremony] a persona's person key v${nextVersion} not announced in ${circleId}: ${err?.message ?? err}`); }
+                  }
+                }
+                // …and handed to the persona's surviving devices, never the revoked device's addresses under it
+                await personaKeySyncFor(pid, rt)?.carryCurrent({ exclude: pCircles.map((cid) => deriveCircleAddress(pDeviceSeed, cid)) });
+              } catch (err) {
+                personaKeysUndone.push(pid);
+                console.warn(`[ceremony] a persona's person key did not rotate: ${err?.message ?? err}`);
+              }
+            }
           }
         }
         if (!internalId && entries.length === 0) console.info('[ceremony] no device-link row for this device — its personas (if any) are not known to this device yet');
@@ -3254,8 +3306,13 @@ export async function createRealHouseholdAgent(opts = {}) {
         ok: true, deviceId, known, revokedIn, revokedUnder, circles: revokedIn.length, nodesTold, botsTold,
         // a device without the general persona did only its personas' parts — the lost device most likely held the
         // general persona too, and that part has to be done on a device that holds it (it is a member of those circles)
-        ...(holdsGeneral ? {} : { outcome: 'partial', undone: ['general-circles'] }),
+        // partial: the general persona's circles (not held here), and any persona another device holds that this one
+        // could not rotate — each named, so the person knows which to finish from the device that holds it
+        ...((!holdsGeneral || personaKeysUndone.length) ? { outcome: 'partial', undone: [...(holdsGeneral ? [] : ['general-circles']), ...personaKeysUndone.map((pid) => `persona-key:${pid}`)] } : {}),
         ...(personKeyVersion ? { personKeyVersion } : {}),
+        ...(Object.keys(personaKeyVersions).length ? { personaKeyVersions } : {}),
+        ...(personaKeysAlone.length ? { personaKeysAlone } : {}),
+        ...(personaKeysUndone.length ? { personaKeysUndone } : {}),
         ...(migrated ? { migrated: true, reloadRequired: true, introduced } : {}),
       })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }

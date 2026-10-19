@@ -4837,7 +4837,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       chatAgent.enableReachabilityOracle({
         peerScope: makeSharedCirclePeerScope({
-          myCircleIds: () => _listMyKnownCircles(),
+          // the circles of the self the caller addressed — a persona's co-member asks at the persona's address
+          myCircleIds: ({ to } = {}) => _listMyKnownCircles(personaAtAddress(to)),
           rosterOf: async (circleId) => {
             const reply = await chatAgent.invoke(
               pinboardAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })], pinboardActAs({ groupId: circleId }),
@@ -4891,6 +4892,21 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   /** The circles ONE self is in — the default's, or (`asSelf`, a persona's chat key) that persona's. Never the union:
    *  its callers (the circle-less noticeboard fan, the reachability scope) must not cross selves. */
+  /**
+   * The persona (its chat key) that answers at `address` on this device — its chat key, its person key, or its address
+   * in one of its circles — or null for the general persona's (and anything not ours). Never a guess across selves.
+   */
+  function personaAtAddress(address) {
+    if (typeof address !== 'string' || !address) return null;
+    const own = sa.agent.security?.ownAddressFor?.(address) ?? address;
+    for (const [pid, rt] of personas) {
+      if (pid === 'default' || !rt?.chatId?.pubKey) continue;
+      if (own === rt.chatId.pubKey || own === rt.personIdentity?.pubKey) return rt.chatId.pubKey;
+      for (const [cid, p] of circlePersonas) if (p === pid && circleAddressFor(cid) === own) return rt.chatId.pubKey;
+    }
+    return null;
+  }
+
   async function _listMyKnownCircles(asSelf = null) {
     try {
       const result = await chatAgent.invoke(

@@ -158,3 +158,20 @@ describe('the per-caller cache is bounded', () => {
     expect((await askAs(agent, 'pk-a')).body.s).not.toBe(a1.body.s);  // re-signed
   });
 });
+
+describe('the answer is the ADDRESSED self\'s — a device with several selves answers each one for its own circles', () => {
+  it('the scope hears which address the request reached, and the cache keeps each self apart', async () => {
+    const peers = new PeerGraph();
+    const agent = await makeAgent({ peers });
+    await seedPeers(peers, ALL);
+    const seen = [];
+    // the general self shares a circle with the caller about Anna; the persona at 'addr-persona' about Cato
+    registerReachablePeersSkill(agent, { peerScope: (caller, all, { to } = {}) => { seen.push(to ?? null); return to === 'addr-persona' ? ['pk-cato'] : ['pk-anna']; } });
+    const ask = async (to) => Parts.data(await agent.skills.get('reachable-peers').handler({ parts: [], from: 'pk-caller', envelope: { _from: 'pk-caller', _to: to } }));
+    const general = await ask('addr-general');
+    const persona = await ask('addr-persona');
+    expect(seen).toEqual(['addr-general', 'addr-persona']);
+    expect(general.body.p).toEqual(['pk-anna']);
+    expect(persona.body.p, 'the persona\'s answer is not the cached general one').toEqual(['pk-cato']);
+  });
+});

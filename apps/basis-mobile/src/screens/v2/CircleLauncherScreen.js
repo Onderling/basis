@@ -216,7 +216,7 @@ import { loadPersonaAvatar } from '../../../../basis/src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../../../basis/src/v2/personaSet.js';
 import PersonaSwitcherModal from './PersonaSwitcherModal.js';
 import FaceView from './FaceView.js';
-import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
+import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource, outboundSharesForAdmin, revokeOutboundForMember, unshareItemFromCircle } from '../../core/circlePods.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
 import { buildCircleLlmProviders } from '../../../../basis/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDispatch.js';
@@ -2082,6 +2082,10 @@ export default function CircleLauncherScreen({
         onBack={() => setView('detail')}
         // a member's own row offers LEAVING (the shared decision): the same leave the tile menu runs, with its confirm
         onLeave={() => onLeaveCircle(selected.id, selected, () => setView('list'))}
+        // what this circle shared out, and taking it back — the shared decision over this device's resolvers
+        outboundFor={() => outboundSharesForAdmin({ fromCircleId: selected.id, circleIds: circles.map((c) => c.id) })}
+        stopShare={(s) => unshareItemFromCircle({ itemId: s.itemId, fromCircleId: selected.id, toCircleId: s.toCircleId })}
+        revokeForRemoved={(webid) => revokeOutboundForMember({ fromCircleId: selected.id, circleIds: circles.map((c) => c.id), recipient: webid })}
       />
     );
   }

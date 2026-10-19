@@ -736,6 +736,37 @@ export async function listOutboundShares({ resolveService, fromCircleId, circleI
 }
 
 /**
+ * The admin panel's outbound section, decided once for both shells: what this circle shared out, and whether it may
+ * take a share back IN PLACE — only a `canonical` posture revokes in place (rotate the key, revoke the grant); under
+ * any other posture the share is a separate object and the row says so instead of offering "Stop sharing". A failing
+ * read is an empty list, never a throw.
+ * @param {{resolveService: Function, fromCircleId: string, circleIds: string[], policy: object|null}} a
+ * @returns {Promise<{shares: Array<{toCircleId: string, itemId: string, sourceType?: string}>, revocable: boolean}>}
+ */
+export async function adminOutboundShares({ resolveService, fromCircleId, circleIds, policy } = {}) {
+  let shares = [];
+  try { shares = await listOutboundShares({ resolveService, fromCircleId, circleIds }); } catch { shares = []; }
+  let revocable = false;
+  try { revocable = isCanonicalPosture(normalizeCirclePolicy(policy ?? {}).sharePosture); } catch { revocable = false; }
+  return { shares, revocable };
+}
+
+/** The words for what the auto-revoke on a member's removal did: how many were taken back, how many failed, or null
+ *  when there was nothing to take back. The removal's own notice stands then. */
+export function memberRevokeWords(res) {
+  if (res?.failed?.length > 0) return { key: 'circle.share.member_revoke_failed', params: { count: res.failed.length } };
+  if (res?.revoked > 0) return { key: 'circle.share.member_revoked', params: { count: res.revoked } };
+  return null;
+}
+
+/** The words for what a "Stop sharing" answered: taken back, or why not. */
+export function stopShareWords(reply, share) {
+  return reply?.ok
+    ? { key: 'circle.share.revoked', params: { item: share?.itemId, recipient: share?.toCircleId } }
+    : { key: 'circle.share.revoke_failed', params: { error: reply?.error ?? 'unknown' } };
+}
+
+/**
  * objective L follow-up — AUTO-REVOKE a departing member. When `recipient` is removed from / leaves
  * `fromCircleId`, revoke their canonical access to every item that circle SHARED OUT — reusing the SAME revoke
  * path (`revokeItemShare` → `enforcement.revokeCanonical`), never a second revoke mechanism.

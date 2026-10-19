@@ -139,6 +139,22 @@ export function registerCalendarSkills(agent, store, opts = {}) {
     }
   });
 
+  reg('updateEvent', async ({ parts }) => {
+    const a = parts?.[0]?.data ?? {};
+    try {
+      const event = await store.update({ eventId: a.id, title: a.title, when: a.when });
+      publishEvent({
+        app: 'calendar', type: 'item-changed',
+        actor: a.actor ?? 'webid:local-demo-user',
+        itemRef: { app: 'calendar', type: 'calendar-event', id: a.id },
+        payload: { message: `✓ Changed event ${a.id}` },
+      });
+      return [DataPart({ ok: true, itemId: a.id, title: event.title, startsAt: event.startsAt, _sync: simulateSync() })];
+    } catch (err) {
+      return [DataPart({ ok: false, error: err.message })];
+    }
+  });
+
   reg('getEventSnapshot', async ({ parts }) => {
     const a = parts?.[0]?.data ?? {};
     const event = await store.getById(a.id);

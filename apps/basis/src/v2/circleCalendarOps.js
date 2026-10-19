@@ -148,7 +148,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       try { next = retimeEvent(event, { title: args?.title, when: args?.when }); }
       catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
       await storeFor(circleId).put(next, { by: who(args) });
-      return { ok: true, title: next.title, startsAt: next.startsAt, message: t('circle.calendar.updated', { title: next.title, when: stamp(next) }) };
+      return { ok: true, itemId: next.id, title: next.title, startsAt: next.startsAt, message: t('circle.calendar.updated', { title: next.title, when: stamp(next) }) };
     },
 
     cancelEvent: async (args) => {
@@ -156,7 +156,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
       await storeFor(circleId).put({ ...event, state: 'cancelled' }, { by: who(args) });
-      return { ok: true, title: event.title, startsAt: event.startsAt, message: t('circle.calendar.cancelled', { title: event.title, when: stamp(event) }) };
+      return { ok: true, itemId: event.id, title: event.title, startsAt: event.startsAt, message: t('circle.calendar.cancelled', { title: event.title, when: stamp(event) }) };
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {

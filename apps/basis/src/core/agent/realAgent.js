@@ -6486,7 +6486,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
       const res = await handler(args ?? {});
       if (res?.ok !== false && (opId === 'updateEvent' || opId === 'cancelEvent')) {
-        try { await reshareOwnEvent(args?.id); } catch (err) { console.warn('[calendar] re-share failed:', err?.message ?? err); }
+        // the appointment the op resolved (it may have been named by its words)
+        try { await reshareOwnEvent(res?.itemId ?? args?.id); } catch (err) { console.warn('[calendar] re-share failed:', err?.message ?? err); }
       }
       // where it was saved, as every write's reply says it: on this device, no peer to wait for (the own store
       // reaches the person's other devices, never a circle's members) — the renderer's "saved locally"

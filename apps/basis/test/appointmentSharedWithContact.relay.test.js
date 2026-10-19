@@ -69,7 +69,8 @@ describe('an own appointment shared with a contact', () => {
 
     // a move on Anne's side re-shares the SAME copy
     const later = new Date(when.getTime() + 3600_000);
-    expect((await anne.agent.callSkill('calendar', 'updateEvent', { id: made.itemId, when: later.toISOString() }))?.ok).not.toBe(false);
+    // named by its WORDS, as a person moves it: the re-share follows the appointment the op resolved
+    expect((await anne.agent.callSkill('calendar', 'updateEvent', { id: 'Koffie bij Anne', when: later.toISOString() }))?.ok).not.toBe(false);
     const moved = await until(async () => (await pairEventsOn(bob, pair)).find((e) => e.id === onBob.id && Date.parse(e.startsAt) === later.getTime()) ?? null, { timeout: 30_000, step: 300 });
     expect(moved, 'the copy moved with it').toBeTruthy();
     expect((await pairEventsOn(bob, pair)).filter((e) => e.title === 'Koffie bij Anne')).toHaveLength(1);

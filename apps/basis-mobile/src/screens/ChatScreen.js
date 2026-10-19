@@ -762,6 +762,11 @@ export default function ChatScreen({
           globalThis.__onderlingPersonKeyKicked = true;
           setTimeout(() => { bundle.agent.personKeySync.requestFromSiblings().catch(() => {}); }, 2500);
         }
+        // Each profile's facts (properties + disclosure) as the devices holding the same self have them — web parity.
+        if (bundle?.agent?.profileFactsSync && !globalThis.__onderlingProfileFactsKicked) {
+          globalThis.__onderlingProfileFactsKicked = true;
+          setTimeout(() => { bundle.agent.profileFactsSync.requestFromSiblings().catch(() => {}); }, 2500);
+        }
         // The person's own store (their own appointments, their planned rows) as their other devices hold it — web parity.
         if (bundle?.agent?.ownStoreSync && !globalThis.__onderlingOwnStoreKicked) {
           globalThis.__onderlingOwnStoreKicked = true;

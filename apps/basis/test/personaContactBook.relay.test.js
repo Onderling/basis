@@ -82,14 +82,16 @@ describe("a persona's contact book, per self", () => {
     expect((await phone.agent.callSkill('pinboard', 'addContact', { webid, displayName: 'Collega', persona: w }))?.ok, 'the phone files the contact under W').not.toBe(false);
     // …and one under the general self, which reaches every general device as before
     const friend = 'w:friend-of-anna';
-    expect((await phone.agent.callSkill('pinboard', 'addContact', { webid: friend, displayName: 'Vriendin' }))?.ok).not.toBe(false);
+    expect((await phone.agent.callSkill('pinboard', 'addContact', { webid: friend, displayName: 'Vriendin', persona: 'default' }))?.ok).not.toBe(false);
     // the live carry, then each device's catch-up (the connect-time ask), so nothing rests on timing
     for (const n of [box, laptop]) await n.agent.knownPeersSync.requestFromSiblings();
 
     const onLaptop = await until(async () => (await contactsOf(laptop)).find((c) => c.webid === webid) ?? null, { timeout: 30_000, step: 300 });
     expect(onLaptop, 'the laptop — W\'s device — has W\'s contact').toBeTruthy();
     expect(onLaptop.persona, 'filed under W there').toBe(w);
-    expect(await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? true : null), { timeout: 30_000, step: 300 }), 'the box has the general contact').toBe(true);
+    const onBox = await until(async () => (await contactsOf(box)).find((c) => c.webid === friend) ?? null, { timeout: 30_000, step: 300 });
+    expect(onBox, 'the box has the general contact').toBeTruthy();
+    expect(onBox.persona, "filed under the general persona there, as on the phone (never dropped to nothing)").toBe('default');
     await new Promise((r) => setTimeout(r, 3000));
     expect((await contactsOf(box)).some((c) => c.webid === webid), 'the box — the general persona\'s device only — never has W\'s contact').toBe(false);
   }, 120_000);

@@ -947,7 +947,7 @@ export default function CircleLauncherScreen({
       };
       const gov = bindCircleGovernance({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
-        myRef: getCircleActorWebId() || '', genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
+        myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
         circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
       });
       await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
@@ -1066,7 +1066,7 @@ export default function CircleLauncherScreen({
     };
     return bindCircleGovernance({
       eventLog, callSkill: bundle.callSkill, getPolicy: (cid) => policyStore.get(cid),
-      myRef: getCircleActorWebId() || '', genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
+      myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
       circleIdentityFor: bundle?.agent?.circleIdentityFor ?? null,
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
     });
@@ -2053,6 +2053,7 @@ export default function CircleLauncherScreen({
       <CircleGovernanceScreen
         callSkill={bundle?.callSkill}
         circleIdentityFor={bundle?.agent?.circleIdentityFor ?? null}
+        selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         eventLog={eventLog}
         getPolicy={(cid) => policyStore.get(cid)}
         updatePolicy={(cid, next) => policyStore.update(cid, next)}
@@ -2099,6 +2100,7 @@ export default function CircleLauncherScreen({
     return (
       <CircleSettingsScreen
         store={broadcastingStore}
+        selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         onProposePolicy={async (cid, patch) => {
           if (!govPolicy) return;
           await govPolicy.propose({
@@ -2329,6 +2331,7 @@ export default function CircleLauncherScreen({
       <>
       <CircleDetail
         selfProfileId={profileIdOfCircle(selected?.id)}
+        selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         circle={selected}
         deliveryStateMap={deliveryStateMap}
         registerCircleBotSink={registerCircleBotSink}
@@ -2777,6 +2780,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 function CircleDetail({
   // the self this device is in this circle (a persona's circle is the persona's): whose drivers it reads
   selfProfileId = 'default',
+  // the self's ref in a circle (`agent.circleSelf(cid).webid`) — one function, not the bundle; null → the device's ref
+  selfIn = null,
   circle, items, resolveSkill, rawCallSkill, catalogue: rawCatalogue, policy, override = null, myListTasks = [],
   deliveryStateMap = null,
   registerCircleBotSink = null,
@@ -3319,7 +3324,8 @@ function CircleDetail({
   // line is addressed to one person, and fanning it would announce it to the circle.
   const caretakerSaidForRef = useRef(null);
   useEffect(() => {
-    const notice = caretakerNotice({ members: rosterRows, myRef: mandateViewer.viewerWebid || '' });
+    // in a persona's circle the caretaker is the persona — the self this device is there
+    const notice = caretakerNotice({ members: rosterRows, myRef: mandateViewer.viewerWebid ?? '' });
     if (!notice || caretakerSaidForRef.current === circle?.id) return;
     caretakerSaidForRef.current = circle?.id ?? null;
     appendCircleMessage({
@@ -3370,7 +3376,9 @@ function CircleDetail({
     setBotLabel(null);   // reset on circle change — fail-closed until the roster resolves
     (async () => {
       let webid = null;
-      try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); webid = r?.webid ?? r?.webId ?? null; } catch { /* best-effort */ }
+      // in a persona's circle, the persona: who this device is THERE decides admin, the caretaker notice and the help roster
+      try { webid = (typeof selfIn === 'function' ? selfIn(circle.id) : null) ?? null; } catch { webid = null; }
+      if (!webid) { try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); webid = r?.webid ?? r?.webId ?? null; } catch { /* best-effort */ } }
       if (!cancelled) myWebidRef.current = webid;
       // The help circle: you + the Onderling-bot (a product constant) — no listGroupMembers round-trip.
       if (circle.id === HELP_CIRCLE_ID) {

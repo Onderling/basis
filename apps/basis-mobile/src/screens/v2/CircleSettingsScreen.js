@@ -72,6 +72,8 @@ const SETTINGS_PAGE = pageForOpMobile(basisManifest, 'settings');
 
 export default function CircleSettingsScreen({
   store, onProposePolicy, circleId, onBack,
+  // the self this device is in a circle (a persona's circle is the persona's) — whose row the save control reads as mine
+  selfIn = null,
   // §4 storage-policy bridge — the host injects the agent's raw callSkill so a
   // pod-tier change drives pinboard.setCircleStoragePolicy (web parity).
   callSkill,
@@ -111,7 +113,8 @@ export default function CircleSettingsScreen({
         callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null),
         callSkill('pinboard', 'whoAmI', {}).catch(() => null),
       ]);
-      if (alive) setSaveRoster({ members: Array.isArray(mem?.members) ? mem.members : [], myRef: who?.webid ?? who?.webId ?? '' });
+      const mine = (typeof selfIn === 'function' ? selfIn(circleId) : null) ?? who?.webid ?? who?.webId ?? '';
+      if (alive) setSaveRoster({ members: Array.isArray(mem?.members) ? mem.members : [], myRef: mine });
     })();
     return () => { alive = false; };
   }, [callSkill, circleId]);

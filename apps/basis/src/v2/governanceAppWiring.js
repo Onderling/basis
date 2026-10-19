@@ -91,7 +91,8 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  * @param {{query:Function, appendSilentEntry:Function}} deps.eventLog  the one circle log
  * @param {(origin:string,op:string,args:object)=>Promise<*>} deps.callSkill
  * @param {(circleId:string)=>Promise<object>} deps.getPolicy
- * @param {string} deps.myRef            this device's member ref (webid)
+ * @param {string|((circleId: string) => string|null)} deps.myRef  this device's member ref — or, for a device that is several
+ *   selves, its self per circle (the agent's `circleSelf(cid).webid`)
  * @param {()=>string} deps.genId        fresh proposal ids
  * @param {()=>number} [deps.now]
  * @param {(channel:'governance'|'report', circleId:string, event:object, opts?:{to?:string[]})=>void} [deps.broadcast]
@@ -104,7 +105,10 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
   // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
   // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
-  const rail = makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSkill });
+  // ONE answer to "who am I in this circle" for every side authority is judged on: the rail's signer, the members read, the
+  // enact check, `iAmAdmin` and the report host — a persona's circle is the persona's on all of them, never the general one
+  const refIn = selfRefIn(myRef);
+  const rail = makeGovernanceRail({ eventLog, circleIdentityFor, myRef: refIn, callSkill });
   if (!rail) throw new Error('bindCircleGovernance: circleIdentityFor is required — governance entries are signed with the per-circle key');
   const fan = (channel, circleId, event, opts = undefined) => {
     if (typeof broadcast !== 'function') return;
@@ -127,7 +131,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
 
   const governance = makeCircleGovernance({
     callSkill, appendGovernanceEvent, getPolicy, getMembers,
-    localActorRef: myRef, newProposalId: genId, now, setPolicy,
+    localActorRef: refIn, newProposalId: genId, now, setPolicy,
     // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
     readGovernanceState: (circleId) => rail.readVerified(circleId),
   });
@@ -144,7 +148,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     try { return (await getMembers(circleId)).filter((m) => m.role === 'admin').map((m) => m.ref).filter(Boolean); }
     catch { return []; }
   };
-  const iAmAdmin = async (circleId) => (await adminRefsOf(circleId)).includes(myRef);
+  const iAmAdmin = async (circleId) => (await adminRefsOf(circleId)).includes(refIn(circleId));
 
   // A report is fanned ONLY to the circle's admins (story 3.6). It used to go to every member, which put the
   // reporter's identity and the free-text reason about the REPORTED person onto that person's own device —
@@ -172,7 +176,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     return entry;
   };
   const reports = makeCircleReports({
-    readReportEvents, appendReportEvent, governance, removeReported, newReportId: genId, localActorRef: myRef, now,
+    readReportEvents, appendReportEvent, governance, removeReported, newReportId: genId, localActorRef: refIn, now,
     isAdmin: iAmAdmin,
   });
 

@@ -6903,7 +6903,8 @@ function showCircle(id, circle, policy) {
   let caretakerNoticeSaid = false;
   function tellCaretakerIfTheCircleBecameTheirs(rawRoster) {
     if (caretakerNoticeSaid) return;
-    const notice = caretakerNotice({ members: rawRoster, myRef: myWebid || '' });
+    // in a persona's circle the caretaker is the persona — the self this device is there
+    const notice = caretakerNotice({ members: rawRoster, myRef: mySelfIn(id) ?? myWebid ?? '' });
     if (!notice) return;
     caretakerNoticeSaid = true;
     // `scope: 'self'` — the line is addressed to ONE person; fanning it would announce the handover
@@ -8127,7 +8128,8 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
   });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
@@ -8142,7 +8144,8 @@ async function showGovernance(id) {
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
@@ -8306,7 +8309,7 @@ async function showAdmin(id) {
   const rerender = () => renderCircleAdminPanel(rootEl, {
     members, muted, outboundShares, outboundCanonical, busy, notice, t,
     resolvePicture: circlePictureResolver(id),
-    viewerWebid: myWebid,
+    viewerWebid: mySelfIn(id) ?? myWebid,
     onBack: () => showDetail(id),
     // A member's own row offers LEAVING (the shared decision): the same leave the circle's tile menu runs, with its confirm.
     onLeave: () => onLeaveCircle(id, circlesCache.find((c) => c?.id === id) ?? { id }),
@@ -8419,7 +8422,8 @@ async function showSettings(id) {
   try { const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
@@ -8462,7 +8466,7 @@ async function showSettings(id) {
   const settingsPage = pageForOp(basisManifest, 'settings');
 
   const rerender = () => renderCircleSettings(rootEl, {
-    saveControl: policySaveControlFor({ members: settingsRoster, myRef: myWebid }),
+    saveControl: policySaveControlFor({ members: settingsRoster, myRef: mySelfIn(id) ?? myWebid }),
     policy: working,
     t,
     // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this

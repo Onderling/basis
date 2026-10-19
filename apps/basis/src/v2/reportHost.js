@@ -14,6 +14,7 @@
  * admin-only too (see `governanceAppWiring`), which stops the payload arriving; this is the second layer, so
  * a report that reaches a device anyway (an admin demoted after delivery, a replayed log) still is not served.
  */
+import { selfRefIn } from './selfRef.js';
 import { reportEvent, resolveReportEvent, foldReports, REPORT_STATUS } from './reportModel.js';
 
 /**
@@ -24,10 +25,11 @@ import { reportEvent, resolveReportEvent, foldReports, REPORT_STATUS } from './r
  * @param {(circleId:string, targetType:string, targetRef:string)=>Promise<*>} [deps.removeReported]
  *   remove the reported post/message (the shell's delete op); called when an admin ACTS on one.
  * @param {()=>string} deps.newReportId
- * @param {string} deps.localActorRef
+ * @param {string|((circleId: string) => string|null)} deps.localActorRef  this device's ref — or its self per circle (personas)
  * @param {()=>number} [deps.now]
  */
 export function makeCircleReports({ readReportEvents, appendReportEvent, governance = null, removeReported = null, newReportId, localActorRef, now = () => 0, isAdmin = null }) {
+  const actorIn = selfRefIn(localActorRef);   // in each circle, the self this device is there
   /** May THIS device's user see everyone's reports? Absent an `isAdmin` seam, assume not (deny-by-default). */
   async function viewerIsAdmin(circleId) {
     if (typeof isAdmin !== 'function') return false;
@@ -43,7 +45,7 @@ export function makeCircleReports({ readReportEvents, appendReportEvent, governa
     const events = await readReportEvents(circleId);
     const folded = foldReports(Array.isArray(events) ? events : []);
     if (await viewerIsAdmin(circleId)) return { ...folded, scope: 'all' };
-    const mine = (rs) => (Array.isArray(rs) ? rs.filter((r) => r && r.by === localActorRef) : []);
+    const mine = (rs) => (Array.isArray(rs) ? rs.filter((r) => r && r.by === actorIn(circleId)) : []);
     const open = mine(folded.open);
     return { ...folded, open, resolved: mine(folded.resolved), openCount: open.length, scope: 'own' };
   }
@@ -58,12 +60,12 @@ export function makeCircleReports({ readReportEvents, appendReportEvent, governa
 
   async function file({ circleId, targetType, targetRef, targetLabel = null, reason = '' }) {
     const reportId = newReportId();
-    await appendReportEvent(circleId, reportEvent({ reportId, targetType, targetRef, targetLabel, reason, by: localActorRef, at: now() }));
+    await appendReportEvent(circleId, reportEvent({ reportId, targetType, targetRef, targetLabel, reason, by: actorIn(circleId), at: now() }));
     return { ok: true, reportId };
   }
 
   async function dismiss({ circleId, reportId }) {
-    await appendReportEvent(circleId, resolveReportEvent({ reportId, outcome: REPORT_STATUS.DISMISSED, by: localActorRef, at: now() }));
+    await appendReportEvent(circleId, resolveReportEvent({ reportId, outcome: REPORT_STATUS.DISMISSED, by: actorIn(circleId), at: now() }));
     return { ok: true, status: REPORT_STATUS.DISMISSED };
   }
 
@@ -76,11 +78,11 @@ export function makeCircleReports({ readReportEvents, appendReportEvent, governa
     let governanceResult = null;
     let removed = null;
     if (r.targetType === 'member' && governance && typeof governance.propose === 'function') {
-      governanceResult = await governance.propose({ circleId, action: 'removeMember', subject: r.targetRef, actor: { ref: localActorRef } });
+      governanceResult = await governance.propose({ circleId, action: 'removeMember', subject: r.targetRef, actor: { ref: actorIn(circleId) } });
     } else if ((r.targetType === 'post' || r.targetType === 'message') && typeof removeReported === 'function') {
       try { removed = await removeReported(circleId, r.targetType, r.targetRef); } catch { removed = { ok: false }; }
     }
-    await appendReportEvent(circleId, resolveReportEvent({ reportId, outcome: REPORT_STATUS.ACTIONED, by: localActorRef, at: now() }));
+    await appendReportEvent(circleId, resolveReportEvent({ reportId, outcome: REPORT_STATUS.ACTIONED, by: actorIn(circleId), at: now() }));
     return { ok: true, status: REPORT_STATUS.ACTIONED, governance: governanceResult, removed };
   }
 

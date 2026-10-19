@@ -404,12 +404,12 @@ import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
-import { sealItem, isCanonicalPosture, memoryDataSource } from '@onderling/item-store';
+import { sealItem, memoryDataSource } from '@onderling/item-store';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
   outOfCircleShareOffered,
-  shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
+  shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, adminOutboundShares, stopShareWords, memberRevokeWords, revokeAllForMember,
   shareErrorStatusKey,
 } from '../../src/v2/circleShare.js';
 // objective L · Phase 2 — the out-of-circle recipient picker (thin DOM over the SHARED `pickableRecipients`).
@@ -788,7 +788,7 @@ import { setActiveCircle, getActiveCircle, subscribeActiveCircle } from '../../s
 import { normalizeCircleMembers, recipientSealKeyFromMembers } from '@onderling/kring-host/circleMembers';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
-import { mergeCirclePolicy, mergeMemberOverride, normalizeCirclePolicy, settingsChangeNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
+import { mergeCirclePolicy, mergeMemberOverride, settingsChangeNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
 import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
@@ -8338,16 +8338,12 @@ async function showAdmin(id) {
     muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
     // objective L — enumerate what THIS circle has shared OUT (across the known circles) + whether its posture
     // is `canonical` (the only revocable-in-place posture). Both best-effort — a failure just hides the section.
-    try {
-      outboundShares = await listOutboundShares({
-        resolveService: _circleServiceFor,
-        fromCircleId: id,
-        circleIds: circlesCache.map((c) => c.id),
-      });
-    } catch { outboundShares = []; }
-    try {
-      outboundCanonical = isCanonicalPosture(normalizeCirclePolicy(await _circlePolicy(id)).sharePosture);
-    } catch { outboundCanonical = false; }
+    const out = await adminOutboundShares({
+      resolveService: _circleServiceFor, fromCircleId: id, circleIds: circlesCache.map((c) => c.id),
+      policy: await _circlePolicy(id).catch(() => null),
+    });
+    outboundShares = out.shares;
+    outboundCanonical = out.revocable;
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
@@ -8388,9 +8384,8 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       const r = await unshareItemFromCircle({ itemId: s.itemId, fromCircleId: id, toCircleId: s.toCircleId })
         .catch((cause) => ({ ok: false, error: cause?.message ?? 'unknown' }));
-      notice = r?.ok
-        ? t('circle.share.revoked', { item: s.itemId, recipient: s.toCircleId })
-        : t('circle.share.revoke_failed', { error: r?.error ?? 'unknown' });
+      const w = stopShareWords(r, s);
+      notice = t(w.key, w.params);
       busy = false; await load();
     },
     onUnmute: async (key) => {
@@ -8435,8 +8430,8 @@ async function showAdmin(id) {
             circleIds: circlesCache.map((c) => c.id),
             recipient: m.webid,
           });
-          if (res.revoked > 0) notice = t('circle.share.member_revoked', { count: res.revoked });
-          if (res.failed.length > 0) notice = t('circle.share.member_revoke_failed', { count: res.failed.length });
+          const w = memberRevokeWords(res);
+          if (w) notice = t(w.key, w.params);
         } catch { /* best-effort — the removal already succeeded, never block it */ }
       }
       busy = false; await load();

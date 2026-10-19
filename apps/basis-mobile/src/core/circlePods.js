@@ -40,7 +40,7 @@ import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.j
 // Mobile calls the SAME builder + ops as web (circleApp.js) — invariant #1/#2, no mobile fork.
 import { buildCircleShareEnforcement } from '../../../basis/src/v2/circleShareEnforcement.js';
 import { recipientSealingKeyResolver } from '../../../basis/src/v2/shareRecipients.js';
-import { shareItemAcrossCircles, shareItemToPublishedKey as sharedShareItemToPublishedKey, listSharedResolved, revokeItemShare } from '../../../basis/src/v2/circleShare.js';
+import { shareItemAcrossCircles, shareItemToPublishedKey as sharedShareItemToPublishedKey, listSharedResolved, revokeItemShare, adminOutboundShares, revokeAllForMember } from '../../../basis/src/v2/circleShare.js';
 // Cache-mode mirroring (RN parity): the SHARED custody-resolution + cache medium, fed by mobile's own
 // ensureCirclePod / getCircleSealStrategy / policy resolver / AsyncStorage backend.
 import { createCirclePodCustody } from '../../../basis/src/v2/circlePodCustody.js';
@@ -498,6 +498,28 @@ export async function listSharedItems(circleId, { recipient, resolveService, enf
     // objective L — default the read subject to the signed-in member's WebID (mirrors web's
     // `recipient ?? circleOwnerWebId`), so the deny-by-default read gate resolves against a real identity.
     circleId, recipient: recipient ?? getCircleActorWebId() ?? undefined,
+  });
+}
+
+/**
+ * The admin panel's outbound section on this device: the shared decision (`adminOutboundShares` — what this circle
+ * shared out, and whether it may take a share back in place) over mobile's own circle resolvers and policy.
+ */
+export async function outboundSharesForAdmin({ fromCircleId, circleIds, policyOf } = {}) {
+  const r = _shareResolvers(policyOf);
+  return adminOutboundShares({
+    resolveService: r.resolveService, fromCircleId, circleIds,
+    policy: await r.policyOf(fromCircleId).catch(() => null),
+  });
+}
+
+/** A member removed from `fromCircleId` loses their access to what it shared out — the shared `revokeAllForMember`
+ *  over mobile's resolvers, as web's admin panel runs it. Best-effort: the caller never blocks the removal on it. */
+export async function revokeOutboundForMember({ fromCircleId, circleIds, recipient, policyOf } = {}) {
+  const r = _shareResolvers(policyOf);
+  return revokeAllForMember({
+    resolveService: r.resolveService, enforcementFor: r.enforcementFor, policyOf: r.policyOf,
+    fromCircleId, circleIds, recipient,
   });
 }
 

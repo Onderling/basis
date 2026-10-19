@@ -16,6 +16,7 @@ import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t } from '../../core/localisation.js';
 import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
+import { stopShareWords, memberRevokeWords } from '../../../../basis/src/v2/circleShare.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
 // through the SAME shared compute web's panel and both members tabs paint — one answer to "how is
 // this person an admin", never a second one per surface.
@@ -30,7 +31,10 @@ import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import FaceView from './FaceView.js';
 
-export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null }) {
+export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null,
+  // what this circle shared out, and taking it back (the host binds them to this device's resolvers — `circlePods.js`):
+  // `outboundFor()` → {shares, revocable} · `stopShare(share)` → reply · `revokeForRemoved(webid)` → the revoke tally
+  outboundFor = null, stopShare = null, revokeForRemoved = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the back link under it could not be tapped
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -39,6 +43,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
   const [announce, setAnnounce] = useState('');
   const [notice, setNotice] = useState(null);
+  const [outbound, setOutbound] = useState({ shares: [], revocable: false });
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
@@ -52,7 +57,8 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     setMyWebid((() => { try { return agent?.circleSelf?.(groupId)?.webid ?? null; } catch { return null; } })() ?? who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
-  }, [callSkill, groupId]);
+    if (typeof outboundFor === 'function') setOutbound(await Promise.resolve(outboundFor()).catch(() => ({ shares: [], revocable: false })));
+  }, [callSkill, groupId, outboundFor]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -72,9 +78,22 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       setNotice(r?.ok
         ? t('circle.admin.removed', { name: m.displayName || m.handle || m.webid })
         : t('circle.admin.refused'));
+      // a removed member loses what this circle shared out (best-effort: the removal already stands)
+      if (r?.ok && m.webid && typeof revokeForRemoved === 'function') {
+        const w = memberRevokeWords(await Promise.resolve(revokeForRemoved(m.webid)).catch(() => null));
+        if (w) setNotice(t(w.key, w.params));
+      }
     } catch { setNotice(t('circle.admin.refused')); }
     load();
-  }, [agent, callSkill, groupId, load]);
+  }, [agent, callSkill, groupId, load, revokeForRemoved]);
+  // "Stop sharing": take ONE share back in place (a canonical circle only — the shared decision says which)
+  const stop = useCallback(async (s) => {
+    setNotice(null);
+    const r = await Promise.resolve(stopShare?.(s)).catch((cause) => ({ ok: false, error: cause?.message ?? 'unknown' }));
+    const w = stopShareWords(r, s);
+    setNotice(t(w.key, w.params));
+    load();
+  }, [stopShare, load]);
   // Make a member an admin, or step an admin back down (your own row included — that is how someone
   // stops running a circle). The op's `ui.confirm` declaration is what puts a confirmation in front of
   // it, carrying the consequence THIS change has: an ordinary demotion, a handover of the whole circle,
@@ -187,6 +206,19 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       </Section>
 
       {/* reports moved to the §8 governance "Decisions" Reports section — see the header note */}
+
+      {typeof outboundFor === 'function' ? (
+        <Section title={t('circle.share.outbound_title')}>
+          {outbound.shares.length === 0 ? <Text style={styles.muted}>{t('circle.share.outbound_empty')}</Text> : outbound.shares.map((s) => (
+            <View key={`${s.toCircleId}:${s.itemId}`} style={styles.row} testID={`admin-share-${s.itemId}`}>
+              <Text style={styles.name}>{t('circle.share.outbound_row', { item: s.itemId, circle: s.toCircleId })}</Text>
+              {outbound.revocable ? (
+                <Pressable style={styles.secondary} onPress={() => stop(s)} testID={`admin-share-stop-${s.itemId}`}><Text style={styles.secondaryText}>{t('circle.share.stop')}</Text></Pressable>
+              ) : <Text style={styles.muted}>{t('circle.share.not_revocable')}</Text>}
+            </View>
+          ))}
+        </Section>
+      ) : null}
 
       <Section title={t('circle.admin.muted')}>
         {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map(({ key, label }) => (

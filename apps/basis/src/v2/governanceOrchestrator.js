@@ -44,14 +44,14 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     // tipped the tally sees the terminal status but leaves the op + resolve to the admin.
     const mayEnact = canEnact(ctx);
     if (p.status === DECISION_STATUS.APPROVED) {
-      if (!mayEnact) return { ok: true, status: DECISION_STATUS.APPROVED, proposalId, awaitingEnactment: true };
+      if (!mayEnact) return { ok: true, status: DECISION_STATUS.APPROVED, proposalId, awaitingEnactment: true, tally: p.decision.tally };
       const ok = await enactAndClose(circleId, p, enactor);
-      return { ok, status: DECISION_STATUS.APPROVED, proposalId, enacted: ok };
+      return { ok, status: DECISION_STATUS.APPROVED, proposalId, enacted: ok, tally: p.decision.tally };
     }
     if (p.status === DECISION_STATUS.REJECTED) {
-      if (!mayEnact) return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, awaitingClose: true };
+      if (!mayEnact) return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, awaitingClose: true, tally: p.decision.tally };
       await appendEvent(circleId, resolveEvent({ proposalId, status: DECISION_STATUS.REJECTED, by: enactor, at: now() }));
-      return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, closed: true };
+      return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, closed: true, tally: p.decision.tally };
     }
     return { ok: true, status: DECISION_STATUS.PENDING, proposalId, tally: p.decision.tally, deadline: p.deadline };
   }

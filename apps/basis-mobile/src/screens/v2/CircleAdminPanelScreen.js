@@ -48,7 +48,8 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       callSkill('basis', 'muted', {}).catch(() => null),
       callSkill('pinboard', 'whoAmI', {}).catch(() => null),
     ]);
-    setMyWebid(who?.webid ?? who?.webId ?? '');
+    // whose row is mine IN THIS CIRCLE: a persona's circle is the persona's
+    setMyWebid((() => { try { return agent?.circleSelf?.(groupId)?.webid ?? null; } catch { return null; } })() ?? who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
   }, [callSkill, groupId]);

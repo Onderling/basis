@@ -140,6 +140,7 @@ export function makeGrantsPeerHandler({ rail, onChange = null } = {}) {
  * @param {Function} a.callSkill
  * @param {string} a.selfPubKey  the profile's chat pubKey (my roster rows' webid)
  * @param {(circleId: string) => string|null} a.circleAddressFor  this device's own per-circle address
+ * @param {(address: string) => boolean} [a.isOwnAddress]  every address this device holds a key for (never a sibling)
  * @returns {Promise<string[]>} deduped sibling addresses
  */
 export async function siblingDeviceAddresses(a) {
@@ -161,7 +162,7 @@ export async function siblingDeviceAddresses(a) {
  *
  * @returns {Promise<Array<{address: string, circleId: string}>>}
  */
-export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, circleIds = null }) {
+export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, circleIds = null, isOwnAddress = null }) {
   const out = new Map();
   let circles = [];
   // The circles to walk: the caller's list when it has a fuller one (the registry's memberships beside the
@@ -185,7 +186,10 @@ export async function siblingDevices({ callSkill, selfPubKey, circleAddressFor, 
       ...(typeof mine.circleAddress === 'string' && mine.circleAddress ? [mine.circleAddress] : []),
     ];
     for (const addr of set) {
-      if (typeof addr === 'string' && addr && addr !== own && addr !== selfPubKey && !out.has(addr)) out.set(addr, { address: addr, circleId });
+      // …and never an address THIS device holds a key for (one the row still lists that `circleAddressFor` does not name
+      // here — rotated, or not bound yet): sent to, it came back to this device and was refused as a stranger's
+      const mineHere = typeof isOwnAddress === 'function' && isOwnAddress(addr);
+      if (typeof addr === 'string' && addr && addr !== own && addr !== selfPubKey && !mineHere && !out.has(addr)) out.set(addr, { address: addr, circleId });
     }
   }
   return [...out.values()];

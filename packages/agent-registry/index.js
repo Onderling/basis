@@ -130,3 +130,4 @@ export { createWellKnownCardResolver } from './src/wellKnownCardResolver.js';
 export { createCommunityCatalogue, communityCatalogueUri } from './src/communityCatalogue.js';
 export { createCommunitySubscriptions } from './src/subscriptions.js';
 export { OFFERINGS_INHERIT_KEY } from './src/profileProperties.js';
+export { RESERVED_PROPERTY_KEYS, RESERVED_PROPERTY_PREFIXES, PERSON_SETTABLE_KEYS, isReservedPropertyKey } from './src/reservedProperties.js';

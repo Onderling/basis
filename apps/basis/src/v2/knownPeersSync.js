@@ -197,6 +197,9 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
   return {
     subtypes: { broadcast: KNOWN_PEERS_BROADCAST, ...KNOWN_PEERS_CATCHUP_SUBTYPES },
 
+    /** Is `fromAddr` one of THIS self's proven sibling addresses (what binds a landing to this self — never a payload field)? */
+    admits: (fromAddr) => fromOwnDevice(fromAddr),
+
     /** Observe what a sibling's wire changed here (a shell repaints its roster; the box writes its log). Returns the unsubscribe. */
     onLanded(fn) { if (typeof fn === 'function') landedListeners.add(fn); return () => landedListeners.delete(fn); },
 
@@ -266,4 +269,43 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
     const r = await carry({ subtype: KNOWN_PEERS_BROADCAST, ...wire });
     return { attempted: r.attempted };
   }
+}
+
+/**
+ * ONE LANE, A CONTACT BOOK PER SELF. A device holds several selves; each has its own contacts and its own siblings (the
+ * devices holding that self). Each self has its own sync; this router hands a landing to the self whose PROVEN SIBLING SET
+ * the sender is in — the self is bound by who sent it, never by anything the payload says — and refuses a sender that is
+ * no self's sibling. Live carries go out through the self they belong to.
+ * @param {object} a
+ * @param {ReturnType<typeof createKnownPeersSync>} a.general  the general persona's sync (the one today's callers know)
+ * @param {() => Array<ReturnType<typeof createKnownPeersSync>>} a.others  every other held self's sync
+ * @param {(contact: object) => (ReturnType<typeof createKnownPeersSync>|null)} a.forContact  the sync a contact's row rides
+ * @param {(reason: string, from: string) => void} [a.onRefused]
+ */
+export function routeKnownPeersBySender({ general, others, forContact, onRefused = null } = {}) {
+  if (!general || typeof others !== 'function' || typeof forContact !== 'function') throw new Error('routeKnownPeersBySender: `general`, `others` and `forContact` are required');
+  const all = () => [general, ...(others() ?? []).filter(Boolean)];
+  const owner = async (fromAddr) => { for (const s of all()) { try { if (await s.admits(fromAddr)) return s; } catch { /* next self */ } } return null; };
+  const route = (subtype) => async (fromAddr, payload) => {
+    if (payload?.subtype !== subtype) return;
+    const s = await owner(fromAddr);
+    if (!s) { try { onRefused?.('not-a-sibling', fromAddr); } catch { /* observability never throws */ } return; }
+    await s.handlers[subtype](fromAddr, payload);
+  };
+  return {
+    subtypes: general.subtypes,
+    handlers: Object.fromEntries(Object.keys(general.handlers).map((st) => [st, route(st)])),
+    onLanded: (fn) => { const offs = all().map((s) => s.onLanded(fn)); return () => offs.forEach((off) => off?.()); },
+    /** A binding a greeting taught this device: the general persona's lane, as before. */
+    fanPeer: (binding) => general.fanPeer(binding),
+    /** A contact's row rides the lane of the self it is filed under — never another self's. */
+    fanContact: (contact) => { const s = forContact(contact); return s ? s.fanContact(contact) : Promise.resolve({ attempted: 0, skipped: 'no-self' }); },
+    /** A new sibling at `address`: the self whose sibling it is hands it that self's book. */
+    pushTo: async (address) => { const s = await owner(address); return s ? s.pushTo(address) : { sent: false, reason: 'not-a-sibling' }; },
+    async requestFromSiblings() {
+      let requested = 0;
+      for (const s of all()) { try { requested += (await s.requestFromSiblings())?.requested ?? 0; } catch { /* next self */ } }
+      return { requested };
+    },
+  };
 }

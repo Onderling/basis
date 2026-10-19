@@ -376,7 +376,9 @@ export async function consumeCircleEntry({ agent, callSkill, sendPeerMessage, re
   // profile, the sibling bound to its webid, its first words sent as it), else the default, as always
   const self = (() => { try { return agent.circleSelf?.(c.id) ?? null; } catch { return null; } })();
   const asPersona = typeof self?.sendAs === 'string' && self.sendAs ? self.sendAs : null;
-  const send = asPersona ? { guarantee: 'hold-forward', sendAs: asPersona } : SEND;
+  // the first words speak as the PERSON key of this circle's self (a persona's own, or the general persona's) — the agent
+  // resolves which from the circle; never a persona's chat key, which the circle refuses once it has proved an address
+  const send = { ...SEND, circleId: c.id };
   try {
     const ownAddress = agent.circleAddressFor?.(c.id) ?? null;
     // 1 — the registry record (what reopenMemberCircles reads on every future boot). The handle is optional

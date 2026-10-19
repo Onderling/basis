@@ -12,6 +12,7 @@
  * newly-appointed caretaker IS an admin in that roster, the same rule makes it the enactor
  * with no special case.
  */
+import { selfRefIn } from './selfRef.js';
 import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
 import { autoEnacts } from './circlePolicy.js';
 import { foldGovernance } from './governanceLog.js';
@@ -24,7 +25,8 @@ import { buildGovernanceView } from './governanceView.js';
  * @param {(circleId:string, event:object)=>Promise<*>} deps.appendGovernanceEvent  write to the log stream
  * @param {(circleId:string)=>Promise<object>} deps.getPolicy
  * @param {(circleId:string)=>Promise<Array<{ref:string, role?:string}>>} deps.getMembers  full roster
- * @param {string} deps.localActorRef                 this device's member ref (enact-authority check)
+ * @param {string|((circleId: string) => string|null)} deps.localActorRef  this device's member ref in a circle (the enact-authority
+ *   check) — one ref, or the self per circle for a device that is several (personas); the same one its statements sign as
  * @param {(circleId:string, patch:object)=>Promise<*>} [deps.setPolicy]   enactor for changeRule/changePolicy
  * @param {(circleId:string)=>Promise<*>} [deps.rotateKey]                 enactor for rotateKey
  * @param {()=>string} deps.newProposalId
@@ -55,6 +57,7 @@ export function makeCircleGovernance({
       getPolicy(circleId), getMembers(circleId), readGovernanceState(circleId),
     ]);
     return {
+      circleId,
       policy, members: Array.isArray(members) ? members : [],
       events: Array.isArray(state?.events) ? state.events : [],
       disputed: state?.disputed instanceof Set ? state.disputed : new Set(),
@@ -62,7 +65,8 @@ export function makeCircleGovernance({
   }
 
   // Decision A: an admin (or the appointed caretaker, who is an admin in the roster) enacts.
-  const canEnact = (ctx) => (ctx.members || []).some((m) => m && m.ref === localActorRef && m.role === 'admin');
+  const actorIn = selfRefIn(localActorRef);   // in each circle, the self this device is there — the one its statements sign as
+  const canEnact = (ctx) => (ctx.members || []).some((m) => m && m.ref === actorIn(ctx.circleId) && m.role === 'admin');
 
   const orch = makeGovernanceOrchestrator({
     appendEvent: appendGovernanceEvent, enact, getContext, newProposalId, now, canEnact,
@@ -80,7 +84,7 @@ export function makeCircleGovernance({
     if (autoEnacts(ctx.policy) && canEnact(ctx)) {
       try { await settle(circleId); ctx = await getContext(circleId); } catch { /* view must still render */ }
     }
-    const me = (ctx.members || []).find((m) => m && m.ref === localActorRef) || null;
+    const me = (ctx.members || []).find((m) => m && m.ref === actorIn(circleId)) || null;
     const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
     const base = buildGovernanceView({ fold, viewer: me, labelForSubject });
     // L3: surface the disputed authors (equivocators) so the shell can prompt "review & remove".
@@ -111,11 +115,21 @@ export function makeCircleGovernance({
     const open = (fold.proposals ?? []).filter((p) => p && !p.closed);
     const results = [];
     for (const p of open) {
-      try { results.push(await orch.tally({ circleId, proposalId: p.proposalId, enactor: localActorRef })); }
+      try { results.push(await orch.tally({ circleId, proposalId: p.proposalId, enactor: actorIn(circleId) })); }
       catch { /* one bad proposal must not block the rest */ }
     }
     return { enacted: results.filter((r) => r?.enacted === true).length, results };
   }
 
-  return { propose: orch.propose, vote: orch.vote, override: orch.override, tally: orch.tally, view, settle, getContext };
+  // The acting ref is ALWAYS this device's self in that circle — whatever a caller hands in: a device acts in a circle
+  // only as the self it is there (a persona in its circle, never the general persona), and it is the ref its statements
+  // sign as. A caller's `role` rides along; its `ref` never decides.
+  const asSelf = (a = {}) => ({ ...(a.actor ?? {}), ref: actorIn(a.circleId) });
+  return {
+    propose: (a = {}) => orch.propose({ ...a, actor: asSelf(a) }),
+    vote: (a = {}) => orch.vote({ ...a, voter: actorIn(a.circleId) }),
+    override: (a = {}) => orch.override({ ...a, actor: asSelf(a) }),
+    tally: (a = {}) => orch.tally({ ...a, enactor: actorIn(a.circleId) }),
+    view, settle, getContext,
+  };
 }

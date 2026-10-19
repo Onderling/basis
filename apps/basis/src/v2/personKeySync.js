@@ -57,7 +57,9 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
   }
   const wireOf = (k) => (k && k.reveals && Object.keys(k.reveals).length
     ? {
-      subtype: PERSON_KEY_CARRY, version: k.version, seed: b64encode(k.seed), reveals: k.reveals,
+      // the SELF this key is: a device holds several (the general persona and its personas), each with its own key —
+      // the receiver routes by it and admits only under that self's own commitment (`routePersonKeySync`)
+      subtype: PERSON_KEY_CARRY, subject: selfPubKey, version: k.version, seed: b64encode(k.seed), reveals: k.reveals,
       // the chain and the older seeds ride along: a survivor answers a contact's pull, and opens what was sealed to an older version
       links: Array.isArray(k.links) ? k.links : [],
       previous: (Array.isArray(k.previous) ? k.previous : []).map((p) => ({ version: p.version, seed: b64encode(p.seed) })),
@@ -110,7 +112,7 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
       try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
       let requested = 0;
       for (const addr of addrs) {
-        try { await sendToPeer(addr, { subtype: PERSON_KEY_CATCHUP_SUBTYPES.request }, { guarantee: 'hold-forward' }); requested += 1; } catch { /* next sibling */ }
+        try { await sendToPeer(addr, { subtype: PERSON_KEY_CATCHUP_SUBTYPES.request, subject: selfPubKey }, { guarantee: 'hold-forward' }); requested += 1; } catch { /* next sibling */ }
       }
       return { requested };
     },
@@ -118,6 +120,9 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
     handlers: {
       [PERSON_KEY_CARRY]: async (fromAddr, payload) => {
         if (payload?.subtype !== PERSON_KEY_CARRY) return;
+        // another self's key is never adopted here, whatever it claims: the router hands each self only its own, and
+        // the reveal below binds it to THIS self's root
+        if (payload.subject !== selfPubKey) { refuse('another-self', fromAddr); return; }
         const k = parse(payload);
         if (!k) { refuse('malformed', fromAddr); return; }
         if (!rootSpoke(k)) { refuse('no-root-reveal', fromAddr); return; }
@@ -127,11 +132,50 @@ export function createPersonKeySync({ siblings, sendToPeer, current, store, self
       },
       [PERSON_KEY_CATCHUP_SUBTYPES.request]: async (fromAddr, payload) => {
         if (payload?.subtype !== PERSON_KEY_CATCHUP_SUBTYPES.request) return;
+        if (payload.subject !== selfPubKey) { refuse('another-self', fromAddr); return; }
         if (!(await fromOwnDevice(fromAddr))) { refuse('not-a-sibling', fromAddr); return; }
         const wire = wireOf(current());
         if (!wire) return;
         try { await sendToPeer(fromAddr, wire, { guarantee: 'hold-forward' }); } catch { /* the asker retries on its next connect */ }
       },
     },
+  };
+}
+
+/**
+ * ONE LANE, A KEY PER SELF. A device holds several selves — the general persona and its personas — and each has its own
+ * person key, its own siblings (the devices holding THAT self) and its own root commitment. The router hands a
+ * hand-over (or a catch-up request) to the self its `subject` names, and that self admits it only when one of its root
+ * reveals verifies against ITS commitment — so a payload that claims a self, authorised by another self's root, lands
+ * nowhere. A subject this device does not hold is refused and said (kind + the sender's id), never guessed.
+ * @param {object} a
+ * @param {(subject: string) => (ReturnType<typeof createPersonKeySync>|null)} a.instanceFor  the self's sync, or null
+ * @param {() => Array<ReturnType<typeof createPersonKeySync>>} a.all  every held self's sync (the connect-time ask)
+ * @param {(reason: string, from: string) => void} [a.onRefused]
+ */
+export function routePersonKeySync({ instanceFor, all, onRefused = null } = {}) {
+  if (typeof instanceFor !== 'function' || typeof all !== 'function') throw new Error('routePersonKeySync: `instanceFor` and `all` are required');
+  const refuse = (reason, from) => { try { onRefused?.(reason, from); } catch { /* observability never throws */ } };
+  const route = (subtype) => async (fromAddr, payload) => {
+    if (payload?.subtype !== subtype) return;
+    const subject = typeof payload.subject === 'string' && payload.subject ? payload.subject : null;
+    const self = subject ? instanceFor(subject) : null;
+    if (!self) { refuse(subject ? 'unknown-self' : 'no-subject', fromAddr); return; }
+    await self.handlers[subtype](fromAddr, payload);
+  };
+  return {
+    subtypes: { carry: PERSON_KEY_CARRY, ...PERSON_KEY_CATCHUP_SUBTYPES },
+    handlers: {
+      [PERSON_KEY_CARRY]: route(PERSON_KEY_CARRY),
+      [PERSON_KEY_CATCHUP_SUBTYPES.request]: route(PERSON_KEY_CATCHUP_SUBTYPES.request),
+    },
+    /** CATCH-UP for every held self: each asks its own siblings. */
+    async requestFromSiblings() {
+      let requested = 0;
+      for (const s of all()) { try { requested += (await s.requestFromSiblings())?.requested ?? 0; } catch { /* next self */ } }
+      return { requested };
+    },
+    /** The sync of one held self (the ceremony carries each rotated self's key through its own). */
+    forSelf: (subject) => instanceFor(subject),
   };
 }

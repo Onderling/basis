@@ -5808,6 +5808,10 @@
       "assign": {
         "text": "Toewijzen",
         "doc": "S3 — per-post action on a lend (author): assign a borrower (assignLend)."
+      },
+      "accept": {
+        "text": "{{name}} kiezen",
+        "doc": "Per-post action on MY request: accept one of the people who answered it (acceptResponder); one chip per recorded responder."
       }
     },
     "due": {

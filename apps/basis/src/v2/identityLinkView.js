@@ -44,11 +44,11 @@ export function createIdentityLinkView({ link, offerFor }) {
  * The person's identity links, composed once per agent.
  * @param {object} a
  * @param {(o: {botAddress: string}) => Promise<{offer: string, nonce: string, root: string}|null>} a.signOffer  this device's offer
- * @param {() => string|null} a.selfRoot   the root this device's delegation names (a statement about another root is not ours)
+ * @param {() => string[]} a.selfRoots   every root this device's selves' delegations name (a statement about another root is not ours)
  * @param {(app: string, op: string, args: object) => Promise<any>} a.callSkill  the contact book, through the waist (it carries)
  * @param {() => number} [a.now]
  */
-export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date.now }) {
+export function createIdentityLinks({ signOffer, selfRoots, callSkill, now = Date.now }) {
   const pending = new Map();   // bot address → { botName }
   const listeners = new Set();
   const emit = (e) => { for (const fn of listeners) { try { fn(e); } catch { /* a painter never breaks the link */ } } };
@@ -65,8 +65,8 @@ export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date
   async function received(from, payload) {
     if (payload?.subtype !== IDENTITY_LINK_SUBTYPE) return false;
     const st = payload.statement;
-    const mine = typeof selfRoot === 'function' ? selfRoot() : null;
-    if (!st || st.bot !== from || typeof st.row !== 'string' || !st.row || !mine || st.root !== mine) return false;
+    const mine = typeof selfRoots === 'function' ? (selfRoots() ?? []) : [];
+    if (!st || st.bot !== from || typeof st.row !== 'string' || !st.row || !mine.includes(st.root)) return false;
     if (payload.unlinked) {
       if (!(await contacts()).some((c) => c?.webid === from && typeof c.linkedRow === 'string' && c.linkedRow)) return false;
       await callSkill('pinboard', 'addContact', { webid: from, linkedRow: null, linkedAt: now() });
@@ -75,6 +75,8 @@ export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date
     }
     const p = pending.get(from);
     if (!p) return false;
+    // linked as the self that made the offer: a statement naming another of this device's roots is not this link
+    if (p.root && st.root !== p.root) return false;
     pending.delete(from);
     const r = await callSkill('pinboard', 'addContact', {
       webid: from, pubKey: from, peerAddr: from, ...(p.botName ? { displayName: p.botName } : {}), linkedRow: st.row, linkedAt: now(),
@@ -90,7 +92,7 @@ export function createIdentityLinks({ signOffer, selfRoot, callSkill, now = Date
       link,
       offerFor: async ({ botAddress, botName }) => {
         const made = await signOffer({ botAddress });
-        if (made?.offer) pending.set(botAddress, { botName });
+        if (made?.offer) pending.set(botAddress, { botName, root: made.root ?? null });
         return made;
       },
     }),

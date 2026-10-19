@@ -4246,7 +4246,7 @@ Resolution for each option: explicit arg → `agent.config.get('oracle.<name>')`
 - `[opts.refreshBeforeMs]` `number`
 - `[opts.maxPeers]` `number`
 - `[opts.seqStore]` `object` — forwarded to signReachabilityClaim
-- `[opts.peerScope]` `(callerPubKey: string, peers: string[]) => string[]|Promise<string[]>` — Which of this device's direct peers THIS caller may learn about. Absent ⇒ none are disclosed (see the disclosure note above). Pass `(_caller, peers) => peers` to opt into the old open behaviour.
+- `[opts.peerScope]` `(callerPubKey: string, peers: string[], ctx?: {to: string|null}) => string[]|Promise<string[]>` — `to`: the address the request reached Which of this device's direct peers THIS caller may learn about. Absent ⇒ none are disclosed (see the disclosure note above). Pass `(_caller, peers) => peers` to opt into the old open behaviour.
 
 ## `src/skills/relayForward.js`
 

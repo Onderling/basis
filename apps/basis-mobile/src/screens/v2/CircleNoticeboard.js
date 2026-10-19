@@ -16,7 +16,7 @@ import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
 // embeds[] — cross-object reference chips ("See also"), shared with web.
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
-import { isNoticeboardPost } from '../../../../basis/src/v2/circlePinboardScope.js';
+import { isNoticeboardPost, responderChoices } from '../../../../basis/src/v2/circlePinboardScope.js';
 import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from '../../../../basis/src/v2/circleStream.js';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
@@ -74,12 +74,16 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       // Keep only real asks/offers — listOpen (no intent) also returns system items
       // (rules / membership) which aren't noticeboard posts.
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
+      // who "me" is HERE: the circle's self (the launcher's per-circle viewer — a persona's circle is the persona's)
+      const meHere = viewerId ?? (who || null);
       const mapped = items.map((it) => ({
         // The INTENT, not the item type — a canonical post's type is 'post', which printed the raw
         // locale key as its badge on both shells (web≡mobile with circleApp's projection).
         id: it.id, text: it.text ?? it.label ?? '',
         type: noticeboardIntentOf(it),   // the shared canonical→badge translator (web ≡ mobile)
-        addedBy: it.addedBy, mine: !!(who && it.addedBy === who),
+        addedBy: it.addedBy, mine: !!(meHere && it.addedBy === meHere),
+        // the people who answered my request, each an Accept (the shared projection — web ≡ mobile)
+        responders: responderChoices(it, { viewerId: meHere, members: members ?? [], policy: revealPolicy }),
         addedByLabel: memberLabelFor(it.addedBy, { members: members ?? [], viewerId, policy: revealPolicy }),
         // S5 — inline-image metadata (thumbnail travels; full bytes on demand).
         attachments: Array.isArray(it.attachments) ? it.attachments
@@ -163,7 +167,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     if (att && att.thumbnail) setViewing({ uri: att.thumbnail, pending: true });
   }, [media]);
 
-  const runAction = useCallback(async (action, post) => {
+  const runAction = useCallback(async (action, post, responder = null) => {
     try {
       if (action === 'respond') { setReplyingTo(post.id); setReplyText(''); return; }
       if (action === 'assign') { setAssigningTo(post.id); setAssignText(''); return; }
@@ -172,6 +176,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       // in the governance Reports section), not the older reportPost item. Falls back if unwired.
       else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('pinboard', 'reportPost', { itemId: post.id }); }
       else if (action === 'markReturned') await callSkill('pinboard', 'markReturned', { requestId: post.id });
+      else if (action === 'accept' && responder) await callSkill('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
       else if (action === 'mute' && post.addedBy) {
         // BLOCK the person — both halves, one act (web parity). Keyed on the webid, which is what
         // makes it a block of a PERSON rather than of one address.
@@ -295,6 +300,9 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
             {!p.mine && <Chip label={t('circle.noticeboard.action.respond')} onPress={() => runAction('respond', p)} />}
             {p.type === 'lend' && p.mine && <Chip label={t('circle.noticeboard.action.assign')} onPress={() => runAction('assign', p)} />}
             {p.type === 'lend' && p.mine && <Chip label={t('circle.noticeboard.action.returned')} onPress={() => runAction('markReturned', p)} />}
+            {(Array.isArray(p.responders) ? p.responders : []).map((r) => (
+              <Chip key={`accept-${r.webid}`} label={t('circle.noticeboard.action.accept', { name: r.label })} onPress={() => runAction('accept', p, r.webid)} />
+            ))}
             {p.mine && <Chip label={t('circle.noticeboard.action.cancel')} onPress={() => runAction('cancel', p)} />}
             {!p.mine && <Chip label={t('circle.noticeboard.action.report')} muted onPress={() => runAction('report', p)} />}
             {!p.mine && <Chip label={t('circle.noticeboard.action.mute')} muted onPress={() => runAction('mute', p)} />}

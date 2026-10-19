@@ -26,6 +26,7 @@ import { itemCircleId } from './circleScope.js';
 import { createMediaEmbed } from '../core/handlers/mediaEmbed.js';
 import { pinboardManifest } from '@onderling-app/pinboard/manifest';
 import { PINBOARD_OP_ALIAS } from './pinboardOpAliases.js';
+import { memberLabelFor } from './circleStream.js';
 
 /**
  * Which pinboard ops act on the ACTIVE circle's items — DERIVED from the manifest's `circleScoped`
@@ -218,4 +219,22 @@ export function scopePinboardCallSkill(callSkill, circleId, getSealStrategy, get
     }
     return res;
   };
+}
+
+/**
+ * THE POSTER'S ACCEPT, on the request: one choice per person who answered it — recorded on this device's copy
+ * (`source.responders`, from the answer's verified sender) — labelled from the roster, on the viewer's OWN open request
+ * only. Each choice is the args of `acceptResponder` (the request's id + the responder). Both shells paint these.
+ *
+ * @param {object} item  a pinboard item as `listOpen` returns it
+ * @param {{viewerId?: string|null, members?: object[], policy?: string}} [o]
+ * @returns {Array<{webid: string, label: string}>}
+ */
+export function responderChoices(item, { viewerId = null, members = [], policy = 'pairwise' } = {}) {
+  if (!item || !viewerId || item.addedBy !== viewerId || item.completedAt) return [];
+  const responders = Array.isArray(item.source?.responders) ? item.source.responders : [];
+  return responders.filter((w) => typeof w === 'string' && w && w !== viewerId).map((webid) => ({
+    webid,
+    label: memberLabelFor(webid, { members, viewerId, policy }) ?? `${webid.slice(0, 8)}…`,
+  }));
 }

@@ -40,6 +40,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
+  responderChoices,
   noticeboardIntentOf,
   memberLabelFor,
   basisManifest, AppRegistry, filterCatalogue } from '../../src/index.js';
@@ -6794,6 +6795,8 @@ function showCircle(id, circle, policy) {
       // listOpen (no intent) also returns system items (rules / membership) — keep only
       // real asks/offers so the noticeboard isn't full of bookkeeping (and other circles').
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
+      // who "me" is HERE: the circle's self (a persona's circle is the persona's)
+      const meHere = mySelfIn(id) ?? myWebid ?? null;
       noticeboardPosts = items.map((it) => ({
         id:           it.id,
         text:         it.text ?? it.label ?? '',
@@ -6814,7 +6817,9 @@ function showCircle(id, circle, policy) {
           viewerId: myWebid ?? null,
           policy:   policy?.revealPolicy ?? 'pairwise',
         }) ?? shortWebid(it.addedBy),
-        mine:         !!(myWebid && it.addedBy === myWebid),
+        mine:         !!(meHere && it.addedBy === meHere),
+        // the people who answered my request, each an Accept (the shared projection — web ≡ mobile)
+        responders:   responderChoices(it, { viewerId: meHere, members: circleRoster ?? [], policy: policy?.revealPolicy ?? 'pairwise' }),
         // carry inline-image metadata (thumbnail travels; full bytes on demand).
         attachments:  Array.isArray(it.attachments) ? it.attachments
                       : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
@@ -6903,7 +6908,8 @@ function showCircle(id, circle, policy) {
   let caretakerNoticeSaid = false;
   function tellCaretakerIfTheCircleBecameTheirs(rawRoster) {
     if (caretakerNoticeSaid) return;
-    const notice = caretakerNotice({ members: rawRoster, myRef: myWebid || '' });
+    // in a persona's circle the caretaker is the persona — the self this device is there
+    const notice = caretakerNotice({ members: rawRoster, myRef: mySelfIn(id) ?? myWebid ?? '' });
     if (!notice) return;
     caretakerNoticeSaid = true;
     // `scope: 'self'` — the line is addressed to ONE person; fanning it would announce the handover
@@ -7097,7 +7103,7 @@ function showCircle(id, circle, policy) {
     if (att && att.thumbnail) showImageModal(att.thumbnail, { pending: true });
   }
 
-  async function noticeboardAction({ action, post }) {
+  async function noticeboardAction({ action, post, responder = null }) {
     // Opened AFTER the board reload below — the reload repaints the circle view, and a thread opened
     // before it was painted over the instant it appeared (browser story 4 found it).
     let openThreadWith = null;
@@ -7122,6 +7128,8 @@ function showCircle(id, circle, policy) {
         await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
         await pinboardCall('pinboard', 'markReturned', { requestId: post.id });
+      } else if (action === 'accept' && responder) {
+        await pinboardCall('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
       } else if (action === 'mute') {
         // BLOCK this person — both halves, one act: their envelopes are refused at this device's
         // boundary AND their posts stop showing here. Keyed on the WEBID, which is what makes it a
@@ -8127,7 +8135,8 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
   });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
@@ -8142,7 +8151,8 @@ async function showGovernance(id) {
   try { const r = await rawCallSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,
     circleIdentityFor: circleIdentityForShell,
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
@@ -8306,7 +8316,7 @@ async function showAdmin(id) {
   const rerender = () => renderCircleAdminPanel(rootEl, {
     members, muted, outboundShares, outboundCanonical, busy, notice, t,
     resolvePicture: circlePictureResolver(id),
-    viewerWebid: myWebid,
+    viewerWebid: mySelfIn(id) ?? myWebid,
     onBack: () => showDetail(id),
     // A member's own row offers LEAVING (the shared decision): the same leave the circle's tile menu runs, with its confirm.
     onLeave: () => onLeaveCircle(id, circlesCache.find((c) => c?.id === id) ?? { id }),
@@ -8419,7 +8429,8 @@ async function showSettings(id) {
   try { const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     circleIdentityFor: circleIdentityForShell,
     setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
       circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
@@ -8462,7 +8473,7 @@ async function showSettings(id) {
   const settingsPage = pageForOp(basisManifest, 'settings');
 
   const rerender = () => renderCircleSettings(rootEl, {
-    saveControl: policySaveControlFor({ members: settingsRoster, myRef: myWebid }),
+    saveControl: policySaveControlFor({ members: settingsRoster, myRef: mySelfIn(id) ?? myWebid }),
     policy: working,
     t,
     // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this
@@ -9175,6 +9186,7 @@ async function boot() {
             },
             notePeer: (addr) => circlePeerGraph?.upsert?.({ pubKey: addr, lastSeen: Date.now() })?.catch?.(() => {}),
             identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+            noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
           }),
           // SILENT out-of-circle delivery — a peer pushed a sealed COPY straight to us. Land it in the per-user
           // "shared with me" store; the surface opens each with this device's own network-derived sealing key.

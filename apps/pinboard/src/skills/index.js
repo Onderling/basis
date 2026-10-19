@@ -94,7 +94,7 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
-import { kindWakes } from '@onderling/item-store';
+import { kindWakes, assigneesOf } from '@onderling/item-store';
 
 /** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
 let _fallbackReportHook = null;
@@ -1189,12 +1189,16 @@ async function respondToItemCore(scope, a, ctx) {
   // when the broadcast loops back (substrate mirror writes their copy).
   try { await store.claim(a.itemId, { actor: ctx.from }); } catch { /* race-OK */ }
 
+  // The answer is threaded under the POSTER's request id (a mirror copy names it as `source.requestId`) — the poster's
+  // device holds that id, files the DM under its own request, and records who answered (`recordResponse`).
+  const threadId = post.source?.requestId ?? post.id;
+
   // Send the chat message.
   const r = await chat.send({
     toStableId,
     toWebid,
     toPubKey,
-    threadId: a.itemId,
+    threadId,
     body:     a.body,
     subtype:  'chat-message',
   });
@@ -1208,7 +1212,7 @@ async function respondToItemCore(scope, a, ctx) {
 
   // `toPubKey` names the poster so the shell can open (and persist into) the contact thread the
   // reply starts — the answer to a post is a 1:1 conversation with its author.
-  return { ok: true, threadId: a.itemId, itemId: r.itemId, toPubKey };
+  return { ok: true, threadId, itemId: r.itemId, toPubKey };
 }
 
 async function signOutOfPodCore(scope, a, ctx) {
@@ -1279,7 +1283,7 @@ export function buildPinboardScope(deps = {}) {
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   // THIS DEVICE in a circle: its persona there (host-injected `selfWebidFor`), else `localActor`. The cores' "is
-  // this my own call?" compares against it — `withCircleSelf` hands a persona's circle's own calls the persona's
+  // this my own call?" compares against it — the host's `pinboardActAs` hands a persona's circle's own calls the persona's
   // webid as `from`, so the local/foreign line must be drawn at the same webid or the device's own call reads foreign.
   const localActorIn = (gid) => {
     let self = null;
@@ -1404,6 +1408,44 @@ export function buildSkills({
     selfSigner, selfWebidFor,
   });
   const localActorIn = scope.localActorIn;
+  // An op that names an ITEM, not a circle, arrives as the device's general self even when the item lives in a
+  // persona's circle (the host's `actAs` reads the circle off the args). The device's own call acts on an item as the
+  // self it is in the item's circle; a foreign caller stays who they are.
+  const itemCircleOf = (it) => it?.source?.groupId
+    ?? (Array.isArray(it?.source?.targets) ? it.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
+    ?? null;
+  const actorOnItem = (from, it) => (from && from === localActor ? localActorIn(itemCircleOf(it)) : from);
+  // THE RESPONSE IS THE CARRIER of "who answered": a responder's answer (`respondToItem`) reaches the poster as a DM
+  // threaded under the poster's request id, and the host hands this device's pinboard the envelope's VERIFIED sender
+  // address with it (`recordResponse`, below — the host's own call only). The responder is recorded on THIS device's
+  // copy of the request: the webid the circle's roster binds that address to (a proven per-circle address, or the
+  // member's own key), never a name in the body, and only on a request this device posted, as its self in that circle. `acceptResponder` accepts
+  // only someone recorded here.
+  const recordResponse = async ({ threadId, fromPubKey } = {}) => {
+    if (typeof threadId !== 'string' || !threadId || typeof fromPubKey !== 'string' || !fromPubKey) return { recorded: false, reason: 'no-ids' };
+    const item = await Promise.resolve(store.getById(threadId)).catch(() => null);
+    if (!item || item.type === 'chat-message') return { recorded: false, reason: 'no-such-request' };   // a DM in any other thread
+    const drop = (reason) => {
+      metrics?.record?.('response-dropped');
+      try { console.info(`[pinboard] a response was not recorded: ${reason} (${item.type} ${threadId.slice(0, 12)}…, from ${fromPubKey.slice(0, 12)}…)`); } catch { /* logging never breaks ingest */ }
+      return { recorded: false, reason };
+    };
+    const circle = itemCircleOf(item);
+    if (!circle) return drop('no-circle');
+    const self = localActorIn(circle);
+    if (item.addedBy !== self) return drop('not-my-request');
+    const roster = (await listGroupMembersCore(scope, { groupId: circle }, { from: self }).catch(() => null))?.members ?? [];
+    // The roster's own ladder: the member's proven per-circle address first, else the member's own key (in basis' binding a
+    // member's webid IS their chat key — and a 1:1 answer travels from it, not from a circle address).
+    const row = roster.find((m) => m && (m.circleAddress === fromPubKey
+      || (Array.isArray(m.circleAddresses) && m.circleAddresses.some((p) => p?.address === fromPubKey && typeof p?.proof === 'string' && p.proof))))
+      ?? roster.find((m) => m && (m.webid === fromPubKey || m.pubKey === fromPubKey));
+    const webid = typeof row?.webid === 'string' && row.webid ? row.webid : null;
+    if (!webid) return drop('sender-not-on-roster');
+    const prior = Array.isArray(item.source?.responders) ? item.source.responders : [];
+    if (!prior.includes(webid)) await store.update(item.id, { source: { ...item.source, responders: [...prior, webid] } }, { actor: self });
+    return { recorded: true, webid };
+  };
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
   // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
   // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
@@ -1882,19 +1924,41 @@ export function buildSkills({
      * acceptResponder({requestId, responderWebid})
      * Requester picks a claim's responder; CAS to set assignee, then complete.
      */
+    /**
+     * recordResponse({requestId, senderAddress})  — the HOST's own call, never a peer's: an answer to one of this
+     *   device's requests arrived from `senderAddress` (the envelope's verified sender, which the host read off the
+     *   transport). Records the responder on this device's copy (`recordResponse` above).
+     */
+    defineSkill('recordResponse', async ({ parts, from }) => {
+      if (!from || from !== localActor) return { error: 'not-yours' };
+      const a = dataArgs(parts);
+      return recordResponse({ threadId: a.requestId, fromPubKey: a.senderAddress });
+    }, {
+      description: "The host's own: record who answered one of this device's requests (from the verified sender address).",
+      visibility:  'authenticated',
+    }),
+
     defineSkill('acceptResponder', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const current = await store.getById(a.requestId);
       if (!current) return { error: 'not-found' };
       if (current.completedAt) return { error: 'already-fulfilled', current };
+      // Accepting is the poster's word about their own request — never a co-member's or an admin's (an admin's tool
+      // for a post that should go is report → remove, which leaves a governance record).
+      const actor = actorOnItem(from, current);
+      if (!actor || current.addedBy !== actor) return { error: 'not-the-poster' };
 
-      const claimResult = await store.claim(a.requestId, { actor: a.responderWebid });
-      if (claimResult.error) {
-        return { error: 'already-fulfilled', current: claimResult.current };
+      // ...and only someone who answered it: their response recorded them on this copy (`recordResponse`).
+      const responders = Array.isArray(current.source?.responders) ? current.source.responders : [];
+      if (!responders.includes(a.responderWebid)) return { error: 'not-a-responder' };
+      // The accepted one is written as the claim.
+      if (!assigneesOf(current).includes(a.responderWebid)) {
+        const claimResult = await store.claim(a.requestId, { actor: a.responderWebid });
+        if (claimResult.error) return { error: 'already-fulfilled', current: claimResult.current };
       }
       const [completed] = await store.markComplete(
         [{ id: a.requestId }],
-        { actor: from },
+        { actor },
       );
       metrics?.record?.('accept-responder');
       return { request: completed, _sync: simulateSync() };
@@ -2089,13 +2153,16 @@ export function buildSkills({
       const current = await store.getById(id);
       if (!current) return { error: 'not-found' };
       if (current.completedAt) return { error: 'already-returned', current };
+      // "Returned" is the lender's word about their own lend (as acceptResponder above).
+      const actor = actorOnItem(from, current);
+      if (!actor || current.addedBy !== actor) return { error: 'not-the-poster' };
 
       if (notifier) {
         try { await notifier.cancel(`due:${id}`); } catch {}
       }
       const [completed] = await store.markComplete(
         [{ id }],
-        { actor: from },
+        { actor },
       );
       metrics?.record?.('mark-returned');
       return { item: completed, _sync: simulateSync() };

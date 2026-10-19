@@ -140,7 +140,10 @@ export function createContactThreadChannel({
     if (typeof onReturned !== 'function' || !contactId) return;
     try { await onReturned(contactId); } catch { /* the row is a convenience; the turn is stored regardless */ }
   };
-  const cardSentTo = new Set();   // the contacts that had my card this session (see `myCard`)
+  // the (contact, self) pairs that had that self's card this session (see `myCard`): a contact switched to another
+  // persona hears THAT persona's card on the next turn, not in a next session
+  const cardSentTo = new Set();
+  const cardKey = (peerAddr, self) => `${peerAddr}|${self?.personaId ?? ''}`;
   const resolveId = (id) => { if (typeof identityOf !== 'function' || !id) return id; try { return identityOf(id) || id; } catch { return id; } };
   const holdsHere = () => (selection && typeof selection.holds === 'function' ? selection.holds('contacts') !== false : true);
   const keepsBytes = () => (selection && typeof selection.keepsBytes === 'function' ? selection.keepsBytes() !== false : true);
@@ -285,7 +288,7 @@ export function createContactThreadChannel({
       }
       let cardOnBoard = null;
       // the card of the self I am to this contact: a persona's own card (`myCard(personaId)`), never the default's
-      if (typeof myCard === 'function' && (!self || self.personaId) && !cardSentTo.has(peerAddr)) {
+      if (typeof myCard === 'function' && (!self || self.personaId) && !cardSentTo.has(cardKey(peerAddr, self))) {
         try { const c = await myCard(self?.personaId ?? null); if (typeof c === 'string' && c) { envelope.extras.card = c; cardOnBoard = c; } } catch { /* no card, no name — the message goes regardless */ }
       }
       // Sealed to the PERSON when their current key is known — the wire carries the box, not the text (and the
@@ -304,11 +307,11 @@ export function createContactThreadChannel({
         ...(route?.to ? { deliverTo: route.to, sendOpts: { circleId: route.circleId } }
           : (self?.sendAs ? { sendOpts: { sendAs: self.sendAs } } : {})),
       });
-      if (cardOnBoard) cardSentTo.add(peerAddr);   // it left (delivered or held): they have it
+      if (cardOnBoard) cardSentTo.add(cardKey(peerAddr, self));   // it left (delivered or held): they have it
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
-      // a persona's contact is not the default's devices' business (no person-level lane on the wire)
-      if (!res?.deduped && !self) {
+      // the fan carries a persona's contact to THAT persona's devices only (the agent's fan is per self)
+      if (!res?.deduped) {
         await fanOwn({
           direction: 'out', contactId: threadId, peerAddr, replyTo,
           text: floored.text, messageId: id, ts: envelope.ts,

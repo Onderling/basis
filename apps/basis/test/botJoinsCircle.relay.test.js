@@ -46,8 +46,10 @@ describe('the bot joins a circle on its admin\'s word', () => {
     child.stderr.on('data', (b) => { out += String(b); });
     const up = await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 });
     expect(up, `the runner never came up:\n${out.slice(-1500)}`).toBe(true);
-    ann = await bootRealAgentNode('ann', { contactChannel: true, taskLane: true });
-    bob = await bootRealAgentNode('bob', { taskLane: true });
+    // a redeem is a full round trip over the relay; under a loaded CI runner the fast 8 s default ran out
+    // (`admin-unreachable` on Bob's join into the third circle, 2026-10-19) — the budget the slower gates use
+    ann = await bootRealAgentNode('ann', { contactChannel: true, taskLane: true, redeemTimeoutMs: 30_000 });
+    bob = await bootRealAgentNode('bob', { taskLane: true, redeemTimeoutMs: 30_000 });
     await connectNodesOverRelay([ann, bob], { relayUrl: relay.url });
     // Ann's circle, Bob in it
     await createCircle(ann, { groupId: CIRCLE, name: 'Huize Rood', purpose: 'samen het huis' });
@@ -144,7 +146,6 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(row, `the bot did not join the second circle. The bot said: ${JSON.stringify((await botTurns(ann)).slice(before).map((t) => t.text))}`).toBeTruthy();
     // what a shell does when its roster changes (production's roster feed): the new member's per-circle key bound
     await bindCircleAddressKeysFor({ agent: ann.agent, circleId: BLUE });
-    const forgotBefore = walkLog(dataDir).filter((e) => e.kind === 'circle-forgotten').length;
     // the removal fans to the member's per-circle address: wait until Ann's roster holds it, or the statement has nowhere
     // to go (a removed member gets no catch-up afterwards) — the race behind this walk's occasional red
     const bound = await until(async () => ((await readRoster(ann, BLUE)).find((m) => m.webid === row.webid)?.circleAddresses?.length ? true : null), { timeout: 60_000, step: 500 });
@@ -154,7 +155,9 @@ describe('the bot joins a circle on its admin\'s word', () => {
     expect(removed.ok, JSON.stringify(removed)).toBe(true);
     const gone = await until(async () => (walkLog(dataDir).some((e) => e.kind === 'circle-removed' && e.ok && e.circleId === BLUE.slice(0, 12)) ? true : null), { timeout: 60_000, step: 500 });
     expect(gone, `the box did not notice its removal. Walk log: ${JSON.stringify(walkLog(dataDir).filter((e) => /circle/.test(e.kind)))}`).toBe(true);
-    expect(walkLog(dataDir).filter((e) => e.kind === "circle-forgotten").length, JSON.stringify(walkLog(dataDir).filter((e) => /circle-(forgotten|removed|said)/.test(e.kind)))).toBe(forgotBefore + 1);
+    // THIS circle's content went (at least once: a removal that lands while the join is still finishing forgets once
+    // more after it) — counted for this circle only, since the first circle's own forgets may still be landing
+    expect(walkLog(dataDir).filter((e) => e.kind === 'circle-forgotten' && e.circleId === BLUE.slice(0, 12)).length, JSON.stringify(walkLog(dataDir).filter((e) => /circle-(forgotten|removed|said)/.test(e.kind)))).toBeGreaterThanOrEqual(1);
     const n = (await botTurns(ann)).length;
     await send('/kringen');
     expect(await until(async () => ((await botTurns(ann)).slice(n).some((t) => /in geen enkele kring/.test(t.text ?? '')) ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
@@ -164,7 +167,7 @@ describe('the bot joins a circle on its admin\'s word', () => {
     const GREEN = 'huize-groen';
     await createCircle(ann, { groupId: GREEN, name: 'Huize Groen', purpose: 'de derde kring' });
     const bj = await joinExistingCircle(ann, bob, { groupId: GREEN, handle: 'bob' });
-    expect(bj.joined?.ok).toBe(true);
+    expect(bj.joined?.ok, `Bob's join into the third circle: ${JSON.stringify(bj.joined ?? bj.error ?? Object.keys(bj ?? {}))}`).toBe(true);
     await bindCircleAddresses([ann, bob], GREEN);
     await Promise.all([ann, bob].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: GREEN })));
     const invite = await buildCircleInviteUri({ callSkill: (a, o, x) => ann.agent.callSkill(a, o, x), circleId: GREEN, adminPeerAddr: ann.pubKey });

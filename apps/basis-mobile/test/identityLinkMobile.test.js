@@ -32,7 +32,7 @@ describe('the identity link on the phone', () => {
       if (op === 'addContact') { rows.set(args.webid, { ...(rows.get(args.webid) ?? {}), ...args }); return { contact: rows.get(args.webid) }; }
       return null;
     };
-    const identityLinks = createIdentityLinks({ signOffer: async () => ({ offer: 'onderling-koppel:x', nonce: 'n'.repeat(32), root: 'ROOT' }), selfRoot: () => 'ROOT', callSkill });
+    const identityLinks = createIdentityLinks({ signOffer: async () => ({ offer: 'onderling-koppel:x', nonce: 'n'.repeat(32), root: 'ROOT' }), selfRoots: () => ['ROOT'], callSkill });
     const lanes = buildCircleLanes({ agent: { identityLinks, sendPeerMessage: async () => {} } });
     expect(CHAT).toMatch(/\.\.\.lanes\.handlers|\.\.\.circleLanes\.handlers/);
     const made = await identityLinks.view(encodeLinkStartLink('https://basis.example/app', { botAddress: 'BOT', botName: '@huisbot' })).offer();

@@ -16,9 +16,11 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 export const ASSISTANT_FALLBACK_MODEL = param({ key: 'assistant.fallbackModel', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 'glm-5.3-flash' });
 /**
  * How long the model may take before the turn says it is slow and tries the fallback once. Well under a minute: a
- * person waiting 60 s for "even geduld" has given up (measured 2026-09-30: a normal model turn is about 2 s).
+ * person waiting 60 s for "even geduld" has given up. Measured on the household's box (2026-10-18, 75 calls): a model
+ * turn is 2.2 s at the median and 4.2 s at p90, the slowest healthy one 11.5 s — 15 s keeps that margin. Not lower: a
+ * timed-out call is billed and the fallback is billed again, against the org's one monthly token budget.
  */
-export const ASSISTANT_MODEL_TIMEOUT_MS = param({ key: 'assistant.modelTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
+export const ASSISTANT_MODEL_TIMEOUT_MS = param({ key: 'assistant.modelTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
 
 const isTimeout = (err) => err?.name === 'AbortError' || /\babort|timed? ?out\b/i.test(String(err?.message ?? ''));
 // the provider no longer serves the model (Privatemode retired kimi-k2.6 on 2026-10-03: "404 model … not found")

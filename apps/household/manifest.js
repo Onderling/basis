@@ -113,7 +113,7 @@ export const householdManifest = {
     // added to a manifest becomes storable + gate-able at once (docs/architecture.md L84).
     // what the household's people want everyone to know, in their own words ("de vuilnis gaat dinsdag buiten"): written by
     // PEOPLE, never the model (no tool to write or remove one), changed or removed only by its maker or an admin
-    note:     { atoms: ['add', 'list', 'get', 'remove'], writtenBy: 'people',
+    note:     { atoms: ['add', 'list', 'get', 'update', 'remove'], writtenBy: 'people',
       presents: { label: 'text', moment: 'updatedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { one: 'notitie', other: 'notities' }, en: { one: 'note', other: 'notes' } } },
   },

@@ -157,13 +157,13 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'text':         renderText(section, block, tr);         break;
     case 'photo':        renderPhoto(section, block, tr);        break;
     case 'noticeboard':  renderNoticeboard(section, block, tr);  break;
-    case 'calendar':       renderAgenda(section, block, tr, highlightRef);       break;
+    case 'calendar':       renderAgenda(section, block, tr, highlightRef, onAction);       break;
     case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
       if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef);
-      else if (block.content?.noun === 'calendar-event') renderAgenda(section, block, tr, highlightRef);
-      else renderItems(section, block, tr);
+      else if (block.content?.noun === 'calendar-event') renderAgenda(section, block, tr, highlightRef, onAction);
+      else renderItems(section, block, tr, onAction);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
@@ -337,7 +337,7 @@ function renderNoticeboard(section, block, tr) {
   section.appendChild(list);
 }
 
-function renderAgenda(section, block, tr, highlightRef) {
+function renderAgenda(section, block, tr, highlightRef, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
   title.textContent = tr(block.titleKey ?? 'circle.recipe.block.calendar');
@@ -365,13 +365,26 @@ function renderAgenda(section, block, tr, highlightRef) {
       li.classList.add('circle-screen__agenda-row--highlight');
       scrollRowIntoView(li);
     }
+    openableOwn(li, ev, 'calendar-event', onAction);
     list.appendChild(li);
   }
   section.appendChild(list);
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */
-function renderItems(section, block, tr) {
+// An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
+// a circle's row stays the circle's.
+function openableOwn(li, item, noun, onAction) {
+  if (!item?.own || typeof onAction !== 'function') return;
+  li.classList.add('circle-screen__row--own');
+  li.tabIndex = 0;
+  li.setAttribute('role', 'button');
+  const open = () => onAction({ kind: 'edit-own', noun, item });
+  li.addEventListener('click', open);
+  li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+}
+
+function renderItems(section, block, tr, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
   title.textContent = block.titleKey ? tr(block.titleKey) : nounHeading(tr, block.content?.noun ?? '');
@@ -391,6 +404,7 @@ function renderItems(section, block, tr) {
     const text = document.createElement('span');
     text.textContent = it.label ?? '';
     li.appendChild(text);
+    openableOwn(li, it, block.content?.noun ?? null, onAction);
     list.appendChild(li);
   }
   section.appendChild(list);

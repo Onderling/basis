@@ -239,7 +239,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `folioStatus` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listFiles` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `searchNotes` | list | ✅ | ✅ | ✅ | · | · | · | search, find, zoek, zoeken |
-| **calendar** | `addEvent` | add | ✅ | ✅ | ✅ | · | ✅ | · | schedule, add event, new event, add appointment, new appointment, afspraak, plan, zet afspraak, nieuwe afspraak |
+| **calendar** | `addEvent` | add | ✅ | ✅ | ✅ | ✅ | ✅ | · | schedule, add event, new event, add appointment, new appointment, afspraak, plan, zet afspraak, nieuwe afspraak |
 |  | `listEvents` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `rsvpAccept` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | accept, accept invite, yes, accepteer, ja |
 |  | `rsvpDecline` | reject | ✅ | ✅ | ✅ | · | ✅ | ✅ | decline, decline invite, no, wijs af, nee, ik kom niet |
@@ -339,7 +339,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 334 ops | | 246 | 183 | 33 | 5 | 153 | 71 | |
+| **totals** | 334 ops | | 246 | 183 | 33 | 6 | 153 | 71 | |
 
 ### Flows
 

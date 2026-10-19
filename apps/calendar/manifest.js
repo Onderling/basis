@@ -76,6 +76,12 @@ export const calendarManifest = {
         { name: 'reminders',     kind: 'string', required: false },
       ],
       surfaces: {
+        // the person's own "+" (Vandaag): an own appointment — with no circle named it lands in the own agenda
+        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent',
+          fields: [
+            { name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' },
+            { name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' },
+          ] },
         // Part C gate — "schedule X" / "afspraak X" → addEvent{title}. PARTIAL: binds title; the
         // required `when` (a date) is form-elicited.
         slash: { command: '/addappt', body: 'flags',

@@ -296,6 +296,18 @@ export function validateManifest(manifest, opts = {}) {
             }
           }
         }
+        // A noun's ATTACH entry (its generic `add` in a "+"): a label key, where it is offered, what the person fills in.
+        if (decl.attach !== undefined) {
+          const at = decl.attach;
+          const bad = (msg) => errors.push({ path: `${np}/attach`, message: msg, code: 'bad-attach' });
+          if (!at || typeof at !== 'object' || Array.isArray(at)) bad('attach must be an object');
+          else {
+            if (!decl.atoms.includes('add')) bad('attach needs the noun to declare the `add` atom');
+            if (at.label !== undefined && typeof at.label !== 'string') bad('attach.label must be a locale key');
+            if (at.scopes !== undefined && !(Array.isArray(at.scopes) && at.scopes.length && at.scopes.every((x) => x === 'own' || x === 'circle'))) bad("attach.scopes must be a non-empty list of 'own' | 'circle'");
+            if (at.fields !== undefined && !(Array.isArray(at.fields) && at.fields.every((f) => f && typeof f.name === 'string' && typeof f.kind === 'string'))) bad('attach.fields must be a list of { name, kind, labelKey? }');
+          }
+        }
         if (decl.names !== undefined) {
           const nm = decl.names;
           // per language its plural forms (Intl.PluralRules categories): `other` required, `one` optional

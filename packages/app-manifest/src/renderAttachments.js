@@ -1,3 +1,5 @@
+import { encodeGenericOpId } from './genericOp.js';
+
 /**
  * renderAttachments — the ATTACHMENT projector.
  *
@@ -47,10 +49,41 @@ export function renderAttachments(manifest) {
         ...(a.group ? { group: a.group } : {}),
         // How the entry is invoked. `'media'` bypasses dispatch entirely; absent means the waist.
         ...(a.via ? { via: a.via } : {}),
+        // WHERE it is offered: a circle's composer ('circle', the default) and/or the person's own "+" ('own')
+        scopes: scopesOf(a),
+        ...(Array.isArray(a.fields) && a.fields.length ? { fields: a.fields } : {}),
+        // the ops that change and take away what this entry made (a sheet opened on an existing item)
+        ...(typeof a.edit === 'string' ? { edit: a.edit } : {}),
+        ...(typeof a.remove === 'string' ? { remove: a.remove } : {}),
       };
     });
 
+  // …and a NOUN that declares `attach`: its generic `add` (declare a noun → its add in the "+" too). The noun's fields
+  // say what the person fills in (a generic op has no params of its own).
+  const nouns = manifest.nouns && typeof manifest.nouns === 'object' ? manifest.nouns : {};
+  for (const [noun, decl] of Object.entries(nouns)) {
+    const a = decl?.attach;
+    if (!a || !Array.isArray(decl.atoms) || !decl.atoms.includes('add') || typeof manifest.app !== 'string') continue;
+    attachMenu.push({
+      label: a.label ?? noun,
+      opId: encodeGenericOpId(manifest.app, 'add', noun),
+      itemType: noun,
+      ...(a.group ? { group: a.group } : {}),
+      scopes: scopesOf(a),
+      ...(Array.isArray(a.fields) && a.fields.length ? { fields: a.fields } : {}),
+      // a noun's own atoms change and take away what it made, when it declares them
+      ...(decl.atoms.includes('update') ? { edit: encodeGenericOpId(manifest.app, 'update', noun) } : {}),
+      ...(decl.atoms.includes('remove') ? { remove: encodeGenericOpId(manifest.app, 'remove', noun) } : {}),
+    });
+  }
+
   return { attachMenu };
+}
+
+/** Where an attach entry is offered: its declared scopes, else a circle's composer only. */
+function scopesOf(a) {
+  const s = Array.isArray(a?.scopes) ? a.scopes.filter((x) => x === 'own' || x === 'circle') : [];
+  return s.length ? s : ['circle'];
 }
 
 /** The single attachable noun of an op, when `appliesTo.type` names exactly one. */

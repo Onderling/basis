@@ -1371,6 +1371,22 @@
     "plus_as": {
       "text": "As whom?",
       "doc": "Vandaag → '+': several selves are ticked in the header — which one this is written as."
+    },
+    "plus_edit": {
+      "text": "Change",
+      "doc": "The \"+\" sheet's title when opened on an own row (change it or take it away)."
+    },
+    "plus_remove": {
+      "text": "Remove",
+      "doc": "The \"+\" sheet's button that takes an own note/appointment away."
+    },
+    "plus_line_ph": {
+      "text": "Say what you want — \"note: milk\", \"appointment tomorrow 14:00 dentist\"",
+      "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
+    },
+    "plus_line_unread": {
+      "text": "I could not read that — fill in the fields below.",
+      "doc": "The free line could not be read: the person fills the fields."
     }
   },
   "screens": {

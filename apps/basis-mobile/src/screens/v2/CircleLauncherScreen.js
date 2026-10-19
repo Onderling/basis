@@ -276,7 +276,7 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead } from '../../../../basis/src/v2/vandaagPlus.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
@@ -730,7 +730,8 @@ export default function CircleLauncherScreen({
   // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
-  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": an own note or an own appointment
+  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
+  const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values }` (shared `plusEditFor`)
   const [screenViewBlocks, setScreenViewBlocks] = useState(null);
   // δ.1 — true while a fresh materialize runs after a cache-hit render.
   // Drives the subtle refresh pip in CircleScreenView.
@@ -1909,27 +1910,41 @@ export default function CircleLauncherScreen({
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
-              onAction={(a) => { if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); } }} />
+              onAction={(a) => {
+                if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); }
+                // an own row (no circle): the "+" sheet opened on it — change it or take it away
+                else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
+              }} />
           </ScrollView>
         </View>
         <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
-        <VandaagPlusModal visible={plusOpen} onClose={() => setPlusOpen(false)}
+        <VandaagPlusModal visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
           selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
+          // the free line: the shared reader over the sheet's own acts (never a circle)
+          onRead={(line) => plusRead(line) ?? { error: t('circle.vandaag.plus_line_unread') }}
+          onRemove={plusEdit ? async (actId) => {
+            const op = plusRemoveOp(actId, { id: plusEdit.id });
+            if (op.error) return t(op.error);
+            const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+            if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
+            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
+            return null;
+          } : null}
           onSave={async (actId, values, asSelf) => {
-            // the act's op through the waist (shared `plusOp`), written as the ticked self; a page with no block showing
-            // it gets one (undoable)
-            const op = plusOp(actId, values);
+            // the act's op through the waist (shared `plusOp`, or `plusSaveOp` on an own row), written as the ticked self;
+            // a page with no block showing it gets one (undoable)
+            const op = plusEdit ? plusSaveOp(actId, values, { id: plusEdit.id }) : plusOp(actId, values);
             if (op.error) return t(op.error);
             // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
             const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
             const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
               .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
             if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
-            const follow = plusFollowUp(screensBook, actId);
+            const follow = plusEdit ? null : plusFollowUp(screensBook, actId);
             if (follow) await runScreenOp(follow.opId, follow.args);
-            setPlusOpen(false); refreshScreensBook();
+            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
             return null;
           }} />
       </WithTabBar>

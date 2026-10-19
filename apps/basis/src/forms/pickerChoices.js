@@ -38,3 +38,20 @@ export function makePickerFetcher(call, appOrigin) {
 export function onlyChoice(choices) {
   return Array.isArray(choices) && choices.length === 1 ? choices[0].id : null;
 }
+
+/**
+ * A ceremony step's picks: the choices each picked param offers, read through the shell's fetcher — and NEVER filled.
+ * A ceremony step is consent (the phrase, the claim, the submit tap); "one choice is no question" is for an op a scan
+ * reached (`opFormOrRun`), never for a ceremony.
+ * @param {{params: Array<{name: string, pickerSource?: object}>}|null} form   `renderFlow`'s form
+ * @param {(decl: object) => Promise<Array<{id: string, label: string}>>} fetchChoices
+ * @returns {Promise<Record<string, Array<{id: string, label: string}>>>}
+ */
+export async function ceremonyChoices(form, fetchChoices) {
+  const out = {};
+  for (const p of form?.params ?? []) {
+    if (!p?.pickerSource || typeof fetchChoices !== 'function') continue;
+    out[p.name] = await Promise.resolve(fetchChoices(p.pickerSource)).catch(() => []);
+  }
+  return out;
+}

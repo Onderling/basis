@@ -170,7 +170,7 @@ import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWiza
 import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
-import RevokeDeviceModal from './RevokeDeviceModal.js';
+import CeremonyFlowModal from './CeremonyFlowModal.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
 import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
@@ -1850,7 +1850,7 @@ export default function CircleLauncherScreen({
       {contactLens.sheet}
       <EnrollDeviceModal visible={scanTask?.id === 'enroll-device'} callSkill={bundle?.callSkill} needs={scanTask?.needs ?? null}
         onClose={() => setScanTask(null)} />
-      <RevokeDeviceModal visible={scanTask?.id === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+      <CeremonyFlowModal visible={scanTask?.id === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
         placeholderKey="circle.companionClaim.placeholder" callSkill={bundle?.callSkill} needs={scanTask?.needs ?? null}
         onClose={() => setScanTask(null)} />
       {/* Mount only once we have the invite — the wizard decodes it in its useState initializer (runs

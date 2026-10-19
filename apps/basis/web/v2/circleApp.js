@@ -171,7 +171,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
 import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -303,7 +303,7 @@ import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
-import { applyUserLlmRuntime, validateUserLlmConfig } from '../../src/v2/userLlmRuntime.js';
+import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
 // basis's own ops, mounted on the agent's waist at boot. Until this, the v2 web shell was the only
@@ -1842,6 +1842,9 @@ let circleSyncFolioNoteEmbedder = null; // 52.25 — re-wire folio /zoek's embed
 // them directly, so every folio-embedder sync threw a ReferenceError instead of setting an embedder. Same
 // publish-a-module-level-handle pattern as the line above.
 let circleResolveRagEmbedder = null;
+// The person's OWN model (their settings' route, never the deployment's fallback), or null — the "+" free line reads
+// with it when the plain reading misses. Published from the same block, same pattern.
+let circleOwnModel = () => null;
 // S6.C — per-user surface preference (inline / screen / minimal); hydrated at boot.
 // Register-backed (the device-params consolidation): the thunk resolves once the agent boots;
 // hydrate() runs post-boot, and set() rides the one kind-gated write.
@@ -2468,6 +2471,7 @@ function buildCircleBot(agent) {
     catch { return null; }
   };
   circleResolveRagEmbedder = resolveCircleRagEmbedder;   // reachable from the agent boot (see declaration)
+  circleOwnModel = () => ownModelClient({ userCfg: userDefault, providers: llmProviders });
   const policyIo = localStoragePolicyIo(sealedKeyValue(globalThis.localStorage, { name: 'the circle policy' }));
   async function policyFor() {
     const cid = getActiveCircle();
@@ -4310,9 +4314,10 @@ function showVandaagPlus({ edit = null } = {}) {
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
-    onRead: (text) => {
+    // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
+    onRead: async (text) => {
       line = text;
-      const r = plusRead(text);
+      const r = plusRead(text) ?? await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) });
       if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
       paint();

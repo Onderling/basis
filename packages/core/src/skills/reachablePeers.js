@@ -51,7 +51,7 @@ export const DEFAULT_MAX_CACHED_CALLERS = param({ key: 'reachablePeers.maxCached
  * @param {number}  [opts.refreshBeforeMs]
  * @param {number}  [opts.maxPeers]
  * @param {object}  [opts.seqStore]          — forwarded to signReachabilityClaim
- * @param {(callerPubKey: string, peers: string[]) => string[]|Promise<string[]>} [opts.peerScope]
+ * @param {(callerPubKey: string, peers: string[], ctx?: {to: string|null}) => string[]|Promise<string[]>} [opts.peerScope]  `to`: the address the request reached
  *   Which of this device's direct peers THIS caller may learn about. Absent ⇒ none are disclosed (see the
  *   disclosure note above). Pass `(_caller, peers) => peers` to opt into the old open behaviour.
  */
@@ -80,7 +80,9 @@ export function registerReachablePeersSkill(agent, opts = {}) {
    */
   const cacheByCaller = new Map();
 
-  agent.register('reachable-peers', async ({ from } = {}) => {
+  agent.register('reachable-peers', async ({ from, envelope } = {}) => {
+    // the address the request reached: on a device with several selves (a person and their personas), the one asked
+    const to = typeof envelope?._to === 'string' && envelope._to ? envelope._to : null;
     const all      = await _directPeerPubKeys(agent, maxPeers);
 
     // Scope the ANSWER. No scoper ⇒ disclose nothing, and say so once: an empty claim degrades hop routing
@@ -90,7 +92,7 @@ export function registerReachablePeersSkill(agent, opts = {}) {
       // AWAITED: a real scope is a membership question ("peers I share a circle with"), and membership
       // lives behind an async roster lookup. A sync-only seam would have forced every host to keep a
       // hand-rolled cache just to answer it. `await` on a plain array is free, so sync scopes still work.
-      const scoped = await peerScope(from ?? null, all);
+      const scoped = await peerScope(from ?? null, all, { to });
       peers = Array.isArray(scoped) ? scoped.filter((p) => all.includes(p)) : [];
     } else {
       peers = [];
@@ -101,7 +103,8 @@ export function registerReachablePeersSkill(agent, opts = {}) {
       }
     }
 
-    const cacheKey = from ?? '<anonymous>';
+    // keyed by caller AND the self asked: one self's claim is never handed to a caller of another
+    const cacheKey = `${from ?? '<anonymous>'}|${to ?? ''}`;
     const setKey   = peers.join(',');
     const now      = Date.now();
     const ageLimit = ttlMs - refreshBeforeMs;

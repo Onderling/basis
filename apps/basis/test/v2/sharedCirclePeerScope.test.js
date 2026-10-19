@@ -132,3 +132,14 @@ describe('the roster cache does not outlive its usefulness', () => {
     expect(reads).toBe(2);
   });
 });
+
+describe('the addressed self\'s circles only (a device with a persona)', () => {
+  it('a caller who asked the persona\'s address is scoped to the persona\'s circles, never the union', async () => {
+    // Anna's general self is in X; her persona is in Y. Cato (Y) asks the PERSONA; Bram (X) asks the general self.
+    const circlesOf = ({ to } = {}) => (to === 'addr-persona' ? ['y'] : ['x']);
+    const s = scope({ myCircleIds: async (ctx) => circlesOf(ctx) });
+    expect(await s(CATO, REACHABLE, { to: 'addr-persona' })).toEqual([CATO]);
+    expect(await s(CATO, REACHABLE, { to: 'addr-general' }), 'the persona\'s co-member learns nothing from the general self').toEqual([]);
+    expect(await s(BRAM, REACHABLE, { to: 'addr-persona' }), 'the general self\'s co-member learns nothing from the persona').toEqual([]);
+  });
+});

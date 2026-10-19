@@ -56,13 +56,14 @@ export function makeSharedCirclePeerScope({ myCircleIds, rosterOf, now = () => D
     return members;
   }
 
-  return async function sharedCirclePeerScope(callerPubKey, peers) {
+  return async function sharedCirclePeerScope(callerPubKey, peers, { to = null } = {}) {
     if (typeof callerPubKey !== 'string' || !callerPubKey) return [];
     const all = Array.isArray(peers) ? peers.filter((p) => typeof p === 'string' && p) : [];
     if (all.length === 0) return [];
 
     let circleIds = [];
-    try { circleIds = (await myCircleIds()) ?? []; } catch { return []; }
+    // the circles of the self the request reached (`to`), never the union of a device's selves
+    try { circleIds = (await myCircleIds({ to })) ?? []; } catch { return []; }
 
     // Only circles the CALLER is in count — my other circles are none of their business, and disclosing a
     // peer because *I* am in a circle with them would leak across the very boundary per-circle identity

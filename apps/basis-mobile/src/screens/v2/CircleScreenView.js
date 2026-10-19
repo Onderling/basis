@@ -119,13 +119,13 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'text':         body = renderText(block, styles); break;
     case 'photo':        body = renderPhoto(block, styles); break;
     case 'noticeboard':  body = renderNoticeboard(block, styles); break;
-    case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
+    case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
     case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
       if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles);
-      else if (block.content?.noun === 'calendar-event') body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles);
-      else body = renderItems(block, styles);
+      else if (block.content?.noun === 'calendar-event') body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction);
+      else body = renderItems(block, styles, onAction);
       break;
     case 'rules':        body = renderRules(block, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
@@ -279,7 +279,19 @@ function renderNoticeboard(block, styles) {
   );
 }
 
-function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles) {
+// An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
+// a circle's row stays the circle's. Web twin: circleScreen.js `openableOwn`.
+const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, children, ...rest }, ref) {
+  if (!item?.own || typeof onAction !== 'function') return <View ref={ref} style={style} {...rest}>{children}</View>;
+  return (
+    <Pressable ref={ref} style={style} accessibilityRole="button" onPress={() => onAction({ kind: 'edit-own', noun, item })}
+      testID={`own-row-${item.id}`} {...rest}>
+      {children}
+    </Pressable>
+  );
+});
+
+function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles, onAction = null) {
   const items = block.content?.items ?? [];
   const isCompact = block.config?.compact === true;
   const rowStyle   = isCompact ? styles.agendaRowCompact   : styles.agendaRow;
@@ -293,14 +305,15 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
         // native layout settles; the panel measures the ref and scrolls to it.
         const hit = matchesHighlight(ev.id, highlightRef);
         return (
-          <View
+          <OwnRow
             key={ev.id ?? Math.random().toString(36)}
+            item={ev} noun="calendar-event" onAction={onAction}
             ref={hit ? highlightRowRef : undefined}
             onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
             <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{ev.label ?? ''}</Text>
-          </View>
+          </OwnRow>
         );
       })}
     </View>
@@ -308,15 +321,15 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */
-function renderItems(block, styles) {
+function renderItems(block, styles, onAction = null) {
   const items = block.content?.items ?? [];
   return (
     <View>
       <Text style={styles.blockTitle}>{block.titleKey ? t(block.titleKey) : nounHeading(t, block.content?.noun ?? '')}</Text>
       {items.map((it) => (
-        <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
+        <OwnRow key={it.id ?? Math.random().toString(36)} item={it} noun={block.content?.noun ?? null} onAction={onAction} style={styles.agendaRow}>
           <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>
-        </View>
+        </OwnRow>
       ))}
     </View>
   );

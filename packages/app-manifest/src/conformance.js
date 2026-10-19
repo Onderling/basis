@@ -51,6 +51,9 @@
  *                           empty `nouns:{}` would be worse than nothing — it
  *                           flips the manifest to declared-authoritative and a
  *                           future noun-op's capability would be silently dropped.
+ *                           An EXTENSION's noun (`<app>.<noun>`, one of its
+ *                           `itemTypes`) with its own atoms (op-less, free CRUD) is
+ *                           a capability, not vacuous.
  *
  *   5. projector-error    — PROJECTOR TOTALITY, the direct reading of invariant
  *                           #4. Each surface projector (renderChat · renderSlash
@@ -159,7 +162,9 @@ export function manifestConformance(manifest) {
       message:
         'manifest has noun-bearing atom ops (an atom verb naming an itemType via appliesTo.type or a `type`-enum param) but declares no `nouns` block — its (verb × noun) capability surface must be declared-authoritative (§1a)',
     });
-  } else if (!hasNounOps && declaresNouns) {
+  } else if (!hasNounOps && declaresNouns && !Object.entries(manifest.nouns).some(([k, n]) => typeof manifest.app === 'string' && k.startsWith(`${manifest.app}.`) && itemTypes.includes(k) && Array.isArray(n?.atoms) && n.atoms.length > 0)) {
+    // (an EXTENSION's noun — under its own app, `<app>.<noun>`, one of its itemTypes — with its own atoms is not
+    // vacuous: its free atoms ARE its capability surface; a first-party block with no noun op stays vacuous)
     issues.push({
       code: 'nouns-vacuous',
       path: '/nouns',

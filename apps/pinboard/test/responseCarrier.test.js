@@ -78,4 +78,10 @@ describe('the response records who answered, on the poster\'s copy', () => {
     expect(JSON.stringify(dm)).toContain('the-posters-id');
     expect(JSON.stringify(dm)).not.toContain(mirror.id);
   });
+
+  it("a 1:1 answer from the member's OWN key (not a circle address) maps through the roster too — as the shells send it", async () => {
+    const { call, request } = await bundleFor();
+    const req = await request(ME, 'circle-b');
+    expect(await call('recordResponse', { requestId: req.id, senderAddress: MEL })).toMatchObject({ recorded: true, webid: MEL });
+  });
 });

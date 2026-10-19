@@ -233,15 +233,17 @@ export function renderCircleNoticeboard(container, {
 
     const actions = document.createElement('div');
     actions.className = 'cc-noticeboard__actions';
-    const chip = (action, labelKey, extraClass = '') => {
+    const chip = (action, labelKey, extraClass = '', { vars = undefined, responder = undefined } = {}) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `cc-noticeboard__chip${extraClass}`;
       b.dataset.action = action;
-      b.textContent = tr(labelKey);
-      b.addEventListener('click', () => { if (typeof onAction === 'function') onAction({ action, post: p }); });
+      b.textContent = tr(labelKey, vars);
+      b.addEventListener('click', () => { if (typeof onAction === 'function') onAction({ action, post: p, ...(responder ? { responder } : {}) }); });
       actions.appendChild(b);
     };
+    // the people who answered MY request: accept one of them (`acceptResponder`)
+    for (const r of (Array.isArray(p.responders) ? p.responders : [])) chip('accept', 'circle.noticeboard.action.accept', '', { vars: { name: r.label }, responder: r.webid });
     if (!p.mine) chip('respond', 'circle.noticeboard.action.respond');
     if (p.type === 'lend' && p.mine) chip('assign', 'circle.noticeboard.action.assign');
     if (p.type === 'lend' && p.mine) chip('markReturned', 'circle.noticeboard.action.returned');

@@ -40,6 +40,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
+  responderChoices,
   noticeboardIntentOf,
   memberLabelFor,
   basisManifest, AppRegistry, filterCatalogue } from '../../src/index.js';
@@ -6794,6 +6795,8 @@ function showCircle(id, circle, policy) {
       // listOpen (no intent) also returns system items (rules / membership) — keep only
       // real asks/offers so the noticeboard isn't full of bookkeeping (and other circles').
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
+      // who "me" is HERE: the circle's self (a persona's circle is the persona's)
+      const meHere = mySelfIn(id) ?? myWebid ?? null;
       noticeboardPosts = items.map((it) => ({
         id:           it.id,
         text:         it.text ?? it.label ?? '',
@@ -6814,7 +6817,9 @@ function showCircle(id, circle, policy) {
           viewerId: myWebid ?? null,
           policy:   policy?.revealPolicy ?? 'pairwise',
         }) ?? shortWebid(it.addedBy),
-        mine:         !!(myWebid && it.addedBy === myWebid),
+        mine:         !!(meHere && it.addedBy === meHere),
+        // the people who answered my request, each an Accept (the shared projection — web ≡ mobile)
+        responders:   responderChoices(it, { viewerId: meHere, members: circleRoster ?? [], policy: policy?.revealPolicy ?? 'pairwise' }),
         // carry inline-image metadata (thumbnail travels; full bytes on demand).
         attachments:  Array.isArray(it.attachments) ? it.attachments
                       : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
@@ -7098,7 +7103,7 @@ function showCircle(id, circle, policy) {
     if (att && att.thumbnail) showImageModal(att.thumbnail, { pending: true });
   }
 
-  async function noticeboardAction({ action, post }) {
+  async function noticeboardAction({ action, post, responder = null }) {
     // Opened AFTER the board reload below — the reload repaints the circle view, and a thread opened
     // before it was painted over the instant it appeared (browser story 4 found it).
     let openThreadWith = null;
@@ -7123,6 +7128,8 @@ function showCircle(id, circle, policy) {
         await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
         await pinboardCall('pinboard', 'markReturned', { requestId: post.id });
+      } else if (action === 'accept' && responder) {
+        await pinboardCall('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
       } else if (action === 'mute') {
         // BLOCK this person — both halves, one act: their envelopes are refused at this device's
         // boundary AND their posts stop showing here. Keyed on the WEBID, which is what makes it a

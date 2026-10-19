@@ -58,7 +58,7 @@ export { SETTINGS_ENUM_AXES as ENUM_AXES } from '../../src/v2/circlePolicy.js';
  * @param {string} [args.note]
  */
 export function renderCircleSettings(container, {
-  policy, t, onChange, onBack, onSave, saveLabel, note, saveControl = null,
+  policy, t, onChange, onBack, onSave, saveLabel, note, saveControl = null, proposalAnswer = null,
   // Display theme — surfaced HERE as well as in "Mijn gegevens", where nobody looked for it (2026-07-22
   // demo feedback). Same shared renderer, so the two can't drift; absent deps ⇒ the block is simply omitted.
   themePref, onSetTheme,
@@ -340,12 +340,33 @@ export function renderCircleSettings(container, {
 
   if (advanced.childElementCount > 1) container.appendChild(advanced);   // only when something is folded
 
+  // an open proposal this admin has not answered: what it changes, and take it over or turn it down
+  if (proposalAnswer) {
+    const box = document.createElement('div');
+    box.className = 'circle-settings__proposal';
+    const text = document.createElement('p');
+    text.className = 'circle-settings__proposal-text';
+    text.textContent = proposalAnswer.text;
+    box.appendChild(text);
+    for (const [choice, key, fn] of [['yes', 'circle.settings.proposal_accept', proposalAnswer.onAccept], ['no', 'circle.settings.proposal_decline', proposalAnswer.onDecline]]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `circle-settings__proposal-${choice}`;
+      b.dataset.choice = choice;
+      b.textContent = tr(key);
+      b.addEventListener('click', () => { b.disabled = true; fn?.(); });
+      box.appendChild(b);
+    }
+    container.appendChild(box);
+  }
+
   const save = document.createElement('button');
   save.type = 'button';
   save.className = 'circle-settings__save';
   save.textContent = saveLabel || tr('circle.settings.save');
-  // The policy is the admins' (a member's statement is dropped by every other device): Save is greyed for anyone
-  // else, with why — the fields stay readable.
+  if (saveControl?.propose) save.dataset.propose = 'true';
+  // The policy is the admins': a member's Save is a proposal (its label says so, `saveControl.propose`); a viewer the
+  // roster does not know yet sees it greyed, with why — the fields stay readable.
   if (saveControl?.disabled) {
     save.disabled = true;
     if (saveControl.reasonKey) save.title = tr(saveControl.reasonKey);

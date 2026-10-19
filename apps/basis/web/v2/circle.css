@@ -235,8 +235,16 @@
   .circle-settings__back,
   .circle-settings__title,
   .circle-settings__save,
+  .circle-settings__proposal,
   .circle-settings__note { column-span: all; }
 }
+/* an open proposal an admin answers here: what it changes, then take it over or turn it down */
+.circle-settings__proposal {
+  margin: 12px 0; padding: 10px 12px; border-left: 3px solid var(--accent);
+  background: var(--paper-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.circle-settings__proposal-text { margin: 0 0 8px; }
+.circle-settings__proposal button { margin-right: 8px; }
 
 /* ───────────────────── launcher (board 1) ───────────────────── */
 /* β.3 — per-kind sections; header style inherits from the global

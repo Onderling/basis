@@ -56,3 +56,15 @@ export function factsDiffer(a, b) {
 
 /** The stamp as the registry stores it — for the write seam that marks a change of the facts. */
 export function factsStamp(at) { return own(at); }
+
+/**
+ * The next stamp for a change made HERE: now, but never at or before the previous stamp — so a device whose clock lags
+ * a sibling's (whose newer stamp it landed) still gets its edit through instead of losing to that stamp until the
+ * clocks cross. (A clock far AHEAD still wins until it is passed: newest-wins by a wall clock, monotonic per profile.)
+ * @param {number|null} previousAt  the profile's stamp before this change
+ * @param {number} now
+ */
+export function nextFactsAt(previousAt, now) {
+  return Number.isFinite(previousAt) ? Math.max(now, previousAt + 1) : now;
+}
+

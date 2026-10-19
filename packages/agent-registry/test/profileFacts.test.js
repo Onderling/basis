@@ -4,7 +4,7 @@
  * records, circle memberships, owned nodes) are NOT facts: each rides its own lane, and a landing never touches them.
  */
 import { describe, it, expect } from 'vitest';
-import { profileFactsOf, withProfileFacts, FACTS_AT_KEY, isReservedPropertyKey } from '../index.js';
+import { profileFactsOf, withProfileFacts, FACTS_AT_KEY, isReservedPropertyKey, nextFactsAt } from '../index.js';
 import { DEVICE_DELEGATIONS_KEY } from '../src/deviceDelegations.js';
 import { CIRCLE_MEMBERSHIPS_KEY } from '../src/circleMembership.js';
 
@@ -36,3 +36,12 @@ describe('profile facts', () => {
     expect(isReservedPropertyKey(FACTS_AT_KEY)).toBe(true);
   });
 });
+
+describe('the stamp is monotonic', () => {
+  it('a device whose clock lags its sibling\'s still gets an edit through: the next stamp passes the previous one', () => {
+    expect(nextFactsAt(5000, 1000), 'clock behind the landed stamp').toBe(5001);
+    expect(nextFactsAt(1000, 5000), 'clock ahead: now').toBe(5000);
+    expect(nextFactsAt(null, 42), 'never stamped: now').toBe(42);
+  });
+});
+

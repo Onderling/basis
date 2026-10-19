@@ -77,7 +77,7 @@ export const calendarManifest = {
       ],
       surfaces: {
         // the person's own "+" (Vandaag): an own appointment — with no circle named it lands in the own agenda
-        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent',
+        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent', share: 'shareEvent',
           fields: [
             { name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' },
             { name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' },
@@ -229,7 +229,8 @@ export const calendarManifest = {
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id',   kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },
-        { name: 'with', kind: 'string', required: true },
+        // a contact, picked from the person's book (the pick offers the ones a pair circle connects)
+        { name: 'with', kind: 'string', required: true, pickerSource: { listOp: 'listContacts', appOrigin: 'pinboard' } },
       ],
       surfaces: {
         ui: { control: 'button', labelKey: 'circle.button.calendar.shareEvent', label: 'Share with…' },

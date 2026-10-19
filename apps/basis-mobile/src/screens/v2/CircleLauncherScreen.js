@@ -276,7 +276,7 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
 import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
@@ -733,6 +733,14 @@ export default function CircleLauncherScreen({
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
+  // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
+  const [plusShareList, setPlusShareList] = useState(null);
+  useEffect(() => {
+    if (!plusEdit?.act?.share) { setPlusShareList(null); return undefined; }
+    let live = true;
+    plusShareTargets(plusEdit.act, (app, op, args) => bundle?.callSkill?.(app, op, args)).then((list) => { if (live) setPlusShareList(list); }).catch(() => { if (live) setPlusShareList([]); });
+    return () => { live = false; };
+  }, [plusEdit, bundle]);
   const [screenViewBlocks, setScreenViewBlocks] = useState(null);
   // δ.1 — true while a fresh materialize runs after a cache-hit render.
   // Drives the subtle refresh pip in CircleScreenView.
@@ -1941,6 +1949,15 @@ export default function CircleLauncherScreen({
           // the free line: the shared reader over the sheet's own acts (never a circle)
           // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
           onRead={async (line) => plusRead(line) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') }}
+          shareTargets={plusShareList}
+          onShare={plusEdit ? async (actId, contact) => {
+            const op = plusShareOp(actId, { id: plusEdit.id, with: contact });
+            if (op.error) return t(op.error);
+            const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+            if (r?.ok === false) return r.error ?? t('circle.vandaag.plus_failed', { error: '' });
+            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
+            return null;
+          } : null}
           onRemove={plusEdit ? async (actId) => {
             const op = plusRemoveOp(actId, { id: plusEdit.id });
             if (op.error) return t(op.error);

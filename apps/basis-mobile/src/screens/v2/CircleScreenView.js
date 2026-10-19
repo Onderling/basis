@@ -120,10 +120,10 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'photo':        body = renderPhoto(block, styles); break;
     case 'noticeboard':  body = renderNoticeboard(block, styles); break;
     case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
-    case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
+    case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
-      if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles);
+      if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction);
       else if (block.content?.noun === 'calendar-event') body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction);
       else body = renderItems(block, styles, onAction);
       break;
@@ -279,6 +279,23 @@ function renderNoticeboard(block, styles) {
   );
 }
 
+// A row is a CARD with ONE button: the action its noun declares (`item.primary`, the shared `primaryActionFor`) — done
+// (an op through the waist), open the "+" sheet on it, or open its circle. Web twin: circleScreen.js `primaryButton`.
+function PrimaryButton({ item, noun, onAction, styles }) {
+  const p = item?.primary;
+  if (!p || typeof onAction !== 'function') return null;
+  const go = () => {
+    if (p.kind === 'op') onAction({ kind: 'row-op', op: { app: p.app, opId: p.opId, args: p.args } });
+    else if (p.kind === 'edit-own') onAction({ kind: 'edit-own', noun, item });
+    else if (p.kind === 'open-circle') onAction({ kind: 'open-circle', circleId: p.circleId });
+  };
+  return (
+    <Pressable style={styles.rowAct} onPress={go} accessibilityRole="button" testID={`row-act-${item.id}`}>
+      <Text style={styles.rowActText}>{t(p.labelKey)}</Text>
+    </Pressable>
+  );
+}
+
 // An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
 // a circle's row stays the circle's. Web twin: circleScreen.js `openableOwn`.
 const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, children, ...rest }, ref) {
@@ -313,6 +330,7 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
             style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
           >
             <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{ev.label ?? ''}</Text>
+            <PrimaryButton item={ev} noun="calendar-event" onAction={onAction} styles={styles} />
           </OwnRow>
         );
       })}
@@ -329,13 +347,14 @@ function renderItems(block, styles, onAction = null) {
       {items.map((it) => (
         <OwnRow key={it.id ?? Math.random().toString(36)} item={it} noun={block.content?.noun ?? null} onAction={onAction} style={styles.agendaRow}>
           <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>
+          <PrimaryButton item={it} noun={block.content?.noun ?? null} onAction={onAction} styles={styles} />
         </OwnRow>
       ))}
     </View>
   );
 }
 
-function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles) {
+function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles, onAction = null) {
   const items = block.content?.items ?? [];
   const isCompact = block.config?.compact === true;
   const rowStyle    = isCompact ? styles.taskRowCompact    : styles.taskRow;
@@ -381,6 +400,7 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
                 })}
               </View>
             )}
+            <PrimaryButton item={task} noun="task" onAction={onAction} styles={styles} />
           </View>
         );
       })}
@@ -451,12 +471,15 @@ const makeStyles = (theme) => StyleSheet.create({
   noticeText:          { fontSize: 14, color: theme.color.ink },
   noticeTextCompact:   { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
-  agendaRow:           { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  // a row is a CARD: the words, and ONE button (the action its noun declares)
+  agendaRow:           { paddingVertical: 8, paddingHorizontal: 10, marginVertical: 3, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, flexDirection: 'row', alignItems: 'center', gap: 8 },
   agendaRowCompact:    { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line },
-  agendaLabel:         { fontSize: 14, color: theme.color.ink },
+  agendaLabel:         { fontSize: 14, color: theme.color.ink, flex: 1 },
   agendaLabelCompact:  { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
-  taskRow:             { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  taskRow:             { paddingVertical: 8, paddingHorizontal: 10, marginVertical: 3, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  rowAct:              { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, marginLeft: 'auto' },
+  rowActText:          { fontSize: 13, color: theme.color.ink },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   taskCircle:          { fontSize: 10, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 },
   taskCircleCompact:   { fontSize: 9,  fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 },

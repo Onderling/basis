@@ -6448,11 +6448,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** An own appointment that was shared and just changed: its copies follow (a cancel goes as a cancel). */
     const reshareOwnEvent = async (ref) => {
       if (!ref) return;
-      let ev = await ownCalendarStore.get(String(ref)).catch(() => null);
-      if (!ev) {
-        const all = (await ownCalendarStore.listByType?.('calendar-event').catch(() => [])) ?? [];
-        ev = all.find((e) => String(e.title ?? '').toLowerCase() === String(ref).toLowerCase()) ?? null;
-      }
+      // by its id only: words could name another appointment with the same title, and re-share the wrong one
+      const ev = await ownCalendarStore.get(String(ref)).catch(() => null);
       for (const m of (Array.isArray(ev?.shared) ? ev.shared : [])) {
         if (typeof m?.pairCircleId === 'string') await writeSharedCopy(ev, m.pairCircleId);
       }

@@ -141,9 +141,9 @@ describe("a persona's person key at a revoke, with the persona on two devices", 
     expect(lost.agent.persona(w).personKey.version).toBe(v1);
     // Y — W's circle — folds the new version for W
     expect(await until(async () => ((await readRoster(phone, Y)).find((m) => m.webid === W.chatId.pubKey)?.personKey?.version === v1 + 1 ? true : null), { timeout: 20_000, step: 200 }), 'Y folded W\'s v2').toBe(true);
-    // and nothing was refused but the OLD key: the lost device's W person key (v1) is no longer one of ours live, so its
-    // words are refused; every other envelope — the later device's first words included — went through
-    const oldKey = lost.agent.persona(w).personIdentity.pubKey.slice(0, 12);
-    expect(refusals.filter((m) => !m.includes(`the key ${oldKey}`)), 'nothing refused but the lost device\'s old W key').toEqual([]);
+    // and nothing was refused but the LOST device: its old W person key (v1, no longer one of ours live) and its retired
+    // W address in Y are refused; every other envelope — the later device's first words included — went through
+    const lostKeys = [lost.agent.persona(w).personIdentity.pubKey, lost.agent.persona(w).circleAddressFor?.(Y) ?? lost.agent.circleAddressFor(Y)].map((k) => k.slice(0, 12));
+    expect(refusals.filter((m) => !lostKeys.some((k) => m.includes(`the key ${k}`))), "nothing refused but the lost device's keys").toEqual([]);
   }, 120_000);
 });

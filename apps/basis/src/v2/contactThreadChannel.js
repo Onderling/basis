@@ -310,8 +310,8 @@ export function createContactThreadChannel({
       if (cardOnBoard) cardSentTo.add(cardKey(peerAddr, self));   // it left (delivered or held): they have it
       // A resend of a turn already stored has already been fanned once; fanning it again would put a
       // second copy on every sibling's wire for nothing.
-      // a persona's contact is not the default's devices' business (no person-level lane on the wire)
-      if (!res?.deduped && !self) {
+      // the fan carries a persona's contact to THAT persona's devices only (the agent's fan is per self)
+      if (!res?.deduped) {
         await fanOwn({
           direction: 'out', contactId: threadId, peerAddr, replyTo,
           text: floored.text, messageId: id, ts: envelope.ts,

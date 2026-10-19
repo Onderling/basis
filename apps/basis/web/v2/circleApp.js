@@ -4628,7 +4628,7 @@ async function showMyData() {
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
   // same capability, and the manifest stops describing what the buttons do.
   const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
-    .catch((e) => globalThis.alert?.(e?.message ?? 'sign-in failed'));
+    .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
   // launch the existing backup/restore wizards in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);

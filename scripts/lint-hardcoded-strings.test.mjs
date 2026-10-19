@@ -60,4 +60,18 @@ describe('the guard itself', () => {
     const hits = findHardcoded(['x.js'], read("const a = 1;\nconst b = 2;\nel.title = 'Remove this member';"));
     expect(hits[0].line).toBe(3);
   });
+
+  it('goes RED on a dialog button labelled in code — the DIALOG sink (Alert.alert and kin)', () => {
+    const src = "Alert.alert(\n  t('circle.tile.menu.leave'),\n  t('x.y'),\n  [\n    { text: 'Cancel', style: 'cancel' },\n    { text: t('a.b'), style: 'destructive' },\n  ],\n);";
+    const hits = findHardcoded(['x.js'], read(src));
+    expect(hits.map((h) => h.text)).toEqual(['Cancel']);
+    expect(hits[0].line).toBe(5);
+  });
+
+  it('…and on the browser dialogs (prompt / confirm / alert) with a sentence, never on their t() form', () => {
+    expect(findHardcoded(['x.js'], read("const v = globalThis.prompt?.('Your name please');"))).toHaveLength(1);
+    expect(findHardcoded(['x.js'], read("if (window.confirm('Delete this circle?')) go();"))).toHaveLength(1);
+    expect(findHardcoded(['x.js'], read("const v = globalThis.prompt?.(t('circle.x.prompt'));"))).toHaveLength(0);
+    expect(findHardcoded(['x.js'], read("ToastAndroid.show(t('a.b'), ToastAndroid.SHORT);"))).toHaveLength(0);
+  });
 });

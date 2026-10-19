@@ -6156,6 +6156,10 @@
       "text": "Sign in to a pod",
       "doc": "S4 — start Solid sign-in so sealed circles store to your pod."
     },
+    "pod_sign_in_failed": {
+      "text": "Sign-in failed.",
+      "doc": "The pod sign-in did not complete (an alert after the sign-in button; the error, when there is one, is shown instead)."
+    },
     "pod_connecting": {
       "text": "Connecting…",
       "doc": "cluster J — pod sign-in in progress (v2 Me screen)."

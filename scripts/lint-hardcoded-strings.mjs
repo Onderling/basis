@@ -88,6 +88,52 @@ const JSX_PROP = /\b(?:placeholder|accessibilityLabel|accessibilityHint|title|la
 const LINES = /(?:\.push\(|^[ \t]*)(['"])((?:\\.|(?!\1)[^\\])*)\1\s*[,)]/gm;
 
 /**
+ * The DIALOG sink: a native or browser dialog a person reads and answers — `Alert.alert(title, message, buttons)`,
+ * `ToastAndroid.show(…)`, `prompt(…)` / `confirm(…)` / `alert(…)`. Its words sit anywhere in the call (a button's
+ * `{ text: 'Cancel' }` three lines down), so the whole balanced argument span is read, every literal in it judged by
+ * `isProse` (a `t('key')` key, a `style: 'cancel'` token pass). Added 2026-10-19 (Frits: every UI string from the
+ * locale files) — two mobile confirm dialogs shipped an English "Cancel" the JSX and DOM sinks never saw.
+ */
+const DIALOG_OPEN = /(?:\bAlert\.(?:alert|prompt)|\bToastAndroid\.show(?:WithGravity)?|(?:\b(?:globalThis|window)\??\.)?\b(?:prompt|confirm|alert)\??\.?)\(/g;
+const STRING_LIT = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+function dialogHits(src) {
+  const out = [];
+  DIALOG_OPEN.lastIndex = 0;
+  let m;
+  while ((m = DIALOG_OPEN.exec(src))) {
+    if (/[\w$.]$/.test(src.slice(Math.max(0, m.index - 1), m.index)) && !/^(?:Alert|ToastAndroid|globalThis|window)/.test(m[0])) continue;   // `foo.prompt(` / `myalert(` are not the dialog
+    // Walk the call's arguments. What a person reads is a literal AT THE CALL'S OWN LEVEL — an argument, an array
+    // element, an object value under `text`/`title`/`message` — never one inside a nested call (`t('key')`,
+    // `console.warn(…)`) or an arrow function's body (`onPress: () => { … }`), and never a comment.
+    let depth = 1; let i = m.index + m[0].length; let lastKey = null; let prev = '(';
+    const skipString = (k) => { const q = src[k]; let x = k + 1; while (x < src.length && src[x] !== q) { if (src[x] === '\\') x += 1; x += 1; } return x; };
+    const skipBlock = (k, open, close) => { let d = 0; for (let x = k; x < src.length; x += 1) { const c = src[x]; if (c === "'" || c === '"' || c === '`') { x = skipString(x); continue; } if (c === '/' && src[x + 1] === '/') { x = src.indexOf('\n', x); if (x < 0) return src.length; continue; } if (c === open) d += 1; else if (c === close) { d -= 1; if (d === 0) return x; } } return src.length; };
+    for (; i < src.length && depth > 0; i += 1) {
+      const c = src[i];
+      if (c === '/' && src[i + 1] === '/') { const e = src.indexOf('\n', i); i = e < 0 ? src.length : e; continue; }
+      if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? src.length : e + 1; continue; }
+      if (c === '=' && src[i + 1] === '>') {   // an arrow function's body is code, not the dialog's words
+        let k = i + 2; while (/\s/.test(src[k] ?? '')) k += 1;
+        if (src[k] === '{') { i = skipBlock(k, '{', '}'); }
+        else { let d = 0; for (; k < src.length; k += 1) { const ch = src[k]; if (ch === "'" || ch === '"' || ch === '`') { k = skipString(k); continue; } if (ch === '(' || ch === '[' || ch === '{') d += 1; else if (ch === ')' || ch === ']' || ch === '}') { if (d === 0) break; d -= 1; } else if (ch === ',' && d === 0) break; } i = k - 1; }
+        prev = ')'; continue;
+      }
+      if (c === "'" || c === '"' || c === '`') {
+        const end = skipString(i);
+        const keyed = prev === ':' ? lastKey : null;
+        if (depth === 1 && (prev !== ':' || /^(?:text|title|message)$/.test(keyed ?? ''))) out.push({ index: i, text: src.slice(i + 1, end) });
+        i = end; prev = 'str'; continue;
+      }
+      if (c === '(') { if (depth >= 1 && !/\s/.test(c)) { i = skipBlock(i, '(', ')'); prev = ')'; continue; } }
+      if (c === ')') { depth -= 1; continue; }
+      if (/[A-Za-z_$]/.test(c)) { let k = i; while (/[\w$]/.test(src[k] ?? '')) k += 1; lastKey = src.slice(i, k); i = k - 1; prev = 'id'; continue; }
+      if (!/\s/.test(c)) prev = c;
+    }
+  }
+  return out;
+}
+
+/**
  * A literal that is only ever thrown is a message to whoever is reading a stack trace, not to a person
  * using the app — the one place in this file where the SINK, not the string, decides. Kept narrow: it
  * looks just behind the match, so a sentence that happens to sit near a throw is still caught.
@@ -135,6 +181,11 @@ export function findHardcoded(files, read = (f) => readFileSync(f, 'utf8')) {
         if (re === LINES && isThrown(src, m.index)) continue;
         hits.push({ file, line: src.slice(0, m.index).split('\n').length, text });
       }
+    }
+    for (const d of dialogHits(src)) {
+      if (!isProse(d.text)) continue;
+      // a literal that is the KEY of a t() call inside the dialog is not prose (isProse already passes dotted keys)
+      hits.push({ file, line: src.slice(0, d.index).split('\n').length, text: d.text });
     }
   }
   return hits;

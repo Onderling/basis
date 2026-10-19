@@ -89,9 +89,13 @@ const chat = wireChat({
     attachmentPath,             // (itemId, attId, mime) → string
     readAttachmentBytesB64,     // ({dataSource, ref}) → base64
     maxBytesPerAttachment:      MAX_CHAT_BYTES_PER_ATT,
+    mayServe,                   // (item, requesterPubKey) → boolean: is the requester in the post's audience?
   },
 });
 ```
+
+Without `mayServe` the author answers no request (fail closed): knowing an item and
+attachment id is not enough to get the bytes.
 
 When `attachmentSupport` is absent, the attachment-related code
 paths silently no-op — the substrate's chat surface is unaffected.

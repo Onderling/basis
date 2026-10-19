@@ -19,7 +19,7 @@
 import { reminderLayerFromWords } from './reminderWords.js';
 import { addChildTo } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
-import { buildEvent, rsvpEvent, eventsInWindow } from '@onderling-app/calendar';
+import { buildEvent, retimeEvent, rsvpEvent, eventsInWindow } from '@onderling-app/calendar';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
 
@@ -137,6 +137,18 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       return event ? { ok: true, event } : missing(among);
+    },
+
+    /** A new title and/or moment for the appointment (the length stays; a day without a time is the whole day). */
+    updateEvent: async (args) => {
+      const circleId = circleOf(args);
+      const { event, among } = await eventOf(circleId, args?.id);
+      if (!event) return missing(among);
+      let next;
+      try { next = retimeEvent(event, { title: args?.title, when: args?.when }); }
+      catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+      await storeFor(circleId).put(next, { by: who(args) });
+      return { ok: true, title: next.title, startsAt: next.startsAt, message: t('circle.calendar.updated', { title: next.title, when: stamp(next) }) };
     },
 
     cancelEvent: async (args) => {

@@ -6365,7 +6365,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Agenda's children — not the per-agent in-memory CalendarStore below, which a person's node keeps.
     // A household bot's appointment is cancelled by the one who added it, or the admin — unless the admin keeps that
     // to themselves (`assistant.cancelPolicy`). The op's rule and the door's setting refuse in the one shape.
-    if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
+    if (appOrigin === 'calendar' && (opId === 'cancelEvent' || opId === 'updateEvent') && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
         && doorRoles.get(ctx.caller) !== 'admin'
         // under the `flat` roles preset, members and coordinators cancel anyone's appointment, as the admin does
         && !(rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY)) === 'flat' && ['member', 'coordinator'].includes(doorRoles.get(ctx.caller)))) {
@@ -6383,7 +6383,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // item in their own-devices store, under an own Agenda, served by the same ops as a circle's.
     // A composition with neither option (a test, a tool) is a person's node with an in-memory own store.
     const personNode = opts.personalCalendar || !opts.calendarInCircle;
-    if (appOrigin === 'calendar' && personNode && !args?.circleId) {
+    // …and the own calendar is the person's on THIS device only: a door's call never reaches it (it would have read,
+    // changed and cancelled the person's own appointments) — it falls to the circle's calendar below, as a door's note
+    // falls to the circle's notes
+    const calendarDoorCall = typeof ctx?.caller === 'string' && !!ctx.caller;
+    if (appOrigin === 'calendar' && personNode && !args?.circleId && !calendarDoorCall) {
       ownCalendarReady ??= (async () => {
         ownCalendarStore = await getOwnStore();
         const tr = agentT;
@@ -6405,7 +6409,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const res = await handler(args ?? {});
       // where it was saved, as every write's reply says it: on this device, no peer to wait for (the own store
       // reaches the person's other devices, never a circle's members) — the renderer's "saved locally"
-      const writes = ['addEvent', 'cancelEvent', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative'];
+      const writes = ['addEvent', 'updateEvent', 'cancelEvent', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative'];
       return res?.ok && writes.includes(opId) && !res._sync ? { ...res, _sync: { style: 'decentralized', peers: [], pending: [], unreachable: [] } } : res;
     }
     // A person's node (`opts.personalCalendar`, web and mobile): a call naming a circle reads and writes that circle's

@@ -224,6 +224,21 @@ export class CalendarStore {
   }
 
   /**
+   * Change an event's title and/or moment (`retimeEvent`).
+   *
+   * @param {{eventId: string, title?: string, when?: string}} args
+   * @returns {Promise<CalendarEvent>}
+   */
+  async update({ eventId, title, when }) {
+    const event = await this.getById(eventId);
+    if (!event) throw new Error(`CalendarStore.update: no event with id "${eventId}"`);
+    const next = retimeEvent(event, { title, when });
+    await this.#write(next);
+    await this.#refreshIcsFeed();
+    return next;
+  }
+
+  /**
    * Search events by title / location substring.  Case-insensitive.
    *
    * @param {string} query
@@ -336,6 +351,36 @@ export class CalendarStore {
  * @param {{actorDefault?: string}} [o]
  * @returns {object} the event
  */
+/**
+ * An event CHANGED: a new title and/or a new moment. The moment is read the way `buildEvent` reads it (a day without a
+ * time is the whole day); a timed event keeps its LENGTH (an hour stays an hour). Returns the next event, or throws on
+ * an empty title / an unreadable moment.
+ * @param {object} event
+ * @param {{title?: string, when?: string}} change
+ */
+export function retimeEvent(event, { title, when } = {}) {
+  const next = { ...event };
+  if (title !== undefined) {
+    const t = String(title ?? '').trim();
+    if (!t) throw new Error('CalendarStore.updateEvent: title cannot be empty');
+    next.title = t;
+  }
+  if (when !== undefined && when !== null && when !== '') {
+    let startsAt = parseDateInput(when);
+    if (!startsAt) throw new Error('CalendarStore.updateEvent: when must be a moment (ISO-8601 or a day)');
+    const allDay = !hasTimeOfDay(when);
+    if (allDay) {
+      const d = new Date(startsAt); d.setHours(0, 0, 0, 0); startsAt = d.toISOString();
+      const e = new Date(startsAt); e.setDate(e.getDate() + 1);
+      next.startsAt = startsAt; next.endsAt = e.toISOString();
+    } else {
+      const length = Math.max(0, new Date(event.endsAt).getTime() - new Date(event.startsAt).getTime()) || 3_600_000;
+      next.startsAt = startsAt; next.endsAt = new Date(new Date(startsAt).getTime() + length).toISOString();
+    }
+  }
+  return next;
+}
+
 export function buildEvent(args = {}, { actorDefault = 'webid:local-demo-user' } = {}) {
     const title = String(args.title ?? '').trim();
     if (!title) throw new Error('CalendarStore.addEvent: title required');

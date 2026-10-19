@@ -713,6 +713,10 @@
     "brief": {
       "text": "{{count}} afspraken in de komende 24 uur",
       "doc": "The morning brief's calendar slot: how many appointments in the next 24 hours."
+    },
+    "updated": {
+      "text": "Afspraak '{{title}}' is nu {{when}}.",
+      "doc": "The reply when an appointment is changed: its title and its (new) moment."
     }
   },
   "embed": {
@@ -8345,6 +8349,10 @@
       "cancelEvent": {
         "text": "Afspraak afzeggen",
         "doc": "Row-action button for calendar:cancelEvent, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "updateEvent": {
+        "text": "Wijzigen",
+        "doc": "Row-action button for calendar:updateEvent: change an appointment (its title and/or moment)."
       }
     },
     "agents": {

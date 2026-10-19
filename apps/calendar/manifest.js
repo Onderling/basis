@@ -196,6 +196,23 @@ export const calendarManifest = {
         chat: { hint: 'cancel an event (organiser only)' },
       },
     },
+    {
+      id:    'updateEvent',
+      verb:  'edit',
+      writes: { scope: 'circle' },
+      // a person's words and moment, like an entry's edited text: the newer change wins
+      resolves: [{ field: 'title', policy: 'content' }, { field: 'startsAt', policy: 'content' }],
+      appliesTo: { type: 'calendar-event', state: ['open'] },
+      params: [
+        { name: 'id', kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },
+        { name: 'title', kind: 'string', required: false },
+        { name: 'when',  kind: 'date',   required: false },
+      ],
+      surfaces: {
+        ui:   { control: 'button', labelKey: 'circle.button.calendar.updateEvent', label: 'Change' },
+        chat: { hint: 'change an appointment: a new title and/or a new moment (the length stays)' },
+      },
+    },
 
     /* ──── Snapshot + search ──── */
     /**

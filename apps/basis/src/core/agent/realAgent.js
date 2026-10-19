@@ -256,7 +256,8 @@ import { buildHouseholdDataSource }        from '../../../../household/src/stora
 import { householdManifest }               from '../../../../household/manifest.js';
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
-import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
+import { mergeManifests }                  from '../../manifestMerge.js';
+import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
@@ -269,7 +270,7 @@ import { calendarManifest }                from '../../../../calendar/manifest.j
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
 import { botDoorChecks } from '../../v2/botRungs.js';
-import { opDeclared } from '../../v2/manifestSources.js';                                            // the bot door's checks, declared once
+import { opDeclared, allManifests } from '../../v2/manifestSources.js';                                            // the bot door's checks, declared once
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
@@ -543,7 +544,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   householdDataSource = opts.householdPersistDb
     ? await buildHouseholdDataSource(opts.householdPersistDb, { strategy: contentSeal })
     : undefined;
+  // THE EXTENSIONS this node runs with: their nouns join the stores' registry (checked: under their origin, no shadow,
+  // their words their own); their free atoms run over the same circle stores. Refused ones bring nothing.
+  const storeRegistry = householdApp.householdRegistry();
+  const { installed: installedExtensions } = composeExtensions(opts.extensions, { registry: storeRegistry, firstParty: allManifests() });
   householdService = householdApp.createHouseholdService({
+    registry: storeRegistry,
     dataSource: householdDataSource,
     dataSourceFor: (id) => circleMedia.get(id) ?? null,
     // what a write is made for, when a planned row made it (`opts.writeOrigin`: the host's runner's ambient origin)
@@ -5700,6 +5706,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (ownCap && !(householdManifest.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)) {
           return { ok: false, code: 'unimplemented', atom: g.atom, noun: g.noun };
         }
+        // a write IN a circle rides its signed lane: wire the circle's publish valve first, as every op in a circle does
+        // (without it the write stayed on this device unless another op had happened to open the circle)
+        if (!ownCap && capCtx.circleId) await ensureCircleSync(capCtx.circleId);
         const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.
@@ -5736,6 +5745,18 @@ export async function createRealHouseholdAgent(opts = {}) {
           }
         }
         return done;
+      }
+      // An INSTALLED extension's noun: its free atoms over the circle's one store, read from its own declaration (the
+      // noun is under its origin, checked at compose). A circle's only — a person's own scope takes no extension type yet.
+      const ext = installedExtensions.get(g?.app);
+      if (ext && householdService && g.noun.startsWith(`${g.app}.`) && (ext.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)) {
+        if (args?.circleId === OWN_DEVICES_SCOPE || (typeof args?.circleId === 'string' && args.circleId.startsWith(`${OWN_DEVICES_SCOPE}:`))) {
+          return { ok: false, code: 'extension-not-in-own-scope', error: 'extension-not-in-own-scope' };
+        }
+        const capCtx = { circleId: resolveCircleId(args), by: actorOf(ctx) ?? chatId?.pubKey };
+        await ensureCircleSync(capCtx.circleId);   // its writes ride the circle's signed lane like any other type's
+        try { return await householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx, { manifest: ext }); }
+        catch (err) { return { ok: false, error: String(err?.message ?? err) }; }
       }
       // An app with no generic handler → a structured error, mirroring how callSkill
       // surfaces skill errors (never throw for this boundary case).

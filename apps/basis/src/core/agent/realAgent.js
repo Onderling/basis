@@ -309,6 +309,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The agent's own words go through the shell's translator — resolved ONCE here (every shell hands `opts.t`; a bare
   // composition without one gets the keys, never English).
   const agentT = typeof opts.t === 'function' ? opts.t : (k) => k;
+  /**
+   * The translator for ONE call: the language the call carries (`ctx.lang` — a door hands the person's `/taal`), else the
+   * bot's own. Per call, never a shared "current language": two people's turns may be in flight at once.
+   */
+  const translatorFor = (lang) => (typeof lang === 'string' && lang && typeof opts.t === 'function' ? (k, p) => opts.t(k, p, lang) : agentT);
+  /** One op table per language (built on first use), so an app's own replies are worded in the call's language. */
+  const perLang = (cache, lang, build) => {
+    const key = typeof lang === 'string' && lang ? lang : '';
+    if (!cache.has(key)) cache.set(key, build(translatorFor(key || null)));
+    return cache.get(key);
+  };
   /** The user's address-fallback setting, read LIVE (the host hands a getter) — every send asks, and so
    *  does the re-drive of messages that were held under the previous answer. */
   const addressFallbackOn = () => (typeof opts.allowAddressFallback === 'function'
@@ -5274,15 +5285,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   // that paints nothing — the box — offered `listLists` to its model and answered `unknown appOrigin "lists"`
   // (seen on the tablet, 2026-09-28). The circle a call means when it names none is the one household ops mean
   // here too (`resolveCircleId`), so a list and a shopping item made through the same door land in the same store.
-  let defaultLists = null;
-  const defaultLocalApp = (appOrigin) => {
+  const defaultListsByLang = new Map();
+  const defaultLocalApp = (appOrigin, lang = null) => {
     if (appOrigin !== 'lists') return null;
-    return (defaultLists ??= {
+    return perLang(defaultListsByLang, lang, (tLang) => ({
       manifest: listsManifest,
       ops: makeListsOps({
         storeFor: (circleId) => householdService.stores.getStore(circleId),
-        // No localisation on a bare agent: a key IS the message (the basis default table's rule).
-        t: agentT,
+        // No localisation on a bare agent: a key IS the message (the basis default table's rule); a call's language wins.
+        t: tLang,
         activeCircle: () => resolveCircleId({}),
         localActor: 'me',
         // a household bot: a chore ticked by its words is the chore's own `completeTask`, as the person (the gate)
@@ -5293,7 +5304,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           days: passedDaysFrom(paramsService.register.valueOf(PASSED_DAYS_KEY)),
         }) } : {}),
       }),
-    });
+    }));
   };
   const basisOps = () => mountedBasisOps ?? (defaultBasisOps ??= createLocalBuiltins({
     catalogue: mergeManifests([{ manifest: basisManifest }]),
@@ -5331,10 +5342,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   const doorRoles = new Map();   // callerId → the role the door gave them (setDoorCaller)
 
-  let circleCalendar = null;   // the bot's calendar over the circle store, made on first use
+  const circleCalendarByLang = new Map();   // the calendar over a circle's store, one per call language, made on first use
   // A person's OWN appointments (of no circle): the same ops over their own-devices store, under an own Agenda — made
   // on first use (the shell hands the store; on web and mobile it is durable, so they come back after a restart).
-  let ownCalendar = null;
+  const ownCalendarByLang = new Map();   // the own calendar's ops, one per call language
   let ownCalendarStore = null;
   let ownCalendarReady = null;
   let circleTasks = null;      // the bot's chores over the circle store, made on first use
@@ -5413,9 +5424,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * see names ("ramen — Ann"), else only that it is taken; an open chore says nobody has it yet. The ids stay off the
    * entry the person (and their model) reads.
    */
-  async function withChoreHolders(items, caller, inCircle = null) {
+  async function withChoreHolders(items, caller, inCircle = null, tr = agentT) {
     if (!items.some((i) => Array.isArray(i?.holders))) return items;
-    const tr = agentT;
     const nameOf = await readerNamer(caller, inCircle);
     return items.map((i) => {
       if (!Array.isArray(i?.holders)) return i;
@@ -5464,7 +5474,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * the chore's who is read. `{ok, ids}` — no ids for "iedereen"/"everyone" — or the refusal a person reads.
    */
   async function peopleNamed(words, ctx) {
-    const tr = agentT;
+    const tr = translatorFor(ctx?.lang);
     const caller = actorOf(ctx);
     const parts = String(words ?? '').split(/\s*(?:,|&|\ben\b|\band\b)\s*/i).map((w) => w.trim()).filter(Boolean);
     const EVERYONE = /^(iedereen|allemaal|alle(n)?|everyone|everybody|all)$/i;
@@ -5492,7 +5502,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * every member's under the flat roles): the add's rule of who may name whom is not asked again.
    */
   async function choreHolderFor(assignee, ctx, { mayGive = true } = {}) {
-    const tr = agentT;
+    const tr = translatorFor(ctx?.lang);
     const caller = actorOf(ctx);
     // in a circle: its roster is who may be named, and assigning follows the standard role table (no household setting)
     const inCircle = doorCircleOf(ctx);
@@ -5525,7 +5535,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * one (`makeChore`). A who or a when said on a line that is not a chore yet makes it one, in place: the same item.
    */
   async function addChoreFor(args, ctx, opId = 'addToList') {
-    const tr = agentT;
+    const tr = translatorFor(ctx?.lang);
     const { assignee, due, ...rest } = args;
     const caller = actorOf(ctx);
     let who = null;
@@ -5573,6 +5583,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   /** The reads a door's person sees people in: the chores' open and own reads, and the agenda. */
   const READER_READS = new Set(['tasks.listOpen', 'tasks.listMine', 'calendar.listEvents']);
   const callSkill = async (appOrigin, opId, args, ctx = {}) => {
+    // this call's words: the language it carries (a door's `/taal`), else the bot's own
+    const tr = translatorFor(ctx?.lang);
     // A local call made AS one of this device's selves (the kernel's `actAs`, at the waist): only a self this device runs,
     // and never with a door's person (a door names who acts itself). What it makes carries that self as its maker.
     // THIS is the check that binds: the kernel's invoke `actAs` refuses only a call that would leave the process — it does
@@ -5602,7 +5614,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       const reader = actorOf(ctx);
       const inCircle = doorCircleOf(ctx);
       const p = personIn(await peopleBook(reader, inCircle), who, reader);
-      const tr = agentT;
       if (!p.ok && p.reason === 'names-hidden') return { ok: false, error: tr('circle.tasks.names_hidden_read'), refusal: refuse('door-settings', 'setting:names') };
       if (!p.ok) return { ok: false, error: tr('circle.tasks.no_such_person', { name: who.trim() }) };
       if (p.self || !p.id) args = rest;
@@ -5656,7 +5667,6 @@ export async function createRealHouseholdAgent(opts = {}) {
           : (opId === 'completeTask' && who ? open.filter((it) => heldBy(it).includes(who)) : null);
         const first = narrow ? matchEntry(narrow, args.id, words) : null;
         const { entry: task, among } = (first?.entry || first?.among?.length) ? first : matchEntry(open, args.id, words);
-        const tr = agentT;
         // `code: 'not-found'` when the words name nothing (a rule that may fall back to the model reads it); two that
         // match ask which, and that is an answer
         if (!task) return among.length ? { ok: false, error: tr('circle.lists.which_one', { options: choicesOf(among, words) }) } : { ok: false, code: 'not-found', error: tr('circle.tasks.no_such_task', { item: args.id }) };
@@ -5723,12 +5733,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           let item = items.find((i) => i.id === ref) ?? null;
           if (!item && ref) {
             const { entry, among } = matchEntry(items, ref, wordsOf);
-            if (!entry && among?.length) return { ok: false, error: agentT('circle.lists.which_one', { options: choicesOf(among, wordsOf) }) };
+            if (!entry && among?.length) return { ok: false, error: tr('circle.lists.which_one', { options: choicesOf(among, wordsOf) }) };
             item = entry ?? null;
           }
-          if (!item) return { ok: false, code: 'not-found', error: agentT('circle.notes.not_there', { item: ref ? ` (${ref})` : '' }) };
+          if (!item) return { ok: false, code: 'not-found', error: tr('circle.notes.not_there', { item: ref ? ` (${ref})` : '' }) };
           if (g.atom !== 'get' && item.createdBy !== capCtx.by && doorRoles.get(actorOf(ctx)) !== 'admin') {
-            return { ok: false, code: 'forbidden', error: agentT('circle.notes.not_yours', { text: wordsOf(item) }) };
+            return { ok: false, code: 'forbidden', error: tr('circle.notes.not_yours', { text: wordsOf(item) }) };
           }
           args = { ...(args ?? {}), id: item.id, _words: wordsOf(item) };
         }
@@ -5738,12 +5748,12 @@ export async function createRealHouseholdAgent(opts = {}) {
           const inner = done?.result ?? done;
           const words = (i) => String(i?.body ?? i?.text ?? i?.title ?? '');
           // the generic answer stays whole (`via`, `atom`, `result`); the words ride beside it
-          if (g.atom === 'add') return { ...done, itemId: inner?.item?.id ?? null, entry: words(inner?.item), message: agentT('circle.notes.added', { text: words(inner?.item) }) };
-          if (g.atom === 'remove') return { ...done, entry: args?._words ?? '', message: agentT('circle.notes.removed', { text: args?._words ?? '' }) };
+          if (g.atom === 'add') return { ...done, itemId: inner?.item?.id ?? null, entry: words(inner?.item), message: tr('circle.notes.added', { text: words(inner?.item) }) };
+          if (g.atom === 'remove') return { ...done, entry: args?._words ?? '', message: tr('circle.notes.removed', { text: args?._words ?? '' }) };
           if (g.atom === 'list') {
             const items = (inner?.items ?? []).filter((i) => i && i.type === g.noun && words(i).trim());
             // each row keeps its moments and its maker, so a view across circles can order it and say whose it is
-            return { ...done, title: agentT('circle.notes.title'), items: items.map((i) => ({ id: i.id, label: words(i), text: words(i), type: g.noun,
+            return { ...done, title: tr('circle.notes.title'), items: items.map((i) => ({ id: i.id, label: words(i), text: words(i), type: g.noun,
               ...(i.createdAt ? { createdAt: i.createdAt } : {}), ...(i.updatedAt ? { updatedAt: i.updatedAt } : {}), ...(i.createdBy ? { createdBy: i.createdBy } : {}) })) };
           }
         }
@@ -5866,10 +5876,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         await ensureCircleSync(circleId);
         const parts = await chatAgent.invoke(householdAgent.address, opId, [DataPart({ ...(args ?? {}), circleId })]);
         const data  = Array.isArray(parts) ? parts[0]?.data : null;
-        return adaptWiredHouseholdReply(opId, data, args);
+        return adaptWiredHouseholdReply(opId, data, args, tr);
       }
       // /brief contributor — derived from the wired store (the dissolved app has no briefSummary core).
-      if (opId === 'household_briefSummary') return householdBriefSummary(circleId);
+      if (opId === 'household_briefSummary') return householdBriefSummary(circleId, tr);
       // Everything else on the 'household' app-origin (calendar_* passthrough, addMember, getChoreSnapshot,
       // resolveContact, help, registerName) is a hostAgent skill — route it there unchanged.
       const parts = [DataPart(args ?? {})];
@@ -5884,7 +5894,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         const list = await callSkill('tasks', 'listMine', args?.actor ? { actor: args.actor } : {});
         const items = (list?.items ?? []).filter((t) => t.state === 'open');
         if (items.length === 0) return { ok: true };   // empty → /brief skips
-        const tr = agentT;
         return {
           items:   items.map((t) => ({ id: t.id, label: t.text ?? t.title })),
           message: tr('circle.tasks.brief', { count: items.length }),
@@ -5913,7 +5922,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }));
         await ensureCircleSync(resolveCircleId(args ?? {}));
         const data = await ops[opId](args ?? {});
-        return adaptTasksReply(opId, data, { actor: args?.actor ?? null, named: namedTask, givenTo, args: args ?? {} });
+        return adaptTasksReply(opId, data, { actor: args?.actor ?? null, named: namedTask, givenTo, args: args ?? {}, tr });
       }
       const realOpId = TASKS_OP_ALIAS[opId] ?? opId;
       // Per-op arg normalisation between the chat-shell vocabulary
@@ -5963,7 +5972,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'archiveCircle' && realArgs.confirm !== true) {
         // two-step confirm.
-        const tr = agentT;
         return { ok: false, error: tr('circle.tasks.state.archive_confirm') };
       }
       if (realOpId === 'suggestSchedule' && realArgs['lookahead-days']) {
@@ -6021,14 +6029,12 @@ export async function createRealHouseholdAgent(opts = {}) {
               ? globalThis.atob(padded) : padded;
             realArgs = { ...realArgs, invite: JSON.parse(json) };
           } catch (err) {
-            const tr = agentT;
             return { ok: false, error: tr('circle.tasks.invite.bad_url', { error: err.message ?? String(err) }) };
           }
         } else if (inv.startsWith('{')) {
           try {
             realArgs = { ...realArgs, invite: JSON.parse(inv) };
           } catch (err) {
-            const tr = agentT;
             return { ok: false, error: tr('circle.tasks.invite.bad_json', { error: err.message ?? String(err) }) };
           }
         }
@@ -6076,7 +6082,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         const list = await callSkill('pinboard', 'listFeed', {});
         const items = list?.items ?? [];
         if (items.length === 0) return { ok: true };   // empty → /brief skips
-        const tr = agentT;
         return {
           items:   items.slice(0, 3).map((p) => ({ id: p.id, label: p.text ?? p.label })),
           message: tr('circle.noticeboard.brief', { count: items.length }),
@@ -6257,7 +6262,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
         // style two-step confirm. Short-circuit before invoke.
-        const tr = agentT;
         return { ok: false, error: tr('circle.groups.leave_confirm') };
       }
       // Synthesize a `/groups` op locally — there's no listMyGroups
@@ -6269,7 +6273,6 @@ export async function createRealHouseholdAgent(opts = {}) {
           [DataPart({ groupId: opts.pinboardGroup ?? 'cc-default-circle' })],
         );
         const members = membersResult?.[0]?.data?.members ?? [];
-        const tr = agentT;
         return {
           title:       tr('circle.groups.current_title'),
           groupId:     opts.pinboardGroup ?? 'cc-default-circle',
@@ -6297,7 +6300,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         rawReply = reply;
         // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the pinboard
         // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
-        return adaptPinboardReply(opId, reply, realArgs);
+        return adaptPinboardReply(opId, reply, realArgs, tr);
       };
       // The three roster reads share one answer per circle for a short window (every lane asks at boot,
       // the verifier per statement — see rosterReadCache.js); any other pinboard op may have changed a
@@ -6393,7 +6396,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         && doorRoles.get(ctx.caller) !== 'admin'
         // under the `flat` roles preset, members and coordinators cancel anyone's appointment, as the admin does
         && !(rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY)) === 'flat' && ['member', 'coordinator'].includes(doorRoles.get(ctx.caller)))) {
-      const tr = agentT;
       // (in a circle the standard rule only: the one who added it, or the circle's admin — no household setting)
       if (!doorCircleOf(ctx) && cancelPolicyFrom(paramsService.register.valueOf(CANCEL_KEY)) === 'admin') {
         return { ok: false, error: tr('circle.calendar.cancel_admin_only'), refusal: refuse('door-settings', 'setting:cancel') };
@@ -6404,10 +6406,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
     }
     /** The calendar over a circle's store (the pair circle's here), made once. */
-    const circleCalendarOps = () => (circleCalendar ??= makeCircleCalendarOps({
+    const circleCalendarOps = () => perLang(circleCalendarByLang, ctx?.lang, (tLang) => makeCircleCalendarOps({
       storeFor: (circleId) => householdService.stores.getStore(circleId),
       activeCircle: () => resolveCircleId({}),
-      t: agentT,
+      t: tLang,
       localActor: 'me',
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */
@@ -6429,21 +6431,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     const shareOwnEvent = async (a) => {
       await ownCalendarReady;
       const ev = await ownCalendarStore.get(String(a?.id ?? '')).catch(() => null);
-      if (!ev || ev.type !== 'calendar-event') return { ok: false, code: 'not-found', error: agentT('circle.calendar.no_event') };
+      if (!ev || ev.type !== 'calendar-event') return { ok: false, code: 'not-found', error: tr('circle.calendar.no_event') };
       const contacts = (await callSkill('pinboard', 'listContacts', {}).catch(() => null))?.contacts ?? [];
       const row = contacts.find((c) => c?.webid === a?.with || c?.pubKey === a?.with);
-      if (!row) return { ok: false, code: 'no-contact', error: agentT('circle.calendar.share_no_contact') };
+      if (!row) return { ok: false, code: 'no-contact', error: tr('circle.calendar.share_no_contact') };
       // the self this contact knows (the persona it is filed under), never the general self by default
       const persona = personaOfContact(row) ?? DEFAULT_PERSONA;
       const selfWebid = personas.get(persona)?.chatId?.pubKey ?? (persona === DEFAULT_PERSONA ? chatId?.pubKey : null);
-      if (!selfWebid) return { ok: false, code: 'no-self', error: agentT('circle.calendar.share_no_contact') };
+      if (!selfWebid) return { ok: false, code: 'no-self', error: tr('circle.calendar.share_no_contact') };
       const pairCircleId = pairCircleIdFor(selfWebid, row.webid ?? row.pubKey);
       const mine = ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
-      if (!mine.includes(pairCircleId)) return { ok: false, code: 'no-pair-circle', error: agentT('circle.calendar.share_no_pair', { name: row.displayName ?? row.handle ?? '' }) };
+      if (!mine.includes(pairCircleId)) return { ok: false, code: 'no-pair-circle', error: tr('circle.calendar.share_no_pair', { name: row.displayName ?? row.handle ?? '' }) };
       const w = await writeSharedCopy(ev, pairCircleId);
       if (w?.ok === false) return w;
       await ownCalendarStore.put(withSharedMark(ev, pairCircleId, w.copyId), { by: 'me' });
-      return { ok: true, itemId: ev.id, copyId: w.copyId, message: agentT('circle.calendar.shared_with', { title: ev.title ?? '', name: row.displayName ?? row.handle ?? '' }) };
+      return { ok: true, itemId: ev.id, copyId: w.copyId, message: tr('circle.calendar.shared_with', { title: ev.title ?? '', name: row.displayName ?? row.handle ?? '' }) };
     };
     /** An own appointment that was shared and just changed: its copies follow (a cancel goes as a cancel). */
     const reshareOwnEvent = async (ref) => {
@@ -6466,7 +6468,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (appOrigin === 'calendar' && personNode && (!args?.circleId || args.circleId === OWN_DEVICES_SCOPE) && !calendarDoorCall) {
       ownCalendarReady ??= (async () => {
         ownCalendarStore = await getOwnStore();
-        const tr = agentT;
         const lists = makeCircleLists({ storeFor: () => ownCalendarStore, manifests: [calendarManifest] });
         const containers = await lists.listContainers(OWN_DEVICES_SCOPE);
         if (!containers.some((c) => c.defaultChild === 'calendar-event')) {
@@ -6474,10 +6475,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
       })();
       await ownCalendarReady;
-      const ops = (ownCalendar ??= makeCircleCalendarOps({
+      const ops = perLang(ownCalendarByLang, ctx?.lang, (tLang) => makeCircleCalendarOps({
         storeFor: () => ownCalendarStore,
         activeCircle: () => OWN_DEVICES_SCOPE,
-        t: agentT,
+        t: tLang,
         localActor: 'me',
       }));
       // SHARED WITH A CONTACT: a minimal copy in the pair circle of the self the contact is filed under, carried by its
@@ -6524,7 +6525,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (opId === 'viewAgent') {
         // A miss surfaces as a soft failure (message, not a false record).
-        const tr = agentT;
         return data?.agent ?? { ok: false, error: tr('circle.op.no_agent', { agent: String(args?.agentId ?? '') }) };
       }
       return data;
@@ -6559,7 +6559,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     // A local app a shell mounted (see `mountAppOps`), else its default table (lists). Same contract as the `basis` branch above: the
     // app's own manifest gates which ops exist, an absent handler is a structured refusal, never a throw.
-    const local = mountedLocalApps.get(appOrigin) ?? defaultLocalApp(appOrigin);
+    const local = mountedLocalApps.get(appOrigin) ?? defaultLocalApp(appOrigin, ctx?.lang);
     if (local) {
       if (!local.manifest?.operations?.some((o) => o.id === opId)) {
         return { ok: false, error: 'unknown-op', app: appOrigin, op: opId };
@@ -6583,7 +6583,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const result = await handler(args ?? {}, doorPerson ? { ...ctxClean, person: doorPerson, personRole } : ctxClean);
       // A door's read of a chores list says who holds each chore — as far as the names setting lets the asker see names
       if (appOrigin === 'lists' && opId === 'listEntries' && typeof ctx?.caller === 'string' && ctx.caller && Array.isArray(result?.items)) {
-        return { ...result, items: await withChoreHolders(result.items, actorOf(ctx), doorCircleOf(ctx)) };
+        return { ...result, items: await withChoreHolders(result.items, actorOf(ctx), doorCircleOf(ctx), tr) };
       }
       // …and a door's read of what was done — or of what is in the trash — says who did it the same way: `{you}` ·
       // `{name}` · `{someone}`, never an id (the field is dropped for any other caller)
@@ -6609,7 +6609,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // round-trip through the existing chat-shell renderer exactly as before.
 
   /** Adapt a wired household-core reply (list OR mutation) to the chat-shell shape. */
-  function adaptWiredHouseholdReply(opId, data, args) {
+  function adaptWiredHouseholdReply(opId, data, args, tr = agentT) {
     if (opId === 'listOpen' || opId === 'listTasks') {
       const items = Array.isArray(data?.items) ? data.items : [];
       // v0.6 — annotate every-other row with a synthetic `_lastSync` so the per-row
@@ -6628,11 +6628,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         _sync: simulateSync(),
       };
     }
-    return adaptWiredHouseholdAction(opId, data, args);
+    return adaptWiredHouseholdAction(opId, data, args, tr);
   }
 
   /** Adapt a wired mutation-core reply → `{ ok, message, text, itemId, _sync }` (or `{ ok:false, error }`). */
-  function adaptWiredHouseholdAction(opId, data, args) {
+  function adaptWiredHouseholdAction(opId, data, args, tr = agentT) {
     const publish = (itemId, message) => {
       if (!itemId) return;
       publishEvent({
@@ -6648,7 +6648,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // not a false "✓".  On MORE THAN ONE open match the core returns `{ambiguous:[…]}` and acts on none
     // — reproduce the legacy chat-shell disambiguation prompt (identical text/shape) so the user picks by
     // id-prefix rather than the tool silently completing the wrong item.
-    const tr = agentT;
     if (opId === 'markComplete' || opId === 'removeItem' || opId === 'claim' || opId === 'reassign') {
       const match = String(args?.match ?? '');
       if (Array.isArray(data?.ambiguous)) {
@@ -6682,13 +6681,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /** /brief contributor — derive household's slot from the wired store's open items. */
-  async function householdBriefSummary(circleId) {
+  async function householdBriefSummary(circleId, tr = agentT) {
     let open = [];
     try { open = await householdApp.listOpen(householdService.stores.getStore(circleId), {}); }
     catch { open = []; }
     if (!open.length) return { ok: true };   // empty → /brief skips the section
     const items = open.slice(0, 5).map((it) => ({ id: it.id, label: it.text }));
-    const tr = agentT;
     return { items, message: tr('circle.household.brief', { count: open.length }) };
   }
 
@@ -6710,10 +6708,9 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   /** The chore actions whose bare `{ok}` the door words itself (see `adaptTasksReply`). */
   const WORDED_BY_DOOR = Object.freeze({ reassignTask: 'reassigned', removeTask: 'removed', editTask: 'edited' });
-  function adaptTasksReply(opId, data, { actor = null, named = null, givenTo = null, args = {} } = {}) {
+  function adaptTasksReply(opId, data, { actor = null, named = null, givenTo = null, args = {}, tr = agentT } = {}) {
     if (data == null) return null;
-    // In the person's words: every shell hands the agent its translator.
-    const tr = agentT;
+    // In the person's words: every shell hands the agent its translator; a call's language (a door's `/taal`) wins.
     // (B8) — DAG hard-dep blocking surface. Real skill returns
     // {error: 'has-open-dependencies', openDeps: [...]} when the user
     // tries to complete a task whose subtasks aren't done.  Translate
@@ -7203,10 +7200,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    *   getMyProfile    → {title, handle, displayName, circle, ...}
    *   setPeerReveal   → {ok, message, peer, action}
    */
-  function adaptPinboardReply(opId, data, args) {
+  function adaptPinboardReply(opId, data, args, tr = agentT) {
     if (data == null) return null;
-    // In the person's words: every shell hands the agent its translator.
-    const tr = agentT;
     if (data.ok === false || data.error)  {
       // Pass through error envelopes; basis dispatch handles them.
       return data.ok === false ? data : { ok: false, error: data.error };

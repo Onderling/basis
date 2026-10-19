@@ -97,7 +97,7 @@ import {
 // of them — the grants lane's fan, pointed at conversation instead of authority.
 import { makeContactTurnFan, makeContactTurnPeerHandler, CONTACT_TURN_BROADCAST } from '../../v2/contactTurnFan.js';
 import { makeSiblingCarry } from '../../v2/siblingCarry.js';
-import { createPersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
+import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../../v2/personKeySync.js';
 import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
@@ -2192,7 +2192,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   primaryDeviceRef.current = primaryDevice;
   await primaryDevice.load();
-  const personKeySync = createPersonKeySync({
+  const primaryKeySync = createPersonKeySync({
     siblings: ownDeviceSiblings,
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
     current: () => persona.personKey,
@@ -2205,6 +2205,46 @@ export async function createRealHouseholdAgent(opts = {}) {
     // My own commitment per circle, from the root's PUBLIC key every device of mine holds — no roster read.
     ownCommitmentFor: (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null),
     onLanded: ({ version }) => console.info(`[person-key] version ${version} arrived from one of my devices`),
+    onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
+  });
+  // EVERY OTHER SELF THIS DEVICE HOLDS has its own person key, siblings and commitment — and its own hand-over, made
+  // on first need (a persona can be created in this session). Its key lands in ITS vault and becomes ITS identity; a
+  // carry for it is admitted only under its own root (the router binds the subject by that, never by the claim).
+  const personaKeySyncs = new Map();   // personaId → its sync
+  const personaKeySyncFor = (pid, rt) => {
+    if (personaKeySyncs.has(pid)) return personaKeySyncs.get(pid);
+    if (!rt?.chatId?.pubKey || !rt.vault) return null;
+    const sync = createPersonKeySync({
+      siblings: () => personaSiblings(pid),
+      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+      current: () => rt.personKey ?? null,
+      store: async (k) => {
+        const landed = await storePersonKey(rt.vault, k);
+        if (landed) {
+          const now = (await loadPersonKey(rt.vault)) ?? k;   // the merged entry: chain + older seeds
+          const old = rt.personIdentity?.pubKey ?? null;
+          rt.personKey = now;
+          rt.personIdentity = await AgentIdentity.fromSeed(now.seed, new VaultMemory());
+          if (old && old !== rt.personIdentity.pubKey) { try { secureAgentRef.current?.forgetSelfIdentity?.(old); } catch { /* best-effort */ } }
+          await registerPersonaIdentities(pid, rt);
+        }
+        return landed;
+      },
+      selfPubKey: rt.chatId.pubKey,
+      ownCommitmentFor: (circleId) => (rt.authorityPubKeyB64 ? ceremonyCommitment(rt.authorityPubKeyB64, circleId) : null),
+      onLanded: ({ version }) => console.info(`[person-key] a persona's version ${version} arrived from one of its devices`),
+      onRefused: (reason, from) => console.warn(`[person-key] refused a persona's hand-over from ${String(from).slice(0, 12)}… (${reason})`),
+    });
+    personaKeySyncs.set(pid, sync);
+    return sync;
+  };
+  const personKeySync = routePersonKeySync({
+    instanceFor: (subject) => {
+      if (subject === chatId.pubKey) return primaryKeySync;
+      for (const [pid, rt] of personas) if (pid !== primaryId && rt?.chatId?.pubKey === subject) return personaKeySyncFor(pid, rt);
+      return null;
+    },
+    all: () => [primaryKeySync, ...[...personas].filter(([pid]) => pid !== primaryId).map(([pid, rt]) => personaKeySyncFor(pid, rt)).filter(Boolean)],
     onRefused: (reason, from) => console.warn(`[person-key] refused a hand-over from ${String(from).slice(0, 12)}… (${reason})`),
   });
   /** My chain, for a contact's pull: the current key and the links that vouch for it from any earlier version. */
@@ -3076,7 +3116,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           }
         }
         // The hand-over to the survivors — the revoked device's addresses excluded by derivation (see above).
-        await personKeySync.carryCurrent({ exclude: [...circleIds].map((cid) => deriveCircleAddress(revokedSeed, cid)) });
+        await primaryKeySync.carryCurrent({ exclude: [...circleIds].map((cid) => deriveCircleAddress(revokedSeed, cid)) });
       } catch (err) { console.warn(`[ceremony] the person key did not rotate: ${err?.message ?? err}`); }
       const revokedIn = await retireAddresses({ root, circleIds: [...circleIds], addressFor: (cid) => deriveCircleAddress(revokedSeed, cid) });
       // EVERY PERSONA THE DEVICE HELD loses it too. Each persona knows the device by its own wire id (its seed over the

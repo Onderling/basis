@@ -123,8 +123,12 @@ export async function run({ relayUrl }) {
     check('a bystander cannot accept an answer on someone else\'s question', refused(byStranger),
       JSON.stringify(byStranger)?.slice(0, 140));
 
+    // Only someone who ANSWERED can be accepted: the poster's chat door records the responder from the answer's verified
+    // sender (`recordResponse`, over the circle's roster). This pinboard-only journey boots neither a chat door nor a
+    // circle roster, so here no answer is recorded and an accept is refused — the recorded-then-accepted path is pinned
+    // in apps/pinboard/test/responseCarrier.test.js.
     const accepted = await call(anne, 'acceptResponder', { requestId: askId, responderWebid: BRAM }, ANNE);
-    check('the asker can accept the answer (the control)', !refused(accepted),
+    check('the asker cannot accept someone whose answer was never recorded', accepted?.error === 'not-a-responder',
       JSON.stringify(accepted)?.slice(0, 140));
 
     // ── 4. OFFERINGS — what a person says they can do: persona drivers (`agents:setProfileDriver`, kind 'offering'),

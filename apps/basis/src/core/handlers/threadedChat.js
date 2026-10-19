@@ -25,7 +25,7 @@
  *   notePeer(fromAddr)
  *     — make the replier a contact row (the graph otherwise only learns peers at send time).
  */
-export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, logger = console } = {}) {
+export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, noteAnswer, logger = console } = {}) {
   if (typeof deliverToThread !== 'function') throw new Error('makeHandleThreadedChat: deliverToThread required');
 
   return function handleThreadedChat(fromAddr, payload) {
@@ -50,6 +50,11 @@ export function makeHandleThreadedChat({ deliverToThread, notePeer, identityOf, 
       });
     } catch (err) {
       logger.warn?.('[peer] threaded chat delivery failed', err?.message ?? err);
+    }
+    // A turn threaded under a request is an ANSWER to it: the agent records who answered (from the sender address
+    // this door was handed, never the body) — on a request of this device's only, decided there.
+    if (typeof payload.threadId === 'string' && payload.threadId && typeof noteAnswer === 'function') {
+      Promise.resolve().then(() => noteAnswer(fromAddr, payload.threadId)).catch(() => { /* the answer still landed in the thread */ });
     }
   };
 }

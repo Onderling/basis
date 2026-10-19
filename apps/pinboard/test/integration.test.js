@@ -145,7 +145,7 @@ describe('H5 — acceptResponder flow', () => {
 
   it('marks the request fulfilled with the chosen responder', async () => {
     const [req] = await bundle.itemStore.addItems(
-      [{ type: 'request', text: 'help' }],
+      [{ type: 'request', text: 'help', source: { responders: [BOB] } }],   // Bob answered (recordResponse)
       { actor: ALICE },
     );
     const r = await callSkill(bundle.agent, 'acceptResponder',
@@ -156,7 +156,7 @@ describe('H5 — acceptResponder flow', () => {
 
   it('returns already-fulfilled if the request was already taken', async () => {
     const [req] = await bundle.itemStore.addItems(
-      [{ type: 'request', text: 'help' }],
+      [{ type: 'request', text: 'help', source: { responders: [BOB, CARL] } }],
       { actor: ALICE },
     );
     await callSkill(bundle.agent, 'acceptResponder',
@@ -208,7 +208,7 @@ describe('H5 — itemStore events (fan-out)', () => {
     bundle.itemStore.on('item-removed',   ({ id }) => events.push(['removed', id]));
 
     const [req] = await bundle.itemStore.addItems(
-      [{ type: 'request', text: 'help' }],
+      [{ type: 'request', text: 'help', source: { responders: [BOB] } }],
       { actor: ALICE },
     );
     await callSkill(bundle.agent, 'acceptResponder',

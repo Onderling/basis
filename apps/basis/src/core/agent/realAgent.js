@@ -8238,6 +8238,17 @@ export async function createRealHouseholdAgent(opts = {}) {
       try { return sa.resolver?.pubKeyForAddr?.(address) || address; }
       catch { return address; }
     },
+    /**
+     * An answer to a request arrived (a DM threaded under the request's id): `fromAddr` is the envelope's VERIFIED
+     * sender, as the transport handed it to the shell. Pinboard records who answered on this device's copy — the
+     * webid the circle's roster binds that address to, and only on a request this device posted. Every shell's chat
+     * door calls it; best-effort (an answer to anything else is dropped there and logged).
+     */
+    noteAnswer: async (fromAddr, requestId) => {
+      if (typeof fromAddr !== 'string' || !fromAddr || typeof requestId !== 'string' || !requestId) return { recorded: false, reason: 'no-ids' };
+      try { return (await rawPinboard('recordResponse', { requestId, senderAddress: fromAddr })) ?? { recorded: false }; }
+      catch { return { recorded: false, reason: 'unavailable' }; }
+    },
     // Decision 1 step 3 — feed the roster authorize. Called from `bindCircleAddressKeysFor`, i.e.
     // from the same read of the same rows that binds each member's address to their key: the two
     // facts are one fact, and reading them twice is how the two drift. Returns how many distinct

@@ -691,6 +691,7 @@ if (relayUrl) {
         deliverToThread: ({ contactId, fromAddr, text, messageId, ts, replyTo }) =>
           landTurn({ fromAddr: contactId ?? fromAddr, text, messageId, ts, replyTo }),
         identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
+        noteAnswer: (addr, requestId) => agent.noteAnswer?.(addr, requestId),
       }),
     },
     // TESTING ONLY (`ONDERLING_WALK_SHAPES=1`, an environment variable, off in every release config): the frame's key

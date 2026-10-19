@@ -101,6 +101,7 @@ import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../..
 import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
+import { createProfileFactsSync, routeProfileFactsBySender } from '../../v2/profileFactsSync.js';
 import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPeersSync.js';
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
@@ -173,6 +174,7 @@ import {
   ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf,
   isRequestable,
   effectiveProperties,
+  profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt, FACTS_AT_KEY,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -1303,6 +1305,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The READ side of the circle-membership registry, exposed OUT of the block below (where agentsRegistry
   // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
   // degraded/bare registry simply re-opens nothing rather than throwing at boot.
+  // the profile-facts carry (below): which profiles are landing a sibling's facts right now (written, not re-told), and
+  // the hook the registry's write seam calls when a profile's facts changed here (late-bound: the carry is built later)
+  const factsLanding = new Set();
+  let profileFactsChanged = null;
   let readSelfCircleMemberships = async () => ({});
   let readAllSelvesCircleMemberships = async () => ({});
   // Siblings follow a circle (composed below, once the sibling set is known): the registry setter — the one seam
@@ -1356,6 +1362,23 @@ export async function createRealHouseholdAgent(opts = {}) {
         opts: { capabilities: ['basis'], name: opts.agentsSelfName ?? 'basis (this device)' },
       }))
       ?? createAgentRegistry({ pseudoPod: registryPseudoPod, deviceId: chatId.pubKey });
+
+    // THE FACTS' WRITE SEAM: every writer of a profile's curated properties or disclosure ends in `register` (the
+    // property, driver, disclosure and Nearby ops, a persona's creation…). A change of the FACTS is stamped here
+    // (`factsAt`) and told to the devices holding that self (`profileFactsSync`), so a person's devices keep them the
+    // same without a pod. A landing from a sibling writes through the same seam, unstamped and untold.
+    {
+      const rawRegister = agentsRegistry.register.bind(agentsRegistry);
+      agentsRegistry.register = async (entry) => {
+        if (!entry?.agentId || factsLanding.has(entry.agentId)) return rawRegister(entry);
+        let before = null;
+        try { before = await agentsRegistry.lookup(entry.agentId); } catch { before = null; }
+        if (!factsDiffer(before ?? {}, entry)) return rawRegister(entry);
+        const out = await rawRegister({ ...entry, properties: { ...(entry.properties ?? {}), [FACTS_AT_KEY]: factsStamp(nextFactsAt(profileFactsOf(before ?? {}).factsAt, Date.now())) } });
+        try { profileFactsChanged?.(entry.agentId); } catch { /* the siblings ask on connect */ }
+        return out;
+      };
+    }
 
     // Expose the default profile's circle-membership map outward (see the outer `let`): the restore-and-open
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
@@ -2579,6 +2602,34 @@ export async function createRealHouseholdAgent(opts = {}) {
     forContact: (c) => { const pid = selfOfContactRow(c); return pid ? (personas.has(pid) ? personaKnownPeers(pid) : null) : generalKnownPeers; },
     onRefused: (reason, from) => console.warn(`[known-peers] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
   });
+  // A PROFILE'S FACTS, between the devices holding that self (profileFactsSync.js): per self, its siblings, sent as it.
+  const profileFactsSyncs = new Map();
+  const profileFactsFor = (pid) => {
+    if (!pid || !personas.has(pid)) return null;
+    if (profileFactsSyncs.has(pid)) return profileFactsSyncs.get(pid);
+    const general = pid === 'default';
+    const s = createProfileFactsSync({
+      siblings: general ? ownDeviceSiblings : () => personaSiblings(pid),
+      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, general ? null : pid),
+      current: async () => { const e = await agentsRegistryRef?.lookup?.(pid); return e ? profileFactsOf(e) : null; },
+      store: async (facts) => {
+        const cur = await agentsRegistryRef?.lookup?.(pid);
+        if (!cur) return false;
+        factsLanding.add(pid);
+        try { await agentsRegistryRef.register(withProfileFacts(cur, facts)); } finally { factsLanding.delete(pid); }
+        return true;
+      },
+      onRefused: (reason, from) => console.warn(`[profile-facts] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
+    });
+    profileFactsSyncs.set(pid, s);
+    return s;
+  };
+  const profileFactsSync = routeProfileFactsBySender({
+    all: () => [...personas.keys()].map(profileFactsFor).filter(Boolean),
+    forSelf: profileFactsFor,
+    onRefused: (reason, from) => console.warn(`[profile-facts] refused ${String(from).slice(0, 12)}… (${reason})`),
+  });
+  profileFactsChanged = (pid) => { profileFactsSync.fanFor(pid).catch(() => {}); };
   // THE CIRCLES THIS DEVICE IS IN, each as the entry a sibling joins from — the enrol offer's circle shape
   // (`{id, handle, address, relays}`, the address THIS device's per-circle one). Built once, for the add-a-device
   // offer and for the follow carry alike: the registry's records first, then whatever the substrate holds
@@ -8211,6 +8262,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shells spread `handlers` into the router and kick `requestFromSiblings` on connect; the
     // announce landing calls `pushTo` for a device of mine that just appeared.
     knownPeersSync,
+    // a profile's facts (properties + disclosure) kept the same on the devices holding that self, without a pod
+    profileFactsSync,
     // Siblings follow a circle: the lane table spreads `handlers`; the shells `setConsume(entry => consumeCircleEntry(deps, entry))`
     // beside their enrol consume and kick `requestFromSiblings` on connect; the registry setter fans a new membership.
     circleFollowSync,

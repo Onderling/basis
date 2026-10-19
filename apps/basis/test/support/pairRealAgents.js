@@ -444,6 +444,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     ...(agent.knownPeersSync?.handlers ?? {}),
     ...(agent.personKeyChain?.handlers ?? {}),
     ...(agent.personKeySync?.handlers ?? {}),
+    ...(agent.profileFactsSync?.handlers ?? {}),
     ...(agent.primaryDevice?.handlers ?? {}),
     // Siblings follow a circle — the join AND the leave (2026-09-21/22), the same entries the lane table spreads.
     ...(agent.circleFollowSync?.handlers ?? {}),

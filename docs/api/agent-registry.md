@@ -1707,6 +1707,83 @@ pendingRevokesOf(entry)
 
 Every revoke still owed, as `[{node, key}]`.
 
+## `src/profileFacts.js`
+
+### `FACTS_AT_KEY`
+
+**Kind:** constant · **Import:** `FACTS_AT_KEY` from `'@onderling/agent-registry'`
+
+When a profile's facts last changed (ms, as an own property) — the registry's own key, refused by the person-facing ops.
+
+### `profileFactsOf`
+
+**Kind:** function · **Import:** `profileFactsOf` from `'@onderling/agent-registry'`
+
+```js
+profileFactsOf(entry)
+```
+
+The facts of a registry entry.
+
+**Parameters**
+
+- `entry` `object`
+
+**Returns:** `{ properties: object, disclosure: object, factsAt: number|null }`
+
+### `withProfileFacts`
+
+**Kind:** function · **Import:** `withProfileFacts` from `'@onderling/agent-registry'`
+
+```js
+withProfileFacts(entry, facts)
+```
+
+The entry with `facts` landed: its curated properties and disclosure replaced by the facts', its machine keys kept,
+stamped with the facts' time. A machine key inside `facts` is ignored.
+
+**Parameters**
+
+- `entry` `object`
+- `facts` `{ properties?: object, disclosure?: object, factsAt: number }`
+
+### `factsDiffer`
+
+**Kind:** function · **Import:** `factsDiffer` from `'@onderling/agent-registry'`
+
+```js
+factsDiffer(a, b)
+```
+
+Do two entries hold different facts (the stamp left out)?
+
+### `factsStamp`
+
+**Kind:** function · **Import:** `factsStamp` from `'@onderling/agent-registry'`
+
+```js
+factsStamp(at)
+```
+
+The stamp as the registry stores it — for the write seam that marks a change of the facts.
+
+### `nextFactsAt`
+
+**Kind:** function · **Import:** `nextFactsAt` from `'@onderling/agent-registry'`
+
+```js
+nextFactsAt(previousAt, now)
+```
+
+The next stamp for a change made HERE: now, but never at or before the previous stamp — so a device whose clock lags
+a sibling's (whose newer stamp it landed) still gets its edit through instead of losing to that stamp until the
+clocks cross. (A clock far AHEAD still wins until it is passed: newest-wins by a wall clock, monotonic per profile.)
+
+**Parameters**
+
+- `previousAt` `number|null` — the profile's stamp before this change
+- `now` `number`
+
 ## `src/profileProperties.js`
 
 ### `own`

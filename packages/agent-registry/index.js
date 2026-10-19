@@ -131,3 +131,4 @@ export { createCommunityCatalogue, communityCatalogueUri } from './src/community
 export { createCommunitySubscriptions } from './src/subscriptions.js';
 export { OFFERINGS_INHERIT_KEY } from './src/profileProperties.js';
 export { RESERVED_PROPERTY_KEYS, RESERVED_PROPERTY_PREFIXES, PERSON_SETTABLE_KEYS, isReservedPropertyKey } from './src/reservedProperties.js';
+export { FACTS_AT_KEY, profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt } from './src/profileFacts.js';

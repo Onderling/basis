@@ -810,6 +810,7 @@ if (relayUrl) {
     for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
   });
   kick(agent.personKeySync, 'person-key', 2500);
+  kick(agent.profileFactsSync, 'profile-facts', 2500);
   // the person's own store: what a sibling wrote while this box was off
   kick(agent.ownStoreSync, 'own-store', 2500);
   // Which device is the primary contact address — a claim made on a phone reaches this box by the carry, and

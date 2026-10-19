@@ -24,7 +24,9 @@
  *   - no fan-out: the ask is bounded (15 s), never retried, one in flight per (node, id) — a second identical request
  *     waits for the first and shares its answer, one with another key waits for it and then asks for itself — at most
  *     two in flight per node (a third waits for a place), and a ceiling on all serves in flight together;
- *   - not a way to poke any connected address: anyone who can GET can name any node, a phone included. A node that
+ *   - not a way to poke any connected address: anyone who can GET can name any node, a phone included — so the seat
+ *     asks ONLY a node that said itself, on its own register frame (`serves: ['feed']`, on the socket that proved its
+ *     key), that it serves links; any other node is the one miss, never a hello (`isPresent` in `server.js`). A node that
  *     REFUSES (it has no `feed.serve`, its gate denies, it answers something that is no answer) is not asked again for
  *     a minute — no hello, the miss at the floor — and concurrent asks to one node share one hello. A companion's own
  *     miss (`{ok: false}`: a wrong key, no file) is an answer, not a refusal, and is never held against it; neither is

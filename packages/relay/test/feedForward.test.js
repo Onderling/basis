@@ -22,9 +22,10 @@ const ICS = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:x\r\nSUMMARY:
 const NOBODY = 'B'.repeat(43);
 
 /** A node holding one file: `feed.serve` answers `{ok, ics}` for the right id + key and one miss otherwise. */
-async function node(relayUrl, { id, k }) {
+async function node(relayUrl, { id, k, announce = true }) {
   const identity = await AgentIdentity.generate(new VaultMemory());
-  const agent = new Agent({ identity, transport: new RelayTransport({ relayUrl, identity }), label: 'node' });
+  // a companion says ITSELF, on its own register frame, that it serves links
+  const agent = new Agent({ identity, transport: new RelayTransport({ relayUrl, identity, ...(announce ? { serves: ['feed'] } : {}) }), label: 'node' });
   const asked = [];
   agent.register('feed.serve', async ({ parts }) => {
     const a = Parts.data(parts) ?? {};
@@ -135,17 +136,28 @@ async function bystander(relayUrl) {
 }
 
 describe('the forward cannot be turned on a node that is no companion', () => {
-  it('ten concurrent GETs for a phone: one hello; another GET inside the minute: none', async () => {
+  it('ten concurrent GETs for a phone (it never opted in): no hello at all, the one miss', async () => {
     const relay = await startRelay({ port: 0, host: '127.0.0.1', log: false, feeds: { missFloorMs: 0 } });
     cleanups.push(() => relay.stop());
     const base = `http://127.0.0.1:${relay.port}`;
     const phone = await bystander(`ws://127.0.0.1:${relay.port}`);
     const storm = await Promise.all(Array.from({ length: 10 }, () => get(base, `/feed/${phone.address}/${randomKey()}.${randomKey()}.ics`)));
     expect(storm.every((r) => r.status === 404 && r.body === FEED_MISS_BODY)).toBe(true);
-    expect(phone.hellos.n, 'one hello for ten asks').toBe(1);
+    expect(phone.hellos.n, 'a node that never said it serves links is never helloed').toBe(0);
     const again = await get(base, `/feed/${phone.address}/${randomKey()}.${randomKey()}.ics`);
     expect(again.status).toBe(404);
-    expect(phone.hellos.n, 'refused once: not asked again inside the minute').toBe(1);
+    expect(phone.hellos.n).toBe(0);
+  }, 30_000);
+
+  it('a node with feed.serve that did not ANNOUNCE it is never asked: the one miss', async () => {
+    const relay = await startRelay({ port: 0, host: '127.0.0.1', log: false, feeds: { missFloorMs: 0 } });
+    cleanups.push(() => relay.stop());
+    const base = `http://127.0.0.1:${relay.port}`;
+    const id = randomKey(); const k = randomKey();
+    const quiet = await node(`ws://127.0.0.1:${relay.port}`, { id, k, announce: false });
+    const r = await get(base, `/feed/${quiet.address}/${id}.${k}.ics`);
+    expect(r.status).toBe(404);
+    expect(quiet.asked).toEqual([]);
   }, 30_000);
 
   it('a companion\'s miss (a wrong key) is not a refusal: the right link still opens at once', async () => {

@@ -23,7 +23,7 @@ function book() {
 }
 const links = (b) => createIdentityLinks({
   signOffer: async ({ botAddress }) => ME.offer('phone', botAddress),
-  selfRoot: () => ME.root,
+  selfRoots: () => [ME.root],
   callSkill: b.callSkill,
   now: () => 1234,
 });
@@ -44,7 +44,7 @@ describe('the app\'s side of the identity link', () => {
 
   it('a device that cannot sign makes no offer, and says so', async () => {
     const b = book();
-    const l = createIdentityLinks({ signOffer: async () => null, selfRoot: () => ME.root, callSkill: b.callSkill });
+    const l = createIdentityLinks({ signOffer: async () => null, selfRoots: () => [ME.root], callSkill: b.callSkill });
     expect(await l.view(LINK).offer()).toEqual({ ok: false, reason: 'no-device-key' });
     // …and waits for nobody
     expect(await l.received('BOT', statement())).toBe(false);

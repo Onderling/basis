@@ -101,7 +101,7 @@ import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../..
 import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
-import { createKnownPeersSync } from '../../v2/knownPeersSync.js';
+import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPeersSync.js';
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
 import { createCircleFollowSync } from '../../v2/circleFollowSync.js';
@@ -2090,10 +2090,26 @@ export async function createRealHouseholdAgent(opts = {}) {
   // shell hands to `createContactThreadChannel`, so every turn in either direction is offered to the
   // person's other devices at the one place all of them pass. `contactTurnHandler(applyTurn)` is the
   // receive half: the shell says what to do with a landed turn, this side says who may send one.
-  const contactTurnFan = makeContactTurnFan({
-    siblings: ownDeviceSiblings,
-    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-  });
+  // …PER SELF: a turn with a contact filed under a persona goes to THAT persona's devices only, as it — never the general
+  // persona's (an incoming turn from a persona's contact reached them before); the general persona's as it always did.
+  const turnFans = new Map();   // personaId (or '' for the general persona) → its fan
+  const turnFanFor = (pid) => {
+    const key = pid ?? '';
+    if (!turnFans.has(key)) {
+      turnFans.set(key, makeContactTurnFan({
+        siblings: pid ? () => personaSiblings(pid) : ownDeviceSiblings,
+        sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, pid ?? null),
+      }));
+    }
+    return turnFans.get(key);
+  };
+  const contactRowFor = async (contactId) => (await rawContacts()).find((c) => c?.webid === contactId || c?.id === contactId) ?? null;
+  const contactTurnFan = async (turn) => {
+    const pid = selfOfContactRow(await contactRowFor(turn?.contactId));
+    // a persona this device does not run has no devices of it to tell from here
+    if (pid && !personas.has(pid)) return { attempted: 0, outcomes: [] };
+    return turnFanFor(pid)(turn);
+  };
   // THE ONE SIBLING CARRY (L100): my other devices as a standing peer of every circle lane. The chat and task
   // emitters hand it every statement this device WRITES (after the member fan); the lane table hands it every
   // statement that LANDS here from a member. Same sibling set, same send, as the two fans above.
@@ -2348,12 +2364,37 @@ export async function createRealHouseholdAgent(opts = {}) {
       return content;
     },
   };
-  const contactTurnHandler = (applyTurn, onRefused = null) => makeContactTurnPeerHandler({
-    siblings: ownDeviceSiblings,
-    selfPubKey: chatId.pubKey,
-    applyTurn,
-    onRefused,
-  });
+  // The receive half, per self: the sender's sibling set says WHOSE device fanned it, and the turn lands only in a contact
+  // filed under that same self — a persona's sibling naming another self's contact, or a contact not here, is refused
+  // (a fanned turn never creates a contact: the row comes by the known-peers lane).
+  const contactTurnHandler = (applyTurn, onRefused = null) => {
+    const refuse = (reason, from) => { try { onRefused?.(reason, from); } catch { /* observability never throws */ } };
+    const landAs = (pid) => async (wire, ctx) => {
+      const row = await contactRowFor(wire?.contactId);
+      // the general persona's turns land as they always did (the thread is the general persona's book); one naming a
+      // contact filed under a persona is another self's — refused
+      if (!pid) {
+        if (row && selfOfContactRow(row)) { refuse('another-self', ctx?.fromAddr); return; }
+        return applyTurn(wire, ctx);
+      }
+      // a persona's turn lands only in a contact filed under that persona — never conjured, never another self's
+      if (!row) { refuse('no-such-contact', ctx?.fromAddr); return; }
+      if (selfOfContactRow(row) !== pid) { refuse('another-self', ctx?.fromAddr); return; }
+      return applyTurn(wire, ctx);
+    };
+    const handlerFor = (pid) => makeContactTurnPeerHandler({
+      siblings: pid ? () => personaSiblings(pid) : ownDeviceSiblings,
+      selfPubKey: pid ? (personas.get(pid)?.chatId?.pubKey ?? chatId.pubKey) : chatId.pubKey,
+      applyTurn: landAs(pid), onRefused,
+    });
+    return async (fromAddr, payload) => {
+      if (((await ownDeviceSiblings().catch(() => [])) ?? []).includes(fromAddr)) return handlerFor(null)(fromAddr, payload);
+      for (const pid of [...personas.keys()].filter((p) => p !== primaryId && p !== 'default')) {
+        if (((await personaSiblings(pid).catch(() => [])) ?? []).includes(fromAddr)) return handlerFor(pid)(fromAddr, payload);
+      }
+      refuse('not-a-sibling', fromAddr);
+    };
+  };
   // WHO I KNOW, on every device of mine: the security layer's bindings and the contact book ride the
   // same sibling set. A greeting binds a key on the ONE device it landed on, and a card scanned on the
   // phone is a contact on the phone — this carries both to the person's other devices, live, to a
@@ -2472,29 +2513,59 @@ export async function createRealHouseholdAgent(opts = {}) {
     // taken out again.
     return sayOnRosters({ circleIds: circles, props: { handle: me.handle, displayName: me.displayName } });
   }
-  const knownPeersSync = createKnownPeersSync({
-    siblings: ownDeviceSiblings,
-    selfPubKey: chatId.pubKey,
-    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-    snapshot: async () => ({
-      peers: sa.agent.security?.peerBindings?.() ?? [],
-      contacts: await rawContacts(),
-    }),
-    learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
-    contacts: {
-      has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
-      add: (contact) => rawPinboard('addContact', contact),
-      get: async (webid) => (await rawContacts()).find((c) => c?.webid === webid) ?? null,
-      // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-      setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
-      // …and a newer change of what the contact sees of the person (L125), by the same rule
-      setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawPinboard('setContactPersona', {
-        webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
-      }),
-      // …and a newer identity link to a household bot (or its undoing), by the same rule
-      setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
-    },
-    onLanded: () => savePeerBindings(),
+  // WHOSE CONTACT A ROW IS: the self it is filed under (`persona` on the row; none or the general persona's id = the
+  // general persona). A self's book — its rows and the key bindings of their addresses — rides only that self's lane.
+  const selfOfContactRow = (c) => (typeof c?.persona === 'string' && c.persona && c.persona !== primaryId && c.persona !== 'default' ? c.persona : null);
+  const knownPeersSyncs = new Map();   // personaId → that persona's sync
+  const makeKnownPeersSync = (pid) => {
+    const rt = pid ? personas.get(pid) : null;
+    if (pid && !rt?.chatId?.pubKey) return null;
+    const mine = (c) => (selfOfContactRow(c) ?? null) === (pid ?? null);
+    const book = async () => (await rawContacts()).filter(mine);
+    return createKnownPeersSync({
+      siblings: pid ? () => personaSiblings(pid) : ownDeviceSiblings,
+      selfPubKey: pid ? rt.chatId.pubKey : chatId.pubKey,
+      // reached in a circle of THIS self's, as it (a persona's book never travels through the general persona's circles)
+      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, pid ?? null),
+      snapshot: async () => {
+        const all = await rawContacts();
+        const ownBook = all.filter(mine);
+        const others = new Set(all.filter((c) => !mine(c)).map((c) => c?.webid).filter(Boolean));
+        const bindings = sa.agent.security?.peerBindings?.() ?? [];
+        // a self's book carries its own contacts' bindings; the general persona's also every binding no other self's
+        // contact owns (greetings of strangers, siblings) — never a persona's contacts' keys
+        const ownAddrs = new Set(ownBook.map((c) => c?.webid).filter(Boolean));
+        const peers = pid ? bindings.filter((b) => ownAddrs.has(b?.address)) : bindings.filter((b) => !others.has(b?.address));
+        return { peers, contacts: ownBook };
+      },
+      learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
+      contacts: {
+        has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
+        // a landed row is filed under THIS self (the sibling set it came from says whose it is), whatever the row says
+        add: (contact) => rawPinboard('addContact', { ...contact, persona: pid ?? undefined }),
+        get: async (webid) => (await book()).find((c) => c?.webid === webid) ?? null,
+        // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
+        setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
+        // …and a newer change of what the contact sees of the person (L125), by the same rule
+        setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawPinboard('setContactPersona', {
+          webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
+        }),
+        // …and a newer identity link to a household bot (or its undoing), by the same rule
+        setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
+      },
+      onLanded: () => savePeerBindings(),
+    });
+  };
+  const personaKnownPeers = (pid) => {
+    if (!knownPeersSyncs.has(pid)) { const s = makeKnownPeersSync(pid); if (s) knownPeersSyncs.set(pid, s); }
+    return knownPeersSyncs.get(pid) ?? null;
+  };
+  const generalKnownPeers = makeKnownPeersSync(null);
+  const knownPeersSync = routeKnownPeersBySender({
+    general: generalKnownPeers,
+    others: () => [...personas.keys()].filter((pid) => pid !== primaryId && pid !== 'default').map(personaKnownPeers).filter(Boolean),
+    forContact: (c) => { const pid = selfOfContactRow(c); return pid ? (personas.has(pid) ? personaKnownPeers(pid) : null) : generalKnownPeers; },
+    onRefused: (reason, from) => console.warn(`[known-peers] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
   });
   // THE CIRCLES THIS DEVICE IS IN, each as the entry a sibling joins from — the enrol offer's circle shape
   // (`{id, handle, address, relays}`, the address THIS device's per-circle one). Built once, for the add-a-device

@@ -88,3 +88,22 @@ test('the free line fills the sheet; an own row opens it on itself to change or 
   await expect(page.locator('.circle-screen__agenda-row').filter({ hasText: 'kapper Jan' }), 'taken away').toHaveCount(0, { timeout: 20_000 });
   expect(errs).toEqual([]);
 });
+
+test('a Vandaag row is a card with ONE button — the action its noun declares', async ({ page }) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.circle-vandaag__plus').click();
+  await page.locator('.circle-vandaag-plus__line').fill('notitie: fietsband plakken');
+  await page.locator('.circle-vandaag-plus__line').press('Enter');
+  await page.locator('.circle-vandaag-plus__save').click();
+  const card = page.locator('.circle-screen__card').filter({ hasText: 'fietsband plakken' });
+  await expect(card, 'the own note is a card').toBeVisible({ timeout: 20_000 });
+  const act = card.locator('.circle-screen__row-act');
+  await expect(act, 'one button on it').toHaveCount(1);
+  await expect(act).toHaveAttribute('data-act', 'edit-own');
+  await act.click();
+  await expect(page.locator('.circle-vandaag-plus__body'), 'the button opens the sheet on the note').toHaveValue('fietsband plakken');
+  expect(errs).toEqual([]);
+});

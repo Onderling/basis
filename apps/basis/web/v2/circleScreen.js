@@ -158,10 +158,10 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'photo':        renderPhoto(section, block, tr);        break;
     case 'noticeboard':  renderNoticeboard(section, block, tr);  break;
     case 'calendar':       renderAgenda(section, block, tr, highlightRef, onAction);       break;
-    case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef); break;
+    case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
-      if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef);
+      if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction);
       else if (block.content?.noun === 'calendar-event') renderAgenda(section, block, tr, highlightRef, onAction);
       else renderItems(section, block, tr, onAction);
       break;
@@ -366,12 +366,33 @@ function renderAgenda(section, block, tr, highlightRef, onAction) {
       scrollRowIntoView(li);
     }
     openableOwn(li, ev, 'calendar-event', onAction);
+    primaryButton(li, ev, 'calendar-event', tr, onAction);
     list.appendChild(li);
   }
   section.appendChild(list);
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */
+// A row is a CARD with ONE button: the action its noun declares (`item.primary`, the shared `primaryActionFor`) —
+// done (an op through the waist), open the "+" sheet on it, or open its circle. The second action stays where it is.
+function primaryButton(li, item, noun, tr, onAction) {
+  li.classList.add('circle-screen__card');
+  const p = item?.primary;
+  if (!p || typeof onAction !== 'function') return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'circle-screen__row-act';
+  b.dataset.act = p.kind;
+  b.textContent = tr(p.labelKey);
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (p.kind === 'op') onAction({ kind: 'row-op', op: { app: p.app, opId: p.opId, args: p.args } });
+    else if (p.kind === 'edit-own') onAction({ kind: 'edit-own', noun, item });
+    else if (p.kind === 'open-circle') onAction({ kind: 'open-circle', circleId: p.circleId });
+  });
+  li.appendChild(b);
+}
+
 // An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
 // a circle's row stays the circle's.
 function openableOwn(li, item, noun, onAction) {
@@ -405,12 +426,13 @@ function renderItems(section, block, tr, onAction) {
     text.textContent = it.label ?? '';
     li.appendChild(text);
     openableOwn(li, it, block.content?.noun ?? null, onAction);
+    primaryButton(li, it, block.content?.noun ?? null, tr, onAction);
     list.appendChild(li);
   }
   section.appendChild(list);
 }
 
-function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
+function renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
   title.textContent = tr(block.titleKey ?? 'circle.recipe.block.tasks');
@@ -459,6 +481,7 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
       }
       li.appendChild(wrap);
     }
+    primaryButton(li, task, 'task', tr, onAction);
     list.appendChild(li);
   }
   section.appendChild(list);

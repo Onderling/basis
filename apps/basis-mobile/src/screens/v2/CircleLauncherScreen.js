@@ -1914,6 +1914,10 @@ export default function CircleLauncherScreen({
                 if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); }
                 // an own row (no circle): the "+" sheet opened on it — change it or take it away
                 else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
+                // a card's one action that IS an op (a chore done): through the waist, then the page repaints
+                else if (a?.kind === 'row-op' && a.op?.app && a.op?.opId) {
+                  Promise.resolve(bundle?.callSkill?.(a.op.app, a.op.opId, a.op.args ?? {})).catch(() => null).then(() => refreshScreensBook());
+                }
               }} />
           </ScrollView>
         </View>

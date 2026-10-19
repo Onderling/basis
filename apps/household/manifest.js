@@ -117,7 +117,7 @@ export const householdManifest = {
       // the person's own "+" (Vandaag): an own note, in the own store (the own route answers the declared `add`)
       attach: { label: 'circle.vandaag.plus_own', scopes: ['own'],
         fields: [{ name: 'body', kind: 'text', labelKey: 'circle.vandaag.plus_note_ph' }] },
-      presents: { label: 'text', moment: 'updatedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
+      presents: { primary: 'edit', label: 'text', moment: 'updatedAt', order: 'desc', mine: ['createdBy', 'author', 'actor', 'by'] },
       names: { nl: { one: 'notitie', other: 'notities' }, en: { one: 'note', other: 'notes' } } },
   },
 

@@ -1451,3 +1451,11 @@
 .cc-person-card__lines { margin: 0 0 8px; padding-left: 18px; font-size: 14px; }
 .cc-person-card__note { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
 .cc-profile__week { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; font-size: 13px; color: var(--ink-soft); }
+
+/* Vandaag rows as cards: the words, and ONE button — the action the row's noun declares */
+.circle-screen__card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 6px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); list-style: none; }
+.circle-screen__card > span:last-of-type { flex: 1 1 auto; min-width: 0; }
+.circle-screen__row-act { margin-left: auto; flex: 0 0 auto; font: inherit; font-size: 13px; padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+.circle-screen__row-act:hover { border-color: var(--accent); color: var(--accent-ink); }
+.circle-screen__row--own { cursor: pointer; }
+

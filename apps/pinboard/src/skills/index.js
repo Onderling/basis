@@ -1279,7 +1279,7 @@ export function buildPinboardScope(deps = {}) {
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   // THIS DEVICE in a circle: its persona there (host-injected `selfWebidFor`), else `localActor`. The cores' "is
-  // this my own call?" compares against it — `withCircleSelf` hands a persona's circle's own calls the persona's
+  // this my own call?" compares against it — the host's `pinboardActAs` hands a persona's circle's own calls the persona's
   // webid as `from`, so the local/foreign line must be drawn at the same webid or the device's own call reads foreign.
   const localActorIn = (gid) => {
     let self = null;
@@ -1404,6 +1404,13 @@ export function buildSkills({
     selfSigner, selfWebidFor,
   });
   const localActorIn = scope.localActorIn;
+  // An op that names an ITEM, not a circle, arrives as the device's general self even when the item lives in a
+  // persona's circle (the host's `actAs` reads the circle off the args). The device's own call acts on an item as the
+  // self it is in the item's circle; a foreign caller stays who they are.
+  const itemCircleOf = (it) => it?.source?.groupId
+    ?? (Array.isArray(it?.source?.targets) ? it.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
+    ?? null;
+  const actorOnItem = (from, it) => (from && from === localActor ? localActorIn(itemCircleOf(it)) : from);
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
   // a member; else the membership lane's last exit for them, in the fold's own order (`lastExit`: their leave, or an
   // admin's evict); else, for a circle from before the lane, the exit items' latest (`exits.kinds`). Left → may join
@@ -1894,7 +1901,7 @@ export function buildSkills({
       }
       const [completed] = await store.markComplete(
         [{ id: a.requestId }],
-        { actor: from },
+        { actor: actorOnItem(from, current) },
       );
       metrics?.record?.('accept-responder');
       return { request: completed, _sync: simulateSync() };
@@ -2095,7 +2102,7 @@ export function buildSkills({
       }
       const [completed] = await store.markComplete(
         [{ id }],
-        { actor: from },
+        { actor: actorOnItem(from, current) },
       );
       metrics?.record?.('mark-returned');
       return { item: completed, _sync: simulateSync() };

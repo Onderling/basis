@@ -36,6 +36,7 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
         book.set(webid, { ...book.get(webid), persona, ...(revealPreset ? { revealPreset } : {}), personaAt });
       },
       setLinked: async (webid, linkedRow, linkedAt) => { book.set(webid, { ...book.get(webid), linkedRow, linkedAt }); },
+      forget: async (webid) => { book.delete(webid); },
     },
     onLanded: (s) => landed.push(s),
     onRefused: (reason, from) => refused.push({ reason, from }),
@@ -245,3 +246,32 @@ describe('the identity link follows the person', () => {
     expect(r.book.get('bot').linkedRow).toBeNull();
   });
 });
+
+describe('a contact RE-FILED under another self leaves the old self\'s book (the old lane hears a webid-only mark)', () => {
+  it('a newer mark forgets the row this self still files; an older one, or a row this self does not hold, is left', async () => {
+    const book = new Map([
+      ['w:bea', { webid: 'w:bea', persona: 'default', personaAt: 100 }],
+      ['w:cor', { webid: 'w:cor', persona: 'default', personaAt: 500 }],
+    ]);
+    const { sync } = rig({ book });
+    await sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [],
+      refiled: [{ webid: 'w:bea', refiledAt: 200 }, { webid: 'w:cor', refiledAt: 200 }, { webid: 'w:nobody', refiledAt: 200 }] });
+    expect(book.has('w:bea'), 'refiled after this self last filed it: gone from this self').toBe(false);
+    expect(book.has('w:cor'), 'filed here AFTER the refile: stays').toBe(true);
+  });
+
+  it('the mark is webid-only on the wire — nothing names the self the contact went to', async () => {
+    const { sync, sent } = rig();
+    await sync.fanRefiled({ webid: 'w:bea', refiledAt: 200, persona: 'p-000000000001' });
+    expect(sent.length).toBe(1);
+    expect(sent[0].payload.refiled).toEqual([{ webid: 'w:bea', refiledAt: 200 }]);
+    expect(JSON.stringify(sent[0].payload).includes('p-000000000001')).toBe(false);
+  });
+
+  it('the catch-up answer carries the self\'s refiled marks beside its rows (an offline device still learns)', async () => {
+    const { sync, sent } = rig({ known: { peers: [], contacts: [], refiled: [{ webid: 'w:bea', refiledAt: 200 }] } });
+    await sync.handlers[KNOWN_PEERS_CATCHUP_SUBTYPES.request](SIBLING, { subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.request });
+    expect(sent[0]?.payload?.refiled).toEqual([{ webid: 'w:bea', refiledAt: 200 }]);
+  });
+});
+

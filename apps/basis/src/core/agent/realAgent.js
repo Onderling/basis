@@ -178,7 +178,7 @@ import {
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
 // that mints a `request` task instead of executing an offering. Wired below onto the
 // live host agent as the `requestOffering` peer-facing dispatcher op.
-import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers } from '@onderling/item-store';
+import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers, retentionWindowFor, RETAIN } from '@onderling/item-store';
 import { matchProfileDrivers } from '@onderling/agent-registry';
 import { isAwayNow } from '../../v2/memberAvailability.js';
 
@@ -2537,7 +2537,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         // contact owns (greetings of strangers, siblings) — never a persona's contacts' keys
         const ownAddrs = new Set(ownBook.map((c) => c?.webid).filter(Boolean));
         const peers = pid ? bindings.filter((b) => ownAddrs.has(b?.address)) : bindings.filter((b) => !others.has(b?.address));
-        return { peers, contacts: ownBook };
+        // …and the contacts re-filed AWAY from this self here, within the keep-aside window: an old-self device that
+        // slept through the live mark still learns the contact left (webid + when; never the self it went to)
+        const since = Date.now() - retentionWindowFor(RETAIN.KEEP_ASIDE);
+        let moved = [];
+        try { moved = (await rawPinboard('listRefiledContacts', {}))?.refiled ?? []; } catch { moved = []; }
+        const refiled = moved.filter((e) => Number.isFinite(e?.at) && e.at >= since && (selfOfContactRow({ persona: e.from }) ?? null) === (pid ?? null))
+          .map((e) => ({ webid: e.webid, refiledAt: e.at }));
+        return { peers, contacts: ownBook, refiled };
       },
       learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
       contacts: {
@@ -2555,6 +2562,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         }),
         // …and a newer identity link to a household bot (or its undoing), by the same rule
         setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
+        // …and a contact re-filed under another self on a device of the person leaves THIS self's book here
+        forget: (webid) => rawPinboard('forgetContact', { webid }),
       },
       onLanded: () => savePeerBindings(),
     });
@@ -6190,6 +6199,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         };
       }
       let rawReply = null;   // the pinboard reply before shaping — the own-devices fan below reads the contact row
+      // the row as it was filed BEFORE a lens change, so a move between selves can be told to the old self's devices
+      let contactBefore = null;
+      if (realOpId === 'setContactPersona' && typeof realArgs?.webid === 'string') {
+        try { contactBefore = (await rawContacts()).find((c) => c?.webid === realArgs.webid) ?? null; } catch { contactBefore = null; }
+      }
       const runPinboard = async () => {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(pinboardAgent.address, realOpId, parts, pinboardActAs(realArgs));
@@ -6222,6 +6236,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // …and what a contact sees of the person (L125), by the same carry: changed here, changed on every device.
       if ((realOpId === 'setContactHidden' || realOpId === 'setContactPersona') && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
+      // A contact RE-FILED under another self: the row rides the new self's lane (above); the OLD self's devices hear it
+      // left — webid and when only, so they never learn which self it went to.
+      if (realOpId === 'setContactPersona' && rawReply?.contact && contactBefore
+          && (selfOfContactRow(contactBefore) ?? null) !== (selfOfContactRow(rawReply.contact) ?? null)) {
+        knownPeersSync.fanRefiled(contactBefore, { webid: rawReply.contact.webid, refiledAt: rawReply.contact.personaAt ?? Date.now() }).catch(() => {});
       }
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
       // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how

@@ -96,6 +96,26 @@ describe("a persona's contact book, per self", () => {
     expect((await contactsOf(box)).some((c) => c.webid === webid), 'the box — the general persona\'s device only — never has W\'s contact').toBe(false);
   }, 120_000);
 
+  it("a general contact RE-FILED under W leaves the box (general only) and is filed under W on the laptop; nothing names W to the box", async () => {
+    const friend = 'w:neighbour-of-anna';
+    expect((await phone.agent.callSkill('pinboard', 'addContact', { webid: friend, displayName: 'Buur', persona: 'default' }))?.ok).not.toBe(false);
+    for (const n of [box, laptop]) await n.agent.knownPeersSync.requestFromSiblings();
+    for (const n of [box, laptop]) expect(await until(async () => ((await contactsOf(n)).some((c) => c.webid === friend) ? true : null), { timeout: 30_000, step: 300 }), 'a general contact on every general device first').toBe(true);
+    const boxSaw = [];
+    const prior = box._routerRef.fn;
+    box._routerRef.fn = (env) => { try { boxSaw.push(JSON.stringify(env?.payload ?? {})); } catch { /* observe only */ } return prior?.(env); };
+    expect((await phone.agent.callSkill('pinboard', 'setContactPersona', { webid: friend, persona: w }))?.contact?.persona, 'the phone files the friend under W now').toBe(w);
+    // the live mark, then each device's catch-up (the refiled list rides the old self's snapshot), so nothing rests on timing
+    await new Promise((r) => setTimeout(r, 1000));
+    for (const n of [box, laptop]) await n.agent.knownPeersSync.requestFromSiblings();
+    const gone = await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? null : true), { timeout: 30_000, step: 300 });
+    expect(gone, "the box — the general persona's device only — no longer has the friend as a contact").toBe(true);
+    const onLaptop = await until(async () => { const c = (await contactsOf(laptop)).find((x) => x.webid === friend); return c?.persona === w ? c : null; }, { timeout: 30_000, step: 300 });
+    expect(onLaptop, "the laptop holds W: the friend is filed under W there").toBeTruthy();
+    box._routerRef.fn = prior;
+    expect(boxSaw.some((p) => p.includes(w)), 'nothing the box received names W').toBe(false);
+  }, 120_000);
+
   it("a W contact's turn reaches the laptop and never the box; a general contact's reaches both", async () => {
     const webid = 'w:colleague-of-werk';
     const friend = 'w:friend-of-anna';

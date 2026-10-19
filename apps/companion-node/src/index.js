@@ -391,7 +391,9 @@ export async function startCompanionNode(opts = {}) {
   });
 
   // ── 4. Compose folio's relocatable agent (byte-identical to browser.js) ───
-  const transport = new RelayTransport({ relayUrl, identity });
+  // With its feed role on, the node says so itself on its own register frame: the relay's seat asks no node that did
+  // not (a link can name any address). Without the role it says nothing — and has no `feed.serve` to answer with.
+  const transport = new RelayTransport({ relayUrl, identity, ...(feeds ? { serves: ['feed'] } : {}) });
   // The ordinary routed agent — the same `RoutingStrategy` every other agent carries, nothing
   // companion-specific. Without it a second transport (nearby mDNS) is registered but never CHOSEN:
   // `routeFor()` falls back to the default relay for a peer standing on the same Wi-Fi, and the hello

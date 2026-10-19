@@ -40,6 +40,9 @@ import { isKnownRole } from '@onderling/core';
 import { isChannel, channelOfWebid } from '@onderling/item-types';
 
 const LISTS_PREFIX = 'mem://pinboard/lists/';
+// Where a contact was filed before its filing persona last changed: one entry per webid (the latest move), so it is
+// bounded by the book itself. The own-devices lane reads it to tell the OLD self's devices the contact left.
+const REFILED_REF = 'mem://pinboard/refiled.json';
 
 const VALID_TRUST = new Set(['bekend', 'vertrouwd']);
 
@@ -174,10 +177,48 @@ export function createContactBook({ members, dataSource }) {
     if (!Number.isFinite(personaAt)) throw new TypeError('setPersona: personaAt must be a time');
     const existing = await members.resolveByWebid(webid);
     if (!existing) throw new Error('setPersona: contact not found');
-    return members.addMember({
+    const before = existing.relation === 'contact' && typeof existing.persona === 'string' && existing.persona ? existing.persona : null;
+    const out = await members.addMember({
       ...existing, relation: 'contact', persona: persona.trim(),
       ...(revealPreset ? { revealPreset } : {}), personaAt,
     });
+    // filed under another persona now: remember where it was, so that self's devices can hear it left
+    if (before && before !== persona.trim()) await recordRefiled(webid, before, personaAt);
+    return out;
+  }
+
+  async function readRefiled() {
+    const raw = await dataSource.read(REFILED_REF).catch(() => null);
+    if (raw == null) return [];
+    try { const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; return Array.isArray(parsed?.entries) ? parsed.entries : []; }
+    catch { return []; }
+  }
+  async function recordRefiled(webid, from, at) {
+    const entries = (await readRefiled()).filter((e) => e?.webid !== webid);
+    entries.push({ webid, from, at });
+    await dataSource.write(REFILED_REF, JSON.stringify({ entries }));
+  }
+  /** The contacts re-filed under another persona here: `[{webid, from, at}]`, one per webid (the latest move). */
+  async function listRefiled() { return readRefiled(); }
+
+  /**
+   * FORGET a contact here: it was re-filed under a self this device does not hold. Its CONTACT facets go — the
+   * relation, the persona and lens, trust, tags, the per-contact flags, its hidden mark, its place in every list —
+   * and its MEMBER row stays: a circle this device shares with them may still need their name. Null when the webid
+   * is not a contact here.
+   */
+  async function forgetContact(webid) {
+    if (!webid) throw new TypeError('forgetContact: webid required');
+    const existing = await members.resolveByWebid(webid);
+    if (!existing || existing.relation !== 'contact') return null;
+    const row = await members.addMember({
+      webid, relation: 'group-member', persona: null, revealPreset: null, personaAt: null, trustLevel: null, tags: [],
+      shareLocation: false, allowHopThrough: false, allowAutomatching: true, hidden: false, hiddenAt: null, deletedAt: null,
+    });
+    for (const l of await listLists().catch(() => [])) {
+      if (Array.isArray(l?.contactWebids) && l.contactWebids.includes(webid)) await removeFromList(l.listId, webid);
+    }
+    return row;
   }
 
   async function setTags(webid, tags) {
@@ -316,6 +357,8 @@ export function createContactBook({ members, dataSource }) {
     setTrustLevel,
     setHidden,
     setPersona,
+    forgetContact,
+    listRefiled,
     setTags,
     setFlag,
     listContacts,

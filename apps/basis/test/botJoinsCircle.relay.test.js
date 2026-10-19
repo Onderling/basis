@@ -46,8 +46,10 @@ describe('the bot joins a circle on its admin\'s word', () => {
     child.stderr.on('data', (b) => { out += String(b); });
     const up = await until(async () => (out.includes('device-runner: up') ? true : null), { timeout: 90_000, step: 250 });
     expect(up, `the runner never came up:\n${out.slice(-1500)}`).toBe(true);
-    ann = await bootRealAgentNode('ann', { contactChannel: true, taskLane: true });
-    bob = await bootRealAgentNode('bob', { taskLane: true });
+    // a redeem is a full round trip over the relay; under a loaded CI runner the fast 8 s default ran out
+    // (`admin-unreachable` on Bob's join into the third circle, 2026-10-19) — the budget the slower gates use
+    ann = await bootRealAgentNode('ann', { contactChannel: true, taskLane: true, redeemTimeoutMs: 30_000 });
+    bob = await bootRealAgentNode('bob', { taskLane: true, redeemTimeoutMs: 30_000 });
     await connectNodesOverRelay([ann, bob], { relayUrl: relay.url });
     // Ann's circle, Bob in it
     await createCircle(ann, { groupId: CIRCLE, name: 'Huize Rood', purpose: 'samen het huis' });

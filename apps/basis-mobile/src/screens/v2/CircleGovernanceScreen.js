@@ -138,6 +138,9 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
             {row.tally ? (
               <Text style={styles.tally}>{t('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })}</Text>
             ) : null}
+            {row.deadline != null ? (
+              <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{t('circle.governance.deadline')}</Text>
+            ) : null}
             {row.approved && row.awaitingEnactment ? (
               <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
             ) : null}

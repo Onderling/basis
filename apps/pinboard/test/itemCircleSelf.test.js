@@ -45,3 +45,24 @@ describe("an item's circle decides the device's self on it", () => {
     expect((await call('markReturned', { requestId: theirs.id }, 'webid:mel')).item.completedBy).toBe('webid:mel');
   });
 });
+
+describe('only the poster completes their post', () => {
+  it("markReturned: the poster's own call in a persona's circle → ok; a co-member, an admin → not-the-poster", async () => {
+    const { store, call } = skills();
+    const item = await seed(store, 'circle:werk', PERSONA);
+    expect((await call('markReturned', { requestId: item.id }, 'webid:mel')).error).toBe('not-the-poster');
+    expect((await call('markReturned', { requestId: item.id }, 'webid:admin')).error).toBe('not-the-poster');
+    expect((await store.getById(item.id)).completedAt ?? null).toBe(null);
+    expect((await call('markReturned', { requestId: item.id })).item.completedBy).toBe(PERSONA);
+  });
+  it('acceptResponder: a co-member, an admin → not-the-poster; the poster → accepted, the responder as the claim', async () => {
+    const { store, call } = skills();
+    const req = await seed(store, 'circle:werk', PERSONA, { type: 'request', kind: undefined });
+    expect((await call('acceptResponder', { requestId: req.id, responderWebid: 'webid:mel' }, 'webid:bram')).error).toBe('not-the-poster');
+    expect((await call('acceptResponder', { requestId: req.id, responderWebid: 'webid:mel' }, 'webid:admin')).error).toBe('not-the-poster');
+    expect((await store.getById(req.id)).completedAt ?? null).toBe(null);
+    const r = await call('acceptResponder', { requestId: req.id, responderWebid: 'webid:mel' });
+    expect(r.request.completedBy).toBe(PERSONA);
+    expect(r.request.assignee).toBe('webid:mel');
+  });
+});

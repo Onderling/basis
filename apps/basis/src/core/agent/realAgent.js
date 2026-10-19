@@ -2039,10 +2039,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // to it can land on the wrong device while the send waits out its timeout and is held (both found by
   // the revoke walk, 2026-09-14). The circle comes from the sibling table; a caller that knows it
   // already — a seed reply to a device not yet on any roster — names it in the payload.
-  const sendToSibling = async (to, payload, o = {}) => {
+  const sendToSibling = async (to, payload, o = {}, asSelf = null) => {
     // an OWN lane names no circle: the sibling is reached in a circle that lane's self shares with it — the default's
-    // lane over the default's circles, a persona's over that persona's (so it travels as that self, never another)
-    const ownSelf = typeof payload?.circleId === 'string' ? selfOfOwnLane(payload.circleId) : null;
+    // lane over the default's circles, a persona's over that persona's (so it travels as that self, never another).
+    // A lane that IS one self's (a persona's person-key hand-over) names that self (`asSelf`): its siblings' circles.
+    const ownSelf = asSelf ?? (typeof payload?.circleId === 'string' ? selfOfOwnLane(payload.circleId) : null);
     let circleId = typeof payload?.circleId === 'string' && !ownSelf ? payload.circleId : null;
     if (!circleId) {
       const rows = ownSelf && ownSelf !== 'default' ? await personaSiblingRows(ownSelf) : await ownDeviceSiblingRows();
@@ -2233,7 +2234,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (!rt?.chatId?.pubKey || !rt.vault) return null;
     const sync = createPersonKeySync({
       siblings: () => personaSiblings(pid),
-      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
+      // reached in a circle of THIS persona's, as it — never through the general persona's circles
+      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, pid),
       current: () => rt.personKey ?? null,
       store: (k) => adoptPersonaKey(pid, rt, k),
       selfPubKey: rt.chatId.pubKey,
@@ -7774,14 +7776,31 @@ export async function createRealHouseholdAgent(opts = {}) {
     async sendPeerMessage(targetAddress, payload, opts = {}) {
       // `asPerson`: speak as the current PERSON key — for the own-device messages the other end cannot yet
       // place (an enrolling device's first requests). Without a person key the send speaks as it always did.
+      // ONE path for every self: the person key of the circle's self — the general persona's, or the persona the circle
+      // belongs to (`circleId`, else the payload's). A self without a person key does not speak at all (`no-person-key`):
+      // never its chat key, which a circle refuses once that self has proved a per-circle address there.
       if (opts?.asPerson) {
-        const { asPerson, ...rest } = opts;   // eslint-disable-line no-unused-vars
+        const { asPerson, circleId: forCircle, ...rest } = opts;   // eslint-disable-line no-unused-vars
+        const cid = typeof forCircle === 'string' && forCircle ? forCircle : (typeof payload?.circleId === 'string' && payload.circleId ? payload.circleId : null);
+        const self = cid ? personaOf(cid) : persona;
+        const noKey = { held: false, delivered: false, msgId: payload?.msgId ?? payload?.id ?? null, reason: 'no-person-key' };
+        if (self !== persona) {
+          // a persona's person address goes on the PERSONA's own sockets only — a socket holding two selves' addresses
+          // would link them at the relay — signed by the persona's person key, right before its first send
+          const [binding] = ownAddressBindingsFor(cid);
+          if (!binding) return noKey;
+          for (const rl of relaysFor(cid) ?? []) {
+            try { await rl.port?.addAddress?.(binding.address, { sign: binding.sign, primary: false }); } catch (err) { console.warn(`[person-key] a persona's relay socket did not take its person address: ${err?.message ?? err}`); }
+          }
+          return sendCircleScoped(targetAddress, payload, { ...rest, sendAs: binding.address });
+        }
         const pa = personAddress();
+        if (!pa) return noKey;
         // The relay refuses a frame from an address this socket has not registered — and tells only the relay's
         // log, the sender still sees "delivered". So the person address is (re)registered right before the first
         // person-speaking send, whatever a shell's boot order (found on the runner's enrol walk, 2026-09-16).
-        if (pa) await registerPersonAddressOnRelays();
-        return sendCircleScoped(targetAddress, payload, { ...rest, ...(pa ? { sendAs: pa } : {}) });
+        await registerPersonAddressOnRelays();
+        return sendCircleScoped(targetAddress, payload, { ...rest, sendAs: pa });
       }
       return sendCircleScoped(targetAddress, payload, opts);
     },

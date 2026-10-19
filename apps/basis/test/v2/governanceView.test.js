@@ -90,3 +90,15 @@ describe('buildSubjectLabeler — subject ref → member name', () => {
     expect(buildSubjectLabeler(null)('x')).toBeNull();
   });
 });
+
+describe('the admins answer what waits on them', () => {
+  it('a member\'s settings proposal (any-admin) and an admin-quorum one: an admin may vote, a member may not', () => {
+    const policy = normalizeCirclePolicy({ governance: { changePolicy: 'any-admin' } });
+    const fold = foldGovernance([proposeEvent({ proposalId: 'p1', action: 'changePolicy', subject: { view: 'screen' }, by: 'm0', at: 1 })], { policy, members: members5, now: 5 });
+    expect(buildGovernanceView({ fold, viewer: { ref: 'admin0', role: 'admin' } }).open[0]).toMatchObject({ pending: true, canVote: true });
+    expect(buildGovernanceView({ fold, viewer: { ref: 'm1', role: 'member' } }).open[0].canVote).toBe(false);
+    const q = normalizeCirclePolicy({ governance: { changePolicy: 'admin-quorum' } });
+    const foldQ = foldGovernance([proposeEvent({ proposalId: 'p2', action: 'changePolicy', subject: {}, by: 'admin0', at: 1 })], { policy: q, members: [...members5, { ref: 'admin1', role: 'admin' }], now: 5 });
+    expect(buildGovernanceView({ fold: foldQ, viewer: { ref: 'admin1', role: 'admin' } }).open[0].canVote).toBe(true);
+  });
+});

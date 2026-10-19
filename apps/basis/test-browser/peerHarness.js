@@ -366,10 +366,11 @@ export async function enableFeature(page, feature = 'tasks') {
     ok = true;
   }
   const save = page.locator('.circle-settings__save');
-  // A MEMBER's Save is greyed (the policy is the admins'; a member's statement is dropped by every other device): the
-  // feature reaches a member over the governance lane from the admin's save, so there is nothing for them to press.
+  // A MEMBER's Save is a proposal to the admins (the policy is theirs; a member's statement is dropped by every other
+  // device): the feature reaches a member over the governance lane from the admin's save, so this files nothing.
   if (await save.count()) {
-    if (!(await save.first().isEnabled())) return false;   // greyed: this viewer is not an admin — nothing was saved
+    if (!(await save.first().isEnabled())) return false;   // greyed: the roster does not know this viewer yet
+    if ((await save.first().getAttribute('data-propose')) === 'true') return false;   // a member: nothing saved here
     await save.first().click(); await page.waitForTimeout(1800);
   }
   return ok;

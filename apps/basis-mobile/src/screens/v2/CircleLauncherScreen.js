@@ -1482,6 +1482,8 @@ export default function CircleLauncherScreen({
     return () => { alive = false; };
   }, [selected, resolveSkill]);
 
+  // a tile's proposals badge leads to where a proposal is answered: the circle's settings
+  const openProposals = useCallback((c) => { setSelected(c); setView('settings'); }, []);
   const openCircle = useCallback(async (c) => {
     setActiveCircle(c.id);
     // bump the seenAt marker so the unread badge clears on the
@@ -2101,13 +2103,16 @@ export default function CircleLauncherScreen({
       <CircleSettingsScreen
         store={broadcastingStore}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
-        onProposePolicy={async (cid, patch) => {
+        // a member's proposal, or an admin's under consensus — signed as this device's self in the circle (the host decides the ref)
+        onProposePolicy={async (cid, patch, { asMember = false } = {}) => {
           if (!govPolicy) return;
           await govPolicy.propose({
             circleId: cid, action: 'changePolicy', subject: patch,
-            actor: { ref: getCircleActorWebId() || '', role: 'admin' },
+            actor: { role: asMember ? 'member' : 'admin' },
           });
         }}
+        loadPolicyProposals={govPolicy ? (cid) => openPolicyProposals(govPolicy, cid) : null}
+        onAnswerPolicyProposal={govPolicy ? (cid, proposalId, choice) => govPolicy.vote({ circleId: cid, proposalId, choice }) : null}
         circleId={selected.id}
         callSkill={bundle?.callSkill}
         // B · consent-card — inject the member-override store (records declined optional caps as
@@ -2487,7 +2492,7 @@ export default function CircleLauncherScreen({
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
               renderLauncherGroups(bySight.shown, {
-                previews, proposalCounts, openCircle,
+                previews, proposalCounts, openCircle, openProposals,
                 // β.5 — pin partition + long-press menu wiring.
                 pinnedMap, mutedMap, onOpenMenu: openTileMenu,
               }, styles)
@@ -2501,7 +2506,7 @@ export default function CircleLauncherScreen({
                 {sightFoldOpen ? bySight.folded.map((c) => (
                   <View key={`sight-${c.id}`} testID={`circle-launcher-folded-${c.id}`}>
                     <LauncherTile circle={c} preview={previews?.[c.id]} pending={Number(proposalCounts?.[c.id]) || 0}
-                      isPinned={!!pinnedMap[c.id]} isMuted={!!mutedMap[c.id]} onOpen={openCircle} onLongPress={openTileMenu} />
+                      isPinned={!!pinnedMap[c.id]} isMuted={!!mutedMap[c.id]} onOpen={openCircle} onProposals={openProposals} onLongPress={openTileMenu} />
                     <Text style={styles.muted}>{t(c.sight === SIGHT.notHere ? 'circle.launcher.not_here' : 'circle.launcher.put_away')}</Text>
                   </View>
                 )) : null}
@@ -2658,7 +2663,7 @@ const KIND_ORDER = ['household', 'neighbourhood', 'friends'];
  *     when all circles share one kind, headers are skipped (flat list).
  */
 function renderLauncherGroups(circles, {
-  previews, proposalCounts, openCircle,
+  previews, proposalCounts, openCircle, openProposals = null,
   pinnedMap = {}, mutedMap = {}, onOpenMenu,
 }, styles) {
   const sorted = [...circles].sort((a, b) => {
@@ -2690,7 +2695,7 @@ function renderLauncherGroups(circles, {
         pending={Number(proposalCounts?.[c.id]) || 0}
         isPinned={!!pinnedMap[c.id]}
         isMuted={!!mutedMap[c.id]}
-        onOpen={openCircle}
+        onOpen={openCircle} onProposals={openProposals}
         onLongPress={onOpenMenu}
       />
     ));
@@ -2706,7 +2711,7 @@ function renderLauncherGroups(circles, {
           pending={Number(proposalCounts?.[c.id]) || 0}
           isPinned={!!pinnedMap[c.id]}
           isMuted={!!mutedMap[c.id]}
-          onOpen={openCircle}
+          onOpen={openCircle} onProposals={openProposals}
           onLongPress={onOpenMenu}
         />
       ))}
@@ -2715,7 +2720,7 @@ function renderLauncherGroups(circles, {
 }
 
 /** Single circle tile (extracted in β.3 so grouped + flat paths share it). */
-function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted = false, onOpen, onLongPress }) {
+function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted = false, onOpen, onLongPress, onProposals = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const subtitle = (preview && preview.subtitle)
@@ -2745,13 +2750,16 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
         </View>
       ) : null}
       {pending > 0 ? (
-        <View
+        <Pressable
           style={styles.tileProposals}
+          onPress={onProposals ? () => onProposals(c) : undefined}
+          disabled={!onProposals}
+          accessibilityRole="button"
           accessibilityLabel={t('circle.tile_proposals', { count: pending })}
           testID={`circle-tile-proposals-${c.id}`}
         >
           <Text style={styles.tileProposalsText}>{pending}</Text>
-        </View>
+        </Pressable>
       ) : null}
       {isPinned ? (
         <Text

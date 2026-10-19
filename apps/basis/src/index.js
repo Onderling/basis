@@ -87,7 +87,7 @@ export { realPodRouting, podRootFromWebid }           from './v2/circleRealPod.j
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
 export {
   CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, decisionDeadlineDays,
-  DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy,
+  DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy, policyPatch,
   // feature-flag consumption seam.
   isFeatureEnabled, enabledFeatures,
   // §4 — admin's policy.view → default Chat/Screen landing surface.

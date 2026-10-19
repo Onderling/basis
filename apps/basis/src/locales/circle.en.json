@@ -2180,6 +2180,42 @@
         "doc": "Consequence of sharePosture=canonical."
       }
     },
+    "propose": {
+      "text": "Propose →",
+      "doc": "Save-button label for a member: their change goes to the admins as a proposal."
+    },
+    "proposed_by": {
+      "text": "Proposed by {{who}}.",
+      "doc": "Under the settings fields while a policy proposal is open; {{who}} is the proposer."
+    },
+    "change_on": {
+      "text": "{{what}} on",
+      "doc": "A proposal turns a feature on; {{what}} is the feature."
+    },
+    "change_off": {
+      "text": "{{what}} off",
+      "doc": "A proposal turns a feature off."
+    },
+    "change_set": {
+      "text": "{{what}}: {{to}}",
+      "doc": "A proposal sets a setting; {{what}} the setting, {{to}} its new option."
+    },
+    "change_other": {
+      "text": "and {{n}} more",
+      "doc": "The rest of a proposal's changes, counted."
+    },
+    "proposal_from": {
+      "text": "{{who}} proposes: {{what}}",
+      "doc": "Above an admin's settings Save: a member's open proposal; {{what}} lists its changes."
+    },
+    "proposal_accept": {
+      "text": "Accept",
+      "doc": "Admin's button: take the member's proposal over (votes yes)."
+    },
+    "proposal_decline": {
+      "text": "Decline",
+      "doc": "Admin's button: turn the member's proposal down (votes no)."
+    },
     "send_proposal": {
       "text": "Send proposal →",
       "doc": "Save-button label when consensus is required."

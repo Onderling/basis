@@ -63,7 +63,8 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     if (!immediate.decisionClass) return { ok: false, reason: 'unknown-action' };
 
     // any-admin — enact now (an admin's unilateral call), leaving a propose+resolve audit trail.
-    if (immediate.decisionClass === 'any-admin') {
+    // (a member's proposal the resolver keeps open — see MEMBER_PROPOSABLE — takes the open path below)
+    if (immediate.decisionClass === 'any-admin' && immediate.status !== DECISION_STATUS.PENDING) {
       if (immediate.status !== DECISION_STATUS.APPROVED) return { ok: false, status: immediate.status, reason: immediate.reason };
       const proposalId = newProposalId();
       await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: null, at: t }));

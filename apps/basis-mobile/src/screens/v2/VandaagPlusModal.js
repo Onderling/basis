@@ -12,7 +12,7 @@ import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
-  // opened on an own row: `{ act, id, values }` (the shared `plusEditFor`)
+  // opened on an own row: `{ act, id, values, asSelf }` (the shared `plusEditFor`)
   edit = null,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
   selves = [], writeAsSelf = null }) {
@@ -26,7 +26,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [line, setLine] = useState('');
   useEffect(() => {
     if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); return; }
-    if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf('default'); }
+    if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf(edit.asSelf ?? 'default'); }  // changed as the self that made it
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;

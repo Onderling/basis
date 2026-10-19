@@ -732,7 +732,7 @@ export default function CircleLauncherScreen({
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
-  const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values }` (shared `plusEditFor`)
+  const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   const [screenViewBlocks, setScreenViewBlocks] = useState(null);
   // δ.1 — true while a fresh materialize runs after a cache-hit render.
   // Drives the subtle refresh pip in CircleScreenView.
@@ -1943,7 +1943,10 @@ export default function CircleLauncherScreen({
           onRemove={plusEdit ? async (actId) => {
             const op = plusRemoveOp(actId, { id: plusEdit.id });
             if (op.error) return t(op.error);
-            const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+            // taken away as the self that made it, like a change
+            const actAs = plusEdit.asSelf && plusEdit.asSelf !== 'default' ? (heldSelves.find((p) => p.id === plusEdit.asSelf)?.webid ?? null) : null;
+            const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+              .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
             if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
             setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
             return null;

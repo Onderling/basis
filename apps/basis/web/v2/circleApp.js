@@ -4296,7 +4296,8 @@ function showVandaagPlus({ edit = null } = {}) {
   let line = '';
   let error = null;
   // written as the one self ticked in the header; with several ticked, the sheet asks which
-  let asSelf = editId ? 'default' : writeAs(_selfSet.on);
+  // an own row is changed as the self that made it (the row says which); something new as the ticked self
+  let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
   const call = async (op) => {
     // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying

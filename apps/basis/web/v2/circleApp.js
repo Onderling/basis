@@ -333,7 +333,9 @@ import {
 // The agent-detail activity card's rows — the device log narrowed to one agent (batch-4 trail).
 import { agentActivityRows } from '../../src/v2/agentActivity.js';
 // The advanced surface's projections (the "default places for any new opId" rule).
-import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
+import { advancedOpRows } from '../../src/v2/advancedSurface.js';
+import { settingsProjection } from '../../src/v2/settingsProjection.js';
+import { renderSettingsGroups } from './settingsPanel.js';
 // The flows substrate (#63): the one runner + the one projector — the restore-settings
 // flow's declaration lives on the params manifest; this shell only paints renderFlow.
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
@@ -4478,7 +4480,7 @@ async function showAdvanced() {
   hideCircleTabBar(tabBarEl);
   const ops = advancedOpRows({ manifests: Object.values(circleManifestsByOrigin) });
   let params = [];
-  try { params = advancedParamRows(await rawCallSkill('params', 'list-user-params', {})); } catch { /* register absent → ops only */ }
+  try { params = (await rawCallSkill('params', 'list-user-params', {}))?.params ?? []; } catch { /* register absent → ops only */ }
 
   rootEl.innerHTML = '';
   const wrap = document.createElement('div');
@@ -4501,30 +4503,17 @@ async function showAdvanced() {
   hint.className = 'muted';
   hint.textContent = t('circle.advanced.params_hint');
   wrap.appendChild(hint);
-  for (const p of params) {
-    const row = document.createElement('div');
-    row.className = 'cc-advanced__param';
-    row.style.cssText = 'display:flex;gap:.5rem;align-items:center;padding:.25rem 0;';
-    const label = document.createElement('code');
-    label.textContent = `${p.key} (${p.scope})`;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = JSON.stringify(p.value ?? p.default);
-    input.style.cssText = 'width:9rem;';
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.className = 'cc-btn cc-btn--quiet';
-    save.textContent = t('circle.advanced.save');
-    save.addEventListener('click', async () => {
-      let value; try { value = JSON.parse(input.value); } catch { value = input.value; }
-      save.disabled = true;
-      const r = await rawCallSkill('params', 'set-param', { key: p.key, value }).catch(() => ({ ok: false }));
-      save.textContent = r?.ok ? '✓' : '✗';
-      setTimeout(() => { save.disabled = false; save.textContent = t('circle.advanced.save'); }, 1200);
-    });
-    row.append(label, input, save);
-    wrap.appendChild(row);
-  }
+  // projected from the register (labels, a control per kind, grouped by scope); a change is the one `set-param` op
+  const settings = settingsProjection(params);
+  renderSettingsGroups(wrap, {
+    projection: settings, t,
+    onSet: async (row, input) => {
+      const value = settings.valueFor(row, input);
+      if (value && typeof value === 'object' && !Array.isArray(value) && value.error) return { errorKey: value.error };
+      const r = await rawCallSkill('params', 'set-param', { key: row.key, value }).catch(() => ({ ok: false }));
+      return r?.ok ? { ok: true } : { errorKey: 'circle.params.save_failed' };
+    },
+  });
 
   // ── the surface-less ops ───────────────────────────────────────────────────
   const oh = document.createElement('h3');

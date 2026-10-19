@@ -1,5 +1,5 @@
 /**
- * A vote with a closing deadline says so on both shells. The web panel did; the phone did not, though its header
+ * A vote with a closing deadline says WHEN on both shells ("sluit morgen om 09:30", the date, "gesloten"): one shared line. The web panel did; the phone did not, though its header
  * comment said it did. Source pins: the RN screen cannot render under vitest.
  */
 import { describe, it, expect } from 'vitest';
@@ -13,7 +13,7 @@ describe('governance: the deadline line, web ≡ mobile', () => {
     it(`${shell}: a row with a deadline shows the shared words`, () => {
       const src = read(rel);
       expect(src).toMatch(/row\.deadline != null/);
-      expect(src).toMatch(/t[r]?\('circle\.governance\.deadline'\)/);
+      expect(src).toMatch(/deadlineLine\(row\.deadline, \{ t(: tr)?, locale: dateLocaleOf\(tr?\) \}\)/);
     });
   }
 });

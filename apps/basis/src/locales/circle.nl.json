@@ -7108,6 +7108,11 @@
       }
     }
   },
+  "when": {
+    "today_at": { "text": "vandaag om {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
+    "tomorrow_at": { "text": "morgen om {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
+    "closed": { "text": "gesloten", "doc": "A deadline that has passed." }
+  },
   "governance": {
     "title": {
       "text": "Besluiten",
@@ -7184,8 +7189,8 @@
       "doc": "Governance — the running vote tally."
     },
     "deadline": {
-      "text": "heeft een deadline",
-      "doc": "Governance — this vote has a closing deadline."
+      "text": "sluit {{when}}",
+      "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
     "awaiting_enactment": {
       "text": "wacht op een beheerder",

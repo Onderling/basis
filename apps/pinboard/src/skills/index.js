@@ -94,7 +94,7 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
-import { kindWakes } from '@onderling/item-store';
+import { kindWakes, assigneesOf } from '@onderling/item-store';
 
 /** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
 let _fallbackReportHook = null;
@@ -1894,14 +1894,20 @@ export function buildSkills({
       const current = await store.getById(a.requestId);
       if (!current) return { error: 'not-found' };
       if (current.completedAt) return { error: 'already-fulfilled', current };
+      // Accepting is the poster's word about their own request — never a co-member's or an admin's (an admin's tool
+      // for a post that should go is report → remove, which leaves a governance record).
+      const actor = actorOnItem(from, current);
+      if (!actor || current.addedBy !== actor) return { error: 'not-the-poster' };
 
-      const claimResult = await store.claim(a.requestId, { actor: a.responderWebid });
-      if (claimResult.error) {
-        return { error: 'already-fulfilled', current: claimResult.current };
+      // The accepted one is written as the claim. (A responder's own claim stays on their device — `respondToItem`
+      // claims their mirror copy — so the poster's copy holds no claim to check the responder against yet.)
+      if (!assigneesOf(current).includes(a.responderWebid)) {
+        const claimResult = await store.claim(a.requestId, { actor: a.responderWebid });
+        if (claimResult.error) return { error: 'already-fulfilled', current: claimResult.current };
       }
       const [completed] = await store.markComplete(
         [{ id: a.requestId }],
-        { actor: actorOnItem(from, current) },
+        { actor },
       );
       metrics?.record?.('accept-responder');
       return { request: completed, _sync: simulateSync() };
@@ -2096,13 +2102,16 @@ export function buildSkills({
       const current = await store.getById(id);
       if (!current) return { error: 'not-found' };
       if (current.completedAt) return { error: 'already-returned', current };
+      // "Returned" is the lender's word about their own lend (as acceptResponder above).
+      const actor = actorOnItem(from, current);
+      if (!actor || current.addedBy !== actor) return { error: 'not-the-poster' };
 
       if (notifier) {
         try { await notifier.cancel(`due:${id}`); } catch {}
       }
       const [completed] = await store.markComplete(
         [{ id }],
-        { actor: actorOnItem(from, current) },
+        { actor },
       );
       metrics?.record?.('mark-returned');
       return { item: completed, _sync: simulateSync() };

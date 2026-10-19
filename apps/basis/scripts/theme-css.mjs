@@ -50,6 +50,9 @@ const css = `/* basis v2 — Onderling design tokens (web).
  * Component + screen styles live in web/v2/circle.css. */
 
 :root {
+  /* the browser draws its NATIVE controls (select menus, date pickers, dialogs, scrollbars) in the page's scheme —
+     without this they stay light in a dark app */
+  color-scheme: light dark;
 ${colorVars(THEME.color, '  ')}
 ${staticVars}
 }
@@ -57,13 +60,16 @@ ${staticVars}
 /* dark — follows the OS unless data-theme overrides (set by the shell) */
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
 ${colorVars(THEME_DARK.color, '    ')}
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
 ${colorVars(THEME_DARK.color, '  ')}
 }
 :root[data-theme="light"] {
+  color-scheme: light;
 ${colorVars(THEME.color, '  ')}
 }
 

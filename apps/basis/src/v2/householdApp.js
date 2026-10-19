@@ -171,7 +171,9 @@ export function createHouseholdService({ dataSource, registry, manifest = househ
      * `household` manifest is operable immediately ("declare a noun → get CRUD free"), with zero handler
      * code. The bespoke `callSkill` path above is untouched (byte-identical for existing callers).
      */
-    async callCapability(atom, noun, args = {}, ctx = {}) {
+    // `capManifest`: whose declaration the (atom × noun) is read from — household's own, or an installed extension's
+    // (its nouns live in the same circle stores; no store of their own)
+    async callCapability(atom, noun, args = {}, ctx = {}, { manifest: capManifest = manifest } = {}) {
       const circleId = ctx.circleId ?? args.circleId;
       if (!circleId) throw new Error('householdService.callCapability: a circleId is required (scope)');
       const store = stores.getStore(circleId);
@@ -179,7 +181,7 @@ export function createHouseholdService({ dataSource, registry, manifest = househ
       // (addItem reads args.type) — the generic path overrides type with the noun regardless.
       const withType = args?.type == null ? { ...args, type: noun } : args;
       return dispatchCapability(
-        manifest,
+        capManifest,
         { atom, noun, args: withType },
         { dispatch: (opId, a) => service.callSkill(opId, a, ctx), generic: createGenericAtomHandlers(store), ctx },
       );

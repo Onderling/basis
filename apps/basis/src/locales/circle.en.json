@@ -713,6 +713,10 @@
     "brief": {
       "text": "{{count}} appointments in the next 24 hours",
       "doc": "The morning brief's calendar slot: how many appointments in the next 24 hours."
+    },
+    "updated": {
+      "text": "Appointment '{{title}}' is now {{when}}.",
+      "doc": "The reply when an appointment is changed: its title and its (new) moment."
     }
   },
   "embed": {
@@ -2175,6 +2179,42 @@
         "text": "The item stays in place in this circle — no copy is made. The recipient gets a revocable key to open it. Un-sharing rotates the key so they lose access.",
         "doc": "Consequence of sharePosture=canonical."
       }
+    },
+    "propose": {
+      "text": "Propose →",
+      "doc": "Save-button label for a member: their change goes to the admins as a proposal."
+    },
+    "proposed_by": {
+      "text": "Proposed by {{who}}.",
+      "doc": "Under the settings fields while a policy proposal is open; {{who}} is the proposer."
+    },
+    "change_on": {
+      "text": "{{what}} on",
+      "doc": "A proposal turns a feature on; {{what}} is the feature."
+    },
+    "change_off": {
+      "text": "{{what}} off",
+      "doc": "A proposal turns a feature off."
+    },
+    "change_set": {
+      "text": "{{what}}: {{to}}",
+      "doc": "A proposal sets a setting; {{what}} the setting, {{to}} its new option."
+    },
+    "change_other": {
+      "text": "and {{n}} more",
+      "doc": "The rest of a proposal's changes, counted."
+    },
+    "proposal_from": {
+      "text": "{{who}} proposes: {{what}}",
+      "doc": "Above an admin's settings Save: a member's open proposal; {{what}} lists its changes."
+    },
+    "proposal_accept": {
+      "text": "Accept",
+      "doc": "Admin's button: take the member's proposal over (votes yes)."
+    },
+    "proposal_decline": {
+      "text": "Decline",
+      "doc": "Admin's button: turn the member's proposal down (votes no)."
     },
     "send_proposal": {
       "text": "Send proposal →",
@@ -6156,6 +6196,10 @@
       "text": "Sign in to a pod",
       "doc": "S4 — start Solid sign-in so sealed circles store to your pod."
     },
+    "pod_sign_in_failed": {
+      "text": "Sign-in failed.",
+      "doc": "The pod sign-in did not complete (an alert after the sign-in button; the error, when there is one, is shown instead)."
+    },
     "pod_connecting": {
       "text": "Connecting…",
       "doc": "cluster J — pod sign-in in progress (v2 Me screen)."
@@ -8341,6 +8385,10 @@
       "cancelEvent": {
         "text": "Cancel event",
         "doc": "Row-action button for calendar:cancelEvent, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
+      },
+      "updateEvent": {
+        "text": "Change",
+        "doc": "Row-action button for calendar:updateEvent: change an appointment (its title and/or moment)."
       }
     },
     "agents": {
@@ -9232,6 +9280,322 @@
     "edit": {
       "text": "Edit",
       "doc": "The header switcher: open that self's own editor."
+    }
+  },
+  "params": {
+    "scope": {
+      "device": {
+        "text": "This device",
+        "doc": "A group on the settings screen: where these values live."
+      },
+      "agent": {
+        "text": "You, on all your devices",
+        "doc": "A group on the settings screen: where these values live."
+      },
+      "circle": {
+        "text": "This circle",
+        "doc": "A group on the settings screen: where these values live."
+      }
+    },
+    "key": {
+      "nearby_ask_defaultTtlMs": {
+        "text": "How long a nearby question stays open",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "calendarEmission_defaultDurationMin": {
+        "text": "Default length of an appointment (minutes)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "onlineCadence_pollIntervalMs": {
+        "text": "How often this device checks who is online",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "history_mirror": {
+        "text": "Keep your history in your own storage",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "history_restore_recencyDays": {
+        "text": "When restoring, first the last … days",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "history_restore_maxPerCircle": {
+        "text": "When restoring, first the newest … messages per circle",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "wake_nudges": {
+        "text": "Wake signals when something is waiting",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "privacy_shareNknAddress": {
+        "text": "Share my network address",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_silo_chat": {
+        "text": "Keep conversations on this device",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_silo_tasks": {
+        "text": "Keep tasks on this device",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_silo_contacts": {
+        "text": "Keep contacts on this device",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_kringenOff": {
+        "text": "Circles this device does not keep",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_files_bytes": {
+        "text": "Files on this device",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "surface_pref": {
+        "text": "Where a bot's replies appear",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "transport_mode": {
+        "text": "Connection",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "display_theme": {
+        "text": "Appearance",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "app_lang": {
+        "text": "Language",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "relay_url": {
+        "text": "Relay server",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "app_developer": {
+        "text": "Developer view",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_apps": {
+        "text": "Apps the assistant may act in",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "home_startScreen": {
+        "text": "The app opens on",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_memoryDefault": {
+        "text": "How much the assistant remembers of a conversation",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_assignPolicy": {
+        "text": "Who may give something to someone else",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_names": {
+        "text": "Who sees the others' names",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_passedItems": {
+        "text": "What happens to what is done or past",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_passedKeepDays": {
+        "text": "Keep showing it for (days)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_cancelPolicy": {
+        "text": "Who may cancel an appointment",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_reminders": {
+        "text": "Reminders",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_feedbackChannel": {
+        "text": "Where feedback goes",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_quietHours": {
+        "text": "Quiet hours",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_reminderRules": {
+        "text": "When reminders are sent",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_usageVisible": {
+        "text": "Who sees the model use",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_monthlyTokenLimit": {
+        "text": "Monthly model limit (tokens)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_roles": {
+        "text": "What each role may do",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_householdInApp": {
+        "text": "The household in the app too",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_calendarFeed": {
+        "text": "Calendar subscription",
+        "doc": "A setting's label (projected from the parameter register)."
+      }
+    },
+    "opt": {
+      "inline": {
+        "text": "In the conversation",
+        "doc": "A choice on the settings screen."
+      },
+      "screen": {
+        "text": "On a screen of its own",
+        "doc": "A choice on the settings screen."
+      },
+      "chat": {
+        "text": "As a message",
+        "doc": "A choice on the settings screen."
+      },
+      "nkn": {
+        "text": "Network (NKN)",
+        "doc": "A choice on the settings screen."
+      },
+      "relay": {
+        "text": "Relay",
+        "doc": "A choice on the settings screen."
+      },
+      "both": {
+        "text": "Both",
+        "doc": "A choice on the settings screen."
+      },
+      "system": {
+        "text": "Like the device",
+        "doc": "A choice on the settings screen."
+      },
+      "light": {
+        "text": "Light",
+        "doc": "A choice on the settings screen."
+      },
+      "dark": {
+        "text": "Dark",
+        "doc": "A choice on the settings screen."
+      },
+      "lang_device": {
+        "text": "Like the device",
+        "doc": "A choice on the settings screen."
+      },
+      "nl": {
+        "text": "Dutch",
+        "doc": "A choice on the settings screen."
+      },
+      "en": {
+        "text": "English",
+        "doc": "A choice on the settings screen."
+      },
+      "full": {
+        "text": "In full",
+        "doc": "A choice on the settings screen."
+      },
+      "description": {
+        "text": "Only the description",
+        "doc": "A choice on the settings screen."
+      },
+      "off": {
+        "text": "Off",
+        "doc": "A choice on the settings screen."
+      },
+      "on": {
+        "text": "On",
+        "doc": "A choice on the settings screen."
+      },
+      "short": {
+        "text": "Short",
+        "doc": "A choice on the settings screen."
+      },
+      "long": {
+        "text": "Long",
+        "doc": "A choice on the settings screen."
+      },
+      "roles": {
+        "text": "By the roles",
+        "doc": "A choice on the settings screen."
+      },
+      "anyone": {
+        "text": "Anyone",
+        "doc": "A choice on the settings screen."
+      },
+      "self": {
+        "text": "Only themselves",
+        "doc": "A choice on the settings screen."
+      },
+      "members": {
+        "text": "Members",
+        "doc": "A choice on the settings screen."
+      },
+      "assigners": {
+        "text": "Who assigns",
+        "doc": "A choice on the settings screen."
+      },
+      "admin": {
+        "text": "Admin",
+        "doc": "A choice on the settings screen."
+      },
+      "none": {
+        "text": "No one",
+        "doc": "A choice on the settings screen."
+      },
+      "keep": {
+        "text": "Keep",
+        "doc": "A choice on the settings screen."
+      },
+      "hide": {
+        "text": "Hide",
+        "doc": "A choice on the settings screen."
+      },
+      "delete": {
+        "text": "Remove",
+        "doc": "A choice on the settings screen."
+      },
+      "own": {
+        "text": "Whoever made it",
+        "doc": "A choice on the settings screen."
+      },
+      "standard": {
+        "text": "Standard",
+        "doc": "A choice on the settings screen."
+      },
+      "flat": {
+        "text": "Everyone the same",
+        "doc": "A choice on the settings screen."
+      }
+    },
+    "bad_number": {
+      "text": "That is not a number.",
+      "doc": "A settings field that takes a number got something else."
+    },
+    "unit_hours": {
+      "text": "hours",
+      "doc": "Unit after a duration field."
+    },
+    "unit_minutes": {
+      "text": "minutes",
+      "doc": "Unit after a duration field."
+    },
+    "unit_seconds": {
+      "text": "seconds",
+      "doc": "Unit after a duration field."
+    },
+    "list_hint": {
+      "text": "Separated by commas",
+      "doc": "Under a field that takes a list."
+    },
+    "title": {
+      "text": "Settings",
+      "doc": "Heading of the settings projected from the parameter register."
+    },
+    "save_failed": {
+      "text": "Not saved.",
+      "doc": "A settings value could not be saved."
     }
   }
 }

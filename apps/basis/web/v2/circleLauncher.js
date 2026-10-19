@@ -256,6 +256,12 @@ function renderTile(c, { previews, proposals, pinnedMap, mutedMap, sights = {}, 
     vb.className = 'circle-tile__proposals';
     vb.setAttribute('aria-label', tr('circle.tile_proposals', { count: pending }));
     vb.textContent = String(pending);
+    // its tap leads to where the proposal is answered: the circle's settings
+    if (typeof handlers?.onSettings === 'function') {
+      vb.setAttribute('role', 'button');
+      vb.tabIndex = 0;
+      vb.addEventListener('click', (e) => { e.stopPropagation(); handlers.onSettings(c.id); });
+    }
     tile.appendChild(vb);
   }
 

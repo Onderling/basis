@@ -235,8 +235,16 @@
   .circle-settings__back,
   .circle-settings__title,
   .circle-settings__save,
+  .circle-settings__proposal,
   .circle-settings__note { column-span: all; }
 }
+/* an open proposal an admin answers here: what it changes, then take it over or turn it down */
+.circle-settings__proposal {
+  margin: 12px 0; padding: 10px 12px; border-left: 3px solid var(--accent);
+  background: var(--paper-2); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.circle-settings__proposal-text { margin: 0 0 8px; }
+.circle-settings__proposal button { margin-right: 8px; }
 
 /* ───────────────────── launcher (board 1) ───────────────────── */
 /* β.3 — per-kind sections; header style inherits from the global
@@ -541,25 +549,25 @@
    in the conversation view. Quiet by default; the whole strip warms when a filter is active, so a
    narrowed conversation never looks like a missing one. */
 /* J-CS10 — what enabling notifications costs, said where the choice is made. Quiet, not alarming. */
-.cc-mydata__notif-privacy { font-size: 12px; color: var(--cc-ink-soft, #6b6b6b); margin: 0 0 6px; line-height: 1.45; }
+.cc-mydata__notif-privacy { font-size: 12px; color: var(--ink-soft); margin: 0 0 6px; line-height: 1.45; }
 
 /* J-CS8 — the global-address publication lock. */
 .cc-mydata__address-sharing { margin: 0 0 4px; }
-.cc-mydata__address-sharing-cost { font-size: 12px; color: var(--cc-ink-soft, #6b6b6b); margin: 0 0 8px; }
+.cc-mydata__address-sharing-cost { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
 
 /* P1 §4 tail — the retention choice row in My data. */
 .cc-mydata__retention { display: flex; flex-wrap: wrap; gap: 6px; }
-.cc-mydata__retention-choice.is-on { background: var(--cc-accent-soft, rgba(0,0,0,0.07)); border-color: transparent; font-weight: 600; }
-.cc-mydata__retention-note { font-size: 12px; color: var(--cc-ink-soft, #6b6b6b); margin: 6px 0 0; }
+.cc-mydata__retention-choice.is-on { background: var(--paper-2); border-color: transparent; font-weight: 600; }
+.cc-mydata__retention-note { font-size: 12px; color: var(--ink-soft); margin: 6px 0 0; }
 
 .circle-view__filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; }
-.circle-view__filter--active { background: var(--cc-surface-2, rgba(0,0,0,0.035)); border-radius: 8px; }
+.circle-view__filter--active { background: var(--paper-2); border-radius: 8px; }
 .circle-view__filter-chip { font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px; border-radius: 999px;
-  border: 1px solid var(--cc-line, rgba(0,0,0,0.15)); background: transparent; color: var(--cc-ink-soft, #5b5b5b); cursor: pointer; }
-.circle-view__filter-chip.is-on { background: var(--cc-accent-soft, rgba(0,0,0,0.07)); color: var(--cc-ink, #222); border-color: transparent; }
+  border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer; }
+.circle-view__filter-chip.is-on { background: var(--paper-2); color: var(--ink); border-color: transparent; }
 .circle-view__filter-chip:disabled { cursor: default; opacity: 0.55; }
-.circle-view__filter-sep { width: 1px; height: 14px; background: var(--cc-line, rgba(0,0,0,0.15)); margin: 0 2px; }
-.circle-view__filter-note { flex-basis: 100%; font-size: 11px; color: var(--cc-ink-soft, #6b6b6b); }
+.circle-view__filter-sep { width: 1px; height: 14px; background: var(--line); margin: 0 2px; }
+.circle-view__filter-note { flex-basis: 100%; font-size: 11px; color: var(--ink-soft); }
 
 .circle-view__list { flex: 1; overflow-y: auto; padding: 4px 0 8px; display: flex; flex-direction: column; gap: 9px; }
 .circle-view__empty { color: var(--ink-soft); font-style: italic; padding: 16px 4px; text-align: center; }
@@ -878,7 +886,7 @@
   width: 100%; height: 100%; border-radius: 50%;
   object-fit: cover;          /* fill the circle; never distort a face to fit it */
   display: block;
-  background: var(--cc-line, #e4e0d8);   /* the ground while it decodes, so the row does not flash */
+  background: var(--line);   /* the ground while it decodes, so the row does not flash */
 }
 .cc-contacts__body { flex: 1 1 auto; min-width: 0; }
 .cc-contacts__name { font-weight: 600; color: var(--ink); }
@@ -1301,8 +1309,8 @@
 .cc-wizard-pod-disclosure {
   margin: 8px 0;
   padding: 8px 10px;
-  border-left: 3px solid var(--warn, #b8860b);
-  background: var(--surface-soft, rgba(184, 134, 11, 0.06));
+  border-left: 3px solid var(--amber);
+  background: var(--amber-bg);
   font-size: 13px;
 }
 .cc-wizard-advice { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; margin: 6px 0; }

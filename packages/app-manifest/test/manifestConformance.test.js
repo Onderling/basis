@@ -108,6 +108,11 @@ describe('manifestConformance: the guard bites (negative cases)', () => {
     expect(r.issues.some((i) => i.code === 'nouns-required')).toBe(true);
   });
 
+  it('an extension\'s noun (under its own app, an itemType) with its own atoms — op-less — is not vacuous', () => {
+    const r = manifestConformance({ app: 'plants', version: '0.1.0', description: 'x', itemTypes: ['plants.plant'], operations: [], nouns: { 'plants.plant': { atoms: ['add', 'list'] } } });
+    expect(r.issues.some((i) => i.code === 'nouns-vacuous')).toBe(false);
+  });
+
   it('rejects a vacuous `nouns` block on a shell manifest (nouns-vacuous, §1a / #81)', () => {
     const m = baseline();
     m.nouns = { thing: { atoms: ['add'] } }; // declared, but no noun-bearing op uses it

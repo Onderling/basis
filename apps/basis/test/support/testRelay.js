@@ -35,7 +35,8 @@ export async function startJourneyRelay(opts = {}) {
   return {
     url: `ws://127.0.0.1:${relay.port}`,
     external: false,
-    close: async () => { try { await relay?.close?.(); } catch { /* teardown is best-effort */ } },
+    // the relay's own teardown is `stop` (it has no `close`): without it every relay a suite starts keeps its port
+    close: async () => { try { await relay?.stop?.(); } catch { /* teardown is best-effort */ } },
   };
 }
 

@@ -85,6 +85,8 @@ export class RelayTransport extends Transport {
   #bound             = new Set();
   #primaryDevice = () => false;
   #primaryAcked = false;
+  /** What this node serves the relay's seat (its own address only), sent on its own register frame. */
+  #serves = [];
   /** alias address → `primary: true` when it registers as the primary (from `addAddress`). */
   #primaryFlags = new Map();
   /** alias address → the caller's `sign(message)` (from `addAddress`). The primary uses `identity`. */
@@ -119,6 +121,9 @@ export class RelayTransport extends Transport {
     // own `register` as `primary: true`; the relay then delivers to this socket while it lives, and a plain
     // registration by another of the person's devices stands by. Absent → plain, as before.
     this.#primaryDevice = typeof opts.primaryDevice === 'function' ? opts.primaryDevice : () => opts.primaryDevice === true;
+    // What this node serves the relay's own seat, said by the node ITSELF on its own register frame (`['feed']`: the
+    // relay may forward a person's agenda link here). The relay asks no node that did not say so. Absent → nothing.
+    this.#serves = Array.isArray(opts.serves) ? opts.serves.filter((x) => typeof x === 'string') : [];
     // Called when the relay reports it gave up on a message we sent (see the 'undelivered' frame below).
     // A plain assignable property rather than an event emitter — this class has no emitter, and one
     // consumer is all this has ever needed.
@@ -348,7 +353,9 @@ export class RelayTransport extends Transport {
   #sendRegister(address, primary = false) {
     this.#asked.add(address);
     this.#proved.delete(address);
-    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}) }));
+    // `serves` rides only the socket's OWN address — an alias never opts the node into anything
+    const serves = address === this.address && this.#serves.length ? { serves: this.#serves } : {};
+    this.#ws.send(JSON.stringify({ type: 'register', address, ...(primary ? { primary: true } : {}), ...serves }));
   }
 
   /** Sign the relay's nonce for `address` and send the proof. Silent about addresses we never asked for. */

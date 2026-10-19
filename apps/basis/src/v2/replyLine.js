@@ -50,6 +50,7 @@ export const REPLY_FAMILY = Object.freeze({
   rsvpDecline: 'appointment',
   rsvpTentative: 'appointment',
   cancelEvent: 'appointment',
+  updateEvent: 'appointment',
   createList: 'list',
   removeList: 'list',
   restoreList: 'list',
@@ -133,6 +134,7 @@ export function replyFact(result, { opId, args = {} } = {}) {
       if (!result.title || !result.startsAt) return own;
       const key = id === 'addEvent' ? (result.duplicate ? 'circle.calendar.already_there' : 'circle.calendar.added')
         : id === 'cancelEvent' ? 'circle.calendar.cancelled'
+        : id === 'updateEvent' ? 'circle.calendar.updated'
           : `circle.calendar.rsvp_${RSVP[id]}`;
       // a day without a time (local midnight — the whole day) is said without a time, as a chore's day is
       return { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: 'auto' } };

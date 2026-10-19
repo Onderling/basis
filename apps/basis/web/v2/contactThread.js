@@ -118,7 +118,7 @@ export function renderContactThread(container, {
     mark.dataset.level = sealed.level;
     Object.assign(mark.style, {
       marginLeft: '8px', fontSize: '12px', lineHeight: '1.4', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px',
-      color: sealed.level === 'person' ? '#2e7d4f' : '#5b5d55',   // the theme's STATUS green / inkSoft
+      color: sealed.level === 'person' ? 'var(--green)' : 'var(--ink-soft)',   // the theme's status green / ink-soft (both schemes)
     });
     mark.textContent = `${sealed.level === 'person' ? '🔐' : '🔒'} ${sealed.label}`;
     mark.title = sealed.label;

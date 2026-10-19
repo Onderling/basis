@@ -191,15 +191,18 @@ export function announceControlFor({ members, myRef } = {}) {
 }
 
 /**
- * Whether this viewer's Save in Circle settings would count. The circle policy travels the governance lane as an
- * ADMIN's signed statement and every device folds only admins' (`foldPolicyUpdates`), so a member's Save would change
- * their own copy and be dropped everywhere else — the circle quietly split. Greyed for a member, with the reason; the
- * fields stay readable.
+ * What this viewer's Save in Circle settings does. The circle policy travels the governance lane as an ADMIN's signed
+ * statement and every device folds only admins' (`foldPolicyUpdates`), so a member's own Save would change their copy
+ * and be dropped everywhere else. A member's Save is therefore a PROPOSAL ("Stel voor": the `changePolicy` governance
+ * action, which an admin enacts); an admin's saves; a viewer the roster does not know yet waits, greyed (fail closed).
  * @param {object} a  `{ members, myRef }`
- * @returns {{disabled: boolean, reasonKey?: string}}
+ * @returns {{disabled: boolean, reasonKey?: string, propose?: boolean, labelKey?: string}}
  */
 export function policySaveControlFor({ members, myRef } = {}) {
-  return adminOnlyControl({ members, myRef });
+  const admin = adminOnlyControl({ members, myRef });
+  if (!admin.disabled) return admin;
+  const known = typeof myRef === 'string' && myRef && rows(members).some((m) => refOf(m) === myRef);
+  return known ? { disabled: false, propose: true, labelKey: 'circle.settings.propose' } : admin;
 }
 
 /** The one admin-only answer the panel's announcement and the settings' Save share (fail closed on an unknown viewer). */

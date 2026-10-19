@@ -317,6 +317,9 @@ const MIME = {
  *   stop: () => Promise<void>,
  * }>}
  */
+/** How long `stop()` waits for open sockets to close before ending them outright. */
+const STOP_GRACE_MS = 1_000;
+
 export async function startRelay(opts = {}) {
   const {
     port            = DEFAULT_PORT,
@@ -455,6 +458,9 @@ export async function startRelay(opts = {}) {
 
   /** address → WebSocket */
   const clients = new Map();
+  // The addresses that SAID they serve links (their own register frame, proven key) → the socket that said it. The feed
+  // seat asks no other address: knowing a connected address is not an invitation to hello it.
+  const feedNodes = new Map();
   // THE PRIMARY REGISTRATION (sync-policy §12, 2026-09-17): a client may register an address as `primary`. While a
   // primary socket holds the address, a plain registration for it STANDS BY instead of taking it over; the standby
   // takes over when the primary socket closes (or steps down by re-registering plainly). With no primary the old
@@ -635,7 +641,7 @@ export async function startRelay(opts = {}) {
     const o = (feeds && typeof feeds === 'object') ? feeds : {};
     mountFeedForward(httpServer, {
       serve: (node, link) => feedSeat.serve(node, link, o.timeoutMs != null ? { timeoutMs: o.timeoutMs } : {}),
-      isPresent: (node) => clients.get(node)?.readyState === 1,
+      isPresent: (node) => { const sock = clients.get(node); return sock?.readyState === 1 && feedNodes.get(node) === sock; },
       isRefused: (node) => feedSeat.isRefused(node),
       ...(o.timeoutMs != null ? { timeoutMs: o.timeoutMs } : {}),
       ...(o.maxInFlight != null ? { maxInFlight: o.maxInFlight } : {}),
@@ -654,6 +660,7 @@ export async function startRelay(opts = {}) {
     let registeredAddress = null;
     const registeredAddresses = new Set();
     const pendingPrimary = new Map();   // address → the `primary` flag its register frame carried, read at proof time
+    const pendingServes = new Map();    // address → whether its register frame said it serves links (`serves: ['feed']`), read at proof time
     /**
      * nonce → { address, expiresAt, meterGroupId } — challenges this socket has been issued and
      * not yet answered (Decision 3). Per SOCKET, not global: a nonce is only answerable on the
@@ -749,6 +756,7 @@ export async function startRelay(opts = {}) {
       if (msg.type === 'register') {
         const { address, groupProof, rotationProof } = msg;
         pendingPrimary.set(address, msg.primary === true);
+        pendingServes.set(address, Array.isArray(msg.serves) && msg.serves.includes('feed'));
         if (!address) {
           socket.send(JSON.stringify({ type: 'error', message: 'Missing address' }));
           return;
@@ -863,6 +871,9 @@ export async function startRelay(opts = {}) {
         const role = takeAddress(address, socket, pendingPrimary.get(address) === true);
         if (role === 'standby') logLine(`[relay] standby     ${shortId(address)} (a primary holds it)`);
         else clients.set(address, socket);
+        // The seat may ask this address only if it said so itself, here, on the socket that just proved its key.
+        if (pendingServes.get(address) === true) feedNodes.set(address, socket);
+        else if (feedNodes.get(address) === socket) feedNodes.delete(address);
 
         // Decision 2(a): a push token registered on this socket covers EVERY address it owns — including
         // ones registered later. Registering per-address would give N chances to forget one, and a
@@ -1109,7 +1120,7 @@ export async function startRelay(opts = {}) {
       if (registeredAddress) {
         // Every address this socket owned goes with it — leaving one behind would route to a dead socket;
         // an address another of the person's devices stands by for falls to that device, live.
-        for (const addr of registeredAddresses) releaseAddress(addr, socket);
+        for (const addr of registeredAddresses) { releaseAddress(addr, socket); if (feedNodes.get(addr) === socket) feedNodes.delete(addr); }
         // Phase 2A — drop the address→group lookup so per-day-msg gating
         // doesn't leak stale slots.
         for (const addr of registeredAddresses) groupByAddress.delete(addr);
@@ -1144,8 +1155,17 @@ export async function startRelay(opts = {}) {
     if (feedSeat) await feedSeat.stop();
     for (const [, s] of clients) { try { s.close(); } catch {} }
     clients.clear();
-    await new Promise(r => wss.close(() => r()));
-    await new Promise(r => httpServer.close(() => r()));
+    // Both closes wait for every open socket. A clean stop finishes at once; one held open — a client that never
+    // registered, or never answers a close — would hold it forever, so after a grace it is ended outright.
+    const graceOver = (p) => Promise.race([p.then(() => false), new Promise(r => setTimeout(() => r(true), STOP_GRACE_MS))]);
+    const endAll = () => {
+      for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
+      try { httpServer.closeAllConnections?.(); } catch {}
+    };
+    const wssClosed = new Promise(r => wss.close(() => r()));
+    if (await graceOver(wssClosed)) { endAll(); await wssClosed; }
+    const httpClosed = new Promise(r => httpServer.close(() => r()));
+    if (await graceOver(httpClosed)) { endAll(); await httpClosed; }
     try { await mrQueue.close(); } catch {}
   }
 

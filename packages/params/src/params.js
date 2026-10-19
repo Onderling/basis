@@ -180,7 +180,8 @@ export function createParamRegistry() {
     userParams() {
       return [...specs.values()]
         .filter((s) => s.kind === PARAM_KIND.USER)
-        .map((s) => ({ key: s.key, scope: s.scope, default: s.default, value: api.valueOf(s.key), home: PARAM_HOME_FOR[s.scope] }));
+        // `choices` (a closed set, when the spec declares one) rides along: the settings surface offers it as a choice
+        .map((s) => ({ key: s.key, scope: s.scope, default: s.default, value: api.valueOf(s.key), home: PARAM_HOME_FOR[s.scope], ...(Array.isArray(s.choices) ? { choices: s.choices } : {}) }));
     },
   };
   return api;

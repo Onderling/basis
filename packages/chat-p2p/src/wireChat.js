@@ -35,7 +35,7 @@
  *
  * **Attachments.** Optional. When an app passes
  * `attachmentSupport: { attachmentPath, readAttachmentBytesB64,
- * maxBytesPerAttachment }`, the substrate wires the
+ * maxBytesPerAttachment, mayServe }`, the substrate wires the
  * `attachment-request` / `attachment-response` flow and the inline
  * chat-message attachment path. When `attachmentSupport` is absent,
  * those code paths are no-ops.
@@ -120,6 +120,9 @@ export function wireChat({
   const attachmentPath           = attachmentSupport?.attachmentPath ?? null;
   const readAttachmentBytesB64   = attachmentSupport?.readAttachmentBytesB64 ?? null;
   const maxBytesPerAttachment    = attachmentSupport?.maxBytesPerAttachment ?? Infinity;
+  // Who may fetch a post's bytes: the app's audience check `(item, requesterPubKey) => boolean` (the circle's roster,
+  // the thread's contact). Without one the author answers no one — knowing an item and attachment id is not enough.
+  const mayServeAttachment       = typeof attachmentSupport?.mayServe === 'function' ? attachmentSupport.mayServe : null;
 
   /** Track recently-seen nonces so resends don't duplicate items. */
   const seenNonces = new Set();
@@ -438,6 +441,10 @@ export function wireChat({
       // Author check: addedBy must equal localActor (we're the
       // sender of the post).  Mirrored items don't pass.
       if (!ours || ours.addedBy !== localActor) return;
+      // Audience check: only a requester the post was shared with is answered; anyone else is ignored, silently
+      // (no "it exists" signal). No check wired → no one.
+      if (!mayServeAttachment) return;
+      if ((await Promise.resolve(mayServeAttachment(ours, fromPubKey)).catch(() => false)) !== true) return;
       const attachments = Array.isArray(ours.source?.attachments) ? ours.source.attachments : [];
       const att = attachments.find(a => a?.id === attId);
       if (!att || !att.ref) return;

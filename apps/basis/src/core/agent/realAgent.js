@@ -101,6 +101,7 @@ import { createPersonKeySync, routePersonKeySync, PERSON_KEY_CARRY } from '../..
 import { createPrimaryDeviceChoice } from '../../v2/primaryDevice.js';
 import { pairRouteFor } from '../../v2/pairRoster.js';
 import { createPersonKeyChain } from '../../v2/personKeyChain.js';
+import { createProfileFactsSync, routeProfileFactsBySender } from '../../v2/profileFactsSync.js';
 import { createKnownPeersSync, routeKnownPeersBySender } from '../../v2/knownPeersSync.js';
 import { backfillContactPersonas } from '../../v2/contactPersona.js';   // contacts from before the lens get `default`, where provable
 import { bookRowsOf } from '../../v2/contactsSource.js';   // a listContacts reply's rows, whole
@@ -173,12 +174,13 @@ import {
   ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf,
   isRequestable,
   effectiveProperties,
+  profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt, FACTS_AT_KEY,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
 // that mints a `request` task instead of executing an offering. Wired below onto the
 // live host agent as the `requestOffering` peer-facing dispatcher op.
-import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers } from '@onderling/item-store';
+import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers, retentionWindowFor, RETAIN } from '@onderling/item-store';
 import { matchProfileDrivers } from '@onderling/agent-registry';
 import { isAwayNow } from '../../v2/memberAvailability.js';
 
@@ -254,7 +256,8 @@ import { buildHouseholdDataSource }        from '../../../../household/src/stora
 import { householdManifest }               from '../../../../household/manifest.js';
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
-import { mergeManifests }                  from '../../manifestMerge.js';                // the catalogue `/help` prints from
+import { mergeManifests }                  from '../../manifestMerge.js';
+import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
 import { makeTasksOps, TASKS_IN_CIRCLE_OPS } from '../../v2/tasksOps.js';   // the bot's chores over the circle's store
@@ -267,7 +270,7 @@ import { calendarManifest }                from '../../../../calendar/manifest.j
 import { matchEntry, choicesOf }           from '../../v2/entryRef.js';
 import { refuse, firstRefusal, refusalText } from '../../v2/refusal.js';                   // the one refusal shape, the one order
 import { botDoorChecks } from '../../v2/botRungs.js';
-import { opDeclared } from '../../v2/manifestSources.js';                                            // the bot door's checks, declared once
+import { opDeclared, allManifests } from '../../v2/manifestSources.js';                                            // the bot door's checks, declared once
 import { assignAllowed, assignPolicyFrom, mayNamePeople, isSelfWord, ASSIGN_POLICY_KEY, NAMES_KEY, PASSED_KEY, PASSED_DAYS_KEY, passedPolicyFrom, passedDaysFrom, CANCEL_KEY, cancelPolicyFrom, ROLES_KEY, rolesPresetFrom } from '../../v2/botSettings.js';   // who may give a chore to whom, who sees names
 import { buildStandardRolePolicy } from '@onderling-app/tasks';                              // the one role rule for chores                           // an entry by its id or a person's words
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
@@ -541,7 +544,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   householdDataSource = opts.householdPersistDb
     ? await buildHouseholdDataSource(opts.householdPersistDb, { strategy: contentSeal })
     : undefined;
+  // THE EXTENSIONS this node runs with: their nouns join the stores' registry (checked: under their origin, no shadow,
+  // their words their own); their free atoms run over the same circle stores. Refused ones bring nothing.
+  const storeRegistry = householdApp.householdRegistry();
+  const { installed: installedExtensions } = composeExtensions(opts.extensions, { registry: storeRegistry, firstParty: allManifests() });
   householdService = householdApp.createHouseholdService({
+    registry: storeRegistry,
     dataSource: householdDataSource,
     dataSourceFor: (id) => circleMedia.get(id) ?? null,
     // what a write is made for, when a planned row made it (`opts.writeOrigin`: the host's runner's ambient origin)
@@ -1303,6 +1311,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The READ side of the circle-membership registry, exposed OUT of the block below (where agentsRegistry
   // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
   // degraded/bare registry simply re-opens nothing rather than throwing at boot.
+  // the profile-facts carry (below): which profiles are landing a sibling's facts right now (written, not re-told), and
+  // the hook the registry's write seam calls when a profile's facts changed here (late-bound: the carry is built later)
+  const factsLanding = new Set();
+  let profileFactsChanged = null;
   let readSelfCircleMemberships = async () => ({});
   let readAllSelvesCircleMemberships = async () => ({});
   // Siblings follow a circle (composed below, once the sibling set is known): the registry setter — the one seam
@@ -1356,6 +1368,23 @@ export async function createRealHouseholdAgent(opts = {}) {
         opts: { capabilities: ['basis'], name: opts.agentsSelfName ?? 'basis (this device)' },
       }))
       ?? createAgentRegistry({ pseudoPod: registryPseudoPod, deviceId: chatId.pubKey });
+
+    // THE FACTS' WRITE SEAM: every writer of a profile's curated properties or disclosure ends in `register` (the
+    // property, driver, disclosure and Nearby ops, a persona's creation…). A change of the FACTS is stamped here
+    // (`factsAt`) and told to the devices holding that self (`profileFactsSync`), so a person's devices keep them the
+    // same without a pod. A landing from a sibling writes through the same seam, unstamped and untold.
+    {
+      const rawRegister = agentsRegistry.register.bind(agentsRegistry);
+      agentsRegistry.register = async (entry) => {
+        if (!entry?.agentId || factsLanding.has(entry.agentId)) return rawRegister(entry);
+        let before = null;
+        try { before = await agentsRegistry.lookup(entry.agentId); } catch { before = null; }
+        if (!factsDiffer(before ?? {}, entry)) return rawRegister(entry);
+        const out = await rawRegister({ ...entry, properties: { ...(entry.properties ?? {}), [FACTS_AT_KEY]: factsStamp(nextFactsAt(profileFactsOf(before ?? {}).factsAt, Date.now())) } });
+        try { profileFactsChanged?.(entry.agentId); } catch { /* the siblings ask on connect */ }
+        return out;
+      };
+    }
 
     // Expose the default profile's circle-membership map outward (see the outer `let`): the restore-and-open
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
@@ -2537,7 +2566,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         // contact owns (greetings of strangers, siblings) — never a persona's contacts' keys
         const ownAddrs = new Set(ownBook.map((c) => c?.webid).filter(Boolean));
         const peers = pid ? bindings.filter((b) => ownAddrs.has(b?.address)) : bindings.filter((b) => !others.has(b?.address));
-        return { peers, contacts: ownBook };
+        // …and the contacts re-filed AWAY from this self here, within the keep-aside window: an old-self device that
+        // slept through the live mark still learns the contact left (webid + when; never the self it went to)
+        const since = Date.now() - retentionWindowFor(RETAIN.KEEP_ASIDE);
+        let moved = [];
+        try { moved = (await rawPinboard('listRefiledContacts', {}))?.refiled ?? []; } catch { moved = []; }
+        const refiled = moved.filter((e) => Number.isFinite(e?.at) && e.at >= since && (selfOfContactRow({ persona: e.from }) ?? null) === (pid ?? null))
+          .map((e) => ({ webid: e.webid, refiledAt: e.at }));
+        return { peers, contacts: ownBook, refiled };
       },
       learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
       contacts: {
@@ -2555,6 +2591,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         }),
         // …and a newer identity link to a household bot (or its undoing), by the same rule
         setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
+        // …and a contact re-filed under another self on a device of the person leaves THIS self's book here
+        forget: (webid) => rawPinboard('forgetContact', { webid }),
       },
       onLanded: () => savePeerBindings(),
     });
@@ -2570,6 +2608,34 @@ export async function createRealHouseholdAgent(opts = {}) {
     forContact: (c) => { const pid = selfOfContactRow(c); return pid ? (personas.has(pid) ? personaKnownPeers(pid) : null) : generalKnownPeers; },
     onRefused: (reason, from) => console.warn(`[known-peers] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
   });
+  // A PROFILE'S FACTS, between the devices holding that self (profileFactsSync.js): per self, its siblings, sent as it.
+  const profileFactsSyncs = new Map();
+  const profileFactsFor = (pid) => {
+    if (!pid || !personas.has(pid)) return null;
+    if (profileFactsSyncs.has(pid)) return profileFactsSyncs.get(pid);
+    const general = pid === 'default';
+    const s = createProfileFactsSync({
+      siblings: general ? ownDeviceSiblings : () => personaSiblings(pid),
+      sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, general ? null : pid),
+      current: async () => { const e = await agentsRegistryRef?.lookup?.(pid); return e ? profileFactsOf(e) : null; },
+      store: async (facts) => {
+        const cur = await agentsRegistryRef?.lookup?.(pid);
+        if (!cur) return false;
+        factsLanding.add(pid);
+        try { await agentsRegistryRef.register(withProfileFacts(cur, facts)); } finally { factsLanding.delete(pid); }
+        return true;
+      },
+      onRefused: (reason, from) => console.warn(`[profile-facts] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
+    });
+    profileFactsSyncs.set(pid, s);
+    return s;
+  };
+  const profileFactsSync = routeProfileFactsBySender({
+    all: () => [...personas.keys()].map(profileFactsFor).filter(Boolean),
+    forSelf: profileFactsFor,
+    onRefused: (reason, from) => console.warn(`[profile-facts] refused ${String(from).slice(0, 12)}… (${reason})`),
+  });
+  profileFactsChanged = (pid) => { profileFactsSync.fanFor(pid).catch(() => {}); };
   // THE CIRCLES THIS DEVICE IS IN, each as the entry a sibling joins from — the enrol offer's circle shape
   // (`{id, handle, address, relays}`, the address THIS device's per-circle one). Built once, for the add-a-device
   // offer and for the follow carry alike: the registry's records first, then whatever the substrate holds
@@ -5635,6 +5701,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
         const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
+        // the own store answers the atoms a noun DECLARES, as a circle does (one contract; the generic handlers alone
+        // would answer any atom for any noun)
+        if (ownCap && !(householdManifest.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)) {
+          return { ok: false, code: 'unimplemented', atom: g.atom, noun: g.noun };
+        }
+        // a write IN a circle rides its signed lane: wire the circle's publish valve first, as every op in a circle does
+        // (without it the write stayed on this device unless another op had happened to open the circle)
+        if (!ownCap && capCtx.circleId) await ensureCircleSync(capCtx.circleId);
         const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.
@@ -5671,6 +5745,18 @@ export async function createRealHouseholdAgent(opts = {}) {
           }
         }
         return done;
+      }
+      // An INSTALLED extension's noun: its free atoms over the circle's one store, read from its own declaration (the
+      // noun is under its origin, checked at compose). A circle's only — a person's own scope takes no extension type yet.
+      const ext = installedExtensions.get(g?.app);
+      if (ext && householdService && g.noun.startsWith(`${g.app}.`) && (ext.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)) {
+        if (args?.circleId === OWN_DEVICES_SCOPE || (typeof args?.circleId === 'string' && args.circleId.startsWith(`${OWN_DEVICES_SCOPE}:`))) {
+          return { ok: false, code: 'extension-not-in-own-scope', error: 'extension-not-in-own-scope' };
+        }
+        const capCtx = { circleId: resolveCircleId(args), by: actorOf(ctx) ?? chatId?.pubKey };
+        await ensureCircleSync(capCtx.circleId);   // its writes ride the circle's signed lane like any other type's
+        try { return await householdService.callCapability(g.atom, g.noun, args ?? {}, capCtx, { manifest: ext }); }
+        catch (err) { return { ok: false, error: String(err?.message ?? err) }; }
       }
       // An app with no generic handler → a structured error, mirroring how callSkill
       // surfaces skill errors (never throw for this boundary case).
@@ -6190,6 +6276,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         };
       }
       let rawReply = null;   // the pinboard reply before shaping — the own-devices fan below reads the contact row
+      // the row as it was filed BEFORE a lens change, so a move between selves can be told to the old self's devices
+      let contactBefore = null;
+      if (realOpId === 'setContactPersona' && typeof realArgs?.webid === 'string') {
+        try { contactBefore = (await rawContacts()).find((c) => c?.webid === realArgs.webid) ?? null; } catch { contactBefore = null; }
+      }
       const runPinboard = async () => {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(pinboardAgent.address, realOpId, parts, pinboardActAs(realArgs));
@@ -6222,6 +6313,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // …and what a contact sees of the person (L125), by the same carry: changed here, changed on every device.
       if ((realOpId === 'setContactHidden' || realOpId === 'setContactPersona') && rawReply?.contact) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
+      }
+      // A contact RE-FILED under another self: the row rides the new self's lane (above); the OLD self's devices hear it
+      // left — webid and when only, so they never learn which self it went to.
+      if (realOpId === 'setContactPersona' && rawReply?.contact && contactBefore
+          && (selfOfContactRow(contactBefore) ?? null) !== (selfOfContactRow(rawReply.contact) ?? null)) {
+        knownPeersSync.fanRefiled(contactBefore, { webid: rawReply.contact.webid, refiledAt: rawReply.contact.personaAt ?? Date.now() }).catch(() => {});
       }
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
       // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how
@@ -6289,7 +6386,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Agenda's children — not the per-agent in-memory CalendarStore below, which a person's node keeps.
     // A household bot's appointment is cancelled by the one who added it, or the admin — unless the admin keeps that
     // to themselves (`assistant.cancelPolicy`). The op's rule and the door's setting refuse in the one shape.
-    if (appOrigin === 'calendar' && opId === 'cancelEvent' && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
+    if (appOrigin === 'calendar' && (opId === 'cancelEvent' || opId === 'updateEvent') && opts.calendarInCircle && typeof ctx?.caller === 'string' && ctx.caller
         && doorRoles.get(ctx.caller) !== 'admin'
         // under the `flat` roles preset, members and coordinators cancel anyone's appointment, as the admin does
         && !(rolesPresetFrom(paramsService.register.valueOf(ROLES_KEY)) === 'flat' && ['member', 'coordinator'].includes(doorRoles.get(ctx.caller)))) {
@@ -6307,7 +6404,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // item in their own-devices store, under an own Agenda, served by the same ops as a circle's.
     // A composition with neither option (a test, a tool) is a person's node with an in-memory own store.
     const personNode = opts.personalCalendar || !opts.calendarInCircle;
-    if (appOrigin === 'calendar' && personNode && !args?.circleId) {
+    // …and the own calendar is the person's on THIS device only: a door's call never reaches it (it would have read,
+    // changed and cancelled the person's own appointments) — it falls to the circle's calendar below, as a door's note
+    // falls to the circle's notes
+    const calendarDoorCall = typeof ctx?.caller === 'string' && !!ctx.caller;
+    if (appOrigin === 'calendar' && personNode && !args?.circleId && !calendarDoorCall) {
       ownCalendarReady ??= (async () => {
         ownCalendarStore = await getOwnStore();
         const tr = agentT;
@@ -6329,7 +6430,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const res = await handler(args ?? {});
       // where it was saved, as every write's reply says it: on this device, no peer to wait for (the own store
       // reaches the person's other devices, never a circle's members) — the renderer's "saved locally"
-      const writes = ['addEvent', 'cancelEvent', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative'];
+      const writes = ['addEvent', 'updateEvent', 'cancelEvent', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative'];
       return res?.ok && writes.includes(opId) && !res._sync ? { ...res, _sync: { style: 'decentralized', peers: [], pending: [], unreachable: [] } } : res;
     }
     // A person's node (`opts.personalCalendar`, web and mobile): a call naming a circle reads and writes that circle's
@@ -8191,6 +8292,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // shells spread `handlers` into the router and kick `requestFromSiblings` on connect; the
     // announce landing calls `pushTo` for a device of mine that just appeared.
     knownPeersSync,
+    // a profile's facts (properties + disclosure) kept the same on the devices holding that self, without a pod
+    profileFactsSync,
     // Siblings follow a circle: the lane table spreads `handlers`; the shells `setConsume(entry => consumeCircleEntry(deps, entry))`
     // beside their enrol consume and kick `requestFromSiblings` on connect; the registry setter fans a new membership.
     circleFollowSync,

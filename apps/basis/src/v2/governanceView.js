@@ -72,9 +72,10 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       tally: p.decision?.tally ?? null,
       deadline: p.deadline ?? null,
       myVote,
-      // A member may vote on an OPEN member-vote proposal; admins get the override only once
-      // the deadline has passed (escape-hatch b). any-admin / admin-quorum aren't member-votable.
-      canVote: !p.closed && cls === 'member-vote' && !!myRef,
+      // A member may vote on an OPEN member-vote proposal; an admin also answers an open proposal that waits on the
+      // admins (admin-quorum, or a member's proposal under any-admin); admins get the override only once the deadline
+      // has passed (escape-hatch b).
+      canVote: !p.closed && !!myRef && (cls === 'member-vote' || (isAdmin && (cls === 'admin-quorum' || cls === 'any-admin'))),
       canOverride: !p.closed && cls === 'member-vote' && isAdmin && overrideAvailable,
       overrideAvailable,
       approved: p.status === DECISION_STATUS.APPROVED,

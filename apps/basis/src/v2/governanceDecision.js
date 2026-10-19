@@ -61,6 +61,13 @@ function finalVotes(votes) {
 }
 
 /**
+ * The actions a MEMBER may propose where the circle lets any one admin decide: the circle's settings (a member's own
+ * statement of them is dropped by every device, so their change goes to the admins as a proposal). Every other
+ * any-admin action stays the admin's alone.
+ */
+export const MEMBER_PROPOSABLE = Object.freeze(['changePolicy']);
+
+/**
  * Resolve a governance proposal to a status.
  *
  * @param {object} a
@@ -88,6 +95,13 @@ export function resolveGovernance({ action, policy, actor = null, members = [], 
 
   if (decisionClass === 'any-admin') {
     if (actor && isAdmin(actor.ref)) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'admin' };
+    // a member's proposal of an action members may propose: open until one admin answers it (their yes or no decides)
+    if (MEMBER_PROPOSABLE.includes(action)) {
+      const tally = { yes: yes.filter((v) => isAdmin(v.voter)).length, no: no.filter((v) => isAdmin(v.voter)).length, need: 1, of: admins.length };
+      if (tally.yes > 0) return { status: DECISION_STATUS.APPROVED, decisionClass, reason: 'admin', tally };
+      if (tally.no > 0) return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'admin-no', tally };
+      return { status: DECISION_STATUS.PENDING, decisionClass, reason: 'awaiting-admin', tally };
+    }
     return { status: DECISION_STATUS.REJECTED, decisionClass, reason: 'not-admin' };
   }
 

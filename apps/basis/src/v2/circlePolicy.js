@@ -435,6 +435,32 @@ export function mergeCirclePolicy(base, patch = {}) {
   return normalizeCirclePolicy(merged);
 }
 
+/** The policy fields kept as maps of their own (a change is per entry, as `mergeCirclePolicy` merges them). */
+const POLICY_MAP_FIELDS = Object.freeze(['features', 'capabilities', 'settings', 'governance']);
+
+/**
+ * What changed from `before` to `after`, as a patch `mergeCirclePolicy` applies: only the changed fields (per entry
+ * inside the map fields). A proposal carries this, so accepting it later is applied over the policy AS IT IS then —
+ * a change made in between is kept, never undone by a stale copy of the whole form.
+ * @param {object} before
+ * @param {object} after
+ * @returns {object}
+ */
+export function policyPatch(before, after) {
+  const b = normalizeCirclePolicy(before);
+  const a = normalizeCirclePolicy(after);
+  const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+  const patch = {};
+  for (const k of new Set([...Object.keys(b), ...Object.keys(a)])) {
+    if (POLICY_MAP_FIELDS.includes(k)) {
+      const sub = {};
+      for (const e of new Set([...Object.keys(b[k] ?? {}), ...Object.keys(a[k] ?? {})])) if (!same(b[k]?.[e], a[k]?.[e])) sub[e] = a[k]?.[e];
+      if (Object.keys(sub).length) patch[k] = sub;
+    } else if (!same(b[k], a[k])) patch[k] = a[k];
+  }
+  return patch;
+}
+
 export const DEFAULT_MEMBER_OVERRIDE = {
   chatOff:            false,
   revealOpen:         false,

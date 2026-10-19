@@ -215,7 +215,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
-import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
+import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -333,7 +333,9 @@ import {
 // The agent-detail activity card's rows — the device log narrowed to one agent (batch-4 trail).
 import { agentActivityRows } from '../../src/v2/agentActivity.js';
 // The advanced surface's projections (the "default places for any new opId" rule).
-import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
+import { advancedOpRows } from '../../src/v2/advancedSurface.js';
+import { settingsProjection } from '../../src/v2/settingsProjection.js';
+import { renderSettingsGroups } from './settingsPanel.js';
 // The flows substrate (#63): the one runner + the one projector — the restore-settings
 // flow's declaration lives on the params manifest; this shell only paints renderFlow.
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
@@ -785,7 +787,7 @@ import { setActiveCircle, getActiveCircle, subscribeActiveCircle } from '../../s
 import { normalizeCircleMembers, recipientSealKeyFromMembers } from '@onderling/kring-host/circleMembers';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
-import { mergeCirclePolicy, mergeMemberOverride, normalizeCirclePolicy, settingsChangeNeedsProposal } from '../../src/v2/circlePolicy.js';
+import { mergeCirclePolicy, mergeMemberOverride, normalizeCirclePolicy, settingsChangeNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
 import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
@@ -4478,7 +4480,7 @@ async function showAdvanced() {
   hideCircleTabBar(tabBarEl);
   const ops = advancedOpRows({ manifests: Object.values(circleManifestsByOrigin) });
   let params = [];
-  try { params = advancedParamRows(await rawCallSkill('params', 'list-user-params', {})); } catch { /* register absent → ops only */ }
+  try { params = (await rawCallSkill('params', 'list-user-params', {}))?.params ?? []; } catch { /* register absent → ops only */ }
 
   rootEl.innerHTML = '';
   const wrap = document.createElement('div');
@@ -4501,30 +4503,17 @@ async function showAdvanced() {
   hint.className = 'muted';
   hint.textContent = t('circle.advanced.params_hint');
   wrap.appendChild(hint);
-  for (const p of params) {
-    const row = document.createElement('div');
-    row.className = 'cc-advanced__param';
-    row.style.cssText = 'display:flex;gap:.5rem;align-items:center;padding:.25rem 0;';
-    const label = document.createElement('code');
-    label.textContent = `${p.key} (${p.scope})`;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = JSON.stringify(p.value ?? p.default);
-    input.style.cssText = 'width:9rem;';
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.className = 'cc-btn cc-btn--quiet';
-    save.textContent = t('circle.advanced.save');
-    save.addEventListener('click', async () => {
-      let value; try { value = JSON.parse(input.value); } catch { value = input.value; }
-      save.disabled = true;
-      const r = await rawCallSkill('params', 'set-param', { key: p.key, value }).catch(() => ({ ok: false }));
-      save.textContent = r?.ok ? '✓' : '✗';
-      setTimeout(() => { save.disabled = false; save.textContent = t('circle.advanced.save'); }, 1200);
-    });
-    row.append(label, input, save);
-    wrap.appendChild(row);
-  }
+  // projected from the register (labels, a control per kind, grouped by scope); a change is the one `set-param` op
+  const settings = settingsProjection(params);
+  renderSettingsGroups(wrap, {
+    projection: settings, t,
+    onSet: async (row, input) => {
+      const value = settings.valueFor(row, input);
+      if (value && typeof value === 'object' && !Array.isArray(value) && value.error) return { errorKey: value.error };
+      const r = await rawCallSkill('params', 'set-param', { key: row.key, value }).catch(() => ({ ok: false }));
+      return r?.ok ? { ok: true } : { errorKey: 'circle.params.save_failed' };
+    },
+  });
 
   // ── the surface-less ops ───────────────────────────────────────────────────
   const oh = document.createElement('h3');
@@ -4628,7 +4617,7 @@ async function showMyData() {
   // that knows podAuth. A screen that reaches the substrate directly is a second implementation of the
   // same capability, and the manifest stops describing what the buttons do.
   const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
-    .catch((e) => globalThis.alert?.(e?.message ?? 'sign-in failed'));
+    .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
   // launch the existing backup/restore wizards in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
@@ -8419,6 +8408,8 @@ async function showAdmin(id) {
 
 async function showSettings(id) {
   let working = await policyStore.get(id);
+  // the policy as it was when the screen opened: a proposal carries only what changed from it (`policyPatch`)
+  let entryPolicy = working;
   // Settings consensus rides GOVERNANCE (the changePolicy action on the log) — the localStorage
   // proposal side-store is retired. One handle serves the pending list, the propose, and (via the
   // wired setPolicy enactor) the apply-on-approval; approvals cross devices because the events fan.
@@ -8448,18 +8439,28 @@ async function showSettings(id) {
   // outstanding "waiting on N admins" approvals on settings entry — folded off the LOG, so a
   // proposal raised on another admin's device shows here too.
   let pending = [];
-  let pendingMembers = [];
-  try { ({ proposals: pending, members: pendingMembers } = await openPolicyProposals(gov, id)); } catch { /* */ }
-  const pendingCount = () => pending.length;
+  try { ({ proposals: pending } = await openPolicyProposals(gov, id)); } catch { /* */ }
+  // what this viewer's Save is: an admin's save, or a member's proposal ("Stel voor") the admins decide
+  const saveCtl = policySaveControlFor({ members: settingsRoster, myRef: mySelfIn(id) ?? myWebid });
+  const asProposal = () => saveCtl.propose === true || consensusActive();
+  // the open proposal's state under the fields: "proposed by … · waiting on …" (the shared projection, by the roster's names)
+  // an admin answers an open proposal here, under the fields (the same governance vote as the Governance screen)
+  const answerFor = () => {
+    const a = policyProposalForAdmin({ proposals: pending, roster: settingsRoster, myRef: mySelfIn(id) ?? myWebid });
+    if (!a) return null;
+    const answer = async (choice) => {
+      try { await gov.vote({ circleId: id, proposalId: a.proposalId, choice }); } catch { /* it stays open; the note says so */ }
+      try { working = await policyStore.get(id); entryPolicy = working; } catch { /* keep the form */ }
+      try { ({ proposals: pending } = await openPolicyProposals(gov, id)); } catch { /* */ }
+      refreshLauncherProposals().catch(() => { /* ignore */ });
+      rerender();
+    };
+    return { text: t('circle.settings.proposal_from', { who: a.who, what: policyChangeText(a.changes, t) }), onAccept: () => answer('yes'), onDecline: () => answer('no') };
+  };
   const pendingNote = () => {
-    if (pendingCount() === 0) return consensusActive() ? t('circle.settings.pending') : undefined;
-    // "waiting on Pieter, Sara" — the admins whose vote the first open proposal still lacks.
-    const first = pending[0];
-    const voted = new Set((first?.votes ?? []).map((v) => v.voter));
-    const waiting = pendingMembers.filter((m) => m.role === 'admin' && !voted.has(m.ref)).map((m) => m.ref);
-    return waiting.length
-      ? t('circle.settings.pending_waiting', { who: waiting.join(', ') })
-      : t('circle.settings.pending');
+    if (pending.length === 0) return consensusActive() ? t('circle.settings.pending') : undefined;
+    const lines = policyProposalNote({ proposals: pending, roster: settingsRoster }).map((l) => t(l.key, l.params));
+    return lines.length ? lines.join(' ') : t('circle.settings.pending');
   };
   // B · consent-card — the recipe reviewed in the consent card (cached between review + Agree so the loaded
   // recipe is reused for apply, avoiding a second load/verify round-trip).
@@ -8473,7 +8474,7 @@ async function showSettings(id) {
   const settingsPage = pageForOp(basisManifest, 'settings');
 
   const rerender = () => renderCircleSettings(rootEl, {
-    saveControl: policySaveControlFor({ members: settingsRoster, myRef: mySelfIn(id) ?? myWebid }),
+    saveControl: saveCtl,
     policy: working,
     t,
     // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this
@@ -8498,8 +8499,9 @@ async function showSettings(id) {
     },
     // the merged manifest sources drive the settings form + the per-skill freedom matrix.
     sources: circleBaseSources,
-    saveLabel: consensusActive() ? t('circle.settings.send_proposal') : undefined,
+    saveLabel: saveCtl.propose ? t(saveCtl.labelKey) : consensusActive() ? t('circle.settings.send_proposal') : undefined,
     note: [pendingNote(), storageNote].filter(Boolean).join(' · ') || undefined,
+    proposalAnswer: answerFor(),
     // OBJ-2 — paired devices (no-pod sync). Only wired when the agent exposes the household
     // sync hooks; add/remove persist + return the updated roster (the panel re-draws itself).
     householdSelfAddr:     circleHouseholdAgent?.householdSelfAddr ?? null,
@@ -8552,7 +8554,7 @@ async function showSettings(id) {
     },
     onBack: () => showDetail(id),
     onSave: async () => {
-      if (!consensusActive()) {
+      if (!asProposal()) {
         await policyStore.update(id, working);
         // The just-saved policy goes on the governance lane as a signed statement — every member, and whoever
         // joins later, catches it up.
@@ -8575,15 +8577,17 @@ async function showSettings(id) {
         showDetail(id);
         return;
       }
-      // Multi-admin consensus → a GOVERNANCE proposal (changePolicy) on the log: it fans to the other
-      // admins, they vote in the governance panel, and on approval the wired setPolicy enactor applies
-      // the patch + broadcasts the committed policy. Single admin / consensus off never reaches here
-      // (the branch above commits immediately) — so this always opens a real cross-device proposal.
+      // A member's change, or an admin's under multi-admin consensus → a GOVERNANCE proposal (changePolicy) on the
+      // log: it fans to the admins, they answer it in the governance panel, and on approval the wired setPolicy
+      // enactor applies the patch + broadcasts the committed policy. It is signed as this device's self in the circle.
+      // only what changed (applied over the policy as it is when an admin accepts it); nothing changed → nothing to propose
+      const patch = policyPatch(entryPolicy, working);
+      if (Object.keys(patch).length === 0) { showDetail(id); return; }
       await gov.propose({
-        circleId: id, action: 'changePolicy', subject: working,
-        actor: { ref: myWebid, role: 'admin' },
+        circleId: id, action: 'changePolicy', subject: patch,
+        actor: { role: saveCtl.propose ? 'member' : 'admin' },
       });
-      try { ({ proposals: pending, members: pendingMembers } = await openPolicyProposals(gov, id)); } catch { /* */ }
+      try { ({ proposals: pending } = await openPolicyProposals(gov, id)); } catch { /* */ }
       // refresh the launcher's voorstellen badge map so the
       // tile reflects the new pending count on the next launcher visit.
       refreshLauncherProposals().catch(() => { /* ignore */ });
@@ -9285,6 +9289,8 @@ async function boot() {
         agent.knownPeersSync?.requestFromSiblings().catch(() => {});
         // The person key a ceremony rotated on another device while this one was off.
         agent.personKeySync?.requestFromSiblings().catch(() => {});
+        // …and each profile's facts (properties + disclosure), from the devices holding the same self
+        agent.profileFactsSync?.requestFromSiblings().catch(() => {});
         // The person's own store (their own appointments, their planned rows) as their other devices hold it.
         agent.ownStoreSync?.requestFromSiblings().catch(() => {});
         // …and which of the person's devices is primary for direct messages (sync-policy §12).

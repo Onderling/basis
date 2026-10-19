@@ -301,6 +301,8 @@ export function buildCircleLanes({
     // The person key between the person's devices: the rotation ceremony's hand-over lands here from a
     // sibling, and a sibling's request is answered. Entries only — the agent owns the gate and the store.
     ...(agent.personKeySync?.handlers ?? {}),
+    // A profile's facts (properties + disclosure) from a device holding the same self: newer facts land, a request is answered.
+    ...(agent.profileFactsSync?.handlers ?? {}),
     // Which of the person's devices is primary for direct messages: a sibling's claim lands here, a request is answered.
     ...(agent.primaryDevice?.handlers ?? {}),
     // A circle a sibling founded or joined lands here and this device joins itself (the kring opt-out wins); a

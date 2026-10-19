@@ -95,3 +95,52 @@ describe("an own item made AS a persona (the waist's actAs)", () => {
     expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).some((n) => n.body === 'x')).toBe(false);
   });
 });
+
+describe("a person's own note can be changed and removed (Vandaag's rows open the sheet pre-filled)", () => {
+  const boot = async (ds) => createRealHouseholdAgent({ seedHousehold: false, ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
+
+  it('update changes the text in the own store; remove takes it out', async () => {
+    const ds = memoryDataSource();
+    const a = await boot(ds);
+    const made = await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'melk' });
+    const id = made?.item?.id ?? (await createOwnDevicesStore({ dataSource: ds }).listByType('note'))[0]?.id;
+    const changed = await a.callSkill('household', op('update'), { circleId: OWN_DEVICES_SCOPE, id, body: 'melk en brood' });
+    expect(changed?.ok, JSON.stringify(changed)).not.toBe(false);
+    expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).map((n) => n.body)).toEqual(['melk en brood']);
+    const gone = await a.callSkill('household', op('remove'), { circleId: OWN_DEVICES_SCOPE, id });
+    expect(gone?.ok, JSON.stringify(gone)).not.toBe(false);
+    expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).length).toBe(0);
+  });
+
+  it("a door's caller naming the own scope changes nothing there (update and remove)", async () => {
+    const ds = memoryDataSource();
+    const a = await boot(ds);
+    await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'van mij' });
+    const id = (await createOwnDevicesStore({ dataSource: ds }).listByType('note'))[0].id;
+    await a.setDoorCaller('door-person', 'admin');
+    const via = { caller: 'door-person', threadId: 'door-person', via: 'screen' };
+    await a.callSkill('household', op('update'), { circleId: OWN_DEVICES_SCOPE, id, body: 'overschreven' }, via).catch(() => null);
+    await a.callSkill('household', op('remove'), { circleId: OWN_DEVICES_SCOPE, id }, via).catch(() => null);
+    expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).map((n) => n.body)).toEqual(['van mij']);
+  });
+});
+
+describe('the note noun declares `update` — one contract for a circle and for the own store', () => {
+  const boot = async (ds) => createRealHouseholdAgent({ seedHousehold: false, ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
+
+  it("a circle's note can be changed (the atom is declared, so the chat projection has it too)", async () => {
+    const a = await boot(memoryDataSource());
+    const made = await a.callSkill('household', op('add'), { body: 'vuilnis dinsdag' });
+    const id = made?.result?.item?.id;
+    const up = await a.callSkill('household', op('update'), { id, body: 'vuilnis woensdag' });
+    expect(up?.ok, JSON.stringify(up)).toBe(true);
+  });
+
+  it('the own store answers only the atoms a noun declares — the same refusal a circle gives', async () => {
+    const a = await boot(memoryDataSource());
+    const r = await a.callSkill('household', encodeGenericOpId('household', 'update', 'contact'), { circleId: OWN_DEVICES_SCOPE, id: 'x' });
+    expect(r?.ok).toBe(false);
+    expect(r?.code).toBe('unimplemented');
+  });
+});
+

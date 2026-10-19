@@ -2,7 +2,7 @@
 // an op with no screen surface ALWAYS appears here, and the list is computed by the
 // SAME coverage renderer the snapshot uses, so the two can never disagree.
 import { describe, it, expect } from 'vitest';
-import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
+import { advancedOpRows } from '../../src/v2/advancedSurface.js';
 import { basisManifest } from '../../manifest.js';
 import pinboardManifest from '../../../pinboard/manifest.js';
 import { tasksManifest } from '../../../tasks-v0/manifest.js';
@@ -94,11 +94,3 @@ describe('advancedOpRows — the app an op belongs to', () => {
   });
 });
 
-describe('advancedParamRows', () => {
-  it('reshapes the list-user-params reply; garbage in → empty out', () => {
-    const rows = advancedParamRows({ ok: true, params: [{ key: 'a.b', scope: 'device', value: 5, default: 3, home: 'x' }] });
-    expect(rows).toEqual([{ key: 'a.b', scope: 'device', value: 5, default: 3 }]);
-    expect(advancedParamRows(null)).toEqual([]);
-    expect(advancedParamRows({ ok: false })).toEqual([]);
-  });
-});

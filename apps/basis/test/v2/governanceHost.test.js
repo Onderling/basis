@@ -17,8 +17,7 @@ const members = [
 ];
 
 /** Build a host over an in-memory log; `localActorRef` decides this device's enact authority. */
-function host({ governance = {}, localActorRef = 'admin0' } = {}) {
-  const events = [];
+function host({ governance = {}, localActorRef = 'admin0', events = [], setPolicy = null } = {}) {
   const policy = normalizeCirclePolicy({ governance });
   const callSkill = vi.fn(async () => ({ ok: true }));
   let n = 0;
@@ -30,7 +29,7 @@ function host({ governance = {}, localActorRef = 'admin0' } = {}) {
     appendGovernanceEvent: async (_c, e) => { events.push(e); },
     getPolicy: async () => policy,
     getMembers: async () => members,
-    localActorRef,
+    localActorRef, setPolicy,
     newProposalId: () => `p${(n += 1)}`,
     now: () => 0,
   });
@@ -95,3 +94,50 @@ describe('view()', () => {
     expect(v.open[0]).toMatchObject({ action: 'removeMember', subjectLabel: 'lid m2@id', decisionClass: 'member-vote' });
   });
 });
+
+describe('a member PROPOSES a circle-policy change (the changePolicy action, enacted by an admin)', () => {
+  it('under any-admin: the member\'s proposal stays open; an admin\'s yes enacts the patch, an admin\'s no rejects it', async () => {
+    const events = [];
+    const setPolicy = vi.fn(async () => ({ ok: true }));
+    const member = host({ governance: { changePolicy: 'any-admin' }, localActorRef: 'm0', events, setPolicy });
+    const patch = { features: { tasks: true } };
+    const r = await member.gov.propose({ circleId: 'c1', action: 'changePolicy', subject: patch, actor: { role: 'member' } });
+    expect(r).toMatchObject({ ok: true, status: DECISION_STATUS.PENDING });
+    expect(setPolicy).not.toHaveBeenCalled();
+    expect(events[0]).toMatchObject({ event: 'propose', action: 'changePolicy', by: 'm0', subject: patch });
+    const admin = host({ governance: { changePolicy: 'any-admin' }, localActorRef: 'admin0', events, setPolicy });
+    const done = await admin.gov.vote({ circleId: 'c1', proposalId: r.proposalId, choice: 'yes' });
+    expect(done).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
+    expect(setPolicy).toHaveBeenCalledWith('c1', patch);
+
+    const no = await member.gov.propose({ circleId: 'c1', action: 'changePolicy', subject: { view: 'screen' }, actor: { role: 'member' } });
+    expect((await admin.gov.vote({ circleId: 'c1', proposalId: no.proposalId, choice: 'no' })).status).toBe(DECISION_STATUS.REJECTED);
+    expect(setPolicy).toHaveBeenCalledTimes(1);
+  });
+
+  it('a member\'s yes never enacts it, and other any-admin actions stay the admin\'s alone', async () => {
+    const events = [];
+    const setPolicy = vi.fn(async () => ({ ok: true }));
+    const m0 = host({ governance: { changePolicy: 'any-admin', removeMember: 'any-admin' }, localActorRef: 'm0', events, setPolicy });
+    const r = await m0.gov.propose({ circleId: 'c1', action: 'changePolicy', subject: { view: 'screen' }, actor: { role: 'member' } });
+    const m1 = host({ governance: { changePolicy: 'any-admin' }, localActorRef: 'm1', events, setPolicy });
+    expect((await m1.gov.vote({ circleId: 'c1', proposalId: r.proposalId, choice: 'yes' })).status).toBe(DECISION_STATUS.PENDING);
+    expect(setPolicy).not.toHaveBeenCalled();
+    const rm = await m0.gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2@id', actor: { role: 'member' } });
+    expect(rm).toMatchObject({ ok: false });
+  });
+});
+
+describe('the settings screen says the open proposal\'s state under the fields — both shells, one projection', () => {
+  it('"proposed by …" and "waiting on …" (the admins who have not answered), by the roster\'s names', async () => {
+    const { policyProposalNote } = await import('../../src/v2/governanceAppWiring.js');
+    const roster = [{ webid: 'a1', role: 'admin', name: 'Anne' }, { webid: 'a2', role: 'admin', name: 'Piet' }, { webid: 'm0', role: 'member', name: 'Bob' }];
+    const proposals = [{ proposalId: 'p1', by: 'm0', votes: [{ voter: 'm0', choice: 'yes' }, { voter: 'a1', choice: 'yes' }] }];
+    expect(policyProposalNote({ proposals, roster })).toEqual([
+      { key: 'circle.settings.proposed_by', params: { who: 'Bob' } },
+      { key: 'circle.settings.pending_waiting', params: { who: 'Piet' } },
+    ]);
+    expect(policyProposalNote({ proposals: [], roster })).toEqual([]);
+  });
+});
+

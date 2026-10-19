@@ -8,8 +8,8 @@
  *     snapshot can never disagree). A row without required params runs directly through
  *     the waist; a row with them points at its chat route (the slash form) — the chat
  *     surface is the arg-taking executor every op already has by construction.
- *   • the USER PARAMS — the register's settable values (`list-user-params`), each editable
- *     through the ONE kind-gated `set-param` op.
+ *   • the USER PARAMS are no longer here: the settings surface projects them from the register
+ *     (`settingsProjection.js`), each changed through the ONE kind-gated `set-param` op.
  *
  * Pure projections; the shells only paint and dispatch.
  */
@@ -110,18 +110,4 @@ export function advancedOpRows({ manifests = [] } = {}) {
     // Grouped, so each shelf appears ONCE. Stable within a shelf: declaration order is the manifest
     // author's order, and re-sorting rows inside a shelf would throw that away for nothing.
     .sort((a, b) => shelfRank(a.group) - shelfRank(b.group));
-}
-
-/**
- * The editable-params rows, from the register's own reply (`list-user-params`).
- * Pure reshape — keeps the shells off the reply's internals.
- *
- * @param {{ok?: boolean, params?: Array}} reply
- * @returns {Array<{key:string, scope:string, value:any, default:any}>}
- */
-export function advancedParamRows(reply) {
-  const params = Array.isArray(reply?.params) ? reply.params : [];
-  return params.map((p) => ({
-    key: p.key, scope: p.scope ?? '', value: p.value, default: p.default,
-  }));
 }

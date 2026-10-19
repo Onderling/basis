@@ -47,7 +47,22 @@ export const isReminderRule = (s) => parseReminderRule(s) !== null;
 export const TIME_ANCHORS = Object.freeze({ 'calendar-event': 'startsAt', task: 'dueAt' });
 
 /** The field that is this type's moment, or null when the type has none. */
-export const timeAnchorOf = (type) => (Object.prototype.hasOwnProperty.call(TIME_ANCHORS, type) ? TIME_ANCHORS[type] : null);
+/**
+ * The field a type's reminders count from: the frozen table first (first-party), else the noun's declared
+ * `presents.moment` in the manifests given, when that noun is SCHEDULED (`presents.order: 'asc'`). Anything else has
+ * no moment to remind from — by design, not an omission.
+ * @param {string} type
+ * @param {{manifests?: object[]}} [o]
+ * @returns {string|null}
+ */
+export const timeAnchorOf = (type, { manifests = [] } = {}) => {
+  if (Object.prototype.hasOwnProperty.call(TIME_ANCHORS, type)) return TIME_ANCHORS[type];
+  for (const m of manifests ?? []) {
+    const p = m?.nouns?.[type]?.presents;
+    if (p && p.order === 'asc' && typeof p.moment === 'string' && p.moment) return p.moment;
+  }
+  return null;
+};
 
 /**
  * The field an item with a moment carries for ITS reminders: the household's statement about the item (synced like any

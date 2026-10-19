@@ -164,6 +164,7 @@ export const SEAMS = Object.freeze([
   { id: 'primary-device-request', pattern: /primaryDevice\??\.requestFromSiblings/, why: 'which device is the primary contact address — asked of the siblings at boot, so a claim made elsewhere reaches here' },
   { id: 'known-peers-catchup',   pattern: /knownPeersSync/,                      why: 'who the person knows, on every device: bindings and the contact book' },
   { id: 'person-key-catchup',    pattern: /personKeySync/,                       why: 'the person key and its chain, on every device' },
+  { id: 'profile-facts-catchup', pattern: /profileFactsSync/,                    why: "a profile's properties and disclosure, the same on every device holding that self" },
   { id: 'grants-catchup',        pattern: /grantsCatchUp/,                       why: 'the grants lane: what my devices may do' },
   { id: 'circle-presence',       pattern: /registerCirclePresence/,              why: 'per-circle addresses on the relay and the announce — the three acts every device performs on connect' },
   // Siblings follow a circle (L109, 2026-09-21): a circle founded or joined on one device reaches the others. A shell

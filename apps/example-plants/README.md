@@ -40,5 +40,5 @@ cd apps/basis && npx vitest run test/extensionNoun.test.js test/extensionNounSyn
 | Free atoms through the waist; chat words `plant add …` | built, tested |
 | Rows sync to a member with the extension; a member without it holds none (said once) | built, tested |
 | Shows on Vandaag / Gepland (presenter) | not yet — the shells' catalogue does not take extensions |
-| Reminders at `waterAt` | not yet — reminders are written for appointments and chores only |
+| Reminders at `waterAt` | built, tested — from its declared moment; with no `presents.mine` it reminds EVERY member (declare `mine` for a quieter noun) |
 | A person's own scope (no circle) | refused for now — an extension type lives in a circle's store only |

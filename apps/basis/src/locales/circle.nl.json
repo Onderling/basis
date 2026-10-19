@@ -9281,5 +9281,321 @@
       "text": "Aanpassen",
       "doc": "The header switcher: open that self's own editor."
     }
+  },
+  "params": {
+    "scope": {
+      "device": {
+        "text": "Dit apparaat",
+        "doc": "A group on the settings screen: where these values live."
+      },
+      "agent": {
+        "text": "Jij, op al je apparaten",
+        "doc": "A group on the settings screen: where these values live."
+      },
+      "circle": {
+        "text": "Deze kring",
+        "doc": "A group on the settings screen: where these values live."
+      }
+    },
+    "key": {
+      "nearby_ask_defaultTtlMs": {
+        "text": "Hoe lang een vraag in de buurt open blijft",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "calendarEmission_defaultDurationMin": {
+        "text": "Standaardduur van een afspraak (minuten)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "onlineCadence_pollIntervalMs": {
+        "text": "Hoe vaak dit apparaat kijkt wie er online is",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "history_mirror": {
+        "text": "Je geschiedenis bewaren in je eigen opslag",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "history_restore_recencyDays": {
+        "text": "Bij herstellen eerst de laatste … dagen",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "history_restore_maxPerCircle": {
+        "text": "Bij herstellen eerst de nieuwste … berichten per kring",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "wake_nudges": {
+        "text": "Wekberichten als er iets klaarstaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "privacy_shareNknAddress": {
+        "text": "Mijn netwerkadres delen",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_silo_chat": {
+        "text": "Gesprekken bewaren op dit apparaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_silo_tasks": {
+        "text": "Taken bewaren op dit apparaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_silo_contacts": {
+        "text": "Contacten bewaren op dit apparaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_kringenOff": {
+        "text": "Kringen die dit apparaat niet bewaart",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "sync_files_bytes": {
+        "text": "Bestanden op dit apparaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "surface_pref": {
+        "text": "Waar de antwoorden van een bot verschijnen",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "transport_mode": {
+        "text": "Verbinding",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "display_theme": {
+        "text": "Weergave",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "app_lang": {
+        "text": "Taal",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "relay_url": {
+        "text": "Relay-server",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "app_developer": {
+        "text": "Ontwikkelaarsweergave",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_apps": {
+        "text": "Apps waarin de assistent mag werken",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "home_startScreen": {
+        "text": "De app opent op",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_memoryDefault": {
+        "text": "Hoeveel de assistent onthoudt van een gesprek",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_assignPolicy": {
+        "text": "Wie iets aan een ander mag geven",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_names": {
+        "text": "Wie de namen van de anderen ziet",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_passedItems": {
+        "text": "Wat er gebeurt met wat klaar of voorbij is",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_passedKeepDays": {
+        "text": "Zo lang nog laten zien (dagen)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_cancelPolicy": {
+        "text": "Wie een afspraak mag afzeggen",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_reminders": {
+        "text": "Herinneringen",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_feedbackChannel": {
+        "text": "Waar feedback heen gaat",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_quietHours": {
+        "text": "Stille uren",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_reminderRules": {
+        "text": "Wanneer er herinnerd wordt",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_usageVisible": {
+        "text": "Wie het modelgebruik ziet",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_monthlyTokenLimit": {
+        "text": "Maandlimiet voor het model (tokens)",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_roles": {
+        "text": "Wat elke rol mag",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_householdInApp": {
+        "text": "Het huishouden ook in de app",
+        "doc": "A setting's label (projected from the parameter register)."
+      },
+      "assistant_calendarFeed": {
+        "text": "Agenda-abonnement",
+        "doc": "A setting's label (projected from the parameter register)."
+      }
+    },
+    "opt": {
+      "inline": {
+        "text": "In het gesprek",
+        "doc": "A choice on the settings screen."
+      },
+      "screen": {
+        "text": "Op een eigen scherm",
+        "doc": "A choice on the settings screen."
+      },
+      "chat": {
+        "text": "Als bericht",
+        "doc": "A choice on the settings screen."
+      },
+      "nkn": {
+        "text": "Netwerk (NKN)",
+        "doc": "A choice on the settings screen."
+      },
+      "relay": {
+        "text": "Relay",
+        "doc": "A choice on the settings screen."
+      },
+      "both": {
+        "text": "Allebei",
+        "doc": "A choice on the settings screen."
+      },
+      "system": {
+        "text": "Zoals het apparaat",
+        "doc": "A choice on the settings screen."
+      },
+      "light": {
+        "text": "Licht",
+        "doc": "A choice on the settings screen."
+      },
+      "dark": {
+        "text": "Donker",
+        "doc": "A choice on the settings screen."
+      },
+      "lang_device": {
+        "text": "Zoals het apparaat",
+        "doc": "A choice on the settings screen."
+      },
+      "nl": {
+        "text": "Nederlands",
+        "doc": "A choice on the settings screen."
+      },
+      "en": {
+        "text": "Engels",
+        "doc": "A choice on the settings screen."
+      },
+      "full": {
+        "text": "Helemaal",
+        "doc": "A choice on the settings screen."
+      },
+      "description": {
+        "text": "Alleen de beschrijving",
+        "doc": "A choice on the settings screen."
+      },
+      "off": {
+        "text": "Uit",
+        "doc": "A choice on the settings screen."
+      },
+      "on": {
+        "text": "Aan",
+        "doc": "A choice on the settings screen."
+      },
+      "short": {
+        "text": "Kort",
+        "doc": "A choice on the settings screen."
+      },
+      "long": {
+        "text": "Lang",
+        "doc": "A choice on the settings screen."
+      },
+      "roles": {
+        "text": "Volgens de rollen",
+        "doc": "A choice on the settings screen."
+      },
+      "anyone": {
+        "text": "Iedereen",
+        "doc": "A choice on the settings screen."
+      },
+      "self": {
+        "text": "Alleen zichzelf",
+        "doc": "A choice on the settings screen."
+      },
+      "members": {
+        "text": "Leden",
+        "doc": "A choice on the settings screen."
+      },
+      "assigners": {
+        "text": "Wie taken verdeelt",
+        "doc": "A choice on the settings screen."
+      },
+      "admin": {
+        "text": "Beheerder",
+        "doc": "A choice on the settings screen."
+      },
+      "none": {
+        "text": "Niemand",
+        "doc": "A choice on the settings screen."
+      },
+      "keep": {
+        "text": "Laten staan",
+        "doc": "A choice on the settings screen."
+      },
+      "hide": {
+        "text": "Verbergen",
+        "doc": "A choice on the settings screen."
+      },
+      "delete": {
+        "text": "Weghalen",
+        "doc": "A choice on the settings screen."
+      },
+      "own": {
+        "text": "Wie hem maakte",
+        "doc": "A choice on the settings screen."
+      },
+      "standard": {
+        "text": "Standaard",
+        "doc": "A choice on the settings screen."
+      },
+      "flat": {
+        "text": "Iedereen gelijk",
+        "doc": "A choice on the settings screen."
+      }
+    },
+    "bad_number": {
+      "text": "Dat is geen getal.",
+      "doc": "A settings field that takes a number got something else."
+    },
+    "unit_hours": {
+      "text": "uur",
+      "doc": "Unit after a duration field."
+    },
+    "unit_minutes": {
+      "text": "minuten",
+      "doc": "Unit after a duration field."
+    },
+    "unit_seconds": {
+      "text": "seconden",
+      "doc": "Unit after a duration field."
+    },
+    "list_hint": {
+      "text": "Gescheiden door komma's",
+      "doc": "Under a field that takes a list."
+    },
+    "title": {
+      "text": "Instellingen",
+      "doc": "Heading of the settings projected from the parameter register."
+    },
+    "save_failed": {
+      "text": "Niet opgeslagen.",
+      "doc": "A settings value could not be saved."
+    }
   }
 }

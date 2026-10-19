@@ -131,7 +131,8 @@ export {
   memberLabelFor,
 } from './v2/circleStream.js';
 export { agentActivityRows } from './v2/agentActivity.js';
-export { advancedOpRows, advancedParamRows } from './v2/advancedSurface.js';
+export { advancedOpRows } from './v2/advancedSurface.js';
+export { settingsProjection, SETTINGS_SCOPE_ORDER } from './v2/settingsProjection.js';
 // The params manifest carries the restore-settings FLOW declaration — the mobile shell's
 // flow painter reads it (web imports the file directly; same package).
 export { paramsManifest } from './v2/paramsManifest.js';

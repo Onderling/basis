@@ -81,8 +81,13 @@ describe('§7.1 — forge a capability token', () => {
       subject: idSubject.pubKey, skill: skillId, agentId: idV.pubKey, expiresIn: 60_000,
     });
     const forged = token.toJSON();
-    // Flip a character in the base64url signature.
-    forged.sig = forged.sig.slice(0, -2) + (forged.sig.endsWith('A') ? 'BB' : 'AA');
+    // Flip one BIT inside the signature's bytes. (Rewriting its last base64url characters was a flake: the final
+    // character of an 86-character Ed25519 signature carries only two data bits, so ~7% of those "tampered"
+    // signatures decoded to the very same bytes and verified — the verifier was right, the tamper was not.)
+    const bytes = Buffer.from(forged.sig, 'base64url');
+    bytes[20] ^= 0x01;
+    forged.sig = bytes.toString('base64url');
+    expect(forged.sig).not.toBe(token.toJSON().sig);
 
     const code = await denialCode(
       pe.checkInbound({ peerPubKey: idSubject.pubKey, skillId, token: forged }));

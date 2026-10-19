@@ -5695,6 +5695,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         const isDoorCall = typeof ctx?.caller === 'string' && ctx.caller;
         const ownCap = args?.circleId === OWN_DEVICES_SCOPE && !isDoorCall ? createGenericAtomHandlers(await getOwnStore()) : null;
+        // the own store answers the atoms a noun DECLARES, as a circle does (one contract; the generic handlers alone
+        // would answer any atom for any noun)
+        if (ownCap && !(householdManifest.nouns?.[g.noun]?.atoms ?? []).includes(g.atom)) {
+          return { ok: false, code: 'unimplemented', atom: g.atom, noun: g.noun };
+        }
         const cap = (atom, noun, a) => (ownCap ? ownCap[atom](noun, a, { by: capCtx.by }) : householdService.callCapability(atom, noun, a, capCtx));
         // A noun PEOPLE write (`writtenBy: 'people'`): an item may be named by its words, and changing or removing one is
         // the maker's or an admin's — anyone else is refused, and nothing changes.

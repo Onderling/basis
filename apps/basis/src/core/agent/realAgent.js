@@ -3632,6 +3632,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     const d = parts?.[0]?.data ?? {};
     const addr = parsePairUri(String(d.addr ?? '').trim())?.addr ?? null;
     if (!addr || typeof d.circle !== 'string' || !d.circle) return [DataPart({ ok: false, outcome: 'bad-code' })];
+    // only into a circle of mine: any other string would make a mirror (and fan its items) for a circle I am not in
+    const mine = ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
+    if (!mine.includes(d.circle)) return [DataPart({ ok: false, outcome: 'not-my-circle' })];
     try { await pairCirclePeer(d.circle, addr); return [DataPart({ ok: true, outcome: 'paired', circle: d.circle })]; }
     catch (err) { return [DataPart({ ok: false, outcome: 'failed', error: err?.message ?? String(err) })]; }
   });

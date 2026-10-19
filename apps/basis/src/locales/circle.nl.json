@@ -514,9 +514,17 @@
     "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
   },
   "scan": {
-    "pair_held": {
-      "text": "Dit is een koppelcode. Koppelen vanuit Scan kan nog niet — open de kring → Kring-instellingen → Gekoppelde apparaten en voeg hem daar toe.",
-      "doc": "Me → Scan read a pairing code: pairing from Scan waits for a picker-capable form (its own row); say where it can be done today, never drop the code."
+    "pair_failed": {
+      "text": "Koppelen lukte niet: {{error}}",
+      "doc": "Me → Scan paired a code into a circle and the op said no (the reason after the colon)."
+    },
+    "pair_no_circle": {
+      "text": "Je hebt nog geen kring om in te koppelen.",
+      "doc": "Me → Scan read a pairing code, and the person is in no circle to pair it into."
+    },
+    "pair_not_mine": {
+      "text": "Dat is geen kring van jou; koppelen kan alleen in je eigen kringen.",
+      "doc": "Me → Scan: the pairing op refused a circle the person is not in (`not-my-circle`)."
     },
     "paste_placeholder": {
       "text": "Plak een code, een link of een claimregel",

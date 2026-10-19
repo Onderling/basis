@@ -172,7 +172,9 @@ import QrScannerModal from '../../rn/QrScannerModal.js';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import RevokeDeviceModal from './RevokeDeviceModal.js';
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
-import { SCAN_TARGETS } from '../../../../basis/src/v2/scanRoute.js';
+import { SCAN_TARGETS, scanOpResultWords } from '../../../../basis/src/v2/scanRoute.js';
+import { opFormOrRun } from '../../../../basis/src/forms/opFormOrRun.js';
+import { makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
 import { useRelayQuestion } from './RelayQuestionModal.js';
 // basis's own ops on the agent's waist. Mobile has ASSEMBLED this table since the chat era
 // (`hostOps.js`) but only ChatScreen ever held one, so the v2 drawer's rows dispatched
@@ -744,6 +746,7 @@ export default function CircleLauncherScreen({
   const [joinScanOpen, setJoinScanOpen] = useState(false);
   // What a scan opened that is a FLOW with its own painter here (enrol · claim): its declared id + the needs it starts with.
   const [scanTask, setScanTask] = useState(null);
+  const [scanForm, setScanForm] = useState(null);   // a scanned code's op, asking what the code did not say (`opFormOrRun`)
   // The "what will they see of you" sheet — the painter of the add-contact flow's needs (persona + reveal), asked first.
   const contactLens = useContactLensSheet({
     callSkill: bundle?.callSkill, pairCircleIdOf: bundle?.pairRoster?.pairCircleIdFor, shareRelease: bundle?.shareCircleRelease, t, theme,
@@ -1750,23 +1753,30 @@ export default function CircleLauncherScreen({
     }
     setJoinArgs({ invite: parsed.inviteUri });
   }, [bundle]);
+  // A declared op from a scan: what the code did not say is asked in the shared form (`opFormOrRun`), or it runs.
+  const sayScanResult = (reply) => { const w = scanOpResultWords(reply); Alert.alert(t('circle.profile.scan'), t(w.key, w.params)); };
+  const runOpFromScan = async (target, needs) => {
+    const call = (app, op, args) => bundle?.callSkill?.(app, op, args);
+    const next = await opFormOrRun(target, needs, makePickerFetcher(call, target.app));
+    if (next.error) { sayScanResult({ ok: false, outcome: next.error }); return; }
+    if (next.run) { sayScanResult(await Promise.resolve(call(next.run.app, next.run.opId, next.run.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }))); return; }
+    setScanForm({ target, form: next.form, choices: next.choices });
+  };
   // THE PER-ID PAINTER MAP — the one shell-side piece of the scan route: the route table names a DECLARED target
-  // (`SCAN_TARGETS`), this map names who paints it here today (PR 2's generic flow painter shrinks it to one). Every
-  // declared id has an entry; pairing is HELD on purpose (its pick-list needs a picker-capable form on both shells —
-  // its own row), and says so instead of dropping the code.
+  // (`SCAN_TARGETS`), this map names who paints it here today. Every declared id has an entry.
   const SCAN_PAINTERS = {
     'add-contact':     (needs) => { contactLens.addWithSheet(needs.payload).catch(() => {}); },
     joinGroup:         (needs, res) => onJoinScan({ kind: 'invite', payload: res.payload }),
     'enroll-device':   (needs) => setScanTask({ id: 'enroll-device', needs }),
     'claim-companion': (needs) => setScanTask({ id: 'claim-companion', needs }),
-    pairCirclePeer:    null,   // HELD (pick-list row) — said, not dropped
+    // the code names the address; the circle is the person's pick (none asked with one circle)
+    pairCirclePeer:    (needs) => runOpFromScan({ app: 'household', id: 'pairCirclePeer' }, needs),
   };
   const onScan = (res) => {
     setJoinScanOpen(false);
     const target = SCAN_TARGETS[res?.kind];
     const paint = target ? SCAN_PAINTERS[target.id] : undefined;
     if (!target || paint === undefined) { Alert.alert(t('circle.profile.scan'), t('scan_qr.scan_unknown')); return; }
-    if (paint === null) { Alert.alert(t('circle.profile.scan'), t('circle.scan.pair_held')); return; }
     paint(target.needs(res.payload), res);
   };
   // The Me actions (declared in the manifest): share opens the existing view; scan runs the `scanQr` op, whose seam is
@@ -1831,6 +1841,12 @@ export default function CircleLauncherScreen({
   const scanOverlays = (
     <>
       <QrScannerModal visible={joinScanOpen} onClose={() => setJoinScanOpen(false)} onResult={onScan} t={t} />
+      {scanForm ? (
+        <OpPageModal visible appOrigin={scanForm.target.app} op={{ id: scanForm.form.opId }} spec={scanForm.form} choices={scanForm.choices}
+          // a refusal stays in the form, in the shared words; done closes it and says so
+          callSkill={async (app, opId, args) => { const r = await bundle?.callSkill?.(app, opId, args); if (r?.ok !== false) return r; const w = scanOpResultWords(r); return { ok: false, error: t(w.key, w.params) }; }}
+          onClose={() => setScanForm(null)} onDispatched={(r) => { setScanForm(null); sayScanResult(r); }} />
+      ) : null}
       {contactLens.sheet}
       <EnrollDeviceModal visible={scanTask?.id === 'enroll-device'} callSkill={bundle?.callSkill} needs={scanTask?.needs ?? null}
         onClose={() => setScanTask(null)} />

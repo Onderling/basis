@@ -13,19 +13,23 @@ import { buildFormSpec, validateAndCoerce } from '../../../../basis/src/forms/bu
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 
-export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose, onDispatched }) {
+export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose, onDispatched,
+  // a form already decided by the shared `opFormOrRun` (what is known filled in), and the choices its pickers offer
+  spec: given = null, choices = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const spec = useMemo(() => (op ? buildFormSpec({
+  const spec = useMemo(() => given ?? (op ? buildFormSpec({
     opParams: Array.isArray(op.params) ? op.params : [], missing: [], prefilledArgs: {}, opId: op.id, appOrigin,
-  }) : null), [op, appOrigin]);
+  }) : null), [given, op, appOrigin]);
   const [values, setValues] = useState({});
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   if (!visible || !op || !spec) return null;
 
-  const submit = async () => {
-    const v = validateAndCoerce(spec, values);
+  // what is known rides along (a field the form shows read-only)
+  const known = Object.fromEntries(spec.fields.filter((f) => f.readOnly && f.value !== undefined).map((f) => [f.name, f.value]));
+  const submit = async (picked = {}) => {
+    const v = validateAndCoerce(spec, { ...known, ...values, ...picked });
     if (v.errors?.length) { setStatus(v.errors.map((e) => `${e.field}: ${e.message}`).join(' · ')); return; }
     setBusy(true); setStatus('');
     try {
@@ -47,7 +51,22 @@ export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose
           <Text style={styles.title}>{title}</Text>
           {hint ? <Text style={styles.hint}>{hint}</Text> : null}
           <ScrollView style={styles.fields} keyboardShouldPersistTaps="handled">
-            {spec.fields.map((f) => (
+            {spec.fields.map((f) => (f.readOnly && f.value !== undefined ? (
+              <View key={f.name} style={styles.field}>
+                <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
+                <Text style={styles.hint} testID={`op-page-known-${f.name}`}>{String(f.value)}</Text>
+              </View>
+            ) : f.pickerSource && choices?.[f.name]?.length ? (
+              // a pick: one button per choice; a tap is the answer (single pick, as the web form)
+              <View key={f.name} style={styles.field}>
+                <Text style={styles.label}>{f.labelKey ? t(f.labelKey) : f.name}</Text>
+                {choices[f.name].map((c) => (
+                  <Pressable key={c.id} style={styles.btnGhost} disabled={busy} onPress={() => submit({ [f.name]: c.id })} testID={`op-page-pick-${f.name}-${c.id}`}>
+                    <Text style={styles.btnGhostText}>{c.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
               <View key={f.name} style={styles.field}>
                 <Text style={styles.label}>{f.name}{f.required ? ' *' : ''}{f.choices ? ` (${f.choices.join(' | ')})` : ''}</Text>
                 <TextInput
@@ -62,14 +81,14 @@ export default function OpPageModal({ visible, appOrigin, op, callSkill, onClose
                 />
                 {f.hint ? <Text style={styles.hint}>{f.hint}</Text> : null}
               </View>
-            ))}
+            )))}
           </ScrollView>
           {status ? <Text style={styles.status}>{status}</Text> : null}
           <View style={styles.actions}>
             <Pressable style={styles.btnGhost} onPress={onClose} disabled={busy}>
               <Text style={styles.btnGhostText}>{t('circle.advanced.cancel')}</Text>
             </Pressable>
-            <Pressable style={styles.btn} onPress={submit} disabled={busy} testID="op-page-submit">
+            <Pressable style={styles.btn} onPress={() => submit()} disabled={busy} testID="op-page-submit">
               <Text style={styles.btnText}>{t('circle.advanced.submit')}</Text>
             </Pressable>
           </View>

@@ -205,7 +205,10 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
-import { routeScan } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
+import { routeScan, scanOpResultWords } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
+import { opFormOrRun } from '../../src/forms/opFormOrRun.js';   // a declared op with part of its args known: the form, or it runs
+import { makePickerFetcher } from '../../src/forms/pickerChoices.js';
+import { renderForm } from '../../src/web/domForm.js';
 // client-side image-attachment encoder (Canvas resize + thumbnail → the
 // inbound shape pinboard.postRequest expects).
 import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
@@ -4955,8 +4958,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
 /**
  * THE PER-ID PAINTER MAP (web) — the one shell-side piece of the scan route: `routeScan` names a DECLARED target
  * (`SCAN_TARGETS`), this map names who paints it here today (PR 2's generic flow painter shrinks it to one). Every
- * declared id has an entry; pairing is HELD on purpose (its pick-list needs a picker-capable form on both shells — its
- * own row), and says so instead of dropping the code.
+ * declared id has an entry; an op target asks what the code did not say through the shared form (`opFormOrRun`).
  */
 const SCAN_PAINTERS = {
   'add-contact': async (needs) => {
@@ -4968,16 +4970,37 @@ const SCAN_PAINTERS = {
   joinGroup:         (needs, text) => showJoinCircle(String(text).trim()),   // the whole text: the app's own link carries its relay
   'enroll-device':   (needs) => showEnrollDeviceFlow({ needs }),
   'claim-companion': (needs) => showClaimCompanionFlow({ needs }),
-  pairCirclePeer:    null,   // HELD (pick-list row) — said, not dropped
+  // the code names the address; the circle is the person's pick (none asked with one circle)
+  pairCirclePeer:    (needs, _text, target) => runOpFromScan(target, needs),
 };
+
+/** A declared op from a scan: what the code did not say is asked in the shared form (or nothing — it runs). */
+async function runOpFromScan(target, needs) {
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), target.app);
+  const run = async (op) => {
+    const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    const w = scanOpResultWords(r);
+    globalThis.alert?.(t(w.key, w.params));
+  };
+  const next = await opFormOrRun(target, needs, fetchChoices);
+  if (next.error) { const w = scanOpResultWords({ ok: false, outcome: next.error }); globalThis.alert?.(t(w.key, w.params)); return; }
+  if (next.run) { await run(next.run); return; }
+  const { card, close } = _restoreOverlay();
+  card.appendChild(renderForm(next.form, {
+    doc: document, t,
+    // the choices already read for the decision, else read now
+    pickerFetcher: async (decl) => next.choices[next.form.fields.find((f) => f.pickerSource === decl)?.name] ?? fetchChoices(decl),
+    onSubmit: async (values) => { close(); await run({ app: target.app, opId: next.form.opId, args: { ...needs, ...values } }); },
+    onCancel: () => close(),
+  }));
+}
 
 /** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter. */
 async function takeScannedText(text) {
   const r = routeScan(text);
   const paint = r.target ? SCAN_PAINTERS[r.target.id] : undefined;
   if (paint === undefined) { globalThis.alert?.(t('scan_qr.scan_unknown')); return; }
-  if (paint === null) { globalThis.alert?.(t('circle.scan.pair_held')); return; }
-  await paint(r.needs, text);
+  await paint(r.needs, text, r.target);
 }
 
 async function showJoinCircle(inviteArg) {

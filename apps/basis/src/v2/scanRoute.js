@@ -48,6 +48,19 @@ export const SCAN_TARGETS = Object.freeze({
 });
 
 /**
+ * The words for what a scanned code's OP answered (an op target: pairing): done, refused because the circle is not mine,
+ * or failed with its reason. One answer both shells say.
+ * @returns {{key: string, params?: object}}
+ */
+export function scanOpResultWords(reply) {
+  if (reply?.ok !== false) return { key: 'circle.pairedDevices.paired' };
+  if (reply.outcome === 'not-my-circle') return { key: 'circle.scan.pair_not_mine' };
+  if (reply.outcome === 'nothing-to-pick') return { key: 'circle.scan.pair_no_circle' };
+  if (reply.outcome === 'unknown-op') return { key: 'scan_qr.scan_unknown' };
+  return { key: 'circle.scan.pair_failed', params: { error: String(reply.error ?? reply.outcome ?? '') } };
+}
+
+/**
  * What a scanned (or pasted) text is, what it carries, and the declared target it goes to.
  * @param {unknown} text
  * @returns {{kind: string, payload: unknown, target?: {kind: 'flow'|'op', app: string, id: string}, needs?: object}}

@@ -223,7 +223,7 @@ import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDis
 // the shared confirm gate at the dispatch waist (mobile presenter: Alert.alert, destructive style).
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../basis/src/v2/userLlmDefault.js';
-import { buildUserLlmRuntime, validateUserLlmConfig } from '../../../../basis/src/v2/userLlmRuntime.js';
+import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf } from '../../../../basis/src/v2/userLlmRuntime.js';
 import { formatNearbyLabel } from '../../core/nearbyLabel.js';
 import { t, lang } from '../../core/localisation.js';
 import {
@@ -276,7 +276,7 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
 import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
@@ -1937,7 +1937,8 @@ export default function CircleLauncherScreen({
         <VandaagPlusModal visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
           selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
           // the free line: the shared reader over the sheet's own acts (never a circle)
-          onRead={(line) => plusRead(line) ?? { error: t('circle.vandaag.plus_line_unread') }}
+          // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
+          onRead={async (line) => plusRead(line) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') }}
           onRemove={plusEdit ? async (actId) => {
             const op = plusRemoveOp(actId, { id: plusEdit.id });
             if (op.error) return t(op.error);

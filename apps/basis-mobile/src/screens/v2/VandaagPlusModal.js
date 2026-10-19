@@ -43,8 +43,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
     if (said) setError(said);
   };
   // the free line: what it understood picks the act and fills the fields below (editable before Save), never a circle
-  const read = () => {
-    const r = onRead?.(line);
+  const read = async () => {
+    const r = await onRead?.(line);
     if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
     else if (r?.error) setError(r.error);
   };

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
-import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 
 describe('Vandaag — the "+"', () => {
@@ -112,6 +112,35 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     expect(asked.acts.map((a) => a.actId)).toEqual(['household.note', 'calendar.calendar-event']);
     expect(ok).toEqual({ actId: 'household.note', values: { body: 'x' } });
     expect(await plusReadWithModel('iets', { ask: async () => ({ actId: 'household.addItem', values: { text: 'x' } }) })).toBe(null);
+  });
+});
+
+describe('the "+" free line read by the person\'s OWN model', () => {
+  it('only the person\'s own route counts: none set (or only the deployment\'s) → no model', async () => {
+    const { ownModelClient } = await import('../../src/v2/userLlmRuntime.js');
+    const local = { invoke: async () => ({}) };
+    expect(ownModelClient({ userCfg: { preset: 'off' }, providers: { local } })).toBe(null);
+    expect(ownModelClient({ userCfg: null, providers: { local } }), 'the deployment\'s env route is not the person\'s').toBe(null);
+    expect(ownModelClient({ userCfg: { preset: 'local-ollama' }, providers: { local } }), 'a preset without its address is no route').toBe(null);
+    expect(ownModelClient({ userCfg: { preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434' }, providers: { local } })).toBe(local);
+    const { ownModelOf } = await import('../../src/v2/userLlmRuntime.js');
+    expect(typeof ownModelOf({ preset: 'local-ollama', llmBaseUrl: 'http://127.0.0.1:11434' })?.invoke).toBe('function');
+    expect(ownModelOf({ preset: 'off' })).toBe(null);
+    expect(ownModelOf({ preset: 'confidential-proxy', llmBaseUrl: 'https://example.org' }), 'a refused confidential route is no model').toBe(null);
+  });
+
+  it('the ask sends the line only, with the acts and the own scope as bounds, and reads the JSON answer back', async () => {
+    let sent = null;
+    const client = { invoke: async (req) => { sent = req; return { replyText: 'Sure: {"actId":"calendar.calendar-event","values":{"title":"kapper","when":"2026-10-20T10:00"}}' }; } };
+    const r = await plusReadWithModel('morgen 10 uur kapper', { ask: plusModelAsk(client) });
+    expect(r).toEqual({ actId: 'calendar.calendar-event', values: { title: 'kapper', when: '2026-10-20T10:00' } });
+    expect(sent.messages).toEqual([{ role: 'user', content: 'morgen 10 uur kapper' }]);
+    expect(sent.system).toContain('household.note');
+    expect(sent.system).toContain(OWN_DEVICES_SCOPE);
+    expect(sent.tools ?? null).toBe(null);
+    // an unreadable answer is no reading
+    expect(await plusReadWithModel('x', { ask: plusModelAsk({ invoke: async () => ({ replyText: 'geen idee' }) }) })).toBe(null);
+    expect(plusModelAsk(null)).toBe(null);
   });
 });
 

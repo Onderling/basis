@@ -3413,11 +3413,33 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch { return null; }
   };
   /** A statement by THIS DEVICE for a party outside the person's devices (its delegation key; the delegation beside it). */
-  const deviceStatementFor = async (domain, node, op, args = {}) => {
+  // A persona's statements are signed by ITS delegation (its own device key under its own authority) — never this device's
+  // general one: a bot linked to a persona knows the persona's root, and nothing of the person's general self.
+  const personaSigners = new Map();   // personaId → its device identity
+  const personaSignerFor = async (pid) => {
+    const rt = personas.get(pid);
+    if (!rt?.enrolledDevice?.record || !rt.deviceDerivationSeed) return null;
+    if (!personaSigners.has(pid)) personaSigners.set(pid, await AgentIdentity.fromSeed(rt.deviceDerivationSeed, new VaultMemory()));
+    return { identity: personaSigners.get(pid), delegation: rt.enrolledDevice.record };
+  };
+  const deviceStatementFor = async (domain, node, op, args = {}, { pid = null } = {}) => {
+    if (pid) {
+      const p = await personaSignerFor(pid);
+      if (!p) return null;
+      return signDeviceStatement({ domain, node, op, args, delegation: p.delegation, sign: (m) => p.identity.sign(m) });
+    }
     const signer = await grantsSignerPromise;
     const delegation = enrolledDevice?.record ?? null;
     if (!signer?.identity || !delegation) return null;
     return signDeviceStatement({ domain, node, op, args, delegation, sign: (m) => signer.identity.sign(m) });
+  };
+  /** The persona a bot (or any contact) at `address` is filed under, when this device runs it; null for the general persona. */
+  const selfOfContactAt = async (address) => {
+    try {
+      const row = (await rawContacts()).find((c) => c?.webid === address || c?.peerAddr === address) ?? null;
+      const pid = selfOfContactRow(row);
+      return pid && personas.has(pid) ? pid : null;
+    } catch { return null; }
   };
   /** A management call to a node this person owns, signed by this device. Null when this device cannot sign. */
   const signedForNode = async (node, op, args = {}) => {
@@ -3444,15 +3466,19 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   const signLinkOffer = async ({ botAddress } = {}) => {
     if (typeof botAddress !== 'string' || !botAddress) return null;
-    const statement = await deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, botAddress, LINK_OPS.LINK, { w: chatId.pubKey });
+    // the self the bot is filed under links: a persona's chat key and ITS delegation, else the general persona's
+    const pid = await selfOfContactAt(botAddress);
+    const me = pid ? personas.get(pid).chatId : chatId;
+    const statement = await deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, botAddress, LINK_OPS.LINK, { w: me.pubKey }, { pid });
     if (!statement) return null;
-    const webidSig = b64encode(chatId.sign(linkOfferMessage({ k: chatId.pubKey, b: botAddress, n: statement.nonce })));
-    return encodeLinkOffer({ statement, webid: chatId.pubKey, webidSig });
+    const webidSig = b64encode(me.sign(linkOfferMessage({ k: me.pubKey, b: botAddress, n: statement.nonce })));
+    return encodeLinkOffer({ statement, webid: me.pubKey, webidSig });
   };
   // The bot's statement becomes a contact row, through the waist (so it carries to the person's other devices).
   const identityLinks = createIdentityLinks({
     signOffer: signLinkOffer,
-    selfRoot: () => enrolledDevice?.record?.by ?? null,
+    // every root a self of this device's delegation names — the general persona's and each held persona's
+    selfRoots: () => [enrolledDevice?.record?.by, ...[...personas.values()].map((rt) => rt?.enrolledDevice?.record?.by)].filter(Boolean),
     callSkill: (app, op, args) => callSkill(app, op, args),
   });
   /** Every linked bot hears a device's revocation — the root's own tombstone, which the bot verifies itself. */
@@ -7527,7 +7553,9 @@ export async function createRealHouseholdAgent(opts = {}) {
      * @param {{text: string, messageId: string}} turn
      */
     linkedTurnAuth: async (peerAddr, { text, messageId } = {}) => {
-      const statement = () => deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId });
+      // signed as the self the bot is filed under — a persona's delegation for a persona's bot, never the general one
+      const pid = await selfOfContactAt(peerAddr);
+      const statement = () => deviceStatementFor(STATEMENT_DOMAINS.IDENTITY_LINK, peerAddr, LINK_OPS.TURN, { text, messageId }, { pid });
       // an agent this person admitted themselves WITH (linked, or admitted by its card's code): every turn is signed
       if (await isLinkedBot(peerAddr)) return statement();
       // the admission itself: the person typed `/start <code>` to a contact whose card says it is a bot — their own act,

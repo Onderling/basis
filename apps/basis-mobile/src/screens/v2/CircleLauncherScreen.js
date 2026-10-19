@@ -2360,7 +2360,7 @@ export default function CircleLauncherScreen({
         eventLog={eventLog}
         circles={circles}
         recipeStore={recipeStore}
-        onPinboardEvent={bundle?.onPinboardEvent}
+        onPinboardEvent={bundle?.agent?.onPinboardEvent}
         emitMemberProps={bundle?.emitMemberProps}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}

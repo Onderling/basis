@@ -19,6 +19,8 @@ describe('an app\'s reply in the call\'s language', () => {
     expect(cal?.message, JSON.stringify(cal)).toMatch(/^en\|circle\.calendar\./);
     const cal2 = await a.callSkill('calendar', 'addEvent', { circleId: 'huis', title: 'Kapper', when: when() });
     expect(cal2?.message).toMatch(/^nl\|circle\.calendar\./);
+    // a language the shell does not speak is the bot's own (and builds no table of its own)
+    expect((await a.callSkill('calendar', 'addEvent', { circleId: 'huis', title: 'Bakker', when: when() }, { lang: 'xx-free' }))?.message).toMatch(/^nl\|circle\.calendar\./);
     const list = await a.callSkill('lists', 'listLists', { circleId: 'huis' }, { lang: 'en' });
     expect(JSON.stringify(list)).toContain('en|');
     expect(JSON.stringify(list)).not.toContain('"nl|');

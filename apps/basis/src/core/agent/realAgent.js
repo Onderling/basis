@@ -23,6 +23,7 @@
  * the wrapper at `src/web/realAgent.js` + `web/main.js`.
  */
 
+import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
   PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
@@ -313,10 +314,12 @@ export async function createRealHouseholdAgent(opts = {}) {
    * The translator for ONE call: the language the call carries (`ctx.lang` — a door hands the person's `/taal`), else the
    * bot's own. Per call, never a shared "current language": two people's turns may be in flight at once.
    */
-  const translatorFor = (lang) => (typeof lang === 'string' && lang && typeof opts.t === 'function' ? (k, p) => opts.t(k, p, lang) : agentT);
+  // only a language the shell speaks (the thread's `/taal` enum): anything else is the bot's own, and caches nothing new
+  const callLang = (lang) => (typeof lang === 'string' && THREAD_LANGS.includes(lang) ? lang : null);
+  const translatorFor = (lang) => (callLang(lang) && typeof opts.t === 'function' ? (k, p) => opts.t(k, p, callLang(lang)) : agentT);
   /** One op table per language (built on first use), so an app's own replies are worded in the call's language. */
   const perLang = (cache, lang, build) => {
-    const key = typeof lang === 'string' && lang ? lang : '';
+    const key = callLang(lang) ?? '';
     if (!cache.has(key)) cache.set(key, build(translatorFor(key || null)));
     return cache.get(key);
   };

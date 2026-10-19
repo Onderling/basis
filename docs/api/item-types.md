@@ -146,6 +146,26 @@ registerCanonicalTypes(registry)
 
 Register every canonical type (with its legacy aliases) on a type registry.
 
+## `src/declaredTypes.js`
+
+### `registerDeclaredTypes`
+
+**Kind:** function · **Import:** `registerDeclaredTypes` from `'@onderling/item-types'`
+
+```js
+registerDeclaredTypes(registry, entries = [])
+```
+
+Register the types the given manifests declare (`nouns[noun].schema`) on a registry, by the rules above: a
+first-party noun under its bare name, an extension's only under its origin, no shadow, all or nothing per manifest.
+
+**Parameters**
+
+- `registry` `ReturnType<typeof import('./registry.js').createRegistry>`
+- `entries` `Array<{origin: string, manifest: object, firstParty?: boolean}>`
+
+**Returns:** `{registered: string[], refused: Array<{origin: string, noun: string, reason: 'not-in-origin'|'already-registered'|'bad-schema'}>}`
+
 ## `src/embedsSchema.js`
 
 ### `EMBEDS_SCHEMA`
@@ -292,10 +312,19 @@ Type → the field that is its moment.
 **Kind:** function · **Import:** `timeAnchorOf` from `'@onderling/item-types'`
 
 ```js
-timeAnchorOf(type)
+timeAnchorOf(type, { manifests = [] } = {})
 ```
 
-The field that is this type's moment, or null when the type has none.
+The field a type's reminders count from: the frozen table first (first-party), else the noun's declared
+`presents.moment` in the manifests given, when that noun is SCHEDULED (`presents.order: 'asc'`). Anything else has
+no moment to remind from — by design, not an omission.
+
+**Parameters**
+
+- `type` `string`
+- `[o]` `{manifests?: object[]}`
+
+**Returns:** `string|null`
 
 ### `ITEM_REMINDERS_SCHEMA`
 

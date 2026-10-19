@@ -342,6 +342,45 @@ bespoke behaviour or free CRUD — "declare a noun, get CRUD". `generic` is the 
 
 **Returns:** `Promise<{ok:true, via:'op'|'generic', opId?:string, atom?:string, result:any} | {ok:false, code:'unimplemented'|'no-dispatch'|'no-generic', opId?:string, atom?:string, noun?:string}>`
 
+## `src/extensionCompose.js`
+
+### `nounWordOf`
+
+**Kind:** function · **Import:** `nounWordOf` from `'@onderling/app-manifest'`
+
+```js
+nounWordOf(noun)
+```
+
+A noun's own word: what follows its origin (`plants.plant` → `plant`).
+
+### `extensionVerbsFor`
+
+**Kind:** function · **Import:** `extensionVerbsFor` from `'@onderling/app-manifest'`
+
+```js
+extensionVerbsFor(noun, atom)
+```
+
+The words an extension noun's free atom answers to, unless the noun declares its own: `<noun word> <atom>`.
+
+### `checkExtensionManifest`
+
+**Kind:** function · **Import:** `checkExtensionManifest` from `'@onderling/app-manifest'`
+
+```js
+checkExtensionManifest(manifest, { origin, firstParty = [] } = {})
+```
+
+Check an extension's manifest against the compose rules above: its nouns under its origin, its words its own.
+
+**Parameters**
+
+- `manifest` `object` — the extension's manifest
+- `a` `{origin: string, firstParty?: object[]}` — the composed origin; the first-party manifests already composed
+
+**Returns:** `{ok: boolean, problems: Array<{noun: string, reason: 'not-in-origin'|'word-not-the-noun'|'word-taken', word?: string}>}`
+
 ## `src/flowRunner.js`
 
 ### `createFlowRunner`

@@ -26,7 +26,7 @@
  *   - COLLECTION atoms (list) → no positional (body kind `none`).
  */
 
-import { capabilitiesOf, encodeGenericOpId, isPeopleWritten, isWritingVerb } from '@onderling/app-manifest';
+import { capabilitiesOf, encodeGenericOpId, isPeopleWritten, isWritingVerb, extensionVerbsFor } from '@onderling/app-manifest';
 
 /** Atoms whose slash positional is the item ID (bound to `id`); everything else binds to `body`. */
 const REFERENCE_ATOMS = new Set(['get', 'remove', 'delete']);
@@ -65,7 +65,11 @@ export function synthesizeGenericOps(manifest) {
     const { atom, noun } = cap;
     if (!atom || !noun) continue;
 
-    const { match, params } = bindingForAtom(atom);
+    const binding = bindingForAtom(atom);
+    // an EXTENSION's noun (`<app>.<noun>`) answers to its own word first — `plant add …` — never a bare verb, which
+    // stays the first-party nouns'
+    const match = noun.startsWith(`${app}.`) ? { ...binding.match, verbs: [extensionVerbsFor(noun, atom)] } : binding.match;
+    const { params } = binding;
     out.push({
       id:        encodeGenericOpId(app, atom, noun),
       verb:      atom,

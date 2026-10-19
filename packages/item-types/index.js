@@ -35,6 +35,7 @@ export const registerType = (name, schemaDef, opts) =>
 // Lower-level surface for callers that want a fresh registry.
 export { createRegistry }         from './src/registry.js';
 export { registerCanonicalTypes } from './src/canonical.js';
+export { registerDeclaredTypes }  from './src/declaredTypes.js';
 export { CANONICAL_TYPES }        from './src/canonical.js';
 export { NAMESPACE }              from './src/baseSchema.js';
 export { EMBEDS_SCHEMA }          from './src/embedsSchema.js';

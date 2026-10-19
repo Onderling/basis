@@ -100,6 +100,8 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
 
   /** Apply a VERIFIED task statement to the circle's materialised head. Idempotent: a re-delivered
    *  snapshot re-merges to the same result; a re-delivered remove re-deletes nothing. */
+  /** The item types this node was handed a row of and does not hold — each said once. */
+  const notHeldTypes = new Set();
   async function applyToHead(circleId, body) {
     const store = storeFor(circleId);
     if (!store) return;
@@ -114,7 +116,17 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       if (isRosterTrailItem(item)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
-      await store.put(item, { sync: false, origin: true });
+      try { await store.put(item, { sync: false, origin: true }); }
+      catch (err) {
+        // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
+        // the log — the head picks it up the day the type is installed here (a rebuild re-applies what the log holds).
+        // Said once per type, never per row.
+        if (/unknown type/.test(String(err?.message ?? err))) {
+          if (!notHeldTypes.has(item.type)) { notHeldTypes.add(item.type); console.warn(`[lane] ${circleId}: a "${item.type}" row is not held here (no such type on this node); kept on the log`); }
+          return;
+        }
+        throw err;
+      }
       // A snapshot that LANDED (verified, merged) — the seam for anything that indexes what the store holds
       // (the noticeboard bridge into pinboard's index). Best-effort: an indexer must never fail the merge.
       if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item); } catch { /* indexed later by catch-up */ } }

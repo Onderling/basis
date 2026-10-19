@@ -6387,7 +6387,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // changed and cancelled the person's own appointments) — it falls to the circle's calendar below, as a door's note
     // falls to the circle's notes
     const calendarDoorCall = typeof ctx?.caller === 'string' && !!ctx.caller;
-    if (appOrigin === 'calendar' && personNode && !args?.circleId && !calendarDoorCall) {
+    // (the own scope named as the circle is the same own agenda — the person's "+" names it for every own entry alike)
+    if (appOrigin === 'calendar' && personNode && (!args?.circleId || args.circleId === OWN_DEVICES_SCOPE) && !calendarDoorCall) {
       ownCalendarReady ??= (async () => {
         ownCalendarStore = await getOwnStore();
         const tr = agentT;

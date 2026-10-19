@@ -1,12 +1,13 @@
 /**
- * basis v2 — Vandaag's "+" sheet (web DOM renderer): pick an own note or an own appointment, fill it in, save. Painted
- * from the shared model (`PLUS_ACTS`); what a save does is the host's (`onSave(actId, values)` → null, or the line to
- * show). Pure render.
+ * basis v2 — Vandaag's "+" sheet (web DOM renderer): the person's own acts (the own-scope attach entries), a free line
+ * at the top that fills them ("notitie: melk", "afspraak morgen 14:00 tandarts"), the fields, Save — and, opened on an
+ * own row, Remove. Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
+ * Pure render.
  */
 import { PLUS_ACTS, plusLabel } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderVandaagPlus(container, { t, actId = null, error = null, onPick, onSave, onClose,
+export function renderVandaagPlus(container, { t, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
   selves = null, asSelf = null, onPickSelf } = {}) {
   if (!container) return container;
@@ -14,10 +15,11 @@ export function renderVandaagPlus(container, { t, actId = null, error = null, on
   container.innerHTML = '';
   container.className = 'circle-vandaag-plus';
   const title = document.createElement('h3');
-  title.textContent = tr('circle.vandaag.plus');
+  title.textContent = tr(editing ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus');
   container.appendChild(title);
   const act = PLUS_ACTS.find((a) => a.id === actId) ?? null;
-  if (Array.isArray(selves) && selves.length > 1 && !asSelf) {
+  const asking = Array.isArray(selves) && selves.length > 1 && !asSelf;
+  if (asking) {
     const ask = document.createElement('p');
     ask.textContent = tr('circle.vandaag.plus_as');
     container.appendChild(ask);
@@ -30,6 +32,24 @@ export function renderVandaagPlus(container, { t, actId = null, error = null, on
       b.addEventListener('click', () => onPickSelf?.(self.id));
       container.appendChild(b);
     }
+  } else {
+    // the free line: say it; what was understood picks the act and fills the fields below (editable before Save)
+    if (!editing && typeof onRead === 'function') {
+      const lf = document.createElement('form');
+      lf.className = 'circle-vandaag-plus__lineform';
+      const li = document.createElement('input');
+      li.type = 'text';
+      li.className = 'circle-vandaag-plus__line';
+      li.value = line ?? '';
+      li.placeholder = tr('circle.vandaag.plus_line_ph');
+      li.setAttribute('aria-label', tr('circle.vandaag.plus_line_ph'));
+      lf.appendChild(li);
+      lf.addEventListener('submit', (e) => { e.preventDefault(); onRead(li.value); });
+      container.appendChild(lf);
+    }
+  }
+  if (asking) {
+    /* the self is asked first */
   } else if (!act) {
     for (const a of PLUS_ACTS) {
       const b = document.createElement('button');
@@ -47,10 +67,11 @@ export function renderVandaagPlus(container, { t, actId = null, error = null, on
     const inputs = {};
     for (const f of act.fields) {
       const label = document.createElement('label');
-      label.textContent = tr(f.labelKey);
+      label.textContent = f.labelKey ? tr(f.labelKey) : f.name;
       const input = document.createElement('input');
       input.type = f.kind === 'datetime' ? 'datetime-local' : 'text';
       input.name = f.name;
+      if (values?.[f.name] != null) input.value = values[f.name];
       input.className = `circle-vandaag-plus__${f.name}`;
       label.appendChild(input);
       form.appendChild(label);
@@ -61,6 +82,15 @@ export function renderVandaagPlus(container, { t, actId = null, error = null, on
     save.className = 'circle-vandaag-plus__save';
     save.textContent = tr('circle.vandaag.plus_save');
     form.appendChild(save);
+    // opened on an own row: take it away
+    if (editing && typeof onRemove === 'function') {
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'circle-vandaag-plus__remove';
+      rm.textContent = tr('circle.vandaag.plus_remove');
+      rm.addEventListener('click', () => onRemove(act.id));
+      form.appendChild(rm);
+    }
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       onSave?.(act.id, Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value])));

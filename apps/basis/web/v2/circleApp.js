@@ -171,7 +171,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead } from '../../src/v2/vandaagPlus.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -4282,30 +4282,53 @@ async function _showVandaag() {
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
 // "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
-function showVandaagPlus() {
+function showVandaagPlus({ edit = null } = {}) {
   const { card, close } = _restoreOverlay();
-  let actId = null;
+  // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
+  let actId = edit?.act?.id ?? null;
+  let values = edit?.values ?? {};
+  const editId = edit?.id ?? null;
+  let line = '';
   let error = null;
   // written as the one self ticked in the header; with several ticked, the sheet asks which
-  let asSelf = writeAs(_selfSet.on);
+  let asSelf = editId ? 'default' : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
+  const call = async (op) => {
+    // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
+    const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
+    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+      .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+  };
   const paint = () => renderVandaagPlus(card, {
-    t, actId, error, selves, asSelf,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId,
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
-    onSave: async (id, values) => {
-      const op = plusOp(id, values);
+    // the free line: what it understood selects the act and fills the fields (editable), never a circle
+    onRead: (text) => {
+      line = text;
+      const r = plusRead(text);
+      if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
+      else error = t('circle.vandaag.plus_line_unread');
+      paint();
+    },
+    onSave: async (id, filled) => {
+      values = filled;
+      const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);
       if (op.error) { error = t(op.error); paint(); return; }
-      // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-      const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
-      const r = await Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
-        .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+      const r = await call(op);
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
-      const follow = plusFollowUp(_screensBook, id);
+      const follow = editId ? null : plusFollowUp(_screensBook, id);
       if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
       close(); _showVandaag();
     },
+    onRemove: editId ? async (id) => {
+      const op = plusRemoveOp(id, { id: editId });
+      if (op.error) { error = t(op.error); paint(); return; }
+      const r = await call(op);
+      if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      close(); _showVandaag();
+    } : null,
     onClose: () => close(),
   });
   paint();
@@ -4340,6 +4363,8 @@ function showVandaagCustomise() {
 // what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
 function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
+  // an own row (no circle): the "+" sheet opened on it — change it or take it away
+  else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
 }
 
 // (Batch 5) `showStream` is GONE — the cross-circle Stream VIEW retired (α.3 already removed its tab;

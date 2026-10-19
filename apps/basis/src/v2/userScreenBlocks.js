@@ -343,6 +343,8 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     circleId: row.circleId ?? null, circleName: row.circleName ?? '', ...(row.own ? { own: true } : {}), mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
     // what a chore row also shows: its words, its state, its "see also" links
     text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
+    // an own row's own words, as made (the "+" sheet opens on them to change or remove it)
+    ...(row.own ? { fields: { ...(row.body != null ? { body: row.body } : {}), ...(row.title != null ? { title: row.title } : {}), ...(row.startsAt ? { when: row.startsAt } : {}) } } : {}),
   }));
   return { blockId: block.id, type: 'items', status: items.length ? 'ok' : 'empty', content: { noun, scope, items } };
 }

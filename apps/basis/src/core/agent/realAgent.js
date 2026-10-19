@@ -2542,8 +2542,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
       contacts: {
         has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
-        // a landed row is filed under THIS self (the sibling set it came from says whose it is), whatever the row says
-        add: (contact) => rawPinboard('addContact', { ...contact, persona: pid ?? undefined }),
+        // a landed row is filed under THIS self (the sibling set it came from says whose it is), whatever the row says —
+        // the general persona's lane files it under 'default' (an explicit undefined dropped the row's own 'default', and
+        // with it the person's choice of whom the contact talks to)
+        add: (contact) => rawPinboard('addContact', { ...contact, persona: pid ?? 'default' }),
         get: async (webid) => (await book()).find((c) => c?.webid === webid) ?? null,
         // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
         setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),

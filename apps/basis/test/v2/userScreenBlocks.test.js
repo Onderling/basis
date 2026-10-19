@@ -141,7 +141,9 @@ describe('materializeScreen · α.2.b — agenda', () => {
     });
     expect(out[0].status).toBe('empty');
     expect(callSkill.mock.calls.filter(([, , a]) => a?.circleId)).toEqual([]);
-    expect(callSkill.mock.calls.map(([app, op]) => `${app}:${op}`)).toEqual(['calendar:listEvents']);
+    // the only events read are my own (and my pair circles', which muting a circle does not touch — here there are
+    // none); the membership read that finds those pair circles is not an events fetch
+    expect(callSkill.mock.calls.map(([app, op]) => `${app}:${op}`).filter((c) => c !== 'pinboard:listMyCircles')).toEqual(['calendar:listEvents']);
   });
 });
 

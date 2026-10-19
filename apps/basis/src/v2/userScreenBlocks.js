@@ -39,6 +39,7 @@ import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
+import { isPairCircleId } from './pairCircleId.js';
 import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
 import { linkedBotsOf } from './identityLink.js';
 import { bookRowsOf } from './contactsSource.js';
@@ -297,8 +298,15 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
   const names = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
   const isAgenda = noun === 'calendar-event';
   const until = Date.now() + horizonDays * 86_400_000;
-  const r = activeCircleIds.length ? await acrossCircles({
-    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
+  // appointments shared WITH me by a contact live in our pair circle (a two-member circle, kept off the circle list):
+  // the agenda over every circle reads those too — appointments only, nothing else of a pair circle
+  let readIds = activeCircleIds;
+  if (isAgenda && withOwn) {
+    const mine = ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
+    readIds = [...new Set([...activeCircleIds, ...mine.filter((id) => isPairCircleId(id))])];
+  }
+  const r = readIds.length ? await acrossCircles({
+    circles: readIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
     manifests: ITEM_MANIFESTS,
     callSkill: (app, op, args) => callSkill(app, op, isAgenda ? { ...args, days: horizonDays } : args),
     genericFor: (circleId) => ({ list: async (n) => (await callSkill('household', encodeGenericOpId('household', 'list', n), { circleId }))?.result ?? [] }),

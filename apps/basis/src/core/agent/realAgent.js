@@ -257,6 +257,9 @@ import { householdManifest }               from '../../../../household/manifest.
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around
 import { mergeManifests }                  from '../../manifestMerge.js';
+import { sharedCopyIdFor, sharedFieldsOf, withSharedMark } from '../../v2/sharedAppointment.js';
+import { personaOfContact, DEFAULT_PERSONA } from '../../v2/contactPersona.js';
+import { pairCircleIdFor } from '../../v2/pairCircleId.js';   // an own appointment shared with a contact
 import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
@@ -6400,6 +6403,60 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: false, error: tr('circle.calendar.not_yours', { title: snap.event.title ?? '' }), refusal: refuse('op-rule', 'not-yours') };
       }
     }
+    /** The calendar over a circle's store (the pair circle's here), made once. */
+    const circleCalendarOps = () => (circleCalendar ??= makeCircleCalendarOps({
+      storeFor: (circleId) => householdService.stores.getStore(circleId),
+      activeCircle: () => resolveCircleId({}),
+      t: agentT,
+      localActor: 'me',
+    }));
+    /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */
+    const writeSharedCopy = async (ev, pairCircleId) => {
+      const copyId = sharedCopyIdFor(ev.id, pairCircleId);
+      const self = circleSelf(pairCircleId)?.webid ?? chatId?.pubKey;
+      await ensureCircleSync(pairCircleId);
+      const store = householdService.stores.getStore(pairCircleId);
+      const existing = await store.get(copyId).catch(() => null);
+      const fields = sharedFieldsOf(ev);
+      if (existing) {
+        await store.put({ ...existing, ...fields, ...(fields.state ? {} : { state: existing.state === 'cancelled' ? 'scheduled' : existing.state }) }, { by: self });
+      } else if (fields.state !== 'cancelled') {
+        const r = await circleCalendarOps().addEvent({ circleId: pairCircleId, id: copyId, title: fields.title, when: fields.startsAt, ...(fields.endsAt ? { until: fields.endsAt } : {}), actor: self });
+        if (r?.ok === false) return r;
+      }
+      return { ok: true, copyId };
+    };
+    const shareOwnEvent = async (a) => {
+      await ownCalendarReady;
+      const ev = await ownCalendarStore.get(String(a?.id ?? '')).catch(() => null);
+      if (!ev || ev.type !== 'calendar-event') return { ok: false, code: 'not-found', error: agentT('circle.calendar.no_event') };
+      const contacts = (await callSkill('pinboard', 'listContacts', {}).catch(() => null))?.contacts ?? [];
+      const row = contacts.find((c) => c?.webid === a?.with || c?.pubKey === a?.with);
+      if (!row) return { ok: false, code: 'no-contact', error: agentT('circle.calendar.share_no_contact') };
+      // the self this contact knows (the persona it is filed under), never the general self by default
+      const persona = personaOfContact(row) ?? DEFAULT_PERSONA;
+      const selfWebid = personas.get(persona)?.chatId?.pubKey ?? (persona === DEFAULT_PERSONA ? chatId?.pubKey : null);
+      if (!selfWebid) return { ok: false, code: 'no-self', error: agentT('circle.calendar.share_no_contact') };
+      const pairCircleId = pairCircleIdFor(selfWebid, row.webid ?? row.pubKey);
+      const mine = ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
+      if (!mine.includes(pairCircleId)) return { ok: false, code: 'no-pair-circle', error: agentT('circle.calendar.share_no_pair', { name: row.displayName ?? row.handle ?? '' }) };
+      const w = await writeSharedCopy(ev, pairCircleId);
+      if (w?.ok === false) return w;
+      await ownCalendarStore.put(withSharedMark(ev, pairCircleId, w.copyId), { by: 'me' });
+      return { ok: true, itemId: ev.id, copyId: w.copyId, message: agentT('circle.calendar.shared_with', { title: ev.title ?? '', name: row.displayName ?? row.handle ?? '' }) };
+    };
+    /** An own appointment that was shared and just changed: its copies follow (a cancel goes as a cancel). */
+    const reshareOwnEvent = async (ref) => {
+      if (!ref) return;
+      let ev = await ownCalendarStore.get(String(ref)).catch(() => null);
+      if (!ev) {
+        const all = (await ownCalendarStore.listByType?.('calendar-event').catch(() => [])) ?? [];
+        ev = all.find((e) => String(e.title ?? '').toLowerCase() === String(ref).toLowerCase()) ?? null;
+      }
+      for (const m of (Array.isArray(ev?.shared) ? ev.shared : [])) {
+        if (typeof m?.pairCircleId === 'string') await writeSharedCopy(ev, m.pairCircleId);
+      }
+    };
     // A person's node (`opts.personalCalendar`, web and mobile): a call without a circle is their OWN appointment — an
     // item in their own-devices store, under an own Agenda, served by the same ops as a circle's.
     // A composition with neither option (a test, a tool) is a person's node with an in-memory own store.
@@ -6425,9 +6482,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         t: agentT,
         localActor: 'me',
       }));
+      // SHARED WITH A CONTACT: a minimal copy in the pair circle of the self the contact is filed under, carried by its
+      // lane; the link stays on this side (the source's `shared` mark), so a move or a cancel here re-shares it
+      if (opId === 'shareEvent') return shareOwnEvent(args ?? {});
       const handler = ops[opId];
       if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
       const res = await handler(args ?? {});
+      if (res?.ok !== false && (opId === 'updateEvent' || opId === 'cancelEvent')) {
+        try { await reshareOwnEvent(args?.id); } catch (err) { console.warn('[calendar] re-share failed:', err?.message ?? err); }
+      }
       // where it was saved, as every write's reply says it: on this device, no peer to wait for (the own store
       // reaches the person's other devices, never a circle's members) — the renderer's "saved locally"
       const writes = ['addEvent', 'updateEvent', 'cancelEvent', 'rsvpAccept', 'rsvpDecline', 'rsvpTentative'];
@@ -6436,14 +6499,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // A person's node (`opts.personalCalendar`, web and mobile): a call naming a circle reads and writes that circle's
     // store; a call without one (and no own store handed in) stays on the person's own calendar below.
     if (appOrigin === 'calendar') {
-      const ops = (circleCalendar ??= makeCircleCalendarOps({
-        storeFor: (circleId) => householdService.stores.getStore(circleId),
-        activeCircle: () => resolveCircleId({}),
-        t: agentT,
-        localActor: 'me',
-      }));
+      const ops = circleCalendarOps();
       const handler = ops[opId];
-      return handler ? handler(args ?? {}) : { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+      if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
+      // a write IN a circle rides its signed lane: wire the circle's publish valve first, as every op in a circle does
+      // (an answer to a shared appointment stayed on the answering device until something else opened that circle)
+      if (typeof args?.circleId === 'string' && args.circleId) await ensureCircleSync(args.circleId);
+      return handler(args ?? {});
     }
     if (appOrigin === 'agents') {
       // The read-only "your agents" skills live on hostAgent (wireSkill-wrapped

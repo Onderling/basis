@@ -717,6 +717,18 @@
     "updated": {
       "text": "Appointment '{{title}}' is now {{when}}.",
       "doc": "The reply when an appointment is changed: its title and its (new) moment."
+    },
+    "share_no_contact": {
+      "text": "I don't know that contact.",
+      "doc": "Sharing an appointment with someone not in the contacts."
+    },
+    "share_no_pair": {
+      "text": "There is no conversation with {{name}} yet; share after a first message.",
+      "doc": "Sharing before the two have a pair circle (a first message makes it)."
+    },
+    "shared_with": {
+      "text": "\"{{title}}\" shared with {{name}} — a copy: what you change here is shared again.",
+      "doc": "An own appointment was shared with a contact as a copy."
     }
   },
   "embed": {
@@ -8389,6 +8401,10 @@
       "updateEvent": {
         "text": "Change",
         "doc": "Row-action button for calendar:updateEvent: change an appointment (its title and/or moment)."
+      },
+      "shareEvent": {
+        "text": "Share with…",
+        "doc": "An own appointment's button: share a copy with a contact."
       }
     },
     "agents": {

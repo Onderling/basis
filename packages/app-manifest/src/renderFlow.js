@@ -30,7 +30,7 @@
  * @returns {{
  *   id: string, labelKey: string, status: string,
  *   progress: Array<{id: string, labelKey: string, state: 'done'|'current'|'pending'|'skipped'}>,
- *   form: null|{step: string, params: Array<{name: string, kind?: string, labelKey: string, required: boolean}>},
+ *   form: null|{step: string, params: Array<{name: string, kind?: string, labelKey: string, required: boolean, pickerSource?: object}>},
  *   actions: {canSubmit: boolean, canCancel: boolean, canRestart: boolean},
  *   reason: string|null,
  *   produces: object|null,
@@ -63,6 +63,8 @@ export function renderFlow(flow, instance, { ops } = {}) {
           kind: p.kind ?? declared?.kind,
           required: declared?.required ?? true,
           labelKey: declared?.labelKey ?? `flow.${flow.id}.${instance.awaiting.step}.${p.name}`,
+          // a param picked from a list (the op's declared read): a shell paints its choices, not a text box
+          ...(declared?.pickerSource && typeof declared.pickerSource === 'object' ? { pickerSource: { ...declared.pickerSource } } : {}),
         };
       }),
     };

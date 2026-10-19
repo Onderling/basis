@@ -71,3 +71,18 @@ describe('renderFlow', () => {
     expect(m.actions.canRestart).toBe(true);
   });
 });
+
+describe('renderFlow — a param picked from a list', () => {
+  it('the form carries the op param\'s pickerSource, so a shell paints choices, not a text box', () => {
+    const flow = { id: 'pickflow', steps: [{ id: 'pick', op: 'pairCirclePeer', needs: ['circle'] }] };
+    const instance = { status: 'awaiting-input', awaiting: { step: 'pick', params: [{ name: 'circle' }] }, steps: {} };
+    const ops = { pairCirclePeer: { id: 'pairCirclePeer', params: [{ name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'pinboard' } }] } };
+    const model = renderFlow(flow, instance, { ops });
+    expect(model.form.params[0].pickerSource).toEqual({ listOp: 'listMyCircles', appOrigin: 'pinboard' });
+  });
+  it('a param without one carries none', () => {
+    const flow = { id: 'f', steps: [{ id: 's', op: 'x' }] };
+    const instance = { status: 'awaiting-input', awaiting: { step: 's', params: [{ name: 'code' }] }, steps: {} };
+    expect(renderFlow(flow, instance, { ops: { x: { id: 'x', params: [{ name: 'code', kind: 'string' }] } } }).form.params[0]).not.toHaveProperty('pickerSource');
+  });
+});

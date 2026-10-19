@@ -1620,7 +1620,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (profileId === 'default') circlePersonas.delete(circleId); else circlePersonas.set(circleId, profileId);
         // A circle this device was not in a moment ago: its siblings hear it now (L109 — every device of the person
         // is in every circle of the person). After the write, so the carry reads the record it just made; best-effort.
-        if (!wasIn && profileId === 'default') circleFollowSync?.fanJoined(circleId).catch(() => { /* the sibling asks on connect */ });
+        // A persona's circle too: it reaches the devices holding that persona only (the follow's `siblings(circleId)`).
+        if (!wasIn) circleFollowSync?.fanJoined(circleId).catch(() => { /* the sibling asks on connect */ });
         return { ok: true };
       },
       // A circle LEFT comes off the profile (2026-09-22): with the record still there a restored device re-opened a
@@ -2596,6 +2597,47 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return out;
   }
+  // ...and the FOLLOW's entries: the general persona's circles in the clear, then each persona's this device runs, NAMING
+  // the persona — a sibling holding it rejoins as it (the enrol consume's persona step), one that does not refuses. The
+  // follow tells a persona's circle only to the devices holding that persona (`siblings(circleId)`), as that persona.
+  async function myFollowEntries() {
+    const out = (await myCircleEntries()).filter(({ id }) => !circlePersonas.has(id));
+    const onRelays = (() => { try { return (sa.relays?.list?.() ?? []).map((r) => r?.url).filter((u) => typeof u === 'string' && u); } catch { return []; } })();
+    for (const [pid, rt] of personas) {
+      if (pid === 'default') continue;
+      let entry = null;
+      try { entry = (await agentsRegistryRef?.lookup?.(pid)) ?? null; } catch { entry = null; }
+      for (const [id, rec] of Object.entries(circleMembershipsOf(entry ?? {}))) {
+        const address = rt?.circleAddressFor?.(id) ?? null;
+        if (!address) continue;
+        out.push({
+          id, handle: rec?.handle ?? null, address, persona: pid,
+          relays: Array.isArray(rec?.relays) && rec.relays.length ? [...rec.relays] : onRelays,
+          ...(rec?.sight ? { sight: { putAway: rec.sight.putAway, at: rec.sight.at } } : {}),
+        });
+      }
+    }
+    return out;
+  }
+  // Every device of the person, as any of their selves (a persona's sibling speaks at the persona's addresses).
+  const allOwnSiblings = async () => {
+    const out = new Set(await ownDeviceSiblings().catch(() => []));
+    for (const pid of personas.keys()) {
+      if (pid === 'default') continue;
+      for (const a of (await personaSiblings(pid).catch(() => []))) out.add(a);
+    }
+    return [...out];
+  };
+  // Which self a follow send to a sibling travels as: the persona an entry names, else the persona whose device `to` is.
+  const followSendSelf = async (to, payload) => {
+    const named = payload?.circle?.persona ?? (typeof payload?.circle?.id === 'string' ? circlePersonas.get(payload.circle.id) : null);
+    if (named) return named;
+    for (const pid of personas.keys()) {
+      if (pid === 'default') continue;
+      if ((await personaSiblings(pid).catch(() => [])).includes(to)) return pid;
+    }
+    return null;
+  };
   // SIBLINGS FOLLOW A CIRCLE (L109 option A): a circle founded or joined on any device of the person reaches the
   // others as a carry, and each joins itself by the enrol consume's per-circle step — the shells hand that step in
   // (`setConsume`, composed beside their `bootstrapFromStashedOffer`), the lane table spreads the handlers, the
@@ -2619,11 +2661,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   circleFollowSync = createCircleFollowSync({
     // per circle: a persona's circle is told only to the devices holding that persona (no person-level lane)
-    siblings: (circleId) => (circleId ? siblingsFor({ circleId }) : ownDeviceSiblings()),
-    sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-    myEntries: myCircleEntries,
+    siblings: (circleId) => (circleId ? siblingsFor({ circleId }) : allOwnSiblings()),
+    sendToPeer: async (to, payload, o) => sendToSibling(to, payload, o, await followSendSelf(to, payload)),
+    myEntries: myFollowEntries,
     myLeft: async () => { try { return (await rawPinboard('listMyCircles', {}))?.left ?? []; } catch { return []; } },
-    isIn: async (circleId) => (await myCircleEntries()).some((e) => e.id === circleId),
+    isIn: async (circleId) => (await myFollowEntries()).some((e) => e.id === circleId),
     kringOn: (circleId) => followSelection.kringOn(circleId),
     consume: (entry) => (typeof circleFollowConsume === 'function'
       ? circleFollowConsume(entry)

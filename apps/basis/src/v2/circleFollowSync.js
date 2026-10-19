@@ -35,7 +35,8 @@ const validEntry = (c) => c && typeof c === 'object' && typeof c.id === 'string'
 
 /**
  * @param {object} a
- * @param {() => Promise<string[]>} a.siblings     the person's other proven device addresses
+ * @param {(circleId?: string) => Promise<string[]>} a.siblings  the person's other proven device addresses — with no circle,
+ *   every one (as any of the person's selves); with a circle, the devices of THAT circle's self (a persona's: those holding it)
  * @param {(to: string, payload: object, opts?: object) => Promise<any>} a.sendToPeer
  * @param {() => Promise<Array<{id: string, handle?: string|null, address: string, relays?: string[]}>>} a.myEntries
  *   the circles THIS device is in, each as the entry a sibling joins from (this device's per-circle address)
@@ -169,12 +170,20 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
         let entries = [];
         try { entries = (await myEntries()) ?? []; } catch { return; }
         for (const circle of entries.filter(validEntry)) {
+          // only to a device of the circle's OWN self: a persona's circle to the devices holding that persona, the general
+          // persona's to the general persona's — never one self's circles told over another's address
+          let theirs = [];
+          try { theirs = (await siblings(circle.id)) ?? []; } catch { theirs = []; }
+          if (!theirs.includes(fromAddr)) continue;
           try { await sendToPeer(fromAddr, wire(circle), { guarantee: 'hold-forward' }); } catch { /* the sibling asks again */ }
         }
         // …then what this device LEFT, so a sibling that slept through a leave leaves on connect
         let left = [];
         try { left = typeof myLeft === 'function' ? ((await myLeft()) ?? []) : []; } catch { left = []; }
         for (const circleId of left.filter((id) => typeof id === 'string' && id)) {
+          let theirs = [];
+          try { theirs = (await siblings(circleId)) ?? []; } catch { theirs = []; }
+          if (!theirs.includes(fromAddr)) continue;
           try { await sendToPeer(fromAddr, leftWire(circleId), { guarantee: 'hold-forward' }); } catch { /* the sibling asks again */ }
         }
       },

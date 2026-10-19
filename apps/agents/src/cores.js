@@ -566,7 +566,9 @@ export async function setProfileProperty(store, args = {}) {
   if (typeof s.profiles?.setProperty !== 'function' || !id || !key) {
     return { ok: false, reason: !id ? 'id-required' : (!key ? 'key-required' : 'profiles-unavailable') };
   }
-  await s.profiles.setProperty({ profileId: id, key, value: args?.value });
+  const r = await s.profiles.setProperty({ profileId: id, key, value: args?.value });
+  // a refusal from the collaborator (the registry's own keys) is the op's answer
+  if (r && r.ok === false) return { ok: false, reason: r.reason ?? 'refused', id, key };
   return { ok: true, id, key };
 }
 
@@ -587,10 +589,11 @@ export async function setProfileDriver(store, args = {}) {
     ? args.tags
     : (typeof args?.tags === 'string' ? args.tags.split(',') : []);
   try {
-    await s.profiles.setDriver({
+    const r = await s.profiles.setDriver({
       profileId: id, key, kind: args?.kind, text: args?.text, tags,
       categoryId: typeof args?.categoryId === 'string' ? args.categoryId : undefined,
     });
+    if (r && r.ok === false) return { ok: false, reason: r.reason ?? 'refused', id, key };
     return { ok: true, id, key };
   } catch (err) {
     return { ok: false, reason: 'invalid-driver', detail: err?.message ?? String(err) };

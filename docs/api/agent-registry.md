@@ -1972,6 +1972,36 @@ the user disclosed values. Otherwise the payload is exactly the coarse released 
 
 **Returns:** `{ allow:boolean, payload:object, receipt:object }`
 
+## `src/reservedProperties.js`
+
+### `RESERVED_PROPERTY_KEYS`
+
+**Kind:** constant · **Import:** `RESERVED_PROPERTY_KEYS` from `'@onderling/agent-registry'`
+
+The registry's machine keys on a profile — refused by the person-facing property ops.
+
+### `RESERVED_PROPERTY_PREFIXES`
+
+**Kind:** constant · **Import:** `RESERVED_PROPERTY_PREFIXES` from `'@onderling/agent-registry'`
+
+The registry's marker namespace (`_inherit.offering`, …): every key under it is the registry's.
+
+### `PERSON_SETTABLE_KEYS`
+
+**Kind:** constant · **Import:** `PERSON_SETTABLE_KEYS` from `'@onderling/agent-registry'`
+
+The keys a person may set through the property ops although this package defines them (their own media ref).
+
+### `isReservedPropertyKey`
+
+**Kind:** function · **Import:** `isReservedPropertyKey` from `'@onderling/agent-registry'`
+
+```js
+isReservedPropertyKey(key)
+```
+
+Is this key the registry's own (refused by the person-facing property ops)?
+
 ## `src/resource.js`
 
 ### `RESOURCE_VERSION`

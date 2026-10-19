@@ -11,6 +11,7 @@ import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { EventLog } from '../src/eventLog.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { Bootstrap, wireDeviceId, deriveDeviceSeed, signDeviceDelegation, deviceDelegationPubKey } from '@onderling/core';
+import { setDeviceDelegation } from '@onderling/agent-registry';
 
 const boot = (o) => createRealHouseholdAgent({ seedHousehold: false, deviceLog: new EventLog({ initial: [], muted: [] }), ...o });
 
@@ -24,12 +25,14 @@ async function cast({ lostHoldsW = true } = {}) {
   const lostWire = wireDeviceId(root.deriveAgentSeed('default'), lostInternal);
   await (await phone.ownStore()).put({ type: 'device-link', id: `device-link:${lostWire}`, wireId: lostWire, internalId: lostInternal }, { by: 'test' });
   // …and, when it held W, its LIVE record on W's row — the root-signed record an enrolment holding W writes (put in
-  // place here through the profile's properties: the registry is per device in this harness, on the pod in production)
+  // place here through the registry: it is per device in this harness, on the pod in production)
   if (lostHoldsW) {
     const wWire = wireDeviceId(root.deriveAgentSeed(w), lostInternal);
     const record = signDeviceDelegation(root.deriveProfileAuthority(w), { profileId: w, deviceId: wWire, pubKey: deviceDelegationPubKey(deriveDeviceSeed(root.deriveAgentSeed(w), wWire)) });
-    const own = (await phone.deviceRecordsOf(w)) ?? {};
-    expect((await phone.callSkill('agents', 'setProfileProperty', { id: w, key: 'deviceDelegations', value: { ...own, [wWire]: record } }))?.ok).toBe(true);
+    // through the registry and its own helper — the person-facing property op refuses the registry's machine keys
+    const registry = phone.agentsRegistry();
+    const entry = await registry.lookup(w);
+    await registry.register({ ...entry, properties: setDeviceDelegation(entry.properties ?? {}, wWire, record) });
     expect((await phone.deviceRecordsOf(w))[wWire]?.revoked === true).toBe(false);
   }
   return { phone, phrase, w, lostWire };

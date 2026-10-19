@@ -14,6 +14,7 @@
  *
  * Pure — no DOM, no RN, no transport import. The agent injects the sends, the sibling lookup and the registry reads.
  */
+import { makeSiblingCarry } from './siblingCarry.js';
 
 export const PROFILE_FACTS_CARRY = 'device-profile-facts';
 export const PROFILE_FACTS_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-profile-facts-request' });
@@ -37,6 +38,8 @@ export function createProfileFactsSync({ siblings, sendToPeer, current, store, o
     throw new Error('profileFactsSync: `siblings`, `sendToPeer`, `current` and `store` are required');
   }
   const refuse = (reason, from) => { try { onRefused?.(reason, from); } catch { /* observability never throws */ } };
+  // the ONE sibling carry (siblingCarry.js) for the live facts and the catch-up ask; an answer is a reply to one device
+  const { carry } = makeSiblingCarry({ siblings: () => siblings(), sendToPeer, onWarn: () => {} });
   const admits = async (fromAddr) => { try { return ((await siblings()) ?? []).includes(fromAddr); } catch { return false; } };
   const wire = (f) => ({ subtype: PROFILE_FACTS_CARRY, properties: f.properties, disclosure: f.disclosure, factsAt: f.factsAt });
   const mine = async () => { try { return await current(); } catch { return null; } };
@@ -50,22 +53,14 @@ export function createProfileFactsSync({ siblings, sendToPeer, current, store, o
     async fan() {
       const f = await mine();
       if (!validFacts(f)) return { attempted: 0 };
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { attempted: 0 }; }
-      let attempted = 0;
-      await Promise.all(addrs.map(async (to) => { attempted += 1; try { await sendToPeer(to, wire(f), { guarantee: 'hold-forward' }); } catch { /* the sibling asks on connect */ } }));
-      return { attempted };
+      const r = await carry(wire(f));   // a sibling that misses it asks on connect
+      return { attempted: r.attempted };
     },
 
     /** CATCH-UP: ask this self's devices for their facts (the newer stand). */
     async requestFromSiblings() {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
-      let requested = 0;
-      for (const to of addrs) {
-        try { await sendToPeer(to, { subtype: PROFILE_FACTS_CATCHUP_SUBTYPES.request }, { guarantee: 'hold-forward' }); requested += 1; } catch { /* next sibling */ }
-      }
-      return { requested };
+      const r = await carry({ subtype: PROFILE_FACTS_CATCHUP_SUBTYPES.request }, { quiet: true });
+      return { requested: r.outcomes.filter((o) => !o.error).length };
     },
 
     handlers: {

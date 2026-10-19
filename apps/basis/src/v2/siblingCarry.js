@@ -49,11 +49,13 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
    * @param {object} payload  the lane's own wire payload — `{ subtype, circleId, event, … }` for a circle lane, exactly
    *   what the member fan sends; `{ subtype, … }` for a PERSONAL channel (grants, contact turns, known peers), which
    *   has no circle — the send picks the circle it shares with each sibling.
-   * @param {{ from?: string|null, exclude?: string[] }} [opts]  `from`: the address the statement ARRIVED from (a landed
-   *   statement), absent for an own write; `exclude`: sibling addresses that must NOT receive this — a device being
-   *   revoked in the very ceremony that carries (its addresses are retired only after the hand-over).
+   * @param {{ from?: string|null, exclude?: string[], sendOpts?: object, quiet?: boolean }} [opts]  `from`: the address the
+   *   statement ARRIVED from (a landed statement), absent for an own write; `exclude`: sibling addresses that must NOT
+   *   receive this — a device being revoked in the very ceremony that carries (its addresses are retired only after the
+   *   hand-over); `sendOpts`: the send's own options (default hold-forward — a catch-up ASK may hold by key instead);
+   *   `quiet`: a sibling that cannot be reached is not worth a line (a catch-up ask, made at every connect).
    */
-  async function carry(payload, { from = null, exclude = [] } = {}) {
+  async function carry(payload, { from = null, exclude = [], sendOpts = { guarantee: 'hold-forward' }, quiet = false } = {}) {
     if (!payload || typeof payload.subtype !== 'string' || !payload.subtype) {
       return { attempted: 0, skipped: 'not-a-lane-payload', outcomes: [] };
     }
@@ -67,10 +69,10 @@ export function makeSiblingCarry({ siblings, sendToPeer, onWarn = null } = {}) {
     const targets = addrs.filter((a) => typeof a === 'string' && a && a !== from && !out.has(a));
     const outcomes = await Promise.all(targets.map(async (to) => {
       try {
-        const r = await sendToPeer(to, payload, { guarantee: 'hold-forward' });
+        const r = await sendToPeer(to, payload, sendOpts);
         return { to, delivered: r?.delivered === true || (r?.held !== true && r?.delivered !== false), held: r?.held === true, error: null };
       } catch (err) {
-        warn(`[sibling-carry] ${payload.subtype}${payload.circleId ? ` for ${payload.circleId}` : ''} did not reach own device ${String(to).slice(0, 12)}… — it follows by catch-up: ${err?.message ?? err}`);
+        if (!quiet) warn(`[sibling-carry] ${payload.subtype}${payload.circleId ? ` for ${payload.circleId}` : ''} did not reach own device ${String(to).slice(0, 12)}… — it follows by catch-up: ${err?.message ?? err}`);
         return { to, delivered: false, held: false, error: err?.message ?? String(err) };
       }
     }));

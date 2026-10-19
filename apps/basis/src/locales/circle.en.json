@@ -1399,6 +1399,34 @@
     "act_open": {
       "text": "Open",
       "doc": "A Vandaag card's one button: the action the row's noun declares (presents.primary)."
+    },
+    "group_now": {
+      "text": "Now",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_soon": {
+      "text": "Soon",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_later": {
+      "text": "Later today",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_tomorrow": {
+      "text": "Tomorrow",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "group_after": {
+      "text": "After that",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "tasks_done": {
+      "text": "Done ({{count}})",
+      "doc": "Vandaag's day shape: a group heading (appointments by their moment) or the folded done chores."
+    },
+    "at_time": {
+      "text": "at {{time}}",
+      "doc": "A card's moment today on Vandaag: the time of day (\"om 14:00\")."
     }
   },
   "screens": {

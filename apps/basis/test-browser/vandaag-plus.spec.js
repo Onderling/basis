@@ -30,6 +30,10 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await page.locator('.circle-vandaag-plus__when').fill(when);
   await page.locator('.circle-vandaag-plus__save').click();
   await expect(page.locator('.circle-screen__agenda-row').filter({ hasText: 'tandarts' }), 'the own appointment shows').toBeVisible({ timeout: 20_000 });
+  // the day's shape: tomorrow's appointment sits in the "tomorrow" group, open (the first group that has any), its moment in words
+  const tomorrow = page.locator('.circle-screen__group[data-group="tomorrow"]');
+  await expect(tomorrow).toHaveAttribute('open', '');
+  await expect(tomorrow.locator('.circle-screen__agenda-row').filter({ hasText: 'tandarts' }).locator('.circle-screen__agenda-moment')).toHaveText('14:00');
 
   // an empty save says so and makes nothing
   await page.locator('.circle-vandaag__plus').click();

@@ -344,6 +344,10 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     circleId: row.circleId ?? null, circleName: row.circleName ?? '', ...(row.own ? { own: true } : {}), mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
     // what a chore row also shows: its words, its state, its "see also" links
     text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
+    // the row's own words, without the moment the merged label is stamped with (a card says the moment its own way)
+    title: presenter.label(row),
+    // done by its noun's declaration (`presents.done`): the day's shape folds it under "gedaan"
+    ...(presenter.isDone?.(row) ? { done: true } : {}),
     // the row's ONE action, declared by its noun (`presents.primary`): done · open the sheet on it · open its circle
     ...((() => { const p = primaryActionFor(row, noun); return p ? { primary: p } : {}; })()),
     // an own row's own words, as made (the "+" sheet opens on them to change or remove it)

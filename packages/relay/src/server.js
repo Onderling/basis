@@ -1144,8 +1144,13 @@ export async function startRelay(opts = {}) {
     if (feedSeat) await feedSeat.stop();
     for (const [, s] of clients) { try { s.close(); } catch {} }
     clients.clear();
+    // every socket, registered or not, is ended now: the HTTP server's close waits for each open one, so a client
+    // that never registered (or never answers a close) would otherwise hold the stop open indefinitely
+    for (const ws of wss.clients) { try { ws.terminate(); } catch {} }
     await new Promise(r => wss.close(() => r()));
-    await new Promise(r => httpServer.close(() => r()));
+    const closed = new Promise(r => httpServer.close(() => r()));
+    try { httpServer.closeAllConnections?.(); } catch {}
+    await closed;
     try { await mrQueue.close(); } catch {}
   }
 

@@ -160,6 +160,7 @@ import {
   createCommunitySubscriptions,
   createProfile as registryCreateProfile,
   setOwn,
+  isReservedPropertyKey,
   setDisclosure as setDisclosurePolicy,
   releasedValues as releaseFromPolicy,
   createDriver,
@@ -1569,6 +1570,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Property layer — set/read a coarse property on a profile (curate once, reuse across apps). setProperty
       // merges (setOwn) then re-registers the FULL existing entry (register replaces), preserving key/role/grants.
       setProperty: async ({ profileId, key, value }) => {
+        // the registry's own keys (device records, circle memberships, owned nodes, its markers) are never a person's to set
+        if (isReservedPropertyKey(key)) return { ok: false, reason: 'reserved-key' };
         const cur = await agentsRegistry.lookup(profileId);
         if (!cur) throw new Error(`setProperty: no such profile ${profileId}`);
         await agentsRegistry.register({ ...cur, properties: setOwn(cur.properties ?? {}, key, value) });
@@ -1579,6 +1582,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // (createDriver throws on an empty driver → the core reports invalid-driver), then store it like any
       // property (setOwn merge + re-register the full entry). getDrivers filters the map to driver values.
       setDriver: async ({ profileId, key, kind, text, tags, categoryId }) => {
+        if (isReservedPropertyKey(key)) return { ok: false, reason: 'reserved-key' };
         const cur = await agentsRegistry.lookup(profileId);
         if (!cur) throw new Error(`setDriver: no such profile ${profileId}`);
         const driver = createDriver({ kind, text, tags, categoryId });
@@ -7797,6 +7801,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     ownAddresses,
     /** A self's device records as this device's registry holds them (`{[wireId]: record}`, a tombstone `revoked: true`). Read-only. */
     deviceRecordsOf: async (selfId) => { try { return deviceDelegationsOf(await agentsRegistryRef?.lookup?.(selfId)); } catch { return {}; } },
+    /** The agents registry itself (its own helpers write the machine keys — device records, memberships), as `ownStore()` hands the own store. */
+    agentsRegistry: () => agentsRegistryRef ?? null,
     /** The own lanes this device serves and carries — one per self it RUNS (a paused or removed persona's is absent). Read-only. */
     servedOwnLanes: () => ownLanes(),
     /** The devices a self's own traffic is carried to — its siblings (the general persona's for 'default'). Read-only. */

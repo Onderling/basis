@@ -41,8 +41,10 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                     <LabelsField key={c.kind} control={c} styles={styles}
                       onApply={(value) => onAct?.('config', { ...base, kind: c.kind, value })} testID={`customise-labels-${b.blockId}`} />
                   ) : c.multi ? (
-                    // the block's own circles: none ticked = all the page's
-                    <View key={c.kind} style={styles.row}>
+                    // the block's own circles: none ticked = all the page's — under the same label web's legend says
+                    <View key={c.kind}>
+                    <Text style={styles.chipText}>{t('circle.vandaag.circles_title')}</Text>
+                    <View style={styles.row}>
                       {c.options.map((o) => {
                         const on = c.value.includes(o.value);
                         return (
@@ -53,6 +55,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                           </Pressable>
                         );
                       })}
+                    </View>
                     </View>
                   ) : (
                     <View key={c.kind} style={styles.row}>

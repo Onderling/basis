@@ -3810,7 +3810,8 @@ function CircleDetail({
           // opens it with that key materialized from the picked row; no drill
           // target → the rows stay plain (no row-open affordance), like web.
           const drill = drilldownForScreen(manifestsByOrigin, screenPanel.screen, screenContext);
-          if (alive) setListScreenData({ items, categoryField, searchFields, labelField, appOrigin, capabilityMatrix, drill, screenContext });
+          // the section's declared audience, as web hands it: the shared model filters by it and says so
+          if (alive) setListScreenData({ items, categoryField, searchFields, labelField, defaultAudience: section.audience, appOrigin, capabilityMatrix, drill, screenContext });
         } catch {
           if (alive) {
             setListScreenData(section.shape === 'record'
@@ -4636,6 +4637,7 @@ function CircleDetail({
                 categoryField={listScreenData.categoryField}
                 searchFields={listScreenData.searchFields}
                 labelField={listScreenData.labelField}
+                defaultAudience={listScreenData.defaultAudience}
                 manifestsByOrigin={manifestsByOrigin}
                 appOrigin={listScreenData.appOrigin}
                 capabilityMatrix={listScreenData.capabilityMatrix}

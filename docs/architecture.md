@@ -103,6 +103,21 @@ is what makes a reader ask "why is `renderAttachments` a peer of the chat shell?
 (`npm run coverage` → `apps/basis/docs/surface-coverage.md`) records which surfaces each op is wired for,
 so the map can't drift from the manifests.
 
+**Web ≡ mobile, held in four layers.** A projector covers only what a manifest declares; much of what a person
+sees is painted by hand on each shell, and the two drifted there unnoticed (an audit in October 2026 found five
+gaps, among them a removed member who kept a circle's shares on the phone). So parity is held at four layers, each
+by a guard in `npm run guards`:
+- **Projector-painted ops** cannot differ: one `renderWeb ≡ renderMobile` column in the coverage snapshot.
+- **Seams and host duties**: what each shell must compose or call, among them the shared decision a screen's host
+  must run after an act, is listed in `scripts/shell-seams.mjs`, and `lint-shell-seams` is red when a shell lacks one.
+- **What a shell says**: `lint-locale-key-parity` compares the `circle.*` keys each shell uses. A key on one shell
+  only is a gap (in a baseline that only shrinks) or a declared decision.
+- **What a shell shows**: a hand-painted screen's sections are declared once (`src/v2/screenSections.js`), both
+  shells paint from that list, and `lint-screen-sections` checks both.
+
+A difference that is meant is a row in `docs/conventions/web-mobile-exceptions.md`, naming the surface, its keys
+or its tag. That table is the one place a difference is a decision; anywhere else it is a defect.
+
 #### Flows — declared multi-step processes
 
 Some things a person does are not one op but a **process**: restoring settings on a new device, enrolling

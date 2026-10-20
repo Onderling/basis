@@ -23,6 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
+import { blockEmptyLine } from '../../src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -80,7 +81,7 @@ export function renderCircleScreen(container, { blocks = [], t, refreshing = fal
     if (typeof onMore === 'function' && block.status === 'ok') {
       const more = document.createElement('button');
       more.type = 'button';
-      more.className = 'cc-btn cc-btn--quiet circle-screen__more';
+      more.className = 'circle-screen__more';
       more.dataset.blockId = block.blockId ?? '';
       more.textContent = tr('circle.screen.more');
       more.addEventListener('click', () => onMore(block.blockId));
@@ -150,7 +151,8 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
   if (block.type === 'onboarding' && block.status === 'empty') { section.hidden = true; return section; }
   if (block.status === 'empty') {
     section.classList.add('circle-screen__block--empty');
-    section.textContent = tr('circle.screen.block_empty', { type: blockName(block, tr) });
+    // one quiet line under the block's own title, in its own words — never its type (blockTitle.js, both shells)
+    section.textContent = blockEmptyLine(block, tr);
     return section;
   }
 

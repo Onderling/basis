@@ -1472,3 +1472,21 @@
 /* the onboarding strip's buttons wear the family (.cc-btn--primary / --quiet); only their spacing is theirs */
 .circle-screen__onb-btn { margin: 6px 6px 0 0; }
 
+
+/* Vandaag: a day, with ONE accent — the "+" (terracotta); everything else is quiet text (schets-2, L343c). */
+.circle-vandaag__day { margin: 4px 0 10px; font-family: var(--font-serif); font-size: 22px; font-weight: 600; color: var(--ink); }
+.circle-vandaag__day::first-letter { text-transform: uppercase; }
+.circle-vandaag__head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.circle-vandaag__plus { margin-left: auto; font: inherit; font-size: 14px; font-weight: 600; padding: 6px 14px; border: 0; border-radius: 999px; background: var(--accent-ink); color: var(--accent-contrast); cursor: pointer; }
+.circle-vandaag__plus:hover { filter: brightness(1.08); }
+.circle-vandaag__customise, .circle-vandaag__back { font: inherit; font-size: 18px; line-height: 1; padding: 2px 6px; border: 0; background: none; color: var(--ink-soft); cursor: pointer; }
+.circle-vandaag__back { font-size: 13px; }
+.circle-vandaag__customise:hover, .circle-vandaag__back:hover { color: var(--ink); }
+.circle-screen__block--empty { padding: 4px 0; font-size: 14px; color: var(--ink-soft); }
+.circle-screen__more { font: inherit; font-size: 13px; padding: 2px 0; border: 0; background: none; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.circle-screen__more:hover { color: var(--ink); }
+.circle-screen__tasks-circle { flex: 0 0 auto; margin-right: 6px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
+/* a row's own act ("Change"): a quiet text button, the accent's ink only on hover */
+.circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
+.circle-screen__row-act:hover { color: var(--accent-ink); }
+.circle-screen__items-list { list-style: none; margin: 0; padding: 0; }

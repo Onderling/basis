@@ -16,9 +16,12 @@ describe('the first appointment in a circle without an Agenda', () => {
     registerCanonicalTypes(registry);
     const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
     const ops = makeCircleCalendarOps({ storeFor: (id) => stores.getStore(id), activeCircle: () => null, t, localActor: 'me' });
-    const first = await ops.addEvent({ circleId: 'c-plus', title: 'Koffie', startsAt: '2026-10-20T11:00:00.000Z', endsAt: '2026-10-20T12:00:00.000Z' });
+    // moments RELATIVE to now: the listing reads the window from now on, so a fixed date passes out of it (this one did,
+    // on its own day)
+    const at = (days, h) => new Date(Date.now() + days * 86_400_000 + h * 3_600_000).toISOString();
+    const first = await ops.addEvent({ circleId: 'c-plus', title: 'Koffie', startsAt: at(1, 0), endsAt: at(1, 1) });
     expect(first.ok, JSON.stringify(first)).toBe(true);
-    const second = await ops.addEvent({ circleId: 'c-plus', title: 'Thee', startsAt: '2026-10-21T11:00:00.000Z', endsAt: '2026-10-21T12:00:00.000Z' });
+    const second = await ops.addEvent({ circleId: 'c-plus', title: 'Thee', startsAt: at(2, 0), endsAt: at(2, 1) });
     expect(second.ok, JSON.stringify(second)).toBe(true);
     const all = await stores.getStore('c-plus').list();
     const agendas = all.filter((i) => i.defaultChild === 'calendar-event');

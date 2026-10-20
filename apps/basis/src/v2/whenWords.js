@@ -62,3 +62,14 @@ export function momentWords(at, { t, now = new Date(), locale, tz } = {}) {
   if (dayOf(d) === dayOf(tomorrow)) return t('circle.when.tomorrow_at', { time });
   return whenWords(d, { locale, tz });
 }
+
+/**
+ * The day a home screen is about, as its header: "dinsdag 20 oktober" — the weekday, the day and the month, on the
+ * device's clock, in the screen's date language (`dateLocaleOf`).
+ * @param {number|Date} [now]
+ * @param {{locale?: string, tz?: string}} [o]
+ */
+export function dayHeader(now = Date.now(), { locale, tz } = {}) {
+  const d = now instanceof Date ? now : new Date(now);
+  return new Intl.DateTimeFormat(locale, { ...(tz ? { timeZone: tz } : {}), weekday: 'long', day: 'numeric', month: 'long' }).format(d).replace(',', '');
+}

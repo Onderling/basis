@@ -29,12 +29,13 @@ describe('Vandaag — parity', () => {
     }
   });
 
-  it('both block painters name a block by its titleKey — the title and the empty / error line', () => {
+  it('both block painters name a block by its titleKey — the title, the empty line (shared) and the error line', () => {
     for (const src of [webPainter, mobilePainter]) {
       expect(src.match(/block\.titleKey \?/g)?.length ?? 0).toBeGreaterThanOrEqual(3);   // tasks · agenda · items titles
       // an items block without its own title is headed by its noun's declared name (the manifest's), never a basis word
       expect(src).toMatch(/nounHeading\(t[r]?, block\.content\?\.noun/);
-      expect(src).toMatch(/block_empty', \{ type: blockName\(block/);
+      // the empty line: ONE quiet line under the block's own title, from the shared blockTitle (never its type)
+      expect(src).toMatch(/blockEmptyLine\(block, t[r]?\)/);
       expect(src).toMatch(/block_error', \{ type: blockName\(block/);
     }
   });

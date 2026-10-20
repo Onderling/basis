@@ -21,7 +21,11 @@ test('the "+" makes an own note and an own appointment, both on Vandaag as mine'
   await page.locator('.circle-vandaag-plus__save').click();
   const noteRow = page.locator('.circle-screen__items-row').filter({ hasText: 'sleutel bij de buren' });
   await expect(noteRow, 'the own note shows on Vandaag').toBeVisible({ timeout: 20_000 });
-  await expect(noteRow.locator('.circle-screen__tasks-circle')).toHaveText(/^(jij|you)$/);
+  // an own row carries no maker tag (it is the person's own page); a circle's row names its circle
+  await expect(noteRow.locator('.circle-screen__tasks-circle')).toHaveCount(0);
+  // the page is a day (its header), and no block ever names itself by its type ("items: …")
+  await expect(page.locator('.circle-vandaag__day')).not.toBeEmpty();
+  await expect(page.locator('.circle-screen__block--empty').filter({ hasText: /^items/i })).toHaveCount(0);
 
   await page.locator('.circle-vandaag__plus').click();
   await page.locator('.circle-vandaag-plus__act[data-act="calendar.calendar-event"]').click();

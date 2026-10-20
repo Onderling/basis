@@ -1223,8 +1223,24 @@
       "doc": "δ.1 — subtle pip tooltip while a cached screen is rendered and a fresh materialize runs in the background."
     },
     "block_empty": {
-      "text": "{{type}}: nog niets om te tonen.",
-      "doc": "α.1c — per-block empty fallback."
+      "text": "{{title}} — nog niets",
+      "doc": "An empty block: ONE quiet line under its own title (blockTitle.js) — never the block's type."
+    },
+    "block_empty_planned": {
+      "text": "{{title}} — niets gepland",
+      "doc": "An empty agenda block: nothing planned."
+    },
+    "block_empty_open": {
+      "text": "{{title}} — niets open",
+      "doc": "An empty task block: nothing open."
+    },
+    "block_empty_news": {
+      "text": "{{title}} — geen",
+      "doc": "An empty \"circles with news\" block: none."
+    },
+    "block_untitled": {
+      "text": "Dit blok",
+      "doc": "A block with no title of its own and no declared kind (a fallback)."
     },
     "block_error": {
       "text": "{{type}}: laden mislukt",
@@ -1383,10 +1399,6 @@
     "plus_failed": {
       "text": "Niet bewaard: {{error}}",
       "doc": "Vandaag → '+': the save failed; the reason follows."
-    },
-    "own_tag": {
-      "text": "jij",
-      "doc": "Vandaag: the tag on one of the person's own items (no circle), where a circle's items name their circle."
     },
     "plus_when_unread": {
       "text": "Zeg de dag en de tijd, bijv. \"morgen om 14:00\".",

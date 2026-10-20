@@ -21,7 +21,7 @@ import { reminderLayerFromWords } from './reminderWords.js';
 import { addChildTo } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { buildEvent, retimeEvent, eventsInWindow } from '@onderling-app/calendar';
-import { rsvpItem, withAnswers, RSVP_TYPE } from './rsvpItems.js';
+import { rsvpItem, signedRsvpItem, withAnswers, RSVP_TYPE } from './rsvpItems.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
 
@@ -36,9 +36,16 @@ const RSVP = { rsvpAccept: 'accepted', rsvpDecline: 'declined', rsvpTentative: '
  *   so a circle that has a self of its own (a pair circle's lens) is written as that self, never as the general one;
  *   null = no writer here (the write is refused with `no-self`). EVERY write into a pair circle resolves its author
  *   here, never at a call site.
+ * @param {(circleId: string) => Promise<{pubKey: string, sign: Function}|null>} [a.signerFor]  the answering self's circle
+ *   identity: an answer is SIGNED by it (rsvpItems.js); absent (a store no one else writes) an answer goes unsigned
+ * @param {(circleId: string) => Promise<((item: object) => boolean)|null>} [a.answerRuleFor]  the roster's rule for which
+ *   answers stand (`rosterAnswerRule`); absent, the local shape
+ * @param {(bytes: Uint8Array) => string} [a.encode]  how a signature is written (base64)
+ * @param {(circleId: string|null, named: string|null) => string|null} [a.answererFor]  who an answer is FROM (the self's
+ *   roster id, or the door person the call names); absent, the writer (`localActor`)
  * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
  */
-export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 'me' } = {}) {
+export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 'me', signerFor = null, answerRuleFor = null, encode = null, answererFor = null } = {}) {
   const lists = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
   // who writes: a function `localActor` DECIDES per circle (it gets the actor the call names, and may refuse it — a
@@ -59,10 +66,11 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
   const eventsOf = async (circleId) => (await storeFor(circleId).listByType('calendar-event')) ?? [];
   // what is READ: the events with their answers projected from the answer items (writes use the raw events above, so
   // a projected map is never written back onto an event)
+  const ruleFor = async (circleId) => (typeof answerRuleFor === 'function' ? (await answerRuleFor(circleId).catch(() => null)) : null);
   const answeredEventsOf = async (circleId) => {
     const store = storeFor(circleId);
-    const [events, answers] = await Promise.all([eventsOf(circleId), store.listByType(RSVP_TYPE).catch(() => [])]);
-    return withAnswers(events, answers ?? []);
+    const [events, answers, counts] = await Promise.all([eventsOf(circleId), store.listByType(RSVP_TYPE).catch(() => []), ruleFor(circleId)]);
+    return withAnswers(events, answers ?? [], counts);
   };
   const pad = (n) => String(n).padStart(2, '0');
   /** When, on the household's clock: `YYYY-MM-DD HH:MM` in local time. */
@@ -101,6 +109,9 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       // without the calendar's own `rsvp: {}`: in a circle the answers are their own items, never a field here
       try { const { rsvp: _none, ...built } = buildEvent(args, { actorDefault: who(args) }); event = built; }
       catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
+      // an import's record of the answers the file held (shown, never counted: an answer is its own signed item)
+      const kept = args?.answersAt && typeof args.answersAt === 'object' ? Object.fromEntries(Object.entries(args.answersAt).filter(([w, r]) => typeof w === 'string' && ['accepted', 'tentative', 'declined'].includes(r))) : null;
+      if (event && kept && Object.keys(kept).length) event = { ...event, answersAt: kept };
       // its own reminders, in a person's words ("ook avond", "60"): the household's statement about this appointment
       const reminders = args?.reminders ? reminderLayerFromWords(args.reminders) : null;
       if (args?.reminders && !reminders) return { ok: false, error: t('circle.bot.reminders_usage') };
@@ -128,6 +139,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const people = (e) => ({
         ...(Array.isArray(e.attendees) && e.attendees.length ? { attendees: [...e.attendees] } : {}),
         ...(e.rsvp && typeof e.rsvp === 'object' && Object.keys(e.rsvp).length ? { rsvp: { ...e.rsvp } } : {}),
+        ...(e.answersAt && typeof e.answersAt === 'object' && Object.keys(e.answersAt).length ? { answersAt: { ...e.answersAt } } : {}),
       });
       return { ok: true, ...(agenda?.text ? { title: agenda.text } : {}), items: open.map((e) => ({ id: e.id, label: label(e), type: 'calendar-event', title: titleOf(e), startsAt: e.startsAt ?? null, ...(e.createdBy ? { createdBy: e.createdBy } : {}), ...people(e) })) };
     },
@@ -156,7 +168,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
-      const [answered] = withAnswers([event], (await storeFor(circleId).listByType(RSVP_TYPE).catch(() => [])) ?? []);
+      const [answered] = withAnswers([event], (await storeFor(circleId).listByType(RSVP_TYPE).catch(() => [])) ?? [], await ruleFor(circleId));
       return { ok: true, event: answered };
     },
 
@@ -183,12 +195,17 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {
-      if (!who(args)) return noSelf();
+      const answerer = typeof answererFor === 'function' ? answererFor(circleOf(args), named(args)) : who(args);
+      if (!answerer) return noSelf();
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
       // the answer is its own item, written as the answering self — the event itself is not touched
-      await storeFor(circleId).put(rsvpItem({ eventId: event.id, person: who(args), response }), { by: who(args) });
+      const facts = { eventId: event.id, person: answerer, response };
+      const signer = typeof signerFor === 'function' ? await signerFor(circleId).catch(() => null) : null;
+      // a circle's answer is signed by the answering self's circle identity; one that cannot be signed is not written
+      if (typeof signerFor === 'function' && !(signer?.pubKey && typeof signer.sign === 'function' && typeof encode === 'function')) return noSelf();
+      await storeFor(circleId).put(signer ? signedRsvpItem(signer, facts, encode) : rsvpItem(facts), { by: answerer });
       // the reply names the appointment answered, and when
       return { ok: true, title: event.title, startsAt: event.startsAt, message: t(`circle.calendar.rsvp_${response}`, { title: event.title, when: stamp(event) }) };
     }])),

@@ -566,7 +566,9 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       return { ok: false, error: { code: 'failed', message: t('circle.bot.import_unreadable', { name: file }) + partly } };
     }
     const missed = (r.notRestored ?? []).length;
-    return { ok: true, message: t('circle.bot.import_done', { ...r.done }) + (missed ? `\n${t('circle.bot.import_missed', { count: missed })}` : '') };
+    // answers in the file come back as a record on their appointments, never as answers (the host cannot sign for a person)
+    const kept = Number(r.done?.answersKept) || 0;
+    return { ok: true, message: t('circle.bot.import_done', { ...r.done }) + (kept ? `\n${t('circle.bot.import_answers_kept', { count: kept })}` : '') + (missed ? `\n${t('circle.bot.import_missed', { count: missed })}` : '') };
   }
 
   /** Which changes the household's rows announce, in words ('' when none is on), or null when it has none at all. */

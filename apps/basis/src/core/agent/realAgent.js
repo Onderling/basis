@@ -23,7 +23,7 @@
  * the wrapper at `src/web/realAgent.js` + `web/main.js`.
  */
 
-import { withAnswers, RSVP_TYPE } from '../../v2/rsvpItems.js';
+import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
@@ -6438,6 +6438,24 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (!isPairCircleId(circleId)) return named ?? 'me';
         const self = circleSelf(circleId)?.webid ?? null;
         return self && (!named || named === self) ? self : null;
+      },
+      // AN ANSWER is signed by the answering self's circle identity, and in an ordinary circle it is from that self's
+      // roster id (never the 'me' placeholder no roster names) — or from the door person the call names (a function
+      // profile's `telegram:…`). Which answers stand is the roster's rule (rsvpItems.js `rosterAnswerRule`): this
+      // node's own circle identity vouches for door people only when this node is composed as a household's bot.
+      answererFor: (circleId, named) => {
+        if (isPairCircleId(circleId)) { const self = circleSelf(circleId)?.webid ?? null; return self && (!named || named === self) ? self : null; }
+        return named ?? circleSelf(circleId)?.webid ?? null;
+      },
+      signerFor: (circleId) => circleIdentityFor(circleId),
+      encode: b64encode,
+      answerRuleFor: async (circleId) => {
+        const rows = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members) ?? [];
+        // the node composed as a household's bot (its calendar in the circle — the function profile that hosts door
+        // people) vouches for its door people's answers with its own circle identity; a person's node vouches for no one
+        const hostsDoors = opts.calendarInCircle === true;
+        const own = hostsDoors ? (await circleIdentityFor(circleId).catch(() => null))?.pubKey : null;
+        return rosterAnswerRule({ rows, verify: AgentIdentity.verify, vouchers: own ? [own] : [] });
       },
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */

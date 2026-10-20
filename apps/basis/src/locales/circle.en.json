@@ -5173,6 +5173,10 @@
       "text": "Restored: {{lists}} lists, {{entries}} entries, {{chores}} chores, {{appointments}} appointments, {{people}} people.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "import_answers_kept": {
+      "text": "{{count}} earlier answer(s) came back as a record on their appointments; to count again, they are given again.",
+      "doc": "Household import: the answers to appointments in the file came back as a record on the appointment (never as answers — an answer is signed by the person who gave it)."
+    },
     "import_missed": {
       "text": "{{count}} things could not be restored.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."

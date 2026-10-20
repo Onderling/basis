@@ -141,7 +141,7 @@ export function countExport(file) {
 export async function importHousehold(file, { call, tier = null, switches = null } = {}) {
   const checked = checkExport(file);
   if (!checked.ok) return { ok: false, reason: checked.reason };
-  const done = { lists: 0, entries: 0, chores: 0, appointments: 0, people: 0, settings: 0, kept: 0 };
+  const done = { lists: 0, entries: 0, chores: 0, appointments: 0, people: 0, settings: 0, kept: 0, answersKept: 0 };
   const notRestored = [];
   try {
     await restore(file, { call, tier, switches, done, notRestored });
@@ -218,18 +218,15 @@ async function restore(file, { call, tier, switches, done, notRestored }) {
     if (e.ref) { notRestored.push({ what: 'second-list', list, ref: e.ref }); return; }
     if (e.type !== 'task') for (const ch of e.children ?? []) notRestored.push({ what: 'child', of: e.text ?? e.title ?? '', text: ch.text ?? ch.title ?? '' });
     if (e.type === 'calendar-event') {
-      const r = await as(e.createdBy, 'calendar', 'addEvent', clean({ title: e.title, when: e.startsAt, until: e.endsAt }));
+      // the answers in the file come back as a RECORD on the appointment (`answersAt`, shown, never counted as an
+      // answer): an answer is signed by the person who gave it, and the host cannot sign for them — new answers are given again
+      const answersAt = Object.fromEntries(Object.entries(e.rsvp ?? {}).filter(([who, answer]) => typeof who === 'string' && ['accepted', 'tentative', 'declined'].includes(answer)));
+      const r = await as(e.createdBy, 'calendar', 'addEvent', clean({ title: e.title, when: e.startsAt, until: e.endsAt, ...(Object.keys(answersAt).length ? { answersAt } : {}) }));
       if (!r?.ok) { notRestored.push({ what: 'appointment', title: e.title, why: r?.error ?? 'refused' }); return; }
       // already there (the same title at the same moment): it stays as it is, its answers too
       if (r.duplicate) { done.kept += 1; return; }
       let ok = true;
-      for (const [who, answer] of Object.entries(e.rsvp ?? {})) {
-        const op = { accepted: 'rsvpAccept', tentative: 'rsvpTentative', declined: 'rsvpDecline' }[answer];
-        if (!op) continue;
-        // an answer is a person's: someone not in the book is not answered for (the host does not "come")
-        if (!inBook.has(who)) { notRestored.push({ what: 'rsvp', title: e.title, who, why: 'not-in-the-book' }); ok = false; continue; }
-        ok = (await step('rsvp', { title: e.title, who }, as(who, 'calendar', op, { id: r.itemId }))) && ok;
-      }
+      done.answersKept += Object.keys(answersAt).length;
       if (e.cancelled) ok = (await step('cancel', { title: e.title }, byHost('cancel', e.createdBy, e.title, () => as(e.createdBy, 'calendar', 'cancelEvent', { id: r.itemId })))) && ok;
       else if (e.completedAt) ok = (await step('passed', { title: e.title }, byHost('tick', e.completedBy, e.title, () => as(e.completedBy, 'lists', 'markListItemDone', { item: r.itemId })))) && ok;
       if (ok) done.appointments += 1;

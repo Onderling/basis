@@ -5173,6 +5173,10 @@
       "text": "Teruggezet: {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken, {{people}} mensen.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "import_answers_kept": {
+      "text": "{{count}} eerdere antwoord(en) staan terug als notitie bij hun afspraken; om weer mee te tellen worden ze opnieuw gegeven.",
+      "doc": "Household import: the answers to appointments in the file came back as a record on the appointment (never as answers — an answer is signed by the person who gave it)."
+    },
     "import_missed": {
       "text": "{{count}} dingen kon ik niet terugzetten.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."

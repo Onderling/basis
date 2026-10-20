@@ -68,6 +68,10 @@ describe('an own appointment shared with a contact', () => {
     // Bob's answer goes to Anne alone, over the pair lane (an item's own statement)
     const rsvp = await bob.agent.callSkill('calendar', 'rsvpAccept', { circleId: pair, id: onBob.id });
     expect(rsvp?.ok, JSON.stringify(rsvp)).not.toBe(false);
+    // …written as Bob's SELF in the pair circle (the lens), never as the general 'me': a row authored by someone not on
+    // the pair roster is one the rail may drop
+    const mine = (await pairEventsOn(bob, pair)).find((x) => x.id === onBob.id);
+    expect(Object.keys(mine?.rsvp ?? {}), JSON.stringify(mine)).toEqual([bob.pubKey]);
     const answered = await until(async () => {
       const e = (await pairEventsOn(anne, pair)).find((x) => x.id === onBob.id);
       return e && JSON.stringify(e.rsvp ?? e).includes('accepted') ? e : null;

@@ -30,13 +30,15 @@ const RSVP = { rsvpAccept: 'accepted', rsvpDecline: 'declined', rsvpTentative: '
  * @param {(circleId: string) => object} a.storeFor   the circle's own CircleItemStore
  * @param {() => string|null} a.activeCircle
  * @param {(key: string, vars?: object) => string} a.t
- * @param {string} [a.localActor]
+ * @param {string|((circleId: string|null) => string)} [a.localActor]  who writes when the call names no actor — per circle,
+ *   so a circle that has a self of its own (a pair circle's lens) is written as that self, never as the general one
  * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
  */
 export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 'me' } = {}) {
   const lists = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
-  const who = (args) => (typeof args?.actor === 'string' && args.actor ? args.actor : localActor);
+  const who = (args) => (typeof args?.actor === 'string' && args.actor ? args.actor
+    : (typeof localActor === 'function' ? localActor(circleOf(args)) : localActor));
 
   /** The Agenda: the list whose default child is an event, else the one by the template's name. */
   async function agendaOf(circleId) {

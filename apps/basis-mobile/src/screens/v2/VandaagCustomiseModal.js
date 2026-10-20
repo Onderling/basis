@@ -7,6 +7,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 
 export default function VandaagCustomiseModal({ visible, model, onAct, onClose }) {
   const theme = useTheme();
@@ -25,6 +26,10 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
         <View style={styles.card}>
           <ScrollView>
             <Text style={styles.title}>{t('circle.vandaag.customise_title')}</Text>
+            {/* the sheet's DECLARED sections (`screenSections.js`), in order, each by its id (= testID) */}
+            {sectionsOf('vandaagCustomise').map((d) => {
+              const PAINT = {
+                'customise-blocks': () => (<>
             <Text style={styles.heading}>{t('circle.vandaag.blocks_title')}</Text>
             {model.blocks.map((b) => {
               const base = { pageId: model.pageId, blockId: b.blockId, index: b.index };
@@ -71,6 +76,8 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                 </View>
               );
             })}
+              </>),
+                'customise-add': () => (<>
             <Text style={styles.heading}>{t('circle.vandaag.add_block_title')}</Text>
             {model.addable.map((a) => (
               <Pressable key={a.type} style={styles.addable} onPress={() => onAct?.('add', { pageId: model.pageId, type: a.type })} testID={`customise-add-${a.type}`}>
@@ -78,6 +85,8 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                 <Text style={styles.why}>{t(a.descriptionKey)}</Text>
               </Pressable>
             ))}
+              </>),
+                'customise-page': () => (<>
             <Text style={styles.heading}>{t('circle.vandaag.page_title')}</Text>
             <TextInput style={styles.input} value={name} onChangeText={setName} testID="customise-page-name" />
             <View style={styles.row}>
@@ -85,8 +94,17 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
               <Btn label={t('circle.vandaag.add_page')} act="add-page" args={{ name: t('circle.vandaag.new_page_name') }} />
               <Btn label={t('circle.vandaag.remove_page')} act="remove-page" args={{ pageId: model.pageId }} disabled={!model.canRemovePage} />
             </View>
+              </>),
+                'customise-undo': () => (
+                  <View style={styles.row}>
+                    <Btn label={t('circle.vandaag.undo')} act="undo" args={{}} testID="customise-undo" />
+                  </View>
+                ),
+              };
+              const el = PAINT[d.id]?.();
+              return el ? <View key={d.id} testID={d.id}>{el}</View> : null;
+            })}
             <View style={styles.row}>
-              <Btn label={t('circle.vandaag.undo')} act="undo" args={{}} testID="customise-undo" />
               <Pressable style={styles.btn} onPress={onClose} testID="customise-done"><Text style={styles.btnText}>{t('circle.vandaag.done')}</Text></Pressable>
             </View>
           </ScrollView>

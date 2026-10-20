@@ -24,6 +24,10 @@ describe('screenSections', () => {
     expect(sectionsOf('governanceProposal').map((s) => s.id)).toEqual(['proposal-head', 'proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting', 'proposal-vote', 'proposal-override']);
     for (const s of sectionsOf('governanceProposal')) if (s.titleKey) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
   });
+  it('Vandaag customise: blocks · add a block · the page · undo', () => {
+    expect(sectionsOf('vandaagCustomise').map((s) => s.id)).toEqual(['customise-blocks', 'customise-add', 'customise-page', 'customise-undo']);
+    for (const s of sectionsOf('vandaagCustomise')) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
+  });
   it('a screen not declared has no sections; the declaration is frozen', () => {
     expect(sectionsOf('nope')).toEqual([]);
     expect(Object.isFrozen(SCREEN_SECTIONS.adminPanel)).toBe(true);

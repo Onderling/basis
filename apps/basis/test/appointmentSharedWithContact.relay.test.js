@@ -65,7 +65,12 @@ describe('an own appointment shared with a contact', () => {
       const e = (await pairEventsOn(anne, pair)).find((x) => x.id === onBob.id);
       return e && JSON.stringify(e.rsvp ?? e).includes('accepted') ? e : null;
     }, { timeout: 30_000, step: 300 });
-    expect(answered, 'Anne sees Bob\'s yes on the shared copy').toBeTruthy();
+    // which side stopped it: Bob's own copy without the yes (the write) or with it (the crossing)
+    const sides = answered ? null : JSON.stringify({
+      bob: (await pairEventsOn(bob, pair)).find((x) => x.id === onBob.id)?.rsvp ?? 'no copy',
+      anne: (await pairEventsOn(anne, pair)).find((x) => x.id === onBob.id)?.rsvp ?? 'no copy',
+    });
+    expect(answered, `Anne sees Bob's yes on the shared copy ${sides}`).toBeTruthy();
 
     // a move on Anne's side re-shares the SAME copy
     const later = new Date(when.getTime() + 3600_000);

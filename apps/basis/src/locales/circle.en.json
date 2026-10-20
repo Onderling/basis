@@ -3100,6 +3100,14 @@
     }
   },
   "fileShare": {
+    "saved": {
+      "text": "Saved: {{name}}",
+      "doc": "A file received in a contact thread, saved where the person chose (mobile; web's Download is the browser's)."
+    },
+    "save_failed": {
+      "text": "Not saved: {{error}}",
+      "doc": "Saving a received file did not work; the reason after the colon."
+    },
     "received": {
       "text": "📎 {{name}} shared with you",
       "doc": "Circle bubble when a peer shares a file."

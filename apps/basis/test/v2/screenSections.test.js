@@ -16,6 +16,10 @@ describe('screenSections', () => {
     expect(sectionsOf('memberCard').map((s) => s.id)).toEqual(['membercard-preset', 'membercard-sees', 'membercard-hides']);
     for (const s of sectionsOf('memberCard')) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
   });
+  it('the file bubble: preview · name and size · keep it', () => {
+    expect(sectionsOf('fileBubble').map((s) => s.id)).toEqual(['file-preview', 'file-meta', 'file-save']);
+    for (const s of sectionsOf('fileBubble')) if (s.titleKey) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
+  });
   it('a screen not declared has no sections; the declaration is frozen', () => {
     expect(sectionsOf('nope')).toEqual([]);
     expect(Object.isFrozen(SCREEN_SECTIONS.adminPanel)).toBe(true);

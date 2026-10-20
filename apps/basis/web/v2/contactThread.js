@@ -11,6 +11,7 @@
  */
 
 import { createComposerCommands } from '../../src/v2/composerCommands.js';
+import { sectionsOf } from '../../src/v2/screenSections.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { returnedMarkerKey } from '../../src/v2/contactDelete.js';
 import { paintFace } from './faceView.js';
@@ -221,25 +222,36 @@ export function renderContactThread(container, {
     if (m.file && typeof m.file === 'object') {
       bubble.classList.add('cc-cthread__bubble--file');
       const f = m.file;
-      if (typeof f.mime === 'string' && f.mime.startsWith('image/') && f.dataB64) {
-        const img = document.createElement('img');
-        img.className = 'cc-cthread__file-preview';
-        img.src = `data:${f.mime};base64,${f.dataB64}`;
-        img.alt = f.name ?? '';
-        bubble.appendChild(img);
-      }
-      const meta = document.createElement('div');
-      meta.className = 'cc-cthread__file-meta';
-      const kb = Number.isFinite(f.size) ? ` · ${(f.size / 1024).toFixed(0)} KB` : '';
-      meta.textContent = `📎 ${f.name ?? '(file)'}${kb}`;
-      bubble.appendChild(meta);
-      if (f.dataB64) {
-        const dl = document.createElement('a');
-        dl.className = 'cc-cthread__file-download';
-        dl.href = `data:${f.mime ?? 'application/octet-stream'};base64,${f.dataB64}`;
-        dl.download = f.name ?? 'file';
-        dl.textContent = tr('circle.fileShare.download');
-        bubble.appendChild(dl);
+      // the bubble's DECLARED sections (`screenSections.js`), in order, each by its id
+      const PAINT = {
+        'file-preview': () => {
+          if (!(typeof f.mime === 'string' && f.mime.startsWith('image/') && f.dataB64)) return null;
+          const img = document.createElement('img');
+          img.className = 'cc-cthread__file-preview';
+          img.src = `data:${f.mime};base64,${f.dataB64}`;
+          img.alt = f.name ?? '';
+          return img;
+        },
+        'file-meta': () => {
+          const meta = document.createElement('div');
+          meta.className = 'cc-cthread__file-meta';
+          const kb = Number.isFinite(f.size) ? ` · ${(f.size / 1024).toFixed(0)} KB` : '';
+          meta.textContent = `📎 ${f.name ?? '(file)'}${kb}`;
+          return meta;
+        },
+        'file-save': () => {
+          if (!f.dataB64) return null;
+          const dl = document.createElement('a');
+          dl.className = 'cc-cthread__file-download';
+          dl.href = `data:${f.mime ?? 'application/octet-stream'};base64,${f.dataB64}`;
+          dl.download = f.name ?? 'file';
+          dl.textContent = tr('circle.fileShare.download');
+          return dl;
+        },
+      };
+      for (const d of sectionsOf('fileBubble')) {
+        const el = PAINT[d.id]?.();
+        if (el) { el.dataset.section = d.id; bubble.appendChild(el); }
       }
     }
     row.appendChild(bubble);

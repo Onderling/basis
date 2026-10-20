@@ -1424,6 +1424,10 @@
       "text": "Zeg wat je wilt — \"notitie: melk\", \"afspraak morgen 14:00 tandarts\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
+    "plus_referral": {
+      "text": "Dat is iets voor {{name}} → openen",
+      "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
+    },
     "plus_line_unread": {
       "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."

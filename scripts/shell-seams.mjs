@@ -182,6 +182,10 @@ export const SEAMS = Object.freeze([
   // rotates when a device is revoked, so a revoked device (which keeps only the old key, and the profile key every device
   // shares) cannot read what is sent after. The box composed its contact channel without it: its replies went out
   // sealed to nothing but the transport, which a revoked device still opens (L236 (b)/(c), found 2026-10-20).
+  // THE "+" LINE talks to the person's own agent only: an own act, or a referral to the circle where it lives — opened,
+  // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
+  // line any other way is how the sheet would come to act in a circle.
+  { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
   { id: 'contact-person-seal', pattern: /sealFor:\s*agent\.contactSeal\?\.sealFor/, why: 'a contact turn — the bot\'s replies included — is readable only with the contact\'s current person key, never by a device they revoked' },
 ]);
 

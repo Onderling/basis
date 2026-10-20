@@ -214,6 +214,39 @@ export function plusRead(line, { acts = PLUS_ACTS, manifestsByOrigin, now } = {}
 }
 
 /**
+ * What the "+" line comes to — the sheet talks to the person's OWN agent only:
+ *   - `{ kind: 'own', actId, values }` — one of the sheet's own acts (`plusRead`), made on the own scope;
+ *   - `{ kind: 'referral', to: [{ circleId, name }] }` — the line names something that lives in a circle: the circles
+ *     whose own manifests' gate reads it ("that is for <circle> → open"). A referral carries NO op: the sheet opens
+ *     the circle, it never acts there (the own scope cannot write a circle — this keeps the sheet from trying);
+ *   - null — no reading.
+ * @param {string} line
+ * @param {{ circles?: Array<{id: string, name?: string, manifestsByOrigin: object, availability?: {of: Function}|null}>, acts?: object[], manifestsByOrigin?: object, now?: number }} [o]
+ */
+export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifestsByOrigin, now } = {}) {
+  const own = plusRead(line, { acts, manifestsByOrigin, now });
+  if (own) return { kind: 'own', ...own };
+  const text = word(line);
+  if (!text) return null;
+  const to = [];
+  for (const c of Array.isArray(circles) ? circles : []) {
+    const ms = Object.values(c?.manifestsByOrigin ?? {}).filter(Boolean);
+    const av = c?.availability ?? null;
+    const offers = new Set(attachEntriesFor({ manifestsByOrigin: c?.manifestsByOrigin ?? {}, availability: av }).map((e) => `${e.appOrigin}.${e.opId}`));
+    // only what works there: an op the circle's availability hides is not offered (the same three-rung answer the + menu reads)
+    const shown = (opId) => !av || av.of(opId).state !== 'hidden';
+    const reads = renderGate(ms).some((rule) => {
+      let cmd = null;
+      try { cmd = rule.command(text); } catch { cmd = null; }
+      // read by this circle's own phrasing, for an op this circle offers (or names, when the gate says its app)
+      return !!cmd && shown(cmd.opId) && (offers.has(`${cmd.appOrigin}.${cmd.opId}`) || ms.some((m) => m.app === cmd.appOrigin && (m.operations ?? []).some((o) => o.id === cmd.opId)));
+    });
+    if (reads) to.push({ circleId: c.id, name: c.name ?? '' });
+  }
+  return to.length ? { kind: 'referral', to } : null;
+}
+
+/**
  * The free line read by a MODEL, when one is configured: asked with the sheet's acts (and their fields) and the own
  * scope only. Its answer is held to those bounds — an act outside them is no reading, a field it does not declare is
  * dropped — so a model can improve the reading, never widen it.

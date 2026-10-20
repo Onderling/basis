@@ -18,6 +18,8 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
+import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
@@ -172,7 +174,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
 import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -1738,20 +1740,7 @@ let circleWiredMoreIds = null;
  * two stores in three places. This is the one that surfaces should use.
  */
 async function circleOpAvailability(circleId) {
-  let policy = null;
-  let capabilityMatrix = [];
-  try {
-    const pol = (await policyStore.get(circleId)) ?? {};
-    const ovr = (await overrideStore.get(circleId)) ?? {};
-    policy = pol;
-    capabilityMatrix = buildCapabilityMatrix(circleBaseSources, {
-      enabledApps: Array.isArray(pol.apps) && pol.apps.length ? pol.apps : null,
-      template: pol.capabilities || {}, optOuts: ovr.capabilityOptOuts || [],
-    });
-  } catch { /* best-effort: an unresolved policy must not make everything look forbidden */ }
-  return makeOpAvailability({
-    catalogue: circleCatalogue, manifestsByOrigin: circleManifestsByOrigin, policy, capabilityMatrix,
-  });
+  return circleAvailabilityFor(circleId, { policyStore, overrideStore, sources: circleBaseSources, catalogue: circleCatalogue, manifestsByOrigin: circleManifestsByOrigin });
 }
 
 // The attach menu, narrowed to what this circle can actually dispatch. Empty until the circle's
@@ -4311,6 +4300,7 @@ function showVandaagPlus({ edit = null } = {}) {
   const editId = edit?.id ?? null;
   let line = '';
   let error = null;
+  let referral = null;   // the line named something that lives in a circle: where (opened, never acted on)
   // written as the one self ticked in the header; with several ticked, the sheet asks which
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
@@ -4325,18 +4315,26 @@ function showVandaagPlus({ edit = null } = {}) {
   let shareTargets = null;
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
-    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, referral,
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
-      line = text;
-      const r = plusRead(text) ?? await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) });
-      if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
+      line = text; referral = null;
+      // the person's OWN agent: an own act, or — for something that lives in a circle — where it lives (a referral,
+      // opened, never acted on from here); the own model only reads what the plain reading missed
+      const circles = await Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+        id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
+      })));
+      const o = plusLineOutcome(text, { circles });
+      const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
+      if (o?.kind === 'referral') { referral = o.to; error = null; }
+      else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
       paint();
     },
+    onOpenCircle: (id) => { close(); showDetail(id); },
     onSave: async (id, filled) => {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);

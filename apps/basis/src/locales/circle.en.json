@@ -1424,6 +1424,10 @@
       "text": "Say what you want — \"note: milk\", \"appointment tomorrow 14:00 dentist\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
+    "plus_referral": {
+      "text": "That is something for {{name}} → open",
+      "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
+    },
     "plus_line_unread": {
       "text": "I could not read that — fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."

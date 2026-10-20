@@ -178,6 +178,11 @@ export const SEAMS = Object.freeze([
   // A MEMBER REMOVED loses their access to what the circle shared out (`revokeAllForMember`, after the removal stands).
   // Web ran it; a member removed from the phone kept every share (a live privacy defect, fixed 2026-10-20).
   { id: 'removed-member-revoke', pattern: /revokeAllForMember\(|revokeOutboundForMember\(/, shells: ['web', 'mobile'], why: 'a member removed on any shell loses access to everything the circle shared out' },
+  // A CONTACT TURN IS SEALED to the contact's CURRENT person key and opened by ours (`agent.contactSeal`): the person key
+  // rotates when a device is revoked, so a revoked device (which keeps only the old key, and the profile key every device
+  // shares) cannot read what is sent after. The box composed its contact channel without it: its replies went out
+  // sealed to nothing but the transport, which a revoked device still opens (L236 (b)/(c), found 2026-10-20).
+  { id: 'contact-person-seal', pattern: /sealFor:\s*agent\.contactSeal\?\.sealFor/, why: 'a contact turn — the bot\'s replies included — is readable only with the contact\'s current person key, never by a device they revoked' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

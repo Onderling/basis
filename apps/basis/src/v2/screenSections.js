@@ -34,6 +34,18 @@ export const SCREEN_SECTIONS = Object.freeze({
     Object.freeze({ id: 'file-meta',    titleKey: null }),
     Object.freeze({ id: 'file-save',    titleKey: 'circle.fileShare.download' }),
   ]),
+  // An open governance proposal: what it is (action · decision class), where it stands (status · tally · when it closes ·
+  // awaiting enactment), and what this person may do (vote · an admin's override). The deadline was missing on the
+  // phone (L353). Status, tally, deadline and awaiting are one meta row on both shells (grouping is layout).
+  governanceProposal: Object.freeze([
+    Object.freeze({ id: 'proposal-head',     titleKey: null }),
+    Object.freeze({ id: 'proposal-status',   titleKey: null }),
+    Object.freeze({ id: 'proposal-tally',    titleKey: null }),
+    Object.freeze({ id: 'proposal-deadline', titleKey: null }),
+    Object.freeze({ id: 'proposal-awaiting', titleKey: 'circle.governance.awaiting_enactment' }),
+    Object.freeze({ id: 'proposal-vote',     titleKey: null }),
+    Object.freeze({ id: 'proposal-override', titleKey: 'circle.governance.override' }),
+  ]),
 });
 
 /**

@@ -80,15 +80,14 @@ describe('Vandaag — a row opens the sheet on itself (change it, or take it awa
     expect(plusSaveOp(e.act.id, { title: 'tandarts', when: '2026-11-03T15:00' }, { id: 'e1' })).toMatchObject({ app: 'calendar', opId: 'updateEvent', args: { id: 'e1', title: 'tandarts' } });
     expect(plusRemoveOp(e.act.id, { id: 'e1' })).toMatchObject({ app: 'calendar', opId: 'cancelEvent', args: { id: 'e1' } });
   });
-  it('an own appointment is shared with a contact a pair circle connects ("Delen met…"), never with one it does not', async () => {
+  it('an own appointment is shared with whom the agent says the share accepts ("Delen met…") — the sheet filters nothing', async () => {
     const e = plusEditFor({ id: 'e1', own: true, fields: { title: 'tandarts', when: '2026-11-03T14:00:00.000Z' } }, 'calendar-event');
     const asked = [];
     const call = async (app, op, args) => { asked.push(`${app}.${op}`); return { items: [
-      { id: 'webid:bob', label: 'Bob', pairCircleId: 'pair-1' },
-      { id: 'webid:carla', label: 'Carla', pairCircleId: null },
+      { id: 'webid:bob', label: 'Bob', pairCircleId: null },
     ] }; };
     expect(await plusShareTargets(e.act, call)).toEqual([{ id: 'webid:bob', label: 'Bob' }]);
-    expect(asked).toEqual(['pinboard.listContacts']);
+    expect(asked).toEqual(['calendar.shareTargets']);
     expect(plusShareOp(e.act.id, { id: 'e1', with: 'webid:bob' })).toEqual({ app: 'calendar', opId: 'shareEvent', args: { circleId: OWN_DEVICES_SCOPE, id: 'e1', with: 'webid:bob' } });
     expect(plusShareOp(e.act.id, { id: 'e1', with: '' })).toHaveProperty('error');
   });

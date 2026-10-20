@@ -45,6 +45,9 @@ describe('an own appointment shared with a contact', () => {
     expect(made?.ok, JSON.stringify(made)).toBe(true);
     // shared the way the own sheet shares it ("Delen met…"): Bob is among the contacts it offers, and the pick is the op
     const act = plusEditFor({ id: made.itemId, own: true, fields: { title: 'Koffie bij Anne' } }, 'calendar-event').act;
+    // the row's pairCircleId is a convenience written AFTER the roster exists (under load it can lag): the pick must not
+    // gate on it — clear it, as a slow write would leave it, and Bob is still offered (the roster is the fact)
+    await anne.agent.callSkill('pinboard', 'addContact', { webid: bob.pubKey, pairCircleId: null });
     const offered = await plusShareTargets(act, (app, op, args) => anne.agent.callSkill(app, op, args));
     expect(offered.map((c) => c.id), JSON.stringify(offered)).toContain(bob.pubKey);
     const op = plusShareOp(act.id, { id: made.itemId, with: bob.pubKey });
@@ -82,7 +85,8 @@ describe('an own appointment shared with a contact', () => {
       const r = await node.agent.callSkill('calendar', 'listEvents', { circleId: pair, days: 30 }).catch((e) => ({ thrown: String(e?.message ?? e) }));
       const items = r?.items ?? r?.events ?? [];
       const hit = items.find((x) => x.id === onBob.id);
-      return hit ? { rsvp: hit.rsvp ?? null } : { ok: r?.ok ?? null, error: r?.error ?? r?.thrown ?? null, n: items.length, ids: items.slice(0, 4).map((x) => `${x.id}:${x.title}`) };
+      // with the copy: its yes, and who wrote it last and when (a later write without the yes names its writer)
+      return hit ? { rsvp: hit.rsvp ?? null, keys: Object.keys(hit), by: hit.updatedBy ?? hit.by ?? hit.author ?? null, at: hit.updatedAt ?? hit.ts ?? null, state: hit.state ?? null } : { ok: r?.ok ?? null, error: r?.error ?? r?.thrown ?? null, n: items.length, ids: items.slice(0, 4).map((x) => `${x.id}:${x.title}`) };
     };
     const sides = answered ? null : JSON.stringify({ rsvp, bob: await side(bob), anne: await side(anne), want: onBob.id });
     expect(answered, `Anne sees Bob's yes on the shared copy ${sides}`).toBeTruthy();

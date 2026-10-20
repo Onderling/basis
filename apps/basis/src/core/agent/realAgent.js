@@ -6455,6 +6455,26 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       return { ok: true, copyId };
     };
+    /** A contact's pair circle as the share uses it: the self they are filed under (their persona, never the general
+     *  self by default) and the pair circle of the two — present only when that circle is one of mine. ONE answer for
+     *  the share and the sheet's pick (the row's `pairCircleId` is a convenience written after the roster; nobody gates
+     *  on it). `{ selfWebid, pairCircleId }`, or `{ code }` for why not. */
+    const contactPairCircle = (row, mine) => {
+      const persona = personaOfContact(row) ?? DEFAULT_PERSONA;
+      const selfWebid = personas.get(persona)?.chatId?.pubKey ?? (persona === DEFAULT_PERSONA ? chatId?.pubKey : null);
+      if (!selfWebid) return { code: 'no-self' };
+      const pairCircleId = pairCircleIdFor(selfWebid, row.webid ?? row.pubKey);
+      return mine.includes(pairCircleId) ? { selfWebid, pairCircleId } : { code: 'no-pair-circle' };
+    };
+    const myCircleIds = async () => ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
+    /** Whom an own appointment can be shared with: exactly the contacts `shareOwnEvent` accepts (the sheet's pick). */
+    const shareTargets = async () => {
+      const contacts = (await callSkill('pinboard', 'listContacts', {}).catch(() => null))?.contacts ?? [];
+      const mine = await myCircleIds();
+      const items = contacts.filter((c) => c?.webid && !c.hidden && contactPairCircle(c, mine).pairCircleId)
+        .map((c) => ({ id: c.webid, label: c.displayName ?? c.handle ?? c.webid }));
+      return { ok: true, items };
+    };
     const shareOwnEvent = async (a) => {
       await ownCalendarReady;
       const ev = await ownCalendarStore.get(String(a?.id ?? '')).catch(() => null);
@@ -6462,13 +6482,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       const contacts = (await callSkill('pinboard', 'listContacts', {}).catch(() => null))?.contacts ?? [];
       const row = contacts.find((c) => c?.webid === a?.with || c?.pubKey === a?.with);
       if (!row) return { ok: false, code: 'no-contact', error: tr('circle.calendar.share_no_contact') };
-      // the self this contact knows (the persona it is filed under), never the general self by default
-      const persona = personaOfContact(row) ?? DEFAULT_PERSONA;
-      const selfWebid = personas.get(persona)?.chatId?.pubKey ?? (persona === DEFAULT_PERSONA ? chatId?.pubKey : null);
-      if (!selfWebid) return { ok: false, code: 'no-self', error: tr('circle.calendar.share_no_contact') };
-      const pairCircleId = pairCircleIdFor(selfWebid, row.webid ?? row.pubKey);
-      const mine = ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
-      if (!mine.includes(pairCircleId)) return { ok: false, code: 'no-pair-circle', error: tr('circle.calendar.share_no_pair', { name: row.displayName ?? row.handle ?? '' }) };
+      // the self this contact knows and the pair circle of the two — the one answer the sheet's pick uses too
+      const pc = contactPairCircle(row, await myCircleIds());
+      if (pc.code === 'no-self') return { ok: false, code: 'no-self', error: tr('circle.calendar.share_no_contact') };
+      if (pc.code) return { ok: false, code: 'no-pair-circle', error: tr('circle.calendar.share_no_pair', { name: row.displayName ?? row.handle ?? '' }) };
+      const { pairCircleId } = pc;
       const w = await writeSharedCopy(ev, pairCircleId);
       if (w?.ok === false) return w;
       await ownCalendarStore.put(withSharedMark(ev, pairCircleId, w.copyId), { by: 'me' });
@@ -6511,6 +6529,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // SHARED WITH A CONTACT: a minimal copy in the pair circle of the self the contact is filed under, carried by its
       // lane; the link stays on this side (the source's `shared` mark), so a move or a cancel here re-shares it
       if (opId === 'shareEvent') return shareOwnEvent(args ?? {});
+      if (opId === 'shareTargets') return shareTargets();
       const handler = ops[opId];
       if (!handler) return { ok: false, error: 'unknown-op', app: 'calendar', op: opId };
       const res = await handler(args ?? {});

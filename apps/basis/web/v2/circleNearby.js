@@ -57,7 +57,7 @@ export function renderCircleNearby(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-nearby__back';
+  back.className = 'cc-btn cc-btn--quiet circle-nearby__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -83,14 +83,14 @@ export function renderCircleNearby(container, {
     for (const v of NEARBY_LEVELS) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `circle-nearby__first-use-option circle-nearby__first-use-option--${v}`;
+      b.className = `cc-btn cc-btn--quiet circle-nearby__first-use-option circle-nearby__first-use-option--${v}`;
       b.textContent = tr(nearbyLevelLabelKey(v));
       b.addEventListener('click', () => firstUse.onChoose(v));
       fu.appendChild(b);
     }
     const later = document.createElement('button');
     later.type = 'button';
-    later.className = 'circle-nearby__first-use-later';
+    later.className = 'cc-btn cc-btn--quiet circle-nearby__first-use-later';
     later.textContent = tr('circle.nearbyScreen.first_use_later');
     later.addEventListener('click', () => firstUse.onLater?.());
     fu.appendChild(later);
@@ -209,7 +209,7 @@ export function renderCircleNearby(container, {
           if (!labelKey) continue;   // an action the renderer does not know is not shown raw
           const btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = `circle-nearby__action circle-nearby__action--${action}`;
+          btn.className = `cc-btn cc-btn--quiet circle-nearby__action circle-nearby__action--${action}`;
           btn.dataset.action = action;
           btn.dataset.peerId = row.id || '';
           btn.textContent = tr(labelKey);
@@ -260,7 +260,7 @@ export function renderCircleNearby(container, {
 
     const send = document.createElement('button');
     send.type = 'submit';
-    send.className = 'circle-nearby__ask-send';
+    send.className = 'cc-btn cc-btn--quiet circle-nearby__ask-send';
     send.textContent = tr('circle.nearbyScreen.ask_send');
     form.appendChild(send);
 
@@ -276,7 +276,7 @@ export function renderCircleNearby(container, {
   } else {
     const askBtn = document.createElement('button');
     askBtn.type = 'button';
-    askBtn.className = 'circle-nearby__ask-compose';
+    askBtn.className = 'cc-btn cc-btn--quiet circle-nearby__ask-compose';
     askBtn.textContent = tr('circle.nearbyScreen.ask_compose');
     askBtn.addEventListener('click', () => { if (typeof onCompose === 'function') onCompose(); });
     asksBlock.appendChild(askBtn);
@@ -344,7 +344,7 @@ export function renderCircleNearby(container, {
         if (!labelKey) continue;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `circle-nearby__ask-action circle-nearby__ask-action--${action}`;
+        btn.className = `cc-btn cc-btn--quiet circle-nearby__ask-action circle-nearby__ask-action--${action}`;
         btn.dataset.action = action;
         btn.dataset.askId = entry.ask?.id || '';
         btn.textContent = tr(labelKey);
@@ -400,7 +400,7 @@ export function renderCircleNearby(container, {
         if (!labelKey) continue;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `circle-nearby__invite-action circle-nearby__invite-action--${action}`;
+        btn.className = `cc-btn cc-btn--quiet circle-nearby__invite-action circle-nearby__invite-action--${action}`;
         btn.dataset.action = action;
         btn.textContent = tr(labelKey);
         btn.addEventListener('click', () => {
@@ -537,7 +537,7 @@ export function renderCircleNearby(container, {
     if (typeof onPrefillCard === 'function') {
       const fill = document.createElement('button');
       fill.type = 'button';
-      fill.className = 'circle-nearby__card-prefill';
+      fill.className = 'cc-btn cc-btn--quiet circle-nearby__card-prefill';
       fill.textContent = tr('circle.nearbyScreen.card_prefill');
       fill.addEventListener('click', async () => {
         let got = {};
@@ -555,7 +555,7 @@ export function renderCircleNearby(container, {
 
     const save = document.createElement('button');
     save.type = 'submit';
-    save.className = 'circle-nearby__card-save';
+    save.className = 'cc-btn cc-btn--quiet circle-nearby__card-save';
     save.textContent = tr('circle.nearbyScreen.card_save');
     form.appendChild(save);
 
@@ -609,7 +609,7 @@ export function renderCircleNearby(container, {
     form.appendChild(input);
     const send = document.createElement('button');
     send.type = 'submit';
-    send.className = 'circle-nearby__chat-send';
+    send.className = 'cc-btn cc-btn--quiet circle-nearby__chat-send';
     send.textContent = tr('circle.nearbyScreen.chat_send');
     form.appendChild(send);
     form.addEventListener('submit', (e) => {

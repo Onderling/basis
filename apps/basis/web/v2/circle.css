@@ -97,10 +97,11 @@
   cursor: pointer;
   border: 1.5px solid transparent;
 }
+/* the primary is THE accent (terracotta), the same colour as Vandaag's "+": one strong colour per screen */
 .cc-btn--primary,
-.cc-wizard-btn-primary { background: var(--accent); color: var(--accent-contrast); }
+.cc-wizard-btn-primary { background: var(--accent-ink); color: var(--accent-contrast); }
 .cc-btn--primary:hover,
-.cc-wizard-btn-primary:hover { background: var(--accent-ink); }
+.cc-wizard-btn-primary:hover { filter: brightness(1.08); }
 .cc-btn--quiet,
 .cc-wizard-btn-secondary { background: none; color: var(--ink); border-color: var(--ink); border-radius: 999px; }
 .cc-btn--quiet:hover,
@@ -610,7 +611,7 @@
 .circle-view__embeds-label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
 .circle-view__embed { font-size: 12px; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
 /* S6.B — a screen button (opens a panel) reads as a filled affordance vs the outline op buttons. */
-.circle-view__screen-button { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); } /* = .cc-btn--primary (colours) */
+.circle-view__screen-button { background: var(--accent-ink); color: var(--accent-contrast); border-color: var(--accent-ink); } /* = .cc-btn--primary (colours) */
 .cc-screen-panel { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.45); }
 .cc-screen-panel__card { width: min(560px, 100%); max-height: 88vh; overflow: auto; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
 .cc-screen-panel__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -628,7 +629,7 @@
 .cc-guided__opt { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .cc-guided__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .cc-guided__btn { cursor: pointer; font: inherit; font-size: 14px; padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
-.cc-guided__btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 700; } /* = .cc-btn--primary (colours) */
+.cc-guided__btn--primary { background: var(--accent-ink); border-color: var(--accent-ink); color: var(--accent-contrast); font-weight: 700; } /* = .cc-btn--primary (colours) */
 .cc-guided__btn--option:hover { border-color: var(--accent); }
 .cc-guided__done { font-size: 14px; color: var(--ink-soft); }
 /* δ.2 — per-message delivery state (lives in the bubble's meta line).  Pending = clock,
@@ -1468,8 +1469,8 @@
 .circle-screen__onb-card p { margin: 0 0 4px; font-size: 13px; color: var(--ink-soft); }
 .circle-screen__onb-card form { display: flex; gap: 6px; margin-top: 6px; }
 .circle-screen__onb-handle { flex: 1 1 auto; min-width: 0; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink); }
-.circle-screen__onb-btn { font: inherit; font-size: 13px; padding: 5px 10px; margin: 6px 6px 0 0; border-radius: var(--radius-sm); border: 1px solid var(--accent); background: var(--accent); color: var(--accent-contrast); cursor: pointer; }
-.circle-screen__onb-btn--quiet { border-color: var(--line); background: var(--paper); color: var(--ink); }
+/* the onboarding strip's buttons wear the family (.cc-btn--primary / --quiet); only their spacing is theirs */
+.circle-screen__onb-btn { margin: 6px 6px 0 0; }
 
 
 /* Vandaag: a day, with ONE accent — the "+" (terracotta); everything else is quiet text (schets-2, L343c). */

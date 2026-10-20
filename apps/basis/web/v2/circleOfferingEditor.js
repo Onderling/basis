@@ -23,7 +23,7 @@ export function renderOfferingEditor(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-offering__back';
+  back.className = 'cc-btn cc-btn--quiet circle-offering__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -62,7 +62,7 @@ export function renderOfferingEditor(container, {
 
   const save = document.createElement('button');
   save.type = 'button';
-  save.className = 'circle-offering__save';
+  save.className = 'cc-btn cc-btn--quiet circle-offering__save';
   save.textContent = tr('circle.settings.save');
   save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
   container.appendChild(save);

@@ -4219,7 +4219,7 @@ async function _showVandaag() {
     for (const page of book.screens) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'circle-vandaag__page';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag__page';
       b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', String(page.id === screen?.id));
       b.dataset.pageId = page.id;
@@ -5872,8 +5872,8 @@ function showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = '
       });
       card.appendChild(go);
       const cancel = document.createElement('button');
-      cancel.type = 'button';
       cancel.className = 'cc-btn cc-btn--quiet';
+      cancel.type = 'button';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => { runner.cancel(inst); done(); });
@@ -8262,7 +8262,7 @@ async function showGovernance(id) {
   });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
-  back.type = 'button'; back.className = 'cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
+  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
   back.addEventListener('click', () => { _govRerender = null; showDetail(id); });
   rootEl.appendChild(back);
   const host = document.createElement('div');

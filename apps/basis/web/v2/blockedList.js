@@ -16,7 +16,7 @@ export function renderBlockedList(container, { rows = [], t, onBack, onUnblock, 
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'cc-blocked__back';
+  back.className = 'cc-btn cc-btn--quiet cc-blocked__back';
   back.textContent = tr('circle.back_mydata');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -61,7 +61,7 @@ export function renderBlockedList(container, { rows = [], t, onBack, onUnblock, 
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'cc-blocked__unblock';
+    btn.className = 'cc-btn cc-btn--quiet cc-blocked__unblock';
     btn.textContent = tr('circle.blocked.unblock');
     // The row's ORIGINAL key, not its label — unblocking by a display name removes nothing.
     btn.addEventListener('click', () => { if (typeof onUnblock === 'function') onUnblock(row.key); });

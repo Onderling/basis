@@ -29,6 +29,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput }
 import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
+import Btn from './Btn.js';
 import { t } from '../../core/localisation.js';
 import { identityLineWords, agentRowWords } from '../../../../basis/src/v2/mijWords.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
@@ -318,10 +319,9 @@ const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, c
 function OnboardingCards({ block, onAction, styles }) {
   const [handle, setHandle] = useState('');
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
-  const Btn = ({ labelKey, a, quiet = false, testID }) => (
-    <Pressable style={quiet ? styles.onbBtnQuiet : styles.onbBtn} onPress={() => act(a)} accessibilityRole="button" testID={testID}>
-      <Text style={quiet ? styles.onbBtnQuietText : styles.onbBtnText}>{t(labelKey)}</Text>
-    </Pressable>
+  // the family (Btn): the strip's act is the screen's primary, the second choice quiet
+  const OnbBtn = ({ labelKey, a, quiet = false, testID }) => (
+    <Btn variant={quiet ? 'quiet' : 'primary'} label={t(labelKey)} onPress={() => act(a)} testID={testID} style={{ alignSelf: 'flex-start' }} />
   );
   return (
     <View>
@@ -333,20 +333,20 @@ function OnboardingCards({ block, onAction, styles }) {
               <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_handle_hint')}</Text>
               <TextInput style={styles.onbInput} value={handle} onChangeText={setHandle} placeholder={t('circle.vandaag.onboarding_handle_ph')}
                 accessibilityLabel={t('circle.vandaag.onboarding_handle_title')} testID="onb-handle" />
-              <Btn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
+              <OnbBtn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
             </View>
           ) : c.id === 'intro' ? (
             <View>
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
               <View style={styles.onbRow}>
-                <Btn labelKey="circle.vandaag.onboarding_intro_more" a={{ kind: 'intro-more' }} testID="onb-intro-more" />
-                <Btn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} quiet testID="onb-intro-seen" />
+                <OnbBtn labelKey="circle.vandaag.onboarding_intro_more" a={{ kind: 'intro-more' }} testID="onb-intro-more" />
+                <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} quiet testID="onb-intro-seen" />
               </View>
             </View>
           ) : (
             <View style={styles.onbRow}>
-              <Btn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
-              <Btn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} quiet testID="onb-join" />
+              <OnbBtn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
+              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} quiet testID="onb-join" />
             </View>
           )}
         </View>
@@ -562,10 +562,6 @@ const makeStyles = (theme) => StyleSheet.create({
   onbLine:             { fontSize: 13, color: theme.color.inkSoft, marginBottom: 4 },
   onbInput:            { fontSize: 14, paddingVertical: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, backgroundColor: theme.color.paper, marginVertical: 6 },
   onbRow:              { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  onbBtn:              { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, backgroundColor: theme.color.accent, alignSelf: 'flex-start' },
-  onbBtnText:          { fontSize: 13, color: theme.color.accentContrast },
-  onbBtnQuiet:         { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, alignSelf: 'flex-start' },
-  onbBtnQuietText:     { fontSize: 13, color: theme.color.ink },
   groupHead:           { fontSize: 13, color: theme.color.inkSoft, paddingVertical: 4 },
   agendaMoment:        { fontSize: 13, color: theme.color.inkSoft },
   // a row's own act ("Change"): a quiet text button — the page's one accent is the "+"

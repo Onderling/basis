@@ -26,7 +26,7 @@ export function renderCircleViewAs(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-viewas__back';
+  back.className = 'cc-btn cc-btn--quiet circle-viewas__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);

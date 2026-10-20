@@ -56,7 +56,7 @@ export function renderRulesEditor(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-rules__back';
+  back.className = 'cc-btn cc-btn--quiet circle-rules__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -97,7 +97,7 @@ export function renderRulesEditor(container, {
 
   const save = document.createElement('button');
   save.type = 'button';
-  save.className = 'circle-rules__save';
+  save.className = 'cc-btn cc-btn--quiet circle-rules__save';
   save.textContent = tr('circle.rules.save');
   save.disabled = !complete;
   save.addEventListener('click', () => { if (complete && typeof onSave === 'function') onSave(); });

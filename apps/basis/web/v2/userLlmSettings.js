@@ -63,7 +63,7 @@ export function renderUserLlmSettings(container, { current = {}, onSave, validat
 
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
-  saveBtn.className = 'cc-user-llm__save';
+  saveBtn.className = 'cc-btn cc-btn--quiet cc-user-llm__save';
   saveBtn.textContent = t('circle.userLlm.save');
   saveBtn.addEventListener('click', onSaveClick);
   sec.appendChild(saveBtn);

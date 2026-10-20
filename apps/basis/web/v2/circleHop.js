@@ -24,7 +24,7 @@ export function renderCircleHop(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-hop__back';
+  back.className = 'cc-btn cc-btn--quiet circle-hop__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);

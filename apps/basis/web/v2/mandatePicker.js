@@ -99,7 +99,7 @@ export function renderMandatePicker(container, {
   if (typeof onCancel === 'function') {
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.className = 'cc-mandate-picker__cancel';
+    cancel.className = 'cc-btn cc-btn--quiet cc-mandate-picker__cancel';
     cancel.style.cssText = 'background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:1.1em';
     cancel.textContent = tr('circle.mandate.cancel');
     cancel.addEventListener('click', () => onCancel());
@@ -135,6 +135,7 @@ export function renderMandatePicker(container, {
   };
 
   const confirmBtn = document.createElement('button');   // referenced by the pickers below
+  confirmBtn.className = 'cc-btn cc-btn--quiet';
 
   // ── WHO ─────────────────────────────────────────────────────────────────────
   container.appendChild(sectionLabel('circle.mandate.who_label'));
@@ -152,7 +153,7 @@ export function renderMandatePicker(container, {
       const w = memberWebid(m);
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'cc-mandate-picker__who-item';
+      btn.className = 'cc-btn cc-btn--quiet cc-mandate-picker__who-item';
       btn.setAttribute('role', 'radio');
       btn.setAttribute('aria-checked', 'false');
       btn.dataset.member = w;
@@ -217,7 +218,7 @@ export function renderMandatePicker(container, {
       if (!firstActiveOpt && opt.active) firstActiveOpt = opt;
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'cc-mandate-picker__what-item';
+      btn.className = 'cc-btn cc-btn--quiet cc-mandate-picker__what-item';
       btn.setAttribute('role', 'radio');
       btn.dataset.what = opt.id;
       btn.dataset.kind = opt.kind;
@@ -254,7 +255,7 @@ export function renderMandatePicker(container, {
     for (const value of options) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `cc-mandate-picker__${testKind}-item`;
+      b.className = `cc-btn cc-btn--quiet cc-mandate-picker__${testKind}-item`;
       b.dataset.value = value;
       b.setAttribute('role', 'radio');
       const on = value === current();

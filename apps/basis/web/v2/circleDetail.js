@@ -68,7 +68,7 @@ export function renderCircleDetail(container, {
   for (const action of circleActions(basisManifest, { policy, platform: 'web' })) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `circle-detail__${CSS_TOKEN[action.id] ?? action.id}`;
+    btn.className = `cc-btn cc-btn--quiet circle-detail__${CSS_TOKEN[action.id] ?? action.id}`;
     btn.dataset.action = action.id;
     btn.textContent = tr(action.labelKey);
     const on = handlers[action.id];

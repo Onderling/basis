@@ -637,7 +637,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
   if (typeof onAddTask === 'function') {
     const add = document.createElement('button');
     add.type = 'button';
-    add.className = 'circle-view__taken-add';
+    add.className = 'cc-btn cc-btn--quiet circle-view__taken-add';
     add.textContent = tr('circle.view.tasks_add');
     add.addEventListener('click', () => onAddTask());
     wrap.appendChild(add);
@@ -990,7 +990,7 @@ function renderBubble(row, {
     let open = false;
     const toggle = document.createElement('button');
     toggle.type = 'button';
-    toggle.className = 'circle-view__bubble-more';
+    toggle.className = 'cc-btn cc-btn--quiet circle-view__bubble-more';
     const paint = () => {
       text.textContent = open ? fullText : `${head}…`;
       toggle.textContent = tr(open ? 'circle.bubble.show_less' : 'circle.bubble.show_more', { defaultValue: open ? 'Show less' : 'Show more' });
@@ -1065,7 +1065,7 @@ function renderBubble(row, {
   if (typeof onReportMessage === 'function' && !rowIsOwn && row?.actor !== 'bot' && row?.id) {
     const rep = document.createElement('button');
     rep.type = 'button';
-    rep.className = 'circle-view__bubble-report';
+    rep.className = 'cc-btn cc-btn--quiet circle-view__bubble-report';
     rep.textContent = tr('circle.governance.report_message');
     rep.addEventListener('click', () => onReportMessage(row.id, row));
     el.appendChild(rep);

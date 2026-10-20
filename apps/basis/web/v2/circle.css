@@ -265,7 +265,7 @@
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-content: center;
   font-family: var(--font-sans); font-weight: 600; font-size: 17px;
-  color: var(--ink); background: var(--paper-2);
+  color: var(--on-tint); background: var(--paper-2);
 }
 .circle-tile { position: relative; }
 .circle-tile__body { min-width: 0; flex: 1; }
@@ -791,7 +791,7 @@
 
 /* ── P5 — Contacten roster + 1:1 DM thread ──────────────────────────────── */
 .cc-contacts { padding: 4px 2px 80px; }
-.cc-contacts__head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 12px; gap: 12px; }
+.cc-contacts__head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 12px; gap: 12px; padding-right: 44px; }   /* clear the fixed header avatar (top-right) */
 .cc-contacts__title { font-size: 18px; font-weight: 700; margin: 0; color: var(--ink); }
 .cc-contacts__add {
   cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;

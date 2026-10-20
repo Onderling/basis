@@ -39,6 +39,7 @@ export const THEME = {
     danger:  '#963528', dangerBg:'#f5e7e2', // blocked / warning — deeper than accentInk rust
     trackOff:'#c9c8c0', // pill-toggle off track
     white:   '#ffffff',
+    onTint:  '#17181a', // text ON a circle's avatar tint (the tints are pastel in both themes)
   },
   font: {
     // Bold sans carries the identity; serif is a small accent (stats-strip
@@ -75,6 +76,7 @@ export const THEME_DARK = {
     danger:  '#e06749', dangerBg:'#332420',
     trackOff:'#3a3c34',
     white:   '#1e1f1a', // "white" surfaces follow the card surface in dark
+    onTint:  '#17181a', // the tints stay pastel in dark, so their text stays dark (light ink vanished on them)
   },
   font:   THEME.font,
   radius: THEME.radius,

@@ -25,23 +25,27 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(60_000);
   });
 
-  // Availability is a screen UNDER Me now (Me → "Availability →"); its Save and its "← Me" return to Me
-  // (Detox survey 2026-10-09: the spec still expected the Me tab to open Availability and Save to land on the launcher).
+  // Availability is a door in My data, under Mij (Mij V1, 2026-10-15): Mij → "My data" → "Availability"; its Save and
+  // its back return to My data.
   async function openAvailability() {
     await element(by.id('circle-tab-mij')).tap();
     await waitFor(element(by.id('circle-profile'))).toBeVisible().withTimeout(10_000);
-    await waitFor(element(by.id('profile-availability'))).toBeVisible()
+    await waitFor(element(by.id('profile-mydata'))).toBeVisible()
       .whileElement(by.id('circle-profile')).scroll(400, 'down');
-    await element(by.id('profile-availability')).tap();
+    await element(by.id('profile-mydata')).tap();
+    await waitFor(element(by.id('circle-mydata'))).toExist().withTimeout(10_000);
+    await waitFor(element(by.id('mydata-door-availability'))).toBeVisible()
+      .whileElement(by.id('circle-mydata')).scroll(400, 'down');
+    await element(by.id('mydata-door-availability')).tap();
     // The loading state carries the same `circle-availability` id — wait for the loaded form (its holiday switch).
     await waitFor(element(by.id('holiday-active'))).toBeVisible().withTimeout(15_000);
   }
 
-  it('opens Availability from Me, toggles holiday, Saves back to Me', async () => {
+  it('opens Availability from My data, toggles holiday, Saves back to My data', async () => {
     await openAvailability();
     await element(by.id('holiday-active')).tap();
     await element(by.id('circle-availability-save')).tap();
-    await waitFor(element(by.id('circle-profile'))).toBeVisible().withTimeout(10_000);
+    await waitFor(element(by.id('circle-mydata'))).toBeVisible().withTimeout(10_000);
   });
 
   it('the Circles tab returns from Availability to the launcher', async () => {

@@ -108,9 +108,13 @@ describe('the walk of 2026-10-08, pinned', () => {
   });
 
   it('a circle opens — the conversation and its composer, no red screen', async () => {
+    // Vandaag is the landing now, mounted OVER the launcher: the tile can count as visible behind it while a tap never
+    // reaches it — go to the Circles tab first.
     await waitFor(element(by.id(HELP_TILE))).toBeVisible().withTimeout(90_000);
+    await element(by.id('circle-tab-circles')).tap();
+    await waitFor(element(by.id(HELP_TILE))).toBeVisible().withTimeout(30_000);
     await element(by.id(HELP_TILE)).tap();
-    await waitFor(element(by.id('circle-detail'))).toBeVisible().withTimeout(30_000);
+    // the circle's page is pinned by its composer (the page's own container is not a reliable Detox target)
     await waitFor(element(by.id('circle-detail-composer'))).toBeVisible().withTimeout(30_000);
     await expect(element(by.text('Render Error'))).not.toExist();
   });

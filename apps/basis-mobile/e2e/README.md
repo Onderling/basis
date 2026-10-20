@@ -29,30 +29,33 @@ Target the physical phone (`c53828f5`) instead:
 npm run detox:test:attached
 ```
 
-## What's covered (D-1)
+## What's covered
 
-| Test | Replaces manual step |
+| Test | Pins |
 |---|---|
-| `coldBoot.test.js` | #249 boot screen + 6 NavModel rows |
-| `slashRoundtrip.test.js` | #253 step 2 — /mine + list bubble with button |
-| `restartSurvival.test.js` | #249 vault + cache persistence on relaunch |
+| `launcherBoot.test.js` | a fresh install boots to the help circle · a restart lands on the launcher (no welcome, no recovery words) · `/contacts` in a circle's composer opens the contacts panel |
+| `walkFixes20261008.test.js` | the phone walk of 2026-10-08 (circle opens, no empty flash, a person's thread actions on screen) |
+| `circleDefault.test.js` · `_hello.test.js` | the launcher is the default screen |
+| `circleScreens.test.js` | Availability under Me, its Save returns to Me |
 
-## State of the suite (Detox survey, 2026-10-09, development @ ed1a25ddc, release APK, headless emulator)
+## State of the suite (Detox survey 2026-10-09; L251 2026-10-20 — release APK, headless emulator)
+
+Retired with L251 (they drove the classic chat shell, which a person can no longer reach): `stateMorph`, `threadDrawer`,
+`multiThreadIsolation`, `allWizards`, `disputeWizard`, `logsPanel` — why, per spec, in `plans/DECISIONS-FOR-REVIEW.md`.
 
 | Spec | State | Why |
 |---|---|---|
 | `walkFixes20261008` | ✅ 3/3 | the week's walk fixes |
 | `_hello` | ✅ | launch now with synchronization off, like the rest (a synchronized launch hung 180 s) |
-| `circleDefault` | ✅ 1, ⏭ 1 | the launcher is the default; the "← chat" test is skipped (affordance removed) |
+| `circleDefault` | ✅ 1 | the launcher is the default (the "← chat" test retired with the affordance) |
 | `circleScreens` | ✅ 2/2 | rewritten: Availability lives under Me, its Save returns to Me |
-| `coldBoot` `logsPanel` `restartSurvival` `allWizards` `disputeWizard` `threadDrawer` `stateMorph` `multiThreadIsolation` `slashRoundtrip` | ⏭ skipped | they drive the classic CHAT SHELL via `gotoChat()`; the launcher's `circle-to-chat` is gone, so that surface is unreachable for a person. Port what is worth pinning to the circle composer before un-skipping. |
+| `launcherBoot` | ✅ 3/3 (L251, 2026-10-20) | replaces `coldBoot`, `restartSurvival`, `slashRoundtrip` on the launcher and the circle composer |
 
 Run: `npx detox test --configuration android.emu.release --reuse -- --no-watchman` (Watchman on this box fails
 "non-recoverable" now and then; Jest's own crawler is fine). Build with `:app:` tasks only (see the gotchas doc).
 
 ## What's NOT covered (D-2+, tracked in #224 Phase B)
 
-- State-morphing assertion (tap → row vanishes from origin bubble)
 - Cross-device JM scenarios (paired emulators)
 - Native-only journeys: JM-3 push, JM-4 BLE, JM-5 camera, JM-6 voice
 - "Mesh transport ready" runtime assertion (needs nknLib in test env)

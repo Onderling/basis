@@ -20,6 +20,13 @@ export const SCREEN_SECTIONS = Object.freeze({
     Object.freeze({ id: 'admin-outbound-shares', titleKey: 'circle.share.outbound_title' }),
     Object.freeze({ id: 'admin-muted',           titleKey: 'circle.admin.muted' }),
   ]),
+  // A member card (another member's, or your own as someone sees it): how much it reveals, what this viewer sees, what
+  // stays hidden. The reveal is the person's own disclosure fact; it was missing on the phone (L359).
+  memberCard: Object.freeze([
+    Object.freeze({ id: 'membercard-preset', titleKey: 'circle.memberCard.preset_label' }),
+    Object.freeze({ id: 'membercard-sees',   titleKey: 'circle.memberCard.sees' }),
+    Object.freeze({ id: 'membercard-hides',  titleKey: 'circle.memberCard.hides' }),
+  ]),
 });
 
 /**

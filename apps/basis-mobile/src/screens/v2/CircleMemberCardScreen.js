@@ -14,7 +14,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Image } from 'react-native';
 import { useTheme } from './themeContext.js';
-import { memberPersonaView, selfViewSplit, VIEWER_KINDS } from '@onderling-app/basis';
+import { memberPersonaView, selfViewSplit, VIEWER_KINDS, revealPresetWords } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 
 export default function CircleMemberCardScreen({
@@ -123,6 +123,12 @@ export default function CircleMemberCardScreen({
           })}
         </View>
       ) : null}
+
+      {/* how much of the persona this card reveals (handle · profile · full) — the shared words, as web's badge */}
+      {(() => {
+        const words = revealPresetWords(split.preset, t);
+        return words ? <Text style={styles.lede} testID="membercard-preset">{`${words.label}: ${words.value}`}</Text> : null;
+      })()}
 
       <ScrollView contentContainerStyle={styles.list}>
         {renderCol('sees', split.sees)}

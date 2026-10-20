@@ -20,7 +20,7 @@
  * from `memberCards.js` (`revealPresetOf`), the single reveal-state home.
  */
 
-import { revealPresetLabelKey } from '../../src/v2/memberCards.js';
+import { revealPresetWords } from '../../src/v2/memberCards.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
@@ -144,17 +144,17 @@ export function renderSelfViewCard(container, {
  * this split reveals, resolved through `t()` (invariant 8). Null preset → no badge.
  */
 function presetBadge(tr, preset) {
-  const labelKey = revealPresetLabelKey(preset);
-  if (!labelKey) return null;
+  const words = revealPresetWords(preset, tr);
+  if (!words) return null;
   const badge = document.createElement('div');
   badge.className = 'circle-membercard__preset';
   badge.dataset.preset = preset;
   const name = document.createElement('span');
   name.className = 'circle-membercard__preset-label';
-  name.textContent = tr('circle.memberCard.preset_label');
+  name.textContent = words.label;
   const value = document.createElement('span');
   value.className = 'circle-membercard__preset-value';
-  value.textContent = tr(labelKey);
+  value.textContent = words.value;
   badge.appendChild(name);
   badge.appendChild(value);
   return badge;

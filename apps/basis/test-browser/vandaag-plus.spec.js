@@ -1,6 +1,6 @@
 /**
  * VANDAAG'S "+", ON A REAL SCREEN (2026-10-15). An own note and an own appointment, made from the "+" beside "Pas aan":
- * each lands in the person's own store and shows on Vandaag tagged as theirs ("jij"/"you") — a page without a notes
+ * each lands in the person's own store and shows on Vandaag as theirs (an own row carries no maker tag) — a page without a notes
  * block gets one, as an ordinary page change.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/vandaag-plus.spec.js

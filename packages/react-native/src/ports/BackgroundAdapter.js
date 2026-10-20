@@ -11,8 +11,8 @@
  *     JS-bundle load, before the engine exists).
  *   - `@onderling/sync-engine-rn/backgroundTasks` — `registerBackgroundFetch` /
  *     `unregisterBackgroundFetch` (periodic wake).
- *   - `@onderling/online-cadence/attachAppStateBridge` — foreground/background
- *     cadence + AppState listener.
+ *   - an `attachAppStateBridge`-shaped dep — foreground/background cadence + AppState listener (its online-cadence
+ *     implementation was retired 2026-10-20 with no consumer; background sync is a design still to come).
  * This port NAMES that surface so the future iOS work (BGTaskScheduler +
  * NSE-driven reconnect-and-drain + App-Group) and the Android counterpart
  * (foreground-service / WorkManager) each drop in as a `BackgroundAdapter`

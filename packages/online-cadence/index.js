@@ -1,35 +1,16 @@
 /**
- * @onderling/online-cadence — foreground/background cadence helpers
- * for React Native agents.
+ * @onderling/online-cadence — the foreground cadence
+ * for React Native agents (and the web, page visibility as the app state).
  *
- * Three modules:
- *   - `./src/cadence.js`         — pure ticker (createActiveCadence)
- *   - `./src/appStateBridge.js`  — RN AppState → bundle.cache.setOnline + ticker
- *   - `./src/bgTask.js`          — re-exports the bg-fetch helpers from
- *                                   `@onderling/sync-engine-rn` for ergonomic
- *                                   colocation
+ * One module: `./src/cadence.js` — the pure foreground ticker (createActiveCadence), the timer behind the
+ * host's one clock (`apps/basis/src/v2/hostTick.js` `foregroundTimers`). The AppState bridge and the bg-task
+ * re-exports were retired 2026-10-20 (no consumer; background sync is a design still to come, not inherited).
  *
  * Lifted from `apps/pinboard-mobile/src/lib/{activeCadence,appStateBridge,bgRunOnce}.js`
- * 2026-05-09 (Phase 41.0 L2; Tasks-mobile is the second consumer).
+ * 2026-05-09.
  */
 
 export {
   createActiveCadence,
   _internal as _cadenceInternal,
 } from './src/cadence.js';
-
-export {
-  attachAppStateBridge,
-} from './src/appStateBridge.js';
-
-export {
-  setBgRunOnce,
-  clearBgRunOnce,
-  bgRunOnce,
-  registerBackgroundTask,
-  defineBackgroundTask,
-  registerBackgroundFetch,
-  unregisterBackgroundFetch,
-  statusBackgroundFetch,
-  DEFAULT_BACKGROUND_FETCH_INTERVAL_S,
-} from './src/bgTask.js';

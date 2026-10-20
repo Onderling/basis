@@ -147,7 +147,7 @@ import { renderListBlock } from './listScreen.js';
 // record-shaped detail screens (read-only key→value, e.g. agent-detail).
 import { renderRecordScreen } from './recordScreen.js';
 // personas#1 — the "Mij → persona's" surface (general persona + persona cards + per-circle sharing)
-// + its shared read-model. Replaces the former single-persona About-me content (circleAboutMe.js).
+// + its shared read-model; the one "About me" on both shells (the single-persona About-me it replaced is retired).
 import { renderMij } from './circleMij.js';
 import { loadMijModel } from '../../src/v2/mijLoader.js';
 // feedback-extension P2c — load downloadable extension mappings + the load-time sandbox gate.

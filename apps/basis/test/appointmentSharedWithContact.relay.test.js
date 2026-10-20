@@ -88,7 +88,13 @@ describe('an own appointment shared with a contact', () => {
       // with the copy: its yes, and who wrote it last and when (a later write without the yes names its writer)
       return hit ? { rsvp: hit.rsvp ?? null, keys: Object.keys(hit), by: hit.updatedBy ?? hit.by ?? hit.author ?? null, at: hit.updatedAt ?? hit.ts ?? null, state: hit.state ?? null } : { ok: r?.ok ?? null, error: r?.error ?? r?.thrown ?? null, n: items.length, ids: items.slice(0, 4).map((x) => `${x.id}:${x.title}`) };
     };
-    const sides = answered ? null : JSON.stringify({ rsvp, bob: await side(bob), anne: await side(anne), want: onBob.id });
+    // …and the pair roster each side holds then (is Bob a member on Anne's side — an answer from a non-member is dropped)
+    const roster = async (node) => {
+      const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: pair }).catch((e) => ({ thrown: String(e?.message ?? e) }));
+      const ms = r?.members ?? r?.items ?? [];
+      return Array.isArray(ms) ? ms.map((m) => `${m?.webid === bob.pubKey ? 'bob' : m?.webid === anne.pubKey ? 'anne' : String(m?.webid ?? m).slice(0, 8)}:${m?.role ?? '?'}`) : r;
+    };
+    const sides = answered ? null : JSON.stringify({ rsvp, bob: await side(bob), anne: await side(anne), want: onBob.id, rosterOnBob: await roster(bob), rosterOnAnne: await roster(anne) });
     expect(answered, `Anne sees Bob's yes on the shared copy ${sides}`).toBeTruthy();
 
     // a move on Anne's side re-shares the SAME copy

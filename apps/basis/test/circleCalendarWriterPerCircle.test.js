@@ -14,7 +14,7 @@ const setup = () => {
   registerCanonicalTypes(registry);
   const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
   const ops = makeCircleCalendarOps({ storeFor: (id) => stores.getStore(id), activeCircle: () => null, t,
-    localActor: (circleId) => (circleId === 'pair-x' ? 'lens-key' : 'me') });
+    localActor: (circleId) => (circleId === 'pair-x' ? 'lens-key' : circleId === 'pair-none' ? null : 'me') });
   return { ops, stores };
 };
 const when = '2026-11-03T13:00:00.000Z';
@@ -36,5 +36,15 @@ describe('the writer per circle', () => {
     await ops.rsvpAccept({ circleId: 'pair-x', id: made.itemId, actor: 'someone' });
     const [e] = (await ops.listEvents({ circleId: 'pair-x', days: 3650 })).items;
     expect(Object.keys(e.rsvp)).toEqual(['someone']);
+  });
+  it('a pair circle whose self this device does not run is not ours to write: refused, nothing written', async () => {
+    const { ops, stores } = setup();
+    const add = await ops.addEvent({ circleId: 'pair-none', title: 'Koffie', startsAt: when });
+    expect(add).toMatchObject({ ok: false, code: 'no-self' });
+    expect((await ops.listEvents({ circleId: 'pair-none', days: 3650 })).items).toEqual([]);
+    for (const op of ['updateEvent', 'cancelEvent', 'rsvpAccept']) {
+      expect(await ops[op]({ circleId: 'pair-none', id: 'x', when }), op).toMatchObject({ ok: false, code: 'no-self' });
+    }
+    expect((await stores.getStore('pair-none').listByType('calendar-event')) ?? []).toEqual([]);
   });
 });

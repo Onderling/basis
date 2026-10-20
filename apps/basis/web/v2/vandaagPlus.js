@@ -18,7 +18,10 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section, one tap from any tab
   meActions = [], onMeAction,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
-  acts = PLUS_ACTS } = {}) {
+  acts = PLUS_ACTS,
+  // Vastgezet: the pins to paint (`paintablePins`, each with its `label` and `key`); a tap → `onOpenPin(pin)`, × →
+  // `onUnpin(key)`; `pinnedActIds` marks the own acts already pinned (☆ / ★ toggles through `onTogglePin(actId)`)
+  pinned = [], onOpenPin, onUnpin, pinnedActIds = [], onTogglePin } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';

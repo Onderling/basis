@@ -141,18 +141,12 @@ test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circl
   // a circle's attach entry pinned to the "+" opens THAT circle (a bookmark never runs the op from the sheet)
   await page.locator('[data-tab="circles"]').first().click();
   await page.locator('.circle-tile').first().click();
-  const trigger = page.locator('.circle-view__attach-trigger, .circle-view__attach').first();
-  if (await trigger.count()) {
-    await trigger.click();
-    const pin = page.locator('.circle-view__attach-pin').first();
-    if (await pin.count()) {
-      await pin.click();
-      await page.locator('[data-tab="screens"]').first().click().catch(() => {});
-      await page.locator('.cc-fab').click();
-      const bm = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open').filter({ hasText: ':' });
-      await expect(bm).toHaveCount(1);
-      await bm.first().click();
-      await expect(page.locator('.circle-view, [data-view="circle"]').first(), 'the bookmark opened its circle').toBeVisible({ timeout: 10_000 });
-    }
-  }
+  await page.locator('.circle-view__attach').first().click();
+  await page.locator('.circle-view__attach-pin').first().click();
+  await page.locator('.cc-fab').click();
+  const bm = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open').filter({ hasText: ':' });
+  await expect(bm, 'the bookmark is under Vastgezet, in its circle\'s name').toHaveCount(1);
+  await bm.first().click();
+  await expect(page.locator('.circle-vandaag-plus'), 'the sheet closed: a bookmark opens its circle, it does not run there').toHaveCount(0);
+  await expect(page.locator('.circle-view__attach').first(), 'the circle is open').toBeVisible({ timeout: 10_000 });
 });

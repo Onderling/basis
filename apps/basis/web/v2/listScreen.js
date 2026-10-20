@@ -51,7 +51,7 @@ export function renderListRows(listEl, { rows = [], t, onRowAction, onRowOpen } 
     for (const a of (row.actions || [])) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'list-screen__row-action';
+      btn.className = 'cc-btn cc-btn--quiet list-screen__row-action';
       btn.textContent = a.label;
       btn.dataset.opId = a.opId;
       btn.dataset.itemId = a.itemId;

@@ -20,6 +20,7 @@ import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 // decision (web ≡ mobile); the panel paints it and works nothing out for itself.
 import { roleControlFor, removeControlFor, announceControlFor } from '../../src/v2/circleRoleControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { sectionsOf } from '../../src/v2/screenSections.js';
 import { paintFace } from './faceView.js';
 
 export function renderCircleAdminPanel(container, {
@@ -68,13 +69,24 @@ export function renderCircleAdminPanel(container, {
     container.appendChild(n);
   }
 
+  // THE SECTIONS ARE DECLARED (`screenSections.js`): each block opens its section by id (title from the declaration),
+  // and they are placed in the declared order below — a section the declaration names and this panel does not paint
+  // is a red `lint-screen-sections`, not a gap someone finds later.
+  const painted = {};
+  const declared = new Map(sectionsOf('adminPanel').map((d) => [d.id, d]));
+  const openSection = (id) => {
+    const sec = document.createElement('section');
+    sec.className = 'cc-admin__section';
+    sec.dataset.section = id;
+    const h = document.createElement('h3');
+    h.className = 'cc-admin__section-title';
+    h.textContent = tr(declared.get(id)?.titleKey ?? id);
+    sec.appendChild(h);
+    return sec;
+  };
+
   // ── members ───────────────────────────────────────────────────────────────
-  const memSection = document.createElement('section');
-  memSection.className = 'cc-admin__section';
-  const memTitle = document.createElement('h3');
-  memTitle.className = 'cc-admin__section-title';
-  memTitle.textContent = tr('circle.admin.members');
-  memSection.appendChild(memTitle);
+  const memSection = openSection('admin-members');
 
   if (!members.length) {
     const empty = document.createElement('p');
@@ -148,15 +160,10 @@ export function renderCircleAdminPanel(container, {
     }
     memSection.appendChild(list);
   }
-  container.appendChild(memSection);
+  painted['admin-members'] = memSection;
 
   // ── announcement ────────────────────────────────────────────────────────
-  const annSection = document.createElement('section');
-  annSection.className = 'cc-admin__section';
-  const annTitle = document.createElement('h3');
-  annTitle.className = 'cc-admin__section-title';
-  annTitle.textContent = tr('circle.admin.announce');
-  annSection.appendChild(annTitle);
+  const annSection = openSection('admin-announce');
   const form = document.createElement('form');
   form.className = 'cc-admin__announce';
   const area = document.createElement('textarea');
@@ -184,17 +191,12 @@ export function renderCircleAdminPanel(container, {
     if (typeof onAnnounce === 'function') onAnnounce(text);
   });
   annSection.appendChild(form);
-  container.appendChild(annSection);
+  painted['admin-announce'] = annSection;
 
   // (reports moved to the §8 governance "Decisions" Reports section — see the header note)
 
   // ── muted peers ───────────────────────────────────────────────────────────
-  const mutSection = document.createElement('section');
-  mutSection.className = 'cc-admin__section';
-  const mutTitle = document.createElement('h3');
-  mutTitle.className = 'cc-admin__section-title';
-  mutTitle.textContent = tr('circle.admin.muted');
-  mutSection.appendChild(mutTitle);
+  const mutSection = openSection('admin-muted');
   if (!muted.length) {
     const empty = document.createElement('p');
     empty.className = 'cc-admin__empty';
@@ -221,18 +223,13 @@ export function renderCircleAdminPanel(container, {
     }
     mutSection.appendChild(list);
   }
-  container.appendChild(mutSection);
+  painted['admin-muted'] = mutSection;
 
   // ── outbound shares (objective L — per-share "Stop sharing") ───────────────
   // Lists what THIS circle has shared OUT (source item → target circle). A "Stop sharing" button appears ONLY
   // when the circle's posture is `canonical` (a revocable in-place grant); for copy/trusted/registered the
   // share is a SEPARATE object (not revocable in place), so the row shows the `not_revocable` note instead.
-  const shareSection = document.createElement('section');
-  shareSection.className = 'cc-admin__section';
-  const shareTitle = document.createElement('h3');
-  shareTitle.className = 'cc-admin__section-title';
-  shareTitle.textContent = tr('circle.share.outbound_title');
-  shareSection.appendChild(shareTitle);
+  const shareSection = openSection('admin-outbound-shares');
   if (!outboundShares.length) {
     const empty = document.createElement('p');
     empty.className = 'cc-admin__empty';
@@ -267,7 +264,9 @@ export function renderCircleAdminPanel(container, {
     }
     shareSection.appendChild(list);
   }
-  container.appendChild(shareSection);
+  painted['admin-outbound-shares'] = shareSection;
+
+  for (const d of sectionsOf('adminPanel')) if (painted[d.id]) container.appendChild(painted[d.id]);
 
   if (busy) {
     const b = document.createElement('div');

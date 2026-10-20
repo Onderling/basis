@@ -20,7 +20,8 @@
  * from `memberCards.js` (`revealPresetOf`), the single reveal-state home.
  */
 
-import { revealPresetLabelKey } from '../../src/v2/memberCards.js';
+import { revealPresetWords } from '../../src/v2/memberCards.js';
+import { sectionsOf } from '../../src/v2/screenSections.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
@@ -43,7 +44,7 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
   if (typeof onReport === 'function') {
     const report = document.createElement('button');
     report.type = 'button';
-    report.className = 'circle-membercard__report';
+    report.className = 'cc-btn cc-btn--quiet circle-membercard__report';
     report.textContent = tr('circle.governance.report_member');
     report.addEventListener('click', () => onReport(member));
     container.appendChild(report);
@@ -64,11 +65,11 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
   lede.textContent = tr('circle.memberCard.persona_lede');
   container.appendChild(lede);
 
-  const badge = presetBadge(tr, split.preset);
-  if (badge) container.appendChild(badge);
-
-  container.appendChild(attrColumn(tr, 'sees', split.sees, resolvePicture));
-  container.appendChild(attrColumn(tr, 'hides', split.hides, resolvePicture));
+  paintDeclared(container, {
+    'membercard-preset': () => presetBadge(tr, split.preset),
+    'membercard-sees': () => attrColumn(tr, 'sees', split.sees, resolvePicture),
+    'membercard-hides': () => attrColumn(tr, 'hides', split.hides, resolvePicture),
+  });
   return container;
 }
 
@@ -129,32 +130,43 @@ export function renderSelfViewCard(container, {
   }
   container.appendChild(picker);
 
-  const badge = presetBadge(tr, split.preset);
-  if (badge) container.appendChild(badge);
-
-  container.appendChild(attrColumn(tr, 'sees', split.sees, resolvePicture));
-  container.appendChild(attrColumn(tr, 'hides', split.hides, resolvePicture));
+  paintDeclared(container, {
+    'membercard-preset': () => presetBadge(tr, split.preset),
+    'membercard-sees': () => attrColumn(tr, 'sees', split.sees, resolvePicture),
+    'membercard-hides': () => attrColumn(tr, 'hides', split.hides, resolvePicture),
+  });
   return container;
 }
 
 /* ── internals ── */
+
+/** The card's DECLARED sections (`screenSections.js`), in order, each painted by its id — `lint-screen-sections` checks
+ *  both shells name every one. A painter that has nothing to show returns null. */
+function paintDeclared(container, paint) {
+  for (const d of sectionsOf('memberCard')) {
+    const el = paint[d.id]?.(d);
+    if (!el) continue;
+    el.dataset.section = d.id;
+    container.appendChild(el);
+  }
+}
 
 /**
  * The amount-preset badge (`handle → profile → full`) — surfaces how much of the persona
  * this split reveals, resolved through `t()` (invariant 8). Null preset → no badge.
  */
 function presetBadge(tr, preset) {
-  const labelKey = revealPresetLabelKey(preset);
-  if (!labelKey) return null;
+  const words = revealPresetWords(preset, tr);
+  if (!words) return null;
   const badge = document.createElement('div');
   badge.className = 'circle-membercard__preset';
   badge.dataset.preset = preset;
   const name = document.createElement('span');
   name.className = 'circle-membercard__preset-label';
-  name.textContent = tr('circle.memberCard.preset_label');
+  name.textContent = words.label;
   const value = document.createElement('span');
   value.className = 'circle-membercard__preset-value';
-  value.textContent = tr(labelKey);
+  value.textContent = words.value;
   badge.appendChild(name);
   badge.appendChild(value);
   return badge;

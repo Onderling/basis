@@ -33,7 +33,7 @@ export function renderRecipientPicker(container, {
   if (typeof onCancel === 'function') {
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.className = 'cc-recipient-picker__cancel';
+    cancel.className = 'cc-btn cc-btn--quiet cc-recipient-picker__cancel';
     cancel.textContent = tr('circle.share.pick_cancel');
     cancel.addEventListener('click', () => onCancel());
     header.appendChild(cancel);
@@ -79,7 +79,7 @@ export function renderRecipientPicker(container, {
 
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'cc-recipient-picker__pick';
+    btn.className = 'cc-btn cc-btn--quiet cc-recipient-picker__pick';
     btn.disabled = !!busy;
 
     const name = document.createElement('span');

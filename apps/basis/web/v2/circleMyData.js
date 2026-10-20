@@ -11,6 +11,7 @@
  */
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
+import { versionLine } from '../../src/v2/versionLine.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
@@ -144,7 +145,7 @@ export function renderCircleMyData(container, {
     for (const d of doorRow) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `cc-profile__${d.id}`;
+      b.className = `cc-btn cc-btn--quiet cc-profile__${d.id}`;
       b.textContent = tr(d.labelKey);
       b.addEventListener('click', () => d.open());
       sec.appendChild(b);
@@ -192,7 +193,7 @@ export function renderCircleMyData(container, {
     current.textContent = tr('circle.mydata.relay_current', { url: relayUrl || relayEnvUrl || tr('circle.mydata.relay_off') });
     const open = document.createElement('button');
     open.type = 'button';
-    open.className = 'cc-mydata__relay-open';
+    open.className = 'cc-btn cc-btn--quiet cc-mydata__relay-open';
     open.textContent = tr('circle.mydata.relay_open');
     open.addEventListener('click', () => onOpenRelayPanel());
     const hint = document.createElement('p');
@@ -213,7 +214,7 @@ export function renderCircleMyData(container, {
     input.setAttribute('aria-label', tr('circle.mydata.relay_set'));
     const save = document.createElement('button');
     save.type = 'button';
-    save.className = 'cc-mydata__relay-save';
+    save.className = 'cc-btn cc-btn--quiet cc-mydata__relay-save';
     save.textContent = tr('circle.mydata.relay_save');
     const note = document.createElement('span');
     note.className = 'cc-mydata__relay-note';
@@ -294,7 +295,7 @@ export function renderCircleMyData(container, {
       if (!d.revoked) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'cc-mydata__device-revoke';
+        b.className = 'cc-btn cc-btn--danger cc-mydata__device-revoke';
         b.textContent = tr('circle.revoke.title');
         b.addEventListener('click', () => onRevokeDevice(d.deviceId));
         row.appendChild(b);
@@ -327,7 +328,7 @@ export function renderCircleMyData(container, {
       name.textContent = tr('circle.companionGrant.node_row', { short: c.short });
       const give = document.createElement('button');
       give.type = 'button';
-      give.className = 'cc-mydata__companion-give';
+      give.className = 'cc-btn cc-btn--quiet cc-mydata__companion-give';
       give.textContent = tr('circle.companionGrant.give');
       head.append(name, give);
       row.appendChild(head);
@@ -361,7 +362,7 @@ export function renderCircleMyData(container, {
           what.textContent = `${h.label} — ${h.may}`;
           const rev = document.createElement('button');
           rev.type = 'button';
-          rev.className = 'cc-mydata__companion-revoke';
+          rev.className = 'cc-btn cc-btn--danger cc-mydata__companion-revoke';
           rev.textContent = tr('circle.companionGrant.revoke');
           rev.addEventListener('click', async () => {
             rev.disabled = true;
@@ -425,7 +426,7 @@ export function renderCircleMyData(container, {
         });
         const confirm = document.createElement('button');
         confirm.type = 'button';
-        confirm.className = 'cc-mydata__companion-confirm';
+        confirm.className = 'cc-btn cc-btn--quiet cc-mydata__companion-confirm';
         confirm.textContent = tr('circle.companionGrant.confirm');
         panel.appendChild(confirm);
         confirm.addEventListener('click', async () => {
@@ -483,7 +484,7 @@ export function renderCircleMyData(container, {
 
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'cc-mydata__connection-unpair';
+      b.className = 'cc-btn cc-btn--quiet cc-mydata__connection-unpair';
       b.textContent = tr('circle.mydata.connection_unpair');
       b.addEventListener('click', () => onUnpairConnection(c.viewPubKey));
       row.appendChild(b);
@@ -543,7 +544,7 @@ export function renderCircleMyData(container, {
 
     const confirm = document.createElement('button');
     confirm.type = 'button';
-    confirm.className = 'cc-mydata__connection-confirm';
+    confirm.className = 'cc-btn cc-btn--quiet cc-mydata__connection-confirm';
     confirm.textContent = tr('circle.mydata.connection_confirm');
     picker.appendChild(confirm);
 
@@ -948,7 +949,7 @@ export function renderCircleMyData(container, {
   if (typeof version === 'string') {
     const v = document.createElement('div');
     v.className = 'cc-profile__version';
-    v.textContent = tr('circle.profile.version', { tag: version || tr('circle.profile.version_dev') });
+    v.textContent = versionLine(version, tr);
     container.appendChild(v);
   }
   return container;

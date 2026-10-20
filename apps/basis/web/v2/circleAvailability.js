@@ -24,7 +24,7 @@ export function renderCircleAvailability(container, { availability, t, onChange,
   if (typeof onBack === 'function') {
     const back = document.createElement('button');
     back.type = 'button';
-    back.className = 'circle-availability__back';
+    back.className = 'cc-btn cc-btn--quiet circle-availability__back';
     back.textContent = tr('circle.back_mydata');
     back.addEventListener('click', () => onBack());
     container.appendChild(back);
@@ -71,7 +71,7 @@ export function renderCircleAvailability(container, { availability, t, onChange,
 
   const save = document.createElement('button');
   save.type = 'button';
-  save.className = 'circle-availability__save';
+  save.className = 'cc-btn cc-btn--quiet circle-availability__save';
   save.textContent = tr('circle.settings.save');
   save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
   container.appendChild(save);

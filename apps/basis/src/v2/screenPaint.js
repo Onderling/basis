@@ -5,6 +5,7 @@
  * The manifests are the screen's own imports (the bot's door catalogue), filtered by the grant. Pure.
  */
 
+import { pickerChoices } from '../forms/pickerChoices.js';
 import { composeAssistantCatalogue } from '../telegram/assistantCatalogue.js';
 import { isAdminOp } from './botHelp.js';
 import { parseInput } from '../parser.js';
@@ -72,11 +73,7 @@ export function screenPickerFetcher({ call, ops, appOrigin }) {
   return async (decl) => {
     const skill = `${decl?.appOrigin ?? appOrigin}.${decl?.listOp}`;
     if (!decl?.listOp || !(ops() ?? []).includes(skill)) return [];
-    const r = await call(skill, decl.filter && typeof decl.filter === 'object' ? { ...decl.filter } : {});
-    const items = Array.isArray(r?.items) ? r.items : (Array.isArray(r?.entries) ? r.entries : (Array.isArray(r) ? r : []));
-    return items
-      .filter((i) => i && (i.id ?? i.webid) != null)
-      .map((i) => ({ id: String(i.id ?? i.webid), label: String(i.label ?? i.text ?? i.title ?? i.name ?? i.id ?? i.webid) }));
+    return pickerChoices(await call(skill, decl.filter && typeof decl.filter === 'object' ? { ...decl.filter } : {}));
   };
 }
 

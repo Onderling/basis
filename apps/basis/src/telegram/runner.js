@@ -172,9 +172,11 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const rec = turns.get(chatId);
     const caller = rec?.caller ?? null;
     const threadId = rec?.thread ?? null;
+    // the person's own language (`/taal`) rides along too, so an app's own reply is worded in it, not only the bot's lines
+    const lang = threadId ? (threads?.langOf?.(threadId) ?? null) : null;
     return caller || threadId
       // the chat the line came from rides along: an answer that counts only in the person's private chat reads it
-      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}), chatId })
+      ? (app, op, args) => callSkill(app, op, args, { ...(caller ? { caller } : {}), ...(threadId ? { threadId } : {}), chatId, ...(lang ? { lang } : {}) })
       : callSkill;
   }
 

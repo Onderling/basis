@@ -43,3 +43,33 @@ export function dateLocaleOf(t) {
   if (typeof named !== 'string' || !named || named === key) return undefined;
   try { return Intl.getCanonicalLocales(named)[0]; } catch { return undefined; }
 }
+
+/**
+ * A moment that is COMING, in a person's words: "vandaag om 14:00" or "morgen om 09:30" (the local day), the date
+ * after that (`whenWords`), and "gesloten" once it has passed — what a vote's deadline says on both shells.
+ * @param {string|number|Date} at
+ * @param {{t: Function, now?: Date, locale?: string, tz?: string}} o
+ * @returns {string}  '' for a moment that is not one
+ */
+export function momentWords(at, { t, now = new Date(), locale, tz } = {}) {
+  const d = at instanceof Date ? at : new Date(at);
+  if (at == null || at === '' || Number.isNaN(d.getTime())) return '';
+  if (d.getTime() <= now.getTime()) return t('circle.when.closed');
+  const dayOf = (x) => new Intl.DateTimeFormat('en-CA', { ...(tz ? { timeZone: tz } : {}), year: 'numeric', month: '2-digit', day: '2-digit' }).format(x);
+  const tomorrow = new Date(now.getTime() + 86_400_000);
+  const time = timeWords(d, { tz });
+  if (dayOf(d) === dayOf(now)) return t('circle.when.today_at', { time });
+  if (dayOf(d) === dayOf(tomorrow)) return t('circle.when.tomorrow_at', { time });
+  return whenWords(d, { locale, tz });
+}
+
+/**
+ * The day a home screen is about, as its header: "dinsdag 20 oktober" — the weekday, the day and the month, on the
+ * device's clock, in the screen's date language (`dateLocaleOf`).
+ * @param {number|Date} [now]
+ * @param {{locale?: string, tz?: string}} [o]
+ */
+export function dayHeader(now = Date.now(), { locale, tz } = {}) {
+  const d = now instanceof Date ? now : new Date(now);
+  return new Intl.DateTimeFormat(locale, { ...(tz ? { timeZone: tz } : {}), weekday: 'long', day: 'numeric', month: 'long' }).format(d).replace(',', '');
+}

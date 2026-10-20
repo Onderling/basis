@@ -15,6 +15,9 @@ importers:
 
   .:
     dependencies:
+      '@onderling/qr':
+        specifier: file:../qr
+        version: file:../qr
       '@onderling/vault':
         specifier: ^0.1.0
         version: link:../vault
@@ -345,6 +348,9 @@ packages:
     peerDependenciesMeta:
       '@onderling/pseudo-pod':
         optional: true
+
+  '@onderling/qr@file:../qr':
+    resolution: {directory: ../qr, type: directory}
 
   '@onderling/transports@file:../transports':
     resolution: {directory: ../transports, type: directory}
@@ -2304,6 +2310,8 @@ snapshots:
       '@onderling/vault': link:../vault
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
+
+  '@onderling/qr@file:../qr': {}
 
   '@onderling/transports@file:../transports':
     dependencies:

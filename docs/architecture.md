@@ -103,6 +103,21 @@ is what makes a reader ask "why is `renderAttachments` a peer of the chat shell?
 (`npm run coverage` → `apps/basis/docs/surface-coverage.md`) records which surfaces each op is wired for,
 so the map can't drift from the manifests.
 
+**Web ≡ mobile, held in four layers.** A projector covers only what a manifest declares; much of what a person
+sees is painted by hand on each shell, and the two drifted there unnoticed (an audit in October 2026 found five
+gaps, among them a removed member who kept a circle's shares on the phone). So parity is held at four layers, each
+by a guard in `npm run guards`:
+- **Projector-painted ops** cannot differ: one `renderWeb ≡ renderMobile` column in the coverage snapshot.
+- **Seams and host duties**: what each shell must compose or call, among them the shared decision a screen's host
+  must run after an act, is listed in `scripts/shell-seams.mjs`, and `lint-shell-seams` is red when a shell lacks one.
+- **What a shell says**: `lint-locale-key-parity` compares the `circle.*` keys each shell uses. A key on one shell
+  only is a gap (in a baseline that only shrinks) or a declared decision.
+- **What a shell shows**: a hand-painted screen's sections are declared once (`src/v2/screenSections.js`), both
+  shells paint from that list, and `lint-screen-sections` checks both.
+
+A difference that is meant is a row in `docs/conventions/web-mobile-exceptions.md`, naming the surface, its keys
+or its tag. That table is the one place a difference is a decision; anywhere else it is a defect.
+
 #### Flows — declared multi-step processes
 
 Some things a person does are not one op but a **process**: restoring settings on a new device, enrolling
@@ -714,6 +729,12 @@ written in plaintext (invariant #7).
   revocable canonical grant **plus** a notice to the circle: its admins, or a `permission-log`-tagged pinboard
   post), or `silent` (a **copy** sealed to the recipient, leaving no ACP/pointer trace in the circle — more
   private). Pre-grant history is never handed to a new out-of-circle recipient unless explicitly opted in.
+- **An own appointment, shared with a contact.** Between two nodes an appointment travels as an *item*, never a file:
+  a contact is a two-member pair circle with a store, so "Delen met…" on an own appointment writes a minimal copy
+  (title, when, length — no attendees, no source id) into that pair circle, carried by its lane; the link stays on
+  the sharer's side (a `shared` mark on the source), so a move or a cancel there re-shares the same copy. The own
+  sheet offers only contacts a pair circle already connects; the op decides, and refuses without one. The `.ics`
+  feed stays for a reader that is no node.
 - **The receiver — "shared with me".** A silent copy is pushed over the relay straight to the recipient's peer;
   their device receives it into a per-user, *tiered* store (local, mirrored to the pod when signed in) surfaced
   on the **Mij** screen. Opening it needs the device's own sealing key — derived from its network secret, which
@@ -863,7 +884,10 @@ devices, so the box holds a circle by catch-up at connect. With a Telegram token
 **Telegram shell** (`apps/basis/src/telegram/runner.js`), where a
 `MessagingBridge` turn goes through the same compilers (`parseInput → resolveDispatch → runDispatch → renderReply`)
 and, for free text, the circle composer's engine (`createCircleDispatch` with the deterministic gate); a button
-tap returns as `opId:itemId` and dispatches like a typed command; chats pair by allow-list. A contact whose
+tap returns as `opId:itemId` and dispatches like a typed command; chats pair by allow-list. Its words follow the
+person, not the box: the thread's language (`/taal`) rides on every call the door makes (`ctx.lang`), and the agent
+hands the shell's one translator that language for that call — the runner's own lines and an app's reply alike, never
+a shared "current language", so two people's turns in flight cannot cross. A contact whose
 card asks for it (`x-onderling.redact`) gets the **pre-send floor**: the channel redacts the turn on the sender's
 device with `@onderling/redaction` before it leaves (the platform's default ruleset, or the ruleset the card
 ships as data), the thread says so under its header, and the echo and the durable copy are the redacted text —

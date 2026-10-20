@@ -95,6 +95,13 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   workspace symlinking is what fixed it. Same "symlink integrity" family as the EAS trap above —
   if resolution breaks, check that the workspace symlinks are intact first.
 
+- **A new workspace PACKAGE also needs every affected per-project lockfile (2026-10-19, `@onderling/qr`).** CI installs
+  with `pnpm install --frozen-lockfile`, and this repo keeps one `pnpm-lock.yaml` per project (not one at the root), so
+  a new package and every project that now depends on it, directly or through a `file:` dep such as the React Native
+  package, must be in those lockfiles, or every CI job fails. `pnpm install --lockfile-only` writes them without touching
+  `node_modules`. It also re-resolves unrelated ranges (seen: `openai` 7→6 in four lockfiles), so keep only the hunks that
+  name the new package and `git checkout` the rest. Then `node scripts/relink-workspace.mjs` for the links, a Metro
+  `watchFolders` + `extraNodeModules` entry when the phone reaches it, `npm run box-role-paths` when the box runs it (the guard says so), and a CI matrix row for its own suite.
 - **New `@onderling/*` workspace dep → its `node_modules` symlink must be materialized (or `pnpm install` re-run).**
   Adding a `@onderling/*` dep to a package's `package.json` — or repointing a raw-`src` reach-in onto a public
   `@onderling/<pkg>` specifier — only resolves once that package has `node_modules/@onderling/<pkg> →
@@ -795,6 +802,11 @@ Each one produced an APK that did not carry the code it was built to test.
   (`app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle`) with the previous build's. Identical
   bundles from two different commits mean the build did not see the change. The release bundle is Hermes bytecode:
   search it with `LC_ALL=C grep -a`.
+- **The release build hangs on "Waiting for Watchman `watch-project`"** when the shell runs niced (an agent's shell here
+  runs at nice 5): watchman refuses to start below nice 0 ("running at a lower than normal priority … refusing to
+  start") and Metro waits forever. Build with watchman off `PATH` (it lives in `/home/linuxbrew/.linuxbrew/bin`):
+  `PATH=$(echo "$PATH" | tr ':' '\n' | grep -v linuxbrew | paste -sd:) ./gradlew :app:assembleRelease …` — Metro
+  falls back to its node crawler. (2026-10-20)
 - **Watchman "non-recoverable condition" kills a Detox run before it starts** (the box's watchman is unhealthy now and
   then). Pass `-- --no-watchman` to `detox test`; Jest's node crawler is enough. Also: a screen's LOADING state may carry
   the same testID as the loaded one (`circle-availability`) — wait for a control of the loaded form, not the screen id.

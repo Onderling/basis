@@ -16,11 +16,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';
 import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
-import { buildSubjectLabeler } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
+import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -127,41 +129,62 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
 
       {model.view.open.map((row) => (
         <View key={row.proposalId} style={styles.card} testID={`gov-proposal-${row.proposalId}`}>
-          <View style={styles.head}>
-            <Text style={styles.action}>
-              {t(`circle.governance.action.${row.action}`)}{row.subjectLabel ? `: ${row.subjectLabel}` : ''}
-            </Text>
-            <Text style={styles.klass}>{t(`circle.governance.class.${CLASS_KEY[row.decisionClass] ?? 'any_admin'}`)}</Text>
-          </View>
-          <View style={styles.meta}>
-            <Text style={[styles.status, styles[`status_${statusKey(row)}`]]}>{t(`circle.governance.status.${statusKey(row)}`)}</Text>
-            {row.tally ? (
-              <Text style={styles.tally}>{t('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })}</Text>
-            ) : null}
-            {row.approved && row.awaitingEnactment ? (
-              <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
-            ) : null}
-          </View>
-          {row.canVote ? (
-            <View style={styles.actions}>
-              {['yes', 'no'].map((choice) => (
-                <Pressable
-                  key={choice}
-                  onPress={() => onVote(row.proposalId, choice)}
-                  accessibilityRole="button"
-                  style={[styles.voteBtn, row.myVote === choice && styles.voteBtnMine]}
-                  testID={`gov-vote-${row.proposalId}-${choice}`}
-                >
-                  <Text style={[styles.voteText, row.myVote === choice && styles.voteTextMine]}>{t(`circle.governance.vote_${choice}`)}</Text>
+          {/* the proposal's DECLARED sections (`screenSections.js`), in order, each by its id; the meta ones share one row */}
+          {(() => {
+            const PAINT = {
+              'proposal-head': () => (
+                <View style={styles.head}>
+                  <Text style={styles.action}>
+                    {t(`circle.governance.action.${row.action}`)}{row.subjectLabel ? `: ${row.subjectLabel}` : ''}
+                  </Text>
+                  <Text style={styles.klass}>{t(`circle.governance.class.${CLASS_KEY[row.decisionClass] ?? 'any_admin'}`)}</Text>
+                </View>
+              ),
+              'proposal-status': () => <Text style={[styles.status, styles[`status_${statusKey(row)}`]]}>{t(`circle.governance.status.${statusKey(row)}`)}</Text>,
+              'proposal-tally': () => (row.tally ? (
+                <Text style={styles.tally}>{t('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })}</Text>
+              ) : null),
+              'proposal-deadline': () => (row.deadline != null ? (
+                <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{deadlineLine(row.deadline, { t, locale: dateLocaleOf(t) })}</Text>
+              ) : null),
+              'proposal-awaiting': () => (row.approved && row.awaitingEnactment ? (
+                <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>
+              ) : null),
+              'proposal-vote': () => (row.canVote ? (
+                <View style={styles.actions}>
+                  {['yes', 'no'].map((choice) => (
+                    <Pressable
+                      key={choice}
+                      onPress={() => onVote(row.proposalId, choice)}
+                      accessibilityRole="button"
+                      style={[styles.voteBtn, row.myVote === choice && styles.voteBtnMine]}
+                      testID={`gov-vote-${row.proposalId}-${choice}`}
+                    >
+                      <Text style={[styles.voteText, row.myVote === choice && styles.voteTextMine]}>{t(`circle.governance.vote_${choice}`)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null),
+              'proposal-override': () => (row.canOverride ? (
+                <Pressable onPress={() => onOverride(row.proposalId)} accessibilityRole="button" style={styles.override} testID={`gov-override-${row.proposalId}`}>
+                  <Text style={styles.overrideText}>{t('circle.governance.override')}</Text>
                 </Pressable>
-              ))}
-            </View>
-          ) : null}
-          {row.canOverride ? (
-            <Pressable onPress={() => onOverride(row.proposalId)} accessibilityRole="button" style={styles.override} testID={`gov-override-${row.proposalId}`}>
-              <Text style={styles.overrideText}>{t('circle.governance.override')}</Text>
-            </Pressable>
-          ) : null}
+              ) : null),
+            };
+            const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting']);
+            const declared = sectionsOf('governanceProposal');
+            const metaRow = declared.filter((d) => META.has(d.id)).map((d) => <React.Fragment key={d.id}>{PAINT[d.id]?.()}</React.Fragment>);
+            let metaPlaced = false;
+            return declared.map((d) => {
+              if (META.has(d.id)) {
+                if (metaPlaced) return null;
+                metaPlaced = true;
+                return <View key="meta" style={styles.meta}>{metaRow}</View>;
+              }
+              const node = PAINT[d.id]?.();
+              return node ? <React.Fragment key={d.id}>{node}</React.Fragment> : null;
+            });
+          })()}
         </View>
       ))}
 

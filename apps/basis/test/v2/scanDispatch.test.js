@@ -1,8 +1,8 @@
 /**
  * Me → Scan / `/scan-qr`: the route table names DECLARED targets (`SCAN_TARGETS`); each shell's per-id painter map
  * (`SCAN_PAINTERS`) — the one shell-side piece, composition — must name every one of them, so a new declared target
- * cannot be scanned into silence. Pairing is HELD on purpose in PR 1 (a picker-capable form on both shells is its own
- * row): both maps say so with `null`, which the shells turn into a sentence, never a dropped code.
+ * cannot be scanned into silence. Pairing asks only what the code does not say (the circle, picked from the person's own;
+ * none asked with one) through the shared `opFormOrRun`; the shells paint its form.
  * Source text: the RN screen cannot render under vitest, and both maps are module-local by design.
  */
 import { describe, it, expect } from 'vitest';
@@ -32,11 +32,19 @@ describe('every declared scan target has a painter in each shell', () => {
         expect(map, `${shell}: no painter entry for ${t.id}`).toContain(key);
       }
     });
-    it(`${shell}: pairing is held ON PURPOSE (null), and the shell says so`, () => {
-      expect(map).toMatch(/pairCirclePeer:\s*null,/);
-      expect(src).toMatch(/circle\.scan\.pair_held/);
+    it(`${shell}: pairing is painted — the shared form-or-run decides, the shell paints only the form`, () => {
+      expect(map).not.toMatch(/pairCirclePeer:\s*null,/);
+      expect(map).toMatch(/pairCirclePeer:[^\n]*/);
+      expect(src).toMatch(/opFormOrRun\(/);
+      expect(src).not.toMatch(/circle\.scan\.pair_held/);
     });
   }
+  it('mobile: the op form opens from the shared decision, its pick one button per choice', () => {
+    expect(SHELLS.mobile).toMatch(/<OpPageModal visible appOrigin=\{scanForm\.target\.app\}[^\n]*spec=\{scanForm\.form\} choices=\{scanForm\.choices\}/);
+    const modal = read('../../../basis-mobile/src/screens/v2/OpPageModal.js');
+    expect(modal).toMatch(/f\.pickerSource && choices\?\.\[f\.name\]\?\.length/);
+    expect(modal).toMatch(/onPress=\{\(\) => submit\(\{ \[f\.name\]: c\.id \}\)\}/);
+  });
   it('mobile: ONE scanner mount, in the overlay painted beside every view', () => {
     const m = SHELLS.mobile;
     expect((m.match(/<QrScannerModal /g) ?? []).length).toBe(1);

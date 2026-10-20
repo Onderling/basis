@@ -19,14 +19,14 @@ export function renderPersonaSwitcher(container, { model, t, onAct, onEdit, onCl
     line.dataset.self = row.id;
     const tick = document.createElement('button');
     tick.type = 'button';
-    tick.className = 'cc-persona-switcher__tick';
+    tick.className = 'cc-btn cc-btn--quiet cc-persona-switcher__tick';
     tick.setAttribute('aria-pressed', String(row.on));
     tick.disabled = !row.canToggle;
     tick.textContent = `${row.on ? '☑' : '☐'} ${row.id === 'default' ? tr('circle.switcher.you') : (row.name || row.id)}`;
     tick.addEventListener('click', () => { const op = model.toggle(row.id); if (op) onAct?.(op); });
     const edit = document.createElement('button');
     edit.type = 'button';
-    edit.className = 'cc-persona-switcher__edit';
+    edit.className = 'cc-btn cc-btn--quiet cc-persona-switcher__edit';
     edit.textContent = `${tr('circle.switcher.edit')} ▸`;
     edit.addEventListener('click', () => onEdit?.(row.id));
     line.append(tick, edit);
@@ -34,14 +34,14 @@ export function renderPersonaSwitcher(container, { model, t, onAct, onEdit, onCl
   }
   const all = document.createElement('button');
   all.type = 'button';
-  all.className = 'cc-persona-switcher__all';
+  all.className = 'cc-btn cc-btn--quiet cc-persona-switcher__all';
   all.disabled = model.allOn;
   all.textContent = tr('circle.switcher.all');
   all.addEventListener('click', () => onAct?.(model.all()));
   container.appendChild(all);
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'cc-persona-switcher__close';
+  close.className = 'cc-btn cc-btn--quiet cc-persona-switcher__close';
   close.textContent = tr('circle.vandaag.done');
   close.addEventListener('click', () => onClose?.());
   container.appendChild(close);

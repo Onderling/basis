@@ -514,9 +514,17 @@
     "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
   },
   "scan": {
-    "pair_held": {
-      "text": "Dit is een koppelcode. Koppelen vanuit Scan kan nog niet — open de kring → Kring-instellingen → Gekoppelde apparaten en voeg hem daar toe.",
-      "doc": "Me → Scan read a pairing code: pairing from Scan waits for a picker-capable form (its own row); say where it can be done today, never drop the code."
+    "pair_failed": {
+      "text": "Koppelen lukte niet: {{error}}",
+      "doc": "Me → Scan paired a code into a circle and the op said no (the reason after the colon)."
+    },
+    "pair_no_circle": {
+      "text": "Je hebt nog geen kring om in te koppelen.",
+      "doc": "Me → Scan read a pairing code, and the person is in no circle to pair it into."
+    },
+    "pair_not_mine": {
+      "text": "Dat is geen kring van jou; koppelen kan alleen in je eigen kringen.",
+      "doc": "Me → Scan: the pairing op refused a circle the person is not in (`not-my-circle`)."
     },
     "paste_placeholder": {
       "text": "Plak een code, een link of een claimregel",
@@ -721,6 +729,10 @@
     "share_no_contact": {
       "text": "Dat contact ken ik niet.",
       "doc": "Sharing an appointment with someone not in the contacts."
+    },
+    "no_self": {
+      "text": "Niet bewaard: op dit apparaat ben je niet degene die dit contact kent.",
+      "doc": "A calendar write into a pair circle whose self this device does not run: refused, nothing written."
     },
     "share_no_pair": {
       "text": "Met {{name}} is er nog geen gesprek; deel na een eerste bericht.",
@@ -1211,8 +1223,24 @@
       "doc": "δ.1 — subtle pip tooltip while a cached screen is rendered and a fresh materialize runs in the background."
     },
     "block_empty": {
-      "text": "{{type}}: nog niets om te tonen.",
-      "doc": "α.1c — per-block empty fallback."
+      "text": "{{title}} — nog niets",
+      "doc": "An empty block: ONE quiet line under its own title (blockTitle.js) — never the block's type."
+    },
+    "block_empty_planned": {
+      "text": "{{title}} — niets gepland",
+      "doc": "An empty agenda block: nothing planned."
+    },
+    "block_empty_open": {
+      "text": "{{title}} — niets open",
+      "doc": "An empty task block: nothing open."
+    },
+    "block_empty_news": {
+      "text": "{{title}} — geen",
+      "doc": "An empty \"circles with news\" block: none."
+    },
+    "block_untitled": {
+      "text": "Dit blok",
+      "doc": "A block with no title of its own and no declared kind (a fallback)."
     },
     "block_error": {
       "text": "{{type}}: laden mislukt",
@@ -1372,10 +1400,6 @@
       "text": "Niet bewaard: {{error}}",
       "doc": "Vandaag → '+': the save failed; the reason follows."
     },
-    "own_tag": {
-      "text": "jij",
-      "doc": "Vandaag: the tag on one of the person's own items (no circle), where a circle's items name their circle."
-    },
     "plus_when_unread": {
       "text": "Zeg de dag en de tijd, bijv. \"morgen om 14:00\".",
       "doc": "Vandaag → '+' → own appointment: the moment typed could not be read (the bounded day-and-time reader)."
@@ -1387,6 +1411,10 @@
     "plus_edit": {
       "text": "Wijzigen",
       "doc": "The \"+\" sheet's title when opened on an own row (change it or take it away)."
+    },
+    "plus_share_none": {
+      "text": "Nog niemand om mee te delen: een contact met wie je een gesprek hebt, staat hier.",
+      "doc": "The \"+\" sheet on an own appointment: no contact a pair circle connects, so nothing to share with."
     },
     "plus_remove": {
       "text": "Weghalen",
@@ -3088,6 +3116,14 @@
     }
   },
   "fileShare": {
+    "saved": {
+      "text": "Bewaard: {{name}}",
+      "doc": "A file received in a contact thread, saved where the person chose (mobile; web's Download is the browser's)."
+    },
+    "save_failed": {
+      "text": "Niet bewaard: {{error}}",
+      "doc": "Saving a received file did not work; the reason after the colon."
+    },
     "received": {
       "text": "📎 {{name}} met je gedeeld",
       "doc": "Circle bubble when a peer shares a file."
@@ -7108,6 +7144,11 @@
       }
     }
   },
+  "when": {
+    "today_at": { "text": "vandaag om {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
+    "tomorrow_at": { "text": "morgen om {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
+    "closed": { "text": "gesloten", "doc": "A deadline that has passed." }
+  },
   "governance": {
     "title": {
       "text": "Besluiten",
@@ -7184,8 +7225,8 @@
       "doc": "Governance — the running vote tally."
     },
     "deadline": {
-      "text": "heeft een deadline",
-      "doc": "Governance — this vote has a closing deadline."
+      "text": "sluit {{when}}",
+      "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
     "awaiting_enactment": {
       "text": "wacht op een beheerder",

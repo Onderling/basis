@@ -1,10 +1,9 @@
 /**
  * basis-mobile v2 — circle rules consent (RN screen).
  *
- * RN counterpart of web's circleRulesConsent: the assembled rules document
- * shown read-only with Agree / Decline; only non-blank fields render.
- * Reached as a preview from the editor (real join-flow consent is the
- * follow-on).
+ * The assembled rules document shown read-only with Agree / Decline; only non-blank fields render. A PREVIEW from the
+ * rules editor (mobile only, and hidden on both shells by the alpha with the editor). The real join-flow consent is not
+ * built on either shell.
  */
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';

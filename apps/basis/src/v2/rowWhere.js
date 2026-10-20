@@ -1,11 +1,10 @@
 /**
- * Where a row across circles comes from, in words: its circle's name, or "jij" for one of the person's own items (no
- * circle — the own store). Both shells' block painters tag a row with it.
+ * Where a row across circles comes from, in words: its circle's name. One of the person's own items (no circle — the
+ * own store) says nothing: on their own page their own rows need no "you" (Frits, 2026-10-20). Both shells' block
+ * painters tag a row with it.
  * @param {{circleName?: string, own?: boolean}} row
- * @param {(k: string) => string} t
- * @returns {string}   '' when there is nothing to say (a circle's own view)
+ * @returns {string}   '' when there is nothing to say (an own row, a circle's own view)
  */
-export function whereTag(row, t) {
-  if (row?.circleName) return row.circleName;
-  return row?.own ? t('circle.vandaag.own_tag') : '';
+export function whereTag(row) {
+  return row?.circleName ?? '';
 }

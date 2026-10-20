@@ -171,6 +171,18 @@ export const SEAMS = Object.freeze([
   // that hands no consume in hears the carry and joins nothing; one that never asks misses what happened while it was off.
   { id: 'circle-follow-consume', pattern: /circleFollowSync\??\.setConsume\(/,   why: 'a circle a sibling founded or joined: this device joins it by the enrol consume\'s per-circle step, composed with the shell\'s seams' },
   { id: 'circle-follow-request', pattern: /circleFollowSync\??\.requestFromSiblings/, why: 'the circles the siblings are in that this device is not — asked at connect' },
+  // WHAT A CIRCLE SHARED OUT, under its admin's hand: the outbound list and "Stop sharing", decided once
+  // (`adminOutboundShares`: revocable only under a canonical posture). Web had it in its admin panel; the phone did not
+  // (found by the buttons assessment, 2026-10-19). A host duty — the shell binds its resolvers — so it is a seam.
+  { id: 'admin-outbound-shares', pattern: /adminOutboundShares\(|outboundSharesForAdmin\(/, shells: ['web', 'mobile'], why: 'an admin sees and can stop what the circle shared out, on every person\'s shell' },
+  // A MEMBER REMOVED loses their access to what the circle shared out (`revokeAllForMember`, after the removal stands).
+  // Web ran it; a member removed from the phone kept every share (a live privacy defect, fixed 2026-10-20).
+  { id: 'removed-member-revoke', pattern: /revokeAllForMember\(|revokeOutboundForMember\(/, shells: ['web', 'mobile'], why: 'a member removed on any shell loses access to everything the circle shared out' },
+  // A CONTACT TURN IS SEALED to the contact's CURRENT person key and opened by ours (`agent.contactSeal`): the person key
+  // rotates when a device is revoked, so a revoked device (which keeps only the old key, and the profile key every device
+  // shares) cannot read what is sent after. The box composed its contact channel without it: its replies went out
+  // sealed to nothing but the transport, which a revoked device still opens (L236 (b)/(c), found 2026-10-20).
+  { id: 'contact-person-seal', pattern: /sealFor:\s*agent\.contactSeal\?\.sealFor/, why: 'a contact turn — the bot\'s replies included — is readable only with the contact\'s current person key, never by a device they revoked' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */

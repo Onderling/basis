@@ -77,7 +77,7 @@ export const calendarManifest = {
       ],
       surfaces: {
         // the person's own "+" (Vandaag): an own appointment — with no circle named it lands in the own agenda
-        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent',
+        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent', share: 'shareEvent',
           fields: [
             { name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' },
             { name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' },
@@ -229,11 +229,22 @@ export const calendarManifest = {
       appliesTo: { type: 'calendar-event', state: ['open'] },
       params: [
         { name: 'id',   kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },
-        { name: 'with', kind: 'string', required: true },
+        // a contact, picked from the person's book (the pick offers the ones a pair circle connects)
+        // a contact the share accepts (the pair circle of the self they are filed under is one of mine) — its own read
+        { name: 'with', kind: 'string', required: true, pickerSource: { listOp: 'shareTargets', appOrigin: 'calendar' } },
       ],
       surfaces: {
         ui: { control: 'button', labelKey: 'circle.button.calendar.shareEvent', label: 'Share with…' },
       },
+    },
+
+    // Whom an own appointment can be shared with: exactly the contacts `shareEvent` accepts — the source of its `with`
+    // pick, never a row a person taps. `internal` takes it out of coverage and the Other shelf.
+    {
+      id:    'shareTargets',
+      verb:  'list',
+      params: [],
+      surfaces: { internal: true },
     },
 
     /* ──── Snapshot + search ──── */

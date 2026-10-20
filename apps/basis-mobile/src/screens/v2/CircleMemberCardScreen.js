@@ -14,8 +14,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Image } from 'react-native';
 import { useTheme } from './themeContext.js';
-import { memberPersonaView, selfViewSplit, VIEWER_KINDS } from '@onderling-app/basis';
+import { memberPersonaView, selfViewSplit, VIEWER_KINDS, revealPresetWords } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 
 export default function CircleMemberCardScreen({
   member = {}, self = false, roster = [], myWebid = null, policy = 'pairwise', onBack, onReport,
@@ -124,9 +125,21 @@ export default function CircleMemberCardScreen({
         </View>
       ) : null}
 
+      {/* the card's DECLARED sections (`screenSections.js`), in order, each by its id (= testID): how much it reveals
+          (the shared words, as web's badge), what this viewer sees, what stays hidden */}
       <ScrollView contentContainerStyle={styles.list}>
-        {renderCol('sees', split.sees)}
-        {renderCol('hides', split.hides)}
+        {sectionsOf('memberCard').map((d) => {
+          const PAINT = {
+            'membercard-preset': () => {
+              const words = revealPresetWords(split.preset, t);
+              return words ? <Text style={styles.lede} testID={d.id}>{`${words.label}: ${words.value}`}</Text> : null;
+            },
+            'membercard-sees': () => <View key={d.id} testID={d.id}>{renderCol('sees', split.sees)}</View>,
+            'membercard-hides': () => <View key={d.id} testID={d.id}>{renderCol('hides', split.hides)}</View>,
+          };
+          const el = PAINT[d.id]?.();
+          return el ? <React.Fragment key={d.id}>{el}</React.Fragment> : null;
+        })}
       </ScrollView>
     </View>
   );

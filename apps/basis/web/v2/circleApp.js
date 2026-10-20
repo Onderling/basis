@@ -18,6 +18,7 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../src/v2/companionGrant.js';
@@ -147,7 +148,7 @@ import { renderListBlock } from './listScreen.js';
 // record-shaped detail screens (read-only key→value, e.g. agent-detail).
 import { renderRecordScreen } from './recordScreen.js';
 // personas#1 — the "Mij → persona's" surface (general persona + persona cards + per-circle sharing)
-// + its shared read-model. Replaces the former single-persona About-me content (circleAboutMe.js).
+// + its shared read-model; the one "About me" on both shells (the single-persona About-me it replaced is retired).
 import { renderMij } from './circleMij.js';
 import { loadMijModel } from '../../src/v2/mijLoader.js';
 // feedback-extension P2c — load downloadable extension mappings + the load-time sandbox gate.
@@ -171,7 +172,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
 import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -205,7 +206,10 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
-import { routeScan } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
+import { routeScan, scanOpResultWords } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
+import { opFormOrRun } from '../../src/forms/opFormOrRun.js';   // a declared op with part of its args known: the form, or it runs
+import { makePickerFetcher, ceremonyChoices } from '../../src/forms/pickerChoices.js';
+import { renderForm } from '../../src/web/domForm.js';
 // client-side image-attachment encoder (Canvas resize + thumbnail → the
 // inbound shape pinboard.postRequest expects).
 import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
@@ -4201,6 +4205,11 @@ async function _showVandaag() {
   const book = _screensBook ?? { screens: [], activeId: null };
   const screen = getActiveScreen(book);
   rootEl.innerHTML = '';
+  // the day this page is about, above everything: a day, not a list
+  const day = document.createElement('h2');
+  day.className = 'circle-vandaag__day';
+  day.textContent = dayHeader(Date.now(), { locale: dateLocaleOf(t) });
+  rootEl.appendChild(day);
   const head = document.createElement('div');
   head.className = 'circle-vandaag__head';
   if (book.screens.length > 1 && !_expandedBlockId) {
@@ -4210,7 +4219,7 @@ async function _showVandaag() {
     for (const page of book.screens) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'circle-vandaag__page';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag__page';
       b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', String(page.id === screen?.id));
       b.dataset.pageId = page.id;
@@ -4231,7 +4240,10 @@ async function _showVandaag() {
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'circle-vandaag__customise';
-    edit.textContent = t('circle.vandaag.customise');
+    // under the ⋯, quiet: the "+" is the page's one accent
+    edit.textContent = '⋯';
+    edit.title = t('circle.vandaag.customise');
+    edit.setAttribute('aria-label', t('circle.vandaag.customise'));
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
     // the "+": an own note or an own appointment, into the person's own store (never a circle)
@@ -4309,8 +4321,11 @@ function showVandaagPlus({ edit = null } = {}) {
     return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
+  let shareTargets = null;
+  if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
-    t, actId, values, line, error, selves, asSelf, editing: !!editId,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets,
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
@@ -4338,6 +4353,13 @@ function showVandaagPlus({ edit = null } = {}) {
       if (op.error) { error = t(op.error); paint(); return; }
       const r = await call(op);
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      close(); _showVandaag();
+    } : null,
+    onShare: editId ? async (id, contact) => {
+      const op = plusShareOp(id, { id: editId, with: contact });
+      if (op.error) { error = t(op.error); paint(); return; }
+      const r = await call(op);
+      if (r?.ok === false) { error = r.error ?? t('circle.vandaag.plus_failed', { error: '' }); paint(); return; }
       close(); _showVandaag();
     } : null,
     onClose: () => close(),
@@ -4955,8 +4977,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
 /**
  * THE PER-ID PAINTER MAP (web) — the one shell-side piece of the scan route: `routeScan` names a DECLARED target
  * (`SCAN_TARGETS`), this map names who paints it here today (PR 2's generic flow painter shrinks it to one). Every
- * declared id has an entry; pairing is HELD on purpose (its pick-list needs a picker-capable form on both shells — its
- * own row), and says so instead of dropping the code.
+ * declared id has an entry; an op target asks what the code did not say through the shared form (`opFormOrRun`).
  */
 const SCAN_PAINTERS = {
   'add-contact': async (needs) => {
@@ -4968,16 +4989,37 @@ const SCAN_PAINTERS = {
   joinGroup:         (needs, text) => showJoinCircle(String(text).trim()),   // the whole text: the app's own link carries its relay
   'enroll-device':   (needs) => showEnrollDeviceFlow({ needs }),
   'claim-companion': (needs) => showClaimCompanionFlow({ needs }),
-  pairCirclePeer:    null,   // HELD (pick-list row) — said, not dropped
+  // the code names the address; the circle is the person's pick (none asked with one circle)
+  pairCirclePeer:    (needs, _text, target) => runOpFromScan(target, needs),
 };
+
+/** A declared op from a scan: what the code did not say is asked in the shared form (or nothing — it runs). */
+async function runOpFromScan(target, needs) {
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), target.app);
+  const run = async (op) => {
+    const r = await Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+    const w = scanOpResultWords(r);
+    globalThis.alert?.(t(w.key, w.params));
+  };
+  const next = await opFormOrRun(target, needs, fetchChoices);
+  if (next.error) { const w = scanOpResultWords({ ok: false, outcome: next.error }); globalThis.alert?.(t(w.key, w.params)); return; }
+  if (next.run) { await run(next.run); return; }
+  const { card, close } = _restoreOverlay();
+  card.appendChild(renderForm(next.form, {
+    doc: document, t,
+    // the choices already read for the decision, else read now
+    pickerFetcher: async (decl) => next.choices[next.form.fields.find((f) => f.pickerSource === decl)?.name] ?? fetchChoices(decl),
+    onSubmit: async (values) => { close(); await run({ app: target.app, opId: next.form.opId, args: { ...needs, ...values } }); },
+    onCancel: () => close(),
+  }));
+}
 
 /** What `scanQr` hands over on web (the paste prompt): through the route table to its declared target's painter. */
 async function takeScannedText(text) {
   const r = routeScan(text);
   const paint = r.target ? SCAN_PAINTERS[r.target.id] : undefined;
   if (paint === undefined) { globalThis.alert?.(t('scan_qr.scan_unknown')); return; }
-  if (paint === null) { globalThis.alert?.(t('circle.scan.pair_held')); return; }
-  await paint(r.needs, text);
+  await paint(r.needs, text, r.target);
 }
 
 async function showJoinCircle(inviteArg) {
@@ -5759,29 +5801,35 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
 }
 
 function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
-  return showDeviceCeremonyFlow({ flowId: 'revoke-device', keyPrefix: 'revoke', deviceId, onClosed });
+  return showCeremonyFlow({ flowId: 'revoke-device', keyPrefix: 'revoke', deviceId, onClosed });
 }
 /** The replace ceremony: after a restore, retire every other device in one act. */
 function showReplaceDeviceFlow({ onClosed } = {}) {
-  return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
+  return showCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
 /** Claim a companion node: paste the line it printed; this device signs the claim. */
 function showClaimCompanionFlow({ onClosed, needs = null } = {}) {
-  return showDeviceCeremonyFlow({
+  return showCeremonyFlow({
     flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed, needs,
     inputName: 'claim', placeholderKey: 'circle.companionClaim.placeholder', rows: 2,
   });
 }
-function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3, needs = null } = {}) {
-  // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
-  // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
-  // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
+function showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3, needs = null } = {}) {
+  // THE ONE PAINTER FOR THE DECLARED DEVICE CEREMONIES (mobile twin: CeremonyFlowModal): revoke ONE device (the
+  // My-data device row that opened this names it), REPLACE — retire every other device —, or CLAIM a companion. Each
+  // runs on THIS device; the typed thing is the proof and the submit tap the person's consent. A pick a step declares
+  // offers its choices (`ceremonyChoices`), never filled for them. The fold does the enforcement everywhere.
   const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
   const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('household', opId, args) });
   const { card, close } = _restoreOverlay();
   let inst = null;
+  let choices = {};      // a pick's choices (offered, never filled)
+  const picked = {};
+  let typed = '';        // what was typed survives a repaint (a pick repaints)
   const done = () => { close(); try { onClosed?.(); } catch { /* */ } };
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), 'household');
+  const step = async (r) => { inst = r; choices = await ceremonyChoices(renderFlow(FLOW, inst, { ops: OPS }).form, fetchChoices); paint(); };
 
   const paint = () => {
     const view = renderFlow(FLOW, inst, { ops: OPS });
@@ -5798,19 +5846,34 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
       input.rows = rows; input.autocomplete = 'off'; input.spellcheck = false;
       input.placeholder = t(placeholderKey);
       input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+      input.value = typed;
+      input.addEventListener('input', () => { typed = input.value; });
       card.appendChild(input);
+      for (const [name, list] of Object.entries(choices)) {
+        const row = document.createElement('div');
+        for (const c of list) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `cc-btn${picked[name] === c.id ? ' cc-btn--primary' : ''}`;
+          b.dataset.pick = `${name}:${c.id}`;
+          b.textContent = c.label;
+          b.addEventListener('click', () => { picked[name] = c.id; paint(); });
+          row.appendChild(b);
+        }
+        card.appendChild(row);
+      }
       const go = document.createElement('button');
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';
       go.textContent = t(`circle.${keyPrefix}.submit`);
       go.addEventListener('click', () => {
-        runner.resume(FLOW, inst, { input: { [inputName]: input.value, ...(deviceId ? { deviceId } : {}) } })
-          .then((r) => { inst = r; paint(); }).catch(() => done());
+        runner.resume(FLOW, inst, { input: { [inputName]: input.value, ...picked, ...(deviceId ? { deviceId } : {}) } })
+          .then(step).catch(() => done());
       });
       card.appendChild(go);
       const cancel = document.createElement('button');
-      cancel.type = 'button';
       cancel.className = 'cc-btn cc-btn--quiet';
+      cancel.type = 'button';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => { runner.cancel(inst); done(); });
@@ -5829,7 +5892,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     btn.textContent = finished ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (finished) return done();
-      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
+      close(); showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
     });
     card.appendChild(btn);
     if (!finished) {
@@ -5843,7 +5906,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     }
   };
 
-  runner.start(FLOW, { needs: needs ?? {} }).then((r) => { inst = r; paint(); }).catch(() => done());
+  runner.start(FLOW, { needs: needs ?? {} }).then(step).catch(() => done());
 }
 
 function showRestoreFinishFlow() {
@@ -8199,7 +8262,7 @@ async function showGovernance(id) {
   });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
-  back.type = 'button'; back.className = 'cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
+  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
   back.addEventListener('click', () => { _govRerender = null; showDetail(id); });
   rootEl.appendChild(back);
   const host = document.createElement('div');

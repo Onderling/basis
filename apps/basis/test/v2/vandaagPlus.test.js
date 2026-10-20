@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
-import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 
 describe('Vandaag — the "+"', () => {
@@ -55,7 +55,7 @@ describe('Vandaag — where an own item shows', () => {
   const page = (blocks) => ({ screens: [{ id: 'p1', name: 'Vandaag', blocks }], activeId: 'p1' });
   it('a page without a notes block gets one, through the screen op, after an own note', () => {
     expect(plusFollowUp(page([{ id: 'b', type: 'calendar', config: {} }]), 'household.note'))
-      .toEqual({ opId: 'screen-add-block', args: { pageId: 'p1', type: 'notes', config: { limit: 5 } } });
+      .toEqual({ opId: 'screen-add-block', args: { pageId: 'p1', type: 'notes', config: {} } });
   });
   it('a page that already shows the type needs nothing', () => {
     expect(plusFollowUp(page([{ id: 'b', type: 'notes', config: {} }]), 'household.note')).toBe(null);
@@ -79,6 +79,22 @@ describe('Vandaag — a row opens the sheet on itself (change it, or take it awa
     expect(e.values.title).toBe('tandarts');
     expect(plusSaveOp(e.act.id, { title: 'tandarts', when: '2026-11-03T15:00' }, { id: 'e1' })).toMatchObject({ app: 'calendar', opId: 'updateEvent', args: { id: 'e1', title: 'tandarts' } });
     expect(plusRemoveOp(e.act.id, { id: 'e1' })).toMatchObject({ app: 'calendar', opId: 'cancelEvent', args: { id: 'e1' } });
+  });
+  it('an own appointment is shared with whom the agent says the share accepts ("Delen met…") — the sheet filters nothing', async () => {
+    const e = plusEditFor({ id: 'e1', own: true, fields: { title: 'tandarts', when: '2026-11-03T14:00:00.000Z' } }, 'calendar-event');
+    const asked = [];
+    const call = async (app, op, args) => { asked.push(`${app}.${op}`); return { items: [
+      { id: 'webid:bob', label: 'Bob', pairCircleId: null },
+    ] }; };
+    expect(await plusShareTargets(e.act, call)).toEqual([{ id: 'webid:bob', label: 'Bob' }]);
+    expect(asked).toEqual(['calendar.shareTargets']);
+    expect(plusShareOp(e.act.id, { id: 'e1', with: 'webid:bob' })).toEqual({ app: 'calendar', opId: 'shareEvent', args: { circleId: OWN_DEVICES_SCOPE, id: 'e1', with: 'webid:bob' } });
+    expect(plusShareOp(e.act.id, { id: 'e1', with: '' })).toHaveProperty('error');
+  });
+  it('a note has no share act: no picker, no op', async () => {
+    const e = plusEditFor({ id: 'n1', own: true, fields: { body: 'x' } }, 'note');
+    expect(await plusShareTargets(e.act, async () => { throw new Error('not asked'); })).toEqual([]);
+    expect(plusShareOp(e.act.id, { id: 'n1', with: 'webid:bob' })).toHaveProperty('error');
   });
   it("a circle's row is not the own sheet's (it opens the circle's own actions)", () => {
     expect(plusEditFor({ id: 'c1', circleId: 'kring', fields: { body: 'x' } }, 'note')).toBe(null);

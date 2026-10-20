@@ -29,6 +29,7 @@ import { roleControlFor, roleChangeConfirm, removeControlFor, announceControlFor
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { useTheme } from './themeContext.js';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import FaceView from './FaceView.js';
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack, onLeave = null, resolvePicture = null,
@@ -132,15 +133,11 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     load();
   }, [callSkill, load]);
 
-  return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-admin">
-      <View style={styles.header}>
-        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="admin-back"><Text style={styles.back}>{t('circle.admin.back')}</Text></Pressable>}
-        <Text style={styles.title}>{t('circle.admin.title')}</Text>
-      </View>
-      {notice && <Text style={styles.notice}>{notice}</Text>}
-
-      <Section title={t('circle.admin.members')}>
+  // THE SECTIONS ARE DECLARED (`screenSections.js`): one painter per declared id, placed in the declared order — a
+  // section the declaration names and this panel does not paint is a red `lint-screen-sections`.
+  const PAINT = {
+    'admin-members': (d) => (
+      <Section key={d.id} id={d.id} title={t(d.titleKey)}>
         {members.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_members')}</Text> : members.map((m) => (
           <View key={m.webid || m.handle} style={styles.row} testID={`admin-member-${m.webid}`}>
             {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
@@ -188,8 +185,9 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
           </View>
         ))}
       </Section>
-
-      <Section title={t('circle.admin.announce')}>
+    ),
+    'admin-announce': (d) => (
+      <Section key={d.id} id={d.id} title={t(d.titleKey)}>
         {(() => {
           // Posting the circle's announcement is the admin's (the skill refuses a member): greyed for anyone else, with why.
           const ann = announceControlFor({ members, myRef: myWebid });
@@ -204,11 +202,11 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
           );
         })()}
       </Section>
-
-      {/* reports moved to the §8 governance "Decisions" Reports section — see the header note */}
-
-      {typeof outboundFor === 'function' ? (
-        <Section title={t('circle.share.outbound_title')}>
+    ),
+    // reports moved to the §8 governance "Decisions" Reports section — see the header note
+    'admin-outbound-shares': (d) => (
+      typeof outboundFor === 'function' ? (
+        <Section key={d.id} id={d.id} title={t(d.titleKey)}>
           {outbound.shares.length === 0 ? <Text style={styles.muted}>{t('circle.share.outbound_empty')}</Text> : outbound.shares.map((s) => (
             <View key={`${s.toCircleId}:${s.itemId}`} style={styles.row} testID={`admin-share-${s.itemId}`}>
               <Text style={styles.name}>{t('circle.share.outbound_row', { item: s.itemId, circle: s.toCircleId })}</Text>
@@ -218,9 +216,10 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
             </View>
           ))}
         </Section>
-      ) : null}
-
-      <Section title={t('circle.admin.muted')}>
+      ) : null
+    ),
+    'admin-muted': (d) => (
+      <Section key={d.id} id={d.id} title={t(d.titleKey)}>
         {blocked.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : blocked.map(({ key, label }) => (
           <View key={key} style={styles.row}>
             <Text style={styles.name}>{label}</Text>
@@ -228,15 +227,27 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
           </View>
         ))}
       </Section>
+    ),
+  };
+
+  return (
+    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-admin">
+      <View style={styles.header}>
+        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="admin-back"><Text style={styles.back}>{t('circle.admin.back')}</Text></Pressable>}
+        <Text style={styles.title}>{t('circle.admin.title')}</Text>
+      </View>
+      {notice && <Text style={styles.notice}>{notice}</Text>}
+
+      {sectionsOf('adminPanel').map((d) => PAINT[d.id]?.(d) ?? null)}
     </ScrollView>
   );
 }
 
-function Section({ title, children }) {
+function Section({ id = undefined, title, children }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   return (
-    <View style={styles.section}>
+    <View style={styles.section} testID={id}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>

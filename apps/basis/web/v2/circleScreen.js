@@ -23,6 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
+import { blockEmptyLine } from '../../src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -150,7 +151,8 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
   if (block.type === 'onboarding' && block.status === 'empty') { section.hidden = true; return section; }
   if (block.status === 'empty') {
     section.classList.add('circle-screen__block--empty');
-    section.textContent = tr('circle.screen.block_empty', { type: blockName(block, tr) });
+    // one quiet line under the block's own title, in its own words — never its type (blockTitle.js, both shells)
+    section.textContent = blockEmptyLine(block, tr);
     return section;
   }
 
@@ -272,7 +274,7 @@ function renderIdentityLine(section, block, tr, onAction) {
   if (typeof onAction === 'function') {
     const edit = document.createElement('button');
     edit.type = 'button';
-    edit.className = 'circle-screen__identity-edit';
+    edit.className = 'cc-btn cc-btn--quiet circle-screen__identity-edit';
     edit.textContent = tr('circle.profile.edit');
     edit.addEventListener('click', () => onAction({ kind: 'edit-me' }));
     head.appendChild(edit);
@@ -433,7 +435,8 @@ function renderOnboarding(section, block, tr, onAction) {
   const btn = (labelKey, a, cls = '') => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `circle-screen__onb-btn${cls}`;
+    // the family: the strip's act is the screen's primary; a quiet one when it is the second choice
+    b.className = `cc-btn ${cls.includes('--quiet') ? 'cc-btn--quiet' : 'cc-btn--primary'} circle-screen__onb-btn${cls}`;
     b.textContent = tr(labelKey);
     b.addEventListener('click', () => act(a));
     return b;
@@ -458,7 +461,7 @@ function renderOnboarding(section, block, tr, onAction) {
       form.appendChild(input);
       const save = document.createElement('button');
       save.type = 'submit';
-      save.className = 'circle-screen__onb-btn';
+      save.className = 'cc-btn cc-btn--primary circle-screen__onb-btn';
       save.textContent = tr('circle.vandaag.onboarding_handle_save');
       form.appendChild(save);
       form.addEventListener('submit', (e) => { e.preventDefault(); if (input.value.trim()) act({ kind: 'set-handle', value: input.value }); });

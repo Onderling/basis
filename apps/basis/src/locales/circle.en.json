@@ -514,9 +514,17 @@
     "doc": "The default persona's name where it has none of its own (the create wizard's Review: \"Started as …\") — a persona id never meets a person."
   },
   "scan": {
-    "pair_held": {
-      "text": "This is a pairing code. Pairing from Scan is not here yet — open the circle → Circle settings → Paired devices and add it there.",
-      "doc": "Me → Scan read a pairing code: pairing from Scan waits for a picker-capable form (its own row); say where it can be done today, never drop the code."
+    "pair_failed": {
+      "text": "Pairing did not work: {{error}}",
+      "doc": "Me → Scan paired a code into a circle and the op said no (the reason after the colon)."
+    },
+    "pair_no_circle": {
+      "text": "You have no circle to pair into yet.",
+      "doc": "Me → Scan read a pairing code, and the person is in no circle to pair it into."
+    },
+    "pair_not_mine": {
+      "text": "That is not one of your circles; you can only pair into your own.",
+      "doc": "Me → Scan: the pairing op refused a circle the person is not in (`not-my-circle`)."
     },
     "paste_placeholder": {
       "text": "Paste a code, a link or a claim line",
@@ -721,6 +729,10 @@
     "share_no_contact": {
       "text": "I don't know that contact.",
       "doc": "Sharing an appointment with someone not in the contacts."
+    },
+    "no_self": {
+      "text": "Not saved: this device does not hold the self this contact knows.",
+      "doc": "A calendar write into a pair circle whose self this device does not run: refused, nothing written."
     },
     "share_no_pair": {
       "text": "There is no conversation with {{name}} yet; share after a first message.",
@@ -1211,8 +1223,24 @@
       "doc": "δ.1 — subtle pip tooltip while a cached screen is rendered and a fresh materialize runs in the background."
     },
     "block_empty": {
-      "text": "{{type}}: nothing to show here yet.",
-      "doc": "α.1c — per-block empty fallback when a block has no content."
+      "text": "{{title}} — nothing yet",
+      "doc": "An empty block: ONE quiet line under its own title (blockTitle.js) — never the block's type."
+    },
+    "block_empty_planned": {
+      "text": "{{title}} — nothing planned",
+      "doc": "An empty agenda block: nothing planned."
+    },
+    "block_empty_open": {
+      "text": "{{title}} — nothing open",
+      "doc": "An empty task block: nothing open."
+    },
+    "block_empty_news": {
+      "text": "{{title}} — none",
+      "doc": "An empty \"circles with news\" block: none."
+    },
+    "block_untitled": {
+      "text": "This block",
+      "doc": "A block with no title of its own and no declared kind (a fallback)."
     },
     "block_error": {
       "text": "{{type}}: couldn't load",
@@ -1372,10 +1400,6 @@
       "text": "Could not save: {{error}}",
       "doc": "Vandaag → '+': the save failed; the reason follows."
     },
-    "own_tag": {
-      "text": "you",
-      "doc": "Vandaag: the tag on one of the person's own items (no circle), where a circle's items name their circle."
-    },
     "plus_when_unread": {
       "text": "Say the day and the time, e.g. \"tomorrow at 2pm\".",
       "doc": "Vandaag → '+' → own appointment: the moment typed could not be read (the bounded day-and-time reader)."
@@ -1387,6 +1411,10 @@
     "plus_edit": {
       "text": "Change",
       "doc": "The \"+\" sheet's title when opened on an own row (change it or take it away)."
+    },
+    "plus_share_none": {
+      "text": "Nobody to share with yet: a contact you have written to shows up here.",
+      "doc": "The \"+\" sheet on an own appointment: no contact a pair circle connects, so nothing to share with."
     },
     "plus_remove": {
       "text": "Remove",
@@ -3088,6 +3116,14 @@
     }
   },
   "fileShare": {
+    "saved": {
+      "text": "Saved: {{name}}",
+      "doc": "A file received in a contact thread, saved where the person chose (mobile; web's Download is the browser's)."
+    },
+    "save_failed": {
+      "text": "Not saved: {{error}}",
+      "doc": "Saving a received file did not work; the reason after the colon."
+    },
     "received": {
       "text": "📎 {{name}} shared with you",
       "doc": "Circle bubble when a peer shares a file."
@@ -7108,6 +7144,11 @@
       }
     }
   },
+  "when": {
+    "today_at": { "text": "today at {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
+    "tomorrow_at": { "text": "tomorrow at {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
+    "closed": { "text": "closed", "doc": "A deadline that has passed." }
+  },
   "governance": {
     "title": {
       "text": "Decisions",
@@ -7184,8 +7225,8 @@
       "doc": "Governance — the running vote tally."
     },
     "deadline": {
-      "text": "has a deadline",
-      "doc": "Governance — this vote has a closing deadline."
+      "text": "closes {{when}}",
+      "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
     "awaiting_enactment": {
       "text": "awaiting an admin",

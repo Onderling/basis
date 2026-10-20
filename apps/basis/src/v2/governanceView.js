@@ -7,6 +7,7 @@
  * voted, and whether the admin override is available. No rendering, no ops; the shells add
  * the platform widgets and call the orchestrator.
  */
+import { momentWords } from './whenWords.js';
 import { DECISION_STATUS } from './governanceDecision.js';
 
 /**
@@ -91,4 +92,17 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
 
   const open = rows.filter((r) => !r.closed);
   return { open, closed: rows.filter((r) => r.closed), hasOpen: open.length > 0 };
+}
+
+/**
+ * A vote's deadline line, the same on both shells: "sluit morgen om 09:30" (or the date), "gesloten" once past;
+ * '' when the vote has none.
+ * @param {number|string|Date|null} deadline
+ * @param {{t: Function, now?: Date, locale?: string}} o
+ */
+export function deadlineLine(deadline, { t, now = new Date(), locale } = {}) {
+  if (deadline == null) return '';
+  const when = momentWords(deadline, { t, now, locale });
+  if (!when) return '';
+  return when === t('circle.when.closed') ? when : t('circle.governance.deadline', { when });
 }

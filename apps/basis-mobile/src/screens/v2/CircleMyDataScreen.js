@@ -51,7 +51,7 @@ import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import ReceivePersonasModal from './ReceivePersonasModal.js';
 import { useRelayQuestion } from './RelayQuestionModal.js';
-import RevokeDeviceModal from './RevokeDeviceModal.js';
+import CeremonyFlowModal from './CeremonyFlowModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
@@ -59,6 +59,8 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 import { myDataActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
+import { versionLine } from '../../../../basis/src/v2/versionLine.js';
+import Constants from 'expo-constants';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
@@ -1035,10 +1037,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
       <ReceivePersonasModal visible={wizard === 'receive-personas'} callSkill={callSkill} onClose={() => setWizard(null)} />
       {relayQuestionModal}
-      <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
-      <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+      <CeremonyFlowModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
+      <CeremonyFlowModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
         placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
-      <RevokeDeviceModal
+      <CeremonyFlowModal
         visible={!!revokeTarget}
         deviceId={revokeTarget}
         callSkill={callSkill}
@@ -1062,6 +1064,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           </Pressable>
         </Pressable>
       </Modal>
+      {/* the version this build was made from (its tree's exact clean tag, through the build; none → dev) — web's line */}
+      <Text style={styles.privacyBody} testID="mydata-version">{versionLine(Constants.expoConfig?.extra?.appVersion ?? null, t)}</Text>
     </ScrollView>
   );
 }

@@ -12,6 +12,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './sup
 import { pairCircleIdFor } from '../src/v2/pairRoster.js';
 import { EventLog } from '../src/eventLog.js';
 import { materializeScreen } from '../src/v2/userScreenBlocks.js';
+import { plusEditFor, plusShareTargets, plusShareOp } from '../src/v2/vandaagPlus.js';
 
 const bootPerson = (label) => bootRealAgentNode(label, { contactChannel: true, pairRoster: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), deviceLog: new EventLog({ initial: [], muted: [] }) } });
 const pairEventsOn = async (node, pair) => {
@@ -42,7 +43,15 @@ describe('an own appointment shared with a contact', () => {
     const when = new Date(Date.now() + 2 * 86_400_000); when.setHours(15, 0, 0, 0);
     const made = await anne.agent.callSkill('calendar', 'addEvent', { title: 'Koffie bij Anne', when: when.toISOString(), duration: '1h', attendees: ['someone-else'] });
     expect(made?.ok, JSON.stringify(made)).toBe(true);
-    const shared = await anne.agent.callSkill('calendar', 'shareEvent', { id: made.itemId, with: bob.pubKey });
+    // shared the way the own sheet shares it ("Delen met…"): Bob is among the contacts it offers, and the pick is the op
+    const act = plusEditFor({ id: made.itemId, own: true, fields: { title: 'Koffie bij Anne' } }, 'calendar-event').act;
+    // the row's pairCircleId is a convenience written AFTER the roster exists (under load it can lag): the pick must not
+    // gate on it — clear it, as a slow write would leave it, and Bob is still offered (the roster is the fact)
+    await anne.agent.callSkill('pinboard', 'addContact', { webid: bob.pubKey, pairCircleId: null });
+    const offered = await plusShareTargets(act, (app, op, args) => anne.agent.callSkill(app, op, args));
+    expect(offered.map((c) => c.id), JSON.stringify(offered)).toContain(bob.pubKey);
+    const op = plusShareOp(act.id, { id: made.itemId, with: bob.pubKey });
+    const shared = await anne.agent.callSkill(op.app, op.opId, op.args);
     expect(shared?.ok, JSON.stringify(shared)).toBe(true);
 
     const onBob = await until(async () => (await pairEventsOn(bob, pair)).find((e) => e.title === 'Koffie bij Anne') ?? null, { timeout: 30_000, step: 300 });
@@ -60,12 +69,33 @@ describe('an own appointment shared with a contact', () => {
     expect((block?.content?.items ?? []).map((i) => i.title ?? i.label).join(' | ')).toContain('Koffie bij Anne');
 
     // Bob's answer goes to Anne alone, over the pair lane (an item's own statement)
-    expect((await bob.agent.callSkill('calendar', 'rsvpAccept', { circleId: pair, id: onBob.id }))?.ok).not.toBe(false);
+    const rsvp = await bob.agent.callSkill('calendar', 'rsvpAccept', { circleId: pair, id: onBob.id });
+    expect(rsvp?.ok, JSON.stringify(rsvp)).not.toBe(false);
+    // …written as Bob's SELF in the pair circle (the lens), never as the general 'me': a row authored by someone not on
+    // the pair roster is one the rail may drop
+    const mine = (await pairEventsOn(bob, pair)).find((x) => x.id === onBob.id);
+    expect(Object.keys(mine?.rsvp ?? {}), JSON.stringify(mine)).toEqual([bob.pubKey]);
     const answered = await until(async () => {
       const e = (await pairEventsOn(anne, pair)).find((x) => x.id === onBob.id);
       return e && JSON.stringify(e.rsvp ?? e).includes('accepted') ? e : null;
     }, { timeout: 30_000, step: 300 });
-    expect(answered, 'Anne sees Bob\'s yes on the shared copy').toBeTruthy();
+    // which side stopped it, and HOW — the probe names its branch: the listing failed, came back empty, holds other
+    // ids, or holds the copy without the yes (the write) / with it (the crossing). 3rd sighting said both "no copy".
+    const side = async (node) => {
+      const r = await node.agent.callSkill('calendar', 'listEvents', { circleId: pair, days: 30 }).catch((e) => ({ thrown: String(e?.message ?? e) }));
+      const items = r?.items ?? r?.events ?? [];
+      const hit = items.find((x) => x.id === onBob.id);
+      // with the copy: its yes, and who wrote it last and when (a later write without the yes names its writer)
+      return hit ? { rsvp: hit.rsvp ?? null, keys: Object.keys(hit), by: hit.updatedBy ?? hit.by ?? hit.author ?? null, at: hit.updatedAt ?? hit.ts ?? null, state: hit.state ?? null } : { ok: r?.ok ?? null, error: r?.error ?? r?.thrown ?? null, n: items.length, ids: items.slice(0, 4).map((x) => `${x.id}:${x.title}`) };
+    };
+    // …and the pair roster each side holds then (is Bob a member on Anne's side — an answer from a non-member is dropped)
+    const roster = async (node) => {
+      const r = await node.agent.callSkill('pinboard', 'listGroupMembers', { groupId: pair }).catch((e) => ({ thrown: String(e?.message ?? e) }));
+      const ms = r?.members ?? r?.items ?? [];
+      return Array.isArray(ms) ? ms.map((m) => `${m?.webid === bob.pubKey ? 'bob' : m?.webid === anne.pubKey ? 'anne' : String(m?.webid ?? m).slice(0, 8)}:${m?.role ?? '?'}`) : r;
+    };
+    const sides = answered ? null : JSON.stringify({ rsvp, bob: await side(bob), anne: await side(anne), want: onBob.id, rosterOnBob: await roster(bob), rosterOnAnne: await roster(anne) });
+    expect(answered, `Anne sees Bob's yes on the shared copy ${sides}`).toBeTruthy();
 
     // a move on Anne's side re-shares the SAME copy
     const later = new Date(when.getTime() + 3600_000);

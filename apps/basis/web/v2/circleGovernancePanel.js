@@ -10,6 +10,9 @@
 
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../src/v2/circlePolicy.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { sectionsOf } from '../../src/v2/screenSections.js';
+import { deadlineLine } from '../../src/v2/governanceView.js';
+import { dateLocaleOf } from '../../src/v2/whenWords.js';
 
 /** decision-class / action / status → a locale key (values carry hyphens; keys don't). */
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -66,46 +69,55 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
     const card = el('div', 'circle-governance__card');
     card.dataset.proposal = row.proposalId;
 
-    const head = el('div', 'circle-governance__head');
-    const actionLabel = tr(`circle.governance.action.${row.action}`);
-    head.appendChild(el('span', 'circle-governance__action', row.subjectLabel ? `${actionLabel}: ${row.subjectLabel}` : actionLabel));
-    head.appendChild(el('span', 'circle-governance__class', tr(`circle.governance.class.${CLASS_KEY[row.decisionClass] ?? 'any_admin'}`)));
-    card.appendChild(head);
-
-    // status pill + live tally (member-vote)
-    const meta = el('div', 'circle-governance__meta');
+    // the proposal's DECLARED sections (`screenSections.js`), in order, each by its id; the meta ones share one row
     const statusKey = row.approved ? 'approved' : row.rejected ? 'rejected' : 'pending';
-    meta.appendChild(el('span', `circle-governance__status circle-governance__status--${statusKey}`, tr(`circle.governance.status.${statusKey}`)));
-    if (row.tally) {
-      meta.appendChild(el('span', 'circle-governance__tally',
-        tr('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })));
-    }
-    if (row.deadline != null) {
-      meta.appendChild(el('span', 'circle-governance__deadline', tr('circle.governance.deadline')));
-    }
-    if (row.approved && row.awaitingEnactment) {
-      meta.appendChild(el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment')));
-    }
-    card.appendChild(meta);
-
-    // affordances — vote (member) / override (admin, past deadline)
-    if (row.canVote) {
-      const actions = el('div', 'circle-governance__actions');
-      for (const choice of ['yes', 'no']) {
-        const b = el('button', `circle-governance__vote circle-governance__vote--${choice}${row.myVote === choice ? ' is-mine' : ''}`,
-          tr(`circle.governance.vote_${choice}`));
-        b.type = 'button';
-        b.dataset.choice = choice;
-        b.addEventListener('click', () => onVote?.(row.proposalId, choice));
-        actions.appendChild(b);
-      }
-      card.appendChild(actions);
-    }
-    if (row.canOverride) {
-      const ob = el('button', 'circle-governance__override', tr('circle.governance.override'));
-      ob.type = 'button';
-      ob.addEventListener('click', () => onOverride?.(row.proposalId));
-      card.appendChild(ob);
+    const PAINT = {
+      'proposal-head': () => {
+        const head = el('div', 'circle-governance__head');
+        const actionLabel = tr(`circle.governance.action.${row.action}`);
+        head.appendChild(el('span', 'circle-governance__action', row.subjectLabel ? `${actionLabel}: ${row.subjectLabel}` : actionLabel));
+        head.appendChild(el('span', 'circle-governance__class', tr(`circle.governance.class.${CLASS_KEY[row.decisionClass] ?? 'any_admin'}`)));
+        return head;
+      },
+      'proposal-status': () => el('span', `circle-governance__status circle-governance__status--${statusKey}`, tr(`circle.governance.status.${statusKey}`)),
+      'proposal-tally': () => (row.tally ? el('span', 'circle-governance__tally',
+        tr('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })) : null),
+      'proposal-deadline': () => (row.deadline != null
+        ? el('span', 'circle-governance__deadline', deadlineLine(row.deadline, { t: tr, locale: dateLocaleOf(tr) })) : null),
+      'proposal-awaiting': () => (row.approved && row.awaitingEnactment
+        ? el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment')) : null),
+      // affordances — vote (member) / override (admin, past deadline)
+      'proposal-vote': () => {
+        if (!row.canVote) return null;
+        const actions = el('div', 'circle-governance__actions');
+        for (const choice of ['yes', 'no']) {
+          const b = el('button', `circle-governance__vote circle-governance__vote--${choice}${row.myVote === choice ? ' is-mine' : ''}`,
+            tr(`circle.governance.vote_${choice}`));
+          b.type = 'button';
+          b.dataset.choice = choice;
+          b.addEventListener('click', () => onVote?.(row.proposalId, choice));
+          actions.appendChild(b);
+        }
+        return actions;
+      },
+      'proposal-override': () => {
+        if (!row.canOverride) return null;
+        const ob = el('button', 'circle-governance__override', tr('circle.governance.override'));
+        ob.type = 'button';
+        ob.addEventListener('click', () => onOverride?.(row.proposalId));
+        return ob;
+      },
+    };
+    const META = new Set(['proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting']);
+    let meta = null;
+    for (const d of sectionsOf('governanceProposal')) {
+      const node = PAINT[d.id]?.();
+      if (!node) continue;
+      node.dataset.section = d.id;
+      if (META.has(d.id)) {
+        if (!meta) { meta = el('div', 'circle-governance__meta'); card.appendChild(meta); }
+        meta.appendChild(node);
+      } else card.appendChild(node);
     }
     container.appendChild(card);
   }

@@ -2077,7 +2077,7 @@ so a composer passes a thunk that reads the variable when the check actually run
 
 ```js
 class PolicyEngine
-new PolicyEngine({ trustRegistry, skillRegistry, agentPubKey = null, groupManager = null, isRevoked = null, actorResolver = null, selfIds = [], isAllowed = null, })
+new PolicyEngine({ trustRegistry, skillRegistry, agentPubKey = null, groupManager = null, isRevoked = null, actorResolver = null, selfIds = [], isAllowed = null, onDenied = null, })
 ```
 
 Central inbound permission gate. `checkInbound()` resolves the caller's trust tier

@@ -37,7 +37,7 @@ export function renderConnectionPoints(container, {
   if (onBack) {
     const back = document.createElement('button');
     back.type = 'button';
-    back.className = 'circle-points__back';
+    back.className = 'cc-btn cc-btn--quiet circle-points__back';
     back.textContent = tr('circle.back');
     back.addEventListener('click', onBack);
     container.appendChild(back);
@@ -113,7 +113,7 @@ export function renderConnectionPoints(container, {
     if (!point.adopted) {
       const adopt = document.createElement('button');
       adopt.type = 'button';
-      adopt.className = 'circle-points__adopt';
+      adopt.className = 'cc-btn cc-btn--quiet circle-points__adopt';
       adopt.textContent = tr('circle.nearbyScreen.point_adopt');
       adopt.addEventListener('click', () => onAdopt?.(point.url));
       bar.appendChild(adopt);
@@ -121,7 +121,7 @@ export function renderConnectionPoints(container, {
 
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.className = 'circle-points__remove';
+    remove.className = 'cc-btn cc-btn--quiet circle-points__remove';
     remove.textContent = tr('circle.nearbyScreen.point_remove');
     remove.addEventListener('click', () => onRemove?.(point.url));
     bar.appendChild(remove);
@@ -167,14 +167,14 @@ export function renderConnectionPoints(container, {
 
       const confirm = document.createElement('button');
       confirm.type = 'button';
-      confirm.className = 'circle-points__confirm';
+      confirm.className = 'cc-btn cc-btn--danger circle-points__confirm';
       confirm.textContent = tr('circle.nearbyScreen.remove_confirm');
       confirm.addEventListener('click', () => onConfirmRemove?.(point.url));
       warn.appendChild(confirm);
 
       const cancel = document.createElement('button');
       cancel.type = 'button';
-      cancel.className = 'circle-points__cancel';
+      cancel.className = 'cc-btn cc-btn--quiet circle-points__cancel';
       cancel.textContent = tr('circle.nearbyScreen.remove_cancel');
       cancel.addEventListener('click', () => onCancelRemove?.());
       warn.appendChild(cancel);

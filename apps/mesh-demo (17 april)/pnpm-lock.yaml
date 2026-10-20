@@ -886,6 +886,9 @@ packages:
   '@onderling/core@file:../../packages/core':
     resolution: {directory: ../../packages/core, type: directory}
 
+  '@onderling/qr@file:../../packages/qr':
+    resolution: {directory: ../../packages/qr, type: directory}
+
   '@onderling/react-native@file:../../packages/react-native':
     resolution: {directory: ../../packages/react-native, type: directory}
     peerDependencies:
@@ -4523,10 +4526,13 @@ snapshots:
     optionalDependencies:
       node-datachannel: 0.32.3
 
+  '@onderling/qr@file:../../packages/qr': {}
+
   '@onderling/react-native@file:../../packages/react-native(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(@onderling/transports@..+packages+transports)(@onderling/vault@..+packages+vault)(@react-native-async-storage/async-storage@1.24.0(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(buffer@6.0.3)(react-native-ble-plx@3.5.1(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native-get-random-values@2.0.0(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native-keychain@9.2.3)':
     dependencies:
       '@onderling/core': file:../../packages/core
       '@onderling/pod-client': link:../../packages/pod-client
+      '@onderling/qr': file:../../packages/qr
       '@onderling/transports': link:../../packages/transports
       '@onderling/vault': link:../../packages/vault
       '@react-native-async-storage/async-storage': 1.24.0(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))

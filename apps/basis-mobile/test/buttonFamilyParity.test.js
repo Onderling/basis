@@ -16,7 +16,7 @@ describe('the button family, one list on both shells', () => {
   });
   it("mobile: every variant has its look in Btn, and nothing else", async () => {
     const { btnStyles } = await import('../src/screens/v2/btnStyles.js');
-    const color = { ink: '#000', inkSoft: '#555', accent: '#111', accentContrast: '#fff', danger: '#900' };
+    const color = { ink: '#000', inkSoft: '#555', accent: '#111', accentInk: '#a34', accentContrast: '#fff', danger: '#900' };
     expect(Object.keys(btnStyles({ color })).sort()).toEqual([...BUTTON_VARIANTS].sort());
   });
 });

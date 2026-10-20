@@ -433,7 +433,8 @@ function renderOnboarding(section, block, tr, onAction) {
   const btn = (labelKey, a, cls = '') => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = `circle-screen__onb-btn${cls}`;
+    // the family: the strip's act is the screen's primary; a quiet one when it is the second choice
+    b.className = `cc-btn ${cls.includes('--quiet') ? 'cc-btn--quiet' : 'cc-btn--primary'} circle-screen__onb-btn${cls}`;
     b.textContent = tr(labelKey);
     b.addEventListener('click', () => act(a));
     return b;
@@ -458,7 +459,7 @@ function renderOnboarding(section, block, tr, onAction) {
       form.appendChild(input);
       const save = document.createElement('button');
       save.type = 'submit';
-      save.className = 'circle-screen__onb-btn';
+      save.className = 'cc-btn cc-btn--primary circle-screen__onb-btn';
       save.textContent = tr('circle.vandaag.onboarding_handle_save');
       form.appendChild(save);
       form.addEventListener('submit', (e) => { e.preventDefault(); if (input.value.trim()) act({ kind: 'set-handle', value: input.value }); });

@@ -14,6 +14,7 @@ import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { saveFileToChosenPlace, fileSaveWords } from '../../core/fileSave.js';
 import { useTheme } from './themeContext.js';
 import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
@@ -279,30 +280,36 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
               {m.replyTo ? (
                 <Text style={styles.replyRef} testID={`contact-reply-ref-${m.id}`}>{t('circle.contacts.reply_to_post')}</Text>
               ) : null}
-              {/* A received peer-wire file rides the turn — an image shows itself, every file gets
-                  its name and size. web≡mobile with contactThread.js's file bubble. */}
-              {m.file?.mime?.startsWith?.('image/') && m.file?.dataB64 ? (
-                <Image
-                  source={{ uri: `data:${m.file.mime};base64,${m.file.dataB64}` }}
-                  style={styles.fileImage}
-                  resizeMode="cover"
-                  testID={`contact-file-image-${m.id}`}
-                />
-              ) : null}
-              {m.file ? (
-                <Text style={styles.fileMeta} testID={`contact-file-meta-${m.id}`}>
-                  {`📎 ${m.file.name ?? ''}${Number.isFinite(m.file.size) ? ` · ${(m.file.size / 1024).toFixed(0)} KB` : ''}`}
-                </Text>
-              ) : null}
-              {/* keep it where the person chooses — the twin of web's Download link */}
-              {m.file?.dataB64 ? (
-                <Pressable accessibilityRole="button" testID={`contact-file-save-${m.id}`} onPress={async () => {
-                  const w = fileSaveWords(await saveFileToChosenPlace({ dataB64: m.file.dataB64, name: m.file.name, mime: m.file.mime }));
-                  if (w) Alert.alert(m.file.name ?? '', t(w.key, w.params));
-                }}>
-                  <Text style={styles.fileMeta}>{t('circle.fileShare.download')}</Text>
-                </Pressable>
-              ) : null}
+              {/* A received peer-wire file rides the turn: the bubble's DECLARED sections (`screenSections.js`), in order,
+                  each by its id — an image shows itself, every file its name and size, and a way to keep it. */}
+              {m.file ? sectionsOf('fileBubble').map((d) => {
+                const PAINT = {
+                  'file-preview': () => (m.file?.mime?.startsWith?.('image/') && m.file?.dataB64 ? (
+                    <Image
+                      source={{ uri: `data:${m.file.mime};base64,${m.file.dataB64}` }}
+                      style={styles.fileImage}
+                      resizeMode="cover"
+                      testID={`contact-file-image-${m.id}`}
+                    />
+                  ) : null),
+                  'file-meta': () => (
+                    <Text style={styles.fileMeta} testID={`contact-file-meta-${m.id}`}>
+                      {`📎 ${m.file.name ?? ''}${Number.isFinite(m.file.size) ? ` · ${(m.file.size / 1024).toFixed(0)} KB` : ''}`}
+                    </Text>
+                  ),
+                  // keep it where the person chooses — the twin of web's Download link
+                  'file-save': () => (m.file?.dataB64 ? (
+                    <Pressable accessibilityRole="button" testID={`contact-file-save-${m.id}`} onPress={async () => {
+                      const w = fileSaveWords(await saveFileToChosenPlace({ dataB64: m.file.dataB64, name: m.file.name, mime: m.file.mime }));
+                      if (w) Alert.alert(m.file.name ?? '', t(w.key, w.params));
+                    }}>
+                      <Text style={styles.fileMeta}>{t('circle.fileShare.download')}</Text>
+                    </Pressable>
+                  ) : null),
+                };
+                const el = PAINT[d.id]?.();
+                return el ? <React.Fragment key={d.id}>{el}</React.Fragment> : null;
+              }) : null}
               {m.text ? (
                 <Text style={m.origin === 'user' ? styles.bubbleUserText : styles.bubbleBotText} testID={`contact-msg-${m.origin}`}>
                   {m.text}

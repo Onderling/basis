@@ -9,7 +9,7 @@
  * shell orders, groups and styles as its platform does.
  */
 
-/** @typedef {{ id: string, titleKey: string }} ScreenSection */
+/** @typedef {{ id: string, titleKey: string|null }} ScreenSection  (a section with no heading of its own has no title key) */
 
 export const SCREEN_SECTIONS = Object.freeze({
   // A circle's admin panel: who is in it (roles, remove, leave), a line to everyone, what it shared out (and taking it
@@ -26,6 +26,13 @@ export const SCREEN_SECTIONS = Object.freeze({
     Object.freeze({ id: 'membercard-preset', titleKey: 'circle.memberCard.preset_label' }),
     Object.freeze({ id: 'membercard-sees',   titleKey: 'circle.memberCard.sees' }),
     Object.freeze({ id: 'membercard-hides',  titleKey: 'circle.memberCard.hides' }),
+  ]),
+  // A file someone sent in a contact thread: an image shows itself, every file its name and size, and a way to keep it
+  // (web's Download; the phone's folder picker). The keep action was missing on the phone (L349).
+  fileBubble: Object.freeze([
+    Object.freeze({ id: 'file-preview', titleKey: null }),
+    Object.freeze({ id: 'file-meta',    titleKey: null }),
+    Object.freeze({ id: 'file-save',    titleKey: 'circle.fileShare.download' }),
   ]),
 });
 

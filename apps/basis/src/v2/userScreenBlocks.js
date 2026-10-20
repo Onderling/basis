@@ -26,6 +26,7 @@
  *                                  diagnostic in the content
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { acrossCircles } from './acrossCircles.js';
 import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
 import { primaryActionFor } from './rowPrimary.js';
@@ -59,6 +60,10 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
  *        per ("hide entirely").
  * @returns {Promise<Array<object>>}
  */
+/** A notes block on a page shows the recent ones: touched within this many days, at most this many (newest first). */
+export const NOTES_RECENT_DAYS = param({ key: 'vandaag.notesRecentDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 });
+export const NOTES_RECENT_LIMIT = param({ key: 'vandaag.notesRecentLimit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+
 export async function materializeScreen({ screen, hostOps = {}, mutedCircleIds = null } = {}) {
   if (!screen || !Array.isArray(screen?.blocks) || screen.blocks.length === 0) return [];
   const muted = mutedCircleIds instanceof Set
@@ -115,8 +120,10 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       case 'tasks':
         return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'task', scope: block.config?.scope === 'all' ? 'all' : 'mine' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
       // the notes across circles — the block a labels filter means something on (notes carry tags)
+      // On a page only the RECENT ones by default (touched this week, newest first, three): "meer" opens the block whole
+      // (`expandedPage`: every note); a page's own "within" / cap, set in Customise, wins.
       case 'notes':
-        return await materializeItems({ ...block, config: { ...(block.config ?? {}), noun: 'note', scope: block.config?.scope === 'mine' ? 'mine' : 'all' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
+        return await materializeItems({ ...block, config: { withinDays: NOTES_RECENT_DAYS, limit: NOTES_RECENT_LIMIT, ...(block.config ?? {}), noun: 'note', scope: block.config?.scope === 'mine' ? 'mine' : 'all' } }, activeCircleIds, hostOps, { pageIsAll: screenIsAll });
 
       case 'rules':
         return await materializeRules(block, activeCircleIds, hostOps, screenIsAll);

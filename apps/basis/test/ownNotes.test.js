@@ -11,6 +11,7 @@ import { PERSON_NODE_STORE_OPTS } from '../src/v2/personNodeStore.js';
 import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 import { OWN_DEVICES_SCOPE } from '../src/v2/grantsManifest.js';
 import { materializeScreen } from '../src/v2/userScreenBlocks.js';
+import { expandedPage } from '../src/v2/vandaag.js';
 
 const op = (atom) => encodeGenericOpId('household', atom, 'note');
 
@@ -172,3 +173,21 @@ describe("an own row made AS a persona is changed AS that persona (the sheet pas
   });
 });
 
+
+describe("Vandaag's notes are the recent ones; \"meer\" is the whole list", () => {
+  it('this week\'s three newest on the page, all of them opened whole', async () => {
+    const ds = memoryDataSource();
+    const a = await createRealHouseholdAgent({ seedHousehold: false, ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
+    // each note at its own moment (an inbound write keeps it): four this week, one last touched ten days ago
+    const own = createOwnDevicesStore({ dataSource: ds });
+    const ago = (h) => new Date(Date.now() - h * 3_600_000).toISOString();
+    const notes = [['een', 50], ['twee', 30], ['drie', 20], ['vier', 10], ['oud', 240]];
+    for (const [i, [body, h]] of notes.entries()) await own.put({ type: 'note', id: `n-${body}`, body, text: body, createdAt: ago(h), updatedAt: ago(h), updatedBy: 'me', clock: i + 1 }, { origin: true, sync: false });
+    const screen = { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'n', type: 'notes', config: {} }] };
+    const hostOps = { callSkill: (app, o, g) => a.callSkill(app, o, g), circles: [] };
+    const [onPage] = await materializeScreen({ screen, hostOps });
+    expect(onPage.content.items.map((r) => r.label)).toEqual(['vier', 'drie', 'twee']);
+    const [whole] = await materializeScreen({ screen: expandedPage(screen, 'n'), hostOps });
+    expect(whole.content.items.map((r) => r.label).sort()).toEqual(['drie', 'een', 'oud', 'twee', 'vier']);
+  });
+});

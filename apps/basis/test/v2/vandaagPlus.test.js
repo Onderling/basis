@@ -55,7 +55,7 @@ describe('Vandaag — where an own item shows', () => {
   const page = (blocks) => ({ screens: [{ id: 'p1', name: 'Vandaag', blocks }], activeId: 'p1' });
   it('a page without a notes block gets one, through the screen op, after an own note', () => {
     expect(plusFollowUp(page([{ id: 'b', type: 'calendar', config: {} }]), 'household.note'))
-      .toEqual({ opId: 'screen-add-block', args: { pageId: 'p1', type: 'notes', config: { limit: 5 } } });
+      .toEqual({ opId: 'screen-add-block', args: { pageId: 'p1', type: 'notes', config: {} } });
   });
   it('a page that already shows the type needs nothing', () => {
     expect(plusFollowUp(page([{ id: 'b', type: 'notes', config: {} }]), 'household.note')).toBe(null);

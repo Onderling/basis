@@ -64,9 +64,11 @@ describe('the block filters, materialized', () => {
       const [b] = await materializeScreen({ screen: page({ id: 'x', type: 'notes', config }), hostOps });
       return (b.content?.items ?? []).map((r) => r.id).sort();
     };
-    expect(await ids({ limit: 10 })).toEqual(['n1', 'n2', 'n3']);
-    expect(await ids({ limit: 10, circleIds: ['b'] }), 'only the block\'s circle').toEqual(['n2', 'n3']);
-    expect(await ids({ limit: 10, labels: ['WERK'] }), 'only the label').toEqual(['n2', 'n3']);
+    // a notes block on a page is the recent ones by default (this week); "any time" is said as within 0
+    expect(await ids({ limit: 10 }), 'the default: this week only').toEqual(['n1', 'n2']);
+    expect(await ids({ limit: 10, withinDays: 0 })).toEqual(['n1', 'n2', 'n3']);
+    expect(await ids({ limit: 10, withinDays: 0, circleIds: ['b'] }), 'only the block\'s circle').toEqual(['n2', 'n3']);
+    expect(await ids({ limit: 10, withinDays: 0, labels: ['WERK'] }), 'only the label').toEqual(['n2', 'n3']);
     expect(await ids({ limit: 10, labels: ['werk'], withinDays: 7 }), 'and only this week').toEqual(['n2']);
   });
 });

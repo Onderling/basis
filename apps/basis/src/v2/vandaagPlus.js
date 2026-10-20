@@ -274,5 +274,6 @@ export function plusFollowUp(book, actId) {
   const page = getActiveScreen(book ?? {});
   if (!type || !page) return null;
   if ((page.blocks ?? []).some((b) => b?.type === type)) return null;
-  return { opId: 'screen-add-block', args: { pageId: page.id, type, config: { limit: 5 } } };
+  // a notes block takes the page's recent-notes default (userScreenBlocks.js); an agenda shows five
+  return { opId: 'screen-add-block', args: { pageId: page.id, type, config: type === 'notes' ? {} : { limit: 5 } } };
 }

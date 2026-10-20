@@ -25,6 +25,19 @@ describe('addChildTo', () => {
     expect(childIdsOf(await store.get(list.id))).toEqual([child.id]);  // edge on the container
   });
 
+  it('the child goes out ONCE, already contained — never a half-made item on the wire', async () => {
+    // A receiver that acts on a first, uncontained write (an answer on it) ticks above THAT write only; the creator's
+    // second write (the back-ref) then out-clocks the answer and it is lost on both replicas (L350's RSVP).
+    const list = await store.put({ type: 'list', text: 'agenda' });
+    const sent = [];
+    store.setSyncHook({ publishItem: (it) => { sent.push(it); } });
+    const child = await addChildTo(store, list.id, { type: 'task', text: 'koffie' });
+    const ofChild = sent.filter((it) => it.id === child.id);
+    expect(ofChild.length, JSON.stringify(ofChild)).toBe(1);
+    expect(ofChild[0].containedBy).toEqual([list.id]);
+    expect(childIdsOf(sent.filter((it) => it.id === list.id).at(-1))).toEqual([child.id]);   // the edge still goes out
+  });
+
   it('validates the child type via the store + guards bad input', async () => {
     const list = await store.put({ type: 'list', text: 'x' });
     await expect(addChildTo(store, list.id, { type: 'bogus' })).rejects.toThrow(/bad bogus/);

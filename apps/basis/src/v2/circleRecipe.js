@@ -66,6 +66,7 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   circlesUnread: { order: 8,  emoji: '🔔', places: ['mij'],    config: () => ({ limit: 5 }) },
   identityLine:  { order: 9,  emoji: '🙂', places: ['mij'],    config: () => ({ readings: [] }) },
   agents:        { order: 10, emoji: '🤝', places: ['mij'],    config: () => ({}) },
+  awaiting:      { order: 11, emoji: '⏳', places: ['mij'],    config: () => ({}) },
   // the notes across the page's circles — filterable by label (notes carry tags)
   notes:         { order: 11, emoji: '🗒️', places: ['mij'],    noun: 'note',    config: () => ({ limit: 5, labels: [] }) },
   // the first steps on a new device: your handle, what Basis is, begin — the cards go as each is done

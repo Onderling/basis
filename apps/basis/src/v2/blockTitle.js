@@ -12,10 +12,10 @@ import { nounHeading } from './nounNames.js';
 
 /** The block kinds with a declared name (`circle.recipe.block.<type>`). */
 const NAMED = new Set(['quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text',
-  'circlesUnread', 'identityLine', 'agents', 'notes', 'onboarding']);
+  'circlesUnread', 'identityLine', 'agents', 'notes', 'onboarding', 'awaiting']);
 
 /** What the empty line says, by kind (the others: "nothing yet"). */
-const EMPTY_KEY = { calendar: 'circle.screen.block_empty_planned', tasks: 'circle.screen.block_empty_open', circlesUnread: 'circle.screen.block_empty_news' };
+const EMPTY_KEY = { calendar: 'circle.screen.block_empty_planned', tasks: 'circle.screen.block_empty_open', circlesUnread: 'circle.screen.block_empty_news', awaiting: 'circle.screen.block_empty_awaiting' };
 /** …and a projected list says what its noun's kind would (the agenda's appointments, a task list's tasks). */
 const EMPTY_KEY_BY_NOUN = { 'calendar-event': EMPTY_KEY.calendar, task: EMPTY_KEY.tasks };
 

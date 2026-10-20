@@ -134,6 +134,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       break;
     case 'rules':        body = renderRules(block, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
+    case 'awaiting':      body = renderAwaiting(block, onAction, styles); break;
     case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
     case 'identityLine': body = renderIdentityLine(block, onAction, styles); break;
     case 'agents':       body = renderAgents(block, onAction, styles); break;
@@ -207,6 +208,23 @@ function renderPhoto(block, styles) {
 
 // The circles with news: each a row with its name and how many unread; a tap opens the circle
 // (`onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does). Web parity: circleScreen.js.
+// Mij's "wat wacht op jou": one chip per waiting thing, each OPENING where it lives (shared awaiting.js; web parity:
+// circleScreen.js renderAwaiting) — nothing acts here.
+function renderAwaiting(block, onAction, styles) {
+  const items = block.content?.items ?? [];
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t('circle.recipe.block.awaiting')}</Text>
+      {items.map((it) => (
+        <Pressable key={`${it.kind}-${it.circleId ?? ''}`} style={styles.noticeRow} testID={`awaiting-${it.kind}-${it.circleId ?? 'here'}`}
+          disabled={typeof onAction !== 'function'} onPress={() => onAction?.({ ...it.open })}>
+          <Text style={styles.noticeText}>{t(it.labelKey, { count: it.count, name: it.name ?? '' })}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 function renderCirclesUnread(block, onAction, styles) {
   const items = block.content?.items ?? [];
   return (

@@ -4289,6 +4289,23 @@ async function _showVandaag() {
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
 // "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
+/** Mij's own governance binding for its reads (made once, on first need). */
+let mijGov = null;
+
+/** The circle governance as the shell binds it (settings, Mij's "wat wacht op jou"): one binding, one set of options. */
+function shellGovernance({ myWebid = '' } = {}) {
+  return bindCircleGovernance({
+    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    circleIdentityFor: circleIdentityForShell,
+    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
+      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
+      return r;
+    }),
+  });
+}
+
 /** A bookmark the "+" sheet opened: its circle opens, then that op's form — once the circle's menu has resolved. */
 let _pendingPinOpen = null;
 
@@ -4488,7 +4505,9 @@ async function showMij() {
     t, blocks, profilePage,
     onBlockAction: (a) => {
       if (a?.kind === 'edit-me') openAboutMePanel('default');
-      else if (a?.kind === 'open-my-data') showMyData();
+      else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') showMyData();
+      // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
+      else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
     onMyData: showMyData,
     // The advanced surface — every surface-less op + the settable params (the default place).
@@ -4512,6 +4531,9 @@ async function showMij() {
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
     online: relays.length ? relays.some((r) => r.connected) : undefined,
     deviceId: circleHouseholdAgent?.myDeviceId?.() ?? null,
+    // "wat wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here
+    openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
+    pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
   } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
   if (_activeTab === 'mij') rerender();
 }
@@ -8602,16 +8624,7 @@ async function showSettings(id) {
   // The roster, for one question: may THIS viewer's Save count? (an admin's statement is folded, a member's dropped)
   let settingsRoster = [];
   try { const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    circleIdentityFor: circleIdentityForShell,
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
-  });
+  const gov = shellGovernance({ myWebid });
   // §4 storage-policy bridge — remember the pod tier at entry so Save only pushes
   // to pinboard when the admin actually changed it; a failed push (admin-only / the
   // one-way downgrade guard / a centralised tier missing its groupPodUri) is

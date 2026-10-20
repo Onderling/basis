@@ -11,6 +11,7 @@
  */
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
+import { versionLine } from '../../src/v2/versionLine.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
@@ -948,7 +949,7 @@ export function renderCircleMyData(container, {
   if (typeof version === 'string') {
     const v = document.createElement('div');
     v.className = 'cc-profile__version';
-    v.textContent = tr('circle.profile.version', { tag: version || tr('circle.profile.version_dev') });
+    v.textContent = versionLine(version, tr);
     container.appendChild(v);
   }
   return container;

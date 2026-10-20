@@ -1490,3 +1490,9 @@
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
 .circle-screen__items-list { list-style: none; margin: 0; padding: 0; }
+
+/* The shared overlay sheet (the "+" sheet, restore, …): the theme's card, so it follows dark mode. */
+.cc-overlay-card { background: var(--card); color: var(--ink); border: 1px solid var(--line); max-width: 26rem; width: 92%; padding: 1.25rem; border-radius: var(--radius); max-height: 80vh; overflow: auto; }
+/* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
+.circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
+.circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }

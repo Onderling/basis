@@ -59,6 +59,8 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 import { myDataActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
+import { versionLine } from '../../../../basis/src/v2/versionLine.js';
+import Constants from 'expo-constants';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
@@ -1062,6 +1064,8 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           </Pressable>
         </Pressable>
       </Modal>
+      {/* the version this build was made from (its tree's exact clean tag, through the build; none → dev) — web's line */}
+      <Text style={styles.privacyBody} testID="mydata-version">{versionLine(Constants.expoConfig?.extra?.appVersion ?? null, t)}</Text>
     </ScrollView>
   );
 }

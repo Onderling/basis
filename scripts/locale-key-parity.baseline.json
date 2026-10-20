@@ -47,8 +47,6 @@
     "circle.noticeboard.attach_remove",
     "circle.pairedDevices.copied",
     "circle.pairedDevices.copy",
-    "circle.profile.version",
-    "circle.profile.version_dev",
     "circle.share.pick_cancel",
     "circle.shareContact.opened_added",
     "circle.slash.ambiguous",

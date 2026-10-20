@@ -51,7 +51,8 @@ export const EXPANDED_LIMIT = 100;
 export function expandedPage(screen, blockId) {
   const block = (screen?.blocks ?? []).find((b) => b.id === blockId);
   if (!block) return null;
-  return { ...screen, blocks: [{ ...block, config: { ...(block.config ?? {}), limit: EXPANDED_LIMIT } }] };
+  // whole: the cap lifted, and no date window (a notes block's "recent" is the page's; opened, it is every note)
+  return { ...screen, blocks: [{ ...block, config: { ...(block.config ?? {}), limit: EXPANDED_LIMIT, ...(block.type === 'notes' ? { withinDays: 0 } : {}) } }] };
 }
 
 /** The horizon presets a calendar block offers ("pas aan"): today · 3 days · a week · a month. */

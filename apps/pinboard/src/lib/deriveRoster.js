@@ -59,6 +59,8 @@ import { isExited } from './circleExits.js';
 export function deriveRoster({
   redemptions = [],
   founderWebids = [],
+  // founder → 'function', from its own verified creation statement; the fold carries it as the founder's kind
+  founderKinds = {},
   memberMapForDisplay = [],
   exits = null,
   spineStatements = [],
@@ -86,6 +88,7 @@ export function deriveRoster({
   }
 
   /** webid → derived record, built FROM the trail. */
+  const kindProven = new Set();   // the rows the fold proved a function profile: only they carry `provenKind`
   const roster = new Map();
 
   /** webid → their most recent `redeemedAt`, so an exit can be compared against their latest join. */
@@ -246,6 +249,7 @@ export function deriveRoster({
     }
     const folded = foldRoster(spineStatements, {
       founders: founderWebids ?? [],
+      founderKinds: founderKinds ?? {},
       seed: { members: seedMembers, admins: seedAdmins },
       ...(rulesGate ? { rulesGate } : {}),
     });
@@ -281,6 +285,11 @@ export function deriveRoster({
       const h = folded.handles?.[webid];
       if (typeof h === 'string' && h) upsert(webid, undefined, { handle: h });
     }
+    // A PROVEN function profile is the fold's answer only: proven by the statement that admitted it (an
+    // admin-signed join for a bot invite) or by the founder's own creation — never by what a row says. It is its own
+    // field, `provenKind`, beside the member's self-said `kind` (member-props: it paints a bot and quiets a person's
+    // assistant, and authorises nothing). Readers that need an authority (the vouchers for door people) read this one.
+    for (const webid of roster.keys()) if (folded.kinds?.[webid] === 'function') kindProven.add(webid);
     // ── HOW EACH ADMIN CAME TO BE ONE ─────────────────────────────────────────────────────────────
     // The fold names it (`adminProvenance`): they made the circle, an admin promoted them, or the
     // circle was left without an admin and the fold handed it over. All three used to render as the
@@ -424,6 +433,7 @@ export function deriveRoster({
     if (pk) merged.personKey = { version: pk.version, pubKey: pk.pubKey };
     out.push(merged);
   }
+  for (const r of out) { if (!r) continue; if (kindProven.has(r.webid)) r.provenKind = 'function'; else delete r.provenKind; }
   return out;
 }
 

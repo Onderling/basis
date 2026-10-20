@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import Btn from './Btn.js';
 import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2/plusPins.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
@@ -1829,7 +1830,7 @@ export default function CircleLauncherScreen({
   // The LIVE register value (device scope, the device-params consolidation) — no bare-key load.
   const shareNknAddress = bundle?.agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false;
 
-  const openCircleInvite = useCallback(async (circleId) => {
+  const openCircleInvite = useCallback(async (circleId, { forFunction = false } = {}) => {
     await askRelayIfNone();   // an invite without a relay gives the person joining none either
     let r;
     try {
@@ -1856,9 +1857,10 @@ export default function CircleLauncherScreen({
         capabilities: pol.capabilities, apps: pol.apps,
         podBacked, podUrl: podBacked ? (storage?.groupPodUri ?? null) : null,
         relayUrl,
+        ...(forFunction ? { forFunction: true } : {}),
       });
     } catch { r = { error: 'failed' }; }
-    setInviteFor({ circleId, ...(r || {}) });
+    setInviteFor({ circleId, ...(forFunction ? { forFunction: true } : {}), ...(r || {}) });
   }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
 
   // ONE mount for everything a scan or the Join button opens, painted beside whichever view is up (the Mij view returns
@@ -2440,7 +2442,7 @@ export default function CircleLauncherScreen({
               {inviteFor?.uri ? (
                 <>
                   <QrCodeView value={inviteFor.uri} size={200} />
-                  <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
+                  <Text style={styles.inviteHint}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
                   {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
                   {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
                     <Text style={styles.inviteHint}>
@@ -2468,6 +2470,11 @@ export default function CircleLauncherScreen({
                         ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
                         : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
                     </Text>
+                  ) : null}
+                  {/* A bot's own invite: single-use; the admin's signed join then says the bot is one (web parity). */}
+                  {!inviteFor.forFunction ? (
+                    <Btn testID="invite-for-bot" label={t('circle.invite.for_bot')}
+                      onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
                   ) : null}
                 </>
               ) : (

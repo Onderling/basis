@@ -89,6 +89,7 @@ export function rosterAnswerRule({ rows = [], verify, vouchers = [], own = null 
   // a person answers from any of their devices, each with its own circle address)
   const addressesOf = new Map();
   const members = new Set();
+  const fnVouchers = new Set();
   for (const r of Array.isArray(rows) ? rows : []) {
     if (typeof r?.webid !== 'string' || !r.webid) continue;
     members.add(r.webid);
@@ -96,8 +97,11 @@ export function rosterAnswerRule({ rows = [], verify, vouchers = [], own = null 
     if (typeof r.circleAddress === 'string' && r.circleAddress) held.add(r.circleAddress);
     for (const p of Array.isArray(r.circleAddresses) ? r.circleAddresses : []) if (typeof p?.address === 'string' && typeof p?.proof === 'string' && p.proof) held.add(p.address);
     addressesOf.set(r.webid, held);
+    // a row the roster PROVED a function profile (from the signed statement that admitted or founded it — never the
+    // row's own say) is a bot that hosts door people: its addresses vouch for their answers on every replica
+    if (r.provenKind === 'function') for (const a of held) fnVouchers.add(a);
   }
-  const vouch = new Set((vouchers ?? []).filter(Boolean));
+  const vouch = new Set([...(vouchers ?? []).filter(Boolean), ...fnVouchers]);
   return (it) => {
     if (typeof it?.sig !== 'string' || typeof it?.signer !== 'string' || typeof verify !== 'function') return false;
     let ok = false;

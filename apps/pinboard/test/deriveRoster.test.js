@@ -568,3 +568,31 @@ describe('the FIRST person key rides the join (option A) — the row carries it 
     expect(rotated.find((m) => m.webid === 'B').personKey).toEqual({ version: 2, pubKey: 'B-2' });
   });
 });
+
+describe('a PROVEN function profile (L389): from the statement that admitted it, never from the row', () => {
+  it("an admin-signed join for a bot gives the row provenKind 'function'; a member's self-said kind gives none", async () => {
+    const founder = await AgentIdentity.generate(new VaultMemory());
+    const bot = await AgentIdentity.generate(new VaultMemory());
+    const person = await AgentIdentity.generate(new VaultMemory());
+    const roster = deriveRoster({
+      redemptions: [
+        redemption({ redeemedBy: bot.pubKey, signingPublicKey: bot.pubKey }),
+        redemption({ redeemedBy: person.pubKey, signingPublicKey: person.pubKey }),
+      ],
+      founderWebids: [founder.pubKey],
+      foldAuthoritative: true,
+      spineStatements: [
+        signSpine(founder, { kind: 'join', circleId: 'g1', subject: bot.pubKey, payload: { kind: 'function' } }).body,
+        // the person says it of themselves (a self-signed join claiming it): ignored for authority
+        signSpine(person, { kind: 'join', circleId: 'g1', subject: person.pubKey, payload: { kind: 'function' } }).body,
+      ],
+    });
+    expect(roster.find((m) => m.webid === bot.pubKey)?.provenKind).toBe('function');
+    expect(roster.find((m) => m.webid === person.pubKey)?.provenKind).toBeUndefined();
+  });
+  it("a founder whose own creation said so is a proven function profile", async () => {
+    const founder = await AgentIdentity.generate(new VaultMemory());
+    const roster = deriveRoster({ redemptions: [], founderWebids: [founder.pubKey], founderKinds: { [founder.pubKey]: 'function' }, foldAuthoritative: true, spineStatements: [signSpine(founder, { kind: 'role', circleId: 'g1', subject: founder.pubKey, payload: { role: 'admin' } }).body] });
+    expect(roster.find((m) => m.webid === founder.pubKey)?.provenKind).toBe('function');
+  });
+});

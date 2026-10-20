@@ -23,6 +23,7 @@
  * the wrapper at `src/web/realAgent.js` + `web/main.js`.
  */
 
+import { withAnswers, RSVP_TYPE } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
@@ -8301,7 +8302,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     reminderSources: async () => {
       const store = householdService.stores.getStore(homeCircleId);
-      const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
+      const [chores, raw, answers] = await Promise.all([store.listByType('task'), store.listByType('calendar-event'), store.listByType(RSVP_TYPE).catch(() => [])]);
+      // who comes is read from the answers, which are their own items (never a field on the event)
+      const events = withAnswers(raw ?? [], answers ?? []);
       // …and the rows of every installed extension's SCHEDULED noun (its declared moment is its reminder anchor)
       const manifests = [...installedExtensions.values()];
       const scheduled = manifests.flatMap((m) => Object.entries(m?.nouns ?? {}).filter(([, n]) => n?.presents?.order === 'asc' && n?.presents?.moment).map(([noun]) => noun));

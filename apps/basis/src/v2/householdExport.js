@@ -21,6 +21,7 @@
  * in the book. What v1 does not restore — a second list, a second holder, sub-chores, loose items, a board's kind, a
  * chore's maker (its holder writes it) — and any step the gate refuses is returned in `notRestored`.
  */
+import { withAnswers, RSVP_TYPE } from './rsvpItems.js';
 import { childIdsOf } from '@onderling/item-store';
 import { isAnnounceRow } from './announceRows.js';
 import { WEEK_OVERVIEW_OP } from './weekOverviewRows.js';
@@ -56,7 +57,12 @@ function entryOf(it) {
  * @param {Record<string, any>} [a.settings]  the household's own settings (`assistant.*`)
  * @param {number} [a.now]
  */
-export function exportHousehold({ items = [], people = [], settings = {}, planned = [], now = Date.now() } = {}) {
+export function exportHousehold({ items: stored = [], people = [], settings = {}, planned = [], now = Date.now() } = {}) {
+  // an appointment's answers are their own items: each event carries them as read (`withAnswers`), and the answer items
+  // themselves are not entries of the file (an import answers again, through the answer ops)
+  const answers = stored.filter((i) => i?.type === RSVP_TYPE);
+  const answered = new Map(withAnswers(stored.filter((i) => i?.type === 'calendar-event'), answers).map((e) => [e.id, e]));
+  const items = stored.filter((i) => i && i.type !== RSVP_TYPE).map((i) => answered.get(i.id) ?? i);
   const byId = new Map(items.filter(Boolean).map((i) => [i.id, i]));
   const numberOf = new Map();   // item id → its number in the file (the first place it is written)
   let next = 1;

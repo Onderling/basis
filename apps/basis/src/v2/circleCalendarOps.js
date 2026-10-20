@@ -7,7 +7,8 @@
  *   - `addEvent`     — the calendar's own validation (`buildEvent`: a title, when, how long), the child written under
  *                      the Agenda (the list whose default child is an event, else the one by the template's name);
  *   - `listEvents`   — a read over the store with a window (`days`, default 7), soonest first;
- *   - `rsvpAccept` · `rsvpDecline` · `rsvpTentative` — the child's rsvp for the person who asks;
+ *   - `rsvpAccept` · `rsvpDecline` · `rsvpTentative` — the asker's answer, as its OWN item (rsvpItems.js), never a
+ *                      field on the event: the event's `rsvp` is projected from the answers when it is read;
  *   - `briefSummary` · `searchEvents` — the next 24 hours for the morning brief; appointments by their words;
  *   - `cancelEvent`  — the child kept as cancelled (the calendar's own soft cancel: the Agenda's edge stays whole and
  *                      the record stays; the window no longer lists it);
@@ -19,7 +20,8 @@
 import { reminderLayerFromWords } from './reminderWords.js';
 import { addChildTo } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
-import { buildEvent, retimeEvent, rsvpEvent, eventsInWindow } from '@onderling-app/calendar';
+import { buildEvent, retimeEvent, eventsInWindow } from '@onderling-app/calendar';
+import { rsvpItem, withAnswers, RSVP_TYPE } from './rsvpItems.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 import { matchEntry, choicesOf } from './entryRef.js';
 
@@ -55,6 +57,13 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       ?? null;
   }
   const eventsOf = async (circleId) => (await storeFor(circleId).listByType('calendar-event')) ?? [];
+  // what is READ: the events with their answers projected from the answer items (writes use the raw events above, so
+  // a projected map is never written back onto an event)
+  const answeredEventsOf = async (circleId) => {
+    const store = storeFor(circleId);
+    const [events, answers] = await Promise.all([eventsOf(circleId), store.listByType(RSVP_TYPE).catch(() => [])]);
+    return withAnswers(events, answers ?? []);
+  };
   const pad = (n) => String(n).padStart(2, '0');
   /** When, on the household's clock: `YYYY-MM-DD HH:MM` in local time. */
   const stamp = (e) => {
@@ -89,7 +98,8 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       }
       if (!agenda) return { ok: false, error: t('circle.calendar.no_agenda') };
       let event;
-      try { event = buildEvent(args, { actorDefault: who(args) }); }
+      // without the calendar's own `rsvp: {}`: in a circle the answers are their own items, never a field here
+      try { const { rsvp: _none, ...built } = buildEvent(args, { actorDefault: who(args) }); event = built; }
       catch (err) { return { ok: false, error: err?.message ?? String(err) }; }
       // its own reminders, in a person's words ("ook avond", "60"): the household's statement about this appointment
       const reminders = args?.reminders ? reminderLayerFromWords(args.reminders) : null;
@@ -110,7 +120,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       const days = Number(args?.days) > 0 ? Number(args.days) : 7;
       const now = Date.now();
-      const open = eventsInWindow(await eventsOf(circleId), { since: now, until: now + days * 86_400_000 });
+      const open = eventsInWindow(await answeredEventsOf(circleId), { since: now, until: now + days * 86_400_000 });
       // the list's own name above its appointments, as any list read says which list it is
       const agenda = await agendaOf(circleId);
       // who it names and who answered (the household's people, by id): a door's reader sees them as names, under the
@@ -127,7 +137,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const circleId = circleOf(args);
       if (!circleId) return { ok: true };
       const now = Date.now();
-      const soon = eventsInWindow(await eventsOf(circleId), { since: now, until: now + 86_400_000 });
+      const soon = eventsInWindow(await answeredEventsOf(circleId), { since: now, until: now + 86_400_000 });
       if (!soon.length) return { ok: true };
       return { ok: true, items: soon.slice(0, 5).map((e) => ({ id: e.id, label: label(e) })), message: t('circle.calendar.brief', { count: soon.length }) };
     },
@@ -145,7 +155,9 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
     getEventSnapshot: async (args) => {
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
-      return event ? { ok: true, event } : missing(among);
+      if (!event) return missing(among);
+      const [answered] = withAnswers([event], (await storeFor(circleId).listByType(RSVP_TYPE).catch(() => [])) ?? []);
+      return { ok: true, event: answered };
     },
 
     /** A new title and/or moment for the appointment (the length stays; a day without a time is the whole day). */
@@ -175,7 +187,8 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
-      await storeFor(circleId).put(rsvpEvent(event, who(args), response), { by: who(args) });
+      // the answer is its own item, written as the answering self — the event itself is not touched
+      await storeFor(circleId).put(rsvpItem({ eventId: event.id, person: who(args), response }), { by: who(args) });
       // the reply names the appointment answered, and when
       return { ok: true, title: event.title, startsAt: event.startsAt, message: t(`circle.calendar.rsvp_${response}`, { title: event.title, when: stamp(event) }) };
     }])),

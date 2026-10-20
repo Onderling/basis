@@ -5,6 +5,7 @@
  * The checked-in v1 file must keep importing: a change that breaks it turns this red (fix the import, or write v2
  * with a reader for v1).
  */
+import { withAnswers } from '../src/v2/rsvpItems.js';
 import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -68,7 +69,9 @@ async function reads({ agent, own }) {
   const entries = async (list) => (((await own('lists', 'listEntries', { list }))?.items) ?? []).map((i) => i.label).sort();
   const chores = (((await own('tasks', 'listOpen', {}))?.items) ?? [])
     .map((c) => `${c.text}|${[...new Set([...(c.assignees ?? []), c.assignee].filter(Boolean))].join(',')}|${String(c.dueAt ?? '').slice(0, 10)}`).sort();
-  const events = (await agent.householdItems()).filter((i) => i.type === 'calendar-event')
+  // an appointment's answers are their own items: read through the projection, as every reader does
+  const all = await agent.householdItems();
+  const events = withAnswers(all.filter((i) => i.type === 'calendar-event'), all.filter((i) => i.type === 'rsvp'))
     .map((e) => `${e.title}|${e.startsAt}|${e.state ?? ''}|${JSON.stringify(e.rsvp ?? {})}`).sort();
   return { boodschappen: await entries('Boodschappen'), reparaties: await entries('Reparaties'), chores, events };
 }

@@ -18,6 +18,7 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../src/v2/companionGrant.js';
@@ -4204,6 +4205,11 @@ async function _showVandaag() {
   const book = _screensBook ?? { screens: [], activeId: null };
   const screen = getActiveScreen(book);
   rootEl.innerHTML = '';
+  // the day this page is about, above everything: a day, not a list
+  const day = document.createElement('h2');
+  day.className = 'circle-vandaag__day';
+  day.textContent = dayHeader(Date.now(), { locale: dateLocaleOf(t) });
+  rootEl.appendChild(day);
   const head = document.createElement('div');
   head.className = 'circle-vandaag__head';
   if (book.screens.length > 1 && !_expandedBlockId) {
@@ -4234,7 +4240,10 @@ async function _showVandaag() {
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'circle-vandaag__customise';
-    edit.textContent = t('circle.vandaag.customise');
+    // under the ⋯, quiet: the "+" is the page's one accent
+    edit.textContent = '⋯';
+    edit.title = t('circle.vandaag.customise');
+    edit.setAttribute('aria-label', t('circle.vandaag.customise'));
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
     // the "+": an own note or an own appointment, into the person's own store (never a circle)

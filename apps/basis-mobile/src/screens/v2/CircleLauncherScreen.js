@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
@@ -1908,6 +1909,10 @@ export default function CircleLauncherScreen({
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="screens" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
+          {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
+          <Text style={{ color: theme.color.ink, fontSize: 20, fontWeight: '600', marginBottom: 8 }} testID="vandaag-day">
+            {dayHeader(Date.now(), { locale: dateLocaleOf(t) })}
+          </Text>
           {screensBook.screens.length > 1 && !expandedBlockId ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }} accessibilityRole="tablist">
               {screensBook.screens.map((page) => (
@@ -1922,15 +1927,18 @@ export default function CircleLauncherScreen({
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 16 }}>
+            {/* quiet: the ⋯ (Customise) and the way back; the "+" is the page's ONE accent (web twin: circle.css) */}
             <Pressable onPress={() => (expandedBlockId ? setExpandedBlockId(null) : setCustomiseOpen(true))} accessibilityRole="button"
+              accessibilityLabel={expandedBlockId ? t('circle.screen.more_back') : t('circle.vandaag.customise')}
               testID={expandedBlockId ? 'vandaag-more-back' : 'vandaag-customise'}>
-              <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>
-                {expandedBlockId ? `← ${t('circle.screen.more_back')}` : t('circle.vandaag.customise')}
+              <Text style={{ color: theme.color.inkSoft, fontSize: expandedBlockId ? 13 : 20, marginBottom: 8 }}>
+                {expandedBlockId ? `← ${t('circle.screen.more_back')}` : '⋯'}
               </Text>
             </Pressable>
             {expandedBlockId ? null : (
-              <Pressable onPress={() => setPlusOpen(true)} accessibilityRole="button" testID="vandaag-plus-open">
-                <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>{`+ ${t('circle.vandaag.plus')}`}</Text>
+              <Pressable onPress={() => setPlusOpen(true)} accessibilityRole="button" testID="vandaag-plus-open"
+                style={{ marginLeft: 'auto', marginBottom: 8, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: theme.color.accentInk }}>
+                <Text style={{ color: theme.color.accentContrast, fontSize: 14, fontWeight: '600' }}>{`+ ${t('circle.vandaag.plus')}`}</Text>
               </Pressable>
             )}
           </View>

@@ -137,8 +137,8 @@ export function plusShareOp(actId, { id, with: who, acts = PLUS_ACTS } = {}) {
 }
 
 /**
- * Whom an own item can be shared with: the contacts the share op's `with` names as its source (the person's book),
- * only those a pair circle already connects — a copy goes nowhere else. Each: its id the value, its name the label.
+ * Whom an own item can be shared with: the share op's `with` source (the agent's read of exactly the contacts the share
+ * accepts — the pair circle of the self they are filed under is one of mine). The sheet filters nothing itself. Each: its id the value, its name the label.
  * @param {object} act
  * @param {(app: string, op: string, args: object) => Promise<any>} call
  * @returns {Promise<Array<{id: string, label: string}>>}
@@ -147,8 +147,9 @@ export async function plusShareTargets(act, call) {
   const src = act?.shareWith;
   if (!act?.share || !src?.listOp || typeof call !== 'function') return [];
   const r = await Promise.resolve(call(src.appOrigin ?? act.appOrigin, src.listOp, {})).catch(() => null);
+  // the read decides whom (the agent's `shareTargets`: exactly the contacts the share accepts) — the sheet filters nothing
   return (Array.isArray(r?.items) ? r.items : [])
-    .filter((c) => c?.id && c.pairCircleId)
+    .filter((c) => c?.id)
     .map((c) => ({ id: String(c.id), label: String(c.label ?? c.id) }));
 }
 

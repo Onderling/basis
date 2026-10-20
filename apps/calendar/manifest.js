@@ -230,11 +230,21 @@ export const calendarManifest = {
       params: [
         { name: 'id',   kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },
         // a contact, picked from the person's book (the pick offers the ones a pair circle connects)
-        { name: 'with', kind: 'string', required: true, pickerSource: { listOp: 'listContacts', appOrigin: 'pinboard' } },
+        // a contact the share accepts (the pair circle of the self they are filed under is one of mine) — its own read
+        { name: 'with', kind: 'string', required: true, pickerSource: { listOp: 'shareTargets', appOrigin: 'calendar' } },
       ],
       surfaces: {
         ui: { control: 'button', labelKey: 'circle.button.calendar.shareEvent', label: 'Share with…' },
       },
+    },
+
+    // Whom an own appointment can be shared with: exactly the contacts `shareEvent` accepts — the source of its `with`
+    // pick, never a row a person taps. `internal` takes it out of coverage and the Other shelf.
+    {
+      id:    'shareTargets',
+      verb:  'list',
+      params: [],
+      surfaces: { internal: true },
     },
 
     /* ──── Snapshot + search ──── */

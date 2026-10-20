@@ -2028,7 +2028,8 @@ export default function CircleLauncherScreen({
     const active = getActiveScreen(screensBook);
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="screens" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
+        {/* clear the status bar: the day's header sat under the clock */}
+        <View style={{ flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper }}>
           {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
           <Text style={{ color: theme.color.ink, fontSize: 20, fontWeight: '600', marginBottom: 8 }} testID="vandaag-day">
             {dayHeader(Date.now(), { locale: dateLocaleOf(t) })}

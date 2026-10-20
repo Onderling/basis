@@ -1432,6 +1432,30 @@
       "text": "Yours",
       "doc": "The \"+\" sheet: the heading over the Me actions (share my card, scan)."
     },
+    "pin_to_plus": {
+      "text": "Pin to +",
+      "doc": "A circle's attach entry: pin it to the person's \"+\" sheet as a bookmark (it only ever opens the circle with that op)."
+    },
+    "pinned_title": {
+      "text": "Pinned",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin": {
+      "text": "Pin",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "unpin": {
+      "text": "Unpin",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin_gone": {
+      "text": "That circle is no longer yours — the pin opens nothing.",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin_bookmark": {
+      "text": "{{name}}: {{op}}",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
     "plus_line_unread": {
       "text": "I could not read that — fill in the fields below.",
       "doc": "The free line could not be read: the person fills the fields."

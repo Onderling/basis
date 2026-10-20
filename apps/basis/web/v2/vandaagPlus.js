@@ -76,6 +76,18 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       b.textContent = plusLabel(tr, a);
       b.addEventListener('click', () => onPick?.(a.id));
       sec['plus-own'].appendChild(b);
+      if (typeof onTogglePin === 'function') {
+        const on = pinnedActIds.includes(a.id);
+        const star = document.createElement('button');
+        star.type = 'button';
+        star.className = 'cc-btn cc-btn--ghost circle-vandaag-plus__pin';
+        star.dataset.act = a.id;
+        star.dataset.pinned = String(on);
+        star.textContent = on ? '★' : '☆';
+        star.setAttribute('aria-label', tr(on ? 'circle.vandaag.unpin' : 'circle.vandaag.pin'));
+        star.addEventListener('click', () => onTogglePin(a.id));
+        sec['plus-own'].appendChild(star);
+      }
     }
   } else {
     const form = document.createElement('form');
@@ -137,6 +149,30 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       onSave?.(act.id, Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value])));
     });
     sec['plus-own'].appendChild(form);
+  }
+  // Vastgezet — on a fresh sheet: own pins choose their act here; a bookmark OPENS its circle with that op (never runs it)
+  if (!editing && !asking && !act) {
+    for (const p of Array.isArray(pinned) ? pinned : []) {
+      const row = document.createElement('span');
+      row.className = 'circle-vandaag-plus__pinned';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__pinned-open';
+      b.dataset.pin = p.key;
+      b.textContent = p.label;
+      b.addEventListener('click', () => onOpenPin?.(p));
+      row.appendChild(b);
+      if (typeof onUnpin === 'function') {
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'cc-btn cc-btn--ghost circle-vandaag-plus__unpin';
+        x.textContent = '×';
+        x.setAttribute('aria-label', tr('circle.vandaag.unpin'));
+        x.addEventListener('click', () => onUnpin(p.key));
+        row.appendChild(x);
+      }
+      sec['plus-pinned'].appendChild(row);
+    }
   }
   // the Me actions — on a fresh sheet only (not while an own row is being changed, nor before the self is picked)
   if (!editing && !asking && !act) {

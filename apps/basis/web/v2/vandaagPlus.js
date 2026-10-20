@@ -17,7 +17,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
-  container.className = 'circle-vandaag-plus';
+  container.classList.add('circle-vandaag-plus');   // beside the host's card class (its theme colours), never over it
   const title = document.createElement('h3');
   title.textContent = tr(editing ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus');
   container.appendChild(title);

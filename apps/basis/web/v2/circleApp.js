@@ -5402,7 +5402,8 @@ function _restoreOverlay() {
   const wrap = document.createElement('div');
   wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9000;display:flex;align-items:center;justify-content:center;';
   const card = document.createElement('div');
-  card.style.cssText = 'background:var(--surface,#fff);color:inherit;max-width:26rem;width:92%;padding:1.25rem;border-radius:8px;max-height:80vh;overflow:auto;';
+  // the theme's card colours (light AND dark) — circle.css `.cc-overlay-card`; never a literal white
+  card.className = 'cc-overlay-card';
   wrap.appendChild(card);
   document.body.appendChild(wrap);
   return { wrap, card, close: () => wrap.remove() };
@@ -5659,7 +5660,7 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
       offerInput.autocomplete = 'off';
       card.appendChild(offerInput);
       const offerErr = document.createElement('p');
-      offerErr.style.cssText = 'color:var(--cc-danger, #b00020);margin:.2rem 0;display:none;'; // hex-ok: fallback only
+      offerErr.style.cssText = 'color:var(--danger);margin:.2rem 0;display:none;';
       offerErr.textContent = t('circle.enroll.offer_paste_invalid');
       card.appendChild(offerErr);
       const values = {};

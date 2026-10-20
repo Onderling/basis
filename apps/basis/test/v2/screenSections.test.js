@@ -12,6 +12,10 @@ describe('screenSections', () => {
     expect(sectionsOf('adminPanel').map((s) => s.id)).toEqual(['admin-members', 'admin-announce', 'admin-outbound-shares', 'admin-muted']);
     for (const s of sectionsOf('adminPanel')) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
   });
+  it('the member card: how much it reveals · what this viewer sees · what stays hidden, titled by keys that exist', () => {
+    expect(sectionsOf('memberCard').map((s) => s.id)).toEqual(['membercard-preset', 'membercard-sees', 'membercard-hides']);
+    for (const s of sectionsOf('memberCard')) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
+  });
   it('a screen not declared has no sections; the declaration is frozen', () => {
     expect(sectionsOf('nope')).toEqual([]);
     expect(Object.isFrozen(SCREEN_SECTIONS.adminPanel)).toBe(true);

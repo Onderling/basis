@@ -21,6 +21,7 @@
  */
 
 import { revealPresetWords } from '../../src/v2/memberCards.js';
+import { sectionsOf } from '../../src/v2/screenSections.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 /**
@@ -64,11 +65,11 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
   lede.textContent = tr('circle.memberCard.persona_lede');
   container.appendChild(lede);
 
-  const badge = presetBadge(tr, split.preset);
-  if (badge) container.appendChild(badge);
-
-  container.appendChild(attrColumn(tr, 'sees', split.sees, resolvePicture));
-  container.appendChild(attrColumn(tr, 'hides', split.hides, resolvePicture));
+  paintDeclared(container, {
+    'membercard-preset': () => presetBadge(tr, split.preset),
+    'membercard-sees': () => attrColumn(tr, 'sees', split.sees, resolvePicture),
+    'membercard-hides': () => attrColumn(tr, 'hides', split.hides, resolvePicture),
+  });
   return container;
 }
 
@@ -129,15 +130,26 @@ export function renderSelfViewCard(container, {
   }
   container.appendChild(picker);
 
-  const badge = presetBadge(tr, split.preset);
-  if (badge) container.appendChild(badge);
-
-  container.appendChild(attrColumn(tr, 'sees', split.sees, resolvePicture));
-  container.appendChild(attrColumn(tr, 'hides', split.hides, resolvePicture));
+  paintDeclared(container, {
+    'membercard-preset': () => presetBadge(tr, split.preset),
+    'membercard-sees': () => attrColumn(tr, 'sees', split.sees, resolvePicture),
+    'membercard-hides': () => attrColumn(tr, 'hides', split.hides, resolvePicture),
+  });
   return container;
 }
 
 /* ── internals ── */
+
+/** The card's DECLARED sections (`screenSections.js`), in order, each painted by its id — `lint-screen-sections` checks
+ *  both shells name every one. A painter that has nothing to show returns null. */
+function paintDeclared(container, paint) {
+  for (const d of sectionsOf('memberCard')) {
+    const el = paint[d.id]?.(d);
+    if (!el) continue;
+    el.dataset.section = d.id;
+    container.appendChild(el);
+  }
+}
 
 /**
  * The amount-preset badge (`handle → profile → full`) — surfaces how much of the persona

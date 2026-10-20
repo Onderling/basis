@@ -19,6 +19,10 @@ export const SCREEN_FILES = Object.freeze({
     web: ['apps/basis/web/v2/circleAdminPanel.js'],
     mobile: ['apps/basis-mobile/src/screens/v2/CircleAdminPanelScreen.js'],
   },
+  memberCard: {
+    web: ['apps/basis/web/v2/circleMemberCard.js'],
+    mobile: ['apps/basis-mobile/src/screens/v2/CircleMemberCardScreen.js'],
+  },
 });
 
 /** What one shell's text lacks for a screen: the `sectionsOf` call, or a declared section id. */

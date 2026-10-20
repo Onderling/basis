@@ -25,7 +25,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section
   meActions = [], onMeAction = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
-  acts = PLUS_ACTS }) {
+  acts = PLUS_ACTS,
+  // Vastgezet: the pins to paint (each with `label` and `key`); `onOpenPin(pin)` → `{actId}` (an own act), a line (why
+  // nothing opened), or null (it opened a circle); × → `onUnpin(key)`; ☆/★ beside an own act → `onTogglePin(actId)`
+  pinned = [], onOpenPin = null, onUnpin = null, pinnedActIds = [], onTogglePin = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -89,9 +92,17 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               ))}
             </View>
           ) : !act ? acts.map((a) => (
-            <Pressable key={a.id} style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
-              <Text style={styles.btnText}>{plusLabel(t, a)}</Text>
-            </Pressable>
+            <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Pressable style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
+                <Text style={styles.btnText}>{plusLabel(t, a)}</Text>
+              </Pressable>
+              {onTogglePin ? (
+                <Pressable onPress={() => onTogglePin(a.id)} accessibilityRole="button" testID={`vandaag-plus-pin-${a.id}`}
+                  accessibilityLabel={t(pinnedActIds.includes(a.id) ? 'circle.vandaag.unpin' : 'circle.vandaag.pin')} style={{ paddingHorizontal: 8 }}>
+                  <Text style={styles.btnText}>{pinnedActIds.includes(a.id) ? '★' : '☆'}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           )) : (
             <View>
               {act.fields.map((f) => (
@@ -123,6 +134,21 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               ) : null}
             </View>
           )),
+              // Vastgezet — on a fresh sheet: an own pin picks its act here; a bookmark OPENS its circle (never runs the op)
+              'plus-pinned': () => (!edit && !act && !(selves.length > 1 && !asSelf) && pinned.length ? pinned.map((p) => (
+                <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Btn label={p.label} testID={`vandaag-plus-pinned-${p.key}`} onPress={async () => {
+                    const r = await onOpenPin?.(p);
+                    if (typeof r === 'string') setError(r);
+                    else if (r?.actId) { setActId(r.actId); setError(null); }
+                  }} />
+                  {onUnpin ? (
+                    <Pressable onPress={() => onUnpin(p.key)} accessibilityRole="button" accessibilityLabel={t('circle.vandaag.unpin')} testID={`vandaag-plus-unpin-${p.key}`} style={{ paddingHorizontal: 8 }}>
+                      <Text style={styles.btnText}>×</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              )) : null),
               // the Me actions — on a fresh sheet only (not while an own row is being changed, nor before the self is picked)
               'plus-me': () => (!edit && !act && !(selves.length > 1 && !asSelf) && meActions.length ? meActions.map((m) => (
                 <Btn key={m.id} label={t(m.labelKey)} onPress={() => onMeAction?.(m.id)} testID={`vandaag-plus-me-${m.id}`} />

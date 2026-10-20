@@ -194,6 +194,8 @@ export function renderCircleView(container, {
   attachMenu = [],
   attachFileOpId = 'embed-file',
   onAttachCommand = null,
+  // "Pin to +" on an attach entry (a bookmark in the person's "+" sheet)
+  onPinEntry = null,
   // D / Surface 2 — the circle policy the ⋯ overflow menu's feature gate reads.
   // The roster + its `requires` gates are projected from manifest.actions; this
   // is the ONLY feature-gate input (the host no longer pre-filters `more`).
@@ -464,7 +466,7 @@ export function renderCircleView(container, {
     // from the manifest via renderAttachments (shared with the noticeboard composer).
     const attachControl = buildAttachControl({
       attachMenu, attachFileOpId,
-      onAttach: onAttachMedia, onAttachCommand,
+      onAttach: onAttachMedia, onAttachCommand, onPinEntry,
       cls: (s) => `circle-view__${s}`,
       tr, menuLabelKey: 'circle.view.attach',
     });

@@ -1432,6 +1432,30 @@
       "text": "Van jou",
       "doc": "The \"+\" sheet: the heading over the Me actions (share my card, scan)."
     },
+    "pin_to_plus": {
+      "text": "Vastzetten in +",
+      "doc": "A circle's attach entry: pin it to the person's \"+\" sheet as a bookmark (it only ever opens the circle with that op)."
+    },
+    "pinned_title": {
+      "text": "Vastgezet",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin": {
+      "text": "Vastzetten",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "unpin": {
+      "text": "Losmaken",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin_gone": {
+      "text": "Die kring is niet meer van jou — de pin opent niets.",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin_bookmark": {
+      "text": "{{name}}: {{op}}",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
     "plus_line_unread": {
       "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
       "doc": "The free line could not be read: the person fills the fields."

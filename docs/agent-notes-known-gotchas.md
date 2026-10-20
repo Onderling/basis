@@ -802,6 +802,11 @@ Each one produced an APK that did not carry the code it was built to test.
   (`app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle`) with the previous build's. Identical
   bundles from two different commits mean the build did not see the change. The release bundle is Hermes bytecode:
   search it with `LC_ALL=C grep -a`.
+- **The release build hangs on "Waiting for Watchman `watch-project`"** when the shell runs niced (an agent's shell here
+  runs at nice 5): watchman refuses to start below nice 0 ("running at a lower than normal priority … refusing to
+  start") and Metro waits forever. Build with watchman off `PATH` (it lives in `/home/linuxbrew/.linuxbrew/bin`):
+  `PATH=$(echo "$PATH" | tr ':' '\n' | grep -v linuxbrew | paste -sd:) ./gradlew :app:assembleRelease …` — Metro
+  falls back to its node crawler. (2026-10-20)
 - **Watchman "non-recoverable condition" kills a Detox run before it starts** (the box's watchman is unhealthy now and
   then). Pass `-- --no-watchman` to `detox test`; Jest's node crawler is enough. Also: a screen's LOADING state may carry
   the same testID as the loaded one (`circle-availability`) — wait for a control of the loaded form, not the screen id.

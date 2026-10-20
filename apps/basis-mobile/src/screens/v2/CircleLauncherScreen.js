@@ -4822,6 +4822,7 @@ function CircleDetail({
             accessibilityLabel={t('circle.view.composer_placeholder')}
             returnKeyType="send"
             onSubmitEditing={sendCircleChat}
+            testID="circle-detail-composer-input"
           />
           <Pressable
             style={styles.composerSend}

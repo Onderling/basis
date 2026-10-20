@@ -28,8 +28,12 @@ export async function addChildTo(store, containerId, childItem) {
   }
   const container = await store.get(containerId);
   if (!container) throw new Error(`addChildTo: container "${containerId}" not found`);
-  const child = await store.put({ ...childItem });        // store validates the type + assigns the id
-  await contain(store, containerId, child.id);            // ref + back-ref
+  // The child goes out ONCE, already carrying its back-ref: a first, uncontained write on the wire is an item a
+  // receiver can act on (answer, tick) — and the creator's own second write (the back-ref) would then out-clock that
+  // act and drop it on every replica. `contain` finds the back-ref in place and writes only the container's edge.
+  const parents = Array.isArray(childItem.containedBy) ? childItem.containedBy : [];
+  const child = await store.put({ ...childItem, containedBy: [...new Set([...parents, containerId])], wasContained: true });   // store validates the type + assigns the id
+  await contain(store, containerId, child.id);            // ref (+ back-ref, already in place)
   return await store.get(child.id);                       // re-read so the returned child carries containedBy
 }
 

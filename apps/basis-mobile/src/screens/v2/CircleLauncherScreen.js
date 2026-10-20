@@ -279,7 +279,9 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
+import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
+import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
@@ -1972,7 +1974,20 @@ export default function CircleLauncherScreen({
           selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
           // the free line: the shared reader over the sheet's own acts (never a circle)
           // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
-          onRead={async (line) => plusRead(line) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') }}
+          // the person's OWN agent: an own act, or — for something that lives in a circle — where it lives (a referral the
+          // sheet OPENS, never acts on); the own model reads only what the plain reading missed (web twin: circleApp.js)
+          onRead={async (line) => {
+            const manifests = buildManifestsByOrigin();
+            const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
+            const list = await Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+              id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
+              availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
+            })));
+            const o = plusLineOutcome(line, { circles: list });
+            if (o?.kind === 'referral') return { referral: o.to };
+            return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };
+          }}
+          onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); setPlusOpen(false); setPlusEdit(null); if (c) openCircle(c); }}
           shareTargets={plusShareList}
           onShare={plusEdit ? async (actId, contact) => {
             const op = plusShareOp(actId, { id: plusEdit.id, with: contact });

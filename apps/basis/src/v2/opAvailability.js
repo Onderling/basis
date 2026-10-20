@@ -48,7 +48,7 @@
  * defaults — an empty `policy.apps` means ALL, an absent `requires` means ALLOWED.
  */
 
-import { affordanceTreatment, canonicalAtom } from '@onderling/app-manifest';
+import { affordanceTreatment, canonicalAtom, buildCapabilityMatrix } from '@onderling/app-manifest';
 import { isFeatureEnabled } from './circlePolicy.js';
 
 /** Why an op is not simply available. `null` when it is. */
@@ -155,3 +155,26 @@ export function makeOpAvailability({
 }
 
 export default makeOpAvailability;
+
+
+/**
+ * A circle's availability, composed the one way every shell composes it: its policy and this member's overrides from
+ * the shell's stores, the capability matrix over the catalogue's sources, then `makeOpAvailability`. Best-effort: an
+ * unresolved policy must not make everything look forbidden.
+ * @param {string} circleId
+ * @param {{ policyStore: {get: Function}, overrideStore: {get: Function}, sources: object[], catalogue: object, manifestsByOrigin: object }} a
+ */
+export async function circleAvailabilityFor(circleId, { policyStore, overrideStore, sources, catalogue, manifestsByOrigin } = {}) {
+  let policy = null;
+  let capabilityMatrix = [];
+  try {
+    const pol = (await policyStore?.get?.(circleId)) ?? {};
+    const ovr = (await overrideStore?.get?.(circleId)) ?? {};
+    policy = pol;
+    capabilityMatrix = buildCapabilityMatrix(sources ?? [], {
+      enabledApps: Array.isArray(pol.apps) && pol.apps.length ? pol.apps : null,
+      template: pol.capabilities || {}, optOuts: ovr.capabilityOptOuts || [],
+    });
+  } catch { /* best-effort */ }
+  return makeOpAvailability({ catalogue, manifestsByOrigin, policy, capabilityMatrix });
+}

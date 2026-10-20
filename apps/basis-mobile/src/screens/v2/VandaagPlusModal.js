@@ -8,6 +8,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
+import Btn from './Btn.js';
 import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 
@@ -17,7 +18,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // opened on an own row: `{ act, id, values, asSelf }` (the shared `plusEditFor`)
   edit = null,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
-  selves = [], writeAsSelf = null }) {
+  selves = [], writeAsSelf = null,
+  // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
+  onOpenCircle = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -26,8 +29,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
   const [line, setLine] = useState('');
+  const [referral, setReferral] = useState(null);
   useEffect(() => {
-    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); return; }
+    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setReferral(null); return; }
     if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf(edit.asSelf ?? 'default'); }  // changed as the self that made it
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
@@ -53,7 +57,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the free line: what it understood picks the act and fills the fields below (editable before Save), never a circle
   const read = async () => {
     const r = await onRead?.(line);
-    if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
+    setReferral(Array.isArray(r?.referral) && r.referral.length ? r.referral : null);
+    if (r?.referral) setError(null);
+    else if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
     else if (r?.error) setError(r.error);
   };
   return (
@@ -109,6 +115,10 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               ) : null}
             </View>
           )}
+          {referral ? referral.map((r) => (
+            <Btn key={r.circleId} label={t('circle.vandaag.plus_referral', { name: r.name || t('circle.screens.untitled') })}
+              onPress={() => onOpenCircle?.(r.circleId)} testID={`vandaag-plus-referral-${r.circleId}`} />
+          )) : null}
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
           <Pressable style={styles.btn} onPress={onClose} testID="vandaag-plus-close">
             <Text style={styles.btnText}>{t('circle.vandaag.done')}</Text>

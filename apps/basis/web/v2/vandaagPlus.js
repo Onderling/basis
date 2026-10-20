@@ -11,7 +11,9 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
   shareTargets = null, onShare,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
-  selves = null, asSelf = null, onPickSelf } = {}) {
+  selves = null, asSelf = null, onPickSelf,
+  // the line named something that lives in a circle: where it lives (`[{circleId, name}]`) — opened, never acted on
+  referral = null, onOpenCircle } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
@@ -122,6 +124,20 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       onSave?.(act.id, Object.fromEntries(Object.entries(inputs).map(([k, el]) => [k, el.value])));
     });
     container.appendChild(form);
+  }
+  if (Array.isArray(referral) && referral.length) {
+    const box = document.createElement('div');
+    box.className = 'circle-vandaag-plus__referral';
+    for (const r of referral) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__referral-open';
+      b.dataset.circleId = r.circleId;
+      b.textContent = tr('circle.vandaag.plus_referral', { name: r.name || tr('circle.screens.untitled') });
+      b.addEventListener('click', () => onOpenCircle?.(r.circleId));
+      box.appendChild(b);
+    }
+    container.appendChild(box);
   }
   if (error) {
     const p = document.createElement('p');

@@ -947,6 +947,47 @@ export const basisManifest = {
     },
 
     /**
+     * `/pin` — pin to the "+" sheet ("Vastgezet"): an own act (`actId`), or a BOOKMARK to an op in one of the person's
+     * circles (`circleId` · `appOrigin` · `opId` — the address only, never the op's args). A bookmark only ever OPENS
+     * its circle with that op's form; it is never invoked from the sheet.
+     */
+    {
+      id:    'screen-pin',
+      group: 'device',
+      // one book per device, one writer: the latest edit stands
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'add',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'kind', kind: 'string', required: true },
+        { name: 'actId', kind: 'string' },
+        { name: 'circleId', kind: 'string' },
+        { name: 'appOrigin', kind: 'string' },
+        { name: 'opId', kind: 'string' },
+      ],
+      surfaces: {
+        slash: { command: '/pin', body: 'flags' },
+      },
+    },
+
+    /**
+     * `/unpin` — take a pin off the "+" sheet, by its key (`pinKey`).
+     */
+    {
+      id:    'screen-unpin',
+      group: 'device',
+      resolves: [{ field: 'book', policy: 'content' }],
+      verb:  'remove',
+      writes: { scope: 'device' },
+      params: [
+        { name: 'key', kind: 'string', required: true },
+      ],
+      surfaces: {
+        slash: { command: '/unpin', body: 'flags' },
+      },
+    },
+
+    /**
      * `/page-block-add` — add a block from the block table (only those the person's pages may hold).
      */
     {

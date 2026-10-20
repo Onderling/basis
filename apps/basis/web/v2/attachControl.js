@@ -39,6 +39,8 @@ export function buildAttachControl({
   attachFileOpId = 'embed-file',
   onAttach,
   onAttachCommand,
+  // "Pin to +": a bookmark to this entry's op in the person's "+" sheet (Vastgezet) — an address only, never the op run
+  onPinEntry = null,
   fileAccept = 'image/png,image/jpeg,image/webp',
   cls,
   tr = (k) => k,
@@ -116,6 +118,17 @@ export function buildAttachControl({
     item.textContent = t(entry.label ?? entry.opId);
     item.addEventListener('click', () => { menu.hidden = true; syncExpanded(); runEntry(entry); });
     menu.appendChild(item);
+    if (typeof onPinEntry === 'function' && entry.opId !== attachFileOpId) {
+      const pin = document.createElement('button');
+      pin.type = 'button';
+      pin.className = `cc-btn cc-btn--ghost ${namer('attach-pin')}`;
+      pin.dataset.opId = entry.opId;
+      pin.textContent = '📌';
+      pin.title = t('circle.vandaag.pin_to_plus');
+      pin.setAttribute('aria-label', t('circle.vandaag.pin_to_plus'));
+      pin.addEventListener('click', () => { menu.hidden = true; syncExpanded(); onPinEntry(entry); });
+      menu.appendChild(pin);
+    }
   }
 
   const syncExpanded = () => trigger.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');

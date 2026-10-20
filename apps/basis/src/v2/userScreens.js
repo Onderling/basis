@@ -40,6 +40,8 @@
 /** Empty book — what a fresh user starts with (host can seed defaults). */
 import { BLOCK_TYPES } from './circleRecipe.js';
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
+import { pinsOf } from './plusPins.js';
+
 export const EMPTY_SCREEN_BOOK = Object.freeze({ screens: [], activeId: null });
 
 /** Sentinel for "all circles" in circleFilter (vs `[circleId, …]`). */
@@ -125,6 +127,13 @@ function personaSetOf(book) {
   return ids.length ? { personaSet: ids } : {};
 }
 
+/** What the book carries beside its pages, kept across every page change: the persona set, and the pins ("Vastgezet",
+ *  each an address only — plusPins.js). */
+function carriedOf(book) {
+  const pinned = pinsOf(book);
+  return { ...personaSetOf(book), ...(pinned.length ? { pinned } : {}) };
+}
+
 export function normalizeScreenBook(raw) {
   if (!raw || typeof raw !== 'object') return { screens: [], activeId: null };
   const arr = Array.isArray(raw.screens) ? raw.screens : [];
@@ -133,7 +142,7 @@ export function normalizeScreenBook(raw) {
   if (activeId && !screens.some((s) => s.id === activeId)) activeId = null;
   if (!activeId && screens.length > 0) activeId = screens[0].id;
   const history = normalizeHistory(raw.history);
-  return { screens, activeId, ...personaSetOf(raw), ...(history ? { history } : {}) };
+  return { screens, activeId, ...carriedOf(raw), ...(history ? { history } : {}) };
 }
 
 /** How many parent links the book keeps (the version store keeps 50 per series). */
@@ -159,7 +168,7 @@ export function addScreen(book, name = '', circleFilter = ALL_CIRCLES) {
   const cur = normalizeScreenBook(book);
   const screen = emptyScreen(name, circleFilter);
   const screens = [...cur.screens, screen];
-  return { screens, activeId: cur.activeId ?? screen.id, ...personaSetOf(cur) };
+  return { screens, activeId: cur.activeId ?? screen.id, ...carriedOf(cur) };
 }
 
 export function renameScreen(book, screenId, newName) {
@@ -173,7 +182,7 @@ export function removeScreen(book, screenId) {
   const screens = cur.screens.filter((s) => s.id !== screenId);
   let activeId = cur.activeId;
   if (activeId === screenId) activeId = screens.length > 0 ? screens[0].id : null;
-  return { screens, activeId, ...personaSetOf(cur) };
+  return { screens, activeId, ...carriedOf(cur) };
 }
 
 export function setActiveScreen(book, screenId) {

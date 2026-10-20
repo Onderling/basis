@@ -125,3 +125,28 @@ test('the "+" is on every tab — its sheet holds the own acts and the Me action
   await expect(page.locator('[data-section="plus-own"] .circle-vandaag-plus__act').first()).toBeVisible();
   await expect(page.locator('[data-section="plus-me"] .circle-vandaag-plus__me[data-me="share-contact"]')).toBeVisible();
 });
+
+test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circle', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  // pin an own act from the sheet (☆ → ★), and it shows under Vastgezet
+  await page.locator('.cc-fab').click();
+  await page.locator('.circle-vandaag-plus__pin[data-act="household.note"]').click();
+  await expect(page.locator('.circle-vandaag-plus__pin[data-act="household.note"]')).toHaveAttribute('data-pinned', 'true');
+  const pinned = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open');
+  await expect(pinned).toHaveCount(1);
+  await pinned.first().click();
+  await expect(page.locator('.circle-vandaag-plus__form[data-act="household.note"]'), 'the pinned act opens its form').toBeVisible();
+  await page.locator('.circle-vandaag-plus__close').click();
+  // a circle's attach entry pinned to the "+" opens THAT circle (a bookmark never runs the op from the sheet)
+  await page.locator('[data-tab="circles"]').first().click();
+  await page.locator('.circle-tile').first().click();
+  await page.locator('.circle-view__attach').first().click();
+  await page.locator('.circle-view__attach-pin').first().click();
+  await page.locator('.cc-fab').click();
+  const bm = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open').filter({ hasText: ':' });
+  await expect(bm, 'the bookmark is under Vastgezet, in its circle\'s name').toHaveCount(1);
+  await bm.first().click();
+  await expect(page.locator('.circle-vandaag-plus'), 'the sheet closed: a bookmark opens its circle, it does not run there').toHaveCount(0);
+  await expect(page.locator('.circle-view__attach').first(), 'the circle is open').toBeVisible({ timeout: 10_000 });
+});

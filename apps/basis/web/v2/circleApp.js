@@ -18,6 +18,7 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
 import { meActionsFor } from '../../src/v2/meActionProjection.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
@@ -4305,6 +4306,9 @@ function shellGovernance({ myWebid = '' } = {}) {
   });
 }
 
+/** A bookmark the "+" sheet opened: its circle opens, then that op's form — once the circle's menu has resolved. */
+let _pendingPinOpen = null;
+
 /** What each DECLARED Me action (manifest `meActions`) does here — from Me and from the "+" sheet alike. */
 function runMeAction(id) {
   if (id === 'share-contact') { showShareMyContact(); return; }
@@ -4333,6 +4337,23 @@ function showVandaagPlus({ edit = null } = {}) {
   let line = '';
   let error = null;
   let referral = null;   // the line named something that lives in a circle: where (opened, never acted on)
+  // Vastgezet: what this person pinned, as it can be painted now (a bookmark only while its circle is theirs and shows
+  // the op there), each with its words; computed after open (availability is async), then the sheet paints again
+  let pinnedView = [];
+  const myCircles = () => (circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id));
+  const refreshPins = async () => {
+    const pins = pinsOf(_screensBook ?? {});
+    const ids = [...new Set(pins.filter((p) => p.kind === 'bookmark').map((p) => p.circleId))];
+    const avs = Object.fromEntries(await Promise.all(ids.map(async (cid) => [cid, await circleOpAvailability(cid).catch(() => null)])));
+    const entries = attachEntriesFor({ manifestsByOrigin: circleManifestsByOrigin ?? {} });
+    pinnedView = paintablePins(pins, { circles: myCircles(), availabilityOf: (cid) => avs[cid] ?? null, ownActIds: PLUS_ACTS.map((x) => x.id) }).map((p) => {
+      if (p.kind === 'own') { const a = PLUS_ACTS.find((x) => x.id === p.actId); return { ...p, key: pinKey(p), label: a ? plusLabel(t, a) : p.actId }; }
+      const e = entries.find((x) => x.appOrigin === p.appOrigin && x.opId === p.opId);
+      return { ...p, key: pinKey(p), label: t('circle.vandaag.pin_bookmark', { name: p.name || t('circle.screens.untitled'), op: t(e?.label ?? p.opId) }) };
+    });
+    paint();
+  };
+  const pinOp = async (opId, args) => { await Promise.resolve(rawCallSkill('basis', opId, args)).catch(() => null); _screensBook = await userScreenStore.get(); await refreshPins(); };
   // written as the one self ticked in the header; with several ticked, the sheet asks which
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
@@ -4349,6 +4370,21 @@ function showVandaagPlus({ edit = null } = {}) {
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, referral,
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
+    pinned: pinnedView,
+    pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
+    onTogglePin: (actId) => {
+      const own = { kind: 'own', actId };
+      const on = pinsOf(_screensBook ?? {}).some((p) => pinKey(p) === pinKey(own));
+      pinOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own);
+    },
+    onUnpin: (key) => pinOp('screen-unpin', { key }),
+    // an own pin chooses its act here; a BOOKMARK opens its circle with that op's form — never run from the sheet
+    onOpenPin: (p) => {
+      const r = openPin(p, { circles: myCircles() });
+      if (r.error) { error = t(r.error); paint(); return; }
+      if (r.kind === 'own') { actId = r.actId; error = null; paint(); return; }
+      _pendingPinOpen = r; close(); showDetail(r.circleId);
+    },
     meActions: meActionsFor(basisManifest), onMeAction: (id) => { close(); runMeAction(id); },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
@@ -4399,6 +4435,7 @@ function showVandaagPlus({ edit = null } = {}) {
     onClose: () => close(),
   });
   paint();
+  refreshPins().catch(() => {});
 }
 
 function showVandaagCustomise() {
@@ -6793,6 +6830,12 @@ function showCircle(id, circle, policy) {
         availability: av,
         mediaWired: !!circleMedia,
       });
+      // a BOOKMARK opened from the "+" sheet: this circle, that op's form — the same path a tap on the entry takes here
+      if (_pendingPinOpen?.circleId === id) {
+        const want = _pendingPinOpen; _pendingPinOpen = null;
+        const entry = circleAttachMenu.find((e) => e.appOrigin === want.appOrigin && e.opId === want.opId);
+        if (entry) Promise.resolve().then(() => attachCommandDispatch(entry)).catch(() => {});
+      }
     } catch { circleAttachMenu = []; }
     try { rerender(); } catch { /* the circle may have closed */ }
   })();
@@ -7441,6 +7484,8 @@ function showCircle(id, circle, policy) {
       attachMenu: circleAttachMenu,
       attachFileOpId: 'embed-file',
       onAttachCommand: attachCommandDispatch,
+      // "Pin to +": a bookmark (this circle · the entry's app · its op) in the person's "+" sheet, through the screen op
+      onPinEntry: (entry) => { Promise.resolve(rawCallSkill('basis', 'screen-pin', { kind: 'bookmark', circleId: id, appOrigin: entry.appOrigin, opId: entry.opId })).then(() => userScreenStore.get()).then((b) => { _screensBook = b; }).catch(() => {}); },
       // S1 #1 — noticeboard surface for the noticeboard tab (the view only uses it when active).
       noticeboard: {
         posts:    noticeboardPosts,

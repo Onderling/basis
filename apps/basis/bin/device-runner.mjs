@@ -283,6 +283,9 @@ const agent = await createRealHouseholdAgent({
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
   onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
+  // a refused token, in the walk log (op · reason · grants folded · ms since boot; never the key or args) — L196's
+  // "Token has been revoked" names itself here the next time it happens (the log is defined below; called after boot)
+  onTokenDenied: (e) => walkLog({ kind: 'token-refused', ...e }),
   writeOrigin: () => writeOrigin.getStore() ?? null,
   ...(botInstall ? { ...HOUSEHOLD_BOT_STORE_OPTS, doorOpLevel: botOpLevel, doorRoleAllows: botRoleAllows, trustOwnGrants: true,
     // other agents' calls: a screen's (each demands a token), and the one call a linked person's app makes without a

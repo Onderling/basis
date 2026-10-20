@@ -78,6 +78,8 @@ export class PolicyEngine {
   #skillRegistry;
   #agentPubKey;   // this agent's pubKey, used to verify token.agentId binding
   #isAllowed = null;   // the allow-list (see the constructor)
+  /** told of every refused PRESENTED token: `{code, reason, skillId}` (never the token) — a log's way in, never a gate */
+  #onDenied = null;
 
   #groupManager;
   #isRevoked;
@@ -131,6 +133,7 @@ export class PolicyEngine {
     actorResolver = null,
     selfIds       = [],
     isAllowed     = null,
+    onDenied      = null,
   }) {
     this.#trustRegistry = trustRegistry;
     this.#skillRegistry = skillRegistry;
@@ -138,6 +141,7 @@ export class PolicyEngine {
     this.#groupManager  = groupManager;
     this.#isRevoked     = typeof isRevoked === 'function' ? isRevoked : null;
     this.#isAllowed     = typeof isAllowed === 'function' ? isAllowed : null;
+    this.#onDenied      = typeof onDenied === 'function' ? onDenied : null;
     // SELF, for `private` skills: this agent's own key plus the owner keys its host names here (an in-process host
     // whose only caller is the owner's chat agent names that key). Fixed at construction, like `isRevoked`: there
     // is no setter, so no door, peer or token can be added to self later.
@@ -311,7 +315,18 @@ export class PolicyEngine {
     // token-less by design. (Enabling this per-agent is a separate wiring/tier
     // decision; see PLAN-agent-management-surface.md.)
     if (token) {
-      await this.#verifyPresentedToken(token, { skillId, peerPubKey, myPubKey });
+      try {
+        await this.#verifyPresentedToken(token, { skillId, peerPubKey, myPubKey });
+      } catch (e) {
+        // the refusal stands whatever the hook does; the hook only hears a short reason, never the token
+        if (this.#onDenied && e instanceof PolicyDeniedError) {
+          const msg = String(e.message ?? '');
+          const reason = /has been revoked/.test(msg) ? 'revoked' : /not active/.test(msg) ? 'not-active'
+            : /Revocation check failed/.test(msg) ? 'check-failed' : 'invalid';
+          try { this.#onDenied({ code: e.code, reason, skillId }); } catch { /* a log is not the gate */ }
+        }
+        throw e;
+      }
     }
 
     return { tier, allowed: true };

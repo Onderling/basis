@@ -614,6 +614,8 @@ export async function createSecureAgent(opts = {}) {
       // the allow-list beside the revocation list (fixed at construction like it): see PolicyEngine
       isAllowed:     peOpts.isAllowed     ?? null,
       actorResolver: peOpts.actorResolver ?? null,
+      // told of every refused presented token (a log's way in, never a gate): see PolicyEngine
+      onDenied:      peOpts.onDenied      ?? null,
     });
     // ATTACH it to the agent — without this the engine is built + exposed as
     // `sa.policy` but `agent.policyEngine` stays null, so `runGatedSkill` never

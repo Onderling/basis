@@ -392,6 +392,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   let historyMirrorSync = null;
   /** viewPubKey → { mirror, readsKey } — the per-view "edition" lanes (remote surface reads). */
   const viewLaneMirrors = new Map();
+  const agentBootAt = Date.now();   // a refused token's log line says how long after boot it came (L196)
   let viewLanesSync = null;   // late-bound; surfaceGrants' change hook calls it before it exists
   // The chat lane (same handover point).
   let chatRail = null;
@@ -820,6 +821,16 @@ export async function createRealHouseholdAgent(opts = {}) {
         // signed off the record with this key (a revoked device keeps it) is refused, whatever it says it is. Before
         // the agent's own key is set, nothing is allowed (the gate cannot tell).
         isAllowed: ownGrantsAllowList(() => secureAgentRef.current?.agent?.identity?.pubKey ?? null, () => surfaceGrants),
+        // a refused token, told to the shell's log (`opts.onTokenDenied`): the op, the reason, whether the grants lane had
+        // folded yet, how long since boot — never the token, the key or the args. A screen's "Token has been revoked" was
+        // otherwise seen only on the screen (L196).
+        ...(typeof opts.onTokenDenied === 'function' ? {
+          onDenied: ({ code, reason, skillId }) => opts.onTokenDenied({
+            op: skillId ?? null, reason: `${code}:${reason}`,
+            grantsFolded: typeof surfaceGrants?.isReady === 'function' ? surfaceGrants.isReady() : null,
+            msSinceBoot: Date.now() - agentBootAt,
+          }),
+        } : {}),
       },
     }),
   });

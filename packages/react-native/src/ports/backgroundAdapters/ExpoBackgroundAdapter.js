@@ -12,7 +12,7 @@
  *     from '@onderling/sync-engine-rn';                       // bgRunOnce
  *   import { registerBackgroundFetch, unregisterBackgroundFetch }
  *     from '@onderling/sync-engine-rn';                       // backgroundTasks
- *   import { attachAppStateBridge } from '@onderling/online-cadence';
+ *   const attachAppStateBridge = …;   // an AppState → cadence bridge (online-cadence's retired 2026-10-20)
  *   import * as TaskManager     from 'expo-task-manager';
  *   import * as BackgroundFetch from 'expo-background-fetch';
  *   import { AppState }         from 'react-native';

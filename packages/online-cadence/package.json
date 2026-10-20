@@ -2,14 +2,12 @@
   "private": true,
   "name": "@onderling/online-cadence",
   "version": "0.1.0",
-  "description": "Foreground/background cadence helpers for React Native agents — pure-JS ticker + AppState bridge + bg-task convenience re-exports. Lifted from apps/pinboard-mobile/src/lib/{activeCadence,appStateBridge,bgRunOnce}.js 2026-05-09; Tasks-mobile is the second consumer (rule of two).",
+  "description": "The foreground cadence for React Native agents — a pure-JS ticker that runs in front and stops in the background; the timer behind the host tick (apps/basis/src/v2/hostTick.js). Lifted from pinboard-mobile 2026-05-09; the AppState bridge and bg-task re-exports retired 2026-10-20 (no consumer).",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
-    "./cadence": "./src/cadence.js",
-    "./appStateBridge": "./src/appStateBridge.js",
-    "./bgTask": "./src/bgTask.js"
+    "./cadence": "./src/cadence.js"
   },
   "scripts": {
     "test": "vitest run",

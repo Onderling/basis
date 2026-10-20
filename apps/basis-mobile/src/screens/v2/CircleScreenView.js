@@ -548,8 +548,9 @@ const makeStyles = (theme) => StyleSheet.create({
   moreLink:        { color: theme.color.inkSoft, fontSize: 13, textDecorationLine: 'underline', paddingVertical: 2 },
   blockError:      { borderColor: theme.color.accent, backgroundColor: theme.color.paper2 },
   blockErrorText:  { color: theme.color.accentInk, fontSize: 13 },
-  identityHead:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 },
-  identityName:   { flex: 1, fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
+  // "Edit" beside the name, as on web (`.cc-mij__head`): at the far edge it sat under the header avatar
+  identityHead:   { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  identityName:   { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   identityEdit:   { fontSize: 14, fontWeight: '600', color: theme.color.accent },
   blockTitle:     { fontSize: 11, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 1.4, marginBottom: 8 },
 

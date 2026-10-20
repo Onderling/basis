@@ -46,6 +46,14 @@ export const SCREEN_SECTIONS = Object.freeze({
     Object.freeze({ id: 'proposal-vote',     titleKey: null }),
     Object.freeze({ id: 'proposal-override', titleKey: 'circle.governance.override' }),
   ]),
+  // Vandaag's customise sheet: the page's blocks (move, remove, each one's settings), what can be added, the page itself
+  // (rename, add one, remove it), and undo. The block list is the shared customise model; these are its frame.
+  vandaagCustomise: Object.freeze([
+    Object.freeze({ id: 'customise-blocks', titleKey: 'circle.vandaag.blocks_title' }),
+    Object.freeze({ id: 'customise-add',    titleKey: 'circle.vandaag.add_block_title' }),
+    Object.freeze({ id: 'customise-page',   titleKey: 'circle.vandaag.page_title' }),
+    Object.freeze({ id: 'customise-undo',   titleKey: 'circle.vandaag.undo' }),
+  ]),
 });
 
 /**

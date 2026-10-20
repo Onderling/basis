@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * lint-css-tokens — every colour/size token the web shell uses (`var(--name)`) is one a web stylesheet DEFINES.
+ * lint-css-tokens — every `var(--name)` in ANY web file (all of apps/basis/web: style.css, inline `cssText` in the JS) is one a web stylesheet DEFINES; `theme-tokens` covers circle.css + the theme file only.
  *
  * A token nobody defines falls back to its literal (`var(--surface, #fff)` is just `#fff`), and a literal does not
  * follow the theme: the "+" sheet on Vandaag stayed white in dark mode (Frits, 2026-10-20) because `--surface` was never

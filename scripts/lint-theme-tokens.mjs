@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/**
+ * lint-theme-tokens — the web design system's drift guards (theme.css regenerates clean; circle.css uses only defined tokens; no live hex); `css-tokens` extends the defined-token check to every web file.
  * lint-theme-tokens — the web design system's drift guards, in the aggregate (`npm run guards`).
  *
  * `apps/basis/scripts/theme-fitness.mjs` holds them: theme.css regenerates clean from the shared tokens; every

@@ -172,6 +172,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       break;
     case 'rules':        renderRules(section, block, tr);        break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
+    case 'awaiting':      renderAwaiting(section, block, tr, onAction); break;
     case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
     case 'identityLine': renderIdentityLine(section, block, tr, onAction); break;
     case 'agents':       renderAgents(section, block, tr, onAction);       break;
@@ -236,6 +237,24 @@ function renderPhoto(section, block, _tr) {
 
 // The circles with news: each a row with its name and how many unread; a tap opens the circle (the screen's
 // `onAction({ kind: 'open-circle', circleId })`, the same act the launcher's tile does).
+/** Mij's "wat wacht op jou": one chip per waiting thing, each OPENING where it lives (`awaiting.js`; nothing acts here). */
+function renderAwaiting(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr('circle.recipe.block.awaiting');
+  section.appendChild(title);
+  for (const it of block.content?.items ?? []) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cc-btn cc-btn--quiet circle-screen__awaiting';
+    b.dataset.kind = it.kind;
+    if (it.circleId) b.dataset.circleId = it.circleId;
+    b.textContent = tr(it.labelKey, { count: it.count, name: it.name ?? '' });
+    if (typeof onAction === 'function') b.addEventListener('click', () => onAction({ ...it.open }));
+    section.appendChild(b);
+  }
+}
+
 function renderCirclesUnread(section, block, tr, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';

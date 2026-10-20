@@ -1488,3 +1488,4 @@
 /* a row's own act ("Change"): a quiet text button, the accent's ink only on hover */
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
+.circle-screen__items-list { list-style: none; margin: 0; padding: 0; }

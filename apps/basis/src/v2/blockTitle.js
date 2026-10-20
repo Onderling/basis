@@ -16,6 +16,8 @@ const NAMED = new Set(['quickActions', 'announcement', 'noticeboard', 'calendar'
 
 /** What the empty line says, by kind (the others: "nothing yet"). */
 const EMPTY_KEY = { calendar: 'circle.screen.block_empty_planned', tasks: 'circle.screen.block_empty_open', circlesUnread: 'circle.screen.block_empty_news' };
+/** …and a projected list says what its noun's kind would (the agenda's appointments, a task list's tasks). */
+const EMPTY_KEY_BY_NOUN = { 'calendar-event': EMPTY_KEY.calendar, task: EMPTY_KEY.tasks };
 
 /**
  * @param {{type: string, titleKey?: string, content?: {noun?: string}}} block   a materialised block
@@ -32,5 +34,6 @@ export function blockTitle(block, t) {
 
 /** The one quiet line an empty block shows. */
 export function blockEmptyLine(block, t) {
-  return t(EMPTY_KEY[block?.type] ?? 'circle.screen.block_empty', { title: blockTitle(block, t) });
+  const key = EMPTY_KEY[block?.type] ?? (block?.type === 'items' ? EMPTY_KEY_BY_NOUN[block?.content?.noun] : null) ?? 'circle.screen.block_empty';
+  return t(key, { title: blockTitle(block, t) });
 }

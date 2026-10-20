@@ -14,6 +14,9 @@ describe("a block's title and empty line (Vandaag polish)", () => {
     expect(blockEmptyLine({ type: 'calendar', status: 'empty' }, t)).toBe('Agenda — nothing planned');
     expect(blockEmptyLine({ type: 'tasks', status: 'empty' }, t)).toBe('Tasks — nothing open');
     expect(blockEmptyLine({ type: 'circlesUnread', status: 'empty' }, t)).toBe('Circles with news — none');
+    // …and a projected list of appointments or tasks says the same as its kind does
+    expect(blockEmptyLine({ type: 'items', status: 'empty', content: { noun: 'calendar-event' } }, t)).toMatch(/— nothing planned$/);
+    expect(blockEmptyLine({ type: 'items', status: 'empty', content: { noun: 'task' } }, t)).toMatch(/— nothing open$/);
   });
   it("a block's own title wins", () => {
     expect(blockTitle({ type: 'calendar', titleKey: 'circle.recipe.block.notes' }, t)).toBe('Notes');

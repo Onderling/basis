@@ -10,6 +10,8 @@
 
 import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../src/v2/circlePolicy.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { deadlineLine } from '../../src/v2/governanceView.js';
+import { dateLocaleOf } from '../../src/v2/whenWords.js';
 
 /** decision-class / action / status → a locale key (values carry hyphens; keys don't). */
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -81,7 +83,7 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
         tr('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })));
     }
     if (row.deadline != null) {
-      meta.appendChild(el('span', 'circle-governance__deadline', tr('circle.governance.deadline')));
+      meta.appendChild(el('span', 'circle-governance__deadline', deadlineLine(row.deadline, { t: tr, locale: dateLocaleOf(tr) })));
     }
     if (row.approved && row.awaitingEnactment) {
       meta.appendChild(el('span', 'circle-governance__awaiting', tr('circle.governance.awaiting_enactment')));

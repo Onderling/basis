@@ -7128,6 +7128,11 @@
       }
     }
   },
+  "when": {
+    "today_at": { "text": "today at {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
+    "tomorrow_at": { "text": "tomorrow at {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
+    "closed": { "text": "closed", "doc": "A deadline that has passed." }
+  },
   "governance": {
     "title": {
       "text": "Decisions",
@@ -7204,8 +7209,8 @@
       "doc": "Governance — the running vote tally."
     },
     "deadline": {
-      "text": "has a deadline",
-      "doc": "Governance — this vote has a closing deadline."
+      "text": "closes {{when}}",
+      "doc": "Governance — when this vote closes ({{when}}: today/tomorrow at a time, else the date)."
     },
     "awaiting_enactment": {
       "text": "awaiting an admin",

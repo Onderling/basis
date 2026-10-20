@@ -102,6 +102,9 @@ importers:
       '@onderling/pod-search':
         specifier: workspace:*
         version: link:../../packages/pod-search
+      '@onderling/qr':
+        specifier: workspace:*
+        version: link:../../packages/qr
       '@onderling/recipe-loader':
         specifier: workspace:*
         version: link:../../packages/recipe-loader

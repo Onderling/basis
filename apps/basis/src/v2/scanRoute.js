@@ -11,6 +11,7 @@
  * The classifier list moved here from mobile's `core/qrClassifiers.js` (which now re-exports it), unchanged in what it
  * reads and in its order, so the native scanner and the router cannot disagree. Pure JS, no camera.
  */
+import { classifyQrPayload } from '@onderling/qr';
 import { parseInviteDeepLink } from './inviteDeepLink.js';
 import { enrollOfferFromLink } from './enrollOffer.js';
 import { contactCardFromLink } from './contactCardLink.js';
@@ -67,17 +68,11 @@ export function scanOpResultWords(reply) {
  */
 export function routeScan(text) {
   const s = typeof text === 'string' ? text.trim() : '';
-  if (s) {
-    for (const c of SCAN_CLASSIFIERS) {
-      let payload = null;
-      try { payload = c.classify(s); } catch { payload = null; }
-      if (payload != null) {
-        const t = SCAN_TARGETS[c.kind];
-        return { kind: c.kind, payload, target: { kind: t.kind, app: t.app, id: t.id }, needs: t.needs(payload) };
-      }
-    }
-  }
-  return { kind: 'unknown', payload: s };
+  // the one first-match loop (the phone's scanner calls the same one)
+  const hit = s ? classifyQrPayload(s, SCAN_CLASSIFIERS) : { kind: 'unknown' };
+  const t = SCAN_TARGETS[hit.kind];
+  if (!t) return { kind: 'unknown', payload: s };
+  return { kind: hit.kind, payload: hit.payload, target: { kind: t.kind, app: t.app, id: t.id }, needs: t.needs(hit.payload) };
 }
 
 function classifyContact(text) {

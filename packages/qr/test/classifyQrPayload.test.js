@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyQrPayload } from '../../src/qr/classifyQrPayload.js';
+import { classifyQrPayload } from '../src/classifyQrPayload.js';
 
-describe('@onderling/react-native/qr classifyQrPayload — input handling', () => {
+describe('@onderling/qr classifyQrPayload — input handling', () => {
   it('returns {kind:"unknown"} for empty input', () => {
     expect(classifyQrPayload('')).toEqual({ kind: 'unknown' });
     expect(classifyQrPayload(null)).toEqual({ kind: 'unknown' });
@@ -21,7 +21,7 @@ describe('@onderling/react-native/qr classifyQrPayload — input handling', () =
   });
 });
 
-describe('@onderling/react-native/qr classifyQrPayload — dispatch', () => {
+describe('@onderling/qr classifyQrPayload — dispatch', () => {
   it('returns the first matching classifier\'s output', () => {
     const cs = [
       { kind: 'first',  classify: (t) => t.startsWith('a') ? { match: 'a' } : null },

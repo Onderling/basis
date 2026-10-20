@@ -64,6 +64,7 @@ describe('Canonical types — registration via default registry', () => {
       'removed-list',
       'request',
       'reveal-request',
+      'rsvp',
       'shared-ref',
       'task',
       'view',
@@ -123,6 +124,7 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'intention':         { op: 'weekOverview', trigger: { every: 'week', on: 'sun', at: '18:00' }, actsAs: 'telegram:1' },
     // A device of the person, own-devices scope only: its default wire id and its internal id.
     'device-link':       { wireId: 'd-0123', internalId: 'i-0123' },
+    'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
   };
 
   for (const [name, extra] of Object.entries(MINIMAL)) {

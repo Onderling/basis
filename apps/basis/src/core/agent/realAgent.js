@@ -23,6 +23,7 @@
  * the wrapper at `src/web/realAgent.js` + `web/main.js`.
  */
 
+import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
@@ -6438,6 +6439,25 @@ export async function createRealHouseholdAgent(opts = {}) {
         const self = circleSelf(circleId)?.webid ?? null;
         return self && (!named || named === self) ? self : null;
       },
+      // AN ANSWER is signed by the answering self's circle identity, and in an ordinary circle it is from that self's
+      // roster id (never the 'me' placeholder no roster names) — or from the door person the call names (a function
+      // profile's `telegram:…`). Which answers stand is the roster's rule (rsvpItems.js `rosterAnswerRule`): this
+      // node's own circle identity vouches for door people only when this node is composed as a household's bot.
+      answererFor: (circleId, named) => {
+        if (isPairCircleId(circleId)) { const self = circleSelf(circleId)?.webid ?? null; return self && (!named || named === self) ? self : null; }
+        return named ?? circleSelf(circleId)?.webid ?? null;
+      },
+      signerFor: (circleId) => circleIdentityFor(circleId),
+      encode: b64encode,
+      answerRuleFor: async (circleId) => {
+        const rows = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members) ?? [];
+        // the node composed as a household's bot (its calendar in the circle — the function profile that hosts door
+        // people) vouches for its door people's answers with its own circle identity; a person's node vouches for no one
+        const hostsDoors = opts.calendarInCircle === true;
+        const mine = (await circleIdentityFor(circleId).catch(() => null))?.pubKey ?? null;
+        const self = circleSelf(circleId)?.webid ?? null;
+        return rosterAnswerRule({ rows, verify: AgentIdentity.verify, vouchers: hostsDoors && mine ? [mine] : [], own: mine && self ? { address: mine, selves: [self] } : null });
+      },
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */
     const writeSharedCopy = async (ev, pairCircleId) => {
@@ -8301,7 +8321,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     reminderSources: async () => {
       const store = householdService.stores.getStore(homeCircleId);
-      const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
+      const [chores, raw, answers] = await Promise.all([store.listByType('task'), store.listByType('calendar-event'), store.listByType(RSVP_TYPE).catch(() => [])]);
+      // who comes is read from the answers, which are their own items (never a field on the event)
+      const events = withAnswers(raw ?? [], answers ?? []);
       // …and the rows of every installed extension's SCHEDULED noun (its declared moment is its reminder anchor)
       const manifests = [...installedExtensions.values()];
       const scheduled = manifests.flatMap((m) => Object.entries(m?.nouns ?? {}).filter(([, n]) => n?.presents?.order === 'asc' && n?.presents?.moment).map(([noun]) => noun));

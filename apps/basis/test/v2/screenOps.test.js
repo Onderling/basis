@@ -85,3 +85,16 @@ describe('the screen book through ops', () => {
     expect((await ops['screen-add-page']({ name: 'x' })).error).toBe('no-screen-book');
   });
 });
+
+describe('Vastgezet through the screen ops', () => {
+  it('a bookmark is kept as its address only; unpin takes it; both are versions an undo steps back', async () => {
+    const { store, ops } = world();
+    expect((await ops['screen-pin']({ kind: 'bookmark', circleId: 'c1', appOrigin: 'pinboard', opId: 'postRequest', args: { text: 'x' } })).ok).toBe(true);
+    expect((await store.get()).pinned).toEqual([{ kind: 'bookmark', circleId: 'c1', appOrigin: 'pinboard', opId: 'postRequest' }]);
+    expect((await ops['screen-pin']({ kind: 'bookmark', circleId: 'c1' })).ok).toBe(false);
+    expect((await ops['screen-unpin']({ key: 'bookmark:c1:pinboard:postRequest' })).ok).toBe(true);
+    expect((await store.get()).pinned ?? []).toEqual([]);
+    await ops['screen-undo']({});
+    expect((await store.get()).pinned).toHaveLength(1);
+  });
+});

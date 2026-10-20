@@ -16,12 +16,13 @@
 import { addScreen, renameScreen, removeScreen, setActiveScreen, updateScreen, setAllCircles, ALL_CIRCLES } from './userScreens.js';
 import { addBlock, removeBlock, moveBlock, updateBlock, blockTypesFor } from './circleRecipe.js';
 import { makeAgentTrailEntry } from '../eventLog.js';
+import { withPin, withoutPin, pinKey, pinsOf } from './plusPins.js';
 
 /** The op ids, as the basis manifest declares them. */
 export const SCREEN_OP_IDS = Object.freeze([
   'screen-add-page', 'screen-remove-page', 'screen-rename-page', 'screen-set-active', 'screen-set-circles',
   'screen-add-block', 'screen-remove-block', 'screen-move-block', 'screen-set-block-config', 'screen-undo',
-  'screen-set-personas',
+  'screen-set-personas', 'screen-pin', 'screen-unpin',
 ]);
 
 const PAGE_PLACE = 'mij';
@@ -61,6 +62,13 @@ export function createScreenOps({ store, log = null, actor = 'owner' } = {}) {
   const onPage = (pageId, fn) => (book) => updateScreen(book, pageId, fn);
 
   return {
+    // Vastgezet: a pin is an address only (`withPin` keeps nothing else); a bookmark is never invoked from the sheet
+    'screen-pin': async ({ kind, actId, circleId, appOrigin, opId } = {}) => {
+      const pin = { kind, actId, circleId, appOrigin, opId };
+      if (!pinKey(pin)) return { ok: false, error: 'bad-pin' };
+      return change('screen-pin', null, (book) => withPin(book, pin));
+    },
+    'screen-unpin': async ({ key } = {}) => change('screen-unpin', (book) => (pinsOf(book).some((p) => pinKey(p) === key) ? null : 'no-such-pin'), (book) => withoutPin(book, key)),
     'screen-add-page': async ({ name, circleIds } = {}) => {
       const filter = Array.isArray(circleIds) && circleIds.length ? circleIds.filter((c) => typeof c === 'string' && c) : ALL_CIRCLES;
       return change('screen-add-page', null, (book) => addScreen(book, str(name), filter));

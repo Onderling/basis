@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2/plusPins.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
@@ -752,6 +753,9 @@ export default function CircleLauncherScreen({
   const [plusShareList, setPlusShareList] = useState(null);
   // a repaint after My data clears this device's usage counts (the store is module-level, not React state)
   const [, setFrequencyTick] = useState(0);
+  // Vastgezet: a bookmark the "+" sheet opened (its circle opens, then that op's form); and the pins as paintable now
+  const [pendingPinOpen, setPendingPinOpen] = useState(null);
+  const [pinnedView, setPinnedView] = useState([]);
   useEffect(() => {
     if (!plusEdit?.act?.share) { setPlusShareList(null); return undefined; }
     let live = true;
@@ -1916,10 +1920,45 @@ export default function CircleLauncherScreen({
   );
 
   const page = (() => {
+  // the pins as they can be painted now (a bookmark only while its circle is the person's and shows the op there)
+  useEffect(() => {
+    if (!plusOpen) return;
+    let alive = true;
+    (async () => {
+      const pins = pinsOf(screensBook ?? {});
+      const manifests = buildManifestsByOrigin();
+      const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
+      const ids = [...new Set(pins.filter((p) => p.kind === 'bookmark').map((p) => p.circleId))];
+      const avs = Object.fromEntries(await Promise.all(ids.map(async (cid) => [cid, await circleAvailabilityFor(cid, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null)])));
+      const entries = attachEntriesFor({ manifestsByOrigin: manifests });
+      const mine = (circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id));
+      const view = paintablePins(pins, { circles: mine, availabilityOf: (cid) => avs[cid] ?? null, ownActIds: PLUS_ACTS.map((x) => x.id) }).map((p) => {
+        if (p.kind === 'own') { const a = PLUS_ACTS.find((x) => x.id === p.actId); return { ...p, key: pinKey(p), label: a ? plusLabel(t, a) : p.actId }; }
+        const e = entries.find((x) => x.appOrigin === p.appOrigin && x.opId === p.opId);
+        return { ...p, key: pinKey(p), label: t('circle.vandaag.pin_bookmark', { name: p.name || t('circle.screens.untitled'), op: t(e?.label ?? p.opId) }) };
+      });
+      if (alive) setPinnedView(view);
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [plusOpen, screensBook, circles, policyStore, overrideStore, bundle?.catalogue]);
+
   // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
   const plusSheet = (
-      <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)} meActions={meActionsMobile(basisManifest)} onMeAction={(id) => { setPlusOpen(false); setPlusEdit(null); onMeAction(id); }} visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
+      <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)}
+        pinned={pinnedView} pinnedActIds={pinsOf(screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId)}
+        onTogglePin={(actId) => { const own = { kind: 'own', actId }; const on = pinsOf(screensBook ?? {}).some((p) => pinKey(p) === pinKey(own)); runScreenOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own); }}
+        onUnpin={(key) => runScreenOp('screen-unpin', { key })}
+        // an own pin chooses its act here; a BOOKMARK opens its circle with that op's form — never run from the sheet
+        onOpenPin={(p) => {
+          const r = openPin(p, { circles: (circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)) });
+          if (r.error) return t(r.error);
+          if (r.kind === 'own') return { actId: r.actId };
+          const c = circles.find((x) => x.id === r.circleId);
+          setPlusOpen(false); setPlusEdit(null); setPendingPinOpen(r); if (c) openCircle(c);
+          return null;
+        }}
+        meActions={meActionsMobile(basisManifest)} onMeAction={(id) => { setPlusOpen(false); setPlusEdit(null); onMeAction(id); }} visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
         selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
         // the free line: the shared reader over the sheet's own acts (never a circle)
         // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
@@ -2443,6 +2482,8 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        onPinEntry={(e) => { if (selected?.id) runScreenOp('screen-pin', { kind: 'bookmark', circleId: selected.id, appOrigin: e.appOrigin, opId: e.opId }); }}
+        openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         circle={selected}
@@ -2894,6 +2935,9 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // "Pin to +" on an attach entry (`onPinEntry(entry)`), and a bookmark opened from the "+" sheet (`openOp`: that op's
+  // form, run once the circle's menu has resolved, then `onOpenOpDone()`)
+  onPinEntry = null, openOp = null, onOpenOpDone = null,
   // the self this device is in this circle (a persona's circle is the persona's): whose drivers it reads
   selfProfileId = 'default',
   // the self's ref in a circle (`agent.circleSelf(cid).webid`) — one function, not the bundle; null → the device's ref
@@ -3412,6 +3456,21 @@ function CircleDetail({
     if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
     return reply;
   }, [onCircleControl, rawCallSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t, circle?.id]);
+  // one entry run, from the attach menu and from a bookmark the "+" sheet opened alike: an entry that needs input opens the
+  // op's OWN form (the shared page sheet the Advanced drawer uses); one that needs none dispatches straight away
+  const runAttachEntry = useCallback((e) => {
+    const required = (Array.isArray(e.params) ? e.params : []).filter((p) => p?.required);
+    if (required.length > 0) setAttachForm(e);
+    else runComposerOp(e.opId, {}, e.appOrigin);
+  }, [runComposerOp]);
+  // a BOOKMARK from the "+" sheet: this circle, that op's form — once the circle's menu has resolved (web twin:
+  // `_pendingPinOpen`); an op the menu does not offer here opens nothing
+  useEffect(() => {
+    if (!openOp || openOp.circleId !== circle?.id || !attachEntries.length) return;
+    const e = attachEntries.find((x) => x.appOrigin === openOp.appOrigin && x.opId === openOp.opId);
+    onOpenOpDone?.();
+    if (e) runAttachEntry(e);
+  }, [openOp, circle?.id, attachEntries, runAttachEntry, onOpenOpDone]);
 
   // The fallback offer speaks HERE while this circle is open (web parity: the chat makes the offer, at the
   // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never
@@ -4810,22 +4869,23 @@ function CircleDetail({
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (
-              <Pressable
-                key={e.opId}
-                style={styles.attachItem}
-                testID={`circle-attach-${e.opId}`}
-                accessibilityRole="button"
-                onPress={() => {
-                  setAttachOpen(false);
-                  const required = (Array.isArray(e.params) ? e.params : []).filter((p) => p?.required);
-                  // An entry that needs input opens the op's OWN form (the shared page sheet the
-                  // Advanced drawer uses); one that needs none dispatches straight away.
-                  if (required.length > 0) setAttachForm(e);
-                  else runComposerOp(e.opId, {}, e.appOrigin);
-                }}
-              >
-                <Text style={styles.attachItemText}>{t(e.label) === e.label ? e.label : t(e.label)}</Text>
-              </Pressable>
+              <View key={e.opId} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Pressable
+                  style={styles.attachItem}
+                  testID={`circle-attach-${e.opId}`}
+                  accessibilityRole="button"
+                  onPress={() => { setAttachOpen(false); runAttachEntry(e); }}
+                >
+                  <Text style={styles.attachItemText}>{t(e.label) === e.label ? e.label : t(e.label)}</Text>
+                </Pressable>
+                {/* "Pin to +": a bookmark in the person's "+" sheet — an address only, it never runs the op from there */}
+                {typeof onPinEntry === 'function' ? (
+                  <Pressable onPress={() => { setAttachOpen(false); onPinEntry(e); }} accessibilityRole="button"
+                    accessibilityLabel={t('circle.vandaag.pin_to_plus')} testID={`circle-attach-pin-${e.opId}`} style={{ paddingHorizontal: 8 }}>
+                    <Text>📌</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ))}
           </View>
         ) : null}

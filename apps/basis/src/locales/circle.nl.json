@@ -1249,6 +1249,10 @@
     "block_unknown": {
       "text": "Onbekend bloktype: {{type}}",
       "doc": "α.1c — forward-compat fallback."
+    },
+    "block_empty_awaiting": {
+      "text": "{{title}} — niets",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
     }
   },
   "vandaag": {
@@ -1656,9 +1660,17 @@
       "onboarding": {
         "text": "Eerste stappen",
         "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+      },
+      "awaiting": {
+        "text": "Wacht op jou",
+        "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
       }
     },
     "block_desc": {
+      "awaiting": {
+        "text": "Wat op jou wacht: een stemming die voor jou open staat, een afspraak om te beantwoorden, een apparaat-aanbod — elk opent waar het hoort.",
+        "doc": "Block table: the one-line description of Mij's waiting-for-you block."
+      },
       "quickActions": {
         "text": "De handelingen die je in deze kring het vaakst doet, als knoppen.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
@@ -7571,6 +7583,18 @@
     "new_persona_offerings_unnamed": {
       "text": "deze persona",
       "doc": "The new-persona form: the name in the offerings question while none is typed yet."
+    },
+    "awaiting_vote": {
+      "text": "{{name}}: {{count}} stemming(en) voor jou open",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_rsvp": {
+      "text": "{{name}}: {{count}} afspra(a)k(en) om te beantwoorden",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_device": {
+      "text": "Er wacht een apparaat-aanbod",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
     }
   },
   "attach": {

@@ -23,7 +23,7 @@ import CircleScreenView from './CircleScreenView.js';
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
  *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
  */
-export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onEditMe, onAdvanced, onMeAction }) {
+export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -44,6 +44,8 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
         online: relays.length ? relays.some((r) => r.connected) : undefined,
         deviceId: (() => { try { return sources.deviceId?.() ?? null; } catch { return null; } })(),
+        ...(typeof sources.openProposals === 'function' ? { openProposals: sources.openProposals } : {}),
+        ...(typeof sources.pendingDeviceOffer === 'function' ? { pendingDeviceOffer: sources.pendingDeviceOffer } : {}),
       } }).catch(() => []);
       if (alive) setBlocks(b);
     })();
@@ -52,7 +54,10 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
 
   const onBlockAction = (a) => {
     if (a?.kind === 'edit-me') onEditMe?.();
-    else if (a?.kind === 'open-my-data') onMyData?.();
+    else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') onMyData?.();
+    // "wat wacht op jou": a chip opens where the thing lives
+    else if (a?.kind === 'open-proposals' && a.circleId) onOpenProposals?.(a.circleId);
+    else if (a?.kind === 'open-circle' && a.circleId) onOpenCircle?.(a.circleId);
   };
   const hasName = Array.isArray(blocks) && blocks.some((b) => b.type === 'identityLine');
 

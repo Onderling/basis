@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { pendingEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
@@ -1032,8 +1033,13 @@ export default function CircleLauncherScreen({
     getPodWriter: () => sessionToPodWriterRN(sessionRef?.current ?? null),
   }), []);
   // What Mij's declared blocks read beside the waist (the identity line's readings, the agents list)
+  // the governance binding, for Mij's reads (made further down; read through a ref when Mij asks, after render)
+  const govPolicyRef = useRef(null);
   const mijSources = useMemo(() => ({
     eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, availabilityStore,
+    // "wat wacht op jou": the votes open in each circle (the same fold the tile badge reads), a device offer here
+    openProposals: (cid) => (govPolicyRef.current ? openPolicyProposals(govPolicyRef.current, cid) : Promise.resolve({ proposals: [] })),
+    pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
     selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
@@ -1099,6 +1105,7 @@ export default function CircleLauncherScreen({
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
     });
   }, [bundle, eventLog, policyStore]);
+  govPolicyRef.current = govPolicy;
   // α.1e — per-circle screen recipe book (multi-recipe; one marked active).
   const recipeStore       = useMemo(() => makeCircleRecipeStoreRN(AsyncStorage), []);
   // α.3 — per-user screens store.  One book per user.
@@ -2043,7 +2050,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}

@@ -35,6 +35,10 @@ export const SCREEN_FILES = Object.freeze({
     web: ['apps/basis/web/v2/vandaagCustomise.js'],
     mobile: ['apps/basis-mobile/src/screens/v2/VandaagCustomiseModal.js'],
   },
+  plusSheet: {
+    web: ['apps/basis/web/v2/vandaagPlus.js'],
+    mobile: ['apps/basis-mobile/src/screens/v2/VandaagPlusModal.js'],
+  },
 });
 
 /** What one shell's text lacks for a screen: the `sectionsOf` call, or a declared section id. */

@@ -45,7 +45,7 @@ Retired with L251 (they drove the classic chat shell, which a person can no long
 
 | Spec | State | Why |
 |---|---|---|
-| `walkFixes20261008` | ✅ 3/3 | the week's walk fixes |
+| `walkFixes20261008` | ✅ 3/3, flaky 2026-10-20 | its person test failed 2 of 5 runs (the add sheet slides, see the gotchas file), and then "a circle opens" fails after it — L370 |
 | `_hello` | ✅ | launch now with synchronization off, like the rest (a synchronized launch hung 180 s) |
 | `circleDefault` | ✅ 1 | the launcher is the default (the "← chat" test retired with the affordance) |
 | `circleScreens` | ✅ 2/2 | rewritten: Availability lives under Me, its Save returns to Me |

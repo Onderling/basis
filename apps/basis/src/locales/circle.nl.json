@@ -1388,6 +1388,10 @@
       "text": "Wijzigen",
       "doc": "The \"+\" sheet's title when opened on an own row (change it or take it away)."
     },
+    "plus_share_none": {
+      "text": "Nog niemand om mee te delen: een contact met wie je een gesprek hebt, staat hier.",
+      "doc": "The \"+\" sheet on an own appointment: no contact a pair circle connects, so nothing to share with."
+    },
     "plus_remove": {
       "text": "Weghalen",
       "doc": "The \"+\" sheet's button that takes an own note/appointment away."

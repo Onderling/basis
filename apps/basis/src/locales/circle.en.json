@@ -1388,6 +1388,10 @@
       "text": "Change",
       "doc": "The \"+\" sheet's title when opened on an own row (change it or take it away)."
     },
+    "plus_share_none": {
+      "text": "Nobody to share with yet: a contact you have written to shows up here.",
+      "doc": "The \"+\" sheet on an own appointment: no contact a pair circle connects, so nothing to share with."
+    },
     "plus_remove": {
       "text": "Remove",
       "doc": "The \"+\" sheet's button that takes an own note/appointment away."

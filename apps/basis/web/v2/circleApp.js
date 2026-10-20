@@ -171,7 +171,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
 import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -4309,8 +4309,11 @@ function showVandaagPlus({ edit = null } = {}) {
     return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
       .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
   };
+  // an own row whose act shares: the contacts it can go to (read once; the sheet paints again when they are in)
+  let shareTargets = null;
+  if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
-    t, actId, values, line, error, selves, asSelf, editing: !!editId,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets,
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
@@ -4338,6 +4341,13 @@ function showVandaagPlus({ edit = null } = {}) {
       if (op.error) { error = t(op.error); paint(); return; }
       const r = await call(op);
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      close(); _showVandaag();
+    } : null,
+    onShare: editId ? async (id, contact) => {
+      const op = plusShareOp(id, { id: editId, with: contact });
+      if (op.error) { error = t(op.error); paint(); return; }
+      const r = await call(op);
+      if (r?.ok === false) { error = r.error ?? t('circle.vandaag.plus_failed', { error: '' }); paint(); return; }
       close(); _showVandaag();
     } : null,
     onClose: () => close(),

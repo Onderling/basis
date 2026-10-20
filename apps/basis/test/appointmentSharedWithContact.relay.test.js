@@ -12,6 +12,7 @@ import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './sup
 import { pairCircleIdFor } from '../src/v2/pairRoster.js';
 import { EventLog } from '../src/eventLog.js';
 import { materializeScreen } from '../src/v2/userScreenBlocks.js';
+import { plusEditFor, plusShareTargets, plusShareOp } from '../src/v2/vandaagPlus.js';
 
 const bootPerson = (label) => bootRealAgentNode(label, { contactChannel: true, pairRoster: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), deviceLog: new EventLog({ initial: [], muted: [] }) } });
 const pairEventsOn = async (node, pair) => {
@@ -42,7 +43,12 @@ describe('an own appointment shared with a contact', () => {
     const when = new Date(Date.now() + 2 * 86_400_000); when.setHours(15, 0, 0, 0);
     const made = await anne.agent.callSkill('calendar', 'addEvent', { title: 'Koffie bij Anne', when: when.toISOString(), duration: '1h', attendees: ['someone-else'] });
     expect(made?.ok, JSON.stringify(made)).toBe(true);
-    const shared = await anne.agent.callSkill('calendar', 'shareEvent', { id: made.itemId, with: bob.pubKey });
+    // shared the way the own sheet shares it ("Delen met…"): Bob is among the contacts it offers, and the pick is the op
+    const act = plusEditFor({ id: made.itemId, own: true, fields: { title: 'Koffie bij Anne' } }, 'calendar-event').act;
+    const offered = await plusShareTargets(act, (app, op, args) => anne.agent.callSkill(app, op, args));
+    expect(offered.map((c) => c.id), JSON.stringify(offered)).toContain(bob.pubKey);
+    const op = plusShareOp(act.id, { id: made.itemId, with: bob.pubKey });
+    const shared = await anne.agent.callSkill(op.app, op.opId, op.args);
     expect(shared?.ok, JSON.stringify(shared)).toBe(true);
 
     const onBob = await until(async () => (await pairEventsOn(bob, pair)).find((e) => e.title === 'Koffie bij Anne') ?? null, { timeout: 30_000, step: 300 });

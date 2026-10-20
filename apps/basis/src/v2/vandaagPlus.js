@@ -27,6 +27,8 @@ export function plusActs({ manifestsByOrigin } = {}) {
       .map((f) => Object.freeze({ ...f }))),
     ...(e.edit ? { edit: e.edit } : {}),
     ...(e.remove ? { remove: e.remove } : {}),
+    // whom it goes to: the source the share op's `with` declares (read from that op, not the entry's add op)
+    ...(e.share ? { share: e.share, shareWith: (byOrigin[e.appOrigin]?.operations ?? []).find((o) => o?.id === e.share)?.params?.find((p) => p?.name === 'with')?.pickerSource ?? null } : {}),
   })));
 }
 
@@ -122,6 +124,32 @@ export function plusRemoveOp(actId, { id, acts = PLUS_ACTS } = {}) {
   const act = actOf(actId, acts);
   if (!act?.remove || !id) return EMPTY;
   return { app: act.appOrigin, opId: act.remove, args: { circleId: OWN_DEVICES_SCOPE, id } };
+}
+
+/**
+ * Sharing an own item with a contact ("Delen met…"): the act's share op, for the contact picked — or `{error}`.
+ * The item stays the person's own; the op puts a copy in the pair circle the two of them share.
+ */
+export function plusShareOp(actId, { id, with: who, acts = PLUS_ACTS } = {}) {
+  const act = actOf(actId, acts);
+  if (!act?.share || !id || !word(who)) return EMPTY;
+  return { app: act.appOrigin, opId: act.share, args: { circleId: OWN_DEVICES_SCOPE, id, with: word(who) } };
+}
+
+/**
+ * Whom an own item can be shared with: the contacts the share op's `with` names as its source (the person's book),
+ * only those a pair circle already connects — a copy goes nowhere else. Each: its id the value, its name the label.
+ * @param {object} act
+ * @param {(app: string, op: string, args: object) => Promise<any>} call
+ * @returns {Promise<Array<{id: string, label: string}>>}
+ */
+export async function plusShareTargets(act, call) {
+  const src = act?.shareWith;
+  if (!act?.share || !src?.listOp || typeof call !== 'function') return [];
+  const r = await Promise.resolve(call(src.appOrigin ?? act.appOrigin, src.listOp, {})).catch(() => null);
+  return (Array.isArray(r?.items) ? r.items : [])
+    .filter((c) => c?.id && c.pairCircleId)
+    .map((c) => ({ id: String(c.id), label: String(c.label ?? c.id) }));
 }
 
 /** The words an act's noun goes by, in every language its manifest names it ("notitie", "afspraak", "appointment"). */

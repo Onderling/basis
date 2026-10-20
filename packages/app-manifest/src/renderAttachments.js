@@ -55,6 +55,8 @@ export function renderAttachments(manifest) {
         // the ops that change and take away what this entry made (a sheet opened on an existing item)
         ...(typeof a.edit === 'string' ? { edit: a.edit } : {}),
         ...(typeof a.remove === 'string' ? { remove: a.remove } : {}),
+        // …and the op that shares it with a contact (an own item only)
+        ...(typeof a.share === 'string' ? { share: a.share } : {}),
       };
     });
 

@@ -25,6 +25,27 @@ describe('lint-unstyled-buttons', () => {
     ].join('\n');
     expect(scanSource(src, isStyled)).toEqual([]);
   });
+  it('the LAST class counts: a helper that overwrites the family with its own unstyled class is counted', () => {
+    const src = [
+      "function button(cls) {",
+      "  const b = document.createElement('button');",
+      "  b.className = 'cc-btn cc-btn--quiet';",
+      "  b.className = cls;",
+      "}",
+    ].join('\n');
+    expect(scanSource(src, isStyled).map((h) => h.name)).toEqual(['b']);
+  });
+  it("a variable reused for the next button does not lend it the next one's class", () => {
+    const src = [
+      "const cancel = document.createElement('button');",
+      "cancel.textContent = 'x';",
+      "if (y) {",
+      "  const cancel = document.createElement('button');",
+      "  cancel.className = 'cc-btn cc-btn--quiet';",
+      "}",
+    ].join('\n');
+    expect(scanSource(src, isStyled).map((h) => h.line)).toEqual([1]);
+  });
   it('passes on the repo as it stands', () => {
     const r = spawnSync(process.execPath, ['scripts/lint-unstyled-buttons.mjs'], { encoding: 'utf8' });
     expect(r.status, r.stdout + r.stderr).toBe(0);

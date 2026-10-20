@@ -79,9 +79,8 @@ export function buildAttachControl({
   }
 
   const trigger = document.createElement('button');
-  trigger.className = 'cc-btn cc-btn--quiet';
   trigger.type = 'button';
-  trigger.className = namer('attach');
+  trigger.className = `cc-btn cc-btn--quiet ${namer('attach')}`;
   trigger.textContent = '+';
   if (menuLabelKey) {
     trigger.title = t(menuLabelKey);
@@ -109,9 +108,8 @@ export function buildAttachControl({
   menu.setAttribute('role', 'menu');
   for (const entry of entries) {
     const item = document.createElement('button');
-    item.className = 'cc-btn cc-btn--quiet';
     item.type = 'button';
-    item.className = namer('attach-item');
+    item.className = `cc-btn cc-btn--quiet ${namer('attach-item')}`;
     item.setAttribute('role', 'menuitem');
     item.dataset.opId = entry.opId;
     if (entry.itemType) item.dataset.itemType = entry.itemType;

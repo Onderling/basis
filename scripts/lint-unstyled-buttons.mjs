@@ -43,14 +43,18 @@ export function scanSource(src, isStyled) {
     const m = text.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*document\.createElement\(\s*['"]button['"]\s*\)/);
     if (!m) return;
     const v = m[1].replace(/\$/g, '\\$');
-    let classLine = null; let classes = [];
+    // the LAST class the button is given in its set-up counts (a later \`b.className = …\` replaces an earlier one);
+    // a class from an expression the scan cannot read (\`b.className = cls\`, a ternary) is not trusted either:
+    // only the literal words in it count, so a helper must name the family itself
+    let classLine = null; let classes = null;
     for (let j = i; j <= Math.min(lines.length - 1, i + WINDOW); j++) {
-      const cm = lines[j].match(new RegExp(`\\b${v}\\.className\\s*=\\s*[\`'"]([^\`'"]*)`));
-      if (cm) { classLine = j + 1; classes = cm[1].replace(/\$\{[^}]*\}/g, ' ').split(/\s+/).filter(Boolean); break; }
+      if (j > i && /document\.createElement\(\s*['"]button['"]/.test(lines[j]) && new RegExp(`\\b${v}\\s*=`).test(lines[j])) break;   // the variable is reused for the next button
+      const cm = lines[j].match(new RegExp(`\\b${v}\\.className\\s*=\\s*(.*)$`));
+      if (cm) { classLine = j + 1; classes = (cm[1].match(/[\`'"]([^\`'"]*)[\`'"]/g) ?? []).flatMap((x) => x.slice(1, -1).replace(/\$\{[^}]*\}/g, ' ').split(/\s+/)).filter(Boolean); continue; }
       const cl = lines[j].match(new RegExp(`\\b${v}\\.classList\\.add\\(([^)]*)\\)`));
-      if (cl) { classes = (cl[1].match(/['"]([^'"]+)['"]/g) ?? []).map((x) => x.slice(1, -1)); break; }
+      if (cl) classes = [...(classes ?? []), ...(cl[1].match(/['"]([^'"]+)['"]/g) ?? []).map((x) => x.slice(1, -1))];
     }
-    if (!classes.some(isStyled)) hits.push({ line: i + 1, name: m[1], classLine });
+    if (!(classes ?? []).some(isStyled)) hits.push({ line: i + 1, name: m[1], classLine });
   });
   return hits;
 }

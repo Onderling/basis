@@ -108,9 +108,8 @@ export function renderProfileBasics(container, {
   }
   function button(text, cls, onClick) {
     const b = document.createElement('button');
-    b.className = 'cc-btn cc-btn--quiet';
     b.type = 'button';
-    b.className = cls;
+    b.className = `cc-btn cc-btn--quiet ${cls}`;
     b.textContent = text;
     b.addEventListener('click', onClick);
     return b;

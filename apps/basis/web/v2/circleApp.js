@@ -5872,8 +5872,8 @@ function showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = '
       });
       card.appendChild(go);
       const cancel = document.createElement('button');
-      cancel.type = 'button';
       cancel.className = 'cc-btn cc-btn--quiet';
+      cancel.type = 'button';
       cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => { runner.cancel(inst); done(); });

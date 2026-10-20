@@ -146,7 +146,6 @@ export function renderCircleAdminPanel(container, {
       // someone else's row is greyed for a member, with the reason — the skill would refuse it anyway.
       const rc = removeControlFor({ members, member: m, myRef: viewerWebid });
       const rm = document.createElement('button');
-      rm.className = 'cc-btn cc-btn--quiet';
       rm.type = 'button';
       rm.className = rc.kind === 'leave' ? 'cc-admin__member-leave' : 'cc-admin__member-remove';
       rm.textContent = tr(rc.labelKey);

@@ -20,6 +20,10 @@ describe('screenSections', () => {
     expect(sectionsOf('fileBubble').map((s) => s.id)).toEqual(['file-preview', 'file-meta', 'file-save']);
     for (const s of sectionsOf('fileBubble')) if (s.titleKey) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
   });
+  it('an open governance proposal: head · status · tally · deadline · awaiting · vote · override', () => {
+    expect(sectionsOf('governanceProposal').map((s) => s.id)).toEqual(['proposal-head', 'proposal-status', 'proposal-tally', 'proposal-deadline', 'proposal-awaiting', 'proposal-vote', 'proposal-override']);
+    for (const s of sectionsOf('governanceProposal')) if (s.titleKey) expect(has(circleNl, s.titleKey), s.titleKey).toBe(true);
+  });
   it('a screen not declared has no sections; the declaration is frozen', () => {
     expect(sectionsOf('nope')).toEqual([]);
     expect(Object.isFrozen(SCREEN_SECTIONS.adminPanel)).toBe(true);

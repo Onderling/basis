@@ -12,6 +12,7 @@ import { buildCircleLlmProviders } from './circleLlmProviders.js';
 import { buildCircleEmbedProviders } from './circleEmbedProviders.js';
 import { CIRCLE_LLM_ROUTE_PRESETS } from './circleLlmRoutes.js';
 import { assertConfidentialRouteSafe } from '@onderling/llm-client/routeSafety';
+import { resolveCircleLlm } from './llmPicker.js';
 
 /** The provider-map key (`local`|`cloud`) a posture mode resolves to. resolveCircleLlm reads these. */
 function keyForMode(mode) { return mode === 'local' ? 'local' : 'cloud'; }
@@ -107,3 +108,26 @@ export function applyUserLlmRuntime({ userCfg, env, llmProviders, embedProviders
   if (embedProviders) { for (const k of Object.keys(embedProviders)) delete embedProviders[k]; Object.assign(embedProviders, runtime.embedProviders); }
   return { ok: true, mode: runtime.mode, confidential: runtime.confidential };
 }
+
+/**
+ * The person's OWN model — the route they set in their settings (its address, its key, its budget) — for something
+ * that is theirs alone (no circle). The deployment's fallback route is not theirs, so it never counts here: no route
+ * set → null, and whatever asks reads without a model.
+ * @param {{userCfg: object|null, providers: {local?: object, cloud?: object}}} a   the saved setting · the live providers built from it
+ * @returns {object|null}   the LlmClient, or null
+ */
+export function ownModelClient({ userCfg, providers } = {}) {
+  if (!userCfg || !userCfg.llmBaseUrl || modeForUserCfg(userCfg) === 'off') return null;
+  return resolveCircleLlm({ circlePolicy: { llmTool: 'user' }, userDefault: { mode: modeForUserCfg(userCfg) }, providers }) ?? null;
+}
+
+/**
+ * `ownModelClient` straight from the saved setting, for a shell that holds the setting but not the live providers
+ * (they are built here from it alone — the deployment's route is never consulted). Null on no route or a refused one.
+ * @param {object|null} userCfg
+ * @returns {object|null}
+ */
+export function ownModelOf(userCfg) {
+  try { return ownModelClient({ userCfg, providers: buildUserLlmRuntime(userCfg, { env: {} }).llmProviders }); } catch { return null; }
+}
+

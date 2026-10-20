@@ -171,7 +171,8 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -302,7 +303,7 @@ import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
-import { applyUserLlmRuntime, validateUserLlmConfig } from '../../src/v2/userLlmRuntime.js';
+import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
 // basis's own ops, mounted on the agent's waist at boot. Until this, the v2 web shell was the only
@@ -403,12 +404,12 @@ import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
-import { sealItem, isCanonicalPosture, memoryDataSource } from '@onderling/item-store';
+import { sealItem, memoryDataSource } from '@onderling/item-store';
 import { createContactDmStore } from '../../src/v2/contactDmStore.js';
 import { createAttachmentBlobStore } from '../../src/v2/attachmentBlobStore.js';
 import {
   outOfCircleShareOffered,
-  shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
+  shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, adminOutboundShares, stopShareWords, memberRevokeWords, revokeAllForMember,
   shareErrorStatusKey,
 } from '../../src/v2/circleShare.js';
 // objective L · Phase 2 — the out-of-circle recipient picker (thin DOM over the SHARED `pickableRecipients`).
@@ -787,7 +788,7 @@ import { setActiveCircle, getActiveCircle, subscribeActiveCircle } from '../../s
 import { normalizeCircleMembers, recipientSealKeyFromMembers } from '@onderling/kring-host/circleMembers';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
-import { mergeCirclePolicy, mergeMemberOverride, normalizeCirclePolicy, settingsChangeNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
+import { mergeCirclePolicy, mergeMemberOverride, settingsChangeNeedsProposal, policyPatch } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
 import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
@@ -1841,6 +1842,9 @@ let circleSyncFolioNoteEmbedder = null; // 52.25 — re-wire folio /zoek's embed
 // them directly, so every folio-embedder sync threw a ReferenceError instead of setting an embedder. Same
 // publish-a-module-level-handle pattern as the line above.
 let circleResolveRagEmbedder = null;
+// The person's OWN model (their settings' route, never the deployment's fallback), or null — the "+" free line reads
+// with it when the plain reading misses. Published from the same block, same pattern.
+let circleOwnModel = () => null;
 // S6.C — per-user surface preference (inline / screen / minimal); hydrated at boot.
 // Register-backed (the device-params consolidation): the thunk resolves once the agent boots;
 // hydrate() runs post-boot, and set() rides the one kind-gated write.
@@ -2467,6 +2471,7 @@ function buildCircleBot(agent) {
     catch { return null; }
   };
   circleResolveRagEmbedder = resolveCircleRagEmbedder;   // reachable from the agent boot (see declaration)
+  circleOwnModel = () => ownModelClient({ userCfg: userDefault, providers: llmProviders });
   const policyIo = localStoragePolicyIo(sealedKeyValue(globalThis.localStorage, { name: 'the circle policy' }));
   async function policyFor() {
     const cid = getActiveCircle();
@@ -4271,6 +4276,8 @@ async function _showVandaag() {
         seenAt: readSeenAt(), myRefs: unreadMyRefs,
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: mySelfIn,
+        // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
+        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(),
       },
     });
   } catch (err) {
@@ -4284,30 +4291,55 @@ async function _showVandaag() {
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
 // "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
-function showVandaagPlus() {
+function showVandaagPlus({ edit = null } = {}) {
   const { card, close } = _restoreOverlay();
-  let actId = null;
+  // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
+  let actId = edit?.act?.id ?? null;
+  let values = edit?.values ?? {};
+  const editId = edit?.id ?? null;
+  let line = '';
   let error = null;
   // written as the one self ticked in the header; with several ticked, the sheet asks which
-  let asSelf = writeAs(_selfSet.on);
+  // an own row is changed as the self that made it (the row says which); something new as the ticked self
+  let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
   const selves = _selfSet.held.filter((p) => _selfSet.on.includes(p.id));
+  const call = async (op) => {
+    // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
+    const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
+    return Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
+      .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+  };
   const paint = () => renderVandaagPlus(card, {
-    t, actId, error, selves, asSelf,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId,
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
-    onSave: async (id, values) => {
-      const op = plusOp(id, values);
+    // the free line: what it understood selects the act and fills the fields (editable), never a circle
+    // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
+    onRead: async (text) => {
+      line = text;
+      const r = plusRead(text) ?? await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) });
+      if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
+      else error = t('circle.vandaag.plus_line_unread');
+      paint();
+    },
+    onSave: async (id, filled) => {
+      values = filled;
+      const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);
       if (op.error) { error = t(op.error); paint(); return; }
-      // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-      const actAs = asSelf && asSelf !== 'default' ? (_selfSet.held.find((p) => p.id === asSelf)?.webid ?? null) : null;
-      const r = await Promise.resolve(actAs ? circleHouseholdAgent.callSkill(op.app, op.opId, op.args, { actAs }) : rawCallSkill(op.app, op.opId, op.args))
-        .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+      const r = await call(op);
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
-      const follow = plusFollowUp(_screensBook, id);
+      const follow = editId ? null : plusFollowUp(_screensBook, id);
       if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
       close(); _showVandaag();
     },
+    onRemove: editId ? async (id) => {
+      const op = plusRemoveOp(id, { id: editId });
+      if (op.error) { error = t(op.error); paint(); return; }
+      const r = await call(op);
+      if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      close(); _showVandaag();
+    } : null,
     onClose: () => close(),
   });
   paint();
@@ -4342,6 +4374,22 @@ function showVandaagCustomise() {
 // what a block on the person's pages asks for: a circle with news opens that circle, as its launcher tile does
 function onScreenAction(action) {
   if (action?.kind === 'open-circle' && action.circleId) showDetail(action.circleId);
+  // an own row (no circle): the "+" sheet opened on it — change it or take it away
+  else if (action?.kind === 'edit-own') { const edit = plusEditFor(action.item, action.noun); if (edit) showVandaagPlus({ edit }); }
+  // the onboarding strip's acts: the handle through the profile op, the intro card seen on this device, begin
+  else if (action?.kind === 'set-handle') {
+    const op = handleOp(action.value);
+    if (op.error) return;
+    Promise.resolve(rawCallSkill(op.app, op.opId, op.args)).catch(() => null).then(() => _showVandaag());
+  }
+  else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
+  else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
+  else if (action?.kind === 'create-circle') openCreateCircleWizard();
+  else if (action?.kind === 'join-circle') showJoinCircle();
+  // a card's one action that IS an op (a chore done): through the waist, then the page repaints
+  else if (action?.kind === 'row-op' && action.op?.app && action.op?.opId) {
+    Promise.resolve(rawCallSkill(action.op.app, action.op.opId, action.op.args ?? {})).catch(() => null).then(() => _showVandaag());
+  }
 }
 
 // (Batch 5) `showStream` is GONE — the cross-circle Stream VIEW retired (α.3 already removed its tab;
@@ -8290,16 +8338,12 @@ async function showAdmin(id) {
     muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
     // objective L — enumerate what THIS circle has shared OUT (across the known circles) + whether its posture
     // is `canonical` (the only revocable-in-place posture). Both best-effort — a failure just hides the section.
-    try {
-      outboundShares = await listOutboundShares({
-        resolveService: _circleServiceFor,
-        fromCircleId: id,
-        circleIds: circlesCache.map((c) => c.id),
-      });
-    } catch { outboundShares = []; }
-    try {
-      outboundCanonical = isCanonicalPosture(normalizeCirclePolicy(await _circlePolicy(id)).sharePosture);
-    } catch { outboundCanonical = false; }
+    const out = await adminOutboundShares({
+      resolveService: _circleServiceFor, fromCircleId: id, circleIds: circlesCache.map((c) => c.id),
+      policy: await _circlePolicy(id).catch(() => null),
+    });
+    outboundShares = out.shares;
+    outboundCanonical = out.revocable;
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
@@ -8340,9 +8384,8 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       const r = await unshareItemFromCircle({ itemId: s.itemId, fromCircleId: id, toCircleId: s.toCircleId })
         .catch((cause) => ({ ok: false, error: cause?.message ?? 'unknown' }));
-      notice = r?.ok
-        ? t('circle.share.revoked', { item: s.itemId, recipient: s.toCircleId })
-        : t('circle.share.revoke_failed', { error: r?.error ?? 'unknown' });
+      const w = stopShareWords(r, s);
+      notice = t(w.key, w.params);
       busy = false; await load();
     },
     onUnmute: async (key) => {
@@ -8387,8 +8430,8 @@ async function showAdmin(id) {
             circleIds: circlesCache.map((c) => c.id),
             recipient: m.webid,
           });
-          if (res.revoked > 0) notice = t('circle.share.member_revoked', { count: res.revoked });
-          if (res.failed.length > 0) notice = t('circle.share.member_revoke_failed', { count: res.failed.length });
+          const w = memberRevokeWords(res);
+          if (w) notice = t(w.key, w.params);
         } catch { /* best-effort — the removal already succeeded, never block it */ }
       }
       busy = false; await load();

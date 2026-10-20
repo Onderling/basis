@@ -23,6 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
+import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
@@ -145,6 +146,8 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
       + (block.error ? ` — ${block.error}` : '');
     return section;
   }
+  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
+  if (block.type === 'onboarding' && block.status === 'empty') { section.hidden = true; return section; }
   if (block.status === 'empty') {
     section.classList.add('circle-screen__block--empty');
     section.textContent = tr('circle.screen.block_empty', { type: blockName(block, tr) });
@@ -157,16 +160,17 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'text':         renderText(section, block, tr);         break;
     case 'photo':        renderPhoto(section, block, tr);        break;
     case 'noticeboard':  renderNoticeboard(section, block, tr);  break;
-    case 'calendar':       renderAgenda(section, block, tr, highlightRef);       break;
-    case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef); break;
+    case 'calendar':       renderAgenda(section, block, tr, highlightRef, onAction);       break;
+    case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
-      if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef);
-      else if (block.content?.noun === 'calendar-event') renderAgenda(section, block, tr, highlightRef);
-      else renderItems(section, block, tr);
+      if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction);
+      else if (block.content?.noun === 'calendar-event') renderAgenda(section, block, tr, highlightRef, onAction);
+      else renderItems(section, block, tr, onAction);
       break;
     case 'rules':        renderRules(section, block, tr);        break;
     case 'circlesUnread': renderCirclesUnread(section, block, tr, onAction); break;
+    case 'onboarding':   renderOnboarding(section, block, tr, onAction); break;
     case 'identityLine': renderIdentityLine(section, block, tr, onAction); break;
     case 'agents':       renderAgents(section, block, tr, onAction);       break;
     default:
@@ -337,15 +341,12 @@ function renderNoticeboard(section, block, tr) {
   section.appendChild(list);
 }
 
-function renderAgenda(section, block, tr, highlightRef) {
+function renderAgenda(section, block, tr, highlightRef, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
   title.textContent = tr(block.titleKey ?? 'circle.recipe.block.calendar');
   section.appendChild(title);
-
-  const list = document.createElement('ul');
-  list.className = 'circle-screen__agenda-list';
-  for (const ev of block.content?.items ?? []) {
+  const rowOf = (ev) => {
     const li = document.createElement('li');
     li.className = 'circle-screen__agenda-row';
     li.dataset.eventId = ev.id ?? '';
@@ -356,22 +357,129 @@ function renderAgenda(section, block, tr, highlightRef) {
       tag.textContent = whereTag(ev, tr);
       li.appendChild(tag);
     }
+    // the moment in words inside its group ("om 14:00"), then the words — or the merged label as it was stamped
+    if (ev.moment) {
+      const m = document.createElement('span');
+      m.className = 'circle-screen__agenda-moment';
+      m.textContent = ev.moment;
+      li.appendChild(m);
+    }
     const lbl = document.createElement('span');
     lbl.className = 'circle-screen__agenda-label';
-    lbl.textContent = ev.label ?? '';
+    lbl.textContent = (ev.moment ? ev.title : null) || ev.label || '';
     li.appendChild(lbl);
     // S6.B — a chip-tap that referenced this event flashes its row + scrolls to it.
     if (matchesHighlight(ev.id, highlightRef)) {
       li.classList.add('circle-screen__agenda-row--highlight');
       scrollRowIntoView(li);
     }
-    list.appendChild(li);
+    openableOwn(li, ev, 'calendar-event', onAction);
+    primaryButton(li, ev, 'calendar-event', tr, onAction);
+    return li;
+  };
+  // THE DAY'S SHAPE: now · soon · later today · tomorrow · after — the first group open, the rest folded
+  for (const g of agendaGroups(block.content?.items ?? [], { t: tr, locale: dateLocaleOf(tr) })) {
+    const det = document.createElement('details');
+    det.className = 'circle-screen__group';
+    det.dataset.group = g.key;
+    if (g.open) det.open = true;
+    const sum = document.createElement('summary');
+    sum.textContent = `${tr(g.labelKey)} (${g.items.length})`;
+    det.appendChild(sum);
+    const list = document.createElement('ul');
+    list.className = 'circle-screen__agenda-list';
+    for (const ev of g.items) list.appendChild(rowOf(ev));
+    det.appendChild(list);
+    section.appendChild(det);
   }
-  section.appendChild(list);
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */
-function renderItems(section, block, tr) {
+// A row is a CARD with ONE button: the action its noun declares (`item.primary`, the shared `primaryActionFor`) —
+// done (an op through the waist), open the "+" sheet on it, or open its circle. The second action stays where it is.
+function primaryButton(li, item, noun, tr, onAction) {
+  li.classList.add('circle-screen__card');
+  const p = item?.primary;
+  if (!p || typeof onAction !== 'function') return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'circle-screen__row-act';
+  b.dataset.act = p.kind;
+  b.textContent = tr(p.labelKey);
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (p.kind === 'op') onAction({ kind: 'row-op', op: { app: p.app, opId: p.opId, args: p.args } });
+    else if (p.kind === 'edit-own') onAction({ kind: 'edit-own', noun, item });
+    else if (p.kind === 'open-circle') onAction({ kind: 'open-circle', circleId: p.circleId });
+  });
+  li.appendChild(b);
+}
+
+// An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
+// a circle's row stays the circle's.
+function openableOwn(li, item, noun, onAction) {
+  if (!item?.own || typeof onAction !== 'function') return;
+  li.classList.add('circle-screen__row--own');
+  li.tabIndex = 0;
+  li.setAttribute('role', 'button');
+  const open = () => onAction({ kind: 'edit-own', noun, item });
+  li.addEventListener('click', open);
+  li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+}
+
+// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+function renderOnboarding(section, block, tr, onAction) {
+  const act = (a) => { if (typeof onAction === 'function') onAction(a); };
+  const btn = (labelKey, a, cls = '') => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `circle-screen__onb-btn${cls}`;
+    b.textContent = tr(labelKey);
+    b.addEventListener('click', () => act(a));
+    return b;
+  };
+  for (const c of block.content?.cards ?? []) {
+    const card = document.createElement('div');
+    card.className = 'circle-screen__onb-card';
+    card.dataset.card = c.id;
+    const h = document.createElement('h4');
+    h.textContent = tr(`circle.vandaag.onboarding_${c.id}_title`);
+    card.appendChild(h);
+    if (c.id === 'handle') {
+      const p = document.createElement('p');
+      p.textContent = tr('circle.vandaag.onboarding_handle_hint');
+      card.appendChild(p);
+      const form = document.createElement('form');
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'circle-screen__onb-handle';
+      input.placeholder = tr('circle.vandaag.onboarding_handle_ph');
+      input.setAttribute('aria-label', tr('circle.vandaag.onboarding_handle_title'));
+      form.appendChild(input);
+      const save = document.createElement('button');
+      save.type = 'submit';
+      save.className = 'circle-screen__onb-btn';
+      save.textContent = tr('circle.vandaag.onboarding_handle_save');
+      form.appendChild(save);
+      form.addEventListener('submit', (e) => { e.preventDefault(); if (input.value.trim()) act({ kind: 'set-handle', value: input.value }); });
+      card.appendChild(form);
+    } else if (c.id === 'intro') {
+      for (const k of ['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3']) {
+        const p = document.createElement('p');
+        p.textContent = tr(`circle.vandaag.${k}`);
+        card.appendChild(p);
+      }
+      card.appendChild(btn('circle.vandaag.onboarding_intro_more', { kind: 'intro-more' }));
+      card.appendChild(btn('circle.vandaag.onboarding_intro_dismiss', { kind: 'intro-seen' }, ' circle-screen__onb-btn--quiet'));
+    } else if (c.id === 'begin') {
+      card.appendChild(btn('circle.vandaag.onboarding_begin_create', { kind: 'create-circle' }));
+      card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }, ' circle-screen__onb-btn--quiet'));
+    }
+    section.appendChild(card);
+  }
+}
+
+function renderItems(section, block, tr, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
   title.textContent = block.titleKey ? tr(block.titleKey) : nounHeading(tr, block.content?.noun ?? '');
@@ -391,12 +499,14 @@ function renderItems(section, block, tr) {
     const text = document.createElement('span');
     text.textContent = it.label ?? '';
     li.appendChild(text);
+    openableOwn(li, it, block.content?.noun ?? null, onAction);
+    primaryButton(li, it, block.content?.noun ?? null, tr, onAction);
     list.appendChild(li);
   }
   section.appendChild(list);
 }
 
-function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
+function renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
   title.textContent = tr(block.titleKey ?? 'circle.recipe.block.tasks');
@@ -404,7 +514,11 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
 
   const list = document.createElement('ul');
   list.className = 'circle-screen__tasks-list';
-  for (const task of block.content?.items ?? []) {
+  // open chores first; the done ones folded under "gedaan (n)"
+  const { open: openTasks, done: doneTasks } = taskGroups(block.content?.items ?? []);
+  const doneList = document.createElement('ul');
+  doneList.className = 'circle-screen__tasks-list';
+  for (const task of [...openTasks, ...doneTasks]) {
     const li = document.createElement('li');
     li.className = 'circle-screen__tasks-row';
     li.dataset.taskId = task.id ?? '';
@@ -445,9 +559,19 @@ function renderTasks(section, block, tr, onEmbedOpen, highlightRef) {
       }
       li.appendChild(wrap);
     }
-    list.appendChild(li);
+    primaryButton(li, task, 'task', tr, onAction);
+    (task.done ? doneList : list).appendChild(li);
   }
   section.appendChild(list);
+  if (doneTasks.length) {
+    const det = document.createElement('details');
+    det.className = 'circle-screen__group circle-screen__group--done';
+    const sum = document.createElement('summary');
+    sum.textContent = tr('circle.vandaag.tasks_done', { count: doneTasks.length });
+    det.appendChild(sum);
+    det.appendChild(doneList);
+    section.appendChild(det);
+  }
 }
 
 function renderRules(section, block, tr) {

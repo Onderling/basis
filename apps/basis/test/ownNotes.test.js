@@ -144,3 +144,31 @@ describe('the note noun declares `update` — one contract for a circle and for 
   });
 });
 
+describe("an own row made AS a persona is changed AS that persona (the sheet passes its maker's self)", () => {
+  it("the row names its maker self; the sheet's edit runs as it; as the general self it is refused", async () => {
+    const { VaultMemory } = await import('@onderling/vault');
+    const { plusEditFor, plusSaveOp } = await import('../src/v2/vandaagPlus.js');
+    const ds = memoryDataSource();
+    const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), ...PERSON_NODE_STORE_OPTS, ownStore: async () => createOwnDevicesStore({ dataSource: ds }) });
+    const made = await a.callSkill('agents', 'createProfile', { name: 'Werk' });
+    const werk = a.persona(made.id).chatId.pubKey;
+    await a.callSkill('household', op('add'), { circleId: OWN_DEVICES_SCOPE, body: 'werkbriefje' }, { actAs: werk });
+    const held = [{ id: 'default', webid: a.identity?.chat?.pubKey ?? 'me' }, { id: made.id, webid: werk }];
+    const [block] = await materializeScreen({
+      screen: { id: 's', name: 'Vandaag', circleFilter: null, blocks: [{ id: 'n', type: 'notes', config: {} }] },
+      hostOps: { callSkill: (app, o, g) => a.callSkill(app, o, g), circles: [], selfSet: { on: ['default', made.id], held } },
+    });
+    const row = block.content.items.find((r) => r.label === 'werkbriefje');
+    expect(row?.maker, 'the row names the self that made it').toBe(made.id);
+    expect(plusEditFor({ ...row, maker: null }, 'note'), 'a maker not run here: read-only').toBe(null);
+    const edit = plusEditFor(row, 'note');
+    expect(edit?.asSelf).toBe(made.id);
+    const save = plusSaveOp(edit.act.id, { body: 'werkbriefje (bijgewerkt)' }, { id: edit.id });
+    const asGeneral = await a.callSkill(save.app, save.opId, save.args);
+    expect(asGeneral?.ok, 'as the general self: not yours').toBe(false);
+    const asMaker = await a.callSkill(save.app, save.opId, save.args, { actAs: werk });
+    expect(asMaker?.ok, JSON.stringify(asMaker)).not.toBe(false);
+    expect((await createOwnDevicesStore({ dataSource: ds }).listByType('note')).map((n) => n.body)).toContain('werkbriefje (bijgewerkt)');
+  });
+});
+

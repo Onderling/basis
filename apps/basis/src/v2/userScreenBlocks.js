@@ -28,6 +28,8 @@
 
 import { acrossCircles } from './acrossCircles.js';
 import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
+import { primaryActionFor } from './rowPrimary.js';
+import { materializeOnboarding } from './onboardingStrip.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
 import { carriesLabels, normLabel } from './itemLabels.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
@@ -39,6 +41,7 @@ import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeCircleBlock } from './circleRecipeBlocks.js';
 import { buildTilePreviews } from './circleTilePreviews.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
+import { isPairCircleId } from './pairCircleId.js';
 import { normalizeAvailability, isPushSuppressed } from './memberAvailability.js';
 import { linkedBotsOf } from './identityLink.js';
 import { bookRowsOf } from './contactsSource.js';
@@ -121,6 +124,10 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       // the circles with news: each circle's unread lines (another person's, since this device last looked), newest first
       case 'circlesUnread':
         return materializeCirclesUnread(block, activeCircleIds, hostOps);
+
+      // the first steps on this device: the cards left (handle · what Basis is · begin)
+      case 'onboarding':
+        return materializeOnboarding(block, hostOps);
 
       // Me's own blocks: the name with the readings its config names, and the person's agents and devices
       case 'identityLine':
@@ -297,8 +304,15 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
   const names = new Map((circles ?? []).map((c) => [c?.id, c?.name ?? '']));
   const isAgenda = noun === 'calendar-event';
   const until = Date.now() + horizonDays * 86_400_000;
-  const r = activeCircleIds.length ? await acrossCircles({
-    circles: activeCircleIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
+  // appointments shared WITH me by a contact live in our pair circle (a two-member circle, kept off the circle list):
+  // the agenda over every circle reads those too — appointments only, nothing else of a pair circle
+  let readIds = activeCircleIds;
+  if (isAgenda && withOwn) {
+    const mine = ((await callSkill('pinboard', 'listMyCircles', {}).catch(() => null))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId));
+    readIds = [...new Set([...activeCircleIds, ...mine.filter((id) => isPairCircleId(id))])];
+  }
+  const r = readIds.length ? await acrossCircles({
+    circles: readIds.map((id) => ({ id, name: names.get(id) ?? '' })), noun, scope, me: selfIn, limit: 500,
     manifests: ITEM_MANIFESTS,
     callSkill: (app, op, args) => callSkill(app, op, isAgenda ? { ...args, days: horizonDays } : args),
     genericFor: (circleId) => ({ list: async (n) => (await callSkill('household', encodeGenericOpId('household', 'list', n), { circleId }))?.result ?? [] }),
@@ -310,14 +324,17 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     const own = isAgenda
       ? await callSkill('calendar', 'listEvents', { days: horizonDays }).catch((err) => { ownError = String(err?.message ?? err); return null; })
       : await callSkill('household', encodeGenericOpId('household', 'list', noun), { circleId: OWN_DEVICES_SCOPE }).catch((err) => { ownError = String(err?.message ?? err); return null; });
-    let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true }));
+    // the self that made each own item (it is changed as that self, never another): its maker's webid among this
+    // device's selves; no maker, or 'me' (an own appointment is made as 'me'), is the default's; a webid no self here
+    // holds is a self not run on this device — null, so the row stays read-only
+    const byWebid = new Map((selfSet?.held ?? []).filter((x) => x?.webid).map((x) => [x.webid, x.id]));
+    const makerOf = (e) => byWebid.get(e.createdBy) ?? (!selfSet || e.createdBy == null || e.createdBy === 'me' ? 'default' : null);
+    let mine = (Array.isArray(own?.items) ? own.items : []).map((e) => ({ ...e, circleId: null, circleName: '', own: true, maker: makerOf(e) }));
     if (scope === 'mine') mine = mine.filter((e) => presenter.isMine(e, selfIn(null)));
-    // the switcher's set: an own item shows when the self that made it is on — its maker's webid among this device's
-    // selves; any other maker (an own appointment is made as 'me') is the default's
+    // the switcher's set: an own item shows when the self that made it is on; one no self here made shows with the default
     if (selfSet && Array.isArray(selfSet.on) && selfSet.on.length) {
-      const byWebid = new Map((selfSet.held ?? []).filter((x) => x?.webid).map((x) => [x.webid, x.id]));
       const on = new Set(selfSet.on);
-      mine = mine.filter((e) => on.has(byWebid.get(e.createdBy) ?? 'default'));
+      mine = mine.filter((e) => on.has(e.maker ?? 'default'));
     }
     const sign = presenter.order === 'asc' ? 1 : -1;
     rows = [...rows, ...mine].filter((e) => !isAgenda || !presenter.when(e) || presenter.when(e) <= until)
@@ -343,6 +360,15 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     circleId: row.circleId ?? null, circleName: row.circleName ?? '', ...(row.own ? { own: true } : {}), mine: presenter.isMine(row, selfIn(row.circleId ?? null)),
     // what a chore row also shows: its words, its state, its "see also" links
     text: row.text ?? row.label ?? presenter.label(row), ...(row.state ? { state: row.state } : {}), ...(Array.isArray(row.embeds) ? { embeds: row.embeds } : {}),
+    // the row's own words, without the moment the merged label is stamped with (a card says the moment its own way)
+    title: presenter.label(row),
+    // done by its noun's declaration (`presents.done`): the day's shape folds it under "gedaan"
+    ...(presenter.isDone?.(row) ? { done: true } : {}),
+    // the row's ONE action, declared by its noun (`presents.primary`): done · open the sheet on it · open its circle
+    ...((() => { const p = primaryActionFor(row, noun); return p ? { primary: p } : {}; })()),
+    // an own row's own words, as made (the "+" sheet opens on them to change or remove it)
+    ...(row.own ? { maker: row.maker ?? null } : {}),
+    ...(row.own ? { fields: { ...((row.body ?? row.text) != null ? { body: row.body ?? row.text } : {}), ...(row.title != null ? { title: row.title } : {}), ...(row.startsAt ? { when: row.startsAt } : {}) } } : {}),
   }));
   return { blockId: block.id, type: 'items', status: items.length ? 'ok' : 'empty', content: { noun, scope, items } };
 }

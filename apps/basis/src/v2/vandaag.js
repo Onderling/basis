@@ -13,6 +13,8 @@ import { PLANNED_HORIZON_DAYS } from './plannedForMe.js';
 
 /** The first page's blocks, in order: what is on today, what is mine to do, where something is new. */
 export const VANDAAG_DEFAULT_BLOCKS = Object.freeze([
+  // the first steps (handle · what Basis is · begin): the cards go as each is done, then the block shows nothing
+  Object.freeze({ type: 'onboarding', config: Object.freeze({}) }),
   // the week ahead across every circle and my own: Gepland's twin when opened whole ("meer"), by the same window
   Object.freeze({ type: 'calendar', config: Object.freeze({ horizonDays: PLANNED_HORIZON_DAYS, limit: 5 }) }),
   Object.freeze({ type: 'tasks', config: Object.freeze({ scope: 'assigned-to-me', limit: 5 }) }),

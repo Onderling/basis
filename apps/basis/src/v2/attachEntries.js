@@ -25,9 +25,13 @@ import { renderAttachments } from '@onderling/app-manifest';
  * @param {boolean} [a.mediaWired]  does this circle have a sealed-media composition? The FILE entry
  *   (`via: 'media'`) never reaches the waist — it rides the media pipeline — so the catalogue has no
  *   say over it and this is the only question that decides whether it can work.
- * @returns {Array<{opId:string, appOrigin:string, label:string, params?:Array, itemType?:string, group?:string, via?:string}>}
+ * @param {'circle'|'own'} [a.scope]  WHERE the "+" is: a circle's composer (default) or the person's own (Vandaag) —
+ *   only entries declared for it (`surfaces.attach.scopes`, default circle). An `own` entry is offered only when its
+ *   add lands in the own store with no circle named: a noun's generic add (the own route answers a DECLARED atom only,
+ *   and the projection requires `add` to be declared) or an op that says `own`.
+ * @returns {Array<{opId:string, appOrigin:string, label:string, params?:Array, itemType?:string, group?:string, via?:string, scopes:string[], fields?:Array}>}
  */
-export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, mediaWired = false } = {}) {
+export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, mediaWired = false, scope = 'circle' } = {}) {
   const out = [];
   for (const [appOrigin, manifest] of Object.entries(manifestsByOrigin ?? {})) {
     if (!manifest || !Array.isArray(manifest.operations)) continue;
@@ -38,6 +42,7 @@ export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, 
     }
   }
   return out
+    .filter((e) => (Array.isArray(e.scopes) ? e.scopes : ['circle']).includes(scope))
     .filter((e) => (e.via === 'media' ? mediaWired : true))
     .filter((e) => !availability || availability.of(e.opId).state !== 'hidden');
 }

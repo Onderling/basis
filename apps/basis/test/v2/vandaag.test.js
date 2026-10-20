@@ -18,7 +18,7 @@ describe('Vandaag', () => {
     expect(book.screens).toHaveLength(1);
     expect(book.activeId).toBe(book.screens[0].id);
     expect(book.screens[0].blocks.map((b) => b.type)).toEqual(VANDAAG_DEFAULT_BLOCKS.map((b) => b.type));
-    expect(book.screens[0].blocks[0].config.horizonDays).toBe(7);
+    expect(book.screens[0].blocks.find((b) => b.type === 'calendar').config.horizonDays).toBe(7);
     // a person's own changes are never seeded over
     await store.update((cur) => ({ ...cur, screens: [{ ...cur.screens[0], name: 'Mijn dag' }] }));
     expect((await ensureVandaagBook({ store, t })).screens.map((s) => s.name)).toEqual(['Mijn dag']);

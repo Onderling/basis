@@ -261,13 +261,8 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
 
     /** CATCH-UP: ask every sibling for everything. Any ONE complete answer suffices (idempotent landing). */
     async requestFromSiblings() {
-      let addrs = [];
-      try { addrs = (await siblings()) ?? []; } catch { return { requested: 0 }; }
-      let requested = 0;
-      for (const addr of addrs) {
-        try { await sendToPeer(addr, { subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.request }); requested += 1; } catch { /* next sibling */ }
-      }
-      return { requested };
+      const r = await carry({ subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.request }, { sendOpts: {}, quiet: true });
+      return { requested: r.outcomes.filter((o) => !o.error).length };
     },
 
     /** The inbound entries, keyed by subtype — spread into the peer router like every other lane. */

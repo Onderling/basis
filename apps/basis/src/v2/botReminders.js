@@ -79,6 +79,8 @@ export function inQuiet(w, quiet) {
  * @param {object} a
  * @param {Array<{id:string, text?:string, dueAt?:string, completedAt?:any, assignees?:string[], assignee?:string}>} [a.chores]
  * @param {Array<{id:string, title?:string, startsAt?:string, createdBy?:string, rsvp?:object, state?:string, completedAt?:any}>} [a.events]
+ * @param {object[]} [a.others]  rows of a declared scheduled type (an extension's), reminded from its own moment
+ * @param {object[]} [a.manifests]  their declarations
  * @param {Array<{id:string, role?:string, revoked?:boolean, remindersOff?:boolean, quiet?:string|null}>} [a.people]  `quiet`: the person's own quiet hours (else the household's)
  * @param {Record<string, Record<string, string|string[]>>} [a.said]  per person: item id → the slots it was said for
  * @param {number} [a.now]
@@ -89,14 +91,14 @@ export function inQuiet(w, quiet) {
  * @param {(item: object, personId: string) => Array<string|{rule: string, layer: string}>|null} [a.rulesFor]  the layers; absent = the household's rhythm
  * @returns {Array<{personId: string, slot: string, items: Array<{id:string, kind:'chore'|'event', text:string, at:string, slot:string}>}>}
  */
-export function dueReminders({ chores = [], events = [], people = [], said = {}, done = new Set(), now = Date.now(), tz, quiet = QUIET_HOURS, lead = 0, rulesFor = null } = {}) {
+export function dueReminders({ chores = [], events = [], others = [], manifests = [], people = [], said = {}, done = new Set(), now = Date.now(), tz, quiet = QUIET_HOURS, lead = 0, rulesFor = null } = {}) {
   const w = wallClockInTz(now, tz);
   const eveningOpen = w.hour * 60 + w.minute >= Number(REMINDER_MOMENTS.evening.slice(0, 2)) * 60 + Number(REMINDER_MOMENTS.evening.slice(3));
   const slotNow = `${w.year}-${String(w.month).padStart(2, '0')}-${String(w.day).padStart(2, '0')}:${eveningOpen ? 'evening' : 'morning'}`;
   const byId = new Map(people.map((p) => [p.id, p]));
   // quiet hours are each recipient's: their own (`/stil`), else the household's — one person's quiet holds back no one else
   const reachable = (id) => { const p = byId.get(id); return Boolean(p && !p.revoked && !p.remindersOff && p.role !== 'observer' && !inQuiet(w, p.quiet || quiet)); };
-  const occurrences = reminderOccurrences({ chores, events, people, now, tz, rulesFor: rulesFor ?? (() => householdRules(lead)) });
+  const occurrences = reminderOccurrences({ chores, events, others, manifests, people, now, tz, rulesFor: rulesFor ?? (() => householdRules(lead)) });
   // several of one item's rules due at once for one person are ONE line — the nearest kind of notice wins — and all of
   // them are marked as said, so none comes back on the next pass
   const RANK = { before: 0, at: 1, 'evening-before': 2, morning: 3 };

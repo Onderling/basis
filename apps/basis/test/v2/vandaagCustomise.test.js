@@ -30,9 +30,11 @@ describe('Pas aan', () => {
   it('the model lists the page\'s blocks with their controls, and what may be added (the person\'s pages only)', async () => {
     const { store } = await world();
     const m = customiseModel(await store.get());
-    expect(m.blocks.map((b) => b.type)).toEqual(['calendar', 'tasks', 'circlesUnread']);
-    expect(m.blocks[0].controls.map((c) => c.kind)).toEqual(['horizonDays', 'limit']);
-    expect(m.blocks[1].controls.map((c) => c.kind)).toEqual(['scope', 'limit', 'withinDays']);
+    // the first steps on top (the onboarding strip, no settings of its own), then the day
+    expect(m.blocks.map((b) => b.type)).toEqual(['onboarding', 'calendar', 'tasks', 'circlesUnread']);
+    expect(m.blocks[0].controls.map((c) => c.kind)).toEqual([]);
+    expect(m.blocks[1].controls.map((c) => c.kind)).toEqual(['horizonDays', 'limit']);
+    expect(m.blocks[2].controls.map((c) => c.kind)).toEqual(['scope', 'limit', 'withinDays']);
     expect(m.blocks[0].canUp).toBe(false);
     expect(m.addable.map((a) => a.type)).not.toContain('rules');
     expect(m.addable.every((a) => a.descriptionKey.startsWith('circle.recipe.block_desc.'))).toBe(true);
@@ -43,11 +45,11 @@ describe('Pas aan', () => {
     const { store, act } = await world();
     let m = customiseModel(await store.get());
     const base = { pageId: m.pageId };
-    await act('down', { ...base, blockId: m.blocks[0].blockId, index: 0 });
-    expect(getActiveScreen(await store.get()).blocks.map((b) => b.type)).toEqual(['tasks', 'calendar', 'circlesUnread']);
+    await act('down', { ...base, blockId: m.blocks[1].blockId, index: 1 });
+    expect(getActiveScreen(await store.get()).blocks.map((b) => b.type)).toEqual(['onboarding', 'tasks', 'calendar', 'circlesUnread']);
     m = customiseModel(await store.get());
-    await act('config', { ...base, blockId: m.blocks[1].blockId, kind: 'horizonDays', value: 30 });
-    expect(getActiveScreen(await store.get()).blocks[1].config.horizonDays).toBe(30);
+    await act('config', { ...base, blockId: m.blocks[2].blockId, kind: 'horizonDays', value: 30 });
+    expect(getActiveScreen(await store.get()).blocks[2].config.horizonDays).toBe(30);
     await act('add', { ...base, type: 'text' });
     expect(getActiveScreen(await store.get()).blocks.map((b) => b.type)).toContain('text');
     await act('rename-page', { ...base, name: 'Mijn dag' });
@@ -62,7 +64,7 @@ describe('Pas aan', () => {
     const { store, act } = await world();
     const circles = [{ id: 'a', name: 'Thuis' }, { id: 'b', name: 'Werk' }];
     let m = customiseModel(await store.get(), { circles });
-    expect(m.blocks[0].controls.find((c) => c.kind === 'circleIds')?.options.map((o) => o.value)).toEqual(['a', 'b']);
+    expect(m.blocks.find((b) => b.type === 'calendar').controls.find((c) => c.kind === 'circleIds')?.options.map((o) => o.value)).toEqual(['a', 'b']);
     expect(m.blocks.some((b) => b.controls.some((c) => c.kind === 'labels')), 'no block on the first page carries labels').toBe(false);
     await act('add', { pageId: m.pageId, type: 'notes' });
     m = customiseModel(await store.get(), { circles });

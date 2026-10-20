@@ -323,11 +323,11 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const lines = [];
     const remindersOn = threads.remindersOn(person);
     if (remindersOn) {
-      const { events = [], chores = [] } = (await intentions.sources().catch(() => null)) ?? {};
+      const { events = [], chores = [], others = [], manifests = [] } = (await intentions.sources().catch(() => null)) ?? {};
       const rulesFor = (item, pid) => layeredRules({ household, personDefault: threads.reminderDefaultOf?.(pid) ?? null, item: item?.reminders ?? null, personItem: threads.reminderExtraOf?.(pid, item?.id) ?? null });
       // computed for THIS person only: an appointment for everyone is theirs too, a named one only if it names them —
       // and nobody else's layers are ever read
-      for (const o of reminderOccurrences({ events, chores, people: [{ id: person }], now: at, tz, rulesFor, horizon })) {
+      for (const o of reminderOccurrences({ events, chores, others, manifests, people: [{ id: person }], now: at, tz, rulesFor, horizon })) {
         if (o.personId === person) lines.push({ at: o.at, text: tp('circle.bot.planned_reminder', { when: when(o.at), title: o.text, rule: describeRules([o.rule], tp) }) });
       }
     }

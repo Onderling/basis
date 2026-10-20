@@ -216,14 +216,14 @@ import { loadPersonaAvatar } from '../../../../basis/src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../../../basis/src/v2/personaSet.js';
 import PersonaSwitcherModal from './PersonaSwitcherModal.js';
 import FaceView from './FaceView.js';
-import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
+import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource, outboundSharesForAdmin, revokeOutboundForMember, unshareItemFromCircle } from '../../core/circlePods.js';
 import CircleMandatePicker from './CircleMandatePicker.js';
 import { buildCircleLlmProviders } from '../../../../basis/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDispatch.js';
 // the shared confirm gate at the dispatch waist (mobile presenter: Alert.alert, destructive style).
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../basis/src/v2/userLlmDefault.js';
-import { buildUserLlmRuntime, validateUserLlmConfig } from '../../../../basis/src/v2/userLlmRuntime.js';
+import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf } from '../../../../basis/src/v2/userLlmRuntime.js';
 import { formatNearbyLabel } from '../../core/nearbyLabel.js';
 import { t, lang } from '../../core/localisation.js';
 import {
@@ -276,7 +276,8 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusRead, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
+import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
@@ -730,7 +731,8 @@ export default function CircleLauncherScreen({
   // Vandaag: a block of the page opened whole ("meer"), or null; the customise sheet open or not
   const [expandedBlockId, setExpandedBlockId] = useState(null);
   const [customiseOpen, setCustomiseOpen] = useState(false);
-  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": an own note or an own appointment
+  const [plusOpen, setPlusOpen] = useState(false);   // Vandaag's "+": the person's own acts
+  const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   const [screenViewBlocks, setScreenViewBlocks] = useState(null);
   // δ.1 — true while a fresh materialize runs after a cache-hit render.
   // Drives the subtle refresh pip in CircleScreenView.
@@ -1275,7 +1277,9 @@ export default function CircleLauncherScreen({
           hostOps: { callSkill: bundle?.callSkill, eventLog, circles: circlesShown, fetchImpl: getCirclePodFetch() || undefined, seenAt, myRefs: unreadMyRefs,
             ...(heldSelves.length > 1 ? { selfSet: { on: selvesOn, held: heldSelves } } : {}),
             // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
-            selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } } },
+            selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
+            // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
+            allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen() },
         });
         if (!alive) return;
         setScreenViewBlocks(blocks);
@@ -1909,27 +1913,58 @@ export default function CircleLauncherScreen({
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
-              onAction={(a) => { if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); } }} />
+              onAction={(a) => {
+                if (a?.kind === 'open-circle') { const c = circles.find((x) => x.id === a.circleId); if (c) openCircle(c); }
+                // an own row (no circle): the "+" sheet opened on it — change it or take it away
+                else if (a?.kind === 'edit-own') { const e = plusEditFor(a.item, a.noun); if (e) { setPlusEdit(e); setPlusOpen(true); } }
+                // the onboarding strip's acts: the handle through the profile op, the intro card seen here, begin
+                else if (a?.kind === 'set-handle') {
+                  const op = handleOp(a.value);
+                  if (!op.error) Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch(() => null).then(() => refreshScreensBook());
+                }
+                else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
+                else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });
+                else if (a?.kind === 'create-circle') setCreating(true);
+                else if (a?.kind === 'join-circle') setJoinScanOpen(true);
+                // a card's one action that IS an op (a chore done): through the waist, then the page repaints
+                else if (a?.kind === 'row-op' && a.op?.app && a.op?.opId) {
+                  Promise.resolve(bundle?.callSkill?.(a.op.app, a.op.opId, a.op.args ?? {})).catch(() => null).then(() => refreshScreensBook());
+                }
+              }} />
           </ScrollView>
         </View>
         <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
-        <VandaagPlusModal visible={plusOpen} onClose={() => setPlusOpen(false)}
+        <VandaagPlusModal visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
           selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
+          // the free line: the shared reader over the sheet's own acts (never a circle)
+          // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
+          onRead={async (line) => plusRead(line) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') }}
+          onRemove={plusEdit ? async (actId) => {
+            const op = plusRemoveOp(actId, { id: plusEdit.id });
+            if (op.error) return t(op.error);
+            // taken away as the self that made it, like a change
+            const actAs = plusEdit.asSelf && plusEdit.asSelf !== 'default' ? (heldSelves.find((p) => p.id === plusEdit.asSelf)?.webid ?? null) : null;
+            const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+              .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+            if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
+            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
+            return null;
+          } : null}
           onSave={async (actId, values, asSelf) => {
-            // the act's op through the waist (shared `plusOp`), written as the ticked self; a page with no block showing
-            // it gets one (undoable)
-            const op = plusOp(actId, values);
+            // the act's op through the waist (shared `plusOp`, or `plusSaveOp` on an own row), written as the ticked self;
+            // a page with no block showing it gets one (undoable)
+            const op = plusEdit ? plusSaveOp(actId, values, { id: plusEdit.id }) : plusOp(actId, values);
             if (op.error) return t(op.error);
             // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
             const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
             const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
               .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
             if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
-            const follow = plusFollowUp(screensBook, actId);
+            const follow = plusEdit ? null : plusFollowUp(screensBook, actId);
             if (follow) await runScreenOp(follow.opId, follow.args);
-            setPlusOpen(false); refreshScreensBook();
+            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
             return null;
           }} />
       </WithTabBar>
@@ -2047,6 +2082,10 @@ export default function CircleLauncherScreen({
         onBack={() => setView('detail')}
         // a member's own row offers LEAVING (the shared decision): the same leave the tile menu runs, with its confirm
         onLeave={() => onLeaveCircle(selected.id, selected, () => setView('list'))}
+        // what this circle shared out, and taking it back — the shared decision over this device's resolvers
+        outboundFor={() => outboundSharesForAdmin({ fromCircleId: selected.id, circleIds: circles.map((c) => c.id) })}
+        stopShare={(s) => unshareItemFromCircle({ itemId: s.itemId, fromCircleId: selected.id, toCircleId: s.toCircleId })}
+        revokeForRemoved={(webid) => revokeOutboundForMember({ fromCircleId: selected.id, circleIds: circles.map((c) => c.id), recipient: webid })}
       />
     );
   }

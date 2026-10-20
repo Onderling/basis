@@ -130,7 +130,9 @@ export function isCanonicalVerb(verb) { return VERB_SET.has(verb); }
  * (soonest first — the noun is something that is going to happen), 'desc' when the row was made (newest first).
  * `done` says when a row is no longer open: `{ field }` (truthy = closed) or `{ field, values }` (one of these = closed).
  */
-export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine', 'done']);
+export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine', 'done', 'primary']);
+/** A merged view's ONE action on a row (`presents.primary`). */
+export const PRIMARY_ACTIONS = Object.freeze(['complete', 'edit', 'open']);
 
 /**
  * Validate a manifest.
@@ -286,6 +288,8 @@ export function validateManifest(manifest, opts = {}) {
             for (const k of Object.keys(pr)) if (!PRESENT_FACETS.includes(k)) bad(`presents.${k} is not a facet (one of ${PRESENT_FACETS.join(', ')})`);
             for (const k of ['label', 'moment']) if (pr[k] !== undefined && !plainKey(pr[k])) bad(`presents.${k} must be a plain field key`);
             if (pr.order !== undefined && !['asc', 'desc'].includes(pr.order)) bad('presents.order must be "asc" or "desc"');
+            if (pr.primary !== undefined && !PRIMARY_ACTIONS.includes(pr.primary)) bad(`presents.primary must be one of ${PRIMARY_ACTIONS.join(', ')}`);
+            if (pr.primary === 'complete' && !(decl.atoms ?? []).includes('complete')) bad('presents.primary "complete" needs the noun to declare the `complete` atom');
             if (pr.mine !== undefined && !(Array.isArray(pr.mine) && pr.mine.every(plainKey))) bad('presents.mine must be a list of plain field keys');
             const dn = pr.done;
             const word = (v) => typeof v === 'string' && v.trim() !== '';
@@ -294,6 +298,18 @@ export function validateManifest(manifest, opts = {}) {
               && (dn.values === undefined || (Array.isArray(dn.values) && dn.values.every(word))))) {
               bad('presents.done must be { field: <plain key>, values?: [non-empty strings] }');
             }
+          }
+        }
+        // A noun's ATTACH entry (its generic `add` in a "+"): a label key, where it is offered, what the person fills in.
+        if (decl.attach !== undefined) {
+          const at = decl.attach;
+          const bad = (msg) => errors.push({ path: `${np}/attach`, message: msg, code: 'bad-attach' });
+          if (!at || typeof at !== 'object' || Array.isArray(at)) bad('attach must be an object');
+          else {
+            if (!decl.atoms.includes('add')) bad('attach needs the noun to declare the `add` atom');
+            if (at.label !== undefined && typeof at.label !== 'string') bad('attach.label must be a locale key');
+            if (at.scopes !== undefined && !(Array.isArray(at.scopes) && at.scopes.length && at.scopes.every((x) => x === 'own' || x === 'circle'))) bad("attach.scopes must be a non-empty list of 'own' | 'circle'");
+            if (at.fields !== undefined && !(Array.isArray(at.fields) && at.fields.every((f) => f && typeof f.name === 'string' && typeof f.kind === 'string'))) bad('attach.fields must be a list of { name, kind, labelKey? }');
           }
         }
         if (decl.names !== undefined) {

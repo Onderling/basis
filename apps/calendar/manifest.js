@@ -41,7 +41,7 @@ export const calendarManifest = {
   nouns: {
     // shown in a merged view: soonest first; mine when I made it or am asked to it
     'calendar-event': { atoms: ['add', 'list', 'remove', 'claim', 'submit', 'reject'],
-      presents: { label: 'title', moment: 'startsAt', order: 'asc', mine: ['createdBy', 'author', 'actor', 'by', 'attendees'] },
+      presents: { primary: 'open', label: 'title', moment: 'startsAt', order: 'asc', mine: ['createdBy', 'author', 'actor', 'by', 'attendees'] },
       names: { nl: { one: 'afspraak', other: 'afspraken' }, en: { one: 'appointment', other: 'appointments' } } },
   },
 
@@ -76,6 +76,12 @@ export const calendarManifest = {
         { name: 'reminders',     kind: 'string', required: false },
       ],
       surfaces: {
+        // the person's own "+" (Vandaag): an own appointment — with no circle named it lands in the own agenda
+        attach: { label: 'circle.vandaag.plus_own', scopes: ['own'], edit: 'updateEvent', remove: 'cancelEvent',
+          fields: [
+            { name: 'title', kind: 'text', labelKey: 'circle.vandaag.plus_title_ph' },
+            { name: 'when', kind: 'datetime', labelKey: 'circle.vandaag.plus_when' },
+          ] },
         // Part C gate — "schedule X" / "afspraak X" → addEvent{title}. PARTIAL: binds title; the
         // required `when` (a date) is form-elicited.
         slash: { command: '/addappt', body: 'flags',
@@ -211,6 +217,22 @@ export const calendarManifest = {
       surfaces: {
         ui:   { control: 'button', labelKey: 'circle.button.calendar.updateEvent', label: 'Change' },
         chat: { hint: 'change an appointment: a new title and/or a new moment (the length stays)' },
+      },
+    },
+
+    // An own appointment shared with a CONTACT: a copy in their pair circle (title, when, length), re-shared on a move
+    // or a cancel. A person's own act: a button, no chat tool — the model never decides what crosses to a contact.
+    {
+      id:    'shareEvent',
+      verb:  'share',
+      writes: { scope: 'circle' },
+      appliesTo: { type: 'calendar-event', state: ['open'] },
+      params: [
+        { name: 'id',   kind: 'string', required: true, pickerSource: { listOp: 'listEvents' } },
+        { name: 'with', kind: 'string', required: true },
+      ],
+      surfaces: {
+        ui: { control: 'button', labelKey: 'circle.button.calendar.shareEvent', label: 'Share with…' },
       },
     },
 

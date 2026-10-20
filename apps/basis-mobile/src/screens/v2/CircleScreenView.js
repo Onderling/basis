@@ -22,8 +22,9 @@
  * Empty `blocks` array → top-level empty state ("admin hasn't set up
  * a screen yet").
  */
-import React, { useMemo } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
+import React, { useMemo, useState } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
 import { featureActionLabelKey } from '@onderling-app/basis';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { useTheme } from './themeContext.js';
@@ -104,6 +105,8 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
       </View>
     );
   }
+  // the onboarding strip, all its cards done: nothing at all (not a line saying so)
+  if (block.type === 'onboarding' && block.status === 'empty') return null;
   if (block.status === 'empty') {
     return (
       <View style={[...baseStyle, styles.blockEmpty]} testID={`screen-block-${block.blockId}`}>
@@ -119,16 +122,17 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'text':         body = renderText(block, styles); break;
     case 'photo':        body = renderPhoto(block, styles); break;
     case 'noticeboard':  body = renderNoticeboard(block, styles); break;
-    case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
-    case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
+    case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
+    case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
-      if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles);
-      else if (block.content?.noun === 'calendar-event') body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles);
-      else body = renderItems(block, styles);
+      if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction);
+      else if (block.content?.noun === 'calendar-event') body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction);
+      else body = renderItems(block, styles, onAction);
       break;
     case 'rules':        body = renderRules(block, styles); break;
     case 'circlesUnread': body = renderCirclesUnread(block, onAction, styles); break;
+    case 'onboarding':   body = <OnboardingCards block={block} onAction={onAction} styles={styles} />; break;
     case 'identityLine': body = renderIdentityLine(block, onAction, styles); break;
     case 'agents':       body = renderAgents(block, onAction, styles); break;
     default:
@@ -279,50 +283,144 @@ function renderNoticeboard(block, styles) {
   );
 }
 
-function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles) {
-  const items = block.content?.items ?? [];
-  const isCompact = block.config?.compact === true;
-  const rowStyle   = isCompact ? styles.agendaRowCompact   : styles.agendaRow;
-  const labelStyle = isCompact ? styles.agendaLabelCompact : styles.agendaLabel;
+// A row is a CARD with ONE button: the action its noun declares (`item.primary`, the shared `primaryActionFor`) — done
+// (an op through the waist), open the "+" sheet on it, or open its circle. Web twin: circleScreen.js `primaryButton`.
+function PrimaryButton({ item, noun, onAction, styles }) {
+  const p = item?.primary;
+  if (!p || typeof onAction !== 'function') return null;
+  const go = () => {
+    if (p.kind === 'op') onAction({ kind: 'row-op', op: { app: p.app, opId: p.opId, args: p.args } });
+    else if (p.kind === 'edit-own') onAction({ kind: 'edit-own', noun, item });
+    else if (p.kind === 'open-circle') onAction({ kind: 'open-circle', circleId: p.circleId });
+  };
   return (
-    <View>
-      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.calendar')}</Text>
-      {items.map((ev) => {
-        // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
-        // it.  The hit row carries the parent's ref + fires onHighlightLayout once
-        // native layout settles; the panel measures the ref and scrolls to it.
-        const hit = matchesHighlight(ev.id, highlightRef);
-        return (
-          <View
-            key={ev.id ?? Math.random().toString(36)}
-            ref={hit ? highlightRowRef : undefined}
-            onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
-            style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
-          >
-            <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{ev.label ?? ''}</Text>
-          </View>
-        );
-      })}
-    </View>
+    <Pressable style={styles.rowAct} onPress={go} accessibilityRole="button" testID={`row-act-${item.id}`}>
+      <Text style={styles.rowActText}>{t(p.labelKey)}</Text>
+    </Pressable>
   );
 }
 
-/** Rows of any item type across circles: the presenter's label, and which circle it is in. */
-function renderItems(block, styles) {
-  const items = block.content?.items ?? [];
+// An OWN row (no circle) opens the "+" sheet on itself — change it or take it away (`onAction({ kind: 'edit-own' })`);
+// a circle's row stays the circle's. Web twin: circleScreen.js `openableOwn`.
+const OwnRow = React.forwardRef(function OwnRow({ item, noun, onAction, style, children, ...rest }, ref) {
+  if (!item?.own || typeof onAction !== 'function') return <View ref={ref} style={style} {...rest}>{children}</View>;
+  return (
+    <Pressable ref={ref} style={style} accessibilityRole="button" onPress={() => onAction({ kind: 'edit-own', noun, item })}
+      testID={`own-row-${item.id}`} {...rest}>
+      {children}
+    </Pressable>
+  );
+});
+
+// THE ONBOARDING STRIP: the cards left (handle · what Basis is · begin), each with its own act through the host.
+// Web twin: circleScreen.js `renderOnboarding`.
+function OnboardingCards({ block, onAction, styles }) {
+  const [handle, setHandle] = useState('');
+  const act = (a) => { if (typeof onAction === 'function') onAction(a); };
+  const Btn = ({ labelKey, a, quiet = false, testID }) => (
+    <Pressable style={quiet ? styles.onbBtnQuiet : styles.onbBtn} onPress={() => act(a)} accessibilityRole="button" testID={testID}>
+      <Text style={quiet ? styles.onbBtnQuietText : styles.onbBtnText}>{t(labelKey)}</Text>
+    </Pressable>
+  );
   return (
     <View>
-      <Text style={styles.blockTitle}>{block.titleKey ? t(block.titleKey) : nounHeading(t, block.content?.noun ?? '')}</Text>
-      {items.map((it) => (
-        <View key={it.id ?? Math.random().toString(36)} style={styles.agendaRow}>
-          <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>
+      {(block.content?.cards ?? []).map((c) => (
+        <View key={c.id} style={styles.onbCard} testID={`onb-card-${c.id}`}>
+          <Text style={styles.onbTitle}>{t(`circle.vandaag.onboarding_${c.id}_title`)}</Text>
+          {c.id === 'handle' ? (
+            <View>
+              <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_handle_hint')}</Text>
+              <TextInput style={styles.onbInput} value={handle} onChangeText={setHandle} placeholder={t('circle.vandaag.onboarding_handle_ph')}
+                accessibilityLabel={t('circle.vandaag.onboarding_handle_title')} testID="onb-handle" />
+              <Btn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
+            </View>
+          ) : c.id === 'intro' ? (
+            <View>
+              {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
+              <View style={styles.onbRow}>
+                <Btn labelKey="circle.vandaag.onboarding_intro_more" a={{ kind: 'intro-more' }} testID="onb-intro-more" />
+                <Btn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} quiet testID="onb-intro-seen" />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.onbRow}>
+              <Btn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
+              <Btn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} quiet testID="onb-join" />
+            </View>
+          )}
         </View>
       ))}
     </View>
   );
 }
 
-function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles) {
+// A folded group (the day's shape): its heading with the count, open or folded by a tap. Web twin: <details>.
+function Group({ label, open: openAtFirst, styles, testID, children }) {
+  const [open, setOpen] = useState(!!openAtFirst);
+  return (
+    <View testID={testID}>
+      <Pressable onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+        <Text style={styles.groupHead}>{`${open ? '▾' : '▸'} ${label}`}</Text>
+      </Pressable>
+      {open ? children : null}
+    </View>
+  );
+}
+
+function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles, onAction = null) {
+  const isCompact = block.config?.compact === true;
+  const rowStyle   = isCompact ? styles.agendaRowCompact   : styles.agendaRow;
+  const labelStyle = isCompact ? styles.agendaLabelCompact : styles.agendaLabel;
+  const rowOf = (ev) => {
+    // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
+    // it.  The hit row carries the parent's ref + fires onHighlightLayout once
+    // native layout settles; the panel measures the ref and scrolls to it.
+    const hit = matchesHighlight(ev.id, highlightRef);
+    return (
+      <OwnRow
+        key={ev.id ?? Math.random().toString(36)}
+        item={ev} noun="calendar-event" onAction={onAction}
+        ref={hit ? highlightRowRef : undefined}
+        onLayout={hit && onHighlightLayout ? () => onHighlightLayout() : undefined}
+        style={hit ? [rowStyle, styles.rowHighlight] : rowStyle}
+      >
+        {ev.moment ? <Text style={styles.agendaMoment}>{ev.moment}</Text> : null}
+        <Text style={labelStyle}>{whereTag(ev, t) ? `${whereTag(ev, t)} · ` : ''}{(ev.moment ? ev.title : null) || ev.label || ''}</Text>
+        <PrimaryButton item={ev} noun="calendar-event" onAction={onAction} styles={styles} />
+      </OwnRow>
+    );
+  };
+  // THE DAY'S SHAPE: now · soon · later today · tomorrow · after — the first group open, the rest folded
+  const groups = agendaGroups(block.content?.items ?? [], { t, locale: dateLocaleOf(t) });
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.calendar')}</Text>
+      {groups.map((g) => (
+        <Group key={g.key} label={`${t(g.labelKey)} (${g.items.length})`} open={g.open} styles={styles} testID={`agenda-group-${g.key}`}>
+          {g.items.map(rowOf)}
+        </Group>
+      ))}
+    </View>
+  );
+}
+
+/** Rows of any item type across circles: the presenter's label, and which circle it is in. */
+function renderItems(block, styles, onAction = null) {
+  const items = block.content?.items ?? [];
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{block.titleKey ? t(block.titleKey) : nounHeading(t, block.content?.noun ?? '')}</Text>
+      {items.map((it) => (
+        <OwnRow key={it.id ?? Math.random().toString(36)} item={it} noun={block.content?.noun ?? null} onAction={onAction} style={styles.agendaRow}>
+          <Text style={styles.agendaLabel}>{whereTag(it, t) ? `${whereTag(it, t)} · ` : ''}{it.label ?? ''}</Text>
+          <PrimaryButton item={it} noun={block.content?.noun ?? null} onAction={onAction} styles={styles} />
+        </OwnRow>
+      ))}
+    </View>
+  );
+}
+
+function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, onHighlightLayout = null, styles, onAction = null) {
   const items = block.content?.items ?? [];
   const isCompact = block.config?.compact === true;
   const rowStyle    = isCompact ? styles.taskRowCompact    : styles.taskRow;
@@ -331,7 +429,7 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
   return (
     <View>
       <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.tasks')}</Text>
-      {items.map((task) => {
+      {taskGroups(items).open.map((task) => {
         const embeds = embedChipsOf(task);
         // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
         // it.  The hit row carries the parent's ref + fires onHighlightLayout once
@@ -368,9 +466,20 @@ function renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef = null, o
                 })}
               </View>
             )}
+            <PrimaryButton item={task} noun="task" onAction={onAction} styles={styles} />
           </View>
         );
       })}
+      {/* the done chores, folded under "gedaan (n)" */}
+      {taskGroups(items).done.length ? (
+        <Group label={t('circle.vandaag.tasks_done', { count: taskGroups(items).done.length })} open={false} styles={styles} testID="tasks-done">
+          {taskGroups(items).done.map((task) => (
+            <View key={task.id ?? Math.random().toString(36)} style={rowStyle}>
+              <Text style={textStyle}>{task.text ?? ''}</Text>
+            </View>
+          ))}
+        </Group>
+      ) : null}
     </View>
   );
 }
@@ -438,12 +547,26 @@ const makeStyles = (theme) => StyleSheet.create({
   noticeText:          { fontSize: 14, color: theme.color.ink },
   noticeTextCompact:   { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
-  agendaRow:           { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  // a row is a CARD: the words, and ONE button (the action its noun declares)
+  agendaRow:           { paddingVertical: 8, paddingHorizontal: 10, marginVertical: 3, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, flexDirection: 'row', alignItems: 'center', gap: 8 },
   agendaRowCompact:    { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line },
-  agendaLabel:         { fontSize: 14, color: theme.color.ink },
+  agendaLabel:         { fontSize: 14, color: theme.color.ink, flex: 1 },
   agendaLabelCompact:  { fontSize: 12, color: theme.color.ink, lineHeight: 16 },
 
-  taskRow:             { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  taskRow:             { paddingVertical: 8, paddingHorizontal: 10, marginVertical: 3, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  onbCard:             { padding: 12, marginVertical: 4, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card },
+  onbTitle:            { fontSize: 15, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },
+  onbLine:             { fontSize: 13, color: theme.color.inkSoft, marginBottom: 4 },
+  onbInput:            { fontSize: 14, paddingVertical: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, backgroundColor: theme.color.paper, marginVertical: 6 },
+  onbRow:              { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  onbBtn:              { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, backgroundColor: theme.color.accent, alignSelf: 'flex-start' },
+  onbBtnText:          { fontSize: 13, color: theme.color.accentContrast },
+  onbBtnQuiet:         { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, alignSelf: 'flex-start' },
+  onbBtnQuietText:     { fontSize: 13, color: theme.color.ink },
+  groupHead:           { fontSize: 13, color: theme.color.inkSoft, paddingVertical: 4 },
+  agendaMoment:        { fontSize: 13, color: theme.color.inkSoft },
+  rowAct:              { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.paper, marginLeft: 'auto' },
+  rowActText:          { fontSize: 13, color: theme.color.ink },
   taskRowCompact:      { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   taskCircle:          { fontSize: 10, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 },
   taskCircleCompact:   { fontSize: 9,  fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 },

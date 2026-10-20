@@ -730,6 +730,10 @@
       "text": "I don't know that contact.",
       "doc": "Sharing an appointment with someone not in the contacts."
     },
+    "no_self": {
+      "text": "Not saved: this device does not hold the self this contact knows.",
+      "doc": "A calendar write into a pair circle whose self this device does not run: refused, nothing written."
+    },
     "share_no_pair": {
       "text": "There is no conversation with {{name}} yet; share after a first message.",
       "doc": "Sharing before the two have a pair circle (a first message makes it)."

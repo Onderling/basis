@@ -66,16 +66,25 @@ describe('an own appointment shared with a contact', () => {
     expect((block?.content?.items ?? []).map((i) => i.title ?? i.label).join(' | ')).toContain('Koffie bij Anne');
 
     // Bob's answer goes to Anne alone, over the pair lane (an item's own statement)
-    expect((await bob.agent.callSkill('calendar', 'rsvpAccept', { circleId: pair, id: onBob.id }))?.ok).not.toBe(false);
+    const rsvp = await bob.agent.callSkill('calendar', 'rsvpAccept', { circleId: pair, id: onBob.id });
+    expect(rsvp?.ok, JSON.stringify(rsvp)).not.toBe(false);
+    // …written as Bob's SELF in the pair circle (the lens), never as the general 'me': a row authored by someone not on
+    // the pair roster is one the rail may drop
+    const mine = (await pairEventsOn(bob, pair)).find((x) => x.id === onBob.id);
+    expect(Object.keys(mine?.rsvp ?? {}), JSON.stringify(mine)).toEqual([bob.pubKey]);
     const answered = await until(async () => {
       const e = (await pairEventsOn(anne, pair)).find((x) => x.id === onBob.id);
       return e && JSON.stringify(e.rsvp ?? e).includes('accepted') ? e : null;
     }, { timeout: 30_000, step: 300 });
-    // which side stopped it: Bob's own copy without the yes (the write) or with it (the crossing)
-    const sides = answered ? null : JSON.stringify({
-      bob: (await pairEventsOn(bob, pair)).find((x) => x.id === onBob.id)?.rsvp ?? 'no copy',
-      anne: (await pairEventsOn(anne, pair)).find((x) => x.id === onBob.id)?.rsvp ?? 'no copy',
-    });
+    // which side stopped it, and HOW — the probe names its branch: the listing failed, came back empty, holds other
+    // ids, or holds the copy without the yes (the write) / with it (the crossing). 3rd sighting said both "no copy".
+    const side = async (node) => {
+      const r = await node.agent.callSkill('calendar', 'listEvents', { circleId: pair, days: 30 }).catch((e) => ({ thrown: String(e?.message ?? e) }));
+      const items = r?.items ?? r?.events ?? [];
+      const hit = items.find((x) => x.id === onBob.id);
+      return hit ? { rsvp: hit.rsvp ?? null } : { ok: r?.ok ?? null, error: r?.error ?? r?.thrown ?? null, n: items.length, ids: items.slice(0, 4).map((x) => `${x.id}:${x.title}`) };
+    };
+    const sides = answered ? null : JSON.stringify({ rsvp, bob: await side(bob), anne: await side(anne), want: onBob.id });
     expect(answered, `Anne sees Bob's yes on the shared copy ${sides}`).toBeTruthy();
 
     // a move on Anne's side re-shares the SAME copy

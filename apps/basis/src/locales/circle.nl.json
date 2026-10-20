@@ -730,6 +730,10 @@
       "text": "Dat contact ken ik niet.",
       "doc": "Sharing an appointment with someone not in the contacts."
     },
+    "no_self": {
+      "text": "Niet bewaard: op dit apparaat ben je niet degene die dit contact kent.",
+      "doc": "A calendar write into a pair circle whose self this device does not run: refused, nothing written."
+    },
     "share_no_pair": {
       "text": "Met {{name}} is er nog geen gesprek; deel na een eerste bericht.",
       "doc": "Sharing before the two have a pair circle (a first message makes it)."

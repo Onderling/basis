@@ -30,13 +30,21 @@ const RSVP = { rsvpAccept: 'accepted', rsvpDecline: 'declined', rsvpTentative: '
  * @param {(circleId: string) => object} a.storeFor   the circle's own CircleItemStore
  * @param {() => string|null} a.activeCircle
  * @param {(key: string, vars?: object) => string} a.t
- * @param {string} [a.localActor]
+ * @param {string|((circleId: string|null, named: string|null) => string|null)} [a.localActor]  who writes when the call names no actor — per circle,
+ *   so a circle that has a self of its own (a pair circle's lens) is written as that self, never as the general one;
+ *   null = no writer here (the write is refused with `no-self`). EVERY write into a pair circle resolves its author
+ *   here, never at a call site.
  * @returns {Record<string, (args: object) => Promise<object>>} opId → handler
  */
 export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 'me' } = {}) {
   const lists = makeCircleLists({ storeFor, manifests: [calendarManifest] });
   const circleOf = (args) => args?.circleId ?? activeCircle?.() ?? null;
-  const who = (args) => (typeof args?.actor === 'string' && args.actor ? args.actor : localActor);
+  // who writes: a function `localActor` DECIDES per circle (it gets the actor the call names, and may refuse it — a
+  // pair circle is written by its self only); a plain one is the default when the call names no actor
+  const named = (args) => (typeof args?.actor === 'string' && args.actor ? args.actor : null);
+  const who = (args) => (typeof localActor === 'function' ? localActor(circleOf(args), named(args)) : (named(args) ?? localActor));
+  // no writer (a pair circle whose self this device does not run): not ours to write — said, never written
+  const noSelf = () => ({ ok: false, code: 'no-self', error: t('circle.calendar.no_self') });
 
   /** The Agenda: the list whose default child is an event, else the one by the template's name. */
   async function agendaOf(circleId) {
@@ -69,6 +77,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
 
   return {
     addEvent: async (args) => {
+      if (!who(args)) return noSelf();
       const circleId = circleOf(args);
       if (!circleId) return { ok: false, error: t('circle.lists.no_circle') };
       // a circle that has no Agenda yet (only a household's template makes one) gets it with its first appointment,
@@ -141,6 +150,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
 
     /** A new title and/or moment for the appointment (the length stays; a day without a time is the whole day). */
     updateEvent: async (args) => {
+      if (!who(args)) return noSelf();
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
@@ -152,6 +162,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
     },
 
     cancelEvent: async (args) => {
+      if (!who(args)) return noSelf();
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);
@@ -160,6 +171,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
     },
 
     ...Object.fromEntries(Object.entries(RSVP).map(([op, response]) => [op, async (args) => {
+      if (!who(args)) return noSelf();
       const circleId = circleOf(args);
       const { event, among } = await eventOf(circleId, args?.id);
       if (!event) return missing(among);

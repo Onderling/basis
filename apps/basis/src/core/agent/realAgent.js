@@ -260,7 +260,7 @@ import { createLocalBuiltins }             from '../localBuiltins.js';          
 import { mergeManifests }                  from '../../manifestMerge.js';
 import { sharedCopyIdFor, sharedFieldsOf, withSharedMark } from '../../v2/sharedAppointment.js';
 import { personaOfContact, DEFAULT_PERSONA } from '../../v2/contactPersona.js';
-import { pairCircleIdFor } from '../../v2/pairCircleId.js';   // an own appointment shared with a contact
+import { pairCircleIdFor, isPairCircleId } from '../../v2/pairCircleId.js';   // an own appointment shared with a contact
 import { composeExtensions }               from '../../v2/extensionCatalogue.js';   // the extensions a node runs with, checked + their types registered                // the catalogue `/help` prints from
 import { listsManifest }                   from '../../../../lists/manifest.js';         // the composable lists' contract — the default table below serves it
 import { makeListsOps }                    from '../../v2/listsOps.js';
@@ -6416,7 +6416,17 @@ export async function createRealHouseholdAgent(opts = {}) {
       storeFor: (circleId) => householdService.stores.getStore(circleId),
       activeCircle: () => resolveCircleId({}),
       t: tLang,
-      localActor: 'me',
+      // a PAIR circle is written as its self (the lens the contact knows, as `writeSharedCopy` writes the copy): a row
+      // authored by the general 'me' is one no pair roster names, and the rail may drop it (L350's rsvp that vanished)
+      // — and only that self: a pair circle whose self this device does not run is not ours to write (null → `no-self`);
+      // falling back to the general key would be the same defect in another coat. 'me' is for ordinary circles only.
+      // A name the call passes must BE that self in a pair circle (`writeSharedCopy` passes it); any other — 'me' included —
+      // is refused too. An ordinary circle keeps the caller's actor, else 'me'.
+      localActor: (circleId, named) => {
+        if (!isPairCircleId(circleId)) return named ?? 'me';
+        const self = circleSelf(circleId)?.webid ?? null;
+        return self && (!named || named === self) ? self : null;
+      },
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */
     const writeSharedCopy = async (ev, pairCircleId) => {

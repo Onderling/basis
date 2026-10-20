@@ -9,6 +9,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 
@@ -20,7 +21,11 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
   selves = [], writeAsSelf = null,
   // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
-  onOpenCircle = null }) {
+  onOpenCircle = null,
+  // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section
+  meActions = [], onMeAction = null,
+  // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
+  acts = PLUS_ACTS }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -67,11 +72,14 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
-          {!edit && onRead && !(selves.length > 1 && !asSelf) ? (
+          {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
+          {sectionsOf('plusSheet').map((d) => {
+            const piece = {
+              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
             <TextInput style={styles.input} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go"
               placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
-          ) : null}
-          {selves.length > 1 && !asSelf ? (
+          ) : null),
+              'plus-own': () => (selves.length > 1 && !asSelf ? (
             <View>
               <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
               {selves.map((p) => (
@@ -80,7 +88,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                 </Pressable>
               ))}
             </View>
-          ) : !act ? PLUS_ACTS.map((a) => (
+          ) : !act ? acts.map((a) => (
             <Pressable key={a.id} style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
               <Text style={styles.btnText}>{plusLabel(t, a)}</Text>
             </Pressable>
@@ -114,7 +122,20 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                 </View>
               ) : null}
             </View>
-          )}
+          )),
+              // the Me actions — on a fresh sheet only (not while an own row is being changed, nor before the self is picked)
+              'plus-me': () => (!edit && !act && !(selves.length > 1 && !asSelf) && meActions.length ? meActions.map((m) => (
+                <Btn key={m.id} label={t(m.labelKey)} onPress={() => onMeAction?.(m.id)} testID={`vandaag-plus-me-${m.id}`} />
+              )) : null),
+            }[d.id]?.();
+            if (!piece) return null;
+            return (
+              <View key={d.id} testID={d.id}>
+                {d.titleKey ? <Text style={styles.label}>{t(d.titleKey)}</Text> : null}
+                {piece}
+              </View>
+            );
+          })}
           {referral ? referral.map((r) => (
             <Btn key={r.circleId} label={t('circle.vandaag.plus_referral', { name: r.name || t('circle.screens.untitled') })}
               onPress={() => onOpenCircle?.(r.circleId)} testID={`vandaag-plus-referral-${r.circleId}`} />

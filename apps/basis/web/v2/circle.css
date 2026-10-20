@@ -1496,3 +1496,8 @@
 /* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
 .circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
 .circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }
+
+/* THE "+": one floating button on every tab, bottom-right above the tab bar — the page's one accent (terracotta) */
+.cc-fab { position: fixed; right: 20px; bottom: 76px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.cc-fab:hover { filter: brightness(1.08); }
+.circle-vandaag-plus__section h4 { margin: 12px 0 6px; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }

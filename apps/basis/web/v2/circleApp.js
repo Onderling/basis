@@ -19,6 +19,7 @@
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { usageRows } from '../../src/v2/actionFrequency.js';
+import { meActionsFor } from '../../src/v2/meActionProjection.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -4236,13 +4237,7 @@ async function _showVandaag() {
     edit.setAttribute('aria-label', t('circle.vandaag.customise'));
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
-    // the "+": an own note or an own appointment, into the person's own store (never a circle)
-    const plus = document.createElement('button');
-    plus.type = 'button';
-    plus.className = 'circle-vandaag__plus';
-    plus.textContent = `+ ${t('circle.vandaag.plus')}`;
-    plus.addEventListener('click', () => showVandaagPlus());
-    head.appendChild(plus);
+    // the "+" is no longer here: one floating button on every tab (`mountPlusButton`)
   }
   rootEl.appendChild(head);
   if (!screen) return;
@@ -4293,6 +4288,25 @@ async function _showVandaag() {
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
 // "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
+/** What each DECLARED Me action (manifest `meActions`) does here — from Me and from the "+" sheet alike. */
+function runMeAction(id) {
+  if (id === 'share-contact') { showShareMyContact(); return; }
+  if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
+}
+
+/** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
+function mountPlusButton() {
+  if (document.querySelector('.cc-fab')) return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'cc-fab circle-vandaag__plus';
+  b.textContent = '+';
+  b.title = t('circle.vandaag.plus');
+  b.setAttribute('aria-label', t('circle.vandaag.plus'));
+  b.addEventListener('click', () => showVandaagPlus());
+  document.body.appendChild(b);
+}
+
 function showVandaagPlus({ edit = null } = {}) {
   const { card, close } = _restoreOverlay();
   // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
@@ -4318,6 +4332,7 @@ function showVandaagPlus({ edit = null } = {}) {
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, referral,
     acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
+    meActions: meActionsFor(basisManifest), onMeAction: (id) => { close(); runMeAction(id); },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
@@ -4443,10 +4458,7 @@ async function showMij() {
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
     // The Me actions are DECLARED (manifest `meActions`); this is what each id does here.
-    onMeAction: (id) => {
-      if (id === 'share-contact') { showShareMyContact(); return; }
-      if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
-    },
+    onMeAction: runMeAction,
   });
   rerender();
   const relays = (() => { try { return _peerAgent?.relays?.list?.() ?? []; } catch { return []; } })();
@@ -8745,6 +8757,7 @@ async function boot() {
   const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
+  mountPlusButton();
   // IS THIS TAB THE BUILD THE SITE SERVES? A page never updates itself: on 2026-09-19 a laptop ran the build from
   // before the fix that made the phone's messages visible, while the site served the fix. Checked now and every time
   // the tab regains focus; when the site is ahead, a bar at the top says so with one action. A dev build never nags.

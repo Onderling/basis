@@ -14,7 +14,13 @@ const setup = () => {
   registerCanonicalTypes(registry);
   const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
   const ops = makeCircleCalendarOps({ storeFor: (id) => stores.getStore(id), activeCircle: () => null, t,
-    localActor: (circleId) => (circleId === 'pair-x' ? 'lens-key' : circleId === 'pair-none' ? null : 'me') });
+    // the agent's rule, in small: a pair circle is written by its self only (a named actor must BE that self), an
+    // ordinary circle by whoever the call names, else 'me'
+    localActor: (circleId, named) => {
+      const self = circleId === 'pair-x' ? 'lens-key' : circleId === 'pair-none' ? null : undefined;
+      if (self === undefined) return named ?? 'me';
+      return self && (!named || named === self) ? self : null;
+    } });
   return { ops, stores };
 };
 const when = '2026-11-03T13:00:00.000Z';
@@ -30,12 +36,20 @@ describe('the writer per circle', () => {
       expect(e.createdBy, c).toBe(c === 'pair-x' ? 'lens-key' : 'me');
     }
   });
-  it('an actor the call names wins', async () => {
+  it('in an ordinary circle the actor the call names is the writer', async () => {
     const { ops } = setup();
-    const made = await ops.addEvent({ circleId: 'pair-x', title: 'Koffie', startsAt: when });
-    await ops.rsvpAccept({ circleId: 'pair-x', id: made.itemId, actor: 'someone' });
-    const [e] = (await ops.listEvents({ circleId: 'pair-x', days: 3650 })).items;
+    const made = await ops.addEvent({ circleId: 'household', title: 'Koffie', startsAt: when });
+    await ops.rsvpAccept({ circleId: 'household', id: made.itemId, actor: 'someone' });
+    const [e] = (await ops.listEvents({ circleId: 'household', days: 3650 })).items;
     expect(Object.keys(e.rsvp)).toEqual(['someone']);
+  });
+  it('in a pair circle a named actor must BE its self: \'me\' (or anyone else) is refused, nothing written', async () => {
+    const { ops, stores } = setup();
+    expect(await ops.addEvent({ circleId: 'pair-x', title: 'Koffie', startsAt: when, actor: 'me' })).toMatchObject({ ok: false, code: 'no-self' });
+    expect((await stores.getStore('pair-x').listByType('calendar-event')) ?? []).toEqual([]);
+    const ok = await ops.addEvent({ circleId: 'pair-x', title: 'Koffie', startsAt: when, actor: 'lens-key' });
+    expect(ok.ok, JSON.stringify(ok)).toBe(true);
+    expect(await ops.rsvpAccept({ circleId: 'pair-x', id: ok.itemId, actor: 'someone' })).toMatchObject({ ok: false, code: 'no-self' });
   });
   it('a pair circle whose self this device does not run is not ours to write: refused, nothing written', async () => {
     const { ops, stores } = setup();

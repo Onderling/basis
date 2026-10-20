@@ -6420,7 +6420,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       // authored by the general 'me' is one no pair roster names, and the rail may drop it (L350's rsvp that vanished)
       // — and only that self: a pair circle whose self this device does not run is not ours to write (null → `no-self`);
       // falling back to the general key would be the same defect in another coat. 'me' is for ordinary circles only.
-      localActor: (circleId) => (isPairCircleId(circleId) ? (circleSelf(circleId)?.webid ?? null) : 'me'),
+      // A name the call passes must BE that self in a pair circle (`writeSharedCopy` passes it); any other — 'me' included —
+      // is refused too. An ordinary circle keeps the caller's actor, else 'me'.
+      localActor: (circleId, named) => {
+        if (!isPairCircleId(circleId)) return named ?? 'me';
+        const self = circleSelf(circleId)?.webid ?? null;
+        return self && (!named || named === self) ? self : null;
+      },
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */
     const writeSharedCopy = async (ev, pairCircleId) => {

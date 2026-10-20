@@ -207,7 +207,7 @@ import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/we
 import { openPagePanel } from '../../src/web/pagePanel.js';
 import { routeScan, scanOpResultWords } from '../../src/v2/scanRoute.js';   // Me → Scan / `/scan-qr`: the route table of declared targets
 import { opFormOrRun } from '../../src/forms/opFormOrRun.js';   // a declared op with part of its args known: the form, or it runs
-import { makePickerFetcher } from '../../src/forms/pickerChoices.js';
+import { makePickerFetcher, ceremonyChoices } from '../../src/forms/pickerChoices.js';
 import { renderForm } from '../../src/web/domForm.js';
 // client-side image-attachment encoder (Canvas resize + thumbnail → the
 // inbound shape pinboard.postRequest expects).
@@ -5792,29 +5792,35 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
 }
 
 function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
-  return showDeviceCeremonyFlow({ flowId: 'revoke-device', keyPrefix: 'revoke', deviceId, onClosed });
+  return showCeremonyFlow({ flowId: 'revoke-device', keyPrefix: 'revoke', deviceId, onClosed });
 }
 /** The replace ceremony: after a restore, retire every other device in one act. */
 function showReplaceDeviceFlow({ onClosed } = {}) {
-  return showDeviceCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
+  return showCeremonyFlow({ flowId: 'replace-device', keyPrefix: 'replace', deviceId: null, onClosed });
 }
 /** Claim a companion node: paste the line it printed; this device signs the claim. */
 function showClaimCompanionFlow({ onClosed, needs = null } = {}) {
-  return showDeviceCeremonyFlow({
+  return showCeremonyFlow({
     flowId: 'claim-companion', keyPrefix: 'companionClaim', deviceId: null, onClosed, needs,
     inputName: 'claim', placeholderKey: 'circle.companionClaim.placeholder', rows: 2,
   });
 }
-function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3, needs = null } = {}) {
-  // THE DEVICE CEREMONIES, as their declared flows: revoke ONE device (the My-data device row that
-  // opened this names it) or REPLACE — retire every other device. Both run on THIS device; the phrase
-  // is the proof; the one pause paints only the phrase. The fold does the enforcement everywhere.
+function showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', rows = 3, needs = null } = {}) {
+  // THE ONE PAINTER FOR THE DECLARED DEVICE CEREMONIES (mobile twin: CeremonyFlowModal): revoke ONE device (the
+  // My-data device row that opened this names it), REPLACE — retire every other device —, or CLAIM a companion. Each
+  // runs on THIS device; the typed thing is the proof and the submit tap the person's consent. A pick a step declares
+  // offers its choices (`ceremonyChoices`), never filled for them. The fold does the enforcement everywhere.
   const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
   const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('household', opId, args) });
   const { card, close } = _restoreOverlay();
   let inst = null;
+  let choices = {};      // a pick's choices (offered, never filled)
+  const picked = {};
+  let typed = '';        // what was typed survives a repaint (a pick repaints)
   const done = () => { close(); try { onClosed?.(); } catch { /* */ } };
+  const fetchChoices = makePickerFetcher((app, op, args) => rawCallSkill(app, op, args), 'household');
+  const step = async (r) => { inst = r; choices = await ceremonyChoices(renderFlow(FLOW, inst, { ops: OPS }).form, fetchChoices); paint(); };
 
   const paint = () => {
     const view = renderFlow(FLOW, inst, { ops: OPS });
@@ -5831,14 +5837,29 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
       input.rows = rows; input.autocomplete = 'off'; input.spellcheck = false;
       input.placeholder = t(placeholderKey);
       input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+      input.value = typed;
+      input.addEventListener('input', () => { typed = input.value; });
       card.appendChild(input);
+      for (const [name, list] of Object.entries(choices)) {
+        const row = document.createElement('div');
+        for (const c of list) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `cc-btn${picked[name] === c.id ? ' cc-btn--primary' : ''}`;
+          b.dataset.pick = `${name}:${c.id}`;
+          b.textContent = c.label;
+          b.addEventListener('click', () => { picked[name] = c.id; paint(); });
+          row.appendChild(b);
+        }
+        card.appendChild(row);
+      }
       const go = document.createElement('button');
       go.type = 'button';
       go.className = 'cc-btn cc-btn--primary';
       go.textContent = t(`circle.${keyPrefix}.submit`);
       go.addEventListener('click', () => {
-        runner.resume(FLOW, inst, { input: { [inputName]: input.value, ...(deviceId ? { deviceId } : {}) } })
-          .then((r) => { inst = r; paint(); }).catch(() => done());
+        runner.resume(FLOW, inst, { input: { [inputName]: input.value, ...picked, ...(deviceId ? { deviceId } : {}) } })
+          .then(step).catch(() => done());
       });
       card.appendChild(go);
       const cancel = document.createElement('button');
@@ -5862,7 +5883,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     btn.textContent = finished ? t('common.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
     btn.addEventListener('click', () => {
       if (finished) return done();
-      close(); showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
+      close(); showCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputName, placeholderKey, rows });
     });
     card.appendChild(btn);
     if (!finished) {
@@ -5876,7 +5897,7 @@ function showDeviceCeremonyFlow({ flowId, keyPrefix, deviceId, onClosed, inputNa
     }
   };
 
-  runner.start(FLOW, { needs: needs ?? {} }).then((r) => { inst = r; paint(); }).catch(() => done());
+  runner.start(FLOW, { needs: needs ?? {} }).then(step).catch(() => done());
 }
 
 function showRestoreFinishFlow() {

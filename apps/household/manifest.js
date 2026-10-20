@@ -359,7 +359,7 @@ export const householdManifest = {
       // a bare address). The circle is PICKED from the person's own circles — the form paints the pick-list from the
       // param's pickerSource, skipped when there is only one. Reached from Me → Scan.
       params: [
-        { name: 'circle', kind: 'string', required: true, pickerSource: { listOp: 'listMyCircles', appOrigin: 'pinboard' } },
+        { name: 'circle', kind: 'string', required: true, labelKey: 'circle.share.pick_label', pickerSource: { listOp: 'listMyCircles', appOrigin: 'pinboard' } },
         { name: 'addr',   kind: 'string', required: true },
       ],
       surfaces: {},

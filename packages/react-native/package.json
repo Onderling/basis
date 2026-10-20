@@ -49,6 +49,9 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "@onderling/qr": "file:../qr"
+  },
   "peerDependencies": {
     "@onderling/core": "^0.1.0",
     "@onderling/pod-client": "^0.1.0",

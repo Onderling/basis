@@ -11,6 +11,7 @@
  * The classifier list moved here from mobile's `core/qrClassifiers.js` (which now re-exports it), unchanged in what it
  * reads and in its order, so the native scanner and the router cannot disagree. Pure JS, no camera.
  */
+import { classifyQrPayload } from '@onderling/qr';
 import { parseInviteDeepLink } from './inviteDeepLink.js';
 import { enrollOfferFromLink } from './enrollOffer.js';
 import { contactCardFromLink } from './contactCardLink.js';
@@ -48,23 +49,30 @@ export const SCAN_TARGETS = Object.freeze({
 });
 
 /**
+ * The words for what a scanned code's OP answered (an op target: pairing): done, refused because the circle is not mine,
+ * or failed with its reason. One answer both shells say.
+ * @returns {{key: string, params?: object}}
+ */
+export function scanOpResultWords(reply) {
+  if (reply?.ok !== false) return { key: 'circle.pairedDevices.paired' };
+  if (reply.outcome === 'not-my-circle') return { key: 'circle.scan.pair_not_mine' };
+  if (reply.outcome === 'nothing-to-pick') return { key: 'circle.scan.pair_no_circle' };
+  if (reply.outcome === 'unknown-op') return { key: 'scan_qr.scan_unknown' };
+  return { key: 'circle.scan.pair_failed', params: { error: String(reply.error ?? reply.outcome ?? '') } };
+}
+
+/**
  * What a scanned (or pasted) text is, what it carries, and the declared target it goes to.
  * @param {unknown} text
  * @returns {{kind: string, payload: unknown, target?: {kind: 'flow'|'op', app: string, id: string}, needs?: object}}
  */
 export function routeScan(text) {
   const s = typeof text === 'string' ? text.trim() : '';
-  if (s) {
-    for (const c of SCAN_CLASSIFIERS) {
-      let payload = null;
-      try { payload = c.classify(s); } catch { payload = null; }
-      if (payload != null) {
-        const t = SCAN_TARGETS[c.kind];
-        return { kind: c.kind, payload, target: { kind: t.kind, app: t.app, id: t.id }, needs: t.needs(payload) };
-      }
-    }
-  }
-  return { kind: 'unknown', payload: s };
+  // the one first-match loop (the phone's scanner calls the same one)
+  const hit = s ? classifyQrPayload(s, SCAN_CLASSIFIERS) : { kind: 'unknown' };
+  const t = SCAN_TARGETS[hit.kind];
+  if (!t) return { kind: 'unknown', payload: s };
+  return { kind: hit.kind, payload: hit.payload, target: { kind: t.kind, app: t.app, id: t.id }, needs: t.needs(hit.payload) };
 }
 
 function classifyContact(text) {

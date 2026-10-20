@@ -1,20 +1,12 @@
 /**
- * classifyQrPayload — generic, plugin-driven QR payload classifier.
+ * classifyQrPayload — the ONE first-match loop over a list of classifiers (`lint-one-scan-loop` holds it).
  *
- * Lifted from apps/pinboard-mobile/src/lib/qrScanner.js 2026-05-09
- * (Phase 41.0 L4; Tasks-mobile is the second consumer). Pinboard's
- * three classifiers (invite/contact/recovery) stay in pinboard-mobile
- * (they're Pinboard-payload-shaped); Tasks-mobile registers its own
- * (e.g. `tasks://invite`, `tasks://bot-token`).
+ * `classifyQrPayload(text, classifiers)` walks `classifiers` in order; the first one that returns a non-null payload
+ * wins. When none match, it returns `{kind: 'unknown'}` so callers can branch on `kind` without null-checking.
  *
- * `classifyQrPayload(text, classifiers)` walks `classifiers` in
- * order; the first one that returns a non-null payload wins. When
- * none match, returns `{kind: 'unknown'}` so callers can branch on
- * `kind` without null-checking.
- *
- * Each classifier is `{kind: string, classify: (text: string) => payload | null}`.
- * Pure JS — no Expo / camera deps. The camera component calls this
- * on each barcode-detected callback.
+ * Each classifier is `{kind: string, classify: (text: string) => payload | null}`. Pure JS — no React Native, no Expo,
+ * no camera: the web router (`routeScan` in basis) and the phone's scanner (through the React Native package's `qr` entry, which
+ * re-exports it) both call this one. Which classifiers there are is the app's (basis: `SCAN_CLASSIFIERS`).
  */
 
 /**

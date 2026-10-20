@@ -95,6 +95,13 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   workspace symlinking is what fixed it. Same "symlink integrity" family as the EAS trap above —
   if resolution breaks, check that the workspace symlinks are intact first.
 
+- **A new workspace PACKAGE also needs every affected per-project lockfile (2026-10-19, `@onderling/qr`).** CI installs
+  with `pnpm install --frozen-lockfile`, and this repo keeps one `pnpm-lock.yaml` per project (not one at the root), so
+  a new package and every project that now depends on it, directly or through a `file:` dep such as the React Native
+  package, must be in those lockfiles, or every CI job fails. `pnpm install --lockfile-only` writes them without touching
+  `node_modules`. It also re-resolves unrelated ranges (seen: `openai` 7→6 in four lockfiles), so keep only the hunks that
+  name the new package and `git checkout` the rest. Then `node scripts/relink-workspace.mjs` for the links, a Metro
+  `watchFolders` + `extraNodeModules` entry when the phone reaches it, `npm run box-role-paths` when the box runs it (the guard says so), and a CI matrix row for its own suite.
 - **New `@onderling/*` workspace dep → its `node_modules` symlink must be materialized (or `pnpm install` re-run).**
   Adding a `@onderling/*` dep to a package's `package.json` — or repointing a raw-`src` reach-in onto a public
   `@onderling/<pkg>` specifier — only resolves once that package has `node_modules/@onderling/<pkg> →

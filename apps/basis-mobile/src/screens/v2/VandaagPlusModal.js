@@ -1,7 +1,7 @@
 /**
  * Vandaag's "+" (RN; web twin: web/v2/vandaagPlus.js): the person's own acts (the own-scope attach entries), a free
  * line at the top that fills them ("notitie: melk", "afspraak morgen 14:00 tandarts"), the fields, Save — and, opened on
- * an own row (`edit`), Remove. Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the
+ * an own row (`edit`), Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the
  * host's (`onSave(actId, values, asSelf)` / `onRead(line)` / `onRemove(actId)` → null, or the line to show). A moment
  * is typed in words ("morgen om 14:00"), read by the shared bounded reader.
  */
@@ -12,6 +12,8 @@ import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
+  // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does → null, or the line
+  shareTargets = null, onShare = null,
   // opened on an own row: `{ act, id, values, asSelf }` (the shared `plusEditFor`)
   edit = null,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
@@ -39,6 +41,12 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const remove = async () => {
     setBusy(true);
     const said = await onRemove?.(act.id);
+    setBusy(false);
+    if (said) setError(said);
+  };
+  const share = async (contact) => {
+    setBusy(true);
+    const said = await onShare?.(act.id, contact);
     setBusy(false);
     if (said) setError(said);
   };
@@ -86,6 +94,18 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                 <Pressable style={[styles.btn, busy && styles.disabled]} disabled={busy} onPress={remove} testID="vandaag-plus-remove">
                   <Text style={styles.btnText}>{t('circle.vandaag.plus_remove')}</Text>
                 </Pressable>
+              ) : null}
+              {/* …and share it with a contact: one button per contact a pair circle connects */}
+              {edit && act.share && onShare && Array.isArray(shareTargets) ? (
+                <View testID="vandaag-plus-share">
+                  <Text style={styles.label}>{t(`circle.button.${act.appOrigin}.${act.share}`)}</Text>
+                  {shareTargets.length ? null : <Text style={styles.label}>{t('circle.vandaag.plus_share_none')}</Text>}
+                  {shareTargets.map((c) => (
+                    <Pressable key={c.id} style={[styles.btn, busy && styles.disabled]} disabled={busy} onPress={() => share(c.id)} testID={`vandaag-plus-share-${c.id}`}>
+                      <Text style={styles.btnText}>{c.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
               ) : null}
             </View>
           )}

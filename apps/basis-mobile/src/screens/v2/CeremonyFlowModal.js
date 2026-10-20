@@ -1,8 +1,9 @@
 /**
- * RevokeDeviceModal — the device-revocation ceremony on mobile, painted as its declared flow
- * (web parity: circleApp's showRevokeDeviceFlow). Runs on THIS — a surviving — device; the
- * phrase is the extra proof; the deviceId rides in prefilled from the My-data device row. The
- * fold does the enforcement everywhere; the revoked device becomes an island.
+ * CeremonyFlowModal — the ONE painter for the declared device ceremonies on mobile (web twin: circleApp's
+ * `showCeremonyFlow`): revoke-device, replace-device, claim-companion — each a flow whose one step waits on one typed
+ * thing (the phrase, the claim line), and whose submit tap is the person's consent. A pick a step declares
+ * (`pickerSource`) offers its choices (`ceremonyChoices`) — never filled for them, not even with one choice.
+ * Enroll keeps its own painter: its persona picker is ceremony-specific UI, not a flow form.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
@@ -11,6 +12,7 @@ import { householdManifest } from '../../../../household/manifest.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { ceremonyOutcomeText, ceremonyFinished } from '../../../../basis/src/v2/ceremonyOutcome.js';
+import { ceremonyChoices, makePickerFetcher } from '../../../../basis/src/forms/pickerChoices.js';
 
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
 
@@ -20,12 +22,14 @@ const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
  * device (the restore wizard's "this is my phone now"); `flowId: 'claim-companion'` makes the person the owner of a
  * companion node (`inputName: 'claim'`, the line the node prints). `keyPrefix` picks the copy.
  */
-export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke', inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', needs = null }) {
+export default function CeremonyFlowModal({ visible, deviceId, callSkill, onClose, flowId = 'revoke-device', keyPrefix = 'revoke', inputName = 'mnemonic', placeholderKey = 'circle.enroll.mnemonic_placeholder', needs = null }) {
   const FLOW = householdManifest.flows.find((f) => f.id === flowId);
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
   const [phrase, setPhrase] = useState('');
+  const [choices, setChoices] = useState({});   // a pick's choices (offered, never filled)
+  const [picked, setPicked] = useState({});
   const runnerRef = useRef(null);
 
   useEffect(() => {
@@ -39,15 +43,21 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
     return () => { alive = false; runnerRef.current = null; };
   }, [visible, callSkill, deviceId, flowId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const view = visible && inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
+  useEffect(() => {
+    let alive = true;
+    ceremonyChoices(view?.form ?? null, makePickerFetcher(callSkill, 'household'))
+      .then((c) => { if (alive) { setChoices(c); setPicked({}); } });
+    return () => { alive = false; };
+  }, [inst]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!visible) return null;
-  const view = inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
   const outcome = inst?.steps?.ceremony?.outcome;
   const finish = () => { setInst(null); onClose?.(); };
 
   const submit = () => {
     const runner = runnerRef.current;
     if (!runner || !inst) return;
-    runner.resume(FLOW, inst, { input: { [inputName]: phrase, ...(deviceId ? { deviceId } : {}) } })
+    runner.resume(FLOW, inst, { input: { [inputName]: phrase, ...picked, ...(deviceId ? { deviceId } : {}) } })
       .then((r) => setInst(r))
       .catch(() => finish());
   };
@@ -68,6 +78,15 @@ export default function RevokeDeviceModal({ visible, deviceId, callSkill, onClos
                 value={phrase} onChangeText={setPhrase}
                 testID="revoke-mnemonic"
               />
+              {Object.entries(choices).map(([name, list]) => (
+                <View key={name} style={styles.row}>
+                  {list.map((c) => (
+                    <Pressable key={c.id} style={[styles.button, picked[name] === c.id && styles.picked]} onPress={() => setPicked((p) => ({ ...p, [name]: c.id }))} testID={`ceremony-pick-${name}-${c.id}`}>
+                      <Text style={styles.buttonText}>{c.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
               <View style={styles.row}>
                 <Pressable style={styles.button} onPress={submit} testID="revoke-submit">
                   <Text style={styles.buttonText}>{t(`circle.${keyPrefix}.submit`)}</Text>
@@ -118,5 +137,6 @@ const makeStyles = (theme) => StyleSheet.create({
   button: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.color.line },
   buttonText: { color: theme.color.ink, fontSize: 14 },
   cancel: { paddingVertical: 8, paddingHorizontal: 6 },
+  picked: { borderColor: theme.color.ink },
   cancelText: { color: theme.color.inkSoft, fontSize: 14 },
 });

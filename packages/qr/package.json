@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "@onderling/qr",
+  "version": "0.1.0",
+  "description": "The one first-match loop that classifies a scanned or pasted text against an app's classifiers — pure JS, no React Native, so the web router and the phone's scanner share it.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  }
+}

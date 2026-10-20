@@ -212,6 +212,8 @@ jobs:
           # BleTransport/MdnsTransport". Measured 2026-08-24: 396 pass, 1 skip,
           # zero failures — the exemption outlived its reason by some margin.
           - { label: react-native,      dir: packages/react-native,      args: '' }
+          # the one first-match loop a scanned text is classified by (web router and phone scanner share it)
+          - { label: qr,                dir: packages/qr,                args: '' }
           # basis + basis-mobile joined 2026-09-01 (the largest suites in the repo, ~5,500 and ~780). Since
           # 2026-09-05 they carry no optional sibling-repo suites: the whole suite runs here.
           - { label: basis,             dir: apps/basis,                 args: '' }

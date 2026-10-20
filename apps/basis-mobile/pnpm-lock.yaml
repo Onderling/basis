@@ -1413,6 +1413,9 @@ packages:
   '@onderling/params@file:../../packages/params':
     resolution: {directory: ../../packages/params, type: directory}
 
+  '@onderling/qr@file:../../packages/qr':
+    resolution: {directory: ../../packages/qr, type: directory}
+
   '@onderling/react-native@file:../../packages/react-native':
     resolution: {directory: ../../packages/react-native, type: directory}
     peerDependencies:
@@ -7028,6 +7031,7 @@ snapshots:
       '@onderling/pod-onboarding': link:../../packages/pod-onboarding
       '@onderling/pod-routing': link:../../packages/pod-routing
       '@onderling/pod-search': link:../../packages/pod-search
+      '@onderling/qr': link:../../packages/qr
       '@onderling/recipe-loader': link:../../packages/recipe-loader
       '@onderling/redaction': link:../../packages/redaction
       '@onderling/sdk': link:../../packages/sdk
@@ -7098,10 +7102,13 @@ snapshots:
 
   '@onderling/params@file:../../packages/params': {}
 
+  '@onderling/qr@file:../../packages/qr': {}
+
   '@onderling/react-native@file:../../packages/react-native(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(@onderling/transports@..+packages+transports)(@onderling/vault@file:../../packages/vault)(@react-native-async-storage/async-storage@1.24.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(@react-native-community/netinfo@11.4.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(buffer@6.0.3)(nkn-sdk@1.3.6)(react-native-ble-plx@3.5.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native-get-random-values@1.11.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native-keychain@10.0.0)':
     dependencies:
       '@onderling/core': file:../../packages/core
       '@onderling/pod-client': link:../../packages/pod-client
+      '@onderling/qr': file:../../packages/qr
       '@onderling/transports': link:../../packages/transports
       '@onderling/vault': file:../../packages/vault
       '@react-native-async-storage/async-storage': 1.24.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))

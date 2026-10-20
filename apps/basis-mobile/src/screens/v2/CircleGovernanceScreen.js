@@ -20,7 +20,8 @@ import { useTheme } from './themeContext.js';
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';
 import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
-import { buildSubjectLabeler } from '../../../../basis/src/v2/governanceView.js';
+import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
+import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -137,6 +138,9 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
             <Text style={[styles.status, styles[`status_${statusKey(row)}`]]}>{t(`circle.governance.status.${statusKey(row)}`)}</Text>
             {row.tally ? (
               <Text style={styles.tally}>{t('circle.governance.tally', { yes: row.tally.yes, need: row.tally.need, of: row.tally.of })}</Text>
+            ) : null}
+            {row.deadline != null ? (
+              <Text style={styles.tally} testID={`governance-deadline-${row.id ?? ''}`}>{deadlineLine(row.deadline, { t, locale: dateLocaleOf(t) })}</Text>
             ) : null}
             {row.approved && row.awaitingEnactment ? (
               <Text style={styles.awaiting}>{t('circle.governance.awaiting_enactment')}</Text>

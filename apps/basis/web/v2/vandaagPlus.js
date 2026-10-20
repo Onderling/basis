@@ -1,13 +1,15 @@
 /**
  * basis v2 — Vandaag's "+" sheet (web DOM renderer): the person's own acts (the own-scope attach entries), a free line
  * at the top that fills them ("notitie: melk", "afspraak morgen 14:00 tandarts"), the fields, Save — and, opened on an
- * own row, Remove. Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
+ * own row, Remove (and, for an act that shares, the contacts to share it with). Painted from the shared model (`PLUS_ACTS`); what a save, a read or a removal does is the host's.
  * Pure render.
  */
 import { PLUS_ACTS, plusLabel } from '../../src/v2/vandaagPlus.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderVandaagPlus(container, { t, actId = null, values = {}, line = '', editing = false, error = null, onPick, onSave, onRead, onRemove, onClose,
+  // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does
+  shareTargets = null, onShare,
   // several selves ticked in the header: the sheet asks which one this is written as (`selves`: [{id, name}])
   selves = null, asSelf = null, onPickSelf } = {}) {
   if (!container) return container;
@@ -90,6 +92,30 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       rm.textContent = tr('circle.vandaag.plus_remove');
       rm.addEventListener('click', () => onRemove(act.id));
       form.appendChild(rm);
+    }
+    // …and share it with a contact: one button per contact a pair circle connects
+    if (editing && act.share && typeof onShare === 'function' && Array.isArray(shareTargets)) {
+      const share = document.createElement('div');
+      share.className = 'circle-vandaag-plus__share';
+      const head = document.createElement('p');
+      head.textContent = tr(`circle.button.${act.appOrigin}.${act.share}`);
+      share.appendChild(head);
+      if (!shareTargets.length) {
+        const none = document.createElement('p');
+        none.className = 'circle-vandaag-plus__share-none';
+        none.textContent = tr('circle.vandaag.plus_share_none');
+        share.appendChild(none);
+      }
+      for (const c of shareTargets) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'circle-vandaag-plus__share-to';
+        b.dataset.contact = c.id;
+        b.textContent = c.label;
+        b.addEventListener('click', () => onShare(act.id, c.id));
+        share.appendChild(b);
+      }
+      form.appendChild(share);
     }
     form.addEventListener('submit', (e) => {
       e.preventDefault();

@@ -865,7 +865,7 @@ which actions are open.
 - `[ctx]` `object`
 - `[ctx.ops]` `Map<string,object>|Object<string,object>` — opId → operation, for param labelKeys
 
-**Returns:** `{ id: string, labelKey: string, status: string, progress: Array<{id: string, labelKey: string, state: 'done'|'current'|'pending'|'skipped'}>, form: null|{step: string, params: Array<{name: string, kind?: string, labelKey: string, required: boolean}>}, actions: {canSubmit: boolean, canCancel: boolean, canRestart: boolean}, reason: string|null, produces: object|null, }`
+**Returns:** `{ id: string, labelKey: string, status: string, progress: Array<{id: string, labelKey: string, state: 'done'|'current'|'pending'|'skipped'}>, form: null|{step: string, params: Array<{name: string, kind?: string, labelKey: string, required: boolean, pickerSource?: object}>}, actions: {canSubmit: boolean, canCancel: boolean, canRestart: boolean}, reason: string|null, produces: object|null, }`
 
 ## `src/renderGate.js`
 

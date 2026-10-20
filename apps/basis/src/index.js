@@ -369,6 +369,7 @@ export { VIEWER_KINDS, viewAsDirectory } from './v2/circleViewAs.js';
 export {
   personaAttributes, memberPersonaView, selfViewSplit,
   personaPresetKeys, revealPresetLabelKey, PERSONA_TIER_KEYS, REVEAL_PRESETS,
+  revealPresetWords,
 } from './v2/memberCards.js';
 export { normalizeCircleMembers, circleMemberCount } from '@onderling/kring-host/circleMembers';
 // 5.9d — Proof-of-Location placeholder seam (real attestation deferred).
@@ -409,7 +410,7 @@ export {
   THEME_PREFS, DEFAULT_THEME_PREF, THEME_PREF_KEY,
   normalizeThemePref, resolveThemeName, createThemePrefStore, asyncStorageThemePrefIo,
 } from './v2/themePref.js';
-export { buildPersonaViewModel, buildMijViewModel } from './v2/personaView.js';
+export { buildMijViewModel } from './v2/personaView.js';
 export { loadMijModel } from './v2/mijLoader.js';
 export { migrateRosterOfferings, offeringKeyFor, OFFERINGS_MIGRATION_KEY } from './core/offeringsMigration.js';
 export { runFind } from './find.js';

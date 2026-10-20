@@ -18,7 +18,7 @@ import { buildScreenModel } from '../../../../basis/src/v2/screenModel.js';
 import { t } from '../../core/localisation.js';
 
 export default function CircleListScreen({
-  items = [], categoryField, searchFields, labelField, manifestsByOrigin, appOrigin, capabilityMatrix = [],
+  items = [], categoryField, searchFields, labelField, defaultAudience, manifestsByOrigin, appOrigin, capabilityMatrix = [],
   title, onRowAction, onRowOpen, onClose,
 }) {
   const theme = useTheme();
@@ -33,9 +33,10 @@ export default function CircleListScreen({
   // `labelField` threads through too (the launcher already passed it;
   // it was silently dropped), so a view like agents (labelField 'name')
   // labels its rows the same as web.
-  const shared = { items, categoryField, searchFields, labelField, manifestsByOrigin, appOrigin, capabilityMatrix };
+  // `defaultAudience`: the section's declared audience — the model filters by it (web hands the same), and says so below
+  const shared = { items, categoryField, searchFields, labelField, defaultAudience, manifestsByOrigin, appOrigin, capabilityMatrix };
   const model = useMemo(() => buildScreenModel({ ...shared, query, activeCategories }),
-    [items, categoryField, labelField, appOrigin, capabilityMatrix, query, activeCategories]);
+    [items, categoryField, labelField, defaultAudience, appOrigin, capabilityMatrix, query, activeCategories]);
   const allCats = useMemo(() => buildScreenModel(shared).categories, [items, categoryField, labelField, appOrigin, capabilityMatrix]);
 
   const toggleCat = (id, checked) => {
@@ -56,6 +57,9 @@ export default function CircleListScreen({
           </Pressable>
         ) : null}
       </View>
+
+      {/* a list scoped to an audience says so, non-dismissible (a visibility scope, not a filter) — as web's caption */}
+      {model.audienceScope != null ? <Text style={styles.muted} testID="list-screen-scope-caption">{t('circle.screen.audience_scope')}</Text> : null}
 
       <TextInput
         style={styles.search}

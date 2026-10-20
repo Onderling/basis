@@ -83,6 +83,7 @@
     "@onderling/pod-onboarding": "workspace:*",
     "@onderling/pod-routing": "workspace:*",
     "@onderling/pod-search": "workspace:*",
+    "@onderling/qr": "workspace:*",
     "@onderling/recipe-loader": "workspace:*",
     "@onderling/redaction": "workspace:*",
     "@onderling/sdk": "workspace:*",

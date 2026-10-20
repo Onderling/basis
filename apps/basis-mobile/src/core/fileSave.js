@@ -59,3 +59,40 @@ export async function saveBase64File({ dataB64, name }) {
     return { ok: false, error: err?.message ?? String(err) };
   }
 }
+
+/**
+ * Save a file WHERE THE PERSON CHOOSES: Android's folder picker (the Storage Access Framework), then the file made
+ * there with its name and type, then the bytes. The twin of web's Download link — the app-private directory above is
+ * no answer for a file a person wants to keep or open, they cannot reach it. A closed picker is `not-chosen`; a
+ * platform without the picker is `no-picker` (said, never thrown).
+ *
+ * @param {{dataB64: string, name?: string, mime?: string}} file
+ * @param {{fs?: object}} [opts]  `fs`: expo-file-system (injectable for tests)
+ * @returns {Promise<{ok: true, uri: string, name: string} | {ok: false, error: string}>}
+ */
+export async function saveFileToChosenPlace({ dataB64, name, mime } = {}, { fs = FileSystem } = {}) {
+  if (!dataB64 || typeof dataB64 !== 'string') return { ok: false, error: 'no-data' };
+  const saf = fs?.StorageAccessFramework;
+  if (typeof saf?.requestDirectoryPermissionsAsync !== 'function' || typeof saf?.createFileAsync !== 'function') return { ok: false, error: 'no-picker' };
+  const type = typeof mime === 'string' && mime ? mime : 'application/octet-stream';
+  // the picker adds the extension its type names; a name keeps its own only when the type is unknown
+  const raw = String(name ?? 'file').replace(/[\\/:*?"<>|]/g, '_');
+  const dot = raw.lastIndexOf('.');
+  const finalName = type !== 'application/octet-stream' && dot > 0 ? raw.slice(0, dot) : raw;
+  try {
+    const perm = await saf.requestDirectoryPermissionsAsync();
+    if (!perm?.granted || !perm.directoryUri) return { ok: false, error: 'not-chosen' };
+    const uri = await saf.createFileAsync(perm.directoryUri, finalName, type);
+    await fs.writeAsStringAsync(uri, dataB64, { encoding: fs.EncodingType?.Base64 ?? 'base64' });
+    return { ok: true, uri, name: finalName };
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
+}
+
+/** The words for what a save answered: kept (and where), or why not; the person closing the picker says nothing. */
+export function fileSaveWords(r) {
+  if (r?.ok) return { key: 'circle.fileShare.saved', params: { name: r.name ?? '' } };
+  if (r?.error === 'not-chosen') return null;
+  return { key: 'circle.fileShare.save_failed', params: { error: r?.error ?? '' } };
+}

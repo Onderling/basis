@@ -253,4 +253,15 @@ export function revealPresetLabelKey(preset) {
   return REVEAL_PRESETS.includes(preset) ? `circle.reveal.preset.${preset}` : null;
 }
 
+/**
+ * How much of a persona a card reveals, in words both shells paint: `{label, value}` ("Zichtbaar" · "profiel"), or null
+ * when nothing reaches even the floor (no badge).
+ * @param {string|null} preset
+ * @param {(key: string) => string} t
+ */
+export function revealPresetWords(preset, t) {
+  const key = revealPresetLabelKey(preset);
+  return key ? { label: t('circle.memberCard.preset_label'), value: t(key) } : null;
+}
+
 export { VIEWER_KINDS, REVEAL_PRESETS };

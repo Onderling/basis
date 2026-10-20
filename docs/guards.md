@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 54
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 57
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -40,12 +40,15 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `kind-appenders` | — | every declared entry kind must have a production APPENDER |
 | `lanes-sign-per-circle` | — | a lane module never names the profile identity — a statement on a lane signs with the |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
+| `locale-key-parity` | — | what one shell SAYS, the other says too, or the difference is a decision |
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
+| `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
 | `plans-structure` | — | the private plans/ folder keeps the shape it was sorted into (2026-09-25) |
+| `platform-exceptions-declared` | — | a surface one shell paints on purpose and the other does not is DECLARED in |
 | `rails-named-verifier` | — | every signed rail is constructed with a NAMED binding verifier, and the name agrees |
 | `register-bypass` | — | a settable value has ONE home, and it is the register |
 | `resolution-policy` | G-L23 | the DECLARATION LAYER is complete + has no SECOND ordering mechanism |

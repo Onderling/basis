@@ -14,6 +14,7 @@ import { presendFloorFor } from '../../../../basis/src/v2/presendFloor.js';
 import { contactSealMark } from '../../../../basis/src/v2/contactSealMark.js';
 import { createComposerCommands } from '../../../../basis/src/v2/composerCommands.js';
 import { t } from '../../core/localisation.js';
+import { saveFileToChosenPlace, fileSaveWords } from '../../core/fileSave.js';
 import { useTheme } from './themeContext.js';
 import { subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import FaceView from './FaceView.js';
@@ -292,6 +293,15 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
                 <Text style={styles.fileMeta} testID={`contact-file-meta-${m.id}`}>
                   {`📎 ${m.file.name ?? ''}${Number.isFinite(m.file.size) ? ` · ${(m.file.size / 1024).toFixed(0)} KB` : ''}`}
                 </Text>
+              ) : null}
+              {/* keep it where the person chooses — the twin of web's Download link */}
+              {m.file?.dataB64 ? (
+                <Pressable accessibilityRole="button" testID={`contact-file-save-${m.id}`} onPress={async () => {
+                  const w = fileSaveWords(await saveFileToChosenPlace({ dataB64: m.file.dataB64, name: m.file.name, mime: m.file.mime }));
+                  if (w) Alert.alert(m.file.name ?? '', t(w.key, w.params));
+                }}>
+                  <Text style={styles.fileMeta}>{t('circle.fileShare.download')}</Text>
+                </Pressable>
               ) : null}
               {m.text ? (
                 <Text style={m.origin === 'user' ? styles.bubbleUserText : styles.bubbleBotText} testID={`contact-msg-${m.origin}`}>

@@ -33,8 +33,8 @@ export const MEMORY_MODES = Object.freeze(['off', 'short', 'long']);
 export const DEFAULT_MEMORY_MODE = 'short';
 /** The admin's default mode — a parameter (`paramsService`), read by the door at each turn. */
 export const ASSISTANT_MEMORY_DEFAULT_KEY = 'assistant.memoryDefault';
-/** The languages a person can fix a thread to; `auto` clears it (the reply follows how they write). */
-export const THREAD_LANGS = Object.freeze(['nl', 'en']);
+import { THREAD_LANGS } from './threadLangs.js';
+export { THREAD_LANGS };
 
 const isMode = (m) => MEMORY_MODES.includes(m);
 

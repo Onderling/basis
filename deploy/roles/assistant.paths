@@ -46,6 +46,7 @@ packages/pod-onboarding/
 packages/pod-routing/
 packages/pod-search/
 packages/pseudo-pod/
+packages/qr/
 packages/recipe-loader/
 packages/redaction/
 packages/relay/

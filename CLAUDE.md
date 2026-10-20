@@ -72,7 +72,9 @@ does NOT come back — this has cost multiple sessions.
    equivalent, or say in the same turn that there isn't one. (5× in July 2026: the rule never failed, *noticing*
    the violation did; 2× on the box in September 2026, days after the seam landed on web and mobile.) The
    seams every shell composes are declared once in `scripts/shell-seams.mjs`; `lint-shell-seams` (in
-   `npm run guards`) is red when one shell lacks one — a new seam goes in that list in the same PR.
+   `npm run guards`) is red when one shell lacks one — a new seam goes in that list in the same PR. A shared decision
+   function a shell HOST must call (the screen's data, a duty after an act) is a seam too, added in the PR that adds it;
+   and what a shell SAYS is compared by `lint-locale-key-parity` — a one-sided key is a gap or a declared exception.
 3. **No duplication.** A string/op/function is defined ONCE. Editing the same thing in two files (e.g. a
    locale key in the web *and* mobile bundle) is the signal to consolidate — then add a guard so it can't
    recur. (`circle.*` locale is now one shared source `apps/basis/src/locales/`; do the same for the rest.)

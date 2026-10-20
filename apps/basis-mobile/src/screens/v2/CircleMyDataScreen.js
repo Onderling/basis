@@ -51,7 +51,7 @@ import * as FileSystem from 'expo-file-system';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
 import ReceivePersonasModal from './ReceivePersonasModal.js';
 import { useRelayQuestion } from './RelayQuestionModal.js';
-import RevokeDeviceModal from './RevokeDeviceModal.js';
+import CeremonyFlowModal from './CeremonyFlowModal.js';
 import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
@@ -1035,10 +1035,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
       <ReceivePersonasModal visible={wizard === 'receive-personas'} callSkill={callSkill} onClose={() => setWizard(null)} />
       {relayQuestionModal}
-      <RevokeDeviceModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
-      <RevokeDeviceModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+      <CeremonyFlowModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
+      <CeremonyFlowModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
         placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
-      <RevokeDeviceModal
+      <CeremonyFlowModal
         visible={!!revokeTarget}
         deviceId={revokeTarget}
         callSkill={callSkill}

@@ -48,6 +48,8 @@ const _cfg = withOnderlingPreset({
     path.resolve(repoRoot, 'packages/vault'),
     // The pre-send floor (a contact's declared redaction) — basis's shared src imports the engine.
     path.resolve(repoRoot, 'packages/redaction'),
+    // The one scan loop (`@onderling/qr`) — the scanner reaches it through @onderling/react-native/qr.
+    path.resolve(repoRoot, 'packages/qr'),
     path.resolve(repoRoot, 'packages/chat-p2p'),
     path.resolve(repoRoot, 'packages/identity-resolver'),
     path.resolve(repoRoot, 'packages/item-store'),
@@ -123,6 +125,7 @@ const _cfg = withOnderlingPreset({
     // unconditionally, so the module must still exist on disk).
     '@onderling/vault':             path.resolve(repoRoot, 'packages/vault'),
     '@onderling/redaction':         path.resolve(repoRoot, 'packages/redaction'),
+    '@onderling/qr':                path.resolve(repoRoot, 'packages/qr'),
     '@onderling/chat-p2p':          path.resolve(repoRoot, 'packages/chat-p2p'),
     '@onderling/identity-resolver': path.resolve(repoRoot, 'packages/identity-resolver'),
     '@onderling/item-store':        path.resolve(repoRoot, 'packages/item-store'),

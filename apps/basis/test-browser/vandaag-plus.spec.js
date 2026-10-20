@@ -115,3 +115,13 @@ test('a Vandaag row is a card with ONE button — the action its noun declares',
   await expect(page.locator('.circle-vandaag-plus__body'), 'the button opens the sheet on the note').toHaveValue('fietsband plakken');
   expect(errs).toEqual([]);
 });
+
+test('the "+" is on every tab — its sheet holds the own acts and the Me actions', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('[data-tab="circles"]').first().click();
+  await expect(page.locator('.cc-fab'), 'the floating "+" on the Circles tab').toHaveCount(1);
+  await page.locator('.cc-fab').click();
+  await expect(page.locator('[data-section="plus-own"] .circle-vandaag-plus__act').first()).toBeVisible();
+  await expect(page.locator('[data-section="plus-me"] .circle-vandaag-plus__me[data-me="share-contact"]')).toBeVisible();
+});

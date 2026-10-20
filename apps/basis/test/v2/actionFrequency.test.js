@@ -94,3 +94,20 @@ describe('actionFrequency · createActionFrequencyStore (D1 / §5A)', () => {
     expect(s.counts('c1')).toEqual({ tasks: 1 });
   });
 });
+
+describe('what this device counted, shown and cleared (My data)', () => {
+  it('clear() forgets every count and tells the host to persist the empty snapshot', async () => {
+    const { createActionFrequencyStore } = await import('../../src/v2/actionFrequency.js');
+    const saved = [];
+    const s = createActionFrequencyStore({ c1: { tasks: 3 } }, { onChange: (snap) => saved.push(snap) });
+    s.clear();
+    expect(s.snapshot()).toEqual({});
+    expect(saved.at(-1)).toEqual({});
+  });
+  it("the rows My data shows: per circle, its features by count, in the circle's name", async () => {
+    const { usageRows } = await import('../../src/v2/actionFrequency.js');
+    const t = (k) => ({ 'circle.tabs.tasks': 'Tasks', 'circle.tabs.conversation': 'Messages' }[k] ?? k);
+    expect(usageRows({ c1: { tasks: 3, chat: 12 }, gone: { tasks: 1 } }, { names: { c1: 'Straat' }, t }))
+      .toEqual([{ circleId: 'c1', name: 'Straat', items: [{ key: 'chat', label: 'Messages', count: 12 }, { key: 'tasks', label: 'Tasks', count: 3 }] }]);
+  });
+});

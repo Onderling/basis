@@ -23,7 +23,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
   onOpenCircle = null,
   // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section
-  meActions = [], onMeAction = null }) {
+  meActions = [], onMeAction = null,
+  // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
+  acts = PLUS_ACTS }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -86,7 +88,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                 </Pressable>
               ))}
             </View>
-          ) : !act ? PLUS_ACTS.map((a) => (
+          ) : !act ? acts.map((a) => (
             <Pressable key={a.id} style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
               <Text style={styles.btnText}>{plusLabel(t, a)}</Text>
             </Pressable>

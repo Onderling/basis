@@ -16,7 +16,9 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   // the line named something that lives in a circle: where it lives (`[{circleId, name}]`) — opened, never acted on
   referral = null, onOpenCircle,
   // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section, one tap from any tab
-  meActions = [], onMeAction } = {}) {
+  meActions = [], onMeAction,
+  // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
+  acts = PLUS_ACTS } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'vandaagPlus.js');
   container.innerHTML = '';
@@ -68,7 +70,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   if (asking) {
     /* the self is asked first */
   } else if (!act) {
-    for (const a of PLUS_ACTS) {
+    for (const a of acts) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__act';

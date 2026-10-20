@@ -28,3 +28,15 @@ describe('the "+" line: own acts, else a referral — never an act elsewhere', (
     expect(plusLineOutcome('vraag: wie heeft een boor?', { circles: [circle('c2', 'Werk', ['tasks'])] })).toBeNull();
   });
 });
+
+describe("the sheet's own acts, most used first (this device's counts, an 'own' key space)", () => {
+  it('orders by the own counts; acts never used keep their declared order after', async () => {
+    const { orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE } = await import('../../src/v2/vandaagPlus.js');
+    const { createActionFrequencyStore } = await import('../../src/v2/actionFrequency.js');
+    const f = createActionFrequencyStore();
+    const last = PLUS_ACTS.at(-1);
+    f.bump(OWN_USAGE_SCOPE, last.id, 3);
+    expect(orderedPlusActs(PLUS_ACTS, f)[0].id).toBe(last.id);
+    expect(orderedPlusActs(PLUS_ACTS, null).map((a) => a.id)).toEqual(PLUS_ACTS.map((a) => a.id));
+  });
+});

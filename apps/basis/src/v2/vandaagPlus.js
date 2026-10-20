@@ -39,6 +39,20 @@ export const PLUS_ACTS = plusActs();
  * An act's words ("Eigen afspraak"): basis's frame around the word the declaring manifest names its noun with.
  * @param {Function} t @param {{noun: string}} act
  */
+/** The counter's key space for the sheet's OWN acts (beside each circle's features): what this person makes most. */
+export const OWN_USAGE_SCOPE = 'own';
+
+/**
+ * The sheet's own acts, most used first on this device (`actionFrequency` under `OWN_USAGE_SCOPE`); acts never used
+ * keep their declared order after them. No counter: the declared order. The host bumps the act on each save.
+ */
+export function orderedPlusActs(acts = PLUS_ACTS, frequency = null) {
+  const ranked = typeof frequency?.top === 'function' ? frequency.top(OWN_USAGE_SCOPE, acts.length) : [];
+  const byId = new Map(acts.map((a) => [a.id, a]));
+  const first = ranked.map((id) => byId.get(id)).filter(Boolean);
+  return [...first, ...acts.filter((a) => !first.includes(a))];
+}
+
 export function plusLabel(t, act) { return t('circle.vandaag.plus_own', { noun: nounWord(t, act.noun) }); }
 
 const EMPTY = { error: 'circle.vandaag.plus_empty' };

@@ -7,6 +7,7 @@
  * Self-contained: loads + mutates via the injected pinboard-capable `callSkill`.
  * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
  */
+import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
@@ -66,6 +67,8 @@ const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-
 
 export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onSetRelay, onReconnectPeer, agent = null,
   eventLog = null,
+  // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
+  frequent = [], onClearFrequent = null,
   // the doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here
   doors = {},
   // the person's own week overview (a row in their own store, switched here): the clock, or null on a shell without one
@@ -1012,6 +1015,14 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           ))}
         </Section>
       )}
+
+      {/* what you use most — counted on this device only (web twin: data-section mydata-frequent) */}
+      <Section title={t('circle.mydata.frequent')}>
+        <Text style={styles.privacyBody} testID="mydata-frequent">{t('circle.mydata.frequent_note')}</Text>
+        {frequent.length ? frequent.map((r) => <KV key={r.circleId} k={r.name} v={r.items.map((i) => `${i.label} ${i.count}`).join(' · ')} />)
+          : <Text style={styles.privacyBody}>{t('circle.mydata.frequent_none')}</Text>}
+        {frequent.length && onClearFrequent ? <Btn label={t('circle.mydata.frequent_clear')} onPress={onClearFrequent} testID="mydata-frequent-clear" /> : null}
+      </Section>
 
       {usage.length > 0 && (
         <Section title={t('circle.mydata.usage')}>

@@ -55,7 +55,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   if (asking) {
     /* the self is asked first */
   } else if (!act) {
-    for (const a of PLUS_ACTS) {
+    for (const a of acts) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__act';

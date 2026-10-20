@@ -40,6 +40,8 @@
  * @param {{ onChange?: (snap: Record<string, Record<string, number>>) => void }} [opts]
  * @returns {ActionFrequencyStore}
  */
+import { featureActionLabelKey } from './circleTabs.js';
+
 export function createActionFrequencyStore(initial = {}, { onChange } = {}) {
   /** @type {Map<string, Map<string, number>>} */
   const map = new Map();
@@ -79,6 +81,12 @@ export function createActionFrequencyStore(initial = {}, { onChange } = {}) {
   }
 
   return {
+    /** Forget every count (My data's "clear"): the host persists the empty snapshot through `onChange`. */
+    clear() {
+      if (!map.size) return;
+      map.clear();
+      notify();
+    },
     bump(circleId, actionKey, weight = 1) {
       if (typeof circleId !== 'string' || circleId === '') return;
       if (typeof actionKey !== 'string' || actionKey === '') return;
@@ -110,4 +118,24 @@ export function createActionFrequencyStore(initial = {}, { onChange } = {}) {
       return () => subs.delete(fn);
     },
   };
+}
+
+
+/**
+ * What My data shows of this device's counts: per circle it still knows (by its name), the features this person used
+ * there, most used first — the counts stay on this device, never synced. A circle no longer known is left out.
+ * @param {Record<string, Record<string, number>>} snap   the store's snapshot
+ * @param {{ names: Record<string, string>, t: (key: string) => string, labelOf?: (scope: string, key: string) => string|null }} o
+ *   `labelOf` names a key of another key space (the "+" sheet's own acts); null falls back to the feature's label
+ */
+export function usageRows(snap, { names = {}, t = (k) => k, labelOf = null } = {}) {
+  const rows = [];
+  for (const [circleId, counts] of Object.entries(snap ?? {})) {
+    if (!names[circleId]) continue;
+    const items = Object.entries(counts ?? {}).filter(([, n]) => typeof n === 'number' && n > 0)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([key, count]) => ({ key, label: (typeof labelOf === 'function' ? labelOf(circleId, key) : null) ?? t(featureActionLabelKey(key)), count }));
+    if (items.length) rows.push({ circleId, name: names[circleId], items });
+  }
+  return rows;
 }

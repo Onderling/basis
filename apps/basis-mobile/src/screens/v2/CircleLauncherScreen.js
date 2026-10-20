@@ -281,6 +281,7 @@ import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
+import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
@@ -740,6 +741,8 @@ export default function CircleLauncherScreen({
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
   const [plusShareList, setPlusShareList] = useState(null);
+  // a repaint after My data clears this device's usage counts (the store is module-level, not React state)
+  const [, setFrequencyTick] = useState(0);
   useEffect(() => {
     if (!plusEdit?.act?.share) { setPlusShareList(null); return undefined; }
     let live = true;
@@ -2085,7 +2088,7 @@ export default function CircleLauncherScreen({
   if (view === 'mydata') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+        <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), t })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
           personClock={personClockRef.current} />
       </WithTabBar>

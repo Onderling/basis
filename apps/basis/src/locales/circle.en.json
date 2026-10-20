@@ -6444,6 +6444,26 @@
       "text": "Privacy",
       "doc": "S5 — privacy disclosure section."
     },
+    "frequent": {
+      "text": "What you use most",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
+    "frequent_note": {
+      "text": "Counted on this device only, never sent: it orders the \"Frequently used\" row in each circle.",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
+    "frequent_none": {
+      "text": "Nothing counted yet.",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
+    "frequent_own": {
+      "text": "Your own (the \"+\")",
+      "doc": "My data: the row of counts for the \"+\" sheet's own acts (a note, an appointment) on this device."
+    },
+    "frequent_clear": {
+      "text": "Clear",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
     "usage": {
       "text": "Usage",
       "doc": "S5 — usage metrics section."

@@ -18,6 +18,7 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { usageRows } from '../../src/v2/actionFrequency.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -174,7 +175,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../src/v2/vandaagPlus.js';
 import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -4316,6 +4317,7 @@ function showVandaagPlus({ edit = null } = {}) {
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
     t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, referral,
+    acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
@@ -4341,6 +4343,8 @@ function showVandaagPlus({ edit = null } = {}) {
       if (op.error) { error = t(op.error); paint(); return; }
       const r = await call(op);
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
+      if (!editId) actionFrequency.bump(OWN_USAGE_SCOPE, id);
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
       const follow = editId ? null : plusFollowUp(_screensBook, id);
       if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
@@ -4790,7 +4794,13 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
+  // what this person used most, per circle, on this device (the counter behind "Veel gebruikt"); shown and forgettable
+  const frequentRows = () => usageRows(actionFrequency.snapshot(), {
+    names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
+    labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
+  });
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
+    frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
     // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
     weekOverview, version: APP_VERSION,

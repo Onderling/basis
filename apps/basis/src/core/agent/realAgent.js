@@ -6454,8 +6454,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         // the node composed as a household's bot (its calendar in the circle — the function profile that hosts door
         // people) vouches for its door people's answers with its own circle identity; a person's node vouches for no one
         const hostsDoors = opts.calendarInCircle === true;
-        const own = hostsDoors ? (await circleIdentityFor(circleId).catch(() => null))?.pubKey : null;
-        return rosterAnswerRule({ rows, verify: AgentIdentity.verify, vouchers: own ? [own] : [] });
+        const mine = (await circleIdentityFor(circleId).catch(() => null))?.pubKey ?? null;
+        const self = circleSelf(circleId)?.webid ?? null;
+        return rosterAnswerRule({ rows, verify: AgentIdentity.verify, vouchers: hostsDoors && mine ? [mine] : [], own: mine && self ? { address: mine, selves: [self] } : null });
       },
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */

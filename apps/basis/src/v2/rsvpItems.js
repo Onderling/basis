@@ -80,10 +80,11 @@ export function withAnswers(events, rsvpItems, counts = null) {
  * `signer`, and either the roster binds `by` to that address — the row's own or a further device's (a member answering
  * as themselves, from any of their devices) — or `by` is no
  * member and the signer is one of the `vouchers` (the circle identity of a function profile answering for its door
- * people). A member's device signing for someone else counts for nothing.
+ * people). A member's device signing for someone else counts for nothing. `own` (`{address, selves}`): this device's own
+ * circle address and its selves there — its own answers stand on its own replica before the roster has the address.
  * @param {{ rows: Array<{webid?: string, circleAddress?: string, circleAddresses?: Array<{address: string, proof: string}>}>, verify: (message: string, sig: string, pubKey: string) => boolean, vouchers?: string[] }} a
  */
-export function rosterAnswerRule({ rows = [], verify, vouchers = [] } = {}) {
+export function rosterAnswerRule({ rows = [], verify, vouchers = [], own = null } = {}) {
   // a member's addresses: the row's own and each further device's, kept with its proof (pinboard's `rowHolds` rule —
   // a person answers from any of their devices, each with its own circle address)
   const addressesOf = new Map();
@@ -102,6 +103,9 @@ export function rosterAnswerRule({ rows = [], verify, vouchers = [] } = {}) {
     let ok = false;
     try { ok = verify(answerStatement(it), it.sig, it.signer) === true; } catch { ok = false; }
     if (!ok) return false;
+    // this device's own answer, signed with its own circle key for one of its own selves: it knows its key before the
+    // roster does (the address reaches the roster after the join, later under load) — only this device holds that key
+    if (own?.address && it.signer === own.address && (own.selves ?? []).includes(it.by)) return true;
     if (members.has(it.by)) return addressesOf.get(it.by)?.has(it.signer) === true;
     return vouch.has(it.signer);
   };

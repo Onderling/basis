@@ -111,3 +111,20 @@ describe('who an answer is from is SIGNED, not stated', () => {
     expect(await answersOn(frits, made.itemId)).toEqual({ 'telegram:222': 'tentative' });
   });
 });
+
+describe('your own answer shows at once on your own device', () => {
+  it('signed with this device\'s own circle key for its own self, it stands before the roster has the address', async () => {
+    const k = { bob: await AgentIdentity.generate(new VaultMemory()) };
+    const registry = createRegistry(); registerCanonicalTypes(registry);
+    const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
+    const ops = makeCircleCalendarOps({
+      storeFor: (id) => stores.getStore(id), activeCircle: () => C, t, localActor: 'bob',
+      signerFor: async () => k.bob, encode: b64encode,
+      // the roster has not got Bob's address yet (it lags under load)
+      answerRuleFor: async () => rosterAnswerRule({ rows: [{ webid: 'bob' }], verify: AgentIdentity.verify, own: { address: k.bob.pubKey, selves: ['bob'] } }),
+    });
+    const made = await ops.addEvent({ circleId: C, title: 'Koffie', startsAt: soon(24), endsAt: soon(25) });
+    await ops.rsvpAccept({ circleId: C, id: made.itemId });
+    expect((await ops.listEvents({ circleId: C, days: 30 })).items.find((e) => e.id === made.itemId)?.rsvp).toEqual({ bob: 'accepted' });
+  });
+});

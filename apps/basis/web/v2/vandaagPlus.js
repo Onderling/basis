@@ -28,7 +28,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     for (const self of selves) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'circle-vandaag-plus__self';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__self';
       b.dataset.self = self.id;
       b.textContent = self.id === 'default' ? tr('circle.switcher.you') : (self.name || self.id);
       b.addEventListener('click', () => onPickSelf?.(self.id));
@@ -56,7 +56,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     for (const a of PLUS_ACTS) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'circle-vandaag-plus__act';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__act';
       b.dataset.act = a.id;
       b.textContent = plusLabel(tr, a);
       b.addEventListener('click', () => onPick?.(a.id));
@@ -81,14 +81,14 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     }
     const save = document.createElement('button');
     save.type = 'submit';
-    save.className = 'circle-vandaag-plus__save';
+    save.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__save';
     save.textContent = tr('circle.vandaag.plus_save');
     form.appendChild(save);
     // opened on an own row: take it away
     if (editing && typeof onRemove === 'function') {
       const rm = document.createElement('button');
       rm.type = 'button';
-      rm.className = 'circle-vandaag-plus__remove';
+      rm.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__remove';
       rm.textContent = tr('circle.vandaag.plus_remove');
       rm.addEventListener('click', () => onRemove(act.id));
       form.appendChild(rm);
@@ -109,7 +109,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       for (const c of shareTargets) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'circle-vandaag-plus__share-to';
+        b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__share-to';
         b.dataset.contact = c.id;
         b.textContent = c.label;
         b.addEventListener('click', () => onShare(act.id, c.id));
@@ -131,7 +131,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   }
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'circle-vandaag-plus__close';
+  close.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__close';
   close.textContent = tr('circle.vandaag.done');
   close.addEventListener('click', () => onClose?.());
   container.appendChild(close);

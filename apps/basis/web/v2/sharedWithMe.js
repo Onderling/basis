@@ -23,7 +23,7 @@ export function renderSharedWithMe(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'shared-with-me__back';
+  back.className = 'cc-btn cc-btn--quiet shared-with-me__back';
   back.textContent = tr('circle.back_mydata');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -54,7 +54,7 @@ export function renderSharedWithMe(container, {
   for (const entry of entries) {
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'shared-with-me__row';
+    el.className = 'cc-btn cc-btn--quiet shared-with-me__row';
     el.dataset.copyId = entry.id;
 
     const label = document.createElement('span');

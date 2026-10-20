@@ -37,7 +37,7 @@ export function renderCircleOverride(container, { override, t, onChange, onBack,
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-override__back';
+  back.className = 'cc-btn cc-btn--quiet circle-override__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -114,7 +114,7 @@ export function renderCircleOverride(container, { override, t, onChange, onBack,
 
   const save = document.createElement('button');
   save.type = 'button';
-  save.className = 'circle-override__save';
+  save.className = 'cc-btn cc-btn--quiet circle-override__save';
   save.textContent = tr('circle.settings.save');
   save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
   container.appendChild(save);

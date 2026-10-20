@@ -80,7 +80,7 @@ export function renderCircleScreen(container, { blocks = [], t, refreshing = fal
     if (typeof onMore === 'function' && block.status === 'ok') {
       const more = document.createElement('button');
       more.type = 'button';
-      more.className = 'circle-screen__more';
+      more.className = 'cc-btn cc-btn--quiet circle-screen__more';
       more.dataset.blockId = block.blockId ?? '';
       more.textContent = tr('circle.screen.more');
       more.addEventListener('click', () => onMore(block.blockId));
@@ -272,7 +272,7 @@ function renderIdentityLine(section, block, tr, onAction) {
   if (typeof onAction === 'function') {
     const edit = document.createElement('button');
     edit.type = 'button';
-    edit.className = 'circle-screen__identity-edit';
+    edit.className = 'cc-btn cc-btn--quiet circle-screen__identity-edit';
     edit.textContent = tr('circle.profile.edit');
     edit.addEventListener('click', () => onAction({ kind: 'edit-me' }));
     head.appendChild(edit);

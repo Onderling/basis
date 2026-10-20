@@ -4213,7 +4213,7 @@ async function _showVandaag() {
     for (const page of book.screens) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'circle-vandaag__page';
+      b.className = 'cc-btn cc-btn--quiet circle-vandaag__page';
       b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', String(page.id === screen?.id));
       b.dataset.pageId = page.id;
@@ -4226,21 +4226,21 @@ async function _showVandaag() {
   if (_expandedBlockId) {
     const back = document.createElement('button');
     back.type = 'button';
-    back.className = 'circle-vandaag__back';
+    back.className = 'cc-btn cc-btn--quiet circle-vandaag__back';
     back.textContent = `← ${t('circle.screen.more_back')}`;
     back.addEventListener('click', () => { _expandedBlockId = null; _showVandaag(); });
     head.appendChild(back);
   } else {
     const edit = document.createElement('button');
     edit.type = 'button';
-    edit.className = 'circle-vandaag__customise';
+    edit.className = 'cc-btn cc-btn--quiet circle-vandaag__customise';
     edit.textContent = t('circle.vandaag.customise');
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
     // the "+": an own note or an own appointment, into the person's own store (never a circle)
     const plus = document.createElement('button');
     plus.type = 'button';
-    plus.className = 'circle-vandaag__plus';
+    plus.className = 'cc-btn cc-btn--quiet circle-vandaag__plus';
     plus.textContent = `+ ${t('circle.vandaag.plus')}`;
     plus.addEventListener('click', () => showVandaagPlus());
     head.appendChild(plus);
@@ -8253,7 +8253,7 @@ async function showGovernance(id) {
   });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
-  back.type = 'button'; back.className = 'cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
+  back.type = 'button'; back.className = 'cc-btn cc-btn--quiet cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
   back.addEventListener('click', () => { _govRerender = null; showDetail(id); });
   rootEl.appendChild(back);
   const host = document.createElement('div');

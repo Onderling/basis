@@ -44,7 +44,7 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
   if (typeof onReport === 'function') {
     const report = document.createElement('button');
     report.type = 'button';
-    report.className = 'circle-membercard__report';
+    report.className = 'cc-btn cc-btn--quiet circle-membercard__report';
     report.textContent = tr('circle.governance.report_member');
     report.addEventListener('click', () => onReport(member));
     container.appendChild(report);

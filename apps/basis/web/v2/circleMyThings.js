@@ -21,7 +21,7 @@ export function renderCircleMyThings(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-my-things__back';
+  back.className = 'cc-btn cc-btn--quiet circle-my-things__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -52,7 +52,7 @@ export function renderCircleMyThings(container, {
   for (const file of files) {
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 'circle-my-things__row';
+    el.className = 'cc-btn cc-btn--quiet circle-my-things__row';
     el.dataset.fileId = file.id;
     const name = document.createElement('span');
     name.className = 'circle-my-things__name';

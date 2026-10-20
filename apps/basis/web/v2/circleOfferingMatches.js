@@ -19,7 +19,7 @@ export function renderOfferingMatches(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-offering-matches__back';
+  back.className = 'cc-btn cc-btn--quiet circle-offering-matches__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);

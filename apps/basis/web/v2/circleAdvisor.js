@@ -22,7 +22,7 @@ export function renderCircleAdvisor(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-advisor__back';
+  back.className = 'cc-btn cc-btn--quiet circle-advisor__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);

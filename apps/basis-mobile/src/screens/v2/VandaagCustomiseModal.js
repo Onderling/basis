@@ -6,6 +6,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
+import Btn from './Btn.js';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 
@@ -15,10 +16,9 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
   const [name, setName] = useState(model?.pageName ?? '');
   useEffect(() => { setName(model?.pageName ?? ''); }, [model?.pageId, model?.pageName]);
   if (!visible || !model) return null;
-  const Btn = ({ label, act, args, disabled = false, testID }) => (
-    <Pressable style={[styles.btn, disabled && styles.disabled]} disabled={disabled} onPress={() => onAct?.(act, args)} testID={testID}>
-      <Text style={styles.btnText}>{label}</Text>
-    </Pressable>
+  // the page's acts wear the shared button family (Btn), quiet by default
+  const ActBtn = ({ label, act, args, disabled = false, testID, variant = 'quiet' }) => (
+    <Btn variant={variant} label={label} disabled={disabled} onPress={() => onAct?.(act, args)} testID={testID} />
   );
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -37,9 +37,9 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                 <View key={b.blockId} style={styles.block} testID={`customise-block-${b.blockId}`}>
                   <Text style={styles.blockName}>{t(b.labelKey)}</Text>
                   <View style={styles.row}>
-                    <Btn label={t('circle.vandaag.up')} act="up" args={base} disabled={!b.canUp} testID={`customise-up-${b.blockId}`} />
-                    <Btn label={t('circle.vandaag.down')} act="down" args={base} disabled={!b.canDown} testID={`customise-down-${b.blockId}`} />
-                    <Btn label={t('circle.vandaag.remove')} act="remove" args={base} testID={`customise-remove-${b.blockId}`} />
+                    <ActBtn label={t('circle.vandaag.up')} act="up" args={base} disabled={!b.canUp} testID={`customise-up-${b.blockId}`} />
+                    <ActBtn label={t('circle.vandaag.down')} act="down" args={base} disabled={!b.canDown} testID={`customise-down-${b.blockId}`} />
+                    <ActBtn variant="danger" label={t('circle.vandaag.remove')} act="remove" args={base} testID={`customise-remove-${b.blockId}`} />
                   </View>
                   {b.controls.map((c) => (c.text ? (
                     // labels, typed: "werk, thuis" — applied when the field is left
@@ -90,14 +90,14 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
             <Text style={styles.heading}>{t('circle.vandaag.page_title')}</Text>
             <TextInput style={styles.input} value={name} onChangeText={setName} testID="customise-page-name" />
             <View style={styles.row}>
-              <Btn label={t('circle.vandaag.rename_page')} act="rename-page" args={{ pageId: model.pageId, name }} />
-              <Btn label={t('circle.vandaag.add_page')} act="add-page" args={{ name: t('circle.vandaag.new_page_name') }} />
-              <Btn label={t('circle.vandaag.remove_page')} act="remove-page" args={{ pageId: model.pageId }} disabled={!model.canRemovePage} />
+              <ActBtn label={t('circle.vandaag.rename_page')} act="rename-page" args={{ pageId: model.pageId, name }} />
+              <ActBtn label={t('circle.vandaag.add_page')} act="add-page" args={{ name: t('circle.vandaag.new_page_name') }} />
+              <ActBtn variant="danger" label={t('circle.vandaag.remove_page')} act="remove-page" args={{ pageId: model.pageId }} disabled={!model.canRemovePage} />
             </View>
               </>),
                 'customise-undo': () => (
                   <View style={styles.row}>
-                    <Btn label={t('circle.vandaag.undo')} act="undo" args={{}} testID="customise-undo" />
+                    <ActBtn label={t('circle.vandaag.undo')} act="undo" args={{}} testID="customise-undo" />
                   </View>
                 ),
               };
@@ -105,7 +105,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
               return el ? <View key={d.id} testID={d.id}>{el}</View> : null;
             })}
             <View style={styles.row}>
-              <Pressable style={styles.btn} onPress={onClose} testID="customise-done"><Text style={styles.btnText}>{t('circle.vandaag.done')}</Text></Pressable>
+              <Btn variant="primary" label={t('circle.vandaag.done')} onPress={onClose} testID="customise-done" />
             </View>
           </ScrollView>
         </View>
@@ -132,9 +132,6 @@ const makeStyles = (theme) => StyleSheet.create({
   block: { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, padding: 8, marginBottom: 8 },
   blockName: { fontSize: 14, color: theme.color.ink, fontWeight: '600' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  btn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: theme.color.line },
-  btnText: { color: theme.color.ink, fontSize: 13 },
-  disabled: { opacity: 0.4 },
   chip: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.color.line },
   chipOn: { borderColor: theme.color.ink },
   chipText: { color: theme.color.ink, fontSize: 12 },

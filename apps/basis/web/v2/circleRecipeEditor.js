@@ -202,7 +202,7 @@ function renderBookMode(container, {
 }) {
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-recipe-editor__back';
+  back.className = 'cc-btn cc-btn--quiet circle-recipe-editor__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -239,7 +239,7 @@ function renderBookMode(container, {
   addRow.appendChild(addInput);
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
-  addBtn.className = 'circle-recipe-editor__add-recipe-btn';
+  addBtn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__add-recipe-btn';
   addBtn.textContent = tr('circle.recipe.editor.add_recipe');
   addBtn.addEventListener('click', () => {
     const name = addInput.value.trim();
@@ -263,7 +263,7 @@ function renderRecipeRow(recipe, {
   // Name (rendered as a button so tapping the name opens the recipe).
   const nameBtn = document.createElement('button');
   nameBtn.type = 'button';
-  nameBtn.className = 'circle-recipe-editor__recipe-name';
+  nameBtn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__recipe-name';
   nameBtn.textContent = recipe.name || tr('circle.recipe.editor.untitled');
   nameBtn.addEventListener('click', () => onOpenRecipe?.(recipe.id));
   li.appendChild(nameBtn);
@@ -282,7 +282,7 @@ function renderRecipeRow(recipe, {
 
   const renameBtn = document.createElement('button');
   renameBtn.type = 'button';
-  renameBtn.className = 'circle-recipe-editor__recipe-rename';
+  renameBtn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__recipe-rename';
   renameBtn.textContent = tr('circle.recipe.editor.rename');
   renameBtn.addEventListener('click', () => {
     const next = globalThis.prompt?.(tr('circle.recipe.editor.rename_prompt'), recipe.name) ?? null;
@@ -295,7 +295,7 @@ function renderRecipeRow(recipe, {
   if (!isActive) {
     const activateBtn = document.createElement('button');
     activateBtn.type = 'button';
-    activateBtn.className = 'circle-recipe-editor__recipe-activate';
+    activateBtn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__recipe-activate';
     activateBtn.textContent = tr('circle.recipe.editor.set_active');
     activateBtn.addEventListener('click', () => onSetActive?.(recipe.id));
     actions.appendChild(activateBtn);
@@ -303,7 +303,7 @@ function renderRecipeRow(recipe, {
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'circle-recipe-editor__recipe-remove';
+  removeBtn.className = 'cc-btn cc-btn--danger circle-recipe-editor__recipe-remove';
   removeBtn.textContent = tr('circle.recipe.editor.delete');
   removeBtn.addEventListener('click', () => {
     if (!globalThis.confirm?.(tr('circle.recipe.editor.delete_confirm', { name: recipe.name || '' }))) return;
@@ -335,7 +335,7 @@ function renderRecipeMode(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-recipe-editor__back';
+  back.className = 'cc-btn cc-btn--quiet circle-recipe-editor__back';
   back.textContent = tr('circle.recipe.editor.back_to_book');
   back.addEventListener('click', () => onBackToBook?.());
   container.appendChild(back);
@@ -377,7 +377,7 @@ function renderRecipeMode(container, {
     const meta = BLOCK_DESCRIPTORS[type];
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'circle-recipe-editor__palette-btn';
+    btn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__palette-btn';
     btn.dataset.blockType = type;
     btn.textContent = `${meta?.emoji ? meta.emoji + ' ' : ''}${tr(`circle.recipe.block.${type}`)}`;
     btn.addEventListener('click', () => onAddBlock?.(recipeId, type));
@@ -409,7 +409,7 @@ function renderBlockRow(block, index, total, {
 
   const upBtn = document.createElement('button');
   upBtn.type = 'button';
-  upBtn.className = 'circle-recipe-editor__block-up';
+  upBtn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__block-up';
   upBtn.textContent = '↑';
   upBtn.disabled = index === 0;
   upBtn.setAttribute('aria-label', tr('circle.recipe.editor.move_up'));
@@ -418,7 +418,7 @@ function renderBlockRow(block, index, total, {
 
   const downBtn = document.createElement('button');
   downBtn.type = 'button';
-  downBtn.className = 'circle-recipe-editor__block-down';
+  downBtn.className = 'cc-btn cc-btn--quiet circle-recipe-editor__block-down';
   downBtn.textContent = '↓';
   downBtn.disabled = index >= total - 1;
   downBtn.setAttribute('aria-label', tr('circle.recipe.editor.move_down'));
@@ -427,7 +427,7 @@ function renderBlockRow(block, index, total, {
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
-  removeBtn.className = 'circle-recipe-editor__block-remove';
+  removeBtn.className = 'cc-btn cc-btn--danger circle-recipe-editor__block-remove';
   removeBtn.textContent = '×';
   removeBtn.setAttribute('aria-label', tr('circle.recipe.editor.remove_block'));
   removeBtn.addEventListener('click', () => onRemoveBlock?.(recipeId, block.id));

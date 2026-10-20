@@ -157,7 +157,7 @@ export function renderContactThread(container, {
   if (typeof hidden === 'boolean' && typeof onOpenLens === 'function') {
     const lens = document.createElement('button');
     lens.type = 'button';
-    lens.className = 'cc-cthread__lens';
+    lens.className = 'cc-btn cc-btn--quiet cc-cthread__lens';
     lens.textContent = tr('circle.contacts.lens.open');
     lens.addEventListener('click', () => onOpenLens());
     header.appendChild(lens);
@@ -166,7 +166,7 @@ export function renderContactThread(container, {
   if (typeof hidden === 'boolean' && typeof onDelete === 'function') {
     const del = document.createElement('button');
     del.type = 'button';
-    del.className = 'cc-cthread__delete';
+    del.className = 'cc-btn cc-btn--danger cc-cthread__delete';
     del.textContent = tr('circle.contacts.delete');
     del.addEventListener('click', () => onDelete());
     header.appendChild(del);

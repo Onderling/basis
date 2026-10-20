@@ -107,7 +107,7 @@ export function renderCircleFolioBrowser(container, {
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-folio__back';
+  back.className = 'cc-btn cc-btn--quiet circle-folio__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   container.appendChild(back);
@@ -144,7 +144,7 @@ export function renderCircleFolioBrowser(container, {
     for (const key of SHARE_FILTERS) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'circle-folio__share-filter';
+      btn.className = 'cc-btn cc-btn--quiet circle-folio__share-filter';
       btn.dataset.shareFilter = key;
       if (key === shareFilter) btn.classList.add('is-active');
       // Locale key uses underscore: shared_by_me / shared_with_me.

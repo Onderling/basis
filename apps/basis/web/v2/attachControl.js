@@ -79,6 +79,7 @@ export function buildAttachControl({
   }
 
   const trigger = document.createElement('button');
+  trigger.className = 'cc-btn cc-btn--quiet';
   trigger.type = 'button';
   trigger.className = namer('attach');
   trigger.textContent = '+';
@@ -108,6 +109,7 @@ export function buildAttachControl({
   menu.setAttribute('role', 'menu');
   for (const entry of entries) {
     const item = document.createElement('button');
+    item.className = 'cc-btn cc-btn--quiet';
     item.type = 'button';
     item.className = namer('attach-item');
     item.setAttribute('role', 'menuitem');

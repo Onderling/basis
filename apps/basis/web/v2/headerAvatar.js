@@ -12,7 +12,7 @@ export function renderHeaderAvatar(container, { avatar = null, pictureUrl = null
   container.className = 'cc-header-avatar';
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'cc-header-avatar__button';
+  b.className = 'cc-btn cc-btn--quiet cc-header-avatar__button';
   b.setAttribute('aria-label', tr('circle.profile.edit'));
   if (avatar?.name) b.title = avatar.name;
   if (pictureUrl) {

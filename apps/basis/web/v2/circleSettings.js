@@ -153,7 +153,7 @@ export function renderCircleSettings(container, {
     status.dataset.role = 'recipe-status';
     const apply = document.createElement('button');
     apply.type = 'button';
-    apply.className = 'circle-settings__recipe-apply';
+    apply.className = 'cc-btn cc-btn--quiet circle-settings__recipe-apply';
     apply.textContent = tr('circle.recipeApply.apply');
     apply.addEventListener('click', async () => {
       const src = (input.value || '').trim();
@@ -351,7 +351,7 @@ export function renderCircleSettings(container, {
     for (const [choice, key, fn] of [['yes', 'circle.settings.proposal_accept', proposalAnswer.onAccept], ['no', 'circle.settings.proposal_decline', proposalAnswer.onDecline]]) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `circle-settings__proposal-${choice}`;
+      b.className = `cc-btn cc-btn--quiet circle-settings__proposal-${choice}`;
       b.dataset.choice = choice;
       b.textContent = tr(key);
       b.addEventListener('click', () => { b.disabled = true; fn?.(); });
@@ -516,13 +516,13 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
       input.disabled = !state.enabled;
       const apply = document.createElement('button');
       apply.type = 'button';
-      apply.className = 'circle-settings__control-apply';
+      apply.className = 'cc-btn cc-btn--quiet circle-settings__control-apply';
       apply.textContent = tr('circle.settings.relayEndpoint_apply');
       apply.disabled = !state.enabled;
       apply.addEventListener('click', () => dispatch(ctl.opId, { [ctl.arg]: input.value.trim() }));
       const clear = document.createElement('button');
       clear.type = 'button';
-      clear.className = 'circle-settings__control-clear';
+      clear.className = 'cc-btn cc-btn--quiet circle-settings__control-clear';
       clear.textContent = tr('circle.settings.relayEndpoint_clear');
       clear.disabled = !state.enabled;
       clear.addEventListener('click', () => { input.value = ''; dispatch(ctl.opId, { clear: true }); });

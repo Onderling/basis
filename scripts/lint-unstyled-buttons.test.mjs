@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { scanSource, styledBy } from './lint-unstyled-buttons.mjs';
+import { scanSource, styledBy, loadedSheets } from './lint-unstyled-buttons.mjs';
 
 const isStyled = styledBy('.cc-btn { } .cc-btn--quiet { } .row__act { }');
 
@@ -45,6 +45,13 @@ describe('lint-unstyled-buttons', () => {
       "}",
     ].join('\n');
     expect(scanSource(src, isStyled).map((h) => h.line)).toEqual([1]);
+  });
+  it('a button made with an injected doc counts too (the shared web pieces create through `doc`)', () => {
+    expect(scanSource("const info = doc.createElement('button');\ninfo.className = 'cc-radio-info';", isStyled)).toHaveLength(1);
+  });
+  it('only the stylesheets the page links style anything (a rule in a retired sheet styles nothing)', () => {
+    const html = '<link rel="stylesheet" href="./v2/theme.css" /><link href="https://x/y.css" rel="stylesheet"><link rel="stylesheet" href="./v2/circle.css">';
+    expect(loadedSheets(html)).toEqual(['./v2/theme.css', './v2/circle.css']);
   });
   it('passes on the repo as it stands', () => {
     const r = spawnSync(process.execPath, ['scripts/lint-unstyled-buttons.mjs'], { encoding: 'utf8' });

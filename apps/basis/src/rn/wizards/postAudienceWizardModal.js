@@ -14,7 +14,9 @@ import {
   initialState, canSubmit, loadAvailableCircles, submitPost,
 } from '../../core/wizards/postAudienceState.js';
 
-import { Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting } from './_kit.js';
+import {
+  Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
+} from './_kit.js';
 
 const KIND_OPTS = [
   { id: 'ask',     label: 'Ask (request help)' },
@@ -23,7 +25,7 @@ const KIND_OPTS = [
 ];
 
 export default function PostAudienceWizardModal({
-  visible, args, callSkill, onClose, onDispatched, t,
+  visible, theme = null, args, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState(args ?? {}));
 
@@ -50,10 +52,11 @@ export default function PostAudienceWizardModal({
   }, [state, callSkill, onDispatched, onClose]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="post-audience-wizard"
         >
@@ -131,6 +134,7 @@ export default function PostAudienceWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

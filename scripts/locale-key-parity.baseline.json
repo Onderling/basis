@@ -74,7 +74,6 @@
     "circle.wizard.create.invite_expiry",
     "circle.wizard.create.leave",
     "circle.wizard.create.name",
-    "circle.wizard.create.offering_add",
     "circle.wizard.create.offering_name",
     "circle.wizard.create.offering_remove",
     "circle.wizard.create.pod_uri",

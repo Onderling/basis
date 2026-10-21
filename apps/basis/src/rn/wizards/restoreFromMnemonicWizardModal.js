@@ -16,11 +16,11 @@ import {
   canAdvanceFromConfirm, submitRestore,
 } from '../../core/wizards/restoreFromMnemonicState.js';
 import {
-  Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting,
+  Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
 } from './_kit.js';
 
 export default function RestoreFromMnemonicWizardModal({
-  visible, callSkill, onClose, onDispatched, t,
+  visible, theme = null, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState());
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
@@ -36,10 +36,11 @@ export default function RestoreFromMnemonicWizardModal({
   }, [state, callSkill, onDispatched]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="restore-from-mnemonic-wizard"
         >
@@ -118,6 +119,7 @@ export default function RestoreFromMnemonicWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

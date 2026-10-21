@@ -24,10 +24,12 @@ import {
   initialState, canSubmit, submitEmbedTime,
 } from '../../core/wizards/embedTimeState.js';
 
-import { Body, Field, Actions, ErrorBanner, Submitting } from './_kit.js';
+import {
+  Body, Field, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
+} from './_kit.js';
 
 export default function EmbedTimeWizardModal({
-  visible, args, callSkill, onClose, onDispatched, t,
+  visible, theme = null, args, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState(args ?? {}));
 
@@ -49,10 +51,11 @@ export default function EmbedTimeWizardModal({
   }, [state, callSkill, onDispatched, onClose]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="embed-time-wizard"
         >
@@ -107,6 +110,7 @@ export default function EmbedTimeWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

@@ -22,7 +22,9 @@ import {
   saveHandle, saveDisplayName, setHolidayMode,
 } from '../../core/wizards/settingsState.js';
 
-import { Body, Field, Actions, ErrorBanner } from './_kit.js';
+import {
+  Body, Field, Actions, ErrorBanner, WizardTheme, wizardPalette,
+} from './_kit.js';
 
 // Pod sign-in section (Bundle I, 2026-05-27).  Mirrors
 // apps/tasks-mobile/src/screens/PodSettingsScreen.jsx: status row,
@@ -36,7 +38,7 @@ const KNOWN_ISSUERS = [
 ];
 
 export default function SettingsWizardModal({
-  visible, callSkill, onClose, t,
+  visible, theme = null, callSkill, onClose, t,
   // Bundle I (2026-05-27) — pod + relay surfaces on mobile.  When
   // these are absent (older callers), the corresponding section is
   // hidden so the modal degrades gracefully.
@@ -198,10 +200,11 @@ export default function SettingsWizardModal({
   }, [agent]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="settings-wizard"
         >
@@ -396,6 +399,7 @@ export default function SettingsWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

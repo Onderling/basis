@@ -40,8 +40,7 @@ import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/pinboard/lib/inviteCeiling';
 
 import {
-  Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField,
-  Actions, ErrorBanner, Submitting, ReviewList, Warn,
+  Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField, Actions, ErrorBanner, Submitting, ReviewList, Warn, WizardTheme,
 } from './_kit.js';
 import { wizardPalette } from './_palette.js';
 
@@ -151,6 +150,7 @@ export default function CreateGroupWizardModal({
   const canAdvance1 = identityComplete(state);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
@@ -320,7 +320,7 @@ export default function CreateGroupWizardModal({
             {state.step === 4 && (
               <Body title={t('circle.wizard.create.step_offerings')} intro={t('circle.wizard.create.step_offerings_intro')}>
                 {state.offerings.map((row, i) => (
-                  <View key={i} style={{ borderWidth: 1, borderColor: '#d8d1bc', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+                  <View key={i} style={{ borderWidth: 1, borderColor: wizardPalette(theme).rail, borderRadius: 6, padding: 10, marginBottom: 10 }}>
                     <Field
                       label="Offering name"
                       value={row.name}
@@ -349,14 +349,14 @@ export default function CreateGroupWizardModal({
                     <Pressable
                       onPress={() => setState((s) => ({ ...s, offerings: s.offerings.filter((_, j) => j !== i) }))}
                     >
-                      <Text style={{ color: '#b04a30', marginTop: 4 }}>{t('circle.wizard.create.offering_remove_row')}</Text>
+                      <Text style={{ color: wizardPalette(theme).info, marginTop: 4 }}>{t('circle.wizard.create.offering_remove_row')}</Text>
                     </Pressable>
                   </View>
                 ))}
                 <Pressable
                   onPress={() => setState((s) => ({ ...s, offerings: [...s.offerings, newOfferingRow()] }))}
                 >
-                  <Text style={{ color: '#b04a30' }}>+ Add offering</Text>
+                  <Text style={{ color: wizardPalette(theme).info }}>{t('circle.wizard.create.offering_add')}</Text>
                 </Pressable>
               </Body>
             )}
@@ -483,6 +483,7 @@ export default function CreateGroupWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 
@@ -501,12 +502,12 @@ function sheetStyles(theme) {
   },
   scroll: { flexGrow: 1 },
   // N3 — extra-roles section.
-  roleHeading: { fontSize: 13, fontWeight: '700', color: '#444', marginTop: 14, marginBottom: 2 },
-  roleHint:    { fontSize: 12, lineHeight: 17, color: '#777', marginBottom: 6 },
-  roleDesc:    { fontSize: 12, lineHeight: 17, color: '#666', marginLeft: 28, marginBottom: 8 },
+  roleHeading: { fontSize: 13, fontWeight: '700', color: p.inkStrong, marginTop: 14, marginBottom: 2 },
+  roleHint:    { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginBottom: 6 },
+  roleDesc:    { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginLeft: 28, marginBottom: 8 },
   // J-NP3 — the pod-host disclosure sits under the pod field. Same weight as the other hints: a
   // disclosure that shouts reads as a warning against a normal choice, and one that whispers is not a
   // disclosure. It matches `roleHint` deliberately.
-  podDisclosure: { fontSize: 12, lineHeight: 17, color: '#777', marginTop: 6, marginBottom: 6 },
+  podDisclosure: { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginTop: 6, marginBottom: 6 },
 });
 }

@@ -28,12 +28,11 @@ import {
 } from '../../core/wizards/conflictDisputeState.js';
 
 import {
-  Steps, Body, Field, Textarea, RadioGroup, ContextCard,
-  Actions, ErrorBanner, Submitting, ReviewList, Warn,
+  Steps, Body, Field, Textarea, RadioGroup, ContextCard, Actions, ErrorBanner, Submitting, ReviewList, Warn, WizardTheme, wizardPalette,
 } from './_kit.js';
 
 export default function ConflictDisputeWizardModal({
-  visible, args, callSkill, onClose, onDispatched, t,
+  visible, theme = null, args, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState(args ?? {}));
 
@@ -69,6 +68,7 @@ export default function ConflictDisputeWizardModal({
   }, [state, callSkill, onDispatched, t]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal
       visible={visible}
       animationType="slide"
@@ -77,7 +77,7 @@ export default function ConflictDisputeWizardModal({
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="conflict-dispute-wizard"
         >
@@ -227,6 +227,7 @@ export default function ConflictDisputeWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

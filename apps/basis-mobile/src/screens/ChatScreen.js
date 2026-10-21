@@ -61,6 +61,7 @@ import { buildCircleLanes }    from '../../../basis/src/v2/circleLanes.js';
 import { makeReceiptReceiver, rehydrateDeliveryState } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
+import { useTheme }          from './v2/themeContext.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
@@ -218,6 +219,7 @@ export default function ChatScreen({
   // placeholder chip.
   media = null,
 }) {
+  const theme = useTheme();   // the wizards' sheets and contents follow the app's light/dark choice
   // M1 (2026-05-29) — the agent bundle is booted ONCE in App.js (shared
   // with the circle launcher).  `bootState` is DERIVED from the props so
   // the rest of this screen — which reads `bootState.kind` /
@@ -1715,6 +1717,7 @@ export default function ChatScreen({
             args={pendingWizard.args}
             callSkill={bootState.kind === 'ready' ? bootState.bundle.callSkill : undefined}
             t={t}
+            theme={theme}
             // joinGroupWizard's cross-instance
             // fallback (membershipCode-with-adminPeerAddr).  Constructed
             // inline so it closes over the live agent + pendingMap.

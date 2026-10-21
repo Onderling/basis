@@ -8,8 +8,7 @@
  * surface, so both must resolve in the shared `@onderling/item-types`
  * registry for the manifest to validate clean under `{strictNouns}`.
  *
- * Shape mirrors basis's ThreadStore thread object
- * (`src/core/threads/threadFormState.js`): a required `name`, an
+ * Shape mirrors basis's ThreadStore thread object: a required `name`, an
  * optional `filter` (which apps / event-types / actors the thread
  * subscribes to), and optional `permissions`.  `additionalProperties`
  * stays open (forward-additive policy) so bespoke thread fields
@@ -29,7 +28,7 @@ export const CHAT_THREAD_SCHEMA = {
     name:        { type: 'string', minLength: 1 },
     // The thread's subscription filter — which apps / event-types /
     // actors it surfaces.  An absent slot means "accept all" (the
-    // wildcard convention in threadFormState.buildFilterFromFormState).
+    // wildcard convention).
     filter: {
       type: 'object',
       properties: {

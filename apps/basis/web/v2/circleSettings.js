@@ -495,14 +495,7 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
         orow.append(box, span);
         row.appendChild(orow);
       }
-      if (ctl.hintKey) {
-        const hint = document.createElement('div');
-        hint.className = 'circle-settings__control-hint';
-        // Says that turning a kind off hides rather than deletes — the property J-CW4 checks, and the one
-        // people will not assume unless told.
-        hint.textContent = tr(ctl.hintKey);
-        row.appendChild(hint);
-      }
+      // its hint comes from the shared tail below, like every control's (painting it here too said it twice)
     } else if (ctl.kind === 'text') {
       const lab = document.createElement('label');
       lab.className = 'circle-settings__control-label';
@@ -573,6 +566,7 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
     if (ctl.hintKey) {
       const hint = document.createElement('div');
       hint.className = 'circle-settings__control-hint';
+      // e.g. that turning a conversation kind off hides rather than deletes — people will not assume it unless told
       hint.textContent = tr(ctl.hintKey);
       row.appendChild(hint);
     }

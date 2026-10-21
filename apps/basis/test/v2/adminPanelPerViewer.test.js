@@ -74,6 +74,19 @@ describe('the admin panel, per viewer — gate first, then the paint', () => {
       .toMatchObject({ kind: 'leave', disabled: false, labelKey: 'circle.tile.menu.leave' });
   });
 
+  it("an ADMIN's own row is leaving too — never a removal of yourself", async () => {
+    const { members, row } = await buildCircle();
+    expect(removeControlFor({ members, member: row(ANNE), myRef: ANNE }))
+      .toMatchObject({ kind: 'leave', disabled: false, labelKey: 'circle.tile.menu.leave' });
+  });
+
+  it("the circle's founder cannot be removed (the roster never lets it): another admin sees it greyed, with why", () => {
+    const members = [{ webid: ANNE, role: 'admin', adminVia: 'founder' }, { webid: BOB, role: 'admin', adminVia: 'role' }, { webid: CARLA, role: 'member' }];
+    expect(removeControlFor({ members, member: members[0], myRef: BOB }))
+      .toMatchObject({ kind: 'remove', disabled: true, reasonKey: 'circle.admin.founder_stays' });
+    expect(removeControlFor({ members, member: members[2], myRef: BOB })).toMatchObject({ kind: 'remove', disabled: false });
+  });
+
   it('the announcement: the gate refuses a member, and the panel greys Post for them; the admin\'s is open', async () => {
     const { bundle, members } = await buildCircle();
     expect(await callSkill(bundle.agent, 'postAnnouncement', { text: 'x' }, BOB)).toEqual({ error: 'admin-only' });

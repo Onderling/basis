@@ -219,6 +219,15 @@
 .cc-radio-info:hover { opacity: .75; }
 .cc-radio-consequence { font-size: 13px; line-height: 1.4; color: var(--ink-soft); margin: 2px 0 6px 22px; padding-left: 8px; border-left: 2px solid var(--line); }
 
+/* the manifest-declared controls (connection & transport, what the conversation contains, the lines it shows,
+   private chat): one control per block, its options one per line, its hint small beneath — they had no rules at
+   all, so their labels, checkboxes and hints ran together on one line */
+.circle-settings__control { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.circle-settings__control-label { font-weight: 600; font-size: 14px; color: var(--ink); }
+.circle-settings__control-opt, .circle-settings__control-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.circle-settings__control-hint, .circle-settings__control-why { font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.circle-settings__control-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
+
 /* ⓘ info button + consequence callout */
 .circle-page .circle-settings__info {
   flex: 0 0 auto; margin-left: auto; align-self: flex-start;
@@ -1082,15 +1091,15 @@
 .cc-admin__section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); margin: 0; }
 .cc-admin__empty { color: var(--ink-soft); font-size: 14px; margin: 0; }
 .cc-admin__member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.cc-admin__member { display: flex; align-items: center; gap: 10px; }
+.cc-admin__member { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }   /* wrap: at phone width the row's buttons ran out of the card */
 .cc-admin__member-name { flex: 1 1 auto; font-size: 14px; color: var(--ink); }
 .cc-admin__member-role { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--accent-ink); }
 .cc-admin__member-via { font-size: 12px; color: var(--ink-soft); }
 .cc-admin__member-via--caretaker { font-style: italic; }
 .cc-admin__member-role-set { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--radius); background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
 .cc-admin__member-role-set:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
-.cc-admin__member-remove { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--radius); background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
-.cc-admin__member-remove:hover { border-color: var(--danger); color: var(--danger); }
+.cc-admin__member-remove, .cc-admin__member-leave { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--radius); background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
+.cc-admin__member-remove:hover, .cc-admin__member-leave:hover { border-color: var(--danger); color: var(--danger); }
 .cc-admin__announce { display: flex; flex-direction: column; gap: 8px; }
 .cc-admin__announce-input { font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); color: var(--ink); resize: vertical; }
 .cc-admin__announce-post { align-self: flex-start; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: var(--radius); background: var(--accent); border: 1px solid var(--accent); color: var(--accent-contrast); }

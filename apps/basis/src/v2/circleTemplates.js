@@ -16,8 +16,7 @@
  *   - `consensusRequired`   — boolean
  *
  * Note: `view` and `admins` are NOT part of the template — `view` has
- * its own default ('screen') and `admins` is computed from the wizard's
- * `additionalAdmins` field at submit time.
+ * its own default ('screen'), and admins beyond the founder are made from the Members tab after they join.
  *
  * Switch-kind semantics: if the user picks `household` then changes to
  * `neighbourhood`, the second `applyTemplate` is essentially a no-op for axes

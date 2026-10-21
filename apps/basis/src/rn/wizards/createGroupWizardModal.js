@@ -4,7 +4,7 @@
  *
  * 5-step flow:
  *   1. Identity — name, groupId, purpose, tags
- *   2. Governance — additionalAdmins, accessPolicy, leavePolicy
+ *   2. Governance — accessPolicy, leavePolicy
  *   3. Rules — rulesText, conflictPolicy
  *   4. Tech — keyRotationMode, rotationDays, inviteExpiresInHours,
  *             storagePolicy, optional groupPodUri
@@ -248,12 +248,6 @@ export default function CreateGroupWizardModal({
             )}
             {state.step === 2 && (
               <Body title={t('circle.wizard.create.step_members')} intro={t('circle.wizard.create.step_members_intro')}>
-                <Field
-                  label="Additional admin WebIDs (optional, comma-separated)"
-                  value={state.additionalAdmins}
-                  onChangeText={(v) => setState((s) => ({ ...s, additionalAdmins: v }))}
-                  placeholder="https://alice.example/profile/card#me"
-                />
                 <RadioGroup
                   label="Access policy"
                   value={state.accessPolicy}
@@ -431,7 +425,6 @@ export default function CreateGroupWizardModal({
                       value: founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal') },
                     ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
                     ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
-                    ...(rules.additionalAdmins ? [{ label: 'Extra admins', value: rules.additionalAdmins.join(', ') }] : []),
                     { label: 'Access',      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
                     { label: 'Leave',       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
                     // 5.5a — surface each non-empty rules-doc field.

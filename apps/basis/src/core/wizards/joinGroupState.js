@@ -241,8 +241,6 @@ export function summariseEmbeddedRules(r) {
   if (r?.conflictPolicy) parts.push(`Conflict resolution: ${r.conflictPolicy}`);
   if (Array.isArray(r?.tags) && r.tags.length)
     parts.push(`Tags: ${r.tags.join(', ')}`);
-  if (Array.isArray(r?.additionalAdmins) && r.additionalAdmins.length)
-    parts.push(`Extra admins: ${r.additionalAdmins.join(', ')}`);
   return parts.length > 0
     ? parts.join('\n')
     : '(no rules set; defaults apply)';

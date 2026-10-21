@@ -1030,11 +1030,11 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         </Section>
       )}
 
-      <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
-      <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
+      <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
+      <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
       {(wizard === 'recovery-export' || wizard === 'recovery-import') && (
         <RecoveryFileWizardModal
-          visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t}
+          visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t} theme={theme}
           onClose={() => setWizard(null)} onDispatched={() => {}}
           onSaveFile={async (text, name) => { await Share.share({ message: text, title: name }); }}
           onPickFile={async () => {

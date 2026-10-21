@@ -1928,6 +1928,58 @@ export default function CircleLauncherScreen({
     </>
   );
 
+  // the invite QR for a circle (admin shows it; another device scans): ONE element, painted beside every view (the
+  // final return). It lived in the list and the open circle only, so an invite opened anywhere else painted nothing.
+  const inviteModal = (
+        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
+          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
+            <Pressable style={styles.inviteCard} onPress={() => {}}>
+              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
+              {inviteFor?.uri ? (
+                <>
+                  <QrCodeView value={inviteFor.uri} size={200} />
+                  <Text style={styles.inviteHint}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
+                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
+                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
+                    <Text style={styles.inviteHint}>
+                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
+                    </Text>
+                  ) : null}
+                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
+                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="invite-announce-nearby"
+                    onPress={async () => {
+                      const res = await bundle?.nearbyRoom?.announceInvite?.({
+                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
+                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
+                      }) ?? { ok: false, reason: 'nobody-nearby' };
+                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
+                    }}
+                  >
+                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
+                  </Pressable>
+                  {inviteFor.announced ? (
+                    <Text style={styles.inviteHint} testID="invite-announce-result">
+                      {inviteFor.announced.ok
+                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
+                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
+                    </Text>
+                  ) : null}
+                  {/* A bot's own invite: single-use; the admin's signed join then says the bot is one (web parity). */}
+                  {!inviteFor.forFunction ? (
+                    <Btn testID="invite-for-bot" label={t('circle.invite.for_bot')}
+                      onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+  );
   const page = (() => {
   // the pins as they can be painted now (a bookmark only while its circle is the person's and shows the op there)
   useEffect(() => {
@@ -2439,59 +2491,6 @@ export default function CircleLauncherScreen({
       />
     );
   }
-  // OBJ-2 — the invite QR for a circle (admin shows it; another device scans). ONE element, painted where the person IS:
-  // the list AND the open circle. It lived only in the list's return, so Invite from a circle's ⋯ set `inviteFor` and
-  // painted nothing until `← circles` (walked 2026-10-09: 22 s of nothing, then the QR the moment the list came back).
-  const inviteModal = (
-        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
-          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
-            <Pressable style={styles.inviteCard} onPress={() => {}}>
-              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
-              {inviteFor?.uri ? (
-                <>
-                  <QrCodeView value={inviteFor.uri} size={200} />
-                  <Text style={styles.inviteHint}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
-                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
-                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
-                    <Text style={styles.inviteHint}>
-                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
-                    </Text>
-                  ) : null}
-                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
-                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
-                  <Pressable
-                    accessibilityRole="button"
-                    testID="invite-announce-nearby"
-                    onPress={async () => {
-                      const res = await bundle?.nearbyRoom?.announceInvite?.({
-                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
-                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
-                      }) ?? { ok: false, reason: 'nobody-nearby' };
-                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
-                    }}
-                  >
-                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
-                  </Pressable>
-                  {inviteFor.announced ? (
-                    <Text style={styles.inviteHint} testID="invite-announce-result">
-                      {inviteFor.announced.ok
-                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
-                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
-                    </Text>
-                  ) : null}
-                  {/* A bot's own invite: single-use; the admin's signed join then says the bot is one (web parity). */}
-                  {!inviteFor.forFunction ? (
-                    <Btn testID="invite-for-bot" label={t('circle.invite.for_bot')}
-                      onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
-  );
 
   if (selected) {
     return (
@@ -2606,8 +2605,6 @@ export default function CircleLauncherScreen({
         onLists={() => setView('lists')}
         onShare={() => { loadShareContacts(); setView('share'); }}
       />
-      {relayQuestionModal}
-      {inviteModal}
       </>
     );
   }
@@ -2699,33 +2696,6 @@ export default function CircleLauncherScreen({
             → review) — web parity (2026-07-26). It used to render a bare inline name row, so the wizard we
             built was reachable only through the onboarding handoff and every governance/rules/offerings
             choice silently defaulted. `quickCreateCircle` stays the PROGRAMMATIC create (help circle). */}
-        {creating ? (
-          <CreateGroupWizardModal
-            visible
-            callSkill={bundle?.callSkill}
-            t={t}
-            theme={theme}
-            getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
-            persistPolicy={async (groupId, patch) => {
-              await policyStore.update?.(groupId, patch);
-              circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
-            }}
-            // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
-            shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
-            onClose={() => setCreating(false)}
-            onDispatched={(r) => {
-              setCreating(false);
-              const gid = r?.groupId ?? null;
-              if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
-              load();
-              // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
-              // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
-              if (gid) openCircleInvite(gid).catch(() => {});
-            }}
-          />
-        ) : null}
-        {relayQuestionModal}
-        {inviteModal}
         {/* β.5 — per-tile context menu, rendered as a transparent modal
             so a tap outside the sheet dismisses it.  The four actions
             mirror web: pin (toggle), mute (toggle), settings, leave. */}
@@ -2809,6 +2779,37 @@ export default function CircleLauncherScreen({
     <>
       {page}
       {scanOverlays}
+      {/* the relay question and the invite card are modals too: painted ONCE beside every view (they lived in the
+          list and the open circle only, so an invite opened from Vandaag — the wizard's last step — never showed) */}
+      {relayQuestionModal}
+      {inviteModal}
+      {/* the create-circle wizard beside whichever view is up: Vandaag's "Make a circle" set `creating` while the
+          wizard was mounted in the circles list only, so on Vandaag the tap did nothing (found walking the phone) */}
+      {creating ? (
+        <CreateGroupWizardModal
+          visible
+          callSkill={bundle?.callSkill}
+          t={t}
+          theme={theme}
+          getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
+          persistPolicy={async (groupId, patch) => {
+            await policyStore.update?.(groupId, patch);
+            circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
+          }}
+          // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
+          shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
+          onClose={() => setCreating(false)}
+          onDispatched={(r) => {
+            setCreating(false);
+            const gid = r?.groupId ?? null;
+            if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
+            load();
+            // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
+            // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
+            if (gid) openCircleInvite(gid).catch(() => {});
+          }}
+        />
+      ) : null}
     </>
   );
 }

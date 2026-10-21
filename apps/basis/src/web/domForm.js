@@ -60,14 +60,14 @@ export function renderForm(spec, ctx) {
 
   const submit = doc.createElement('button');
   submit.type = 'submit';
-  submit.className = 'cc-form-submit';
+  submit.className = 'cc-btn cc-btn--primary cc-form-submit';
   submit.textContent = tr('form.submit');
   actions.appendChild(submit);
 
   if (typeof onCancel === 'function') {
     const cancel = doc.createElement('button');
     cancel.type = 'button';
-    cancel.className = 'cc-form-cancel';
+    cancel.className = 'cc-btn cc-btn--quiet cc-form-cancel';
     cancel.textContent = tr('form.cancel');
     // v0.7.-followup 2026-05-23 (5th pass): after a successful
     // submit, the cancel button is relabelled to 'Close'.  Clicking
@@ -192,7 +192,7 @@ function renderPickerField(field, { doc, tr, pickerFetcher, onSubmit }) {
       for (const it of items) {
         const btn = doc.createElement('button');
         btn.type = 'button';
-        btn.className = 'cc-picker-row';
+        btn.className = 'cc-btn cc-btn--quiet cc-picker-row';
         btn.dataset.itemId = it.id;
         btn.textContent = it.label ?? it.id;
         btn.addEventListener('click', () => {

@@ -500,6 +500,12 @@ describe('createGroupState', () => {
     expect(CG.labelOf(CG.ACCESS_POLICIES, 'unknown')).toBe('unknown');
   });
 
+  it('the wizard asks for no admin webids: nobody has one to type at creation, and nothing read them', () => {
+    // admins are made from the Members tab after someone joins (setMemberRole) — one path for one act
+    expect('additionalAdmins' in CG.initialState()).toBe(false);
+    expect('additionalAdmins' in CG.buildRulesObjectFromState({ ...CG.initialState(), additionalAdmins: 'webid:a' })).toBe(false);
+  });
+
   it('buildRulesObjectFromState: empty slots collapse', () => {
     const s = CG.initialState();
     const r = CG.buildRulesObjectFromState(s);
@@ -515,14 +521,12 @@ describe('createGroupState', () => {
   it('buildRulesObjectFromState parses CSV lists + spreads the rules doc', () => {
     const s = CG.initialState();
     s.tags = 'tools, gardening,, ';
-    s.additionalAdmins = 'webid:a, webid:b';
     s.purpose = 'Test circle';
     s.rulesDoc.agreements = 'Be kind.';
     s.rulesDoc.conflict   = 'Mediation by two.';
     s.rulesDoc.admission  = 'Admins must approve.';
     const r = CG.buildRulesObjectFromState(s);
     expect(r.tags).toEqual(['tools', 'gardening']);
-    expect(r.additionalAdmins).toEqual(['webid:a', 'webid:b']);
     expect(r.purpose).toBe('Test circle');           // Step 1 → rules doc
     expect(r.agreements).toBe('Be kind.');           // 5.5a — structured doc
     expect(r.conflict).toBe('Mediation by two.');

@@ -7508,9 +7508,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (Array.isArray(rulesObj.tags) && rulesObj.tags.length) {
           parts.push(field('tags', rulesObj.tags.join(', ')));
         }
-        if (Array.isArray(rulesObj.additionalAdmins) && rulesObj.additionalAdmins.length) {
-          parts.push(field('extra_admins', rulesObj.additionalAdmins.join(', ')));
-        }
         rulesText = parts.length > 0
           ? parts.join('\n')
           : tr('circle.rules.defaults_apply');

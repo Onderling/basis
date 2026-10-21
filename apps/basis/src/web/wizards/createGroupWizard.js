@@ -293,10 +293,6 @@ function refreshActionsLocal(container, ok) {
 function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, rerender) {
   const wrap = makeBody(doc, t('circle.wizard.create.step_members'), t('circle.wizard.create.step_members_intro'));
 
-  appendField(wrap, doc, t('circle.wizard.create.extra_admins'), 'additionalAdmins',
-    state.additionalAdmins, (v) => { state.additionalAdmins = v; },
-    { placeholder: 'e.g. webid:anne,webid:karl',
-      hint: 'You are admin by default. Add others now or invite later.' });
   appendRadioField(wrap, doc, t('circle.wizard.create.access'), state.accessPolicy, ACCESS_POLICIES,
     (v) => { state.accessPolicy = v; rerender(); }, { consequenceGroup: 'accessPolicy' });
   appendRadioField(wrap, doc, t('circle.wizard.create.leave'), state.leavePolicy, LEAVE_POLICIES,
@@ -470,7 +466,6 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal'));
   if (state.purpose) appendReview(dl, doc, t('circle.wizard.create.purpose'), state.purpose);
   if (state.tags)    appendReview(dl, doc, t('circle.wizard.create.review_tags'), state.tags);
-  if (state.additionalAdmins) appendReview(dl, doc, t('circle.wizard.create.review_admins'), state.additionalAdmins);
   appendReview(dl, doc, t('circle.wizard.create.access'),   labelOf(ACCESS_POLICIES, state.accessPolicy));
   appendReview(dl, doc, t('circle.wizard.create.leave'),    labelOf(LEAVE_POLICIES, state.leavePolicy));
   appendReview(dl, doc, t('circle.wizard.create.review_expiry'),   `${state.inviteExpiresInHours} h`);

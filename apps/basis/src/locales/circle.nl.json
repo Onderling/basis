@@ -4118,10 +4118,6 @@
       "tags": {
         "text": "Labels",
         "doc": "Rules summary label (/group-rules): the circle's tags."
-      },
-      "extra_admins": {
-        "text": "Extra beheerders",
-        "doc": "Rules summary label (/group-rules): admins beyond the founder."
       }
     },
     "conflict": {
@@ -7989,10 +7985,6 @@
         "text": "Labels (komma-gescheiden)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
-      "extra_admins": {
-        "text": "Extra beheerders (webids, komma-gescheiden)",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
       "access": {
         "text": "Wie mag erbij?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8071,10 +8063,6 @@
       },
       "review_tags": {
         "text": "Labels",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "review_admins": {
-        "text": "Extra beheerders",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "review_expiry": {

@@ -143,6 +143,9 @@ test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circl
   await page.locator('.circle-tile').first().click();
   await page.locator('.circle-view__attach').first().click();
   await page.locator('.circle-view__attach-pin').first().click();
+  // the floating "+" lives where the tab bar lives (not inside a circle): back out, and open the bookmark from Vandaag
+  await page.locator('.circle-view__back').click();
+  await page.locator('[data-tab="screens"]').first().click();
   await page.locator('.cc-fab').click();
   const bm = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open').filter({ hasText: ':' });
   await expect(bm, 'the bookmark is under Vastgezet, in its circle\'s name').toHaveCount(1);

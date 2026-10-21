@@ -53,6 +53,11 @@ describe('lint-unstyled-buttons', () => {
     const html = '<link rel="stylesheet" href="./v2/theme.css" /><link href="https://x/y.css" rel="stylesheet"><link rel="stylesheet" href="./v2/circle.css">';
     expect(loadedSheets(html)).toEqual(['./v2/theme.css', './v2/circle.css']);
   });
+  it('a choice between classes needs EVERY branch styled (one styled branch hid the other)', () => {
+    const src = "const rm = document.createElement('button');\nrm.className = kind === 'leave' ? 'nobody-styles-this' : 'cc-btn';";
+    expect(scanSource(src, isStyled)).toHaveLength(1);
+    expect(scanSource(src.replace('nobody-styles-this', 'row__act'), isStyled)).toHaveLength(0);
+  });
   it('passes on the repo as it stands', () => {
     const r = spawnSync(process.execPath, ['scripts/lint-unstyled-buttons.mjs'], { encoding: 'utf8' });
     expect(r.status, r.stdout + r.stderr).toBe(0);

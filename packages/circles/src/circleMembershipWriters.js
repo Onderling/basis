@@ -405,6 +405,9 @@ export async function verifyMembershipCodeForPeer({
   const joinerKey = personKeyAnnouncement(a.personKey);
   await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
     redemptionRef: item.id,
+    // A FUNCTION PROFILE, stated by THIS admin: only for a code the admin minted for a bot, and only when the
+    // redeemer says it runs one. The fold reads it from this admin-signed join; a claim on an ordinary code says nothing.
+    ...(valid?.source?.forFunction === true && a.profileKind === 'function' ? { kind: 'function' } : {}),
     // The handle the joiner presented, so every device that folds this join can name them — the redemption
     // row above carries it too, but only the admitting device ever holds that row. Self-asserted, like the
     // circle address; uniqueness within the circle is enforced at redemption, before this is emitted.

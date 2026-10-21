@@ -5178,7 +5178,7 @@ async function showJoinCircle(inviteArg) {
 
 // OBJ-2 — Invite to THIS circle: read the current membership code (admin-gated) + encode it as a
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
-async function showCircleInvite(circleId) {
+async function showCircleInvite(circleId, { forFunction = false } = {}) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
   // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
   // address in a persona's circle, which the joiner's trail would record as its confirming admin
@@ -5225,6 +5225,7 @@ async function showCircleInvite(circleId) {
       podBacked: invitePodBacked,
       podUrl:    invitePodBacked ? (inviteStorage?.groupPodUri ?? null) : null,
       relayUrl:  inviteRelayUrl,
+      ...(forFunction ? { forFunction: true } : {}),
     });
   }
   catch { r = { error: 'failed' }; }
@@ -5254,7 +5255,7 @@ async function showCircleInvite(circleId) {
   card.appendChild(canvas);
   import('qrcode').then((m) => (m.default ?? m).toCanvas(canvas, deepLink, { width: 220, margin: 1, errorCorrectionLevel: 'L' }, () => {})).catch(() => { canvas.remove(); });
   const hint = document.createElement('p');
-  hint.textContent = t('circle.invite.hint');
+  hint.textContent = t(forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint');
   card.appendChild(hint);
   // how many places this invite still has. The admin holding a code is the one person who can
   // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
@@ -5289,6 +5290,17 @@ async function showCircleInvite(circleId) {
   });
   card.appendChild(announce);
   card.appendChild(announced);
+  // A bot's own invite: single-use, and the admin's signed join then says the bot is one (only when it runs as a bot).
+  if (!forFunction) {
+    const forBot = document.createElement('button');
+    forBot.type = 'button';
+    forBot.className = 'cc-btn';
+    forBot.dataset.testid = 'invite-for-bot';
+    forBot.textContent = t('circle.invite.for_bot');
+    forBot.style.cssText = 'margin-top:10px;margin-left:8px';
+    forBot.addEventListener('click', () => { overlay.remove(); showCircleInvite(circleId, { forFunction: true }); });
+    card.appendChild(forBot);
+  }
 }
 
 // reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —
@@ -9069,6 +9081,7 @@ async function boot() {
       sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
       currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (2026-09-16)
       circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
+      profileKind:     () => agent.profileKind?.() ?? 'person',   // a bot's node says so; the admin decides what it means
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.

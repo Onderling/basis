@@ -72,7 +72,7 @@ function makeLoopbackNknHub() {
 
 /* ─── Two-agent fixture: admin + joiner ─────────────────── */
 
-async function makeAdminAndJoiner({ verifyResult }) {
+async function makeAdminAndJoiner({ verifyResult, profileKind = null }) {
   const hub = makeLoopbackNknHub();
 
   // Mutable router holders so we can pass onPeerMessage at agent-
@@ -127,6 +127,7 @@ async function makeAdminAndJoiner({ verifyResult }) {
     isPeerConnected: () => joiner.peer.status === 'connected',
     pendingMap,
     timeoutMs:       8_000,
+    ...(profileKind ? { profileKind } : {}),
   });
 
   return { admin, joiner, sendPeerRedeem, adminVerify, adminAddr: admin.peer.address };
@@ -153,6 +154,15 @@ describe('group-redeem cross-device round-trip', () => {
     expect(adminVerify).toHaveBeenCalledWith(
       expect.objectContaining({ groupId: 'circle-oost', code: 'SECRET-123', peerDisplay: 'Anne' }),
     );
+  });
+
+  it('a function-profile node says so on the redeem; a person node says nothing', async () => {
+    const bot = await makeAdminAndJoiner({ verifyResult: { codeId: 'c-b' }, profileKind: async () => 'function' });
+    await bot.sendPeerRedeem({ adminPeerAddr: bot.adminAddr, groupId: 'circle-oost', code: 'BOT-1' });
+    expect(bot.adminVerify).toHaveBeenCalledWith(expect.objectContaining({ profileKind: 'function' }));
+    const person = await makeAdminAndJoiner({ verifyResult: { codeId: 'c-p' }, profileKind: () => 'person' });
+    await person.sendPeerRedeem({ adminPeerAddr: person.adminAddr, groupId: 'circle-oost', code: 'P-1' });
+    expect(person.adminVerify.mock.calls[0][0].profileKind).toBeUndefined();
   });
 
   it('invalid code: admin error propagates back to the joiner', async () => {

@@ -1353,6 +1353,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The registry handle, bridged OUT of the agents block for the host-skill ceremonies
   // (revokeDevice's tombstone write) — same outer-let idiom as its neighbours.
   let agentsRegistryRef = null;
+  /** Whether THIS node runs a function profile (a household bot), from its own profile record — one read, every use. */
+  const myProfileKind = async () => ((await agentsRegistryRef?.lookup?.('default').catch?.(() => null))?.kind === 'function' ? 'function' : 'person');
   // Patch the wrapped-key POINTER into an EXISTING circle-membership record. Set inside the block; a
   // no-op until then. Returns false when there is no record to attach to (the key facet needs a prior
   // {handle,address} join write) — so it is safe to call at every circle-open, best-effort.
@@ -6226,7 +6228,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         // a FUNCTION profile (a household bot) says so on its card — for display and the add-flow's words only; what a
         // person's app signs to is decided by their own admission, never by this claim
-        if (!cardPersona) { try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ } }
+        if (!cardPersona) { try { if ((await myProfileKind()) === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ } }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -6277,6 +6279,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         try {
           realArgs = { ...realArgs, circleAddress: circleAddressFor(realArgs.groupId) };
         } catch { /* address derivation is additive — never block the redeem/create */ }
+      }
+      // A FUNCTION PROFILE that FOUNDS says so in its own signed creation statement: the founder is the circle's
+      // root authority, so the claim grants nothing it could not take. A person's create carries nothing.
+      if (realOpId === 'createGroupV2' && realArgs.profileKind == null) {
+        try { if ((await myProfileKind()) === 'function') realArgs = { ...realArgs, profileKind: 'function' }; } catch { /* a person's circle */ }
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
         // style two-step confirm. Short-circuit before invoke.
@@ -8335,7 +8342,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * (a household bot on its own node — its inbox is the bot's, and the assistant answers it). Read from the
      * profile record, never from a flag or from "not enrolled".
      */
-    profileKind: async () => ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function' ? 'function' : 'person'),
+    profileKind: () => myProfileKind(),
     /**
      * Name this node's profile a function's (once, at the bot's install: the bot IS its own profile, this node its
      * device). Refused when the profile has another device: a profile with a phone and a laptop behind it is a

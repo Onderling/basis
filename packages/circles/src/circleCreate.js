@@ -49,7 +49,7 @@ export async function createGroupWithRules({ store, simulateSync, emitSpine = nu
   // corroborates the author, or where it has no trail for the circle at all — which is exactly the
   // brand-new case. Best-effort, like every other spine hook here: the circle still exists without it.
   if (typeof emitSpine === 'function') {
-    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: createPayload(currentPersonKey), actor: from }); }
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: { ...createPayload(currentPersonKey), ...(a.profileKind === 'function' ? { kind: 'function' } : {}) }, actor: from }); }
     catch { /* the typed item is written; the statement can be re-derived by a later ceremony */ }
   }
   return { rulesId: item.id, groupId: a.groupId, _sync: simulateSync() };
@@ -176,7 +176,7 @@ export async function createGroupV2({
   // `createGroupWithRules`: a receiver folds it as foundership only where its own trail corroborates
   // the author, or where it has no trail for the circle at all.
   if (typeof emitSpine === 'function') {
-    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: createPayload(currentPersonKey), actor: from }); }
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: { ...createPayload(currentPersonKey), ...(a.profileKind === 'function' ? { kind: 'function' } : {}) }, actor: from }); }
     catch { /* best-effort, like every spine hook here */ }
   }
   return {

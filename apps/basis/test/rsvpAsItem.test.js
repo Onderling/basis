@@ -112,6 +112,47 @@ describe('who an answer is from is SIGNED, not stated', () => {
   });
 });
 
+describe('on a person\'s phone, the bot that vouches is the one the roster PROVED a function profile', () => {
+  const nodeWith = async (self, keyOf, roster) => {
+    const registry = createRegistry(); registerCanonicalTypes(registry);
+    const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
+    const ops = makeCircleCalendarOps({
+      storeFor: (id) => stores.getStore(id), activeCircle: () => C, t, localActor: self,
+      signerFor: async () => keyOf[self] ?? null, encode: b64encode,
+      // no node-local voucher: what the roster proves is all this replica knows
+      answerRuleFor: async () => rosterAnswerRule({ rows: roster(), verify: AgentIdentity.verify }),
+    });
+    return { self, store: () => stores.getStore(C), ops };
+  };
+  const doorAnswer = async (node, key, eventId, by, response, clock) => {
+    const f = { type: 'rsvp', id: rsvpItemId(eventId, by), event: eventId, by, response, at: clock };
+    await node.store().put({ ...f, signer: key.pubKey, sig: b64encode(key.sign(answerStatement(f))), updatedBy: by, clock }, { origin: true, sync: false });
+  };
+
+  it("the proven bot's door answer counts on Frits's phone; a person's signed one does not", async () => {
+    const k = { bot: await AgentIdentity.generate(new VaultMemory()), frits: await AgentIdentity.generate(new VaultMemory()), anne: await AgentIdentity.generate(new VaultMemory()) };
+    const roster = () => [
+      { webid: 'bot', circleAddress: k.bot.pubKey, provenKind: 'function' },
+      { webid: 'frits', circleAddress: k.frits.pubKey },
+      { webid: 'anne', circleAddress: k.anne.pubKey },
+    ];
+    const frits = await nodeWith('frits', k, roster);
+    const made = await frits.ops.addEvent({ circleId: C, title: 'Tandarts', startsAt: soon(24), endsAt: soon(25) });
+    await doorAnswer(frits, k.bot, made.itemId, 'telegram:222', 'accepted', 70);
+    await doorAnswer(frits, k.anne, made.itemId, 'telegram:333', 'declined', 71);
+    expect(await answersOn(frits, made.itemId)).toEqual({ 'telegram:222': 'accepted' });
+  });
+
+  it('a row that only SAYS it is a bot (its own kind) vouches for no one', async () => {
+    const k = { bot: await AgentIdentity.generate(new VaultMemory()), frits: await AgentIdentity.generate(new VaultMemory()) };
+    const roster = () => [{ webid: 'bot', circleAddress: k.bot.pubKey, kind: 'function' }, { webid: 'frits', circleAddress: k.frits.pubKey }];
+    const frits = await nodeWith('frits', k, roster);
+    const made = await frits.ops.addEvent({ circleId: C, title: 'Tandarts', startsAt: soon(24), endsAt: soon(25) });
+    await doorAnswer(frits, k.bot, made.itemId, 'telegram:222', 'accepted', 70);
+    expect(await answersOn(frits, made.itemId) ?? {}).toEqual({});
+  });
+});
+
 describe('your own answer shows at once on your own device', () => {
   it('signed with this device\'s own circle key for its own self, it stands before the roster has the address', async () => {
     const k = { bob: await AgentIdentity.generate(new VaultMemory()) };

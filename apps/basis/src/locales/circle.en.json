@@ -272,6 +272,14 @@
       "text": "People per invite",
       "doc": "B5 — review-step label for the circle invite ceiling."
     },
+    "for_bot": {
+      "text": "Invite a bot instead",
+      "doc": "On the invite card: make a single-use invite for a bot (a function profile). The bot that uses it is shown in the circle as a bot."
+    },
+    "for_bot_hint": {
+      "text": "An invite for a bot, for one use. Give it to the bot (Telegram: /kring and this invite). It joins as a bot; a person who uses it joins as a person.",
+      "doc": "On the bot invite card: what this invite is and how to hand it over."
+    },
     "uses_left": {
       "text": "{{used}} of {{max}} places on this invite used",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
@@ -5551,7 +5559,7 @@
     "link_open_app": "Open this link in your Basis app to link your identity to this bot: {{link}}\nYour app then shows a line to paste here.",
     "link_not_private": "That only counts in your own chat with the bot.",
     "link_question": "A Basis app wants to link to you: messages from your Basis apps (every device of yours, except one you revoke) then count as you, and the bot knows your Basis identity. Pick the code your app shows.",
-    "kring_usage": "Paste a circle's invite after /kring. Out of a circle: /kring los <name>.",
+    "kring_usage": "Paste a circle's bot invite after /kring (in the app: Invite, then Invite a bot). Out of a circle: /kring los <name>.",
     "kring_question": "The bot joins the circle “{{name}}”.\nRules: {{rules}}\n\nThe bot then keeps that circle's data on this device, and members of that circle can ask it things. The circle sees it is your bot: it is @{{handle}} there. Go ahead? (/kring ja {{id}} or /kring nee {{id}})",
     "kring_no_rules": "no rules set",
     "kring_asked": "I asked you in this private chat whether the bot may join the circle.",

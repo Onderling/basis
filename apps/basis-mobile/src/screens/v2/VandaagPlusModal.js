@@ -79,7 +79,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
-            <TextInput style={styles.input} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go"
+            <TextInput style={styles.input} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1}
               placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
           ) : null),
               'plus-own': () => (selves.length > 1 && !asSelf ? (

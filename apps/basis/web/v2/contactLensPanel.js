@@ -85,12 +85,12 @@ export function renderContactLensPanel({ container, doc = document, t, onClose, 
   actions.className = 'cc-lens__actions';
   const cancel = doc.createElement('button');
   cancel.type = 'button';
-  cancel.className = 'cc-lens__cancel';
+  cancel.className = 'cc-btn cc-btn--quiet cc-lens__cancel';
   cancel.textContent = tr('circle.contacts.lens.cancel');
   cancel.addEventListener('click', () => { try { cancelOnce(); } finally { onClose?.(); } });
   const ok = doc.createElement('button');
   ok.type = 'button';
-  ok.className = 'cc-lens__ok';
+  ok.className = 'cc-btn cc-btn--primary cc-lens__ok';
   ok.textContent = tr(mode === 'add' ? 'circle.contacts.add_sheet.add' : 'circle.contacts.lens.save');
   ok.addEventListener('click', async () => {
     ok.disabled = true;

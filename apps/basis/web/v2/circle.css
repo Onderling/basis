@@ -213,6 +213,12 @@
   content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
 }
 
+/* the create-circle wizard's per-option ⓘ and its note (they were styled only in the retired v1 sheet, so they
+   rendered as the browser's grey default) */
+.cc-radio-info { background: transparent; border: none; color: var(--accent-ink); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; vertical-align: baseline; }
+.cc-radio-info:hover { opacity: .75; }
+.cc-radio-consequence { font-size: 13px; line-height: 1.4; color: var(--ink-soft); margin: 2px 0 6px 22px; padding-left: 8px; border-left: 2px solid var(--line); }
+
 /* ⓘ info button + consequence callout */
 .circle-page .circle-settings__info {
   flex: 0 0 auto; margin-left: auto; align-self: flex-start;

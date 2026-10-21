@@ -4317,13 +4317,15 @@ function runMeAction(id) {
 
 /** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
 function mountPlusButton() {
-  if (document.querySelector('.cc-fab')) return;
-  const b = document.createElement('button');
+  const had = document.querySelector('.cc-fab');
+  const b = had ?? document.createElement('button');
+  // its words, in the current language: mounted after localisation, and named again on a language change
+  b.title = t('circle.vandaag.plus');
+  b.setAttribute('aria-label', t('circle.vandaag.plus'));
+  if (had) return;
   b.type = 'button';
   b.className = 'cc-fab circle-vandaag__plus';
   b.textContent = '+';
-  b.title = t('circle.vandaag.plus');
-  b.setAttribute('aria-label', t('circle.vandaag.plus'));
   b.addEventListener('click', () => showVandaagPlus());
   document.body.appendChild(b);
 }
@@ -4810,6 +4812,7 @@ async function showMyData() {
     try { localStorage.setItem('circle.app.lang', lng); } catch { /* best-effort */ }
     circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
       .catch(() => { /* the cache stands */ });
+    mountPlusButton();   // the "+" says its name in the new language
     showMij();
   };
   // Display theme: persist + stamp data-theme live (the pre-paint hook in
@@ -8827,7 +8830,6 @@ async function boot() {
   const deviceLogIo = backendSnapshotIo(sealedLocalBackend(pickWebBackend('cc-device-log')));
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
-  mountPlusButton();
   // IS THIS TAB THE BUILD THE SITE SERVES? A page never updates itself: on 2026-09-19 a laptop ran the build from
   // before the fix that made the phone's messages visible, while the site served the fix. Checked now and every time
   // the tab regains focus; when the site is ahead, a bar at the top says so with one action. A dev build never nags.
@@ -8849,6 +8851,7 @@ async function boot() {
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
+  mountPlusButton();   // after localisation: mounted before it, the button was named by its key
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
   renderCircleLauncher(rootEl, { loading: true, t });

@@ -307,6 +307,27 @@ export function renderCircleView(container, {
   // no-tabs case ends up on 'conversation' (the CONVERSATION render path).
   const firstTabId = Array.isArray(tabs) && tabs.length > 0 ? tabs[0].id : null;
   const effectiveTab = activeTab || firstTabId || 'conversation';
+  // the circle's tab row, directly under its name and sticky there (on the web; the phone keeps a bottom bar for
+  // thumb reach). It used to come AFTER the pane, so a short pane left it floating mid-screen and a long one hid it
+  // at the end. Only with ≥ 2 tabs (a single-tab circle has nothing to switch), never in screen mode (one page).
+  if (Array.isArray(tabs) && tabs.length >= 2 && viewMode !== 'screen') {
+    const bar = document.createElement('nav');
+    bar.className = 'circle-view__tabs';
+    bar.setAttribute('aria-label', tr('circle.view.tabs_label'));
+    for (const tab of tabs) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'circle-view__tab';
+      btn.dataset.tab = tab.id;
+      if (tab.id === effectiveTab) btn.classList.add('is-active');
+      btn.textContent = tab.label ?? tr(tab.labelKey);
+      btn.addEventListener('click', () => {
+        if (typeof onTab === 'function' && tab.id !== effectiveTab) onTab(tab.id);
+      });
+      bar.appendChild(btn);
+    }
+    container.appendChild(bar);
+  }
   // S1 #1 — in the noticeboard tab the body owns its own composer, so the chat
   // composer + inline form below are suppressed.
   const inPrikbord = effectiveTab === 'noticeboard' && !!noticeboard;
@@ -574,30 +595,6 @@ export function renderCircleView(container, {
     container.appendChild(form);
   }
 
-  // per-circle bottom tab bar. Only renders when a tabs
-  // list with ≥ 2 entries is supplied (a single-tab circle has no
-  // bar to switch on).  The launcher's global Circles/Stroom/Mij
-  // bar sits in a different DOM root, so the two never collide.
-  // also suppress in screen-mode (screen is one canonical
-  // page, no sub-tabs).
-  if (Array.isArray(tabs) && tabs.length >= 2 && viewMode !== 'screen') {
-    const bar = document.createElement('nav');
-    bar.className = 'circle-view__tabs';
-    bar.setAttribute('aria-label', tr('circle.view.tabs_label'));
-    for (const tab of tabs) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'circle-view__tab';
-      btn.dataset.tab = tab.id;
-      if (tab.id === effectiveTab) btn.classList.add('is-active');
-      btn.textContent = tab.label ?? tr(tab.labelKey);
-      btn.addEventListener('click', () => {
-        if (typeof onTab === 'function' && tab.id !== effectiveTab) onTab(tab.id);
-      });
-      bar.appendChild(btn);
-    }
-    container.appendChild(bar);
-  }
 
   // The newest bubble must be the one you can SEE.
   //

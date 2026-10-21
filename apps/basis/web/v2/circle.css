@@ -731,10 +731,10 @@
 .circle-view__form-submit:hover { opacity: 0.92; }
 .circle-view__form-submit:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
 
-/* SP-13.3 — per-circle bottom tab bar + tab-coming placeholder. */
-.circle-view__tabs { display: flex; justify-content: space-around; align-items: stretch; border-top: 1px solid var(--line); margin-top: 4px; }
-.circle-view__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-top: 2px solid transparent; margin-top: -1px; }
-.circle-view__tab.is-active { color: var(--accent-ink); border-top-color: var(--accent-ink); }
+/* the circle's tab row (web: under its name, sticky; the phone keeps a bottom bar) + tab-coming placeholder. */
+.circle-view__tabs { display: flex; justify-content: space-around; align-items: stretch; border-bottom: 1px solid var(--line); margin: 4px 0 10px; position: sticky; top: 0; z-index: 5; background: var(--paper); }
+.circle-view__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.circle-view__tab.is-active { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
 .circle-view__placeholder { padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center; }
 
 /* SP-13.4 — Chat ↔ Screen header pill (v2 §4 "De mode switch"). */
@@ -1517,4 +1517,7 @@
 /* THE "+": one floating button on every tab, bottom-right above the tab bar — the page's one accent (terracotta) */
 .cc-fab { position: fixed; right: 20px; bottom: 76px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
 .cc-fab:hover { filter: brightness(1.08); }
+/* the floating "+" shows exactly where the main tab bar shows: inside a circle (bar hidden) the circle's composer
+   and its attach "+" are the acts — and the floating one covered the composer's send button there */
+.circle-tabbar--hidden ~ .cc-fab { display: none; }
 .circle-vandaag-plus__section h4 { margin: 12px 0 6px; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }

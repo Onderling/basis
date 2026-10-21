@@ -261,11 +261,13 @@
   transition: border-color .12s ease;
 }
 .circle-tile:hover { border-color: var(--accent); }
+/* the customise sheet: a block's name, its controls beside it with room between, wrapping as a row */
+.vandaag-customise__block { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0; }
 .circle-tile__avatar {
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-content: center;
   font-family: var(--font-sans); font-weight: 600; font-size: 17px;
-  color: var(--ink); background: var(--paper-2);
+  color: var(--on-tint); background: var(--paper-2);
 }
 .circle-tile { position: relative; }
 .circle-tile__body { min-width: 0; flex: 1; }
@@ -537,7 +539,7 @@
 
 /* ───────────────────── circle view (SP-13.2 · v2 §1+§5) ───────────────────── */
 .circle-view { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px 12px; }
-.circle-view__header { display: flex; align-items: center; gap: 12px; padding: 10px 0 4px; }
+.circle-view__header { display: flex; align-items: center; gap: 12px; padding: 10px 44px 4px 0; }   /* the ⋯ menu clear of the fixed header avatar (34px + its .75rem inset; same room as .cc-contacts__head) */
 .circle-view__back { background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; padding: 4px 6px; }
 .circle-view__title { flex: 1; margin: 0; font-family: var(--font-sans); font-size: 22px; font-weight: 800; color: var(--ink); }
 .circle-view__more { background: none; border: none; color: var(--ink-soft); font-size: 20px; cursor: pointer; padding: 4px 10px; }
@@ -791,7 +793,7 @@
 
 /* ── P5 — Contacten roster + 1:1 DM thread ──────────────────────────────── */
 .cc-contacts { padding: 4px 2px 80px; }
-.cc-contacts__head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 12px; gap: 12px; }
+.cc-contacts__head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 12px; gap: 12px; padding-right: 44px; }   /* clear the fixed header avatar (top-right) */
 .cc-contacts__title { font-size: 18px; font-weight: 700; margin: 0; color: var(--ink); }
 .cc-contacts__add {
   cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;

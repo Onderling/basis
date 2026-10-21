@@ -1,10 +1,9 @@
 /**
- * Pure state-machine pieces lifted from src/web/threadSidebar.js
+ * Pure state-machine pieces lifted from the v1 web thread sidebar
  * (2026-05-24).
  *
- * The web DOM renderer keeps living in src/web/threadSidebar.js and
- * imports these helpers; basis-mobile's eventual RN thread
- * sidebar will import them too.  Same functions, two surfaces.
+ * That DOM renderer was retired on 2026-10-22: the v2 shells never used it. Nothing imports these helpers now;
+ * they stay for a thread surface that wants them (see the ledger), or go with the next decision on threads.
  *
  * Conventions:
  *   - Zero DOM, zero RN, zero Node-only deps.  Pure value transforms.

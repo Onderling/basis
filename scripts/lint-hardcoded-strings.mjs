@@ -52,6 +52,9 @@ const SCOPE = [
   'apps/basis/web/v2/',
   'apps/basis/src/web/',
   'apps/basis-mobile/src/',
+  // the phone's wizards are drawn from here (the mobile shell imports them) — outside the scope until 2026-10-22,
+  // the same blind spot src/web/ had: 44 English labels shipped untranslated to the create wizard and five others
+  'apps/basis/src/rn/',
 ];
 
 /** Assignment to a sink a person reads. */

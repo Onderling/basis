@@ -231,7 +231,7 @@ function renderHolidayControl(doc, state, callSkill, rerender) {
     box.disabled = false;
   });
   toggle.appendChild(box);
-  toggle.appendChild(doc.createTextNode(' Suppress notifications + mark me unavailable.'));
+  toggle.appendChild(doc.createTextNode(` ${t('circle.wizard.settings.holiday_hint')}`));
   row.appendChild(toggle);
   return row;
 }

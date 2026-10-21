@@ -65,13 +65,13 @@ export default function EncryptedBackupWizardModal({
                   placeholder="(no length minimum, but use one you'll remember)"
                 />
                 <Field
-                  label="Confirm passphrase"
+                  label={t('circle.wizard.backup.confirm_passphrase')}
                   value={state.confirm}
                   onChangeText={(v) => setState((s) => ({ ...s, confirm: v }))}
                   placeholder="re-enter"
                 />
                 <ErrorBanner message={state.submitError} />
-                <Submitting visible={state.submitting} label="Building backup…" />
+                <Submitting visible={state.submitting} label={t('circle.wizard.backup.building')} />
               </Body>
             )}
             {state.step === 2 && (

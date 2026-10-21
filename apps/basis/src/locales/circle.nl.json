@@ -7886,6 +7886,24 @@
     }
   },
   "wizard": {
+    "embed": {
+      "duration": {
+        "text": "Duur (bv. 1h, 90m, 2h30m)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "location": {
+        "text": "Plaats (optioneel)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "share_with": {
+        "text": "Delen met (optioneel, het adres van een contact)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "creating": {
+        "text": "Tijdsblok maken…",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      }
+    },
     "recovery": {
       "after_restore_hint": {
         "text": "Je kringen zitten niet in de herstelzin. Meld je na het herladen aan bij je pod, of laad je herstelbestand onder Mijn gegevens, om ze terug te krijgen.",
@@ -8205,6 +8223,26 @@
       }
     },
     "settings": {
+      "holiday_hint": {
+        "text": "Zet meldingen op pauze en toont je als niet beschikbaar.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "pod_section": {
+        "text": "Solid pod",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_section": {
+        "text": "NKN-relay",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_url": {
+        "text": "Relay-adres",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_hint": {
+        "text": "Kies zelf een NKN-relay in plaats van de automatische (geavanceerd). Alleen ws:// of wss://.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "loading": {
         "text": "Instellingen worden geladen…",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8271,6 +8309,14 @@
       }
     },
     "backup": {
+      "confirm_passphrase": {
+        "text": "Herhaal het wachtwoord",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "building": {
+        "text": "Back-up maken…",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "passphrase_warning": {
         "text": "Raak je het wachtwoord kwijt, dan is de back-up weg. Er is geen herstel. Schrijf het op.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8301,6 +8347,18 @@
       }
     },
     "restore": {
+      "phrase": {
+        "text": "Herstelzin",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "ack_lost": {
+        "text": "Ik begrijp dat mijn huidige identiteit en lokale gegevens VERLOREN gaan.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "ack_undone": {
+        "text": "Ik begrijp dat dit NIET ongedaan te maken is.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "identity_warning": {
         "text": "Na herstellen gebruikt de app de herstelde identiteit. Je huidige handle, contacten, kringen en openstaande uitnodigingen horen bij de oude identiteit en lijken dan weg. Ze zijn niet gewist, maar je kunt er niets mee zonder de oude herstelzin.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8339,6 +8397,22 @@
       }
     },
     "audience": {
+      "what": {
+        "text": "Wat wil je plaatsen?",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "trust": {
+        "text": "Vertrouwensniveau",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "recipients": {
+        "text": "Ontvangers (optioneel, handles gescheiden door komma's)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "target": {
+        "text": "Kring",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "max_distance": {
         "text": "Tot hoever?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."

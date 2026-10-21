@@ -50,12 +50,12 @@ export function renderPostAudienceWizard(opts) {
     // Circle picker (only when we have a real list).  Single-circle
     // users see one radio for clarity; multi-circle users see all.
     if (Array.isArray(state.availableCircles) && state.availableCircles.length > 0) {
-      mkRadioGroup(body, doc, 'Circle', state.selectedCircle ?? state.availableCircles[0].id,
+      mkRadioGroup(body, doc, t('circle.wizard.audience.target'), state.selectedCircle ?? state.availableCircles[0].id,
         state.availableCircles.map(b => ({ id: b.id, label: b.label })),
         (v) => { state.selectedCircle = v; });
     }
     const validText = () => state.text.trim().length > 0;
-    mkTextarea(body, doc, 'Post text', state.text, (v) => {
+    mkTextarea(body, doc, t('circle.wizard.audience.what'), state.text, (v) => {
       state.text = v;
       refreshActions(container, { textOk: validText });
     }, { placeholder: 'What are you asking / offering?', rows: 3 });
@@ -66,7 +66,7 @@ export function renderPostAudienceWizard(opts) {
       { id: 'offer', label: 'Offer (share skills/items)' },
       { id: 'lend',  label: 'Lend (share a physical thing)' },
     ], (v) => { state.kind = v; });
-    mkRadioGroup(body, doc, 'Trust level', state.minTrust, TRUST_OPTS,
+    mkRadioGroup(body, doc, t('circle.wizard.audience.trust'), state.minTrust, TRUST_OPTS,
       (v) => { state.minTrust = v; });
     mkField(body, doc, 'Tags (CSV — match contacts with any tag)',
       state.tags, (v) => { state.tags = v; },
@@ -89,7 +89,7 @@ export function renderPostAudienceWizard(opts) {
     }
     body.appendChild(distGrid);
 
-    mkField(body, doc, 'Specific webids (CSV, optional)',
+    mkField(body, doc, t('circle.wizard.audience.recipients'),
       state.recipients, (v) => { state.recipients = v; },
       { placeholder: 'e.g. webid:anne,webid:karl', monospace: true,
         hint: 'When set, restricts to these recipients regardless of trust/distance.' });

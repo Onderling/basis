@@ -950,10 +950,6 @@
       "text": "gisteren",
       "doc": "SP-13.2 — day-divider."
     },
-    "tab_coming": {
-      "text": "{{tab}} komt in een vervolg-slice.",
-      "doc": "SP-13.3 — placeholder voor tabs zonder eigen screen (yet)."
-    },
     "tasks_empty": {
       "text": "Nog geen taken in deze kring.",
       "doc": "tasks tab — lege staat (geen taken)."
@@ -985,10 +981,6 @@
     "view_toggle_label": {
       "text": "Wissel tussen chat en scherm",
       "doc": "SP-13.4 — a11y group label."
-    },
-    "screen_coming": {
-      "text": "Scherm-weergave (admin-recept) komt in een vervolg-slice.",
-      "doc": "SP-13.4 — placeholder."
     },
     "attach": {
       "text": "Foto toevoegen",

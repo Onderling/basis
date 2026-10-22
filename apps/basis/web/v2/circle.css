@@ -604,6 +604,10 @@
    a bot-header strip over the message log, in a 2px-ink-bordered --card container. */
 .circle-view__chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-top: 4px; }
 .circle-view__chat-card .circle-view__list { padding: 14px; }
+/* the bulletin's ink frame is a dark line on paper; inverted in dark it became a bright white box around the chat —
+   in dark the frame takes the theme's line colour instead (the same two dark selectors theme.css uses) */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .circle-view__chat-card { border-color: var(--line); } }
+:root[data-theme="dark"] .circle-view__chat-card { border-color: var(--line); }
 /* Bot-header strip: green presence dot + the assistant's name in bold, a --line hairline under it. */
 .circle-view__bot-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
 .circle-view__bot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
@@ -670,13 +674,17 @@
 .circle-view__composer-input { flex: 1; padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
 .circle-view__composer-input::placeholder { color: var(--ink-soft); }
 .circle-view__composer-input:focus { outline: none; border-color: var(--accent); }
-.circle-view__composer-send { border: none; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 14px; font-weight: 700; line-height: 1; padding: 9px 15px; cursor: pointer; }
-.circle-view__composer-send:hover { background: var(--accent-ink); }
+/* send and attach are one square family (quiet: line border, paper, ink) — they were two looks side by side */
+.circle-view__composer-send {
+  cursor: pointer; font: inherit; font-size: 16px; font-weight: 700; line-height: 1; width: 36px; height: 36px; padding: 0; flex: 0 0 auto;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink);
+}
+.circle-view__composer-send:hover { border-color: var(--accent); }
 
 /* media P1 — sealed-media attach button (only rendered when the circle has a seal strategy). */
 .circle-view__attach {
   cursor: pointer; font-size: 16px; line-height: 1; width: 36px; height: 36px; padding: 0; flex: 0 0 auto;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper, #fff); color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink);
 }
 .circle-view__attach:hover { border-color: var(--accent); }
 
@@ -745,7 +753,6 @@
 .circle-view__tabs { display: flex; justify-content: space-around; align-items: stretch; border-bottom: 1px solid var(--line); margin: 4px 0 10px; position: sticky; top: 0; z-index: 5; background: var(--paper); }
 .circle-view__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .circle-view__tab.is-active { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
-.circle-view__placeholder { padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center; }
 
 /* SP-13.4 — Chat ↔ Screen header pill (v2 §4 "De mode switch"). */
 .circle-view__view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--paper); }

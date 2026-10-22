@@ -378,13 +378,6 @@ export function renderCircleView(container, {
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
     renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture });
-  } else if (effectiveTab !== 'conversation') {
-    const placeholder = document.createElement('div');
-    placeholder.className = 'circle-view__placeholder';
-    placeholder.textContent = tr('circle.view.tab_coming', {
-      tab: tr(`circle.tabs.${effectiveTab}`),
-    });
-    body.appendChild(placeholder);
   } else if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'circle-view__empty';

@@ -10,6 +10,13 @@
  * `[data-tab="circles"]`, chat toggle `.circle-view__view-toggle-btn`.
  */
 import { expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+// The wizard's last button, in every language the app ships — read from the locale files, so a reworded or newly
+// keyed label cannot leave the walks clicking nothing (keyed in Dutch as "Kring maken", a copied regex missed it).
+const CREATE_LABELS = ['en', 'nl'].map((l) =>
+  JSON.parse(readFileSync(new URL(`../src/locales/circle.${l}.json`, import.meta.url), 'utf8')).wizard.create.create_button.text.toLowerCase());
+const isCreateLabel = (s) => CREATE_LABELS.includes(String(s).trim().toLowerCase());
 
 /** Boot the v2 app and open a circle chat composer. Resolves once `.circle-view__composer-input` is visible.
  *  Lifted from the per-spec `openCircleComposer` (circle-view-*.spec.js) so migrated specs share ONE boot. */
@@ -50,13 +57,13 @@ export async function createCircleViaWizard(page, name, { handle = 'founder' } =
   // given them one. The wizard now derives the id from the founder, and a walk that types one is
   // measuring itself (2026-08-28).
   for (let step = 0; step < 10; step += 1) {
-    const advance = page.locator('.cc-wizard-btn:visible')
-      .filter({ hasText: /next|review|create|maak/i });
+    // the step's one primary button: Next on each step, the create button on the last
+    const advance = page.locator('.cc-wizard-btn-primary:visible');
     if (await advance.count() === 0) break;
     const label = (await advance.first().textContent() ?? '').trim();
     await advance.first().click();
     await page.waitForTimeout(1500);
-    if (/create|maak/i.test(label)) break;      // the last step; the invite panel follows
+    if (isCreateLabel(label)) break;      // the last step; the invite panel follows
   }
   await page.waitForTimeout(4000);
   // Creating leaves the INVITE panel open ("Copy URL · Copy code · Done") on top of the launcher. The tile

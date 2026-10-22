@@ -6377,6 +6377,10 @@
     "edit": {
       "text": "Aanpassen",
       "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
+    },
+    "logReport": {
+      "text": "Kopieer logboek / Meld een probleem →",
+      "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
     }
   },
   "blocked": {
@@ -10056,6 +10060,28 @@
     "save_failed": {
       "text": "Niet opgeslagen.",
       "doc": "A settings value could not be saved."
+    }
+  },
+  "logReport": {
+    "title": {
+      "text": "Logboek van dit apparaat",
+      "doc": "Title of the copy-log screen."
+    },
+    "intro": {
+      "text": "Wat de app op dit apparaat bijhield: gebeurteniscodes en getallen, geen namen, berichten of adressen. Kopieer het en stuur het naar wie je helpt. Vanaf hier wordt niets verstuurd.",
+      "doc": "Copy-log screen: what the text is and that nothing leaves the device from this screen."
+    },
+    "empty": {
+      "text": "Nog niets bijgehouden.",
+      "doc": "Copy-log screen when the log is empty."
+    },
+    "copy": {
+      "text": "Kopieer",
+      "doc": "Copy-log screen: copies the shown text (the phone opens its share sheet, which has Copy)."
+    },
+    "copied": {
+      "text": "Gekopieerd.",
+      "doc": "Copy-log screen: confirmation after copying (web)."
     }
   }
 }

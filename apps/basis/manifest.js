@@ -1155,6 +1155,7 @@ export const basisManifest = {
     { id: 'connection-points', labelKey: 'circle.nearbyScreen.points_open', target: { kind: 'nav', to: 'points' } },
     { id: 'shared-with-me',    labelKey: 'circle.profile.sharedWithMe',     target: { kind: 'nav', to: 'sharedWithMe' } },
     { id: 'blocked',           labelKey: 'circle.profile.blocked',          target: { kind: 'nav', to: 'blocked' } },
+    { id: 'log-report',        labelKey: 'circle.profile.logReport',        target: { kind: 'nav', to: 'logReport' } },
   ],
 
   /**

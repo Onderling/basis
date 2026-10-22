@@ -298,6 +298,7 @@ import CircleShareScreen from './CircleShareScreen.js';   // objective L — cro
 import CircleProfileScreen from './CircleProfileScreen.js';
 import ShareMyContactScreen from './ShareMyContactScreen.js';
 import CircleBlockedScreen from './CircleBlockedScreen.js';
+import LogReportScreen from './LogReportScreen.js';
 import CircleAdvancedScreen from './CircleAdvancedScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
@@ -1718,6 +1719,7 @@ export default function CircleLauncherScreen({
       // Hop screen lives under the Mij tab.
       if (view === 'hop') { setView('availability'); return true; }
       if (view === 'blocked') { setView('mydata'); return true; }
+      if (view === 'logReport') { setView('mydata'); return true; }
       if (view === 'shareContact') { setView('profile'); return true; }
       // Mij's sub-views; availability, blocked and shared-with-me sit behind My data.
       if (view === 'availability' || view === 'sharedWithMe') { setView('mydata'); return true; }
@@ -2161,6 +2163,14 @@ export default function CircleLauncherScreen({
       </WithTabBar>
     );
   }
+  // This device's log, to copy — a My data sub-view (web parity: showLogReport); nothing is sent from it.
+  if (view === 'logReport') {
+    return (
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <LogReportScreen onBack={() => setView('mydata')} />
+      </WithTabBar>
+    );
+  }
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
@@ -2200,7 +2210,7 @@ export default function CircleLauncherScreen({
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
-          doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
+          doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
           personClock={personClockRef.current} />
       </WithTabBar>
     );

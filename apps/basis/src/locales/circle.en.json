@@ -6377,6 +6377,10 @@
     "edit": {
       "text": "Edit",
       "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
+    },
+    "logReport": {
+      "text": "Copy log / report a problem →",
+      "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
     }
   },
   "blocked": {
@@ -10056,6 +10060,28 @@
     "save_failed": {
       "text": "Not saved.",
       "doc": "A settings value could not be saved."
+    }
+  },
+  "logReport": {
+    "title": {
+      "text": "Log of this device",
+      "doc": "Title of the copy-log screen."
+    },
+    "intro": {
+      "text": "What the app noted on this device: event codes and numbers, no names, messages or addresses. Copy it and send it to whoever helps you. Nothing is sent from here.",
+      "doc": "Copy-log screen: what the text is and that nothing leaves the device from this screen."
+    },
+    "empty": {
+      "text": "Nothing logged yet.",
+      "doc": "Copy-log screen when the log is empty."
+    },
+    "copy": {
+      "text": "Copy",
+      "doc": "Copy-log screen: copies the shown text (the phone opens its share sheet, which has Copy)."
+    },
+    "copied": {
+      "text": "Copied.",
+      "doc": "Copy-log screen: confirmation after copying (web)."
     }
   }
 }

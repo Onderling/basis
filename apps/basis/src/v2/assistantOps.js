@@ -970,6 +970,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const isPrivate = Boolean(row) && (row.channel !== 'telegram' || isOwnTelegramChat(ctx?.chatId, row.uid));
     const r = await admin.screens.confirm(person, answer, { isPrivate });
     if (r.ok && r.declined) return { ok: true, message: tp('circle.bot.screen_declined') };
+    if (r.ok && r.already) return { ok: true, message: tp('circle.bot.screen_already') };
     // connected: and where the screen is from now on (the page itself became it; this link brings it back)
     if (r.ok) return { ok: true, message: r.reopen ? tp('circle.bot.screen_confirmed_open', { link: r.reopen }) : tp('circle.bot.screen_confirmed') };
     const key = { 'not-private': 'screen_confirm_not_private', expired: 'screen_confirm_expired', 'nothing-pending': 'screen_confirm_nothing' }[r.reason] ?? 'screen_confirm_failed';
@@ -1109,7 +1110,7 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
     const r = await link.pasted(person, offer, question);
     if (r.ok && r.already) return { ok: true, message: tp('circle.bot.link_already') };
     if (r.ok) return { ok: true, message: tp('circle.bot.link_asked') };
-    const key = { 'another-bot': 'link_another_bot', 'key-on-another-row': 'link_key_taken', 'row-has-a-key': 'link_row_has_key', revoked: 'link_revoked', stale: 'link_stale' }[r.reason] ?? 'link_not_an_offer';
+    const key = { 'another-bot': 'link_another_bot', 'key-on-another-row': 'link_key_taken', 'row-has-a-key': 'link_row_has_key', revoked: 'link_revoked', stale: 'link_stale', used: 'link_used' }[r.reason] ?? 'link_not_an_offer';
     return { ok: false, error: { code: r.reason, message: tp(`circle.bot.${key}`) } };
   }
 

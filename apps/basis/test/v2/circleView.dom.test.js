@@ -264,7 +264,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(3);
   });
 
-  it('clicking a non-active tab fires onTab(id); clicking the active one is a no-op', () => {
+  it('clicking a tab fires onTab(id); clicking the active one fires it too, so the open tab re-reads', () => {
     const el = mount();
     const onTab = vi.fn();
     renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'conversation', onTab });
@@ -272,7 +272,8 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(onTab).toHaveBeenCalledTimes(1);
     expect(onTab.mock.calls[0][0]).toBe('members');
     el.querySelector('.circle-view__tab[data-tab=conversation]').click();
-    expect(onTab).toHaveBeenCalledTimes(1); // unchanged — re-tap on active = no-op
+    expect(onTab).toHaveBeenCalledTimes(2);   // a re-tap on the active tab re-reads it (the board's new answers)
+    expect(onTab.mock.calls[1][0]).toBe('conversation');
   });
 
   it('defaults activeTab to the first tab id when caller omits it', () => {

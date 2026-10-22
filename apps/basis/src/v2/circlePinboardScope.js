@@ -62,6 +62,10 @@ export const SCOPED_LIST_OPS = DERIVED.lists;
 // every basis call site keeps its import path.
 export { SYSTEM_PINBOARD_TYPES, isNoticeboardPost, NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 
+/** What the pinboard announces when a post on the board changed under an open board: the requested attachment bytes
+ *  arrived, or an answer to the poster's own request was recorded. Both shells re-read the open board on each. */
+export const NOTICEBOARD_REFRESH_EVENTS = Object.freeze(['pinboard:attachment-fetched', 'pinboard:response-recorded']);
+
 /**
  * Keep `item` for `circleId` — lenient: an item carrying NO circle hint is kept
  * (the op already scoped it server-side). Mirrors `circleContent.js`'s rule so the

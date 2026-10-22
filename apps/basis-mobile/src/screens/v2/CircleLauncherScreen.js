@@ -3240,6 +3240,8 @@ function CircleDetail({
   // Reset to CONVERSATION whenever we switch circles so a non-default tab
   // doesn't persist across opens.
   useEffect(() => { setActiveTab(DEFAULT_CIRCLE_TAB); }, [circle?.id]);
+  // a tap on the open tab re-reads it (web parity): the board takes this as its refresh signal
+  const [tabRetap, setTabRetap] = useState(0);
 
   // (roster state `tabMembers` is declared above the rows memo — it feeds the sender labels.)
   // A member's row moved — a statement on this circle's MEMBERSHIP lane (a join, a leave, a role, what a member
@@ -4547,7 +4549,7 @@ function CircleDetail({
         ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see pinboardCall above).
-          <CircleNoticeboard callSkill={pinboardCall} onPinboardEvent={onPinboardEvent} media={circleMedia} selfProfileId={selfProfileId}
+          <CircleNoticeboard callSkill={pinboardCall} onPinboardEvent={onPinboardEvent} refreshKey={tabRetap} media={circleMedia} selfProfileId={selfProfileId}
             contactChannel={contactChannel}
             notePeer={notePeer}
             identityOf={identityOf}
@@ -4955,7 +4957,7 @@ function CircleDetail({
               accessibilityRole="button"
               testID={`circle-detail-tab-${tab.id}`}
               onPress={() => {
-                if (tab.id === activeTab) return;
+                if (tab.id === activeTab) { setTabRetap((n) => n + 1); return; }
                 setActiveTab(tab.id);
                 // D1 — count tab use so the Veel-gebruikt row reflects reality.
                 const f = featureForTabId(tab.id);

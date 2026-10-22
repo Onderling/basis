@@ -34,6 +34,7 @@ const keyFanRoster = async (circleId) => {
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
+import { createSingleFlight } from '../../../basis/src/v2/singleFlight.js';
 import { realPodRouting } from '../../../basis/src/v2/circleRealPod.js';
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
 // the SHARED cross-circle SHARE logic + the platform-neutral enforcement assembly.
@@ -226,9 +227,19 @@ function makeCirclePodClient(circleId) {
   return new PodClient({ podRoot: `pseudo-pod://${deviceId}/`, auth: { getAuthHeaders: async () => ({}) }, pseudoPod });
 }
 
+// One build per circle at a time (web parity): concurrent callers share the first's producer, so a circle gets one
+// group key — not one per caller.
+const podFlight = createSingleFlight();
+const strategyFlight = createSingleFlight();
+
 /** Ensure a per-circle producer exists (idempotent). Best-effort; null when no vault / on failure. */
 export async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
+  return podFlight(circleId, () => buildCirclePod(circleId, policy));
+}
+
+async function buildCirclePod(circleId, policy) {
+  if (circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
   let producer = null;
   // Circle OIDC: when signed in, route a sealed circle to the user's REAL pod via the RN
   // session's authenticated fetch (the fetch is no longer hidden); else the pseudo-pod.
@@ -275,6 +286,11 @@ export async function seedCircleRosterFor({ circleId, policy, callSkill }) {
 
 /** Resolve (+ cache) a circle's content seal/open strategy via the device's own sealing identity. */
 export async function getCircleSealStrategy(circleId, policy) {
+  if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
+  return strategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
+}
+
+async function buildCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
   let strat = null;
   try {

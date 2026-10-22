@@ -225,6 +225,34 @@ export async function nameContactsFromRosters(rows = [], { rosterRow = null } = 
   return sortContactRows(named);
 }
 
+/**
+ * A PERSON MET IN A CIRCLE YOU SHARE is named by the handle they use there. A row reaches Contacten from the peer graph
+ * when someone in one of your circles talks to you, and only a PAIR circle used to name it — so a co-member showed as
+ * their address in the list and in the thread title. Only rows still called by their address are touched; only the
+ * HANDLE travels (what anyone in that circle sees), never a name they released to that circle.
+ *
+ * @param {object[]} rows
+ * @param {{ circleIds?: () => Promise<string[]>, membersOf?: (circleId: string) => Promise<object[]> }} [o]
+ */
+export async function nameCoMembersFromCircles(rows = [], { circleIds = null, membersOf = null } = {}) {
+  const unnamed = (r) => r && !r.isBot && !r.pairCircleId && r.contactId && (!r.name || r.name === r.contactId);
+  if (!rows.some(unnamed) || typeof circleIds !== 'function' || typeof membersOf !== 'function') return rows;
+  let ids = [];
+  try { ids = (await circleIds()).filter((c) => typeof c === 'string' && c); } catch { ids = []; }
+  const handleOf = new Map();   // address or webid → handle
+  for (const id of ids) {
+    let members = [];
+    try { members = await membersOf(id); } catch { members = []; }
+    for (const m of members) {
+      if (typeof m?.handle !== 'string' || !m.handle) continue;
+      for (const key of [m.circleAddress, m.webid]) if (typeof key === 'string' && key && !handleOf.has(key)) handleOf.set(key, m.handle);
+    }
+  }
+  if (!handleOf.size) return rows;
+  return sortContactRows(rows.map((r) => (unnamed(r) && handleOf.has(r.contactId)
+    ? { ...r, name: handleOf.get(r.contactId), namedBy: 'circle' } : r)));
+}
+
 /** The book's rows, through the one row mapper. */
 export async function loadBookRows(callSkill) {
   if (typeof callSkill !== 'function') return [];
@@ -256,11 +284,17 @@ export async function loadContactRoster({ peerGraph = null, agent = null, callSk
   const merged = mergeContacts(peerRows, bookRows);
   if (typeof callSkill !== 'function') return withNameMarkers(merged, names);
   const rosters = new Map();   // circleId → the members read (one read per roster per call)
-  const rosterRow = async (circleId, webid) => {
+  const membersOf = (circleId) => {
     if (!rosters.has(circleId)) rosters.set(circleId, callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).then((r) => (Array.isArray(r?.members) ? r.members : [])).catch(() => []));
-    return (await rosters.get(circleId)).find((m) => m?.webid === webid) ?? null;
+    return rosters.get(circleId);
   };
-  return withNameMarkers(await nameContactsFromRosters(merged, { rosterRow }), names);
+  const rosterRow = async (circleId, webid) => (await membersOf(circleId)).find((m) => m?.webid === webid) ?? null;
+  const named = await nameContactsFromRosters(merged, { rosterRow });
+  const coNamed = await nameCoMembersFromCircles(named, {
+    circleIds: async () => (await callSkill('pinboard', 'listMyCircles', {}))?.circles ?? [],
+    membersOf,
+  });
+  return withNameMarkers(coNamed, names);
 }
 
 /**

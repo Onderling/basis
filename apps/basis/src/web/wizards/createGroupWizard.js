@@ -218,7 +218,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
       // is known the Next button stays off — this used to call a `founderKey()` that was never defined.
       refreshNextBtn();
     },
-    { placeholder: 'e.g. Circle Westend' });
+    { placeholder: t('circle.wizard.create.name_placeholder') });
 
   // The founder's handle, asked only when their profile has none — the join wizard's field (a founder without one
   // reached every member as `peer-xxxxxx`).
@@ -508,7 +508,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   renderActions(container, doc, [
     { label: '← Back',         onClick: onBack,                       kind: 'secondary', disabled: state.submitting },
     { label: 'Cancel',         onClick: onCancel,                     kind: 'secondary', disabled: state.submitting },
-    { label: 'Create circle',   onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
+    { label: t('circle.wizard.create.create_button'), onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
   ]);
 }
 

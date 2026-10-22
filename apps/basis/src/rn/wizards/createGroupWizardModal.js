@@ -197,10 +197,11 @@ export default function CreateGroupWizardModal({
                   </>
                 )}
                 <Field
-                  label="Name"
+                  label={t('circle.wizard.create.name')}
                   value={state.name}
                   onChangeText={updateName}
-                  placeholder="e.g. Onze Circle"
+                  placeholder={t('circle.wizard.create.name_placeholder')}
+                  testID="create-group-name"
                 />
                 {state.needsHandle ? (
                   <HandleField
@@ -459,18 +460,18 @@ export default function CreateGroupWizardModal({
           <Actions buttons={(() => {
             if (state.step === 1) return [
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(2), kind: 'primary', disabled: !canAdvance1 },
+              { label: t('common.next'),   onPress: () => setStep(2), kind: 'primary', disabled: !canAdvance1, testID: 'create-group-next' },
             ];
             // 5.5c — six-step wizard.  Steps 2-5 share Back/Next; step 6 is Review.
             if (state.step < STEP_NAMES.length) return [
               { label: t('common.back'),   onPress: () => setStep(state.step - 1), kind: 'secondary' },
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(state.step + 1), kind: 'primary' },
+              { label: t('common.next'),   onPress: () => setStep(state.step + 1), kind: 'primary', testID: 'create-group-next' },
             ];
             return [
               { label: t('common.back'),   onPress: () => setStep(STEP_NAMES.length - 1), kind: 'secondary', disabled: state.submitting },
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: 'Create circle',     onPress: onCreate, kind: 'primary', disabled: state.submitting },
+              { label: t('circle.wizard.create.create_button'), onPress: onCreate, kind: 'primary', disabled: state.submitting, testID: 'create-group-create' },
             ];
           })()} />
         </Pressable>

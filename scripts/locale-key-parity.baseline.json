@@ -67,7 +67,6 @@
     "circle.wizard.create.copy_url",
     "circle.wizard.create.created_intro",
     "circle.wizard.create.created_title",
-    "circle.wizard.create.name",
     "circle.wizard.create.offering_remove",
     "circle.wizard.create.qr_hint",
     "circle.wizard.create.review_conflict",

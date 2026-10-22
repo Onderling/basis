@@ -35,6 +35,7 @@ import {
   b64encode,
   b64decode,
 } from '@onderling/core';
+import { parseUntrustedJson } from '@onderling/core';
 
 export const CLAIM_VERSION   = 1;
 export const DEFAULT_TTL_MS  = 7 * 24 * 60 * 60 * 1000;   // 7 days
@@ -140,5 +141,5 @@ export function serializeClaim(claim) {
  * @returns {object}
  */
 export function parseClaim(str) {
-  return JSON.parse(str);
+  return parseUntrustedJson(str);
 }

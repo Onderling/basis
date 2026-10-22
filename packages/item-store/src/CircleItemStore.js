@@ -24,6 +24,7 @@
 import { ulid } from './ulid.js';
 import { causalWinner, reconcileClaim, applyClaimOverlay, claimClusterEqual } from './causalMerge.js';
 import { defaultResolutionRegistry, RESOLUTION } from './resolutionPolicy.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 const ITEMS_DIR = 'items';
 
@@ -311,7 +312,7 @@ export class CircleItemStore {
   async get(id) {
     const raw = await this.#source.read(this.#uri(id));
     if (raw === null || raw === undefined) return null;
-    const item = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const item = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
     if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
     return item;
   }
@@ -335,7 +336,7 @@ export class CircleItemStore {
       const raw = await this.#source.read(k);
       if (raw === null || raw === undefined) continue;
       try {
-        const item = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const item = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
         if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
         out.push(item);
       } catch { /* skip malformed */ }

@@ -44,6 +44,7 @@ import {
   Transport, addressPossessionMessage, signAddressPossession, b64encode,
 } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { parseUntrustedJson } from '@onderling/core';
 
 /** Error frames that refuse ONE frame (a send) rather than a registration — never a reason to fail a pending bind. */
 const PER_FRAME_REFUSALS = new Set(['SENDER_NOT_REGISTERED', 'OVER_RATE', 'OVER_QUOTA_MSGS_PER_DAY']);
@@ -511,7 +512,7 @@ export class RelayTransport extends Transport {
 
     ws.onmessage = (event) => {
       let msg;
-      try { msg = JSON.parse(event.data); } catch { return; }
+      try { msg = parseUntrustedJson(event.data); } catch (err) { this._frameRefused(err); return; }
 
       // The relay demands proof: sign ITS nonce with the key behind the address we are claiming.
       // Note what the relay supplies and what it does not — it hands us a nonce, and we build the

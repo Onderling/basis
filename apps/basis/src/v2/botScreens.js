@@ -25,6 +25,7 @@
 import { sha256Hex } from './botAdmission.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { TELEGRAM_LAUNCH_MAX_AGE_S } from './telegramLaunch.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 /**
  * The calls a household bot takes from its connected screens: per screen a burst, then so many a second; and from all
@@ -98,7 +99,7 @@ export function encodeScreenLink(appUrl, { botAddress, relayUrl = null, nonce, b
 export function parseScreenLink(link) {
   const m = /#scherm=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-screen-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1) return { ok: false, reason: 'wrong-version' };
   if (typeof d.b !== 'string' || !d.b || typeof d.n !== 'string' || !d.n) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, nonce: d.n, botName: typeof d.m === 'string' && d.m ? d.m : null };
@@ -117,7 +118,7 @@ export function encodeScreenStartLink(appUrl, { botAddress, relayUrl = null, bot
 export function parseScreenStartLink(link) {
   const m = /#scherm-nieuw=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-start-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
 }
@@ -134,7 +135,7 @@ export function encodeScreenLaunchLink(appUrl, { botAddress, relayUrl = null, bo
 export function parseScreenLaunchLink(link) {
   const m = /[?&]scherm-tg=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-launch-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
 }

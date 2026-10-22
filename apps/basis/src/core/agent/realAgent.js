@@ -281,6 +281,7 @@ import { buildStandardRolePolicy } from '@onderling-app/tasks';                 
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 // Deterministic seed for the real household store.  Three open items across
 // list types so `/list shopping` + the brief demo are non-empty out of the
@@ -6047,13 +6048,13 @@ export async function createRealHouseholdAgent(opts = {}) {
                               + '=='.slice(0, (4 - b64.length % 4) % 4);
             const json = typeof globalThis.atob === 'function'
               ? globalThis.atob(padded) : padded;
-            realArgs = { ...realArgs, invite: JSON.parse(json) };
+            realArgs = { ...realArgs, invite: parseUntrustedJson(json) };
           } catch (err) {
             return { ok: false, error: tr('circle.tasks.invite.bad_url', { error: err.message ?? String(err) }) };
           }
         } else if (inv.startsWith('{')) {
           try {
-            realArgs = { ...realArgs, invite: JSON.parse(inv) };
+            realArgs = { ...realArgs, invite: parseUntrustedJson(inv) };
           } catch (err) {
             return { ok: false, error: tr('circle.tasks.invite.bad_json', { error: err.message ?? String(err) }) };
           }

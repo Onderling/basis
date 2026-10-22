@@ -4137,6 +4137,30 @@ callers can cleanly drop the message without throwing.
 
 **Returns:** `object|null` — parsed innerOW, or null on failure
 
+## `src/security/untrustedJson.js`
+
+### `UNSAFE_JSON_KEYS`
+
+**Kind:** constant · **Import:** `UNSAFE_JSON_KEYS` from `'@onderling/core'`
+
+The keys a parsed input may not carry.
+
+### `parseUntrustedJson`
+
+**Kind:** function · **Import:** `parseUntrustedJson` from `'@onderling/core'`
+
+```js
+parseUntrustedJson(text)
+```
+
+`JSON.parse` for someone else's JSON: the same result, or a refusal when any key reaches a prototype.
+
+**Parameters**
+
+- `text` `string`
+
+**Returns:** `unknown` — what `JSON.parse(text)` returns
+
 ## `src/skills/SkillRegistry.js`
 
 ### `SkillRegistry`
@@ -4754,7 +4778,7 @@ interaction primitives (sendOneWay/sendAck/request/respond/sendHello), reply
 correlation, auto-ACK of AS envelopes, SecurityLayer wiring, and receive-handler
 dispatch. See the file header for the full port contract.
 
-**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_receive()` · `appMessageIdFor()` · `_send()` · `_awaitReply()`
+**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `holdsAddress()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_frameRefused()` · `_receive()` · `appMessageIdFor()` · `_send()` · `_awaitReply()`
 
 ## `src/transport/discoverability.js`
 

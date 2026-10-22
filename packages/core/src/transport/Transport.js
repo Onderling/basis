@@ -599,6 +599,16 @@ export class Transport extends Emitter {
   // ── Inbound — subclasses call this when a raw envelope arrives ──────────────
 
   /**
+   * A frame this transport refused at the parse. One that names a prototype key is REPORTED as a `security-error` (the
+   * agent counts those per reason), like an envelope refused after it; JSON that does not parse stays a quiet drop.
+   * @param {Error} err  what the parse threw
+   * @param {unknown} [raw]
+   */
+  _frameRefused(err, raw = null) {
+    if (err?.code === 'UNSAFE_JSON_KEY') this.emit('security-error', err, raw);
+  }
+
+  /**
    * Process an incoming envelope.
    *  1. SecurityLayer.decryptAndVerify (if set)
    *  2. Auto-ACK for AS envelopes

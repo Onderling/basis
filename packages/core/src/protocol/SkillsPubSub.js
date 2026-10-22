@@ -28,6 +28,7 @@
  * through `publish(agent, topic, payload)` unchanged.
  */
 import { subscribe as pubsubSubscribe, publish as pubsubPublish } from './pubSub.js';
+import { parseUntrustedJson } from '../security/untrustedJson.js';
 
 /**
  * Translate D1's `humanInTheLoop` into the on-the-wire audience segment.
@@ -390,7 +391,7 @@ function _extractPayload(parts) {
   if (p == null) return null;
   if (p.type === 'DataPart' && p.data !== undefined) return p.data;
   if (p.type === 'TextPart' && typeof p.text === 'string') {
-    try { return JSON.parse(p.text); } catch { return p.text; }
+    try { return parseUntrustedJson(p.text); } catch { return p.text; }
   }
   return p;
 }

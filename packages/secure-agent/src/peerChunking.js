@@ -24,6 +24,8 @@
  * still fit the transport's envelope limit. A third of the limit keeps the sealed chunk comfortably
  * under it (the same 2×-plus margin the old fileSharing chose with 32 KB under 64 KB).
  */
+import { parseUntrustedJson } from '@onderling/core';
+
 const CHUNK_DIVISOR = 3;
 /** Floor so a tiny declared limit still makes progress instead of degenerating into confetti. */
 const MIN_CHUNK_CHARS = 4 * 1024;
@@ -117,7 +119,7 @@ export function makeChunkReassembler({
       const joined = entry.chunks.join('');
       if (p.meta?.encoding === 'json') {
         let whole = null;
-        try { whole = JSON.parse(joined); } catch { return true; }   // unparseable → refused, not delivered
+        try { whole = parseUntrustedJson(joined); } catch { return true; }   // unparseable → refused, not delivered
         try { onPayload(whole, env); } catch { /* the app's problem, not the wire's */ }
         return true;
       }

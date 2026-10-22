@@ -25,6 +25,7 @@
  */
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { canonicalize }                              from '../Envelope.js';
+import { parseUntrustedJson } from './untrustedJson.js';
 
 /**
  * Version tag (`v`) embedded in the sealed-forward plaintext. `packSealed` writes it;
@@ -126,7 +127,7 @@ export function openSealed({ identity, sealed, nonce, senderPubKey } = {}) {
 
   let body;
   try {
-    body = JSON.parse(new TextDecoder().decode(plaintext));
+    body = parseUntrustedJson(new TextDecoder().decode(plaintext));
   } catch {
     throw new Error('openSealed: sealed plaintext is not valid JSON');
   }

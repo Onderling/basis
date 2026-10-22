@@ -23,6 +23,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { AgentIdentity } from './AgentIdentity.js';
 import { VaultMemory } from '@onderling/vault';
+import { parseUntrustedJson } from '../security/untrustedJson.js';
 
 const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every person key).
@@ -146,7 +147,7 @@ export async function openFromPersonKey(mySeed, senderPubKey, { sealed, nonce })
     const id = await AgentIdentity.fromSeed(mySeed, new VaultMemory());
     const plain = id.unbox(b64decode(sealed), b64decode(nonce), senderPubKey);
     if (!plain) return null;
-    return JSON.parse(new TextDecoder().decode(plain));
+    return parseUntrustedJson(new TextDecoder().decode(plain));
   } catch { return null; }
 }
 
@@ -156,7 +157,7 @@ export async function loadPersonKey(vault) {
   try { raw = await vault?.get?.(PERSON_KEY_VAULT_KEY); } catch { return null; }
   if (!raw) return null;
   try {
-    const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const o = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
     if (!Number.isInteger(o?.version) || o.version < 1 || typeof o?.seed !== 'string') return null;
     const seed = b64decode(o.seed);
     if (!(seed instanceof Uint8Array) || seed.length !== 32) return null;
@@ -184,7 +185,7 @@ export async function storePersonKey(vault, { version, seed, reveals = {}, links
   if (have && have.version >= version) {
     if (have.version === version && !have.linkKeyPub && pub) {
       let raw = await vault.get(PERSON_KEY_VAULT_KEY);
-      raw = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      raw = typeof raw === 'string' ? parseUntrustedJson(raw) : raw;
       await vault.set(PERSON_KEY_VAULT_KEY, JSON.stringify({ ...raw, linkKeyPub: pub }));
       return true;
     }

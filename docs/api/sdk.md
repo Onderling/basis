@@ -189,6 +189,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `P` | constant | [`core.md`](core.md#p) |
 | `packSealed` | function | [`core.md`](core.md#packsealed) |
 | `parentsOf` | function | [`core.md`](core.md#parentsof) |
+| `parseUntrustedJson` | function | [`core.md`](core.md#parseuntrustedjson) |
 | `Parts` | class | [`core.md`](core.md#parts) |
 | `pathScopeCovers` | function | [`core.md`](core.md#pathscopecovers) |
 | `PeerDiscovery` | class | [`core.md`](core.md#peerdiscovery) |
@@ -292,6 +293,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `TunnelSessions` | class | [`core.md`](core.md#tunnelsessions) |
 | `unregisterCustomRole` | function | [`core.md`](core.md#unregistercustomrole) |
 | `unregisterRoleBundle` | function | [`core.md`](core.md#unregisterrolebundle) |
+| `UNSAFE_JSON_KEYS` | constant | [`core.md`](core.md#unsafe_json_keys) |
 | `unsubscribe` | function | [`core.md`](core.md#unsubscribe) |
 | `validateMnemonic` | function | [`core.md`](core.md#validatemnemonic) |
 | `verifyAddressPossession` | function | [`core.md`](core.md#verifyaddresspossession) |

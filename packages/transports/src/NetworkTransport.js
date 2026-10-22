@@ -54,6 +54,7 @@
  */
 import { Transport } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { parseUntrustedJson } from '@onderling/core';
 
 /** Wire-frame version + kind — lets a real multiplexed channel demux. */
 const FRAME_V    = 1;
@@ -82,7 +83,7 @@ export function encodeFrame({ to, from, envelope }) {
  * @returns {{ to: string, from: string, envelope: object }}
  */
 export function decodeFrame(frame) {
-  const obj = typeof frame === 'string' ? JSON.parse(frame) : frame;
+  const obj = typeof frame === 'string' ? parseUntrustedJson(frame) : frame;
   if (!obj || obj.kind !== FRAME_KIND || !obj.envelope) {
     throw Object.assign(new Error('NetworkTransport: malformed frame'), { code: 'BAD_FRAME' });
   }
@@ -145,6 +146,11 @@ export class NetworkTransport extends Transport {
     await this.#send(frame);
   }
 
+  /** Decode, reporting a frame refused for naming a prototype key; the throw still reaches the caller, as before. */
+  #decode(frame) {
+    try { return decodeFrame(frame); } catch (err) { this._frameRefused(err); throw err; }
+  }
+
   /**
    * Inbound: feed a frame pulled off the channel into the transport. Decodes,
    * then hands the envelope to the inherited `_receive()` — which runs
@@ -154,7 +160,7 @@ export class NetworkTransport extends Transport {
    * @param {string|object} frame
    */
   receiveFrame(frame) {
-    const { envelope } = decodeFrame(frame);
+    const { envelope } = this.#decode(frame);
     this._receive(envelope);
   }
 
@@ -170,7 +176,7 @@ export class NetworkTransport extends Transport {
    * @returns {Promise<string>} the response frame (JSON string)
    */
   _serveRequest(frame, { timeout = DEFAULT_SERVE_TIMEOUT } = {}) {
-    const { envelope } = decodeFrame(frame);
+    const { envelope } = this.#decode(frame);
     const id = envelope?._id;
     if (id == null) {
       return Promise.reject(

@@ -47,6 +47,7 @@ import { AgentIdentity }                            from '../identity/AgentIdent
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { genId }                                    from '../Envelope.js';
 import { pathScopeCovers }                          from './pathScope.js';
+import { parseUntrustedJson } from '../security/untrustedJson.js';
 
 const ACTIONS = ['read', 'write', 'delete'];
 
@@ -231,7 +232,7 @@ export class PodCapabilityToken {
   // ── Parse ─────────────────────────────────────────────────────────────────
 
   static fromJSON(obj) {
-    return new PodCapabilityToken(typeof obj === 'string' ? JSON.parse(obj) : obj);
+    return new PodCapabilityToken(typeof obj === 'string' ? parseUntrustedJson(obj) : obj);
   }
 }
 

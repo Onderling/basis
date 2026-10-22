@@ -4552,6 +4552,7 @@ function CircleDetail({
             viewerId={mandateViewer?.viewerWebid ?? null}
             revealPolicy={policy?.revealPolicy ?? 'pairwise'}
             onReplied={({ toPubKey }) => onOpenContact?.({ contactId: toPubKey, peerAddr: toPubKey, name: toPubKey })}
+            onOpenContact={onOpenContact}
             onPeerMuted={() => setMembersReloadTick((n) => n + 1)}
             onReportPost={onReportPost}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />

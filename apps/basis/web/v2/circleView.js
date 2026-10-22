@@ -379,12 +379,7 @@ export function renderCircleView(container, {
     // G16 — the real member roster (trail-derived), one tappable row per member.
     renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture });
   } else if (effectiveTab !== 'conversation') {
-    const placeholder = document.createElement('div');
-    placeholder.className = 'circle-view__placeholder';
-    placeholder.textContent = tr('circle.view.tab_coming', {
-      tab: tr(`circle.tabs.${effectiveTab}`),
-    });
-    body.appendChild(placeholder);
+    // a tab whose surface has not loaded yet paints nothing — never the conversation's bubbles under its name
   } else if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'circle-view__empty';

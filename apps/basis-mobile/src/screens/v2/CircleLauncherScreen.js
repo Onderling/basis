@@ -4699,11 +4699,8 @@ function CircleDetail({
               ))
             )}
           </View>
-        ) : activeTab !== 'conversation' ? (
-          <Text style={styles.placeholder}>
-            {t('circle.view.tab_coming', { tab: t(`circle.tabs.${activeTab}`) })}
-          </Text>
-        ) : rows.length === 0 ? (
+        ) : activeTab !== 'conversation' ? null   /* a tab whose surface has not loaded yet paints nothing (web parity) */
+        : rows.length === 0 ? (
           <Text style={styles.muted}>{t('circle.view.empty')}</Text>
         ) : (
           renderBubblesWithDayDividers(rows, t, {

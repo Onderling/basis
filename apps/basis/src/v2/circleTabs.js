@@ -31,14 +31,18 @@
 
 import { isFeatureEnabled } from './circlePolicy.js';
 
-/** Canonical tab id ↔ feature key ↔ locale-key triples, in render order. */
+/**
+ * Canonical tab id ↔ feature key ↔ locale-key triples, in render order. `built: false` = no shell paints a surface for
+ * it yet, so it is NOT a tab: a feature that is on without a surface is a feature, not a tab (both shells used to show
+ * "… komt in een vervolg-slice" there). Flip it when the surface lands on both shells.
+ */
 const TAB_DEFS = [
   { id: 'conversation', feature: 'chat',            labelKey: 'circle.tabs.conversation' },
   { id: 'noticeboard',  feature: 'noticeboard',     labelKey: 'circle.tabs.noticeboard'  },
   { id: 'tasks',        feature: 'tasks',           labelKey: 'circle.tabs.tasks'        },
-  { id: 'lists',        feature: 'lists',           labelKey: 'circle.tabs.lists'        },
-  { id: 'notes',        feature: 'notes',           labelKey: 'circle.tabs.notes'        },
-  { id: 'calendar',     feature: 'calendar',        labelKey: 'circle.tabs.calendar'     },
+  { id: 'lists',        feature: 'lists',           labelKey: 'circle.tabs.lists',        built: false },
+  { id: 'notes',        feature: 'notes',           labelKey: 'circle.tabs.notes',        built: false },
+  { id: 'calendar',     feature: 'calendar',        labelKey: 'circle.tabs.calendar',     built: false },
   { id: 'members',      feature: 'memberDirectory', labelKey: 'circle.tabs.members'      },
 ];
 
@@ -56,6 +60,7 @@ export function buildCircleTabs(policy, t) {
   for (const def of TAB_DEFS) {
     // CONVERSATION always renders (chat is the circle's core surface even
     // when the chat feature flag was explicitly turned off).
+    if (def.built === false) continue;
     const on = def.id === 'conversation' ? true : isFeatureEnabled(policy, def.feature);
     if (!on) continue;
     out.push({

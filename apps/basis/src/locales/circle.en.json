@@ -950,10 +950,6 @@
       "text": "yesterday",
       "doc": "SP-13.2 — chat-stream day-divider label."
     },
-    "tab_coming": {
-      "text": "{{tab}} content lands in a follow-up slice.",
-      "doc": "SP-13.3 — placeholder body for a tab whose content surface isn't built yet (e.g. NOTICEBOARD / MEMBERS)."
-    },
     "tasks_empty": {
       "text": "No tasks in this circle yet.",
       "doc": "Taken (tasks) tab — empty state (no tasks)."
@@ -985,10 +981,6 @@
     "view_toggle_label": {
       "text": "Switch between chat and screen view",
       "doc": "SP-13.4 — a11y group label on the Chat | Screen pill."
-    },
-    "screen_coming": {
-      "text": "Screen view (admin's recept'd page) lands in a follow-up slice.",
-      "doc": "SP-13.4 — placeholder until the recept renderer is built."
     },
     "attach": {
       "text": "Attach a photo",

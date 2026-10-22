@@ -6880,8 +6880,7 @@ function showCircle(id, circle, policy) {
   // admin's policy.view sets the landing surface until the user overrides.
   let viewMode = readViewMode(id, policy);
   // α.1c — materialized screen blocks (recipe book → blocks).  Null
-  // until the async load below resolves; replaces 's
-  // "screen_coming" placeholder when present.
+  // until the async load below resolves.
   let screenBlocks = null;
   let seq = 0;
 

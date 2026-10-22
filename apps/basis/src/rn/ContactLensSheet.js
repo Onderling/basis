@@ -56,7 +56,7 @@ export function ContactLensSheet({ visible, mode = 'change', model, t, theme, on
             <Actions buttons={[
               { label: t('circle.contacts.lens.cancel'), onPress: onCancel, kind: 'secondary' },
               { label: t(mode === 'add' ? 'circle.contacts.add_sheet.add' : 'circle.contacts.lens.save'),
-                onPress: () => onSubmit({ persona, revealPreset: level }), kind: 'primary' },
+                onPress: () => onSubmit({ persona, revealPreset: level }), kind: 'primary', testID: 'contact-sheet-submit' },
             ]} />
           </Pressable>
         </Pressable>

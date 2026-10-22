@@ -512,7 +512,7 @@ export class RelayTransport extends Transport {
 
     ws.onmessage = (event) => {
       let msg;
-      try { msg = parseUntrustedJson(event.data); } catch { return; }
+      try { msg = parseUntrustedJson(event.data); } catch (err) { this._frameRefused(err); return; }
 
       // The relay demands proof: sign ITS nonce with the key behind the address we are claiming.
       // Note what the relay supplies and what it does not — it hands us a nonce, and we build the

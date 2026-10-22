@@ -126,7 +126,7 @@ export class WsServerTransport extends Transport {
 
     ws.on('message', raw => {
       let msg;
-      try { msg = parseUntrustedJson(raw); } catch { return; }
+      try { msg = parseUntrustedJson(raw); } catch (err) { this._frameRefused(err); return; }
 
       // Register, step 1: ask. Nothing is registered here — `#clients.set` is unreachable from
       // this branch, which is what makes "no unproven address is ever routed to" structural.

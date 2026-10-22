@@ -285,7 +285,9 @@ export class RendezvousTransport extends Transport {
       this.emit('peer-connected', peerAddress);
     };
     dc.onmessage = ({ data }) => {
-      try { this._receive(parseUntrustedJson(data)); } catch { /* drop malformed */ }
+      let env;
+      try { env = parseUntrustedJson(data); } catch (err) { this._frameRefused(err); return; }
+      try { this._receive(env); } catch { /* a receive that throws must not take the channel down */ }
     };
     dc.onclose = () => {
       this.#peers.delete(peerAddress);

@@ -558,6 +558,8 @@ export async function startRelay(opts = {}) {
   };
 
   const logLine = (line) => { if (log) console.log(line); };
+  let refusedFrames = 0;   // frames refused at the parse for naming a prototype key
+  const refusedSaid = new WeakSet();   // the sockets already told about in the log
 
   /**
    * Fire a wake-up push for an offline recipient.  Best-effort and
@@ -747,7 +749,14 @@ export async function startRelay(opts = {}) {
         return;
       }
       let msg;
-      try { msg = parseUntrustedJson(raw); } catch { return; }
+      try { msg = parseUntrustedJson(raw); } catch (err) {
+        // a frame naming a prototype key is counted and said once per socket; JSON that does not parse stays a quiet drop
+        if (err?.code === 'UNSAFE_JSON_KEY') {
+          refusedFrames += 1;
+          if (!refusedSaid.has(socket)) { refusedSaid.add(socket); logLine(`[relay] refused a frame naming a prototype key (${refusedFrames} so far)`); }
+        }
+        return;
+      }
 
       // ── register — step 1 of 2: the relay CHALLENGES, and registers nothing ──
       //
@@ -1172,6 +1181,8 @@ export async function startRelay(opts = {}) {
 
   return {
     httpServer, wss, port: boundPort, tls: hasTls, stop, multiRecipientQueue: mrQueue,
+    /** How many frames were refused at the parse for naming a prototype key. */
+    refusedFrames: () => refusedFrames,
     // Only present when `blobGate` was configured — the no-blobGate return
     // shape stays exactly as before.
     ...(blobGateMount ? { blobGate: blobGateMount } : {}),

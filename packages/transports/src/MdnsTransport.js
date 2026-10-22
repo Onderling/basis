@@ -391,7 +391,7 @@ export class MdnsTransport extends Transport {
         let envelope;
         try {
           envelope = parseUntrustedJson(new TextDecoder().decode(b64Decode(data)));
-        } catch { return; }
+        } catch (err) { this._frameRefused(err); return; }
 
         // The handshake frames are internal: never passed upstream, and the only way a connection gets a key.
         if (envelope && (envelope._mdns_hello || envelope._mdns_challenge || envelope._mdns_proof)) {

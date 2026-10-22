@@ -74,7 +74,7 @@ export class MqttTransport extends Transport {
 
       this.#client.on('message', (_topic, payload) => {
         let envelope;
-        try { envelope = parseUntrustedJson(payload.toString()); } catch { return; }
+        try { envelope = parseUntrustedJson(payload.toString()); } catch (err) { this._frameRefused(err); return; }
         this._receive(envelope);
       });
 

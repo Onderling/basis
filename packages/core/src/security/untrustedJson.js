@@ -5,6 +5,9 @@
  * loop) that merges the result then sets the target's prototype — fields that read as present without being there.
  * Refusing at the parse means no decoder downstream has to remember. Throws an Error (a SyntaxError for malformed
  * JSON, as `JSON.parse` does), so a decoder's existing catch turns either into its refusal.
+ *
+ * The price, accepted: an honest field that happens to be called `constructor` (or `prototype`) refuses its input
+ * too. None of our encoders writes one; a new wire field must not take one of these three names.
  */
 
 /** The keys a parsed input may not carry. */

@@ -75,3 +75,22 @@ describe('the guard itself', () => {
     expect(findHardcoded(['x.js'], read("ToastAndroid.show(t('a.b'), ToastAndroid.SHORT);"))).toHaveLength(0);
   });
 });
+
+describe('the wizard kit positions (a label handed to a helper becomes the screen)', () => {
+  const read = (src) => () => src;
+  const hits = (src) => findHardcoded(['x.js'], read(src)).map((h) => h.text);
+  it('flags English handed to the web kit, and passes it keyed', () => {
+    expect(hits("mkField(body, doc, 'Passphrase', state.p, onIn);")).toEqual(['Passphrase']);
+    expect(hits("mkActions(c, doc, [{ label: 'Cancel', onClick }]);")).toEqual(['Cancel']);
+    expect(hits("mkSteps(c, doc, ['Mnemonic', 'Confirm'], 1);")).toEqual(['Mnemonic', 'Confirm']);
+    expect(hits("mkField(b, doc, t('a.b'), v, f, { placeholder: 'e.g. plumbing', hint: 'Words separated by spaces.' });"))
+      .toEqual(['e.g. plumbing', 'Words separated by spaces.']);
+    expect(hits("mkField(body, doc, t('a.b'), v, f, { placeholder: t('a.c') }); mkActions(c, doc, [{ label: t('common.cancel') }]);")).toEqual([]);
+  });
+  it('flags the phone kit too: Steps labels, one-word JSX props, lowercase placeholders', () => {
+    expect(hits("<Steps labels={['Passphrase', 'Save']} current={1} />")).toEqual(['Passphrase', 'Save']);
+    expect(hits('<Field label="Kind" />')).toEqual(['Kind']);
+    expect(hits('<Field placeholder="e.g. alice" />')).toEqual(['e.g. alice']);
+    expect(hits("<Field label={t('a.b')} placeholder={t('a.c')} />")).toEqual([]);
+  });
+});

@@ -58,19 +58,19 @@ export function renderPostAudienceWizard(opts) {
     mkTextarea(body, doc, t('circle.wizard.audience.what'), state.text, (v) => {
       state.text = v;
       refreshActions(container, { textOk: validText });
-    }, { placeholder: 'What are you asking / offering?', rows: 3 });
+    }, { placeholder: t('circle.wizard.audience.text_placeholder'), rows: 3 });
     // Radio + distance buttons change visible UI; rerender is safe
     // (no text input focus to preserve at those points).
-    mkRadioGroup(body, doc, 'Kind', state.kind, [
-      { id: 'ask', label: 'Ask (request help)' },
-      { id: 'offer', label: 'Offer (share skills/items)' },
-      { id: 'lend',  label: 'Lend (share a physical thing)' },
+    mkRadioGroup(body, doc, t('circle.wizard.audience.kind'), state.kind, [
+      { id: 'ask', label: t('circle.wizard.audience.kind_ask') },
+      { id: 'offer', label: t('circle.wizard.audience.kind_offer') },
+      { id: 'lend',  label: t('circle.wizard.audience.kind_lend') },
     ], (v) => { state.kind = v; });
     mkRadioGroup(body, doc, t('circle.wizard.audience.trust'), state.minTrust, TRUST_OPTS,
       (v) => { state.minTrust = v; });
-    mkField(body, doc, 'Tags (CSV — match contacts with any tag)',
+    mkField(body, doc, t('circle.wizard.audience.tags'),
       state.tags, (v) => { state.tags = v; },
-      { placeholder: 'e.g. tools, gardening, kids' });
+      { placeholder: t('circle.wizard.audience.tags_placeholder') });
 
     // km distance grid
     const distLabel = doc.createElement('div');
@@ -91,15 +91,15 @@ export function renderPostAudienceWizard(opts) {
 
     mkField(body, doc, t('circle.wizard.audience.recipients'),
       state.recipients, (v) => { state.recipients = v; },
-      { placeholder: 'e.g. webid:anne,webid:karl', monospace: true,
-        hint: 'When set, restricts to these recipients regardless of trust/distance.' });
+      { placeholder: t('circle.wizard.audience.recipients_placeholder'), monospace: true,
+        hint: t('circle.wizard.audience.recipients_hint') });
 
     mkError(body, doc, state.submitError);
-    mkSubmitting(body, doc, state.submitting, 'Posting…');
+    mkSubmitting(body, doc, state.submitting, t('circle.wizard.audience.posting'));
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: 'Cancel', onClick: onClose, kind: 'secondary', disabled: state.submitting },
-      { label: 'Post',   onClick: async () => {
+      { label: t('common.cancel'), onClick: onClose, kind: 'secondary', disabled: state.submitting },
+      { label: t('circle.noticeboard.post'),   onClick: async () => {
         rerender(); // show submitting state
         const { result } = await submitPost({ state, callSkill });
         if (result) {

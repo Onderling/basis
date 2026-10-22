@@ -236,15 +236,15 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
 
   appendField(wrap, doc, t('circle.wizard.create.purpose'), 'purpose',
     state.purpose, (v) => { state.purpose = v; },
-    { placeholder: 'One sentence: what is this circle for?' });
+    { placeholder: t('circle.wizard.create.purpose_placeholder') });
   appendField(wrap, doc, t('circle.wizard.create.tags'), 'tags',
     state.tags, (v) => { state.tags = v; },
-    { placeholder: 'e.g. neighbourhood, tools, kids' });
+    { placeholder: t('circle.wizard.create.tags_placeholder') });
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: 'Cancel', onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →', onClick: onNext, kind: 'primary',
+    { label: t('common.cancel'), onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'), onClick: onNext, kind: 'primary',
       disabled: !identityComplete(state),
       validate: 'identityOk' },
   ]);
@@ -306,7 +306,7 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
         ? Math.max(1, Math.min(8760, n)) : 1;
     },
     { type: 'number',
-      hint: 'How long the membership-code stays redeemable. Short = safer for ad-hoc shares (1 h default). Long = good for slower onboarding (e.g. 168 = 1 week). Admin can /rotate-code later to mint a fresh one.' });
+      hint: t('circle.wizard.create.invite_expiry_hint') });
 
   // B5 — the invite CEILING, next to the invite expiry because they answer the same worry from two
   // sides: how long a leaked code lives, and how many people it can let in while it does.
@@ -325,9 +325,9 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext,   kind: 'primary' },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'),  onClick: onNext,   kind: 'primary' },
   ]);
 }
 
@@ -360,9 +360,9 @@ function renderRulesStep(container, doc, state, onNext, onBack, onCancel, rerend
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext,   kind: 'primary' },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'),  onClick: onNext,   kind: 'primary' },
   ]);
 }
 
@@ -378,7 +378,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
     card.style.cssText = 'border:1px solid var(--cc-line,#d8d1bc);border-radius:6px;padding:10px;margin-bottom:10px';
 
     appendField(card, doc, t('circle.wizard.create.offering_name'), `offering-${i}-name`,
-      row.name, (v) => { row.name = v; }, { placeholder: 'e.g. plumbing' });
+      row.name, (v) => { row.name = v; }, { placeholder: t('circle.wizard.create.offering_placeholder') });
 
     for (const axis of Object.keys(OFFERING_AXES)) {
       const opts = OFFERING_AXES[axis].map((id) => ({ id, label: id }));
@@ -410,9 +410,9 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext,   kind: 'primary' },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'),  onClick: onNext,   kind: 'primary' },
   ]);
 }
 
@@ -427,7 +427,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     appendField(wrap, doc, t('circle.wizard.create.pod_uri'), 'groupPodUri',
       state.groupPodUri, (v) => { state.groupPodUri = v; },
       { placeholder: 'https://group-pod.example/onderling/circle/',
-        hint: 'Required for centralised + hybrid storage.', monospace: true });
+        hint: t('circle.wizard.create.pod_uri_hint'), monospace: true });
     // NKN+pod circle (J-NP3) — the CREATE half of the disclosure shown at both ends: choosing a shared
     // pod means its host can see the membership. Said here, next to the choice that causes it, so the
     // creator decides with the fact in view rather than discovering it in a settings screen later.
@@ -451,9 +451,9 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Review →',  onClick: onNext, kind: 'primary', disabled: !uriOk },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('circle.wizard.create.review_button'),  onClick: onNext, kind: 'primary', disabled: !uriOk },
   ]);
 }
 
@@ -506,8 +506,8 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',         onClick: onBack,                       kind: 'secondary', disabled: state.submitting },
-    { label: 'Cancel',         onClick: onCancel,                     kind: 'secondary', disabled: state.submitting },
+    { label: t('common.back'),         onClick: onBack,                       kind: 'secondary', disabled: state.submitting },
+    { label: t('common.cancel'),         onClick: onCancel,                     kind: 'secondary', disabled: state.submitting },
     { label: t('circle.wizard.create.create_button'), onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
   ]);
 }
@@ -623,7 +623,7 @@ function renderSuccessStep(container, doc, state, onClose) {
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: 'Done', onClick: onClose, kind: 'primary' },
+    { label: t('common.done'), onClick: onClose, kind: 'primary' },
   ]);
 }
 

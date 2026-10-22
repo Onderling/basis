@@ -237,13 +237,13 @@ export default function CreateGroupWizardModal({
                   label={t('circle.wizard.create.purpose')}
                   value={state.purpose}
                   onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
-                  placeholder="one-line description"
+                  placeholder={t('circle.wizard.create.purpose_placeholder')}
                 />
                 <Field
                   label={t('circle.wizard.create.tags')}
                   value={state.tags}
                   onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
-                  placeholder="quiet, sustainable, tools"
+                  placeholder={t('circle.wizard.create.tags_placeholder')}
                 />
               </Body>
             )}
@@ -324,7 +324,7 @@ export default function CreateGroupWizardModal({
                         offerings[i] = { ...offerings[i], name: v };
                         return { ...s, offerings };
                       })}
-                      placeholder="e.g. plumbing"
+                      placeholder={t('circle.wizard.create.offering_placeholder')}
                     />
                     {Object.keys(OFFERING_AXES).map((axis) => (
                       <RadioGroup
@@ -371,6 +371,7 @@ export default function CreateGroupWizardModal({
                 />
                 <Field
                   label={t('circle.wizard.create.invite_expiry')}
+                  hint={t('circle.wizard.create.invite_expiry_hint')}
                   value={String(state.inviteExpiresInHours)}
                   onChangeText={(v) => setState((s) => ({ ...s, inviteExpiresInHours: Number(v) || 1 }))}
                   placeholder="1"
@@ -399,6 +400,7 @@ export default function CreateGroupWizardModal({
                   <>
                     <Field
                       label={t('circle.wizard.create.pod_uri')}
+                      hint={t('circle.wizard.create.pod_uri_hint')}
                       value={state.groupPodUri}
                       onChangeText={(v) => setState((s) => ({ ...s, groupPodUri: v }))}
                       placeholder="https://group.example/pod/"
@@ -421,13 +423,13 @@ export default function CreateGroupWizardModal({
               return (
                 <Body title={t('circle.wizard.create.step_review')} intro={t('circle.wizard.create.step_review_intro')}>
                   <ReviewList items={[
-                    { label: 'Name',        value: state.name },
+                    { label: t('circle.wizard.create.review_name'),        value: state.name },
                     { label: t('circle.wizard.create.review_persona'),
                       value: founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal') },
-                    ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
-                    ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
-                    { label: 'Access',      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
-                    { label: 'Leave',       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
+                    ...(rules.purpose      ? [{ label: t('circle.wizard.create.purpose'),    value: rules.purpose }]      : []),
+                    ...(rules.tags         ? [{ label: t('circle.wizard.create.review_tags'),       value: rules.tags.join(', ') }] : []),
+                    { label: t('circle.wizard.create.access'),      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
+                    { label: t('circle.wizard.create.leave'),       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
                     // 5.5a — surface each non-empty rules-doc field.
                     ...RULES_QUESTIONS.filter((q) => q.key !== 'purpose').flatMap((q) => {
                       const v = rules[q.key];
@@ -436,20 +438,20 @@ export default function CreateGroupWizardModal({
                         ? t(`circle.rules.q.${q.key}`) : q.key;
                       return [{ label, value: v, pre: true }];
                     }),
-                    { label: 'Conflict',    value: labelOf(CONFLICT_POLICIES, state.conflictPolicy) },
+                    { label: t('circle.wizard.create.review_conflict'),    value: labelOf(CONFLICT_POLICIES, state.conflictPolicy) },
                     // 5.5c — surface named offerings (axes inline). Read-accept
                     // the legacy `rules.skills` field on an un-migrated rules blob.
                     ...((rules.offerings ?? rules.skills ?? []).length > 0
-                      ? [{ label: 'Offerings',
+                      ? [{ label: t('circle.wizard.create.review_offerings'),
                           value: (rules.offerings ?? rules.skills).map((s) => `${s.name} — ${s.openness}/${s.posture}/${s.status}/${s.radius}`).join('\n'),
                           pre: true }]
                       : []),
-                    { label: 'Key rotation',value: labelOf(KEY_ROTATION_MODES, state.keyRotationMode) },
-                    { label: 'Rotation interval (days)', value: String(state.rotationDays) },
-                    { label: 'Invite expiry (hours)',    value: String(state.inviteExpiresInHours) },
+                    { label: t('circle.wizard.create.review_rotation'),value: labelOf(KEY_ROTATION_MODES, state.keyRotationMode) },
+                    { label: t('circle.wizard.create.review_rotation_days'), value: String(state.rotationDays) },
+                    { label: t('circle.wizard.create.review_expiry'),    value: String(state.inviteExpiresInHours) },
                     { label: t('circle.invite.ceiling_review'), value: String(state.inviteMaxRedemptions) },
-                    { label: 'Storage',     value: labelOf(STORAGE_POLICIES, state.storagePolicy) },
-                    ...(state.groupPodUri  ? [{ label: 'Group pod', value: state.groupPodUri, monospace: true }] : []),
+                    { label: t('circle.wizard.create.review_storage'),     value: labelOf(STORAGE_POLICIES, state.storagePolicy) },
+                    ...(state.groupPodUri  ? [{ label: t('circle.wizard.create.review_pod'), value: state.groupPodUri, monospace: true }] : []),
                   ]} />
                   <ErrorBanner message={state.submitError} />
                   <Submitting visible={state.submitting} label={t('circle.wizard.create.creating')} />
@@ -466,7 +468,7 @@ export default function CreateGroupWizardModal({
             if (state.step < STEP_NAMES.length) return [
               { label: t('common.back'),   onPress: () => setStep(state.step - 1), kind: 'secondary' },
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(state.step + 1), kind: 'primary', testID: 'create-group-next' },
+              { label: t(STEP_NAMES[state.step] === 'Review' ? 'circle.wizard.create.review_button' : 'common.next'), onPress: () => setStep(state.step + 1), kind: 'primary', testID: 'create-group-next' },
             ];
             return [
               { label: t('common.back'),   onPress: () => setStep(STEP_NAMES.length - 1), kind: 'secondary', disabled: state.submitting },

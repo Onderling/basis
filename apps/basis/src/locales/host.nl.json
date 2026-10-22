@@ -665,6 +665,14 @@
     "claim": {
       "text": "Oppakken",
       "doc": "Take on an embed offered to the circle (see circle.settings.verb.claim)."
+    },
+    "next": {
+      "text": "Volgende →",
+      "doc": "Volgende-stap-knop in wizards"
+    },
+    "back": {
+      "text": "← Terug",
+      "doc": "Vorige-stap-knop in wizards"
     }
   },
   "logs": {
@@ -707,6 +715,122 @@
     "open_in_chat": {
       "text": "Openen in gesprek",
       "doc": "Logs row action: jump to the message it came from."
+    }
+  },
+  "wizards": {
+    "dispute": {
+      "step_raise": {
+        "text": "Melden",
+        "doc": "Stap-1 in dispute wizard (#258)"
+      },
+      "step_propose": {
+        "text": "Voorstel",
+        "doc": "Stap-2"
+      },
+      "step_file": {
+        "text": "Indienen",
+        "doc": "Stap-3"
+      },
+      "raise_title": {
+        "text": "Een conflict melden",
+        "doc": "Stap-1 titel"
+      },
+      "raise_intro": {
+        "text": "Beschrijf wat er gebeurde. Dit gaat naar de buurt; admins en (als jouw conflictbeleid bemiddeling is) twee willekeurige leden zien het.",
+        "doc": "Stap-1 intro"
+      },
+      "about_post_label": {
+        "text": "Conflict gaat over:",
+        "doc": "Header van de context-card"
+      },
+      "about_post_loading": {
+        "text": "(post-tekst laden…)",
+        "doc": "Placeholder tot loadAboutPostText resolved"
+      },
+      "about_post_optional": {
+        "text": "Gerelateerd post-id (optioneel)",
+        "doc": "Veldlabel zonder pre-fill"
+      },
+      "about_post_placeholder": {
+        "text": "leeg laten voor algemeen conflict",
+        "doc": "Veld-placeholder"
+      },
+      "summary_label": {
+        "text": "Wat is er gebeurd?",
+        "doc": "Stap-1 textarea-label"
+      },
+      "summary_placeholder": {
+        "text": "Wees specifiek. Noem derden alleen als nodig.",
+        "doc": "Stap-1 textarea-placeholder"
+      },
+      "escalation_label": {
+        "text": "Gewenste escalatie",
+        "doc": "Radio-groep-label"
+      },
+      "propose_title": {
+        "text": "Stel een oplossing voor",
+        "doc": "Stap-2 titel"
+      },
+      "propose_intro": {
+        "text": "Wat zou dit voor jou oplossen? Ook al weet je het niet zeker, schrijf wat \"goed genoeg\" zou voelen zodat de bemiddelaar een startpunt heeft.",
+        "doc": "Stap-2 intro"
+      },
+      "proposal_label": {
+        "text": "Voorgestelde oplossing",
+        "doc": "Stap-2 textarea-label"
+      },
+      "proposal_placeholder": {
+        "text": "bijv. \"een excuus + afspraak dat ze m'n gereedschap niet zonder vragen gebruiken\"",
+        "doc": "Stap-2 placeholder"
+      },
+      "file_title": {
+        "text": "Conflict indienen",
+        "doc": "Stap-3 titel"
+      },
+      "file_intro": {
+        "text": "Controleer + bevestig. Ingediende conflicten zijn zichtbaar voor admins (en bemiddelaars als je bemiddeling koos). Je kunt intrekken via /leave-group → opnieuw lid worden, of via een follow-up post.",
+        "doc": "Stap-3 intro"
+      },
+      "review_summary": {
+        "text": "Samenvatting",
+        "doc": "Review-rij-label"
+      },
+      "review_about_post": {
+        "text": "Over post",
+        "doc": "Review-rij-label"
+      },
+      "review_escalation": {
+        "text": "Escalatie",
+        "doc": "Review-rij-label"
+      },
+      "review_proposal": {
+        "text": "Voorgestelde oplossing",
+        "doc": "Review-rij-label"
+      },
+      "substrate_warn": {
+        "text": "⚠️ V0 substraat-gat: dit wordt ingediend als een prikbord-post met kind:dispute. Volledige bemiddeling (raiseDispute → proposeResolution → acceptResolution) komt wanneer prikbord die skills uitlevert.",
+        "doc": "Waarschuwingsbanner over substraat-gat"
+      },
+      "filing": {
+        "text": "Conflict indienen…",
+        "doc": "Activity indicator-label"
+      },
+      "file_button": {
+        "text": "Indienen",
+        "doc": "Eindknop"
+      },
+      "filed_message": {
+        "text": "✓ Conflict ingediend.",
+        "doc": "Bot-bubble na onDispatched"
+      },
+      "success_title": {
+        "text": "✓ Conflict ingediend",
+        "doc": "Success-stap titel"
+      },
+      "success_intro": {
+        "text": "Admins (en bemiddelaars als je bemiddeling koos) zien het in de buurt-feed.",
+        "doc": "Success-stap intro"
+      }
     }
   }
 }

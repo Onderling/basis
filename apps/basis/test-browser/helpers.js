@@ -13,7 +13,7 @@ import { expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 // The wizard's last button, in every language the app ships — read from the locale files, so a reworded or newly
-// keyed label cannot leave the walks clicking nothing (#789 keyed it as "Kring maken", which a copied regex missed).
+// keyed label cannot leave the walks clicking nothing (keyed in Dutch as "Kring maken", a copied regex missed it).
 const CREATE_LABELS = ['en', 'nl'].map((l) =>
   JSON.parse(readFileSync(new URL(`../src/locales/circle.${l}.json`, import.meta.url), 'utf8')).wizard.create.create_button.text.toLowerCase());
 const isCreateLabel = (s) => CREATE_LABELS.includes(String(s).trim().toLowerCase());

@@ -457,6 +457,11 @@
 .circle-membercard__attr { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
 .circle-membercard__attr-label { color: var(--ink-soft); }
 .circle-membercard__none { color: var(--ink-soft); font-style: italic; padding: 4px 0; }
+/* how much this member shows you: the label and its value side by side, not run together ("ZichtbaarheidAlleen handle") */
+.circle-membercard__preset { display: flex; gap: 8px; align-items: baseline; margin: 0 0 14px; font-size: 14px; }
+.circle-membercard__preset-label { color: var(--ink-soft); }
+/* reporting a member is the last thing on the card, after who they are — and not as wide as the page */
+.circle-membercard__report { display: block; margin-top: 20px; width: auto; align-self: flex-start; }
 
 /* ───────────────────── advisor (board 3D) ───────────────────── */
 .circle-advisor__card { border-left: 3px solid var(--accent); }
@@ -921,7 +926,7 @@
 }
 
 .cc-cthread { display: flex; flex-direction: column; height: 100%; padding-bottom: 12px; }
-.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .cc-cthread__lang { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
 .cc-cthread__lang-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; padding: 3px 9px; background: transparent; border: none; color: var(--ink-soft); }
 .cc-cthread__lang-btn.is-active { background: var(--accent); color: var(--accent-contrast); }
@@ -930,6 +935,9 @@
   background: transparent; border: none; padding: 4px 0; letter-spacing: .02em;
 }
 .cc-cthread__title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 0; }
+/* a long name (or an address nobody named yet) breaks inside the title instead of pushing the sealed mark and Hide
+   off the right edge at laptop width (screen walk, 2026-10-22) */
+.cc-cthread__title { min-width: 0; flex: 1 1 12em; overflow-wrap: anywhere; }
 .cc-cthread__log { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 4px 2px; }
 .cc-cthread__msg { display: flex; flex-direction: column; max-width: 80%; }
 .cc-cthread__msg--user { align-self: flex-end; align-items: flex-end; }
@@ -1131,6 +1139,11 @@
 .cc-mydata__header { display: flex; align-items: baseline; gap: 12px; }
 .cc-mydata__back { cursor: pointer; font: inherit; font-size: 12px; color: var(--ink-soft); background: transparent; border: none; padding: 4px 0; }
 .cc-mydata__title { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0; }
+/* the relay line and its button: side by side with room between, wrapping on a narrow screen ("Relay: ws://…" sat
+   glued against "Relayserver instellen…") */
+.cc-mydata__relay-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cc-mydata__relay-note { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.cc-mydata__relay-hint { font-size: 12px; color: var(--ink-soft); margin: 0; line-height: 1.45; }
 .cc-mydata__section { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--paper); display: flex; flex-direction: column; gap: 8px; }
 .cc-mydata__section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); margin: 0; }
 .cc-mydata__kv { display: flex; gap: 10px; font-size: 13px; }

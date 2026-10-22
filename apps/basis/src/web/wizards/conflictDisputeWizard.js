@@ -51,7 +51,7 @@ export function renderConflictDisputeWizard(opts) {
   }
 
   function renderRaiseStep() {
-    const body = mkBody(doc, t('circle.wizard.dispute.raise_title'), t('circle.wizard.dispute.raise_intro'));
+    const body = mkBody(doc, t('wizards.dispute.raise_title'), t('wizards.dispute.raise_intro'));
     const validSummary = () => isSummaryValid(state.summary);
     // 2026-05-24 — when launched from a row button (postId pre-filled),
     // show the post text as a read-only context card instead of a raw
@@ -61,7 +61,7 @@ export function renderConflictDisputeWizard(opts) {
       card.className = 'cc-wizard-context-card';
       const label = doc.createElement('div');
       label.className = 'cc-wizard-field-label';
-      label.textContent = t('circle.wizard.dispute.about');
+      label.textContent = t('wizards.dispute.about_post_label');
       card.appendChild(label);
       const quote = doc.createElement('blockquote');
       quote.className = 'cc-wizard-context-quote';
@@ -90,9 +90,9 @@ export function renderConflictDisputeWizard(opts) {
   }
 
   function renderProposeStep() {
-    const body = mkBody(doc, t('circle.wizard.dispute.propose_title'), t('circle.wizard.dispute.propose_intro'));
+    const body = mkBody(doc, t('wizards.dispute.propose_title'), t('wizards.dispute.propose_intro'));
     const validProposal = () => isProposalValid(state.proposal);
-    mkTextarea(body, doc, t('circle.wizard.dispute.proposal'), state.proposal, (v) => {
+    mkTextarea(body, doc, t('wizards.dispute.proposal_label'), state.proposal, (v) => {
       state.proposal = v;
       refreshActions(container, { proposalOk: validProposal });
     }, { placeholder: t('wizards.dispute.proposal_placeholder'), rows: 4 });
@@ -106,18 +106,18 @@ export function renderConflictDisputeWizard(opts) {
   }
 
   function renderFileStep() {
-    const body = mkBody(doc, t('circle.wizard.dispute.file_title'), t('circle.wizard.dispute.file_intro'));
+    const body = mkBody(doc, t('wizards.dispute.file_title'), t('wizards.dispute.file_intro'));
     const dl = doc.createElement('dl');
     dl.className = 'cc-wizard-review';
-    appendKV(dl, doc, t('circle.wizard.dispute.summary'),          state.summary, { pre: true });
-    if (state.aboutPostId) appendKV(dl, doc, t('circle.wizard.dispute.about_post'), state.aboutPostId, { mono: true });
-    appendKV(dl, doc, t('circle.wizard.dispute.escalation'),       labelOf(ESCALATION_PATHS, state.escalation));
-    appendKV(dl, doc, t('circle.wizard.dispute.proposal'), state.proposal, { pre: true });
+    appendKV(dl, doc, t('wizards.dispute.review_summary'),          state.summary, { pre: true });
+    if (state.aboutPostId) appendKV(dl, doc, t('wizards.dispute.review_about_post'), state.aboutPostId, { mono: true });
+    appendKV(dl, doc, t('wizards.dispute.review_escalation'),       labelOf(ESCALATION_PATHS, state.escalation));
+    appendKV(dl, doc, t('wizards.dispute.review_proposal'), state.proposal, { pre: true });
     body.appendChild(dl);
 
     const warn = doc.createElement('div');
     warn.className = 'cc-wizard-warn';
-    warn.textContent = t('circle.wizard.dispute.substrate_note');
+    warn.textContent = t('wizards.dispute.substrate_warn');
     body.appendChild(warn);
 
     mkError(body, doc, state.submitError);
@@ -139,7 +139,7 @@ export function renderConflictDisputeWizard(opts) {
 }
 
 function renderSuccessStep(container, doc, state, onClose) {
-  const body = mkBody(doc, t('circle.wizard.dispute.filed_title'), t('circle.wizard.dispute.filed_intro'));
+  const body = mkBody(doc, t('wizards.dispute.success_title'), t('wizards.dispute.success_intro'));
   container.appendChild(body);
   mkActions(container, doc, [{ label: t('common.done'), onClick: onClose, kind: 'primary' }]);
 }

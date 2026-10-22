@@ -8583,64 +8583,6 @@
         "doc": "Post-with-audience wizard (web): while posting."
       }
     },
-    "dispute": {
-      "about": {
-        "text": "Je maakt bezwaar tegen dit bericht:",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "substrate_note": {
-        "text": "Dit legt het bezwaar vast als bericht. De volledige bemiddeling — bezwaar, voorstel, akkoord — komt later.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "summary": {
-        "text": "Samenvatting",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "about_post": {
-        "text": "Over bericht",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "escalation": {
-        "text": "Escalatie",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "proposal": {
-        "text": "Voorgestelde oplossing",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "raise_title": {
-        "text": "Bezwaar maken",
-        "doc": "Dispute wizard step 1 title."
-      },
-      "raise_intro": {
-        "text": "Beschrijf wat er gebeurd is. Dit gaat naar de kring; beheerders zien het, en twee willekeurige leden ook als de kring conflicten met bemiddeling oplost.",
-        "doc": "Dispute wizard step 1 body."
-      },
-      "propose_title": {
-        "text": "Stel een oplossing voor",
-        "doc": "Dispute wizard step 2 title."
-      },
-      "propose_intro": {
-        "text": "Wat zou dit voor jou oplossen? Ook als je het niet zeker weet: schrijf op wat goed genoeg zou voelen, dan heeft een bemiddelaar een begin.",
-        "doc": "Dispute wizard step 2 body."
-      },
-      "file_title": {
-        "text": "Bezwaar indienen",
-        "doc": "Dispute wizard step 3 title."
-      },
-      "file_intro": {
-        "text": "Kijk het na. Een ingediend bezwaar is zichtbaar voor beheerders, en voor bemiddelaars als de kring bemiddeling gebruikt. Je kunt er later een bericht over plaatsen.",
-        "doc": "Dispute wizard step 3 body."
-      },
-      "filed_title": {
-        "text": "✓ Bezwaar ingediend",
-        "doc": "Dispute wizard, the final screen."
-      },
-      "filed_intro": {
-        "text": "Beheerders zien het in de kring, en bemiddelaars ook als de kring bemiddeling gebruikt.",
-        "doc": "Dispute wizard, the final screen."
-      }
-    },
     "embed_time": {
       "title": {
         "text": "Een tijd toevoegen",

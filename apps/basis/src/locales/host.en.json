@@ -736,11 +736,11 @@
         "doc": "Step-1 title"
       },
       "raise_intro": {
-        "text": "Describe what happened. This goes to the circle; admins and (if your conflict policy is mediation) two random members see it.",
+        "text": "Describe what happened. This goes to the circle; admins see it, and two random members do too if the circle resolves conflicts by mediation.",
         "doc": "Step-1 intro"
       },
       "about_post_label": {
-        "text": "Disputing this post:",
+        "text": "You are disputing this post:",
         "doc": "Header for the context card showing the disputed post"
       },
       "about_post_loading": {
@@ -772,7 +772,7 @@
         "doc": "Step-2 title"
       },
       "propose_intro": {
-        "text": "What would resolve this for you? Even if you're not sure, write what would feel \"good enough\" so the mediator has a starting point.",
+        "text": "What would settle this for you? Even if you are not sure, write what would feel good enough, so a mediator has somewhere to start.",
         "doc": "Step-2 intro"
       },
       "proposal_label": {
@@ -788,7 +788,7 @@
         "doc": "Step-3 title"
       },
       "file_intro": {
-        "text": "Review + confirm. Filed disputes are visible to admins (and mediators if you picked mediation). You can withdraw via /leave-group → re-join, or via a follow-up post.",
+        "text": "Check it over. A filed dispute is visible to admins, and to mediators if the circle uses mediation. You can follow it up with another post.",
         "doc": "Step-3 intro"
       },
       "review_summary": {
@@ -808,7 +808,7 @@
         "doc": "Review row label"
       },
       "substrate_warn": {
-        "text": "⚠️ V0 substrate gap: this files as a pinboard post with kind:dispute. Full mediation flow (raiseDispute → proposeResolution → acceptResolution) lands when pinboard ships those skills.",
+        "text": "This records the dispute as a post. The full mediation — raise, propose, accept — comes later.",
         "doc": "Warning banner about the substrate gap"
       },
       "filing": {
@@ -828,7 +828,7 @@
         "doc": "Success step title"
       },
       "success_intro": {
-        "text": "Admins (and mediators if you picked mediation) will see it in the circle feed.",
+        "text": "Admins will see it in the circle, and mediators too if the circle uses mediation.",
         "doc": "Success step intro"
       }
     }

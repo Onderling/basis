@@ -318,6 +318,13 @@ jobs:
         run: node scripts/relink-workspace.mjs
       - name: Rebuild native bindings (better-sqlite3, for the relay fixture)
         run: npm rebuild better-sqlite3 --prefix packages/relay
+      # the browser itself (~430 MB) kept between runs, keyed on the lockfile that pins @playwright/test; the install
+      # below then skips the download and only fetches the system packages (the part the retry is for)
+      - name: Browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Browsers
         # its own ceiling: the install fetches the runner's package lists from Ubuntu's mirrors, and a stalled mirror
         # once held a shard (and the release queued behind it) for the whole job's 60 minutes (2026-10-07). A stall

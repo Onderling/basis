@@ -502,7 +502,7 @@
     "doc": "Shown when the launcher has no circles."
   },
   "loading": {
-    "text": "Kringen laden…",
+    "text": "Laden…",
     "doc": "Shown while circles are being fetched."
   },
   "back_me": {
@@ -7991,6 +7991,14 @@
       }
     },
     "create": {
+      "create_button": {
+        "text": "Kring maken",
+        "doc": "Create wizard, both shells: the last step's button that makes the circle."
+      },
+      "name_placeholder": {
+        "text": "bv. Kring Westend",
+        "doc": "Create wizard, both shells: the placeholder in the circle-name field."
+      },
       "name": {
         "text": "Naam *",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."

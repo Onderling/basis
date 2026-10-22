@@ -1938,7 +1938,7 @@ export default function CircleLauncherScreen({
               {inviteFor?.uri ? (
                 <>
                   <QrCodeView value={inviteFor.uri} size={200} />
-                  <Text style={styles.inviteHint}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
+                  <Text style={styles.inviteHint} testID={inviteFor.forFunction ? 'invite-bot-hint' : 'invite-hint'}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
                   {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
                   {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
                     <Text style={styles.inviteHint}>
@@ -4962,7 +4962,8 @@ function CircleDetail({
               }}
               style={[styles.circleTab, tab.id === activeTab && styles.circleTabActive]}
             >
-              <Text style={[styles.circleTabText, tab.id === activeTab && styles.circleTabTextActive]}>
+              {/* one line, shrunk to fit: "CONVERSATION" letter-spaced broke onto two lines at phone width */}
+              <Text style={[styles.circleTabText, tab.id === activeTab && styles.circleTabTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {tab.label}
               </Text>
             </Pressable>
@@ -6291,7 +6292,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   circleTabs:        { flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.color.line, marginTop: 4 },
   circleTab:         { flex: 1, paddingVertical: 12, alignItems: 'center', borderTopWidth: 2, borderTopColor: 'transparent', marginTop: -1 },
   circleTabActive:   { borderTopColor: theme.color.accent },
-  circleTabText:     { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 1.4 },
+  circleTabText:     { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.8 },
   circleTabTextActive:{ color: theme.color.accentInk, fontWeight: '600' },
   // Chat ↔ Screen header pill.
   viewToggle:          { flexDirection: 'row', borderWidth: 1, borderColor: theme.color.line, borderRadius: 999, overflow: 'hidden', backgroundColor: theme.color.paper, marginLeft: 'auto', marginRight: 8 },

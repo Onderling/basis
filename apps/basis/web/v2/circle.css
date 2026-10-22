@@ -1513,6 +1513,20 @@
 /* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
 .circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
 .circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }
+/* each section is a wrapping row of pills with room between them (they sat flush against each other and against the
+   line above at laptop width); a section's title, the free line and an act's form take a whole row */
+.circle-vandaag-plus__section { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.circle-vandaag-plus__section:empty, .circle-vandaag-plus__section[hidden] { display: none; }   /* flex would override [hidden] */
+/* an act's form stacks: each field's words over its box, the box full width, the buttons below */
+.circle-vandaag-plus__form { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.circle-vandaag-plus__form input, .circle-vandaag-plus__form textarea, .circle-vandaag-plus__form select { width: 100%; box-sizing: border-box; }
+.circle-vandaag-plus__form .cc-btn { align-self: flex-start; }
+.circle-vandaag-plus__form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
+.circle-vandaag-plus__section > h4, .circle-vandaag-plus__lineform, .circle-vandaag-plus__form,
+.circle-vandaag-plus__share, .circle-vandaag-plus__referral, .circle-vandaag-plus__error { flex-basis: 100%; }
+/* the ☆ that pins an act sits against its pill, not as a pill of its own */
+.circle-vandaag-plus__pin, .circle-vandaag-plus__unpin { margin-left: -6px; padding-left: 4px; padding-right: 4px; }
+.circle-vandaag-plus__close { margin-top: 14px; }
 
 /* THE "+": one floating button on every tab, bottom-right above the tab bar — the page's one accent (terracotta) */
 .cc-fab { position: fixed; right: 20px; bottom: 76px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
@@ -1520,4 +1534,4 @@
 /* the floating "+" shows exactly where the main tab bar shows: inside a circle (bar hidden) the circle's composer
    and its attach "+" are the acts — and the floating one covered the composer's send button there */
 .circle-tabbar--hidden ~ .cc-fab { display: none; }
-.circle-vandaag-plus__section h4 { margin: 12px 0 6px; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+.circle-vandaag-plus__section h4 { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }

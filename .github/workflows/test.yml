@@ -318,26 +318,32 @@ jobs:
         run: node scripts/relink-workspace.mjs
       - name: Rebuild native bindings (better-sqlite3, for the relay fixture)
         run: npm rebuild better-sqlite3 --prefix packages/relay
-      # the browser itself (~430 MB) kept between runs, keyed on the lockfile that pins @playwright/test; the install
-      # below then skips the download and only fetches the system packages (the part the retry is for)
+      # the browser itself (~430 MB) kept between runs, keyed on the lockfile that pins @playwright/test
       - name: Browser cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Browsers
-        # its own ceiling: the install fetches the runner's package lists from Ubuntu's mirrors, and a stalled mirror
-        # once held a shard (and the release queued behind it) for the whole job's 60 minutes (2026-10-07). A stall
-        # fails in minutes — and is tried ONCE more inside the step: a rerun of the failed job was meant to take over,
-        # but on the trunk a newer merge cancels it, so three stalls on 2026-10-22 left the tail red with no test run.
+        # The browser ALONE, then a launch: the runner image already carries chromium's libraries, and the system
+        # packages `--with-deps` fetched were extra fonts from Ubuntu's mirror — whose stalls failed five shards on
+        # 2026-10-22 after the lock was fixed. The packages are fetched only when chromium does not launch without them.
         timeout-minutes: 16
         run: |
+          for try in 1 2; do
+            timeout --kill-after=15 300 npx playwright install chromium && break
+            [ "$try" = 2 ] && { echo "browser download failed twice"; exit 1; }
+            echo "browser download stalled or failed (try $try) — once more"
+          done
+          launches() { timeout 60 node -e "import('@playwright/test').then(({ chromium }) => chromium.launch()).then((b) => b.close()).then(() => process.exit(0), (e) => { console.error(e.message.split('\n')[0]); process.exit(1); })"; }
+          launches && { echo "chromium launches with the image's libraries"; exit 0; }
+          echo "chromium does not launch with the image's libraries — fetching its system packages"
           # apt WAITS for the dpkg lock instead of failing on it: a try that times out leaves its apt-get running (the
           # timeout ends npx, not its child), and the next try then hit the lock at once (2026-10-22, three shards)
           echo 'DPkg::Lock::Timeout "240";' | sudo tee /etc/apt/apt.conf.d/99-lock-timeout >/dev/null
           for try in 1 2; do
-            timeout --kill-after=15 300 npx playwright install --with-deps chromium && exit 0
-            echo "browser install stalled or failed (try $try) — ending what it left running, then once more"
+            timeout --kill-after=15 300 npx playwright install-deps chromium && launches && exit 0
+            echo "system packages stalled or failed (try $try) — ending what it left running, then once more"
             # the timeout reaches npx, not the apt-get it started under sudo: end that try's apt-get/dpkg ourselves, and
             # let dpkg finish any half-done configuration, so the next try starts clean
             sudo pkill -x apt-get || true; sudo pkill -x dpkg || true; sleep 3

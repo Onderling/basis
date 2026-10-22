@@ -29,7 +29,7 @@
  * core right in v2 §1, not an opt-in feature).
  */
 
-import { isFeatureEnabled } from './circlePolicy.js';
+import { isFeatureEnabled, CIRCLE_FEATURES } from './circlePolicy.js';
 
 /**
  * Canonical tab id ↔ feature key ↔ locale-key triples, in render order. `built: false` = no shell paints a surface for
@@ -45,6 +45,16 @@ const TAB_DEFS = [
   { id: 'calendar',     feature: 'calendar',        labelKey: 'circle.tabs.calendar',     built: false },
   { id: 'members',      feature: 'memberDirectory', labelKey: 'circle.tabs.members'      },
 ];
+
+/** Features whose surface is not built on either shell (their tab definition says `built: false`). */
+const SURFACELESS = new Set(TAB_DEFS.filter((d) => d.built === false).map((d) => d.feature));
+
+/** Does this feature have somewhere to show what it holds? A feature that does not is not offered — not as a tab, not
+ *  as a settings toggle, not as an entry in the composer's "+". */
+export function featureHasSurface(feature) { return !SURFACELESS.has(feature); }
+
+/** The features a circle's settings offer as toggles: every circle feature that has a surface. */
+export function offeredFeatures() { return CIRCLE_FEATURES.filter(featureHasSurface); }
 
 /**
  * Build the ordered tab list for a circle.

@@ -16,7 +16,7 @@ import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
 import {
-  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, policyPatch, DEFAULT_CIRCLE_ORIGINS,
+  CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, policyPatch, DEFAULT_CIRCLE_ORIGINS,
 } from '@onderling-app/basis';
 // the shared manifest-driven settings form + per-skill freedom matrix (web≡mobile).
 import { buildSettingsForm, buildCapabilityMatrix, FREEDOM_LEVELS, OPT_OUT_CONSEQUENCES } from '@onderling/app-manifest';
@@ -32,6 +32,7 @@ import { loadRecipeForReview, applyReviewedRecipe } from '../../core/recipeConse
 // §4 storage-policy bridge — the circle `pod` axis drives pinboard's authoritative
 // four-tier circle storage policy (shared with web; pure mapping + call).
 import { pushCircleStoragePolicy } from '../../../../basis/src/v2/circleStoragePolicy.js';
+import { offeredFeatures } from '../../../../basis/src/v2/circleTabs.js';
 import { multiControlRows } from '../../../../basis/src/v2/settingsMultiRows.js';
 // D / consumer-switch (MOBILE parity) — the screen header is sourced from
 // the manifest PAGE projection: the `settings` op declares `surfaces.page` with
@@ -313,7 +314,7 @@ export default function CircleSettingsScreen({
             card (what it enables + opt-out switches) → Agree applies, Decline nothing. Same shared model as web. */}
 
         <Text style={styles.section}>{t('circle.settings.features')}</Text>
-        {CIRCLE_FEATURES.map((f) => (
+        {offeredFeatures().map((f) => (   /* only features that have a surface (web parity) */
           <View key={f} style={styles.row}>
             <Text style={styles.rowLabel}>{t(`circle.settings.feat.${f}`)}</Text>
             <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}

@@ -670,6 +670,11 @@
 .circle-view__bubble-delivery--failed  { color: var(--danger); cursor: pointer; }
 .circle-view__bubble-delivery--failed:hover { text-decoration: underline; }
 .circle-view__composer { position: relative; display: flex; gap: 8px; align-items: center; padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+/* the composer's "+" opens as a SHEET above the composer — a card of its own that wraps its acts — never inline in the
+   row, where it squeezed the input to a sliver (screen walk, 2026-10-22) */
+.circle-view__attach-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); }
+.circle-view__attach-menu[hidden] { display: none; }   /* flex would override [hidden] */
+.circle-view__attach-pin { margin-left: -6px; padding-left: 4px; padding-right: 4px; }
 /* Bulletin sketch composer: flat paper input + ink send block (mirror of the site's .chatbox form). */
 .circle-view__composer-input { flex: 1; padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
 .circle-view__composer-input::placeholder { color: var(--ink-soft); }

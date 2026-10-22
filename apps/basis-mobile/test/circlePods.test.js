@@ -40,6 +40,17 @@ describe('mobile circlePods', () => {
     expect(strat).toBeNull();
   });
 
+  it('concurrent ensures build ONE producer — one group key for the circle, not one per caller', async () => {
+    // A circle opening asks for its producer from several places at once (the board's seal strategy, the media
+    // composition, the roster seed). Each used to build its own producer, and each minted its own "version 1" key.
+    initCirclePods(mockAsyncStorage());
+    const prods = await Promise.all([1, 2, 3, 4].map(() => ensureCirclePod('mob-race', { storagePosture: 'p2' })));
+    expect(prods[0]).toBeTruthy();
+    expect(new Set(prods).size).toBe(1);
+    const strats = await Promise.all([1, 2, 3, 4].map(() => getCircleSealStrategy('mob-race-s', { storagePosture: 'p2' })));
+    expect(new Set(strats).size).toBe(1);
+  });
+
   it('caches the strategy per circle (stable across calls)', async () => {
     initCirclePods(mockAsyncStorage());
     const a = await getCircleSealStrategy('mob-cache', { storagePosture: 'p2' });

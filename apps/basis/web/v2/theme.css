@@ -31,6 +31,7 @@
   --danger-bg: #f5e7e2;
   --track-off: #c9c8c0;
   --white: #ffffff;
+  --on-tint: #17181a;
 
   --radius-sm: 4px;
   --radius:    8px;
@@ -68,6 +69,7 @@
     --danger-bg: #332420;
     --track-off: #3a3c34;
     --white: #1e1f1a;
+    --on-tint: #17181a;
   }
 }
 :root[data-theme="dark"] {
@@ -95,6 +97,7 @@
   --danger-bg: #332420;
   --track-off: #3a3c34;
   --white: #1e1f1a;
+  --on-tint: #17181a;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -121,6 +124,7 @@
   --danger-bg: #f5e7e2;
   --track-off: #c9c8c0;
   --white: #ffffff;
+  --on-tint: #17181a;
 }
 
 * { box-sizing: border-box; }

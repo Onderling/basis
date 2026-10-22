@@ -471,6 +471,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
     signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     circleSelfFor: (gid) => agent.circleSelf?.(gid) ?? null,   // as the three shells: a persona's redeem leaves as it
+    profileKind:   () => agent.profileKind?.() ?? 'person',     // as the three shells: a bot's node says so
     // The redeem is a full round-trip (request → admin → response). Over a mesh
     // transport (real NKN) each leg pays a several-second cold-start, so the
     // in-process default (8s) is too tight; the NKN gate boots with a larger
@@ -704,12 +705,12 @@ export async function createCircle(admin, { groupId = 'peer-circle', name = 'Pee
  * in-process transport (the real join wizard op path → group-redeem peer bridge → membership trail). Callable
  * repeatedly against one circle to admit several members.
  */
-export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle', handle = 'peerbee' } = {}) {
+export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle', handle = 'peerbee', forFunction = false } = {}) {
   const adminCallSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
   const joinerCallSkill = (app, op, args) => joiner.agent.callSkill(app, op, args);
 
   // the circle's own self as the admin to redeem with, as the shells name it
-  const invite = await buildCircleInviteUri({ callSkill: adminCallSkill, circleId: groupId, adminPeerAddr: admin.agent.circleSelf?.(groupId)?.webid ?? admin.pubKey });
+  const invite = await buildCircleInviteUri({ callSkill: adminCallSkill, circleId: groupId, adminPeerAddr: admin.agent.circleSelf?.(groupId)?.webid ?? admin.pubKey, ...(forFunction ? { forFunction: true } : {}) });
   if (invite?.error) throw new Error(`buildCircleInviteUri failed: ${invite.error}`);
 
   const joined = await joinCircleFromInvite({

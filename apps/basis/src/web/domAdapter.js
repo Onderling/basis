@@ -275,7 +275,7 @@ function renderTextBubble(rendered, state, ctx) {
     for (const qr of rendered.quickReplies) {
       const btn = doc.createElement('button');
       btn.type = 'button';
-      btn.className = 'cc-quick-reply-btn';
+      btn.className = 'cc-btn cc-btn--quiet cc-quick-reply-btn';
       btn.textContent = qr.label;
       btn.dataset.slash = qr.slash;
       btn.addEventListener('click', () => onQuickReply(qr.slash));
@@ -293,7 +293,7 @@ function renderTextBubble(rendered, state, ctx) {
     for (const fu of rendered.followUps) {
       const btn = doc.createElement('button');
       btn.type = 'button';
-      btn.className = 'cc-followup-btn';
+      btn.className = 'cc-btn cc-btn--quiet cc-followup-btn';
       btn.textContent = fu.label ?? `${fu.appOrigin}.${fu.opId}`;
       btn.addEventListener('click', () => onFollowUp(fu));
       kb.appendChild(btn);
@@ -374,7 +374,7 @@ function renderListMessage(rendered, state, ctx) {
       for (const btn of item.buttons) {
         const button = doc.createElement('button');
         button.type = 'button';
-        button.className = 'cc-keyboard-btn';
+        button.className = 'cc-btn cc-btn--quiet cc-keyboard-btn';
         button.textContent = btn.label;
         button.dataset.callback = btn.callbackData;
         if (state === 'disabled') {
@@ -419,7 +419,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
     if (typeof onExpandPanel !== 'function') return null;
     const btn = doc.createElement('button');
     btn.type = 'button';
-    btn.className = 'cc-panel-expand';
+    btn.className = 'cc-btn cc-btn--quiet cc-panel-expand';
     btn.textContent = '⤢';
     btn.title = ctx.t ? ctx.t('chat.nav.openInFull') : 'Open in full';
     btn.setAttribute('aria-label', btn.title);
@@ -468,7 +468,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
     if (typeof onCloseMessage === 'function') {
       const closeBtn = doc.createElement('button');
       closeBtn.type = 'button';
-      closeBtn.className = 'cc-panel-close';
+      closeBtn.className = 'cc-btn cc-btn--quiet cc-panel-close';
       closeBtn.textContent = '×';
       closeBtn.title = tt('common.close', 'Close');
       closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
@@ -485,7 +485,7 @@ function renderRecordPanel(rendered, state, ctx, variant) {
     if (typeof onCloseMessage === 'function') {
       const closeBtn = doc.createElement('button');
       closeBtn.type = 'button';
-      closeBtn.className = 'cc-panel-close cc-panel-close-bare';
+      closeBtn.className = 'cc-btn cc-btn--quiet cc-panel-close cc-panel-close-bare';
       closeBtn.textContent = '×';
       closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
       wrap.appendChild(closeBtn);
@@ -566,7 +566,7 @@ function renderQrField(container, doc, text, tt) {
 
   const copyBtn = doc.createElement('button');
   copyBtn.type = 'button';
-  copyBtn.className = 'cc-field-qr-copy';
+  copyBtn.className = 'cc-btn cc-btn--quiet cc-field-qr-copy';
   copyBtn.textContent = tt('common.copy', 'Copy');
   copyBtn.addEventListener('click', () => {
     try {
@@ -662,7 +662,7 @@ function renderGridField(container, doc, grid, rendered, onButtonTap) {
       const td = doc.createElement('td');
       const btn = doc.createElement('button');
       btn.type = 'button';
-      btn.className = `cc-grid-cell cc-grid-cell-${cellState}`;
+      btn.className = `cc-btn cc-btn--quiet cc-grid-cell cc-grid-cell-${cellState}`;
       btn.textContent = STATE_GLYPH[cellState] ?? '⚪';
       btn.title = `${DAYS[d]} ${half}: ${cellState} (click to cycle)`;
       if (typeof onButtonTap === 'function') {
@@ -739,7 +739,7 @@ function renderEmbedCard(rendered, state, ctx) {
   if (typeof onCloseMessage === 'function') {
     const closeBtn = doc.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'cc-panel-close';
+    closeBtn.className = 'cc-btn cc-btn--quiet cc-panel-close';
     closeBtn.textContent = '×';
     closeBtn.title = tt('common.close', 'Close');
     closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
@@ -802,7 +802,7 @@ function renderEmbedCard(rendered, state, ctx) {
       && (!embed.issuedBy || embed.issuedBy !== localActor)) {
     const claimBtn = doc.createElement('button');
     claimBtn.type = 'button';
-    claimBtn.className = 'cc-embed-claim-btn';
+    claimBtn.className = 'cc-btn cc-btn--quiet cc-embed-claim-btn';
     claimBtn.textContent = tt('common.claim', 'Claim');
     claimBtn.addEventListener('click', () => onClaimEmbed(rendered.messageId));
     wrap.appendChild(claimBtn);
@@ -837,7 +837,7 @@ function renderEmbedCard(rendered, state, ctx) {
       for (const btn of buttons) {
         const b = doc.createElement('button');
         b.type = 'button';
-        b.className = 'cc-keyboard-btn';
+        b.className = 'cc-btn cc-btn--quiet cc-keyboard-btn';
         b.textContent = btn.label;
         b.dataset.callback = btn.callbackData;
         b.addEventListener('click', () => {
@@ -1009,7 +1009,7 @@ function renderMediaCard(rendered, state, ctx) {
     const tt = (k, fb) => (ctx.t ? ctx.t(k) : fb);
     const viewBtn = doc.createElement('button');
     viewBtn.type = 'button';
-    viewBtn.className = 'cc-media-view';
+    viewBtn.className = 'cc-btn cc-btn--quiet cc-media-view';
     viewBtn.textContent = tt('circle.media.view.label', 'View');
     const alt = (typeof snap.caption === 'string' && snap.caption) || mime || 'media';
     viewBtn.addEventListener('click', () => {
@@ -1082,7 +1082,7 @@ function openMediaLightbox(doc, { openFull, line, mime, alt, t } = {}) {
 
   const closeBtn = doc.createElement('button');
   closeBtn.type = 'button';
-  closeBtn.className = 'cc-media-lightbox__close';
+  closeBtn.className = 'cc-btn cc-btn--quiet cc-media-lightbox__close';
   closeBtn.textContent = '×';
   closeBtn.setAttribute('aria-label', tt('common.close', 'Close'));
   closeBtn.addEventListener('click', () => close());
@@ -1252,7 +1252,7 @@ function appendManifestActions(wrap, embed, state, ctx, doc) {
   for (const btn of buttons) {
     const b = doc.createElement('button');
     b.type = 'button';
-    b.className = 'cc-keyboard-btn';
+    b.className = 'cc-btn cc-btn--quiet cc-keyboard-btn';
     b.textContent = btn.label;
     b.dataset.callback = btn.callbackData;
     b.addEventListener('click', () => {
@@ -1292,7 +1292,7 @@ function appendDemoActions(wrap, embed, state, ctx, doc, actions) {
   for (const a of actions) {
     const btn = doc.createElement('button');
     btn.type = 'button';
-    btn.className = 'cc-keyboard-btn cc-demo-action';
+    btn.className = 'cc-btn cc-btn--quiet cc-keyboard-btn cc-demo-action';
     btn.textContent = a.label;
     btn.dataset.demo = '1';
     btn.addEventListener('click', () => ctx.onButtonTap(a.op, embed?.snapshot?.id ?? '', { embed }));
@@ -1313,7 +1313,7 @@ function appendEmbedHeader(wrap, embed, ctx, doc) {
   if (typeof onCloseMessage === 'function') {
     const closeBtn = doc.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'cc-panel-close';
+    closeBtn.className = 'cc-btn cc-btn--quiet cc-panel-close';
     closeBtn.textContent = '×';
     closeBtn.title = tt('common.close', 'Close');
     closeBtn.addEventListener('click', () => onCloseMessage(wrap.dataset.messageId));
@@ -1350,7 +1350,7 @@ function appendClaimButton(wrap, embed, state, ctx, doc) {
       && (!embed.issuedBy || embed.issuedBy !== localActor)) {
     const claimBtn = doc.createElement('button');
     claimBtn.type = 'button';
-    claimBtn.className = 'cc-embed-claim-btn';
+    claimBtn.className = 'cc-btn cc-btn--quiet cc-embed-claim-btn';
     claimBtn.textContent = tt('common.claim', 'Claim');
     claimBtn.addEventListener('click', () => onClaimEmbed(wrap.dataset.messageId));
     wrap.appendChild(claimBtn);
@@ -1407,7 +1407,7 @@ function renderBrief(rendered, state, ctx) {
   if (typeof onBriefRefresh === 'function' && state !== 'disabled') {
     const refresh = doc.createElement('button');
     refresh.type = 'button';
-    refresh.className = 'cc-brief-refresh';
+    refresh.className = 'cc-btn cc-btn--quiet cc-brief-refresh';
     refresh.textContent = tt('brief.refresh', '↻ Refresh');
     refresh.title = tt('brief.refresh_hint', 'Re-run /brief and bypass the cache');
     refresh.addEventListener('click', () => onBriefRefresh());
@@ -1416,7 +1416,7 @@ function renderBrief(rendered, state, ctx) {
   if (typeof onCloseMessage === 'function') {
     const closeBtn = doc.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'cc-panel-close';
+    closeBtn.className = 'cc-btn cc-btn--quiet cc-panel-close';
     closeBtn.textContent = '×';
     closeBtn.title = tt('common.close', 'Close');
     closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
@@ -1566,7 +1566,7 @@ function renderFind(rendered, state, ctx) {
   if (typeof onCloseMessage === 'function') {
     const closeBtn = doc.createElement('button');
     closeBtn.type = 'button';
-    closeBtn.className = 'cc-panel-close';
+    closeBtn.className = 'cc-btn cc-btn--quiet cc-panel-close';
     closeBtn.textContent = '×';
     closeBtn.addEventListener('click', () => onCloseMessage(rendered.messageId));
     header.appendChild(closeBtn);
@@ -1615,7 +1615,7 @@ function renderFind(rendered, state, ctx) {
     footer.className = 'cc-find-footer';
     const btn = doc.createElement('button');
     btn.type = 'button';
-    btn.className = 'cc-keyboard-btn cc-find-extensive';
+    btn.className = 'cc-btn cc-btn--quiet cc-keyboard-btn cc-find-extensive';
     btn.textContent = tt('find.extensive', 'Extensive search (pod + network)');
     btn.title = tt('find.extensive_hint', 'Not wired yet — the backing skills land per app');
     btn.addEventListener('click', () => onButtonTap('demo-extensive-search', rendered.query));

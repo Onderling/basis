@@ -34,7 +34,6 @@ describe('Bundle F P2 — createGroup state machine', () => {
     s.groupId           = 'onze-circle';
     s.purpose           = 'Sharing tools';
     s.tags              = 'tools, quiet';
-    s.additionalAdmins  = 'https://alice.example/#me';
     s.accessPolicy      = 'request';
     s.conflictPolicy    = 'mediation';
     s.storagePolicy     = 'none';

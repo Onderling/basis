@@ -444,7 +444,8 @@ async function _findLatestActiveCode(store, groupId) {
   const all = await store.listOpen({ type: 'membership-code' });
   const now = Date.now();
   const forGroup = all
-    .filter(i => i?.source?.groupId === groupId && !i.source?.boundTo)   // a bound code is one person's, never passed on
+    // a bound code is one person's, a bot code one bot's: neither is ever passed on as the circle's code
+    .filter(i => i?.source?.groupId === groupId && !i.source?.boundTo && !i.source?.forFunction)
     .filter(i => (i.source.expiresAt ?? 0) > now);
   if (forGroup.length === 0) return null;
   // Latest issuedAt wins; tie-break on the item's ulid (monotonic
@@ -897,6 +898,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   // is the local recorder rather than the author, so every device read itself as the circle's
   // founder — and a member's own rules write promoted them to admin two steps later.
   const founderWebids = new Set();
+  const founderKinds = {};   // founder → 'function', from its own verified creation statement
   {
     const admitters = new Set();
     const redeemers = new Set();
@@ -955,7 +957,12 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     for (const b of bodies ?? []) {
       if (b?.kind !== 'create' || typeof b.author !== 'string' || !b.author) continue;
       if (b.author !== b.subject) continue;                       // self-subject only
-      if (admissions.length === 0 || founderWebids.has(b.author)) founderWebids.add(b.author);
+      if (admissions.length === 0 || founderWebids.has(b.author)) {
+        founderWebids.add(b.author);
+        // a function profile that FOUNDS says so in its own signed creation: the founder is the circle's root
+        // authority, so the claim grants nothing it could not take; the fold carries it as the founder's kind
+        if (b.payload && typeof b.payload === 'object' && b.payload.kind === 'function') founderKinds[b.author] = 'function';
+      }
     }
   };
   // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`
@@ -1134,6 +1141,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   return deriveRoster({
     redemptions: forGroup,
     founderWebids: [...founderWebids],
+    founderKinds,
     memberMapForDisplay: list,
     // Authoritative ONLY on the rail path: its statements carry verified per-circle-key bindings. The
     // legacy store path keeps the pre-rider semantics until pinboard dissolves.
@@ -2584,7 +2592,11 @@ export function buildSkills({
       // A code BOUND to one person's key (the household bot's invite to someone who said yes): only that key
       // redeems it, once. It closes nobody else's code, and no rotation closes it.
       const boundTo = typeof a.boundTo === 'string' && a.boundTo ? a.boundTo : null;
-      const maxRedemptions = boundTo ? 1 : clampInviteMaxRedemptions(a.maxRedemptions, inviteCeiling);
+      // "INVITE A BOT": the admin's choice that whoever redeems this code — and says it runs a function profile —
+      // is admitted AS one (the admin's signed join then carries kind 'function'). Kept on this code record only, the
+      // admin's own; single-use, and like a bound invite it does not rotate the circle's ordinary code.
+      const forFunction = a.forFunction === true;
+      const maxRedemptions = (boundTo || forFunction) ? 1 : clampInviteMaxRedemptions(a.maxRedemptions, inviteCeiling);
 
       const code = _freshMembershipCode();
       // Guarantee the rotated code has a strictly later issuedAt than
@@ -2598,8 +2610,8 @@ export function buildSkills({
       const expiresAt = issuedAt + inviteExpiresInHours * 60 * 60 * 1000;
       // Supersede the codes this one replaces, BEFORE minting the new one — if the mint fails we would
       // rather have closed the old door than leave two open.
-      for (const prev of (boundTo ? [] : allCodes).filter((i) => i?.source?.groupId === a.groupId
-        && typeof i.source?.supersededAt !== 'number' && !i.source?.boundTo)) {
+      for (const prev of ((boundTo || forFunction) ? [] : allCodes).filter((i) => i?.source?.groupId === a.groupId
+        && typeof i.source?.supersededAt !== 'number' && !i.source?.boundTo && !i.source?.forFunction)) {
         try {
           await store.update(prev.id, { source: { ...prev.source, supersededAt: issuedAt } }, { actor: from });
         } catch { /* best-effort per row: one un-superseded code must not abort the rotation */ }
@@ -2611,7 +2623,7 @@ export function buildSkills({
           source:     {
             groupId: a.groupId, code, issuedAt, expiresAt,
             issuedBy: from, rotationDays, keyRotationMode, inviteExpiresInHours,
-            maxRedemptions, ...(boundTo ? { boundTo } : {}),
+            maxRedemptions, ...(boundTo ? { boundTo } : {}), ...(forFunction ? { forFunction: true } : {}),
           },
           visibility: 'household',
         }],

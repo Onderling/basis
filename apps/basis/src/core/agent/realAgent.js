@@ -23,6 +23,7 @@
  * the wrapper at `src/web/realAgent.js` + `web/main.js`.
  */
 
+import { withAnswers, RSVP_TYPE, rosterAnswerRule } from '../../v2/rsvpItems.js';
 import { THREAD_LANGS } from '../../v2/threadLangs.js';
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, Parts, TokenRegistry,
@@ -1352,6 +1353,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The registry handle, bridged OUT of the agents block for the host-skill ceremonies
   // (revokeDevice's tombstone write) — same outer-let idiom as its neighbours.
   let agentsRegistryRef = null;
+  /** Whether THIS node runs a function profile (a household bot), from its own profile record — one read, every use. */
+  const myProfileKind = async () => ((await agentsRegistryRef?.lookup?.('default').catch?.(() => null))?.kind === 'function' ? 'function' : 'person');
   // Patch the wrapped-key POINTER into an EXISTING circle-membership record. Set inside the block; a
   // no-op until then. Returns false when there is no record to attach to (the key facet needs a prior
   // {handle,address} join write) — so it is safe to call at every circle-open, best-effort.
@@ -6225,7 +6228,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         // a FUNCTION profile (a household bot) says so on its card — for display and the add-flow's words only; what a
         // person's app signs to is decided by their own admission, never by this claim
-        if (!cardPersona) { try { if ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ } }
+        if (!cardPersona) { try { if ((await myProfileKind()) === 'function') realArgs = { ...realArgs, bot: true }; } catch { /* a person's card */ } }
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));
         }
@@ -6276,6 +6279,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         try {
           realArgs = { ...realArgs, circleAddress: circleAddressFor(realArgs.groupId) };
         } catch { /* address derivation is additive — never block the redeem/create */ }
+      }
+      // A FUNCTION PROFILE that FOUNDS says so in its own signed creation statement: the founder is the circle's
+      // root authority, so the claim grants nothing it could not take. A person's create carries nothing.
+      if (realOpId === 'createGroupV2' && realArgs.profileKind == null) {
+        try { if ((await myProfileKind()) === 'function') realArgs = { ...realArgs, profileKind: 'function' }; } catch { /* a person's circle */ }
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
         // style two-step confirm. Short-circuit before invoke.
@@ -6437,6 +6445,25 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (!isPairCircleId(circleId)) return named ?? 'me';
         const self = circleSelf(circleId)?.webid ?? null;
         return self && (!named || named === self) ? self : null;
+      },
+      // AN ANSWER is signed by the answering self's circle identity, and in an ordinary circle it is from that self's
+      // roster id (never the 'me' placeholder no roster names) — or from the door person the call names (a function
+      // profile's `telegram:…`). Which answers stand is the roster's rule (rsvpItems.js `rosterAnswerRule`): this
+      // node's own circle identity vouches for door people only when this node is composed as a household's bot.
+      answererFor: (circleId, named) => {
+        if (isPairCircleId(circleId)) { const self = circleSelf(circleId)?.webid ?? null; return self && (!named || named === self) ? self : null; }
+        return named ?? circleSelf(circleId)?.webid ?? null;
+      },
+      signerFor: (circleId) => circleIdentityFor(circleId),
+      encode: b64encode,
+      answerRuleFor: async (circleId) => {
+        const rows = ((await callSkill('pinboard', 'listGroupMembers', { groupId: circleId }).catch(() => null))?.members) ?? [];
+        // the node composed as a household's bot (its calendar in the circle — the function profile that hosts door
+        // people) vouches for its door people's answers with its own circle identity; a person's node vouches for no one
+        const hostsDoors = opts.calendarInCircle === true;
+        const mine = (await circleIdentityFor(circleId).catch(() => null))?.pubKey ?? null;
+        const self = circleSelf(circleId)?.webid ?? null;
+        return rosterAnswerRule({ rows, verify: AgentIdentity.verify, vouchers: hostsDoors && mine ? [mine] : [], own: mine && self ? { address: mine, selves: [self] } : null });
       },
     }));
     /** Write (or update) the copy of an own appointment in one pair circle, as `self` there. */
@@ -7481,9 +7508,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (Array.isArray(rulesObj.tags) && rulesObj.tags.length) {
           parts.push(field('tags', rulesObj.tags.join(', ')));
         }
-        if (Array.isArray(rulesObj.additionalAdmins) && rulesObj.additionalAdmins.length) {
-          parts.push(field('extra_admins', rulesObj.additionalAdmins.join(', ')));
-        }
         rulesText = parts.length > 0
           ? parts.join('\n')
           : tr('circle.rules.defaults_apply');
@@ -8301,7 +8325,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     reminderSources: async () => {
       const store = householdService.stores.getStore(homeCircleId);
-      const [chores, events] = await Promise.all([store.listByType('task'), store.listByType('calendar-event')]);
+      const [chores, raw, answers] = await Promise.all([store.listByType('task'), store.listByType('calendar-event'), store.listByType(RSVP_TYPE).catch(() => [])]);
+      // who comes is read from the answers, which are their own items (never a field on the event)
+      const events = withAnswers(raw ?? [], answers ?? []);
       // …and the rows of every installed extension's SCHEDULED noun (its declared moment is its reminder anchor)
       const manifests = [...installedExtensions.values()];
       const scheduled = manifests.flatMap((m) => Object.entries(m?.nouns ?? {}).filter(([, n]) => n?.presents?.order === 'asc' && n?.presents?.moment).map(([noun]) => noun));
@@ -8313,7 +8339,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * (a household bot on its own node — its inbox is the bot's, and the assistant answers it). Read from the
      * profile record, never from a flag or from "not enrolled".
      */
-    profileKind: async () => ((await agentsRegistryRef?.lookup?.('default'))?.kind === 'function' ? 'function' : 'person'),
+    profileKind: () => myProfileKind(),
     /**
      * Name this node's profile a function's (once, at the bot's install: the bot IS its own profile, this node its
      * device). Refused when the profile has another device: a profile with a phone and a laptop behind it is a

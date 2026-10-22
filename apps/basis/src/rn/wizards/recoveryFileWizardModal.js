@@ -10,9 +10,11 @@ import {
   initialExportState, initialImportState, submitExport, submitImport, canImport, importErrorKey, exportErrorKey,
   loadExportChoices, toggleRosterChoice,
 } from '../../core/wizards/recoveryFileState.js';
-import { Body, Actions, ErrorBanner, Submitting, Checkbox } from './_kit.js';
+import {
+  Body, Actions, ErrorBanner, Submitting, Checkbox, WizardTheme, wizardPalette,
+} from './_kit.js';
 
-export default function RecoveryFileWizardModal({ visible, mode = 'export', callSkill, onClose, onDispatched, onPickFile, onSaveFile, t }) {
+export default function RecoveryFileWizardModal({ visible, theme = null, mode = 'export', callSkill, onClose, onDispatched, onPickFile, onSaveFile, t }) {
   const [state, setState] = useState(() => (mode === 'import' ? initialImportState() : initialExportState()));
 
   // The per-circle choice (the member list, default on) is listed before the file is made — web parity.
@@ -63,9 +65,10 @@ export default function RecoveryFileWizardModal({ visible, mode = 'export', call
   })();
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()} testID={`recovery-file-wizard-${mode}`}>
+        <Pressable style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]} onPress={(e) => e.stopPropagation()} testID={`recovery-file-wizard-${mode}`}>
           <ScrollView style={styles.scroll}>
             {mode === 'export' && (
               <Body title={t('circle.wizard.recovery.export_title')} intro={t('circle.wizard.recovery.export_intro')}>
@@ -108,6 +111,7 @@ export default function RecoveryFileWizardModal({ visible, mode = 'export', call
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

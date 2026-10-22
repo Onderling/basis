@@ -897,6 +897,7 @@ export async function bootAgentBundle(opts = {}) {
     sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
     currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (web parity)
     circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
+    profileKind:     () => agent.profileKind?.() ?? 'person',   // a bot's node says so; the admin decides what it means
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).

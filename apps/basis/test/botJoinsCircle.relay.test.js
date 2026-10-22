@@ -77,7 +77,8 @@ describe('the bot joins a circle on its admin\'s word', () => {
   });
 
   it('asked first; joined on the yes; Ann and Bob see the bot on the roster; `/kring los` takes it off and the box forgets', async () => {
-    const invite = await buildCircleInviteUri({ callSkill: (a, o, x) => ann.agent.callSkill(a, o, x), circleId: CIRCLE, adminPeerAddr: ann.pubKey });
+    // a BOT invite: Ann's signed join then says the bot is one, which every replica can prove (Bob's too)
+    const invite = await buildCircleInviteUri({ callSkill: (a, o, x) => ann.agent.callSkill(a, o, x), circleId: CIRCLE, adminPeerAddr: ann.pubKey, forFunction: true });
     expect(invite?.uri).toBeTruthy();
     const before = (await botTurns(ann)).length;
     await send(`/kring ${invite.uri}`);
@@ -102,6 +103,11 @@ describe('the bot joins a circle on its admin\'s word', () => {
       const kind = await until(async () => (await readRoster(node, CIRCLE)).find((m) => /^huisbot/.test(String(m.handle ?? '')))?.kind ?? null, { timeout: 30_000, step: 500 });
       expect(kind, `${who}'s row for the bot does not say what it is: ${JSON.stringify((await readRoster(node, CIRCLE)).map((m) => [m.handle, m.kind]))}`).toBe('function');
     }
+    // …and the roster PROVES it from Ann's signed join on the bot invite, not from the bot's own word
+    for (const [who, node] of [['Ann', ann], ['Bob', bob]]) {
+      const proven = await until(async () => (await readRoster(node, CIRCLE)).find((m) => /^huisbot/.test(String(m.handle ?? '')))?.provenKind ?? null, { timeout: 30_000, step: 500 });
+      expect(proven, `${who}'s roster does not prove the bot a function profile: ${JSON.stringify((await readRoster(node, CIRCLE)).map((m) => [m.handle, m.provenKind]))}`).toBe('function');
+    }
 
     await send('/kringen');
     expect(await until(async () => ((await botTurns(ann)).some((t) => /De bot zit in:\n• Huize Rood/.test(t.text ?? '')) ? true : null), { timeout: 30_000, step: 500 })).toBe(true);
@@ -125,6 +131,8 @@ describe('the bot joins a circle on its admin\'s word', () => {
     await send(/\/kring ja \S+/.exec(q2.text)[0].replace(/\)$/, ''));
     const backOnAnn = await until(async () => (botOnRoster(await readRoster(ann, CIRCLE)) ? true : null), { timeout: 60_000, step: 500 });
     expect(backOnAnn, `the bot did not come back on Ann's roster. The bot said: ${JSON.stringify((await botTurns(ann)).slice(n2).map((t) => t.text))}`).toBe(true);
+    // back on an ORDINARY invite: a kind is fixed at admission, so this admission states none
+    expect((await readRoster(ann, CIRCLE)).find((m) => /^huisbot/.test(String(m.handle ?? '')))?.provenKind).toBeUndefined();
     const n3 = (await botTurns(ann)).length;
     await send('/kring los Huize Rood');
     // the bot says it left only after it forgot the circle: the next case counts forgets from here

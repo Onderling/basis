@@ -115,3 +115,41 @@ test('a Vandaag row is a card with ONE button — the action its noun declares',
   await expect(page.locator('.circle-vandaag-plus__body'), 'the button opens the sheet on the note').toHaveValue('fietsband plakken');
   expect(errs).toEqual([]);
 });
+
+test('the "+" is on every tab — its sheet holds the own acts and the Me actions', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('[data-tab="circles"]').first().click();
+  await expect(page.locator('.cc-fab'), 'the floating "+" on the Circles tab').toHaveCount(1);
+  await page.locator('.cc-fab').click();
+  await expect(page.locator('[data-section="plus-own"] .circle-vandaag-plus__act').first()).toBeVisible();
+  await expect(page.locator('[data-section="plus-me"] .circle-vandaag-plus__me[data-me="share-contact"]')).toBeVisible();
+});
+
+test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circle', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  // pin an own act from the sheet (☆ → ★), and it shows under Vastgezet
+  await page.locator('.cc-fab').click();
+  await page.locator('.circle-vandaag-plus__pin[data-act="household.note"]').click();
+  await expect(page.locator('.circle-vandaag-plus__pin[data-act="household.note"]')).toHaveAttribute('data-pinned', 'true');
+  const pinned = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open');
+  await expect(pinned).toHaveCount(1);
+  await pinned.first().click();
+  await expect(page.locator('.circle-vandaag-plus__form[data-act="household.note"]'), 'the pinned act opens its form').toBeVisible();
+  await page.locator('.circle-vandaag-plus__close').click();
+  // a circle's attach entry pinned to the "+" opens THAT circle (a bookmark never runs the op from the sheet)
+  await page.locator('[data-tab="circles"]').first().click();
+  await page.locator('.circle-tile').first().click();
+  await page.locator('.circle-view__attach').first().click();
+  await page.locator('.circle-view__attach-pin').first().click();
+  // the floating "+" lives where the tab bar lives (not inside a circle): back out, and open the bookmark from Vandaag
+  await page.locator('.circle-view__back').click();
+  await page.locator('[data-tab="screens"]').first().click();
+  await page.locator('.cc-fab').click();
+  const bm = page.locator('[data-section="plus-pinned"] .circle-vandaag-plus__pinned-open').filter({ hasText: ':' });
+  await expect(bm, 'the bookmark is under Vastgezet, in its circle\'s name').toHaveCount(1);
+  await bm.first().click();
+  await expect(page.locator('.circle-vandaag-plus'), 'the sheet closed: a bookmark opens its circle, it does not run there').toHaveCount(0);
+  await expect(page.locator('.circle-view__attach').first(), 'the circle is open').toBeVisible({ timeout: 10_000 });
+});

@@ -63,11 +63,13 @@ export const ROLE_CONTROL_KEYS = Object.freeze({
   notice_demoted:      'circle.admin.role_notice.demoted',
   notice_handed_over:  'circle.admin.role_notice.handed_over',
   notice_no_one_else:  'circle.admin.role_notice.no_one_else',
+  founder_stays:       'circle.admin.founder_stays',
 });
 
 /** The roster row's identity, in the order the roster shapes carry it (same reading as `caretakerNotice`). */
 const refOf = (row) => (typeof row === 'string' ? row : (row?.webid ?? row?.id ?? row?.addr ?? row?.ref ?? ''));
 const isAdminRow = (row) => row?.role === 'admin';
+const FOUNDER_STAYS_KEY = ROLE_CONTROL_KEYS.founder_stays;
 const rows = (members) => (Array.isArray(members) ? members.filter((m) => m && typeof m === 'object') : []);
 
 /**
@@ -175,8 +177,11 @@ export function removeControlFor({ members, member, myRef } = {}) {
   const greyed = { ...REMOVE, disabled: true, reasonKey: ADMIN_ONLY_KEY };
   if (typeof myRef !== 'string' || !myRef || !targetRef) return greyed;
   const me = list.find((m) => refOf(m) === myRef);
-  if (isAdminRow(me)) return { ...REMOVE, disabled: false };
+  // your own row is leaving, for an admin too (an admin used to be offered "remove" on themselves)
   if (me && targetRef === myRef) return { kind: 'leave', labelKey: 'circle.tile.menu.leave', disabled: false };
+  // the circle's founder is never evicted by the roster fold, so no admin is offered a removal that cannot stand
+  if (isAdminRow(me) && member?.adminVia === 'founder') return { ...REMOVE, disabled: true, reasonKey: FOUNDER_STAYS_KEY };
+  if (isAdminRow(me)) return { ...REMOVE, disabled: false };
   return greyed;
 }
 

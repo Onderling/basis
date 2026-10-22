@@ -19,11 +19,11 @@ import {
   initialState, canCreateBackup, submitCreateBackup, suggestedFilename,
 } from '../../core/wizards/encryptedBackupState.js';
 import {
-  Steps, Body, Field, Actions, ErrorBanner, Submitting, Warn,
+  Steps, Body, Field, Actions, ErrorBanner, Submitting, Warn, WizardTheme, wizardPalette,
 } from './_kit.js';
 
 export default function EncryptedBackupWizardModal({
-  visible, callSkill, onClose, onDispatched, t,
+  visible, theme = null, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState());
 
@@ -43,10 +43,11 @@ export default function EncryptedBackupWizardModal({
   }, [state, callSkill, onDispatched]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="encrypted-backup-wizard"
         >
@@ -64,13 +65,13 @@ export default function EncryptedBackupWizardModal({
                   placeholder="(no length minimum, but use one you'll remember)"
                 />
                 <Field
-                  label="Confirm passphrase"
+                  label={t('circle.wizard.backup.confirm_passphrase')}
                   value={state.confirm}
                   onChangeText={(v) => setState((s) => ({ ...s, confirm: v }))}
                   placeholder="re-enter"
                 />
                 <ErrorBanner message={state.submitError} />
-                <Submitting visible={state.submitting} label="Building backup…" />
+                <Submitting visible={state.submitting} label={t('circle.wizard.backup.building')} />
               </Body>
             )}
             {state.step === 2 && (
@@ -93,6 +94,7 @@ export default function EncryptedBackupWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

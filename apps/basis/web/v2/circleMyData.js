@@ -36,6 +36,8 @@ export function renderCircleMyData(container, {
   onReplaceDevice,
   // Become the owner of a companion node (the claim it printed), signed by this device.
   onClaimCompanion,
+  // what this person used most, per circle, ON THIS DEVICE (`usageRows`) — never synced; `onClearFrequent` forgets it
+  frequent = [], onClearFrequent,
   devices = [],
   onRevokeDevice,
   devicesNeedPhrase = false,
@@ -945,6 +947,32 @@ export function renderCircleMyData(container, {
       usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
     }
     container.appendChild(usage);
+  }
+  // ── what you use most (this device only) ─────────────────────────────────────
+  {
+    const sec = section(tr('circle.mydata.frequent'));
+    sec.dataset.section = 'mydata-frequent';
+    const note = document.createElement('p');
+    note.className = 'cc-mydata__note';
+    note.textContent = tr('circle.mydata.frequent_note');
+    sec.appendChild(note);
+    if (Array.isArray(frequent) && frequent.length) {
+      for (const r of frequent) sec.appendChild(kv(r.name, r.items.map((i) => `${i.label} ${i.count}`).join(' · ')));
+      if (typeof onClearFrequent === 'function') {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-btn cc-btn--quiet cc-mydata__frequent-clear';
+        b.textContent = tr('circle.mydata.frequent_clear');
+        b.addEventListener('click', () => onClearFrequent());
+        sec.appendChild(b);
+      }
+    } else {
+      const none = document.createElement('p');
+      none.className = 'cc-mydata__note';
+      none.textContent = tr('circle.mydata.frequent_none');
+      sec.appendChild(none);
+    }
+    container.appendChild(sec);
   }
   if (typeof version === 'string') {
     const v = document.createElement('div');

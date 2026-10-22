@@ -8,6 +8,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
+import Btn from './Btn.js';
+import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
 import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 
@@ -17,7 +19,16 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // opened on an own row: `{ act, id, values, asSelf }` (the shared `plusEditFor`)
   edit = null,
   // several selves ticked in the header: the sheet asks which one this is written as; one ticked: `writeAsSelf`
-  selves = [], writeAsSelf = null }) {
+  selves = [], writeAsSelf = null,
+  // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
+  onOpenCircle = null,
+  // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section
+  meActions = [], onMeAction = null,
+  // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
+  acts = PLUS_ACTS,
+  // Vastgezet: the pins to paint (each with `label` and `key`); `onOpenPin(pin)` → `{actId}` (an own act), a line (why
+  // nothing opened), or null (it opened a circle); × → `onUnpin(key)`; ☆/★ beside an own act → `onTogglePin(actId)`
+  pinned = [], onOpenPin = null, onUnpin = null, pinnedActIds = [], onTogglePin = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [actId, setActId] = useState(null);
@@ -26,8 +37,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   const [busy, setBusy] = useState(false);
   const [asSelf, setAsSelf] = useState(writeAsSelf);
   const [line, setLine] = useState('');
+  const [referral, setReferral] = useState(null);
   useEffect(() => {
-    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); return; }
+    if (!visible) { setActId(null); setValues({}); setError(null); setBusy(false); setAsSelf(writeAsSelf); setLine(''); setReferral(null); return; }
     if (edit?.act) { setActId(edit.act.id); setValues(edit.values ?? {}); setAsSelf(edit.asSelf ?? 'default'); }  // changed as the self that made it
   }, [visible, writeAsSelf, edit]);
   if (!visible) return null;
@@ -53,7 +65,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   // the free line: what it understood picks the act and fills the fields below (editable before Save), never a circle
   const read = async () => {
     const r = await onRead?.(line);
-    if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
+    setReferral(Array.isArray(r?.referral) && r.referral.length ? r.referral : null);
+    if (r?.referral) setError(null);
+    else if (r?.actId) { setActId(r.actId); setValues((cur) => ({ ...cur, ...r.values })); setError(null); }
     else if (r?.error) setError(r.error);
   };
   return (
@@ -61,23 +75,31 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
       <View style={styles.backdrop}>
         <View style={styles.card} testID="vandaag-plus">
           <Text style={styles.title}>{t(edit ? 'circle.vandaag.plus_edit' : 'circle.vandaag.plus')}</Text>
-          {!edit && onRead && !(selves.length > 1 && !asSelf) ? (
-            <TextInput style={styles.input} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go"
+          {/* the sheet's DECLARED sections (`screenSections.js` plusSheet), in order, each by its id (= the web data-section) */}
+          {sectionsOf('plusSheet').map((d) => {
+            const piece = {
+              'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
+            <TextInput style={styles.input} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1}
               placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
-          ) : null}
-          {selves.length > 1 && !asSelf ? (
+          ) : null),
+              'plus-own': () => (selves.length > 1 && !asSelf ? (
             <View>
               <Text style={styles.label}>{t('circle.vandaag.plus_as')}</Text>
               {selves.map((p) => (
-                <Pressable key={p.id} style={styles.btn} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}>
-                  <Text style={styles.btnText}>{p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)}</Text>
-                </Pressable>
+                <Btn key={p.id} style={styles.btnAt} onPress={() => setAsSelf(p.id)} testID={`vandaag-plus-self-${p.id}`}
+                  label={p.id === 'default' ? t('circle.switcher.you') : (p.name || p.id)} />
               ))}
             </View>
-          ) : !act ? PLUS_ACTS.map((a) => (
-            <Pressable key={a.id} style={styles.btn} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`}>
-              <Text style={styles.btnText}>{plusLabel(t, a)}</Text>
-            </Pressable>
+          ) : !act ? acts.map((a) => (
+            <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Btn style={styles.btnAt} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`} label={plusLabel(t, a)} />
+              {onTogglePin ? (
+                <Pressable onPress={() => onTogglePin(a.id)} accessibilityRole="button" testID={`vandaag-plus-pin-${a.id}`}
+                  accessibilityLabel={t(pinnedActIds.includes(a.id) ? 'circle.vandaag.unpin' : 'circle.vandaag.pin')} style={{ paddingHorizontal: 8 }}>
+                  <Text style={styles.btnText}>{pinnedActIds.includes(a.id) ? '★' : '☆'}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           )) : (
             <View>
               {act.fields.map((f) => (
@@ -87,13 +109,9 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                     onChangeText={(v) => setValues((cur) => ({ ...cur, [f.name]: v }))} />
                 </View>
               ))}
-              <Pressable style={[styles.btn, busy && styles.disabled]} disabled={busy} onPress={save} testID="vandaag-plus-save">
-                <Text style={styles.btnText}>{t('circle.vandaag.plus_save')}</Text>
-              </Pressable>
+              <Btn disabled={busy} onPress={save} testID="vandaag-plus-save" label={t('circle.vandaag.plus_save')} style={styles.btnAt} />
               {edit && onRemove ? (
-                <Pressable style={[styles.btn, busy && styles.disabled]} disabled={busy} onPress={remove} testID="vandaag-plus-remove">
-                  <Text style={styles.btnText}>{t('circle.vandaag.plus_remove')}</Text>
-                </Pressable>
+                <Btn disabled={busy} onPress={remove} testID="vandaag-plus-remove" label={t('circle.vandaag.plus_remove')} style={styles.btnAt} />
               ) : null}
               {/* …and share it with a contact: one button per contact a pair circle connects */}
               {edit && act.share && onShare && Array.isArray(shareTargets) ? (
@@ -101,18 +119,46 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                   <Text style={styles.label}>{t(`circle.button.${act.appOrigin}.${act.share}`)}</Text>
                   {shareTargets.length ? null : <Text style={styles.label}>{t('circle.vandaag.plus_share_none')}</Text>}
                   {shareTargets.map((c) => (
-                    <Pressable key={c.id} style={[styles.btn, busy && styles.disabled]} disabled={busy} onPress={() => share(c.id)} testID={`vandaag-plus-share-${c.id}`}>
-                      <Text style={styles.btnText}>{c.label}</Text>
-                    </Pressable>
+                    <Btn key={c.id} style={styles.btnAt} disabled={busy} onPress={() => share(c.id)} testID={`vandaag-plus-share-${c.id}`} label={c.label} />
                   ))}
                 </View>
               ) : null}
             </View>
-          )}
+          )),
+              // Vastgezet — on a fresh sheet: an own pin picks its act here; a bookmark OPENS its circle (never runs the op)
+              'plus-pinned': () => (!edit && !act && !(selves.length > 1 && !asSelf) && pinned.length ? pinned.map((p) => (
+                <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Btn label={p.label} testID={`vandaag-plus-pinned-${p.key}`} style={styles.btnAt} onPress={async () => {
+                    const r = await onOpenPin?.(p);
+                    if (typeof r === 'string') setError(r);
+                    else if (r?.actId) { setActId(r.actId); setError(null); }
+                  }} />
+                  {onUnpin ? (
+                    <Pressable onPress={() => onUnpin(p.key)} accessibilityRole="button" accessibilityLabel={t('circle.vandaag.unpin')} testID={`vandaag-plus-unpin-${p.key}`} style={{ paddingHorizontal: 8 }}>
+                      <Text style={styles.btnText}>×</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              )) : null),
+              // the Me actions — on a fresh sheet only (not while an own row is being changed, nor before the self is picked)
+              'plus-me': () => (!edit && !act && !(selves.length > 1 && !asSelf) && meActions.length ? meActions.map((m) => (
+                <Btn key={m.id} label={t(m.labelKey)} onPress={() => onMeAction?.(m.id)} testID={`vandaag-plus-me-${m.id}`} style={styles.btnAt} />
+              )) : null),
+            }[d.id]?.();
+            if (!piece) return null;
+            return (
+              <View key={d.id} testID={d.id}>
+                {d.titleKey ? <Text style={styles.label}>{t(d.titleKey)}</Text> : null}
+                {piece}
+              </View>
+            );
+          })}
+          {referral ? referral.map((r) => (
+            <Btn key={r.circleId} label={t('circle.vandaag.plus_referral', { name: r.name || t('circle.screens.untitled') })}
+              onPress={() => onOpenCircle?.(r.circleId)} testID={`vandaag-plus-referral-${r.circleId}`} style={styles.btnAt} />
+          )) : null}
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
-          <Pressable style={styles.btn} onPress={onClose} testID="vandaag-plus-close">
-            <Text style={styles.btnText}>{t('circle.vandaag.done')}</Text>
-          </Pressable>
+          <Btn onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
         </View>
       </View>
     </Modal>
@@ -126,8 +172,7 @@ const makeStyles = (theme) => StyleSheet.create({
   field: { gap: 4, marginBottom: 8 },
   label: { fontSize: 13, color: theme.color.inkSoft },
   input: { fontSize: 14, paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, color: theme.color.ink },
-  btn: { paddingVertical: 9, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.color.line, alignSelf: 'flex-start' },
+  btnAt: { alignSelf: 'flex-start', marginTop: 6 },   // one button family (Btn), each at its own width as on web
   btnText: { color: theme.color.ink, fontSize: 14 },
-  disabled: { opacity: 0.4 },
   error: { color: theme.color.accent, fontSize: 13 },
 });

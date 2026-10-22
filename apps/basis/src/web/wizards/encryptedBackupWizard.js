@@ -48,7 +48,7 @@ export function renderEncryptedBackupWizard(opts) {
         refreshActions(container, { canSubmit: () => canCreateBackup(state) && !state.submitting });
       },
       { type: 'password', placeholder: 'minimum 12 characters recommended' });
-    mkField(body, doc, 'Confirm passphrase', state.confirm,
+    mkField(body, doc, t('circle.wizard.backup.confirm_passphrase'), state.confirm,
       (v) => {
         state.confirm = v;
         refreshActions(container, { canSubmit: () => canCreateBackup(state) && !state.submitting });
@@ -61,7 +61,7 @@ export function renderEncryptedBackupWizard(opts) {
     body.appendChild(warn);
 
     mkError(body, doc, state.submitError);
-    mkSubmitting(body, doc, state.submitting, 'Encrypting…');
+    mkSubmitting(body, doc, state.submitting, t('circle.wizard.backup.building'));
     container.appendChild(body);
 
     mkActions(container, doc, [

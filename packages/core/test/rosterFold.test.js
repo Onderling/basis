@@ -793,3 +793,32 @@ describe('member-props supersession — the fold computes the dead set, and drop
     expect(foldRoster(shuffled, { founders: [founder.pubKey] }).superseded).toEqual(full.superseded);
   });
 });
+
+describe('a function profile is a roster fact, set by who admitted it (L389)', () => {
+  it("an ADMIN-authored join carrying kind 'function' makes the row a function profile", async () => {
+    const { founder, bob } = await ids();
+    const r = foldRoster([body(founder, 'join', bob, { payload: { kind: 'function' } })], { founders: [founder.pubKey] });
+    expect(r.members).toContain(bob.pubKey);
+    expect(r.kinds?.[bob.pubKey]).toBe('function');
+  });
+  it('a SELF-signed join claiming it is ignored: a member never sets its own kind', async () => {
+    const { founder, mallory } = await ids();
+    const r = foldRoster([body(mallory, 'join', mallory, { payload: { kind: 'function' } })], { founders: [founder.pubKey] });
+    expect(r.members).toContain(mallory.pubKey);
+    expect(r.kinds?.[mallory.pubKey]).toBeUndefined();
+  });
+  it('a founder is one when its own creation said so (handed in as founderKinds); a removal clears it', async () => {
+    const { founder, bob } = await ids();
+    const join = body(founder, 'join', bob, { payload: { kind: 'function' } });
+    const evict = body(founder, 'evict', bob, { parent: join.hash });
+    const r = foldRoster([join, evict], { founders: [founder.pubKey], founderKinds: { [founder.pubKey]: 'function' } });
+    expect(r.kinds?.[founder.pubKey]).toBe('function');
+    expect(r.members).not.toContain(bob.pubKey);
+    expect(r.kinds?.[bob.pubKey]).toBeUndefined();
+  });
+  it('any kind other than function is no kind', async () => {
+    const { founder, bob } = await ids();
+    const r = foldRoster([body(founder, 'join', bob, { payload: { kind: 'admin' } })], { founders: [founder.pubKey] });
+    expect(r.kinds?.[bob.pubKey]).toBeUndefined();
+  });
+});

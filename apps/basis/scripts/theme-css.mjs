@@ -21,7 +21,7 @@ const NAME = {
   botBg: '--bot-bg', botLine: '--bot-line', consentBg: '--consent-bg',
   green: '--green', greenBg: '--green-bg', blue: '--blue', blueBg: '--blue-bg',
   amber: '--amber', amberBg: '--amber-bg', danger: '--danger', dangerBg: '--danger-bg',
-  trackOff: '--track-off', white: '--white',
+  trackOff: '--track-off', white: '--white', onTint: '--on-tint',
 };
 
 function colorVars(colors, indent) {

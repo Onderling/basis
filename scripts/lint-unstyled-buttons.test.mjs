@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { scanSource, styledBy } from './lint-unstyled-buttons.mjs';
+import { scanSource, styledBy, loadedSheets } from './lint-unstyled-buttons.mjs';
 
 const isStyled = styledBy('.cc-btn { } .cc-btn--quiet { } .row__act { }');
 
@@ -45,6 +45,18 @@ describe('lint-unstyled-buttons', () => {
       "}",
     ].join('\n');
     expect(scanSource(src, isStyled).map((h) => h.line)).toEqual([1]);
+  });
+  it('a button made with an injected doc counts too (the shared web pieces create through `doc`)', () => {
+    expect(scanSource("const info = doc.createElement('button');\ninfo.className = 'cc-radio-info';", isStyled)).toHaveLength(1);
+  });
+  it('only the stylesheets the page links style anything (a rule in a retired sheet styles nothing)', () => {
+    const html = '<link rel="stylesheet" href="./v2/theme.css" /><link href="https://x/y.css" rel="stylesheet"><link rel="stylesheet" href="./v2/circle.css">';
+    expect(loadedSheets(html)).toEqual(['./v2/theme.css', './v2/circle.css']);
+  });
+  it('a choice between classes needs EVERY branch styled (one styled branch hid the other)', () => {
+    const src = "const rm = document.createElement('button');\nrm.className = kind === 'leave' ? 'nobody-styles-this' : 'cc-btn';";
+    expect(scanSource(src, isStyled)).toHaveLength(1);
+    expect(scanSource(src.replace('nobody-styles-this', 'row__act'), isStyled)).toHaveLength(0);
   });
   it('passes on the repo as it stands', () => {
     const r = spawnSync(process.execPath, ['scripts/lint-unstyled-buttons.mjs'], { encoding: 'utf8' });

@@ -4,7 +4,7 @@
  *
  * 5-step flow:
  *   1. Identity — name, groupId, purpose, tags
- *   2. Governance — additionalAdmins, accessPolicy, leavePolicy
+ *   2. Governance — accessPolicy, leavePolicy
  *   3. Rules — rulesText, conflictPolicy
  *   4. Tech — keyRotationMode, rotationDays, inviteExpiresInHours,
  *             storagePolicy, optional groupPodUri
@@ -40,8 +40,7 @@ import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/pinboard/lib/inviteCeiling';
 
 import {
-  Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField,
-  Actions, ErrorBanner, Submitting, ReviewList, Warn,
+  Steps, Body, Field, Textarea, RadioGroup, Checkbox, HandleField, Actions, ErrorBanner, Submitting, ReviewList, Warn, WizardTheme,
 } from './_kit.js';
 import { wizardPalette } from './_palette.js';
 
@@ -151,6 +150,7 @@ export default function CreateGroupWizardModal({
   const canAdvance1 = identityComplete(state);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
@@ -233,13 +233,13 @@ export default function CreateGroupWizardModal({
                   </>
                 )}
                 <Field
-                  label="Purpose (optional)"
+                  label={t('circle.wizard.create.purpose')}
                   value={state.purpose}
                   onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
                   placeholder="one-line description"
                 />
                 <Field
-                  label="Tags (optional, comma-separated)"
+                  label={t('circle.wizard.create.tags')}
                   value={state.tags}
                   onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
                   placeholder="quiet, sustainable, tools"
@@ -248,21 +248,15 @@ export default function CreateGroupWizardModal({
             )}
             {state.step === 2 && (
               <Body title={t('circle.wizard.create.step_members')} intro={t('circle.wizard.create.step_members_intro')}>
-                <Field
-                  label="Additional admin WebIDs (optional, comma-separated)"
-                  value={state.additionalAdmins}
-                  onChangeText={(v) => setState((s) => ({ ...s, additionalAdmins: v }))}
-                  placeholder="https://alice.example/profile/card#me"
-                />
                 <RadioGroup
-                  label="Access policy"
+                  label={t('circle.wizard.create.access')}
                   value={state.accessPolicy}
                   options={attachConsequences('accessPolicy', ACCESS_POLICIES, t)}
                   onChange={(v) => setState((s) => ({ ...s, accessPolicy: v }))}
                   consequenceLabel={t('common.consequences')}
                 />
                 <RadioGroup
-                  label="Leave policy"
+                  label={t('circle.wizard.create.leave')}
                   value={state.leavePolicy}
                   options={attachConsequences('leavePolicy', LEAVE_POLICIES, t)}
                   onChange={(v) => setState((s) => ({ ...s, leavePolicy: v }))}
@@ -308,7 +302,7 @@ export default function CreateGroupWizardModal({
                   />
                 ))}
                 <RadioGroup
-                  label="Conflict policy"
+                  label={t('circle.wizard.create.conflict')}
                   value={state.conflictPolicy}
                   options={attachConsequences('conflictPolicy', CONFLICT_POLICIES, t)}
                   onChange={(v) => setState((s) => ({ ...s, conflictPolicy: v }))}
@@ -320,9 +314,9 @@ export default function CreateGroupWizardModal({
             {state.step === 4 && (
               <Body title={t('circle.wizard.create.step_offerings')} intro={t('circle.wizard.create.step_offerings_intro')}>
                 {state.offerings.map((row, i) => (
-                  <View key={i} style={{ borderWidth: 1, borderColor: '#d8d1bc', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+                  <View key={i} style={{ borderWidth: 1, borderColor: wizardPalette(theme).rail, borderRadius: 6, padding: 10, marginBottom: 10 }}>
                     <Field
-                      label="Offering name"
+                      label={t('circle.wizard.create.offering_name')}
                       value={row.name}
                       onChangeText={(v) => setState((s) => {
                         const offerings = s.offerings.slice();
@@ -349,33 +343,33 @@ export default function CreateGroupWizardModal({
                     <Pressable
                       onPress={() => setState((s) => ({ ...s, offerings: s.offerings.filter((_, j) => j !== i) }))}
                     >
-                      <Text style={{ color: '#b04a30', marginTop: 4 }}>{t('circle.wizard.create.offering_remove_row')}</Text>
+                      <Text style={{ color: wizardPalette(theme).info, marginTop: 4 }}>{t('circle.wizard.create.offering_remove_row')}</Text>
                     </Pressable>
                   </View>
                 ))}
                 <Pressable
                   onPress={() => setState((s) => ({ ...s, offerings: [...s.offerings, newOfferingRow()] }))}
                 >
-                  <Text style={{ color: '#b04a30' }}>+ Add offering</Text>
+                  <Text style={{ color: wizardPalette(theme).info }}>{t('circle.wizard.create.offering_add')}</Text>
                 </Pressable>
               </Body>
             )}
             {state.step === 5 && (
               <Body title={t('circle.wizard.create.step_tech')} intro={t('circle.wizard.create.step_tech_intro')}>
                 <RadioGroup
-                  label="Key rotation mode"
+                  label={t('circle.wizard.create.rotation_mode')}
                   value={state.keyRotationMode}
                   options={KEY_ROTATION_MODES}
                   onChange={(v) => setState((s) => ({ ...s, keyRotationMode: v }))}
                 />
                 <Field
-                  label="Rotation interval (days)"
+                  label={t('circle.wizard.create.rotation_days')}
                   value={String(state.rotationDays)}
                   onChangeText={(v) => setState((s) => ({ ...s, rotationDays: Number(v) || 30 }))}
                   placeholder="30"
                 />
                 <Field
-                  label="Invite expiry (hours)"
+                  label={t('circle.wizard.create.invite_expiry')}
                   value={String(state.inviteExpiresInHours)}
                   onChangeText={(v) => setState((s) => ({ ...s, inviteExpiresInHours: Number(v) || 1 }))}
                   placeholder="1"
@@ -394,7 +388,7 @@ export default function CreateGroupWizardModal({
                   hint={t('circle.invite.ceiling_hint')}
                 />
                 <RadioGroup
-                  label="Storage policy"
+                  label={t('circle.wizard.create.storage')}
                   value={state.storagePolicy}
                   options={attachConsequences('storagePolicy', STORAGE_POLICIES, t)}
                   onChange={(v) => setState((s) => setStoragePolicy(s, v))}
@@ -403,7 +397,7 @@ export default function CreateGroupWizardModal({
                 {(state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') && (
                   <>
                     <Field
-                      label="Group pod URI"
+                      label={t('circle.wizard.create.pod_uri')}
                       value={state.groupPodUri}
                       onChangeText={(v) => setState((s) => ({ ...s, groupPodUri: v }))}
                       placeholder="https://group.example/pod/"
@@ -431,7 +425,6 @@ export default function CreateGroupWizardModal({
                       value: founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal') },
                     ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
                     ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
-                    ...(rules.additionalAdmins ? [{ label: 'Extra admins', value: rules.additionalAdmins.join(', ') }] : []),
                     { label: 'Access',      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
                     { label: 'Leave',       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
                     // 5.5a — surface each non-empty rules-doc field.
@@ -458,7 +451,7 @@ export default function CreateGroupWizardModal({
                     ...(state.groupPodUri  ? [{ label: 'Group pod', value: state.groupPodUri, monospace: true }] : []),
                   ]} />
                   <ErrorBanner message={state.submitError} />
-                  <Submitting visible={state.submitting} label="Creating circle…" />
+                  <Submitting visible={state.submitting} label={t('circle.wizard.create.creating')} />
                 </Body>
               );
             })()}
@@ -483,6 +476,7 @@ export default function CreateGroupWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 
@@ -501,12 +495,12 @@ function sheetStyles(theme) {
   },
   scroll: { flexGrow: 1 },
   // N3 — extra-roles section.
-  roleHeading: { fontSize: 13, fontWeight: '700', color: '#444', marginTop: 14, marginBottom: 2 },
-  roleHint:    { fontSize: 12, lineHeight: 17, color: '#777', marginBottom: 6 },
-  roleDesc:    { fontSize: 12, lineHeight: 17, color: '#666', marginLeft: 28, marginBottom: 8 },
+  roleHeading: { fontSize: 13, fontWeight: '700', color: p.inkStrong, marginTop: 14, marginBottom: 2 },
+  roleHint:    { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginBottom: 6 },
+  roleDesc:    { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginLeft: 28, marginBottom: 8 },
   // J-NP3 — the pod-host disclosure sits under the pod field. Same weight as the other hints: a
   // disclosure that shouts reads as a warning against a normal choice, and one that whispers is not a
   // disclosure. It matches `roleHint` deliberately.
-  podDisclosure: { fontSize: 12, lineHeight: 17, color: '#777', marginTop: 6, marginBottom: 6 },
+  podDisclosure: { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginTop: 6, marginBottom: 6 },
 });
 }

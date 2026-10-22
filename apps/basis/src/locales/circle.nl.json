@@ -272,6 +272,14 @@
       "text": "Mensen per uitnodiging",
       "doc": "B5 — review-step label for the circle invite ceiling."
     },
+    "for_bot": {
+      "text": "Nodig een bot uit",
+      "doc": "On the invite card: make a single-use invite for a bot (a function profile). The bot that uses it is shown in the circle as a bot."
+    },
+    "for_bot_hint": {
+      "text": "Een uitnodiging voor een bot, voor één keer. Geef hem aan de bot (Telegram: /kring en deze uitnodiging). Die komt erin als bot; een mens die hem gebruikt, komt erin als mens.",
+      "doc": "On the bot invite card: what this invite is and how to hand it over."
+    },
     "uses_left": {
       "text": "{{used}} van {{max}} plekken op deze uitnodiging gebruikt",
       "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
@@ -1249,6 +1257,10 @@
     "block_unknown": {
       "text": "Onbekend bloktype: {{type}}",
       "doc": "α.1c — forward-compat fallback."
+    },
+    "block_empty_awaiting": {
+      "text": "{{title}} — niets",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
     }
   },
   "vandaag": {
@@ -1423,6 +1435,38 @@
     "plus_line_ph": {
       "text": "Zeg wat je wilt — \"notitie: melk\", \"afspraak morgen 14:00 tandarts\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
+    },
+    "plus_referral": {
+      "text": "Dat is iets voor {{name}} → openen",
+      "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
+    },
+    "plus_me_title": {
+      "text": "Van jou",
+      "doc": "The \"+\" sheet: the heading over the Me actions (share my card, scan)."
+    },
+    "pin_to_plus": {
+      "text": "Vastzetten in +",
+      "doc": "A circle's attach entry: pin it to the person's \"+\" sheet as a bookmark (it only ever opens the circle with that op)."
+    },
+    "pinned_title": {
+      "text": "Vastgezet",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin": {
+      "text": "Vastzetten",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "unpin": {
+      "text": "Losmaken",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin_gone": {
+      "text": "Die kring is niet meer van jou — de pin opent niets.",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
+    },
+    "pin_bookmark": {
+      "text": "{{name}}: {{op}}",
+      "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "plus_line_unread": {
       "text": "Dat kon ik niet lezen — vul de velden hieronder in.",
@@ -1648,9 +1692,17 @@
       "onboarding": {
         "text": "Eerste stappen",
         "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+      },
+      "awaiting": {
+        "text": "Wacht op jou",
+        "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
       }
     },
     "block_desc": {
+      "awaiting": {
+        "text": "Wat op jou wacht: een stemming die voor jou open staat, een afspraak om te beantwoorden, een apparaat-aanbod — elk opent waar het hoort.",
+        "doc": "Block table: the one-line description of Mij's waiting-for-you block."
+      },
       "quickActions": {
         "text": "De handelingen die je in deze kring het vaakst doet, als knoppen.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
@@ -4066,10 +4118,6 @@
       "tags": {
         "text": "Labels",
         "doc": "Rules summary label (/group-rules): the circle's tags."
-      },
-      "extra_admins": {
-        "text": "Extra beheerders",
-        "doc": "Rules summary label (/group-rules): admins beyond the founder."
       }
     },
     "conflict": {
@@ -5185,6 +5233,10 @@
       "text": "Teruggezet: {{lists}} lijsten, {{entries}} regels, {{chores}} klusjes, {{appointments}} afspraken, {{people}} mensen.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
     },
+    "import_answers_kept": {
+      "text": "{{count}} eerdere antwoord(en) staan terug als notitie bij hun afspraken; om weer mee te tellen worden ze opnieuw gegeven.",
+      "doc": "Household import: the answers to appointments in the file came back as a record on the appointment (never as answers — an answer is signed by the person who gave it)."
+    },
     "import_missed": {
       "text": "{{count}} dingen kon ik niet terugzetten.",
       "doc": "The household's export files and reading one back (the admin's /exports and /import)."
@@ -5503,7 +5555,7 @@
     "link_open_app": "Open deze link in je Basis-app om je identiteit aan deze bot te koppelen: {{link}}\nJe app toont daarna een regel om hier te plakken.",
     "link_not_private": "Dat telt alleen in je eigen chat met de bot.",
     "link_question": "Een Basis-app wil zich aan jou koppelen: berichten van je Basis-apps (elk apparaat van je, behalve een dat je intrekt) tellen dan als jou, en de bot kent je Basis-identiteit. Kies de code die je app toont.",
-    "kring_usage": "Plak de uitnodiging van een kring achter /kring. Uit een kring: /kring los <naam>.",
+    "kring_usage": "Plak de botuitnodiging van een kring achter /kring (in de app: Uitnodigen, dan Nodig een bot uit). Uit een kring: /kring los <naam>.",
     "kring_question": "De bot gaat in de kring “{{name}}”.\nRegels: {{rules}}\n\nDe bot bewaart dan de gegevens van die kring op dit apparaat, en leden van die kring kunnen hem vragen stellen. De kring ziet dat het jouw bot is: hij heet daar @{{handle}}. Doen? (/kring ja {{id}} of /kring nee {{id}})",
     "kring_no_rules": "geen regels gezet",
     "kring_asked": "Ik heb je in dit privégesprek gevraagd of de bot in de kring mag.",
@@ -6436,6 +6488,26 @@
       "text": "Privacy",
       "doc": "S5 — privacy disclosure section."
     },
+    "frequent": {
+      "text": "Wat je het meest gebruikt",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
+    "frequent_note": {
+      "text": "Alleen op dit apparaat geteld, nooit verstuurd: het ordent de rij \"Veel gebruikt\" in elke kring.",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
+    "frequent_none": {
+      "text": "Nog niets geteld.",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
+    "frequent_own": {
+      "text": "Van jezelf (de \"+\")",
+      "doc": "My data: the row of counts for the \"+\" sheet's own acts (a note, an appointment) on this device."
+    },
+    "frequent_clear": {
+      "text": "Wissen",
+      "doc": "My data: this device's usage counts per circle (the counter behind \"Frequently used\"), shown and clearable; never synced."
+    },
     "usage": {
       "text": "Gebruik",
       "doc": "S5 — usage metrics section."
@@ -6821,6 +6893,10 @@
     "make_admin": {
       "text": "Beheerder maken",
       "doc": "The roster control that promotes a member to admin (admin panel, next to the role it changes). Admin-only: shown only to someone the roster says runs this circle. The op is `setMemberRole`; the roster fold on every device is what actually decides, so this is a convenience, not the gate."
+    },
+    "founder_stays": {
+      "text": "Wie deze kring begon, kan niet verwijderd worden.",
+      "doc": "Why Remove is greyed on the founder's row in the admin panel: the roster never evicts the person who started the circle (they can leave, or step back as admin)."
     },
     "make_member": {
       "text": "Beheerdersrol intrekken",
@@ -7539,6 +7615,18 @@
     "new_persona_offerings_unnamed": {
       "text": "deze persona",
       "doc": "The new-persona form: the name in the offerings question while none is typed yet."
+    },
+    "awaiting_vote": {
+      "text": "{{name}}: {{count}} stemming(en) voor jou open",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_rsvp": {
+      "text": "{{name}}: {{count}} afspra(a)k(en) om te beantwoorden",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_device": {
+      "text": "Er wacht een apparaat-aanbod",
+      "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
     }
   },
   "attach": {
@@ -7798,6 +7886,24 @@
     }
   },
   "wizard": {
+    "embed": {
+      "duration": {
+        "text": "Duur (bv. 1h, 90m, 2h30m)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "location": {
+        "text": "Plaats (optioneel)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "share_with": {
+        "text": "Delen met (optioneel, het adres van een contact)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "creating": {
+        "text": "Tijdsblok maken…",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      }
+    },
     "recovery": {
       "after_restore_hint": {
         "text": "Je kringen zitten niet in de herstelzin. Meld je na het herladen aan bij je pod, of laad je herstelbestand onder Mijn gegevens, om ze terug te krijgen.",
@@ -7897,10 +8003,6 @@
         "text": "Labels (komma-gescheiden)",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
-      "extra_admins": {
-        "text": "Extra beheerders (webids, komma-gescheiden)",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
       "access": {
         "text": "Wie mag erbij?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -7979,10 +8081,6 @@
       },
       "review_tags": {
         "text": "Labels",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "review_admins": {
-        "text": "Extra beheerders",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
       "review_expiry": {
@@ -8125,6 +8223,26 @@
       }
     },
     "settings": {
+      "holiday_hint": {
+        "text": "Zet meldingen op pauze en toont je als niet beschikbaar.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "pod_section": {
+        "text": "Solid pod",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_section": {
+        "text": "NKN-relay",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_url": {
+        "text": "Relay-adres",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_hint": {
+        "text": "Kies zelf een NKN-relay in plaats van de automatische (geavanceerd). Alleen ws:// of wss://.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "loading": {
         "text": "Instellingen worden geladen…",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8191,6 +8309,14 @@
       }
     },
     "backup": {
+      "confirm_passphrase": {
+        "text": "Herhaal het wachtwoord",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "building": {
+        "text": "Back-up maken…",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "passphrase_warning": {
         "text": "Raak je het wachtwoord kwijt, dan is de back-up weg. Er is geen herstel. Schrijf het op.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8221,6 +8347,18 @@
       }
     },
     "restore": {
+      "phrase": {
+        "text": "Herstelzin",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "ack_lost": {
+        "text": "Ik begrijp dat mijn huidige identiteit en lokale gegevens VERLOREN gaan.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "ack_undone": {
+        "text": "Ik begrijp dat dit NIET ongedaan te maken is.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "identity_warning": {
         "text": "Na herstellen gebruikt de app de herstelde identiteit. Je huidige handle, contacten, kringen en openstaande uitnodigingen horen bij de oude identiteit en lijken dan weg. Ze zijn niet gewist, maar je kunt er niets mee zonder de oude herstelzin.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8259,6 +8397,22 @@
       }
     },
     "audience": {
+      "what": {
+        "text": "Wat wil je plaatsen?",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "trust": {
+        "text": "Vertrouwensniveau",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "recipients": {
+        "text": "Ontvangers (optioneel, handles gescheiden door komma's)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "target": {
+        "text": "Kring",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "max_distance": {
         "text": "Tot hoever?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."

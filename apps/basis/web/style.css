@@ -564,7 +564,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
   margin-top: 0.4rem;
 }
 .cc-page-status-error {
-  color: var(--err, #c33);
+  color: var(--danger);
 }
 
 /* #196 (C2 join-group wizard) — multi-step panel layout. */
@@ -641,7 +641,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
 }
 .cc-wizard-suggestion {
   padding: 0.2rem 0.6rem;
-  background: var(--bg-mute, #f0f0f0);
+  background: var(--paper-2);
   border: 1px solid var(--border, #ddd);
   border-radius: 12px;
   font-size: 0.8rem;
@@ -673,7 +673,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
   background: var(--bg, #fafafa);
 }
 .cc-wizard-error {
-  color: var(--err, #c33);
+  color: var(--danger);
   font-size: 0.85rem;
   margin: 0.4rem 0;
 }
@@ -724,7 +724,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
   padding: 0.5rem 0.65rem;
   border-radius: 6px;
   margin: 0 0 0.5rem;
-  background: var(--bg-subtle, #f4f1ec);
+  background: var(--paper-2);
   border-left: 3px solid var(--border, #ccc);
   color: var(--fg, #333);
 }
@@ -938,7 +938,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
 }
 .cc-wizard-distance {
   padding: 0.3rem 0.7rem;
-  background: var(--bg-mute, #f0f0f0);
+  background: var(--paper-2);
   border: 1px solid var(--border, #ddd);
   border-radius: 12px;
   font-size: 0.85rem;
@@ -1397,7 +1397,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
   font-size: 0.8rem;
   border: 1px solid var(--fg-mute, #ccc);
   border-radius: 12px;
-  background: var(--bg-mute, #f5f5f5);
+  background: var(--paper-2);
   white-space: nowrap;
 }
 
@@ -1424,7 +1424,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
   font-size: 1rem;
   cursor: pointer;
 }
-.cc-grid-cell:hover { background: var(--bg-hover, #eef); }
+.cc-grid-cell:hover { background: var(--paper-2); }
 .cc-grid-cell:disabled { cursor: default; opacity: 0.5; }
 
 .cc-panel-empty {

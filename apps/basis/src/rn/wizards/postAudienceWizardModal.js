@@ -14,7 +14,9 @@ import {
   initialState, canSubmit, loadAvailableCircles, submitPost,
 } from '../../core/wizards/postAudienceState.js';
 
-import { Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting } from './_kit.js';
+import {
+  Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
+} from './_kit.js';
 
 const KIND_OPTS = [
   { id: 'ask',     label: 'Ask (request help)' },
@@ -23,7 +25,7 @@ const KIND_OPTS = [
 ];
 
 export default function PostAudienceWizardModal({
-  visible, args, callSkill, onClose, onDispatched, t,
+  visible, theme = null, args, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState(args ?? {}));
 
@@ -50,10 +52,11 @@ export default function PostAudienceWizardModal({
   }, [state, callSkill, onDispatched, onClose]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="post-audience-wizard"
         >
@@ -63,7 +66,7 @@ export default function PostAudienceWizardModal({
               intro="Compose a post; pick a trust filter, optional tags, distance, and recipients."
             >
               <Textarea
-                label="What do you want to post?"
+                label={t('circle.wizard.audience.what')}
                 value={state.text}
                 onChangeText={(v) => setState((s) => ({ ...s, text: v }))}
                 placeholder="e.g. Anyone got a ladder I can borrow?"
@@ -76,13 +79,13 @@ export default function PostAudienceWizardModal({
                 onChange={(v) => setState((s) => ({ ...s, kind: v }))}
               />
               <RadioGroup
-                label="Trust level"
+                label={t('circle.wizard.audience.trust')}
                 value={state.minTrust}
                 options={TRUST_OPTS}
                 onChange={(v) => setState((s) => ({ ...s, minTrust: v }))}
               />
               <Field
-                label="Tags (comma-separated)"
+                label={t('circle.wizard.create.tags')}
                 value={state.tags}
                 onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
                 placeholder="ladder, tools"
@@ -105,14 +108,14 @@ export default function PostAudienceWizardModal({
                 })}
               </View>
               <Field
-                label="Recipients (optional, comma-separated webids/handles)"
+                label={t('circle.wizard.audience.recipients')}
                 value={state.recipients}
                 onChangeText={(v) => setState((s) => ({ ...s, recipients: v }))}
                 placeholder="leave blank to use audience filter"
               />
               {state.availableCircles && state.availableCircles.length > 1 && (
                 <RadioGroup
-                  label="Target circle"
+                  label={t('circle.wizard.audience.target')}
                   value={state.selectedCircle ?? ''}
                   options={state.availableCircles.map((b) => ({ id: b.id, label: b.label }))}
                   onChange={(v) => setState((s) => ({ ...s, selectedCircle: v }))}
@@ -131,6 +134,7 @@ export default function PostAudienceWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

@@ -4,6 +4,7 @@ import { renderCircleSettings } from '../../web/v2/circleSettings.js';
 import { SETTINGS_ENUM_AXES, CIRCLE_POLICY_ENUMS, DEFAULT_CIRCLE_POLICY, mergeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { pageForOp } from '../../src/v2/pageProjection.js';
 import { basisManifest } from '../../manifest.js';
+import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
 
 const t = (k) => k;
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
@@ -367,5 +368,18 @@ describe('renderCircleSettings — header sourced from the manifest page project
     const el = mount();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t: (k) => `T:${k}` });
     expect(el.querySelector('.circle-settings__title').textContent).toBe('T:circle.settings.title');
+  });
+});
+
+describe("a control's hint shows once", () => {
+  // the multi-choice rows (what the conversation contains · the lines it shows) painted their hint in their own
+  // branch AND in the shared tail, so the settings page said each of those two sentences twice
+  it('every control hint is on the page exactly once', () => {
+    const el = mount();
+    const controls = settingsControlsFromManifest(basisManifest);
+    renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t, controls });
+    const hints = [...el.querySelectorAll('.circle-settings__control-hint')].map((h) => h.textContent);
+    expect(hints.length).toBeGreaterThan(0);
+    expect(hints.filter((h, i) => hints.indexOf(h) !== i)).toEqual([]);
   });
 });

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 58
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 60
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -24,6 +24,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `circle-store-door` | G-C1 | one store per circle |
 | `codenames` | — | no internal PLANNING CODENAMES in public code comments or docs |
 | `content-classification` | — | every durable STORE a shell builds is classified in `enrolForgets.js` |
+| `css-tokens` | — | every `var(--name)` in ANY web file (all of apps/basis/web: style.css, inline `cssText` in the JS) is one a… |
 | `default-literal` | — | PRIMARY |
 | `dep-boundaries` | — | Dependency-boundary fitness function — CLAUDE.md invariant #5 |
 | `disclosure-exit` | G-A1 | the Agent membrane's disclosure gate is the ONLY exit for identity |
@@ -43,6 +44,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `locale-key-parity` | — | what one shell SAYS, the other says too, or the difference is a decision |
 | `locale-ownership` | — | a user-facing string is defined in exactly ONE place, and the place is |
 | `manifest-scopes` | — | every writing op declares where it writes; every manifest, the hosts it reaches |
+| `mobile-buttons` | — | the phone's twin of lint-unstyled-buttons: a button on the phone wears the one button family |
 | `no-relay-literal` | — | the public relay's domain appears nowhere in the tree |
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
@@ -61,7 +63,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `shell-reaches-waist` | — | a shell may COMPOSE the substrate, never CALL it |
 | `shell-seams` | — | web ≡ mobile ≡ box: every shell composes every seam (`shell-seams.mjs` declares them) |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
-| `theme-tokens` | — | the web design system's drift guards, in the aggregate (`npm run guards`) |
+| `theme-tokens` | — | the web design system's drift guards (theme.css regenerates clean; circle.css uses only defined tokens; no … |
 | `typed-commands-reachable` | — | a command a person can TYPE must have a door, in both shells |
 | `unbound-names` | — | a Node entry point uses no name that nothing defines |
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |

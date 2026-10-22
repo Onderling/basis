@@ -287,8 +287,7 @@ export function initialState() {
     // N3 — extra role templates the admin opted into (ids from
     // ROLE_TEMPLATE_IDS).  Persisted as `rules.roles` at submit.
     extraRoles:            [],
-    // Step 2 — members & governance
-    additionalAdmins:      '',
+    // Step 2 — members & governance (admins are made later, from the Members tab — `setMemberRole`)
     accessPolicy:          'invite-only',
     leavePolicy:           'anyone',
     // Step 3 — rules & conflict
@@ -409,8 +408,6 @@ export function founderPersonaName(state, t = null) {
  * Pure function — no side effects, easy to test.
  */
 export function buildRulesObjectFromState(state) {
-  const additionalAdmins = String(state.additionalAdmins ?? '')
-    .split(',').map((s) => s.trim()).filter(Boolean);
   const tags = String(state.tags ?? '')
     .split(',').map((s) => s.trim()).filter(Boolean);
   // 5.5a — Step 1's `purpose` is the canonical one-liner; it lives in
@@ -418,7 +415,6 @@ export function buildRulesObjectFromState(state) {
   const doc = buildRulesDoc({ ...state.rulesDoc, purpose: state.purpose });
   const rules = {
     tags:              tags.length > 0 ? tags : undefined,
-    additionalAdmins:  additionalAdmins.length > 0 ? additionalAdmins : undefined,
     accessPolicy:      state.accessPolicy,
     leavePolicy:       state.leavePolicy,
     conflictPolicy:    state.conflictPolicy,

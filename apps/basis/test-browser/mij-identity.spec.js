@@ -37,3 +37,11 @@ test('Mij shows the name, its readings and the devices; Edit and My data hold th
   for (const door of ['availability', 'shared-with-me', 'blocked']) await expect(page.locator(`.cc-mydata__doors .cc-profile__${door}`), door).toBeVisible({ timeout: 15_000 });
   expect(errs).toEqual([]);
 });
+
+test('Mij shows what is waiting for you — on a fresh profile, one quiet line', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('[data-tab="mij"]').first().click();
+  await expect(page.locator('.circle-screen__block--awaiting'), 'the block is on Mij').toHaveCount(1);
+  await expect(page.locator('.circle-screen__block--awaiting')).toHaveText(/Waiting for you — nothing|Wacht op jou — niets/);
+});

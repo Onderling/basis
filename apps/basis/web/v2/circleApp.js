@@ -18,6 +18,11 @@
 
 // Buffer polyfill (with base64url) — on-device signing runs in this browser bundle;
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
+import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
+import { usageRows } from '../../src/v2/actionFrequency.js';
+import { meActionsFor } from '../../src/v2/meActionProjection.js';
+import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
+import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
 import { startScreenShell } from './screenShell.js';
 import { openIdentityLinkSheet } from './identityLinkSheet.js';
@@ -172,7 +177,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../src/v2/vandaagPlus.js';
 import { handleOp } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -1738,20 +1743,7 @@ let circleWiredMoreIds = null;
  * two stores in three places. This is the one that surfaces should use.
  */
 async function circleOpAvailability(circleId) {
-  let policy = null;
-  let capabilityMatrix = [];
-  try {
-    const pol = (await policyStore.get(circleId)) ?? {};
-    const ovr = (await overrideStore.get(circleId)) ?? {};
-    policy = pol;
-    capabilityMatrix = buildCapabilityMatrix(circleBaseSources, {
-      enabledApps: Array.isArray(pol.apps) && pol.apps.length ? pol.apps : null,
-      template: pol.capabilities || {}, optOuts: ovr.capabilityOptOuts || [],
-    });
-  } catch { /* best-effort: an unresolved policy must not make everything look forbidden */ }
-  return makeOpAvailability({
-    catalogue: circleCatalogue, manifestsByOrigin: circleManifestsByOrigin, policy, capabilityMatrix,
-  });
+  return circleAvailabilityFor(circleId, { policyStore, overrideStore, sources: circleBaseSources, catalogue: circleCatalogue, manifestsByOrigin: circleManifestsByOrigin });
 }
 
 // The attach menu, narrowed to what this circle can actually dispatch. Empty until the circle's
@@ -4246,13 +4238,7 @@ async function _showVandaag() {
     edit.setAttribute('aria-label', t('circle.vandaag.customise'));
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
-    // the "+": an own note or an own appointment, into the person's own store (never a circle)
-    const plus = document.createElement('button');
-    plus.type = 'button';
-    plus.className = 'circle-vandaag__plus';
-    plus.textContent = `+ ${t('circle.vandaag.plus')}`;
-    plus.addEventListener('click', () => showVandaagPlus());
-    head.appendChild(plus);
+    // the "+" is no longer here: one floating button on every tab (`mountPlusButton`)
   }
   rootEl.appendChild(head);
   if (!screen) return;
@@ -4303,6 +4289,47 @@ async function _showVandaag() {
 
 // "PAS AAN": the customise sheet over the active page — painted from the shared model, every control a screen op
 // "+" on Vandaag: pick an act, fill it in; the save is the act's op through the waist (the shared `plusOp`)
+/** Mij's own governance binding for its reads (made once, on first need). */
+let mijGov = null;
+
+/** The circle governance as the shell binds it (settings, Mij's "wat wacht op jou"): one binding, one set of options. */
+function shellGovernance({ myWebid = '' } = {}) {
+  return bindCircleGovernance({
+    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
+    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    circleIdentityFor: circleIdentityForShell,
+    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
+      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
+      return r;
+    }),
+  });
+}
+
+/** A bookmark the "+" sheet opened: its circle opens, then that op's form — once the circle's menu has resolved. */
+let _pendingPinOpen = null;
+
+/** What each DECLARED Me action (manifest `meActions`) does here — from Me and from the "+" sheet alike. */
+function runMeAction(id) {
+  if (id === 'share-contact') { showShareMyContact(); return; }
+  if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
+}
+
+/** THE "+" — one floating button on every tab: the person's own entry (their line, their acts, their Me actions). */
+function mountPlusButton() {
+  const had = document.querySelector('.cc-fab');
+  const b = had ?? document.createElement('button');
+  // its words, in the current language: mounted after localisation, and named again on a language change
+  b.title = t('circle.vandaag.plus');
+  b.setAttribute('aria-label', t('circle.vandaag.plus'));
+  if (had) return;
+  b.type = 'button';
+  b.className = 'cc-fab circle-vandaag__plus';
+  b.textContent = '+';
+  b.addEventListener('click', () => showVandaagPlus());
+  document.body.appendChild(b);
+}
+
 function showVandaagPlus({ edit = null } = {}) {
   const { card, close } = _restoreOverlay();
   // opened on an own row: its act, its words, its id — Save changes it, Remove takes it away
@@ -4311,6 +4338,24 @@ function showVandaagPlus({ edit = null } = {}) {
   const editId = edit?.id ?? null;
   let line = '';
   let error = null;
+  let referral = null;   // the line named something that lives in a circle: where (opened, never acted on)
+  // Vastgezet: what this person pinned, as it can be painted now (a bookmark only while its circle is theirs and shows
+  // the op there), each with its words; computed after open (availability is async), then the sheet paints again
+  let pinnedView = [];
+  const myCircles = () => (circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id));
+  const refreshPins = async () => {
+    const pins = pinsOf(_screensBook ?? {});
+    const ids = [...new Set(pins.filter((p) => p.kind === 'bookmark').map((p) => p.circleId))];
+    const avs = Object.fromEntries(await Promise.all(ids.map(async (cid) => [cid, await circleOpAvailability(cid).catch(() => null)])));
+    const entries = attachEntriesFor({ manifestsByOrigin: circleManifestsByOrigin ?? {} });
+    pinnedView = paintablePins(pins, { circles: myCircles(), availabilityOf: (cid) => avs[cid] ?? null, ownActIds: PLUS_ACTS.map((x) => x.id) }).map((p) => {
+      if (p.kind === 'own') { const a = PLUS_ACTS.find((x) => x.id === p.actId); return { ...p, key: pinKey(p), label: a ? plusLabel(t, a) : p.actId }; }
+      const e = entries.find((x) => x.appOrigin === p.appOrigin && x.opId === p.opId);
+      return { ...p, key: pinKey(p), label: t('circle.vandaag.pin_bookmark', { name: p.name || t('circle.screens.untitled'), op: t(e?.label ?? p.opId) }) };
+    });
+    paint();
+  };
+  const pinOp = async (opId, args) => { await Promise.resolve(rawCallSkill('basis', opId, args)).catch(() => null); _screensBook = await userScreenStore.get(); await refreshPins(); };
   // written as the one self ticked in the header; with several ticked, the sheet asks which
   // an own row is changed as the self that made it (the row says which); something new as the ticked self
   let asSelf = editId ? (edit.asSelf ?? 'default') : writeAs(_selfSet.on);
@@ -4325,24 +4370,51 @@ function showVandaagPlus({ edit = null } = {}) {
   let shareTargets = null;
   if (editId && edit?.act?.share) plusShareTargets(edit.act, rawCallSkill).then((list) => { shareTargets = list; paint(); }).catch(() => { shareTargets = []; paint(); });
   const paint = () => renderVandaagPlus(card, {
-    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets,
+    t, actId, values, line, error, selves, asSelf, editing: !!editId, shareTargets, referral,
+    acts: orderedPlusActs(PLUS_ACTS, actionFrequency),
+    pinned: pinnedView,
+    pinnedActIds: pinsOf(_screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId),
+    onTogglePin: (actId) => {
+      const own = { kind: 'own', actId };
+      const on = pinsOf(_screensBook ?? {}).some((p) => pinKey(p) === pinKey(own));
+      pinOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own);
+    },
+    onUnpin: (key) => pinOp('screen-unpin', { key }),
+    // an own pin chooses its act here; a BOOKMARK opens its circle with that op's form — never run from the sheet
+    onOpenPin: (p) => {
+      const r = openPin(p, { circles: myCircles() });
+      if (r.error) { error = t(r.error); paint(); return; }
+      if (r.kind === 'own') { actId = r.actId; error = null; paint(); return; }
+      _pendingPinOpen = r; close(); showDetail(r.circleId);
+    },
+    meActions: meActionsFor(basisManifest), onMeAction: (id) => { close(); runMeAction(id); },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
-      line = text;
-      const r = plusRead(text) ?? await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) });
-      if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
+      line = text; referral = null;
+      // the person's OWN agent: an own act, or — for something that lives in a circle — where it lives (a referral,
+      // opened, never acted on from here); the own model only reads what the plain reading missed
+      const circles = await Promise.all((circlesCache ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+        id: c.id, name: c.name ?? '', manifestsByOrigin: circleManifestsByOrigin ?? {}, availability: await circleOpAvailability(c.id).catch(() => null),
+      })));
+      const o = plusLineOutcome(text, { circles });
+      const r = o?.kind === 'own' ? o : (o ? null : await plusReadWithModel(text, { ask: plusModelAsk(circleOwnModel()) }));
+      if (o?.kind === 'referral') { referral = o.to; error = null; }
+      else if (r) { actId = r.actId; values = { ...values, ...r.values }; error = null; }
       else error = t('circle.vandaag.plus_line_unread');
       paint();
     },
+    onOpenCircle: (id) => { close(); showDetail(id); },
     onSave: async (id, filled) => {
       values = filled;
       const op = editId ? plusSaveOp(id, filled, { id: editId }) : plusOp(id, filled);
       if (op.error) { error = t(op.error); paint(); return; }
       const r = await call(op);
       if (r?.ok === false) { error = t('circle.vandaag.plus_failed', { error: r.error ?? '' }); paint(); return; }
+      // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
+      if (!editId) actionFrequency.bump(OWN_USAGE_SCOPE, id);
       // a page with no block showing it gets one (an ordinary, undoable page change) — so the person sees what they made
       const follow = editId ? null : plusFollowUp(_screensBook, id);
       if (follow) { await rawCallSkill('basis', follow.opId, follow.args).catch(() => null); _screensBook = await userScreenStore.get(); }
@@ -4365,6 +4437,7 @@ function showVandaagPlus({ edit = null } = {}) {
     onClose: () => close(),
   });
   paint();
+  refreshPins().catch(() => {});
 }
 
 function showVandaagCustomise() {
@@ -4434,17 +4507,16 @@ async function showMij() {
     t, blocks, profilePage,
     onBlockAction: (a) => {
       if (a?.kind === 'edit-me') openAboutMePanel('default');
-      else if (a?.kind === 'open-my-data') showMyData();
+      else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') showMyData();
+      // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
+      else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
     onMyData: showMyData,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
     // The Me actions are DECLARED (manifest `meActions`); this is what each id does here.
-    onMeAction: (id) => {
-      if (id === 'share-contact') { showShareMyContact(); return; }
-      if (id === 'scan') { Promise.resolve(rawCallSkill('basis', 'scanQr', {})).catch(() => {}); }
-    },
+    onMeAction: runMeAction,
   });
   rerender();
   const relays = (() => { try { return _peerAgent?.relays?.list?.() ?? []; } catch { return []; } })();
@@ -4461,6 +4533,9 @@ async function showMij() {
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
     online: relays.length ? relays.some((r) => r.connected) : undefined,
     deviceId: circleHouseholdAgent?.myDeviceId?.() ?? null,
+    // "wat wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here
+    openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
+    pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
   } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
   if (_activeTab === 'mij') rerender();
 }
@@ -4737,6 +4812,7 @@ async function showMyData() {
     try { localStorage.setItem('circle.app.lang', lng); } catch { /* best-effort */ }
     circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
       .catch(() => { /* the cache stands */ });
+    mountPlusButton();   // the "+" says its name in the new language
     showMij();
   };
   // Display theme: persist + stamp data-theme live (the pre-paint hook in
@@ -4792,7 +4868,13 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
+  // what this person used most, per circle, on this device (the counter behind "Veel gebruikt"); shown and forgettable
+  const frequentRows = () => usageRows(actionFrequency.snapshot(), {
+    names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
+    labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
+  });
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
+    frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
     // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
     weekOverview, version: APP_VERSION,
@@ -5099,7 +5181,7 @@ async function showJoinCircle(inviteArg) {
 
 // OBJ-2 — Invite to THIS circle: read the current membership code (admin-gated) + encode it as a
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
-async function showCircleInvite(circleId) {
+async function showCircleInvite(circleId, { forFunction = false } = {}) {
   await askRelayIfNone();   // an invite without a relay gives the person joining none either
   // the admin a joiner redeems with is the circle's OWN self (a persona's circle: the persona) — never the default's
   // address in a persona's circle, which the joiner's trail would record as its confirming admin
@@ -5146,6 +5228,7 @@ async function showCircleInvite(circleId) {
       podBacked: invitePodBacked,
       podUrl:    invitePodBacked ? (inviteStorage?.groupPodUri ?? null) : null,
       relayUrl:  inviteRelayUrl,
+      ...(forFunction ? { forFunction: true } : {}),
     });
   }
   catch { r = { error: 'failed' }; }
@@ -5175,7 +5258,7 @@ async function showCircleInvite(circleId) {
   card.appendChild(canvas);
   import('qrcode').then((m) => (m.default ?? m).toCanvas(canvas, deepLink, { width: 220, margin: 1, errorCorrectionLevel: 'L' }, () => {})).catch(() => { canvas.remove(); });
   const hint = document.createElement('p');
-  hint.textContent = t('circle.invite.hint');
+  hint.textContent = t(forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint');
   card.appendChild(hint);
   // how many places this invite still has. The admin holding a code is the one person who can
   // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
@@ -5210,6 +5293,17 @@ async function showCircleInvite(circleId) {
   });
   card.appendChild(announce);
   card.appendChild(announced);
+  // A bot's own invite: single-use, and the admin's signed join then says the bot is one (only when it runs as a bot).
+  if (!forFunction) {
+    const forBot = document.createElement('button');
+    forBot.type = 'button';
+    forBot.className = 'cc-btn';
+    forBot.dataset.testid = 'invite-for-bot';
+    forBot.textContent = t('circle.invite.for_bot');
+    forBot.style.cssText = 'margin-top:10px;margin-left:8px';
+    forBot.addEventListener('click', () => { overlay.remove(); showCircleInvite(circleId, { forFunction: true }); });
+    card.appendChild(forBot);
+  }
 }
 
 // reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —
@@ -5404,7 +5498,8 @@ function _restoreOverlay() {
   const wrap = document.createElement('div');
   wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9000;display:flex;align-items:center;justify-content:center;';
   const card = document.createElement('div');
-  card.style.cssText = 'background:var(--surface,#fff);color:inherit;max-width:26rem;width:92%;padding:1.25rem;border-radius:8px;max-height:80vh;overflow:auto;';
+  // the theme's card colours (light AND dark) — circle.css `.cc-overlay-card`; never a literal white
+  card.className = 'cc-overlay-card';
   wrap.appendChild(card);
   document.body.appendChild(wrap);
   return { wrap, card, close: () => wrap.remove() };
@@ -5661,7 +5756,7 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
       offerInput.autocomplete = 'off';
       card.appendChild(offerInput);
       const offerErr = document.createElement('p');
-      offerErr.style.cssText = 'color:var(--cc-danger, #b00020);margin:.2rem 0;display:none;'; // hex-ok: fallback only
+      offerErr.style.cssText = 'color:var(--danger);margin:.2rem 0;display:none;';
       offerErr.textContent = t('circle.enroll.offer_paste_invalid');
       card.appendChild(offerErr);
       const values = {};
@@ -6750,6 +6845,12 @@ function showCircle(id, circle, policy) {
         availability: av,
         mediaWired: !!circleMedia,
       });
+      // a BOOKMARK opened from the "+" sheet: this circle, that op's form — the same path a tap on the entry takes here
+      if (_pendingPinOpen?.circleId === id) {
+        const want = _pendingPinOpen; _pendingPinOpen = null;
+        const entry = circleAttachMenu.find((e) => e.appOrigin === want.appOrigin && e.opId === want.opId);
+        if (entry) Promise.resolve().then(() => attachCommandDispatch(entry)).catch(() => {});
+      }
     } catch { circleAttachMenu = []; }
     try { rerender(); } catch { /* the circle may have closed */ }
   })();
@@ -7398,6 +7499,8 @@ function showCircle(id, circle, policy) {
       attachMenu: circleAttachMenu,
       attachFileOpId: 'embed-file',
       onAttachCommand: attachCommandDispatch,
+      // "Pin to +": a bookmark (this circle · the entry's app · its op) in the person's "+" sheet, through the screen op
+      onPinEntry: (entry) => { Promise.resolve(rawCallSkill('basis', 'screen-pin', { kind: 'bookmark', circleId: id, appOrigin: entry.appOrigin, opId: entry.opId })).then(() => userScreenStore.get()).then((b) => { _screensBook = b; }).catch(() => {}); },
       // S1 #1 — noticeboard surface for the noticeboard tab (the view only uses it when active).
       noticeboard: {
         posts:    noticeboardPosts,
@@ -8524,16 +8627,7 @@ async function showSettings(id) {
   // The roster, for one question: may THIS viewer's Save count? (an admin's statement is folded, a member's dropped)
   let settingsRoster = [];
   try { const r = await rawCallSkill('pinboard', 'listGroupMembers', { groupId: id }); settingsRoster = Array.isArray(r?.members) ? r.members : []; } catch { /* fail closed: greyed */ }
-  const gov = bindCircleGovernance({
-    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    // the self this device is in each circle — a persona's circle is the persona's (governance judges and signs as it)
-    myRef: (cid) => mySelfIn(cid) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-    circleIdentityFor: circleIdentityForShell,
-    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
-      circlePolicyLane.state(cid).catch(() => { /* catch-up reconciles */ });
-      return r;
-    }),
-  });
+  const gov = shellGovernance({ myWebid });
   // §4 storage-policy bridge — remember the pod tier at entry so Save only pushes
   // to pinboard when the admin actually changed it; a failed push (admin-only / the
   // one-way downgrade guard / a centralised tier missing its groupPodUri) is
@@ -8757,6 +8851,7 @@ async function boot() {
   // pre-boot cache of app.lang
   let _storedAppLang = null; try { _storedAppLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
+  mountPlusButton();   // after localisation: mounted before it, the button was named by its key
   // A hosted build links back to its site, above everything else (no frame ⇒ nothing).
   renderHostFrame(document.body, { frame: HOST_FRAME, t });
   renderCircleLauncher(rootEl, { loading: true, t });
@@ -8989,6 +9084,7 @@ async function boot() {
       sendPeer:        (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts),
       currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join (2026-09-16)
       circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
+      profileKind:     () => agent.profileKind?.() ?? 'person',   // a bot's node says so; the admin decides what it means
       isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
       pendingMap:      circlePendingRedeems,
       // Identity 5B/C — present this device's per-circle address on the peer redeem path.

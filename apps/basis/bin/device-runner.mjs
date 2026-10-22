@@ -603,6 +603,7 @@ if (relayUrl) {
     sendPeer,
     currentPersonKey: () => agent.personKey?.() ?? null,   // the first person key rides the join
     circleSelfFor:   (gid) => agent.circleSelf?.(gid) ?? null,   // WHO joins: the circle's persona (its redeem leaves as it)
+    profileKind:     () => agent.profileKind?.() ?? 'person',   // a bot's node says so; the admin decides what it means
     isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
     pendingMap:      pendingPeerRedeems,
     // this device's per-circle address on the redeem path, proven with its own key (source circle == the circle joined)

@@ -5,6 +5,7 @@
  * The checked-in v1 file must keep importing: a change that breaks it turns this red (fix the import, or write v2
  * with a reader for v1).
  */
+import { withAnswers } from '../src/v2/rsvpItems.js';
 import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -68,8 +69,11 @@ async function reads({ agent, own }) {
   const entries = async (list) => (((await own('lists', 'listEntries', { list }))?.items) ?? []).map((i) => i.label).sort();
   const chores = (((await own('tasks', 'listOpen', {}))?.items) ?? [])
     .map((c) => `${c.text}|${[...new Set([...(c.assignees ?? []), c.assignee].filter(Boolean))].join(',')}|${String(c.dueAt ?? '').slice(0, 10)}`).sort();
-  const events = (await agent.householdItems()).filter((i) => i.type === 'calendar-event')
-    .map((e) => `${e.title}|${e.startsAt}|${e.state ?? ''}|${JSON.stringify(e.rsvp ?? {})}`).sort();
+  // an appointment's answers are their own items: read through the projection, as every reader does
+  const all = await agent.householdItems();
+  const events = withAnswers(all.filter((i) => i.type === 'calendar-event'), all.filter((i) => i.type === 'rsvp'))
+    // what a person sees of the answers: the answer items, or — after an import — the record the file brought back
+    .map((e) => `${e.title}|${e.startsAt}|${e.state ?? ''}|${JSON.stringify({ ...(e.answersAt ?? {}), ...(e.rsvp ?? {}) })}`).sort();
   return { boodschappen: await entries('Boodschappen'), reparaties: await entries('Reparaties'), chores, events };
 }
 
@@ -246,18 +250,22 @@ describe('a file is not trusted beyond the household', () => {
     ]));
   });
 
-  it('a step the gate refuses after the thing was made is reported, not counted as done', async () => {
-    const call = async (app, op) => {
+  it("the file's answers come back as a RECORD on the appointment, never as answers (the host cannot sign for a person)", async () => {
+    const calls = [];
+    const call = async (app, op, args) => {
+      calls.push({ op, args });
       if (op === 'listLists') return { ok: true, items: [{ label: 'Agenda' }] };
       if (op === 'listContacts') return { ok: true, contacts: [] };
-      if (op === 'rsvpAccept') return { ok: false, error: 'refused' };
       return { ok: true, itemId: 'e1' };
     };
     const file = { format: 'onderling-household-export', v: 1, loose: [], settings: {},
       people: [{ id: 'telegram:2', channel: 'telegram', uid: '2', role: 'member' }],
       lists: [{ n: 1, name: 'Agenda', entries: [{ n: 2, type: 'calendar-event', title: 'x', startsAt: '2026-10-07T08:00:00.000Z', rsvp: { 'telegram:2': 'accepted' } }] }] };
     const r = await importHousehold(file, { call });
-    expect(r.notRestored).toEqual([expect.objectContaining({ what: 'rsvp', who: 'telegram:2' })]);
+    expect(calls.filter((c) => /^rsvp/.test(c.op))).toEqual([]);
+    expect(calls.find((c) => c.op === 'addEvent')?.args?.answersAt).toEqual({ 'telegram:2': 'accepted' });
+    expect(r.done.answersKept).toBe(1);
+    expect(r.notRestored).toEqual([]);
   });
 });
 
@@ -308,8 +316,8 @@ describe('a step by someone not in the book', () => {
     expect(calls.filter((c) => c.op === 'rsvpAccept')).toEqual([]);
     expect(calls.find((c) => c.op === 'cancelEvent')?.caller).toBeNull();
     expect(calls.find((c) => c.op === 'markListItemDone')?.caller).toBeNull();
+    expect(r.done.answersKept, 'the answer rides on the appointment as its record').toBe(1);
     expect(r.notRestored).toEqual(expect.arrayContaining([
-      expect.objectContaining({ what: 'rsvp', who: 'telegram:77', why: 'not-in-the-book' }),
       expect.objectContaining({ what: 'by-the-host', step: 'cancel', who: 'telegram:77' }),
       expect.objectContaining({ what: 'by-the-host', step: 'tick', who: 'telegram:77' }),
     ]));

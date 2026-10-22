@@ -16,11 +16,11 @@ import {
   canAdvanceFromConfirm, submitRestore,
 } from '../../core/wizards/restoreFromMnemonicState.js';
 import {
-  Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting,
+  Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
 } from './_kit.js';
 
 export default function RestoreFromMnemonicWizardModal({
-  visible, callSkill, onClose, onDispatched, t,
+  visible, theme = null, callSkill, onClose, onDispatched, t,
 }) {
   const [state, setState] = useState(() => initialState());
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
@@ -36,10 +36,11 @@ export default function RestoreFromMnemonicWizardModal({
   }, [state, callSkill, onDispatched]);
 
   return (
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={styles.sheet}
+          style={[styles.sheet, { backgroundColor: wizardPalette(theme).card }]}
           onPress={(e) => e.stopPropagation()}
           testID="restore-from-mnemonic-wizard"
         >
@@ -60,7 +61,7 @@ export default function RestoreFromMnemonicWizardModal({
                     intro="Paste your 12- or 24-word recovery phrase. This WILL replace your current identity — make sure you've backed up anything important first."
                   >
                     <Textarea
-                      label="Recovery phrase"
+                      label={t('circle.wizard.restore.phrase')}
                       value={state.mnemonic}
                       onChangeText={(v) => setState((s) => ({ ...s, mnemonic: v }))}
                       placeholder="word1 word2 word3 …"
@@ -74,12 +75,12 @@ export default function RestoreFromMnemonicWizardModal({
                 {state.step === 2 && (
                   <Body title="Confirm" intro="This is destructive. Please confirm by ticking both boxes.">
                     <Checkbox
-                      label="I understand my current identity + local data will be LOST."
+                      label={t('circle.wizard.restore.ack_lost')}
                       checked={state.understandsLoss}
                       onToggle={(v) => setState((s) => ({ ...s, understandsLoss: v }))}
                     />
                     <Checkbox
-                      label="I understand this CANNOT be undone."
+                      label={t('circle.wizard.restore.ack_undone')}
                       checked={state.confirmedNoUndo}
                       onToggle={(v) => setState((s) => ({ ...s, confirmedNoUndo: v }))}
                     />
@@ -118,6 +119,7 @@ export default function RestoreFromMnemonicWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 

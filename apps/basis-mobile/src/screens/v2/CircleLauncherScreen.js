@@ -12,6 +12,9 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import Btn from './Btn.js';
+import { pendingEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
+import { pinsOf, pinKey, paintablePins, openPin } from '../../../../basis/src/v2/plusPins.js';
 import { dayHeader, dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../../../basis/src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY } from '../../../../basis/src/v2/startScreen.js';
@@ -279,7 +282,11 @@ import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import VandaagCustomiseModal from './VandaagCustomiseModal.js';
 import VandaagPlusModal from './VandaagPlusModal.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../../../basis/src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
+import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
+import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
+import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
+import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
@@ -476,7 +483,7 @@ function PersonaPanel({
   );
 }
 
-function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, overlay = null, hasMesh = false, children }) {
+function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, overlay = null, hasMesh = false, onPlus = null, plusSheet = null, children }) {
   // The tab frame paints the app's GROUND. It used to be a bare `flex: 1` View, which is transparent,
   // so any screen inside it that themed its text but not its background showed the platform's default
   // white — themed (light) ink on white, unreadable, and glaring beside an otherwise dark app. The
@@ -489,6 +496,14 @@ function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, 
       {/* the header avatar, top-right on every tab: the persona's picture or initials; a tap opens the person's editor */}
       {avatar ? <HeaderAvatar avatar={avatar} onPress={onAvatar} /> : null}
       {overlay}
+      {/* THE "+": one floating button on every tab, bottom-right above the tab bar — the one accent (web twin: .cc-fab) */}
+      {onPlus ? (
+        <Pressable onPress={onPlus} accessibilityRole="button" accessibilityLabel={t('circle.vandaag.plus')} testID="vandaag-plus-open"
+          style={{ position: 'absolute', right: 20, bottom: 76, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.accentInk, elevation: 4 }}>
+          <Text style={{ color: theme.color.accentContrast, fontSize: 28, lineHeight: 30 }}>+</Text>
+        </Pressable>
+      ) : null}
+      {plusSheet}
       <CircleTabBar active={active} onSelect={onSelect} badges={badges} hasMesh={hasMesh} />
     </View>
   );
@@ -738,6 +753,11 @@ export default function CircleLauncherScreen({
   const [plusEdit, setPlusEdit] = useState(null);     // …opened on an own row: `{ act, id, values, asSelf }` (shared `plusEditFor`)
   // …and, when its act shares, the contacts it can go to (the shared `plusShareTargets`; read when the sheet opens on it)
   const [plusShareList, setPlusShareList] = useState(null);
+  // a repaint after My data clears this device's usage counts (the store is module-level, not React state)
+  const [, setFrequencyTick] = useState(0);
+  // Vastgezet: a bookmark the "+" sheet opened (its circle opens, then that op's form); and the pins as paintable now
+  const [pendingPinOpen, setPendingPinOpen] = useState(null);
+  const [pinnedView, setPinnedView] = useState([]);
   useEffect(() => {
     if (!plusEdit?.act?.share) { setPlusShareList(null); return undefined; }
     let live = true;
@@ -1018,8 +1038,13 @@ export default function CircleLauncherScreen({
     getPodWriter: () => sessionToPodWriterRN(sessionRef?.current ?? null),
   }), []);
   // What Mij's declared blocks read beside the waist (the identity line's readings, the agents list)
+  // the governance binding, for Mij's reads (made further down; read through a ref when Mij asks, after render)
+  const govPolicyRef = useRef(null);
   const mijSources = useMemo(() => ({
     eventLog, circles: circlesShown, seenAt, myRefs: unreadMyRefs, availabilityStore,
+    // "wat wacht op jou": the votes open in each circle (the same fold the tile badge reads), a device offer here
+    openProposals: (cid) => (govPolicyRef.current ? openPolicyProposals(govPolicyRef.current, cid) : Promise.resolve({ proposals: [] })),
+    pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
     selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
@@ -1085,6 +1110,7 @@ export default function CircleLauncherScreen({
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
     });
   }, [bundle, eventLog, policyStore]);
+  govPolicyRef.current = govPolicy;
   // α.1e — per-circle screen recipe book (multi-recipe; one marked active).
   const recipeStore       = useMemo(() => makeCircleRecipeStoreRN(AsyncStorage), []);
   // α.3 — per-user screens store.  One book per user.
@@ -1811,7 +1837,7 @@ export default function CircleLauncherScreen({
   // The LIVE register value (device scope, the device-params consolidation) — no bare-key load.
   const shareNknAddress = bundle?.agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false;
 
-  const openCircleInvite = useCallback(async (circleId) => {
+  const openCircleInvite = useCallback(async (circleId, { forFunction = false } = {}) => {
     await askRelayIfNone();   // an invite without a relay gives the person joining none either
     let r;
     try {
@@ -1838,9 +1864,10 @@ export default function CircleLauncherScreen({
         capabilities: pol.capabilities, apps: pol.apps,
         podBacked, podUrl: podBacked ? (storage?.groupPodUri ?? null) : null,
         relayUrl,
+        ...(forFunction ? { forFunction: true } : {}),
       });
     } catch { r = { error: 'failed' }; }
-    setInviteFor({ circleId, ...(r || {}) });
+    setInviteFor({ circleId, ...(forFunction ? { forFunction: true } : {}), ...(r || {}) });
   }, [bundle, policyStore, shareNknAddress, askRelayIfNone]);
 
   // ONE mount for everything a scan or the Join button opens, painted beside whichever view is up (the Mij view returns
@@ -1901,14 +1928,161 @@ export default function CircleLauncherScreen({
     </>
   );
 
+  // the invite QR for a circle (admin shows it; another device scans): ONE element, painted beside every view (the
+  // final return). It lived in the list and the open circle only, so an invite opened anywhere else painted nothing.
+  const inviteModal = (
+        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
+          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
+            <Pressable style={styles.inviteCard} onPress={() => {}}>
+              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
+              {inviteFor?.uri ? (
+                <>
+                  <QrCodeView value={inviteFor.uri} size={200} />
+                  <Text style={styles.inviteHint}>{t(inviteFor.forFunction ? 'circle.invite.for_bot_hint' : 'circle.invite.hint')}</Text>
+                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
+                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
+                    <Text style={styles.inviteHint}>
+                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
+                    </Text>
+                  ) : null}
+                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
+                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="invite-announce-nearby"
+                    onPress={async () => {
+                      const res = await bundle?.nearbyRoom?.announceInvite?.({
+                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
+                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
+                      }) ?? { ok: false, reason: 'nobody-nearby' };
+                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
+                    }}
+                  >
+                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
+                  </Pressable>
+                  {inviteFor.announced ? (
+                    <Text style={styles.inviteHint} testID="invite-announce-result">
+                      {inviteFor.announced.ok
+                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
+                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
+                    </Text>
+                  ) : null}
+                  {/* A bot's own invite: single-use; the admin's signed join then says the bot is one (web parity). */}
+                  {!inviteFor.forFunction ? (
+                    <Btn testID="invite-for-bot" label={t('circle.invite.for_bot')}
+                      onPress={() => { const cid = inviteFor.circleId; setInviteFor(null); openCircleInvite(cid, { forFunction: true }); }} />
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+  );
   const page = (() => {
+  // the pins as they can be painted now (a bookmark only while its circle is the person's and shows the op there)
+  useEffect(() => {
+    if (!plusOpen) return;
+    let alive = true;
+    (async () => {
+      const pins = pinsOf(screensBook ?? {});
+      const manifests = buildManifestsByOrigin();
+      const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
+      const ids = [...new Set(pins.filter((p) => p.kind === 'bookmark').map((p) => p.circleId))];
+      const avs = Object.fromEntries(await Promise.all(ids.map(async (cid) => [cid, await circleAvailabilityFor(cid, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null)])));
+      const entries = attachEntriesFor({ manifestsByOrigin: manifests });
+      const mine = (circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id));
+      const view = paintablePins(pins, { circles: mine, availabilityOf: (cid) => avs[cid] ?? null, ownActIds: PLUS_ACTS.map((x) => x.id) }).map((p) => {
+        if (p.kind === 'own') { const a = PLUS_ACTS.find((x) => x.id === p.actId); return { ...p, key: pinKey(p), label: a ? plusLabel(t, a) : p.actId }; }
+        const e = entries.find((x) => x.appOrigin === p.appOrigin && x.opId === p.opId);
+        return { ...p, key: pinKey(p), label: t('circle.vandaag.pin_bookmark', { name: p.name || t('circle.screens.untitled'), op: t(e?.label ?? p.opId) }) };
+      });
+      if (alive) setPinnedView(view);
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [plusOpen, screensBook, circles, policyStore, overrideStore, bundle?.catalogue]);
+
+  // THE "+" SHEET, on every tab (the person's own entry): its line, their own acts, their Me actions — one element the tab
+  // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
+  const plusSheet = (
+      <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)}
+        pinned={pinnedView} pinnedActIds={pinsOf(screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId)}
+        onTogglePin={(actId) => { const own = { kind: 'own', actId }; const on = pinsOf(screensBook ?? {}).some((p) => pinKey(p) === pinKey(own)); runScreenOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own); }}
+        onUnpin={(key) => runScreenOp('screen-unpin', { key })}
+        // an own pin chooses its act here; a BOOKMARK opens its circle with that op's form — never run from the sheet
+        onOpenPin={(p) => {
+          const r = openPin(p, { circles: (circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)) });
+          if (r.error) return t(r.error);
+          if (r.kind === 'own') return { actId: r.actId };
+          const c = circles.find((x) => x.id === r.circleId);
+          setPlusOpen(false); setPlusEdit(null); setPendingPinOpen(r); if (c) openCircle(c);
+          return null;
+        }}
+        meActions={meActionsMobile(basisManifest)} onMeAction={(id) => { setPlusOpen(false); setPlusEdit(null); onMeAction(id); }} visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
+        selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
+        // the free line: the shared reader over the sheet's own acts (never a circle)
+        // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
+        // the person's OWN agent: an own act, or — for something that lives in a circle — where it lives (a referral the
+        // sheet OPENS, never acts on); the own model reads only what the plain reading missed (web twin: circleApp.js)
+        onRead={async (line) => {
+          const manifests = buildManifestsByOrigin();
+          const sources = [...new Set(Object.values(manifests))].map((manifest) => ({ manifest }));
+          const list = await Promise.all((circles ?? []).filter((c) => c?.id && !isPairCircleId(c.id)).map(async (c) => ({
+            id: c.id, name: c.name ?? '', manifestsByOrigin: manifests,
+            availability: await circleAvailabilityFor(c.id, { policyStore, overrideStore, sources, catalogue: bundle?.catalogue ?? null, manifestsByOrigin: manifests }).catch(() => null),
+          })));
+          const o = plusLineOutcome(line, { circles: list });
+          if (o?.kind === 'referral') return { referral: o.to };
+          return (o?.kind === 'own' ? o : null) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') };
+        }}
+        onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); setPlusOpen(false); setPlusEdit(null); if (c) openCircle(c); }}
+        shareTargets={plusShareList}
+        onShare={plusEdit ? async (actId, contact) => {
+          const op = plusShareOp(actId, { id: plusEdit.id, with: contact });
+          if (op.error) return t(op.error);
+          const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+          if (r?.ok === false) return r.error ?? t('circle.vandaag.plus_failed', { error: '' });
+          setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
+          return null;
+        } : null}
+        onRemove={plusEdit ? async (actId) => {
+          const op = plusRemoveOp(actId, { id: plusEdit.id });
+          if (op.error) return t(op.error);
+          // taken away as the self that made it, like a change
+          const actAs = plusEdit.asSelf && plusEdit.asSelf !== 'default' ? (heldSelves.find((p) => p.id === plusEdit.asSelf)?.webid ?? null) : null;
+          const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+            .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+          if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
+          setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
+          return null;
+        } : null}
+        onSave={async (actId, values, asSelf) => {
+          // the act's op through the waist (shared `plusOp`, or `plusSaveOp` on an own row), written as the ticked self;
+          // a page with no block showing it gets one (undoable)
+          const op = plusEdit ? plusSaveOp(actId, values, { id: plusEdit.id }) : plusOp(actId, values);
+          if (op.error) return t(op.error);
+          // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
+          const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
+          const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
+            .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
+          if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
+          // counted on this device: the sheet offers what this person makes most first (My data shows and clears it)
+          if (!plusEdit) actionFrequency.bump(OWN_USAGE_SCOPE, actId);
+          const follow = plusEdit ? null : plusFollowUp(screensBook, actId);
+          if (follow) await runScreenOp(follow.opId, follow.args);
+          setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
+          return null;
+        }} />
+  );
   if (view === 'screens') {
     // VANDAAG: the active page of the person's own pages, its blocks capped with "meer"; the pages as sub-tabs only
     // when there is more than one; "Pas aan" opens the customise sheet (every control a screen op). Web: circleApp.js.
     const active = getActiveScreen(screensBook);
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="screens" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <View style={{ flex: 1, padding: 16, backgroundColor: theme.color.paper }}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="screens" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        {/* clear the status bar: the day's header sat under the clock */}
+        <View style={{ flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper }}>
           {/* the day this page is about, above everything: a day, not a list (web twin: circle-vandaag__day) */}
           <Text style={{ color: theme.color.ink, fontSize: 20, fontWeight: '600', marginBottom: 8 }} testID="vandaag-day">
             {dayHeader(Date.now(), { locale: dateLocaleOf(t) })}
@@ -1935,12 +2109,7 @@ export default function CircleLauncherScreen({
                 {expandedBlockId ? `← ${t('circle.screen.more_back')}` : '⋯'}
               </Text>
             </Pressable>
-            {expandedBlockId ? null : (
-              <Pressable onPress={() => setPlusOpen(true)} accessibilityRole="button" testID="vandaag-plus-open"
-                style={{ marginLeft: 'auto', marginBottom: 8, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: theme.color.accentInk }}>
-                <Text style={{ color: theme.color.accentContrast, fontSize: 14, fontWeight: '600' }}>{`+ ${t('circle.vandaag.plus')}`}</Text>
-              </Pressable>
-            )}
+            {/* the "+" is the floating button on every tab now (WithTabBar) */}
           </View>
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
@@ -1968,54 +2137,14 @@ export default function CircleLauncherScreen({
         <VandaagCustomiseModal visible={customiseOpen} model={customiseModel(screensBook, { circles })}
           onAct={(act, args) => { const { opId, args: opArgs } = customiseOp(act, args ?? {}); runScreenOp(opId, opArgs); }}
           onClose={() => setCustomiseOpen(false)} />
-        <VandaagPlusModal visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
-          selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
-          // the free line: the shared reader over the sheet's own acts (never a circle)
-          // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)
-          onRead={async (line) => plusRead(line) ?? (await plusReadWithModel(line, { ask: plusModelAsk(ownModelOf(userLlmCfg)) })) ?? { error: t('circle.vandaag.plus_line_unread') }}
-          shareTargets={plusShareList}
-          onShare={plusEdit ? async (actId, contact) => {
-            const op = plusShareOp(actId, { id: plusEdit.id, with: contact });
-            if (op.error) return t(op.error);
-            const r = await Promise.resolve(bundle?.callSkill?.(op.app, op.opId, op.args)).catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
-            if (r?.ok === false) return r.error ?? t('circle.vandaag.plus_failed', { error: '' });
-            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
-            return null;
-          } : null}
-          onRemove={plusEdit ? async (actId) => {
-            const op = plusRemoveOp(actId, { id: plusEdit.id });
-            if (op.error) return t(op.error);
-            // taken away as the self that made it, like a change
-            const actAs = plusEdit.asSelf && plusEdit.asSelf !== 'default' ? (heldSelves.find((p) => p.id === plusEdit.asSelf)?.webid ?? null) : null;
-            const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
-              .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
-            if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
-            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
-            return null;
-          } : null}
-          onSave={async (actId, values, asSelf) => {
-            // the act's op through the waist (shared `plusOp`, or `plusSaveOp` on an own row), written as the ticked self;
-            // a page with no block showing it gets one (undoable)
-            const op = plusEdit ? plusSaveOp(actId, values, { id: plusEdit.id }) : plusOp(actId, values);
-            if (op.error) return t(op.error);
-            // made AS the ticked self (the waist's actAs): it rides that self's own lane; the default needs no saying
-            const actAs = asSelf && asSelf !== 'default' ? (heldSelves.find((p) => p.id === asSelf)?.webid ?? null) : null;
-            const r = await Promise.resolve(actAs ? bundle?.agent?.callSkill?.(op.app, op.opId, op.args, { actAs }) : bundle?.callSkill?.(op.app, op.opId, op.args))
-              .catch((e) => ({ ok: false, error: e?.message ?? String(e) }));
-            if (r?.ok === false) return t('circle.vandaag.plus_failed', { error: r.error ?? '' });
-            const follow = plusEdit ? null : plusFollowUp(screensBook, actId);
-            if (follow) await runScreenOp(follow.opId, follow.args);
-            setPlusOpen(false); setPlusEdit(null); refreshScreensBook();
-            return null;
-          }} />
       </WithTabBar>
     );
   }
   // Mij = identity, the declared screen; its other doors are behind My data.
   if (view === 'profile') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2027,7 +2156,7 @@ export default function CircleLauncherScreen({
   // its only undo, in a place a person can find without being any circle's admin.
   if (view === 'blocked') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('mydata')} />
       </WithTabBar>
     );
@@ -2035,7 +2164,7 @@ export default function CircleLauncherScreen({
   // Share my contact — a Mij sub-view (web parity: showShareMyContact); back returns to profile.
   if (view === 'shareContact') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <ShareMyContactScreen callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2044,7 +2173,7 @@ export default function CircleLauncherScreen({
   // op + the settable params, from the shared projections; back returns to profile.
   if (view === 'advanced') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} onBack={() => setView('profile')} />
       </WithTabBar>
     );
@@ -2057,7 +2186,7 @@ export default function CircleLauncherScreen({
   // built from the encapsulated identity secret). A null opener makes a row tap a deny-safe no-op.
   if (view === 'sharedWithMe') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
@@ -2069,8 +2198,8 @@ export default function CircleLauncherScreen({
   // S5 — "My data": data-location + privacy + usage (read-only); sub-view of Mij.
   if (view === 'mydata') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleMyDataScreen callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked') }}
           personClock={personClockRef.current} />
       </WithTabBar>
@@ -2078,7 +2207,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'availability') {
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => setView('mydata')}
@@ -2091,7 +2220,7 @@ export default function CircleLauncherScreen({
   if (view === 'contacten') {
     if (contactThread) {
       return (
-        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
@@ -2103,7 +2232,7 @@ export default function CircleLauncherScreen({
       );
     }
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>
@@ -2235,7 +2364,7 @@ export default function CircleLauncherScreen({
     // On a device with no discovering transport the surface is honest about it rather than silent:
     // the banner says "unavailable" instead of the screen looking like an empty room.
     return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="nearby" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="nearby" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <NearbyScreenHost
           bundle={bundle}
           heldSelves={heldSelves}
@@ -2362,59 +2491,13 @@ export default function CircleLauncherScreen({
       />
     );
   }
-  // OBJ-2 — the invite QR for a circle (admin shows it; another device scans). ONE element, painted where the person IS:
-  // the list AND the open circle. It lived only in the list's return, so Invite from a circle's ⋯ set `inviteFor` and
-  // painted nothing until `← circles` (walked 2026-10-09: 22 s of nothing, then the QR the moment the list came back).
-  const inviteModal = (
-        <Modal visible={!!inviteFor} transparent animationType="fade" onRequestClose={() => setInviteFor(null)}>
-          <Pressable style={styles.inviteBackdrop} onPress={() => setInviteFor(null)}>
-            <Pressable style={styles.inviteCard} onPress={() => {}}>
-              <Text style={styles.inviteTitle}>{t('circle.invite.title')}</Text>
-              {inviteFor?.uri ? (
-                <>
-                  <QrCodeView value={inviteFor.uri} size={200} />
-                  <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
-                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
-                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
-                    <Text style={styles.inviteHint}>
-                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
-                    </Text>
-                  ) : null}
-                  {/* The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is
-                      listed nearby for 15 minutes. Only an admin reaches this branch (a uri exists). */}
-                  <Pressable
-                    accessibilityRole="button"
-                    testID="invite-announce-nearby"
-                    onPress={async () => {
-                      const res = await bundle?.nearbyRoom?.announceInvite?.({
-                        uri: inviteFor.uri, circleId: inviteFor.circleId, expiresAt: inviteFor.expiresAt ?? null,
-                        circleName: circles.find((c) => c.id === inviteFor.circleId)?.name ?? '',
-                      }) ?? { ok: false, reason: 'nobody-nearby' };
-                      setInviteFor((cur) => (cur ? { ...cur, announced: res } : cur));
-                    }}
-                  >
-                    <Text style={styles.inviteHint}>{t('circle.invite.announce_nearby')}</Text>
-                  </Pressable>
-                  {inviteFor.announced ? (
-                    <Text style={styles.inviteHint} testID="invite-announce-result">
-                      {inviteFor.announced.ok
-                        ? t('circle.invite.announce_nearby_done', { reached: inviteFor.announced.reached ?? 0, peers: inviteFor.announced.peers ?? 0 })
-                        : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
-  );
 
   if (selected) {
     return (
       <>
       <CircleDetail
+        onPinEntry={(e) => { if (selected?.id) runScreenOp('screen-pin', { kind: 'bookmark', circleId: selected.id, appOrigin: e.appOrigin, opId: e.opId }); }}
+        openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
         selfIn={(cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } }}
         circle={selected}
@@ -2522,15 +2605,13 @@ export default function CircleLauncherScreen({
         onLists={() => setView('lists')}
         onShare={() => { loadShareContacts(); setView('share'); }}
       />
-      {relayQuestionModal}
-      {inviteModal}
       </>
     );
   }
 
   const listPaint = launcherListPaint({ loading, settled: launcherSettled, count: circles.length, bootError });
   return (
-    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} overlay={switcherModal} active="circles" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+    <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="circles" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
       <View style={styles.page} testID="circle-launcher">
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>
@@ -2615,33 +2696,6 @@ export default function CircleLauncherScreen({
             → review) — web parity (2026-07-26). It used to render a bare inline name row, so the wizard we
             built was reachable only through the onboarding handoff and every governance/rules/offerings
             choice silently defaulted. `quickCreateCircle` stays the PROGRAMMATIC create (help circle). */}
-        {creating ? (
-          <CreateGroupWizardModal
-            visible
-            callSkill={bundle?.callSkill}
-            t={t}
-            theme={theme}
-            getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
-            persistPolicy={async (groupId, patch) => {
-              await policyStore.update?.(groupId, patch);
-              circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
-            }}
-            // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
-            shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
-            onClose={() => setCreating(false)}
-            onDispatched={(r) => {
-              setCreating(false);
-              const gid = r?.groupId ?? null;
-              if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
-              load();
-              // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
-              // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
-              if (gid) openCircleInvite(gid).catch(() => {});
-            }}
-          />
-        ) : null}
-        {relayQuestionModal}
-        {inviteModal}
         {/* β.5 — per-tile context menu, rendered as a transparent modal
             so a tap outside the sheet dismisses it.  The four actions
             mirror web: pin (toggle), mute (toggle), settings, leave. */}
@@ -2725,6 +2779,37 @@ export default function CircleLauncherScreen({
     <>
       {page}
       {scanOverlays}
+      {/* the relay question and the invite card are modals too: painted ONCE beside every view (they lived in the
+          list and the open circle only, so an invite opened from Vandaag — the wizard's last step — never showed) */}
+      {relayQuestionModal}
+      {inviteModal}
+      {/* the create-circle wizard beside whichever view is up: Vandaag's "Make a circle" set `creating` while the
+          wizard was mounted in the circles list only, so on Vandaag the tap did nothing (found walking the phone) */}
+      {creating ? (
+        <CreateGroupWizardModal
+          visible
+          callSkill={bundle?.callSkill}
+          t={t}
+          theme={theme}
+          getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
+          persistPolicy={async (groupId, patch) => {
+            await policyStore.update?.(groupId, patch);
+            circlePolicyLane?.state(groupId).catch(() => {});   // the founder's first policy, on the lane
+          }}
+          // the persona the founder picked says what it discloses in the new circle (the picture resealed here)
+          shareFounderRelease={(cid, personaId) => bundle?.shareCircleRelease?.(cid, personaId, { resealMediaForCircle })}
+          onClose={() => setCreating(false)}
+          onDispatched={(r) => {
+            setCreating(false);
+            const gid = r?.groupId ?? null;
+            if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
+            load();
+            // The code Review promised: the circle's invite, through the one builder the ⋯ menu uses (its relay, its
+            // policy) — the wizard's own URL was dropped here, so a new circle closed with nothing to share.
+            if (gid) openCircleInvite(gid).catch(() => {});
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -2866,6 +2951,9 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
+  // "Pin to +" on an attach entry (`onPinEntry(entry)`), and a bookmark opened from the "+" sheet (`openOp`: that op's
+  // form, run once the circle's menu has resolved, then `onOpenOpDone()`)
+  onPinEntry = null, openOp = null, onOpenOpDone = null,
   // the self this device is in this circle (a persona's circle is the persona's): whose drivers it reads
   selfProfileId = 'default',
   // the self's ref in a circle (`agent.circleSelf(cid).webid`) — one function, not the bundle; null → the device's ref
@@ -3384,6 +3472,21 @@ function CircleDetail({
     if (sent) broadcastFanOut({ msgId: sent.msgId, text: out.text, ts: sent.ts, card: out.card });
     return reply;
   }, [onCircleControl, rawCallSkill, manifestsByOrigin, appendCircleMessage, broadcastFanOut, t, circle?.id]);
+  // one entry run, from the attach menu and from a bookmark the "+" sheet opened alike: an entry that needs input opens the
+  // op's OWN form (the shared page sheet the Advanced drawer uses); one that needs none dispatches straight away
+  const runAttachEntry = useCallback((e) => {
+    const required = (Array.isArray(e.params) ? e.params : []).filter((p) => p?.required);
+    if (required.length > 0) setAttachForm(e);
+    else runComposerOp(e.opId, {}, e.appOrigin);
+  }, [runComposerOp]);
+  // a BOOKMARK from the "+" sheet: this circle, that op's form — once the circle's menu has resolved (web twin:
+  // `_pendingPinOpen`); an op the menu does not offer here opens nothing
+  useEffect(() => {
+    if (!openOp || openOp.circleId !== circle?.id || !attachEntries.length) return;
+    const e = attachEntries.find((x) => x.appOrigin === openOp.appOrigin && x.opId === openOp.opId);
+    onOpenOpDone?.();
+    if (e) runAttachEntry(e);
+  }, [openOp, circle?.id, attachEntries, runAttachEntry, onOpenOpDone]);
 
   // The fallback offer speaks HERE while this circle is open (web parity: the chat makes the offer, at the
   // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never
@@ -4782,22 +4885,23 @@ function CircleDetail({
         {attachOpen && attachEntries.length > 0 ? (
           <View style={styles.attachMenu} testID="circle-attach-menu">
             {attachEntries.map((e) => (
-              <Pressable
-                key={e.opId}
-                style={styles.attachItem}
-                testID={`circle-attach-${e.opId}`}
-                accessibilityRole="button"
-                onPress={() => {
-                  setAttachOpen(false);
-                  const required = (Array.isArray(e.params) ? e.params : []).filter((p) => p?.required);
-                  // An entry that needs input opens the op's OWN form (the shared page sheet the
-                  // Advanced drawer uses); one that needs none dispatches straight away.
-                  if (required.length > 0) setAttachForm(e);
-                  else runComposerOp(e.opId, {}, e.appOrigin);
-                }}
-              >
-                <Text style={styles.attachItemText}>{t(e.label) === e.label ? e.label : t(e.label)}</Text>
-              </Pressable>
+              <View key={e.opId} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Pressable
+                  style={styles.attachItem}
+                  testID={`circle-attach-${e.opId}`}
+                  accessibilityRole="button"
+                  onPress={() => { setAttachOpen(false); runAttachEntry(e); }}
+                >
+                  <Text style={styles.attachItemText}>{t(e.label) === e.label ? e.label : t(e.label)}</Text>
+                </Pressable>
+                {/* "Pin to +": a bookmark in the person's "+" sheet — an address only, it never runs the op from there */}
+                {typeof onPinEntry === 'function' ? (
+                  <Pressable onPress={() => { setAttachOpen(false); onPinEntry(e); }} accessibilityRole="button"
+                    accessibilityLabel={t('circle.vandaag.pin_to_plus')} testID={`circle-attach-pin-${e.opId}`} style={{ paddingHorizontal: 8 }}>
+                    <Text>📌</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ))}
           </View>
         ) : null}

@@ -65,7 +65,7 @@ export function makeHandleGroupRedeemRequest({
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
 
   return async function handleGroupRedeemRequest(fromAddr, payload) {
-    const { requestId, groupId, code, shareCard, peerDisplay, circleAddress, circleAddressProof, personaProperties, rulesAccepted, personKey } = payload ?? {};
+    const { requestId, groupId, code, shareCard, peerDisplay, circleAddress, circleAddressProof, personaProperties, rulesAccepted, personKey, profileKind } = payload ?? {};
     if (!requestId || !groupId || !code) {
       logger.warn?.('[peer] group-redeem-request missing fields', payload);
       return;
@@ -88,6 +88,8 @@ export function makeHandleGroupRedeemRequest({
         ...(typeof rulesAccepted === 'string' && rulesAccepted ? { rulesAccepted } : {}),
         // The joiner's FIRST person key (2026-09-16), forwarded verbatim onto the admin-signed join like the acceptance.
         ...(personKey && typeof personKey === 'object' ? { personKey } : {}),
+        // The joiner's own profile kind: it counts only on a code the admin minted for a bot — the admin decides.
+        ...(profileKind === 'function' ? { profileKind: 'function' } : {}),
         // Property layer — the joiner's disclosed persona properties, forwarded to the admin's roster.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
       });
@@ -215,6 +217,9 @@ export function makeSendGroupRedeemRequest({
   // (groupId) => { webid, sendAs, personKey } | null — WHO joins this circle: the persona it is being joined as. A
   // persona's redeem leaves AS that persona (its own socket) and announces ITS person key; the default's is unchanged.
   circleSelfFor = null,
+  // () => 'person'|'function' (or a promise of it) — this node's profile kind. A function profile (a bot's node) says
+  // so on the redeem; the admin writes it into the signed join only for an invite it minted FOR a bot.
+  profileKind = null,
   sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
 } = {}) {
   if (typeof sendPeer !== 'function') {
@@ -272,6 +277,8 @@ export function makeSendGroupRedeemRequest({
     else {
       try { ownKey = typeof currentPersonKey === 'function' ? (currentPersonKey() ?? null) : null; } catch { ownKey = null; }
     }
+    let kind = null;
+    try { kind = typeof profileKind === 'function' ? await profileKind() : null; } catch { kind = null; }
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -293,6 +300,7 @@ export function makeSendGroupRedeemRequest({
         ...(typeof rulesAccepted === 'string' && rulesAccepted ? { rulesAccepted } : {}),
         // This device's FIRST person key, for the admin-signed join (the self-join path announces it itself).
         ...(ownKey ? { personKey: ownKey } : {}),
+        ...(kind === 'function' ? { profileKind: 'function' } : {}),
         // Property layer — the joiner's disclosed persona properties (from finalSubmit), forwarded to the admin.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
         sentAt: Date.now(),

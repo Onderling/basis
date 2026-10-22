@@ -152,6 +152,8 @@ function depthOf(stmts) {
  *
  * @param {Array<object>} statements  VERIFIED spine bodies (verifySpine passed) for ONE circle.
  * @param {object} [opts]
+ * @param {Record<string, string>} [opts.founderKinds]  a founder's kind from its own VERIFIED creation statement
+ *   (`{ <founder>: 'function' }` when a function profile founded); returned as `kinds` with the admin-authored joins'
  * @param {Array<string>} [opts.founders]  the circle's creators — admin + member by construction, and
  *   the fold's starting authority. They are **not evictable**: you cannot be put out of a circle you
  *   made. They ARE demotable once another admin exists (Frits, 2026-08-23), so a founder who steps
@@ -177,7 +179,7 @@ function depthOf(stmts) {
  *   `'founder'` · `'role'` · `` `caretaker:<hash>` `` (see the note where `adminVia` is built), plus
  *   which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).
  */
-export function foldRoster(statements, { founders = [], seed = null, rulesGate = null } = {}) {
+export function foldRoster(statements, { founders = [], seed = null, rulesGate = null, founderKinds = {} } = {}) {
   const stmts = (Array.isArray(statements) ? statements : []).filter(
     (s) => s && typeof s === 'object' && MEMBERSHIP_KINDS.has(s.kind)
       && typeof s.author === 'string' && typeof s.subject === 'string' && typeof s.hash === 'string',
@@ -211,6 +213,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   );
 
   const founderSet = new Set(founders.filter((f) => typeof f === 'string' && f));
+  // a member's KIND — 'function' only, from the statement that admitted it: a founder's own creation (handed in by the
+  // caller from the verified \`create\` statement, as the founders are), or an admin-authored join (below)
+  const kinds = {};
+  for (const [who, k] of Object.entries(founderKinds ?? {})) if (founderSet.has(who) && k === 'function') kinds[who] = 'function';
   const asKeys = (xs) => (Array.isArray(xs) ? xs.filter((x) => typeof x === 'string' && x) : []);
   // Seed = the pre-cutover roster the spine deltas fold onto. Founders are always in both sets; seed members
   // start IN but are ordinary (evictable) — a later evict/leave in the spine removes them like any member.
@@ -374,10 +380,13 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (typeof v === 'string' && v) rulesAccepted[s.subject] = v;
       const h = s.payload && typeof s.payload === 'object' ? s.payload.peerDisplay : undefined;
       if (typeof h === 'string' && h) handles[s.subject] = h;
+      // A FUNCTION PROFILE is a fact the ADMITTING ADMIN states, in the join they sign for a bot they invited as one;
+      // a self-signed join's claim is ignored — a member never sets its own kind. Proven by the join itself.
+      if (s.author !== s.subject && s.payload && typeof s.payload === 'object' && s.payload.kind === 'function') kinds[s.subject] = 'function';
     }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; lastExit[x] = removedHow.get(x) ?? 'evict'; }
+    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; delete handles[x]; delete props[x]; delete kinds[x]; lastExit[x] = removedHow.get(x) ?? 'evict'; }
     for (const x of joined)   if (!removed.has(x)) members.add(x);
     for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); adminVia.set(x, 'role'); }
     for (const x of demoted)  { admins.delete(x); adminVia.delete(x); }
@@ -511,7 +520,7 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   const superseded = propStatements
     .filter((st) => !st.setsHandle && st.fields.length > 0 && st.fields.every((f) => propSetters.get(st.subject)?.get(f) !== st.hash))
     .map((st) => st.hash).sort();
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded, lastExit };
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged, handles, props, superseded, lastExit, kinds };
 }
 
 export default foldRoster;

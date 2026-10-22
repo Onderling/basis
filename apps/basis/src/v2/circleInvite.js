@@ -48,12 +48,16 @@ import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkCho
  *           capabilities?:object|null, apps?:string[]|null, offeringsMatching?:boolean|null }} a
  * @returns {Promise<{uri:string, expiresAt?:number} | {error:string}>}
  */
-export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null, relayUrl = null, boundTo = null, boundForHours = 24 } = {}) {
+export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null, relayUrl = null, boundTo = null, boundForHours = 24, forFunction = false } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return { error: 'missing-args' };
   let res;
   // An invite for ONE person: a fresh code bound to their key, for one use (never the circle's shared code).
-  if (typeof boundTo === 'string' && boundTo) {
-    try { res = await callSkill('pinboard', 'rotateMyGroupCode', { groupId: circleId, boundTo, inviteExpiresInHours: boundForHours }); }
+  // An invite for a BOT: a fresh single-use code the admin marks as one, so the redeemer that runs a function profile
+  // is admitted as one. Neither replaces the circle's shared code.
+  const forBot = forFunction === true;
+  if ((typeof boundTo === 'string' && boundTo) || forBot) {
+    const args = forBot ? { groupId: circleId, forFunction: true } : { groupId: circleId, boundTo, inviteExpiresInHours: boundForHours };
+    try { res = await callSkill('pinboard', 'rotateMyGroupCode', args); }
     catch (err) { res = { error: err?.message || 'rotate-failed' }; }
     if (!res?.code) return { error: res?.error || 'no-code' };
     res = { ...res, redemptionsUsed: 0 };

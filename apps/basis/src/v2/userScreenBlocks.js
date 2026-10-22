@@ -26,6 +26,7 @@
  *                                  diagnostic in the content
  */
 
+import { awaitingItems } from './awaiting.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { acrossCircles } from './acrossCircles.js';
 import { presenterFor, nounsDeclaring } from './declaredPresenters.js';
@@ -137,6 +138,8 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
         return materializeOnboarding(block, hostOps);
 
       // Me's own blocks: the name with the readings its config names, and the person's agents and devices
+      case 'awaiting':
+        return await materializeAwaiting(block, hostOps);
       case 'identityLine':
         return await materializeIdentityLine(block, activeCircleIds, hostOps);
       case 'agents':
@@ -378,6 +381,29 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
     ...(row.own ? { fields: { ...((row.body ?? row.text) != null ? { body: row.body ?? row.text } : {}), ...(row.title != null ? { title: row.title } : {}), ...(row.startsAt ? { when: row.startsAt } : {}) } } : {}),
   }));
   return { blockId: block.id, type: 'items', status: items.length ? 'ok' : 'empty', content: { noun, scope, items } };
+}
+
+/**
+ * Mij's "wat wacht op jou" (`awaiting.js`): from the reads the tabs already make — each circle's open proposals
+ * (`hostOps.openProposals`, the tile badge's read), its appointments ahead (`listEvents`, answers projected), and a
+ * device offer stashed here (`hostOps.pendingDeviceOffer`). A source a shell does not hand in counts as nothing waiting.
+ */
+async function materializeAwaiting(block, { callSkill, circles = [], selfIn = () => null, openProposals = null, pendingDeviceOffer = null } = {}) {
+  const mine = (Array.isArray(circles) ? circles : []).filter((c) => c?.id && !isPairCircleId(c.id));
+  const proposalsByCircle = {};
+  const eventsByCircle = {};
+  await Promise.all(mine.map(async (c) => {
+    if (typeof openProposals === 'function') {
+      try { proposalsByCircle[c.id] = (await openProposals(c.id))?.proposals ?? []; } catch { proposalsByCircle[c.id] = []; }
+    }
+    if (typeof callSkill === 'function') {
+      try { eventsByCircle[c.id] = (await callSkill('calendar', 'listEvents', { circleId: c.id, days: 14 }))?.items ?? []; } catch { eventsByCircle[c.id] = []; }
+    }
+  }));
+  let deviceOffer = false;
+  if (typeof pendingDeviceOffer === 'function') { try { deviceOffer = !!(await pendingDeviceOffer()); } catch { deviceOffer = false; } }
+  const items = awaitingItems({ circles: mine, selfIn, proposalsByCircle, eventsByCircle, deviceOffer });
+  return { blockId: block.id, type: 'awaiting', status: items.length ? 'ok' : 'empty', content: { items } };
 }
 
 async function materializeRules(block, activeCircleIds, { callSkill } = {}, screenIsAll = false) {

@@ -47,8 +47,14 @@ test('opening a circle shows its detail and back returns to the launcher', async
   // a tile opens the CIRCLE view (chat IS the circle view); the old action-grid CircleDetail
   // (.circle-detail__*) was replaced as the per-circle landing surface by showCircle.
   await expect(page.locator('.circle-view__title')).toBeVisible({ timeout: LONG });
+  // the floating "+" shows exactly where the main tab bar shows: inside a circle its composer is the act
+  await expect(page.locator('.cc-fab'), 'no floating + inside a circle').toBeHidden();
+  // its tab row sits under its name, before the pane
+  const order = await page.evaluate(() => { const v = document.querySelector('.circle-view__tabs'); const t = document.querySelector('.circle-view__title'); return v && t ? !!(t.compareDocumentPosition(v) & Node.DOCUMENT_POSITION_FOLLOWING) : null; });
+  if (order !== null) expect(order, 'the tab row follows the title').toBe(true);
   await page.locator('.circle-view__back').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
+  await expect(page.locator('.cc-fab'), 'the + is back with the tab bar').toBeVisible();
 });
 
 // G16 + §2 — the real MEMBERS (members) tab renders the trail-roster as tappable rows,

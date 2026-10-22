@@ -39,7 +39,7 @@ function hostCall({ events = [], chores = [] } = {}) {
 describe('Mij — the declared screen', () => {
   it('the manifest declares the Mij blocks, each a known block type placed on Mij', () => {
     const types = (basisManifest.meBlocks ?? []).map((b) => b.type);
-    expect(types).toEqual(['identityLine', 'agents']);
+    expect(types).toEqual(['identityLine', 'awaiting', 'agents']);
     for (const t of types) expect(BLOCK_TYPES).toContain(t);
     const readings = basisManifest.meBlocks[0].config.readings;
     expect(readings.length).toBeGreaterThan(0);
@@ -76,7 +76,7 @@ describe('Mij — the declared screen', () => {
   });
 
   it('the agents block: live devices (this one marked), companions, linked bots — no revoked device, no person', async () => {
-    const [, agents] = await mijScreenBlocks({ hostOps: { callSkill: hostCall(), circles: [], deviceId: 'laptop' } });
+    const agents = (await mijScreenBlocks({ hostOps: { callSkill: hostCall(), circles: [], deviceId: 'laptop' } })).find((b) => b.type === 'agents');
     expect(agents.type).toBe('agents');
     expect(agents.status).toBe('ok');
     const rows = agents.content.items.map((r) => [r.kind, r.label, r.here === true]);
@@ -89,7 +89,7 @@ describe('Mij — the declared screen', () => {
   });
 
   it('a device that is not in the delegations still lists itself', async () => {
-    const [, agents] = await mijScreenBlocks({ hostOps: { callSkill: hostCall(), circles: [], deviceId: 'fresh' } });
+    const agents = (await mijScreenBlocks({ hostOps: { callSkill: hostCall(), circles: [], deviceId: 'fresh' } })).find((b) => b.type === 'agents');
     expect(agents.content.items.filter((r) => r.here)).toHaveLength(1);
   });
 
@@ -114,7 +114,7 @@ describe('Mij follows the switcher', () => {
       if (app === 'pinboard' && op === 'listContacts') return { contacts: [{ displayName: 'Huishoudbot', peerAddr: 'bot', linkedRow: 'r' }] };
       return null;
     };
-    const [line, agents] = await mijScreenBlocks({ hostOps: { callSkill, circles: [], mijSelf: { id: 'p-werk', name: 'Werk', deviceId: 'wd' } } });
+    const blocks = await mijScreenBlocks({ hostOps: { callSkill, circles: [], mijSelf: { id: 'p-werk', name: 'Werk', deviceId: 'wd' } } }); const line = blocks.find((b) => b.type === 'identityLine'); const agents = blocks.find((b) => b.type === 'agents');
     expect(line.content.name).toBe('Werk');
     expect(agents.content.items.map((r) => [r.kind, r.label, r.here === true])).toEqual([['device', 'werklaptop', true]]);
   });

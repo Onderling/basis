@@ -213,6 +213,21 @@
   content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
 }
 
+/* the create-circle wizard's per-option ⓘ and its note (they were styled only in the retired v1 sheet, so they
+   rendered as the browser's grey default) */
+.cc-radio-info { background: transparent; border: none; color: var(--accent-ink); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; vertical-align: baseline; }
+.cc-radio-info:hover { opacity: .75; }
+.cc-radio-consequence { font-size: 13px; line-height: 1.4; color: var(--ink-soft); margin: 2px 0 6px 22px; padding-left: 8px; border-left: 2px solid var(--line); }
+
+/* the manifest-declared controls (connection & transport, what the conversation contains, the lines it shows,
+   private chat): one control per block, its options one per line, its hint small beneath — they had no rules at
+   all, so their labels, checkboxes and hints ran together on one line */
+.circle-settings__control { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.circle-settings__control-label { font-weight: 600; font-size: 14px; color: var(--ink); }
+.circle-settings__control-opt, .circle-settings__control-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.circle-settings__control-hint, .circle-settings__control-why { font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.circle-settings__control-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
+
 /* ⓘ info button + consequence callout */
 .circle-page .circle-settings__info {
   flex: 0 0 auto; margin-left: auto; align-self: flex-start;
@@ -261,11 +276,13 @@
   transition: border-color .12s ease;
 }
 .circle-tile:hover { border-color: var(--accent); }
+/* the customise sheet: a block's name, its controls beside it with room between, wrapping as a row */
+.vandaag-customise__block { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0; }
 .circle-tile__avatar {
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-content: center;
   font-family: var(--font-sans); font-weight: 600; font-size: 17px;
-  color: var(--ink); background: var(--paper-2);
+  color: var(--on-tint); background: var(--paper-2);
 }
 .circle-tile { position: relative; }
 .circle-tile__body { min-width: 0; flex: 1; }
@@ -537,7 +554,7 @@
 
 /* ───────────────────── circle view (SP-13.2 · v2 §1+§5) ───────────────────── */
 .circle-view { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px 12px; }
-.circle-view__header { display: flex; align-items: center; gap: 12px; padding: 10px 0 4px; }
+.circle-view__header { display: flex; align-items: center; gap: 12px; padding: 10px 44px 4px 0; }   /* the ⋯ menu clear of the fixed header avatar (34px + its .75rem inset; same room as .cc-contacts__head) */
 .circle-view__back { background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; padding: 4px 6px; }
 .circle-view__title { flex: 1; margin: 0; font-family: var(--font-sans); font-size: 22px; font-weight: 800; color: var(--ink); }
 .circle-view__more { background: none; border: none; color: var(--ink-soft); font-size: 20px; cursor: pointer; padding: 4px 10px; }
@@ -714,10 +731,10 @@
 .circle-view__form-submit:hover { opacity: 0.92; }
 .circle-view__form-submit:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
 
-/* SP-13.3 — per-circle bottom tab bar + tab-coming placeholder. */
-.circle-view__tabs { display: flex; justify-content: space-around; align-items: stretch; border-top: 1px solid var(--line); margin-top: 4px; }
-.circle-view__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-top: 2px solid transparent; margin-top: -1px; }
-.circle-view__tab.is-active { color: var(--accent-ink); border-top-color: var(--accent-ink); }
+/* the circle's tab row (web: under its name, sticky; the phone keeps a bottom bar) + tab-coming placeholder. */
+.circle-view__tabs { display: flex; justify-content: space-around; align-items: stretch; border-bottom: 1px solid var(--line); margin: 4px 0 10px; position: sticky; top: 0; z-index: 5; background: var(--paper); }
+.circle-view__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.circle-view__tab.is-active { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
 .circle-view__placeholder { padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center; }
 
 /* SP-13.4 — Chat ↔ Screen header pill (v2 §4 "De mode switch"). */
@@ -791,7 +808,7 @@
 
 /* ── P5 — Contacten roster + 1:1 DM thread ──────────────────────────────── */
 .cc-contacts { padding: 4px 2px 80px; }
-.cc-contacts__head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 12px; gap: 12px; }
+.cc-contacts__head { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 12px; gap: 12px; padding-right: 44px; }   /* clear the fixed header avatar (top-right) */
 .cc-contacts__title { font-size: 18px; font-weight: 700; margin: 0; color: var(--ink); }
 .cc-contacts__add {
   cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
@@ -1074,15 +1091,15 @@
 .cc-admin__section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); margin: 0; }
 .cc-admin__empty { color: var(--ink-soft); font-size: 14px; margin: 0; }
 .cc-admin__member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.cc-admin__member { display: flex; align-items: center; gap: 10px; }
+.cc-admin__member { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }   /* wrap: at phone width the row's buttons ran out of the card */
 .cc-admin__member-name { flex: 1 1 auto; font-size: 14px; color: var(--ink); }
 .cc-admin__member-role { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--accent-ink); }
 .cc-admin__member-via { font-size: 12px; color: var(--ink-soft); }
 .cc-admin__member-via--caretaker { font-style: italic; }
 .cc-admin__member-role-set { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--radius); background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
 .cc-admin__member-role-set:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
-.cc-admin__member-remove { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--radius); background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
-.cc-admin__member-remove:hover { border-color: var(--danger); color: var(--danger); }
+.cc-admin__member-remove, .cc-admin__member-leave { cursor: pointer; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: var(--radius); background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
+.cc-admin__member-remove:hover, .cc-admin__member-leave:hover { border-color: var(--danger); color: var(--danger); }
 .cc-admin__announce { display: flex; flex-direction: column; gap: 8px; }
 .cc-admin__announce-input { font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); color: var(--ink); resize: vertical; }
 .cc-admin__announce-post { align-self: flex-start; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: var(--radius); background: var(--accent); border: 1px solid var(--accent); color: var(--accent-contrast); }
@@ -1490,3 +1507,17 @@
 .circle-screen__row-act { border: 0; background: none; padding: 4px 6px; color: var(--ink-soft); }
 .circle-screen__row-act:hover { color: var(--accent-ink); }
 .circle-screen__items-list { list-style: none; margin: 0; padding: 0; }
+
+/* The shared overlay sheet (the "+" sheet, restore, …): the theme's card, so it follows dark mode. */
+.cc-overlay-card { background: var(--card); color: var(--ink); border: 1px solid var(--line); max-width: 26rem; width: 92%; padding: 1.25rem; border-radius: var(--radius); max-height: 80vh; overflow: auto; }
+/* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
+.circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
+.circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }
+
+/* THE "+": one floating button on every tab, bottom-right above the tab bar — the page's one accent (terracotta) */
+.cc-fab { position: fixed; right: 20px; bottom: 76px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.cc-fab:hover { filter: brightness(1.08); }
+/* the floating "+" shows exactly where the main tab bar shows: inside a circle (bar hidden) the circle's composer
+   and its attach "+" are the acts — and the floating one covered the composer's send button there */
+.circle-tabbar--hidden ~ .cc-fab { display: none; }
+.circle-vandaag-plus__section h4 { margin: 12px 0 6px; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }

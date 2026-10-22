@@ -54,6 +54,16 @@ Retired with L251 (they drove the classic chat shell, which a person can no long
 Run: `npx detox test --configuration android.emu.release --reuse -- --no-watchman` (Watchman on this box fails
 "non-recoverable" now and then; Jest's own crawler is fine). Build with `:app:` tasks only (see the gotchas doc).
 
+## A second person: `support/relayPeer.mjs`
+
+A story about two people needs the other one to be real. `support/relayPeer.mjs` is that other person: a real agent
+node (the relay tests' `bootRealAgentNode`, the composition the shells use) on a test relay, with a circle of its own,
+optionally an offering released to it, and an invite that carries the relay as the emulator sees it (`10.0.2.2`). A
+walk spawns it, waits for its `{"step":"ready","invite":…,"circleId":…}` line, opens the invite on the phone as a link
+(`device.openURL`) and joins through the real wizard. It keeps running until the walk ends its stdin. First user:
+`askMatches.test.js`. The shared moves (launch, poll, tap through modal focus, first boot, emulator-only) are in
+`support/ui.js`.
+
 ## What's NOT covered (D-2+, tracked in #224 Phase B)
 
 - Cross-device JM scenarios (paired emulators)

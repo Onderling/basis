@@ -9,59 +9,14 @@
 // Each step leaves a screenshot (Detox's artifacts), so a walk in light or dark can be read afterwards:
 // `adb shell cmd uimode night yes` before the run for the dark one. Runs against the RELEASE APK, like the rest.
 
-async function launch() {
-  // The app's network timers never let RN idle; launch with synchronization off (see circleDefault.test.js).
-  await device.launchApp({ newInstance: true, delete: true, launchArgs: { detoxEnableSynchronization: 0 } });
-  await device.disableSynchronization();
-}
-
-async function isVisible(matcher) {
-  try { await expect(element(matcher)).toBeVisible(); return true; } catch { return false; }
-}
-
-/** Poll until visible — survives the moment one RN modal closes as the next opens (no window focus, Detox throws). */
-async function soon(matcher, ms = 30_000) {
-  const until = Date.now() + ms;
-  while (Date.now() < until) { if (await isVisible(matcher)) return; await new Promise((r) => setTimeout(r, 400)); }
-  throw new Error(`not visible within ${ms} ms: ${JSON.stringify(matcher)}`);
-}
-
-/** Tap once it is visible, retrying through the same moment without focus. */
-async function tapSoon(matcher, ms = 30_000) {
-  await soon(matcher, ms);
-  for (let i = 0; i < 6; i += 1) {
-    try { await element(matcher).tap(); return; } catch (err) { if (i === 5) throw err; await new Promise((r) => setTimeout(r, 500)); }
-  }
-}
-
-/** Wait for the first of several matchers; returns its index. */
-async function firstOf(matchers, ms) {
-  const until = Date.now() + ms;
-  while (Date.now() < until) {
-    for (let i = 0; i < matchers.length; i += 1) if (await isVisible(matchers[i])) return i;
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  return -1;
-}
+const { launch, isVisible, soon, tapSoon, firstOf, firstBoot, emulatorOnly } = require('./support/ui');
 
 describe('a circle made on the phone, and its invite, settings and admin', () => {
   beforeAll(async () => {
     // A fresh install (it deletes the app): emulator only, refused before the device is touched.
-    if (!String(device.id ?? '').startsWith('emulator-')) {
-      throw new Error(`circleWalk refuses to run on ${device.id}: it deletes the app — emulator only`);
-    }
-    await launch();
-    await waitFor(element(by.id('first-run-welcome'))).toBeVisible().withTimeout(90_000);
-    await element(by.id('first-run-start')).tap();
-    // the recovery words come once: confirm them whenever they show, until Today is up
-    const until = Date.now() + 180_000;
-    let today = false;
-    while (Date.now() < until && !today) {
-      if (await isVisible(by.id('mnemonic-create'))) await element(by.id('mnemonic-create-written')).tap();
-      today = await isVisible(by.id('vandaag-day'));
-      if (!today) await new Promise((r) => setTimeout(r, 500));
-    }
-    if (!today) throw new Error('first boot: Today never showed (180 s)');
+    emulatorOnly('circleWalk');
+    await launch({ fresh: true });
+    await firstBoot();
   });
 
   it("Today's Make a circle opens the wizard there, and the wizard makes the circle", async () => {

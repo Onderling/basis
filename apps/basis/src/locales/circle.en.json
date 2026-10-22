@@ -8558,10 +8558,6 @@
         "text": "Lend (a physical thing)",
         "doc": "Post-with-audience wizard (web): a lend."
       },
-      "kind_announce": {
-        "text": "Announce",
-        "doc": "Post-with-audience wizard (phone): an announcement."
-      },
       "text_placeholder": {
         "text": "e.g. Anyone got a ladder I can borrow?",
         "doc": "Post-with-audience wizard, both shells: the text placeholder."

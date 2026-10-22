@@ -26,6 +26,7 @@ import { mkBody, mkActions, mkField, mkTextarea, mkRadioGroup, mkError, mkSubmit
 import {
   TRUST_OPTS, DISTANCE_OPTS,
   initialState, canSubmit, loadAvailableCircles, submitPost,
+  postKindOptions,
 } from '../../core/wizards/postAudienceState.js';
 import { t } from '../../localisation.js';
 
@@ -61,11 +62,8 @@ export function renderPostAudienceWizard(opts) {
     }, { placeholder: t('circle.wizard.audience.text_placeholder'), rows: 3 });
     // Radio + distance buttons change visible UI; rerender is safe
     // (no text input focus to preserve at those points).
-    mkRadioGroup(body, doc, t('circle.wizard.audience.kind'), state.kind, [
-      { id: 'ask', label: t('circle.wizard.audience.kind_ask') },
-      { id: 'offer', label: t('circle.wizard.audience.kind_offer') },
-      { id: 'lend',  label: t('circle.wizard.audience.kind_lend') },
-    ], (v) => { state.kind = v; });
+    mkRadioGroup(body, doc, t('circle.wizard.audience.kind'), state.kind,
+      postKindOptions().map((o) => ({ id: o.id, label: t(o.labelKey) })), (v) => { state.kind = v; });
     mkRadioGroup(body, doc, t('circle.wizard.audience.trust'), state.minTrust, TRUST_OPTS,
       (v) => { state.minTrust = v; });
     mkField(body, doc, t('circle.wizard.audience.tags'),

@@ -7,9 +7,13 @@ settings:
 overrides:
   '@noble/hashes': ^2.2.0
   '@scure/bip39': ^2.0.1
-  ws: ^8.20.0
+  ws: ^8.21.0
   '@react-native-async-storage/async-storage': ^1.24.0
   bunyan: 2.0.5
+  axios: ^1.20.0
+  follow-redirects: ^1.16.1
+  fast-uri: ^3.1.7
+  ip-address: ^10.3.1
 
 importers:
 
@@ -76,8 +80,8 @@ importers:
         specifier: ^2.1.4
         version: 2.1.4
       ws:
-        specifier: ^8.20.0
-        version: 8.20.1
+        specifier: ^8.21.0
+        version: 8.22.0
     devDependencies:
       vitest:
         specifier: ^2.1.0
@@ -3157,8 +3161,8 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
-  ws@8.20.1:
-    resolution: {integrity: sha512-It4dO0K5v//JtTXuPkfEOaI3uUN87iYPnqo/ZzqCoG3g8uhA66QUMs/SrM0YK7/NAu+r4LMh/9dq2A7k+rHs+w==}
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -3873,7 +3877,7 @@ snapshots:
       terminal-link: 2.1.1
       toqr: 0.1.1
       wrap-ansi: 7.0.0
-      ws: 8.20.1
+      ws: 8.22.0
       zod: 3.25.76
     optionalDependencies:
       react-native: 0.85.3(@babel/core@7.29.0)(react@19.2.6)
@@ -4416,7 +4420,7 @@ snapshots:
       nullthrows: 1.1.1
       open: 7.4.2
       serve-static: 1.16.3
-      ws: 8.20.1
+      ws: 8.22.0
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -4435,7 +4439,7 @@ snapshots:
       nullthrows: 1.1.1
       open: 7.4.2
       serve-static: 1.16.3
-      ws: 8.20.1
+      ws: 8.22.0
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -5997,7 +6001,7 @@ snapshots:
       serialize-error: 2.1.0
       source-map: 0.5.7
       throat: 5.0.0
-      ws: 8.20.1
+      ws: 8.22.0
       yargs: 17.7.2
     transitivePeerDependencies:
       - bufferutil
@@ -6043,7 +6047,7 @@ snapshots:
       serialize-error: 2.1.0
       source-map: 0.5.7
       throat: 5.0.0
-      ws: 8.20.1
+      ws: 8.22.0
       yargs: 17.7.2
     transitivePeerDependencies:
       - bufferutil
@@ -6323,7 +6327,7 @@ snapshots:
   react-devtools-core@6.1.5:
     dependencies:
       shell-quote: 1.8.3
-      ws: 8.20.1
+      ws: 8.22.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -6363,7 +6367,7 @@ snapshots:
       stacktrace-parser: 0.1.11
       tinyglobby: 0.2.16
       whatwg-fetch: 3.6.20
-      ws: 8.20.1
+      ws: 8.22.0
       yargs: 17.7.2
     transitivePeerDependencies:
       - '@babel/core'
@@ -6862,7 +6866,7 @@ snapshots:
 
   wrappy@1.0.2: {}
 
-  ws@8.20.1: {}
+  ws@8.22.0: {}
 
   xcode@3.0.1:
     dependencies:

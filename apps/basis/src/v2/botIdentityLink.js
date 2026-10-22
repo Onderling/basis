@@ -115,6 +115,8 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
       }
       if (rows.some((r) => r.id !== person && (r.linkedRoot === o.root || r.id === o.webid || r.pubKey === o.webid))) return { ok: false, reason: 'key-on-another-row' };
       if (row.linkedRoot) return { ok: false, reason: 'row-has-a-key' };
+      // spent before the question goes out: if sending it fails, the offer is gone with nothing pending — the person makes
+      // a new one, which is the honest outcome for a line that was used to ask
       nonces.add(o.nonce, o.statement.ts);
       pending.set(person, { root: o.root, webid: o.webid, deviceId: v.deviceId, nonce: o.nonce, until: now() + OFFER_FOR_MS });
       const codes = codeChoices(await linkCode(o.root, o.nonce), rand);

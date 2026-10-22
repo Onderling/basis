@@ -2,7 +2,7 @@
  * .4 — pod-settings.html -adopt.
  *
  * Mirrors pinboard's -adopt settings test (commit 9e7003b /
- * `apps/pinboard/test/pinboard-web.test.js`).  Asserts:
+ * the retired pinboard web shell's test).  Asserts:
  *
  *   1. The manifest validates with the new view added.
  *   2. The `pod-settings` view declares `shape: 'record'`.

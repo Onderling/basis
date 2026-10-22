@@ -2,7 +2,7 @@
  * Pinboard V1 — Phase 19 closed-beta hardening smoke.
  *
  * One end-to-end pass through the circle-deployable flow that the
- * runbook (`CLOSED-BETA-RUNBOOK.md`) tells facilitators to verify
+ * runbook (retired with the standalone shell, 2026-10-22) told facilitators to verify
  * before bringing a real circle online:
  *
  *   1. Member redeems via the gated path (privacy + rules).

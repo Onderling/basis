@@ -2,7 +2,7 @@
   "name": "@onderling-app/pinboard",
   "version": "0.2.0",
   "private": true,
-  "description": "Pinboard \u2014 neighbourhood-skill-app. V2 of the H5 / neighbourhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
+  "description": "Pinboard — neighbourhood-skill-app. V2 of the H5 / neighbourhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -21,17 +21,9 @@
     "./locales/en": "./locales/en.json",
     "./locales/nl": "./locales/nl.json"
   },
-  "bin": {
-    "pinboard-ui": "bin/pinboard-ui.js",
-    "pinboard-testbed": "bin/pinboard-testbed.js",
-    "pinboard-web": "bin/pinboard-web.js"
-  },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest",
-    "ui": "node bin/pinboard-ui.js",
-    "testbed": "node bin/pinboard-testbed.js",
-    "web": "node bin/pinboard-web.js"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@onderling/agent-registry": "file:../../packages/agent-registry",

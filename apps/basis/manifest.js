@@ -89,7 +89,7 @@ export const basisManifest = {
      * `/help-with <post-id>` — v0.7.cc.  Spawn (or activate) a chat
      * thread whose filter targets a specific pinboard post.  The user
      * who tapped "Ik help" on Anne's post ends up in a private
-     * thread on that post — DEMO.md §1.  Chat-shell builtin (no
+     * thread on that post.  Chat-shell builtin (no
      * pinboard-side skill needed: filters on itemRef.id).
      */
 

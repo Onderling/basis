@@ -22,10 +22,8 @@ Circle-skill-app: vragen, aanbod, en lenen tussen circlegenoten —
 prikbord-not-feed, mens en machine-agents naast elkaar, decentraal
 via het @onderling platform.
 
-**Mobile companion:** Pinboard V3 native React-Native client lives at
-[`apps/pinboard-mobile/`](../pinboard-mobile/) — same platform, same skills,
-parallel UI in JSX. Wiring complete (Phases 40.14–40.22, 2026-05-08);
-real-device pass + closed-beta APK pending Phase 40.23.
+**Mobile companion:** the Pinboard V3 React-Native client (`apps/pinboard-mobile/`, 2026-05-08) was retired with the
+standalone shell on 2026-10-22; the phone app is basis-mobile, which composes this substrate.
 
 **Heads-up (2026-05-08):** Tasks V1 implementation lifts seven
 of Pinboard's `lib/` files into shared substrates (rule of two
@@ -47,8 +45,7 @@ substrate path) + the full A-track UX surface from
 - A6 `/profile.html` "My Solid pods" section
 - A7 agent-registry on bundle bring-up (Phase 52.10)
 
-Mobile mirror (C-track) at
-[`apps/pinboard-mobile/`](../pinboard-mobile/) shipped same day. See
+Mobile mirror (C-track, the since-retired `apps/pinboard-mobile/`) shipped same day. See
 [`CHANGELOG.md`](./CHANGELOG.md) for the per-slice breakdown.
 
 **Status:** V1.5 demo-ready (2026-05-06). This package was
@@ -73,8 +70,7 @@ Phases 0–22 of the coding plan have landed:
   `getInviteQrPayload`, gated `redeemInviteWithGate`.
 - 18: in-app notification banners + `UsageMetrics` integration +
   `getMetrics` skill for the closed-beta dashboard.
-- 19: closed-beta hardening (`CLOSED-BETA-RUNBOOK.md`,
-  `web/metrics.html` dashboard, runbook smoke test).
+- 19: closed-beta hardening (runbook and metrics dashboard; retired with the standalone shell, 2026-10-22).
 - 20: Solid pod sign-in (`startPodSignIn` / `completePodSignIn` /
   `signOutOfPod`) — OIDC via `@inrupt/solid-client-authn-node`,
   `bundle.cache.attachInner(SolidPodSource)`.
@@ -87,9 +83,8 @@ Phases 0–22 of the coding plan have landed:
 
 Current test count: **378** in `apps/pinboard` (34 test files).
 
-See [`DEMO.md`](./DEMO.md) for the demo script and
-[`CLOSED-BETA-RUNBOOK.md`](./CLOSED-BETA-RUNBOOK.md) for the
-operational runbook.
+The standalone shell (web server, UI, testbed, demo script, beta runbook) was retired on 2026-10-22 — pinboard is
+the circle substrate basis composes; the shell is kept under the tag `archive/pinboard-standalone-shell-2026-10-22`.
 
 **V2 expansion shipped (2026-05-07).** Phases 23-30 cover the
 contact graph (1:1 trust-graded contacts independent of groups),

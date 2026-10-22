@@ -4523,6 +4523,9 @@ function CircleDetail({
         contentContainerStyle={viewMode !== 'screen' && activeTab === 'conversation' ? [styles.list, styles.chatListPad] : styles.list}
         style={viewMode !== 'screen' && activeTab === 'conversation' ? styles.chatScroll : undefined}
         testID="circle-detail-stream"
+        // A button pressed with the keyboard up must PRESS, not only close the keyboard: the board's Post took two taps
+        // (the first was eaten), so an ask typed and posted once was never posted (walked on an emulator 2026-10-22).
+        keyboardShouldPersistTaps="handled"
         ref={streamScrollRef}
         // "My own message never appears in the Conversation" — it DID appear, at the bottom, below the
         // fold. Bubbles render oldest-first, this pane never scrolled, and nothing here moved the

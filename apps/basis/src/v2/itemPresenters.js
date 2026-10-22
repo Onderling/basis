@@ -31,5 +31,10 @@ export const NOT_MERGED = Object.freeze({
   rsvp: 'one person\'s answer to one appointment; read through its event (withAnswers), never shown on its own',
 });
 
-/** Canonical nouns without a presenter yet — this list only shrinks. */
+/**
+ * Canonical nouns without a presenter yet — this list only shrinks.
+ * `neighbourhood-job` has NO PRODUCER: no manifest declares it and no skill writes one, so a presenter would show
+ * nothing. Whether a job is its own thing or an ask with a nested task is an open design question; it is retired or
+ * given a producer then — not presented before.
+ */
 export const NOT_YET = Object.freeze(['claim', 'contact', 'reveal-request', 'neighbourhood-job', 'view', 'circle', 'shared-ref', 'media', 'inbox-item', 'board']);

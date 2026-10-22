@@ -8583,64 +8583,6 @@
         "doc": "Post-with-audience wizard (web): while posting."
       }
     },
-    "dispute": {
-      "about": {
-        "text": "You are disputing this post:",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "substrate_note": {
-        "text": "This records the dispute as a post. The full mediation — raise, propose, accept — comes later.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "summary": {
-        "text": "Summary",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "about_post": {
-        "text": "About post",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "escalation": {
-        "text": "Escalation",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "proposal": {
-        "text": "Proposed resolution",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "raise_title": {
-        "text": "Raise a dispute",
-        "doc": "Dispute wizard step 1 title."
-      },
-      "raise_intro": {
-        "text": "Describe what happened. This goes to the circle; admins see it, and two random members do too if the circle resolves conflicts by mediation.",
-        "doc": "Dispute wizard step 1 body."
-      },
-      "propose_title": {
-        "text": "Propose a resolution",
-        "doc": "Dispute wizard step 2 title."
-      },
-      "propose_intro": {
-        "text": "What would settle this for you? Even if you are not sure, write what would feel good enough, so a mediator has somewhere to start.",
-        "doc": "Dispute wizard step 2 body."
-      },
-      "file_title": {
-        "text": "File the dispute",
-        "doc": "Dispute wizard step 3 title."
-      },
-      "file_intro": {
-        "text": "Check it over. A filed dispute is visible to admins, and to mediators if the circle uses mediation. You can follow it up with another post.",
-        "doc": "Dispute wizard step 3 body."
-      },
-      "filed_title": {
-        "text": "✓ Dispute filed",
-        "doc": "Dispute wizard, the final screen."
-      },
-      "filed_intro": {
-        "text": "Admins will see it in the circle, and mediators too if the circle uses mediation.",
-        "doc": "Dispute wizard, the final screen."
-      }
-    },
     "embed_time": {
       "title": {
         "text": "Embed a time",

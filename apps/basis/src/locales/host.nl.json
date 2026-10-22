@@ -732,15 +732,15 @@
         "doc": "Stap-3"
       },
       "raise_title": {
-        "text": "Een conflict melden",
+        "text": "Bezwaar maken",
         "doc": "Stap-1 titel"
       },
       "raise_intro": {
-        "text": "Beschrijf wat er gebeurde. Dit gaat naar de buurt; admins en (als jouw conflictbeleid bemiddeling is) twee willekeurige leden zien het.",
+        "text": "Beschrijf wat er gebeurd is. Dit gaat naar de kring; beheerders zien het, en twee willekeurige leden ook als de kring conflicten met bemiddeling oplost.",
         "doc": "Stap-1 intro"
       },
       "about_post_label": {
-        "text": "Conflict gaat over:",
+        "text": "Je maakt bezwaar tegen dit bericht:",
         "doc": "Header van de context-card"
       },
       "about_post_loading": {
@@ -772,7 +772,7 @@
         "doc": "Stap-2 titel"
       },
       "propose_intro": {
-        "text": "Wat zou dit voor jou oplossen? Ook al weet je het niet zeker, schrijf wat \"goed genoeg\" zou voelen zodat de bemiddelaar een startpunt heeft.",
+        "text": "Wat zou dit voor jou oplossen? Ook als je het niet zeker weet: schrijf op wat goed genoeg zou voelen, dan heeft een bemiddelaar een begin.",
         "doc": "Stap-2 intro"
       },
       "proposal_label": {
@@ -784,11 +784,11 @@
         "doc": "Stap-2 placeholder"
       },
       "file_title": {
-        "text": "Conflict indienen",
+        "text": "Bezwaar indienen",
         "doc": "Stap-3 titel"
       },
       "file_intro": {
-        "text": "Controleer + bevestig. Ingediende conflicten zijn zichtbaar voor admins (en bemiddelaars als je bemiddeling koos). Je kunt intrekken via /leave-group → opnieuw lid worden, of via een follow-up post.",
+        "text": "Kijk het na. Een ingediend bezwaar is zichtbaar voor beheerders, en voor bemiddelaars als de kring bemiddeling gebruikt. Je kunt er later een bericht over plaatsen.",
         "doc": "Stap-3 intro"
       },
       "review_summary": {
@@ -796,7 +796,7 @@
         "doc": "Review-rij-label"
       },
       "review_about_post": {
-        "text": "Over post",
+        "text": "Over bericht",
         "doc": "Review-rij-label"
       },
       "review_escalation": {
@@ -808,7 +808,7 @@
         "doc": "Review-rij-label"
       },
       "substrate_warn": {
-        "text": "⚠️ V0 substraat-gat: dit wordt ingediend als een prikbord-post met kind:dispute. Volledige bemiddeling (raiseDispute → proposeResolution → acceptResolution) komt wanneer prikbord die skills uitlevert.",
+        "text": "Dit legt het bezwaar vast als bericht. De volledige bemiddeling — bezwaar, voorstel, akkoord — komt later.",
         "doc": "Waarschuwingsbanner over substraat-gat"
       },
       "filing": {
@@ -824,11 +824,11 @@
         "doc": "Bot-bubble na onDispatched"
       },
       "success_title": {
-        "text": "✓ Conflict ingediend",
+        "text": "✓ Bezwaar ingediend",
         "doc": "Success-stap titel"
       },
       "success_intro": {
-        "text": "Admins (en bemiddelaars als je bemiddeling koos) zien het in de buurt-feed.",
+        "text": "Beheerders zien het in de kring, en bemiddelaars ook als de kring bemiddeling gebruikt.",
         "doc": "Success-stap intro"
       }
     }

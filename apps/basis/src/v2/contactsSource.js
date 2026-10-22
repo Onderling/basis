@@ -12,6 +12,7 @@
  *   `url` (the A2A base URL) → the HTTP A2A path (skill dispatch) for a
  *     URL-only agent with no peer address.
  */
+import { isPairCircleId } from './pairCircleId.js';
 
 /** A peer is a bot/agent when it's an A2A/hybrid agent or exposes skills. */
 function isBot(peer) {
@@ -230,6 +231,7 @@ export async function nameContactsFromRosters(rows = [], { rosterRow = null } = 
  * when someone in one of your circles talks to you, and only a PAIR circle used to name it — so a co-member showed as
  * their address in the list and in the thread title. Only rows still called by their address are touched; only the
  * HANDLE travels (what anyone in that circle sees), never a name they released to that circle.
+ * Pair rosters are skipped: their handle is derived, never a name (2026-09-21).
  *
  * @param {object[]} rows
  * @param {{ circleIds?: () => Promise<string[]>, membersOf?: (circleId: string) => Promise<object[]> }} [o]
@@ -238,7 +240,7 @@ export async function nameCoMembersFromCircles(rows = [], { circleIds = null, me
   const unnamed = (r) => r && !r.isBot && !r.pairCircleId && r.contactId && (!r.name || r.name === r.contactId);
   if (!rows.some(unnamed) || typeof circleIds !== 'function' || typeof membersOf !== 'function') return rows;
   let ids = [];
-  try { ids = (await circleIds()).filter((c) => typeof c === 'string' && c); } catch { ids = []; }
+  try { ids = (await circleIds()).filter((c) => typeof c === 'string' && c && !isPairCircleId(c)); } catch { ids = []; }
   const handleOf = new Map();   // address or webid → handle
   for (const id of ids) {
     let members = [];

@@ -39,17 +39,6 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
 
   container.appendChild(backButton(tr, onBack));
 
-  // §8 — report this member to the circle's admins (the member↔admin lane). The admin then
-  // dismisses or acts; acting routes through the removeMember decision-class.
-  if (typeof onReport === 'function') {
-    const report = document.createElement('button');
-    report.type = 'button';
-    report.className = 'cc-btn cc-btn--quiet circle-membercard__report';
-    report.textContent = tr('circle.governance.report_member');
-    report.addEventListener('click', () => onReport(member));
-    container.appendChild(report);
-  }
-
   const title = document.createElement('h2');
   title.className = 'circle-membercard__title';
   // Legible name — but never leak the real name in the title when the split HID it
@@ -70,6 +59,17 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
     'membercard-sees': () => attrColumn(tr, 'sees', split.sees, resolvePicture),
     'membercard-hides': () => attrColumn(tr, 'hides', split.hides, resolvePicture),
   });
+  // §8 — LAST on the card, after who they are and what they share (it sat above their name): report this member to the circle's admins (the member↔admin lane). The admin then
+  // dismisses or acts; acting routes through the removeMember decision-class.
+  if (typeof onReport === 'function') {
+    const report = document.createElement('button');
+    report.type = 'button';
+    report.className = 'cc-btn cc-btn--quiet circle-membercard__report';
+    report.textContent = tr('circle.governance.report_member');
+    report.addEventListener('click', () => onReport(member));
+    container.appendChild(report);
+  }
+
   return container;
 }
 

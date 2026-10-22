@@ -5,6 +5,7 @@ import { SETTINGS_ENUM_AXES, CIRCLE_POLICY_ENUMS, DEFAULT_CIRCLE_POLICY, mergeCi
 import { pageForOp } from '../../src/v2/pageProjection.js';
 import { basisManifest } from '../../manifest.js';
 import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
+import { offeredFeatures } from '../../src/v2/circleTabs.js';
 
 const t = (k) => k;
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
@@ -13,10 +14,11 @@ describe('renderCircleSettings', () => {
   // The axis COUNT is derived from the shared list rather than hardcoded: adding an axis is a one-line
   // change in `circlePolicy.js`, and this test should verify the surface renders them all, not re-state how
   // many there are. `settingsAxesParity.test.js` guards that the list is shared and fully localised.
-  it('renders 8 feature toggles + every shared enum axis, reflecting the policy', () => {
+  it('renders a toggle per OFFERED feature (no toggle for a feature without a surface) + every shared enum axis', () => {
     const el = mount();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t });
-    expect(el.querySelectorAll('.circle-settings__feature input[type=checkbox]')).toHaveLength(8);
+    expect(el.querySelectorAll('.circle-settings__feature input[type=checkbox]')).toHaveLength(offeredFeatures().length);
+    expect(offeredFeatures()).toHaveLength(5);   // chat · noticeboard · tasks · houseRules · memberDirectory
     expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(SETTINGS_ENUM_AXES.length);
     // every axis is rendered, in axis order — `pod` in view, the others inside the closed
     // "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS), so the DOM order is pod first

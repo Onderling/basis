@@ -25,7 +25,7 @@ export default function LogReportScreen({ onBack }) {
       <Text style={styles.note}>{t(n ? 'circle.logReport.intro' : 'circle.logReport.empty')}</Text>
       <Text style={styles.text} selectable testID="log-report-text">{text}</Text>
       <Pressable style={styles.copy} onPress={() => { Share.share({ message: text }).catch(() => {}); }} testID="log-report-copy">
-        <Text style={styles.copyText}>{t('circle.logReport.copy')}</Text>
+        <Text style={styles.copyText}>{t('circle.logReport.share')}</Text>
       </Pressable>
     </ScrollView>
   );

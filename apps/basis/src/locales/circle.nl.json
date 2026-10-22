@@ -10076,8 +10076,12 @@
       "doc": "Copy-log screen when the log is empty."
     },
     "copy": {
-      "text": "Kopieer",
-      "doc": "Copy-log screen: copies the shown text (the phone opens its share sheet, which has Copy)."
+      "text": "Logboek kopiëren",
+      "doc": "Copy-log screen, web: copies the shown text to the clipboard."
+    },
+    "share": {
+      "text": "Logboek delen",
+      "doc": "Copy-log screen, phone: hands the shown text to the share sheet (which has Copy); nothing is added to it."
     },
     "copied": {
       "text": "Gekopieerd.",

@@ -100,6 +100,20 @@ export const log = Object.freeze({
   error: (tag, code, fields) => record('error', tag, code, fields),
 });
 
+/**
+ * Take the credentials out of a piece of free text before it reaches a log, a console or a chat: a Telegram bot token
+ * in a URL (`/bot<id>:<secret>`), a password in a URL (`https://user:pass@host`), and a credential-named query value
+ * (`?token=…`, `api_key=…`). A fetch error's message IS the request URL, so any sink that prints one needs this.
+ * @param {unknown} text
+ * @returns {string}
+ */
+export function scrubSecrets(text) {
+  return String(text)
+    .replace(/\/bot\d+:[A-Za-z0-9_-]+/g, `/bot${REDACTED}`)
+    .replace(/(:\/\/)[^\s/:@]+:[^\s/@]+@/g, `$1${REDACTED}@`)
+    .replace(/([?&](?:token|access_token|api_key|apikey|key|secret|password|sig)=)[^&\s"']+/gi, `$1${REDACTED}`);
+}
+
 /** The recent records (shallow copy) — for a bug report / a "copy logs" affordance. */
 export function dumpLogs() { return state.buf.slice(); }
 

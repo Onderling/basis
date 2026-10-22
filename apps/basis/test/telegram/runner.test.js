@@ -127,6 +127,18 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(calls.at(-1).ctx).toEqual({ caller: 'telegram:7', threadId: 'telegram:7', chatId: '42' });
   });
 
+  it("a failing call's error reaches the chat and the log without a credential: a fetch error's message is the URL", async () => {
+    const log = [];
+    const leak = 'request to https://api.telegram.org/bot123456789:AAHsecretSECRETsecret/sendMessage failed, reason: ETIMEDOUT';
+    const callSkill = async () => { throw new Error(leak); };
+    const { say } = await boot({ walkLog: (e) => log.push(e), callSkill });
+    const out = await say('/mine');
+    expect(out.length).toBeGreaterThan(0);
+    expect(JSON.stringify(out)).not.toContain('AAHsecret');
+    expect(JSON.stringify(log)).not.toContain('AAHsecret');
+    expect(JSON.stringify(log)).toContain('ETIMEDOUT');   // the reason survives, only the credential goes
+  });
+
   it('a door whose admission fails runs nothing', async () => {
     const { say, calls } = await boot({ admit: async () => null });
     const out = await say('/mine');

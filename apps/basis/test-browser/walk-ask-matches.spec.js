@@ -55,10 +55,10 @@ test('an ask shows the asker who offers it — released offerings only, nobody e
     await expect(A.page.locator('.cc-noticeboard__matches .circle-offering-matches__offering')).toHaveText(['boormachine uitlenen']);
     await expect(A.page.locator('.cc-noticeboard__matches')).not.toContainText('bits');
 
-    // Bram has the ask on his board, and no matches under it — they are the asker's. Counted by its row, not its
-    // words: a post from the composer can still arrive sealed to a key version the joiner lacks (a separate gap).
-    await expect.poll(async () => { await openBoard(B.page); return B.page.locator('.cc-noticeboard li').count(); },
-      { timeout: 60_000, message: "Anna's ask reaches Bram's board" }).toBeGreaterThan(0);
+    // Bram reads the ask — its WORDS, so a post sealed under a key he was never given shows up here as the sealed
+    // envelope it is — and no matches under it: they are the asker's.
+    await expect.poll(async () => { await openBoard(B.page); return B.page.evaluate(() => document.body.innerText); },
+      { timeout: 60_000, message: "Anna's ask reaches Bram's board, readable" }).toMatch(/boormachine\?/i);
     expect(await B.page.locator('.cc-noticeboard__matches').count()).toBe(0);
 
     // Ask: the contact thread with Bram opens (nothing is sent until Anna writes).

@@ -312,6 +312,7 @@ import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
+import { createSingleFlight } from '../../src/v2/singleFlight.js';
 import { askMatchChoices, askMatchThreadId, createAskMatchSkips, localStorageAskMatchSkipsIo } from '../../src/v2/askMatches.js';
 import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
@@ -1908,7 +1909,17 @@ const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePo
  * circle this is the producer's control-agent strategy unwrapped with the local device's
  * own per-circle sealing identity (a recipient of the group key). p0/p1 → null (plaintext).
  */
+// One build per circle at a time: a circle opening asks for its producer and its seal strategy from several places at
+// once, and each used to build its own — minting its own "version 1" group key (createSingleFlight says more).
+const circlePodFlight = createSingleFlight();
+const circleStrategyFlight = createSingleFlight();
+
 async function getCircleSealStrategy(circleId, policy) {
+  if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
+  return circleStrategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
+}
+
+async function buildCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
   let strat = null;
   try {
@@ -2041,6 +2052,11 @@ function makeCirclePodClient(circleId) {
  */
 async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
+  return circlePodFlight(circleId, () => buildCirclePod(circleId, policy));
+}
+
+async function buildCirclePod(circleId, policy) {
+  if (circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
   const storagePosture = policy?.storagePosture ?? 'p0';
   // Circle OIDC: when signed in, route a sealed circle to the user's REAL pod; else the
   // in-memory pseudo-pod (offline / not signed in). Verified end-to-end in circlePodProducer.css.test.js.

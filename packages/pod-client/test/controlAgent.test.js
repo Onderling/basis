@@ -244,3 +244,23 @@ describe('controlAgent — device-grained audience surgery (the custody arc)', (
     expect((await agent.revokeRecipient({ publicKey: generateKeypair().publicKey })).rotated).toBe(false);
   });
 });
+
+describe('controlAgent — bootstrap is single-flight', () => {
+  it('four concurrent bootstraps write ONE version-1 key and fan ONE key-event', async () => {
+    const sharing = { grant: vi.fn(async () => {}), revoke: vi.fn(async () => {}) };
+    let stored = null; let writes = 0;
+    // a store that answers after a tick, like a pod: the read-then-write gap is where concurrent calls overlapped
+    const keyStore = {
+      read: async () => { await new Promise((r) => setTimeout(r, 1)); return stored; },
+      write: async (r) => { await new Promise((res) => setTimeout(res, 1)); writes += 1; stored = r; },
+    };
+    const controllerKey = generateKeypair();
+    const log = [];
+    const agent = createControlAgent({ sharing, containerUri: 'https://pod/c/', keyStore, controllerKey,
+      keyEventLog: { append: (e) => { log.push(e); } }, groupId: 'c1' });
+    await Promise.all([agent.bootstrap(), agent.bootstrap(), agent.bootstrap(), agent.bootstrap()]);
+    expect(writes).toBe(1);
+    expect(log).toHaveLength(1);
+    expect(stored.version).toBe(1);
+  });
+});

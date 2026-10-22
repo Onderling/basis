@@ -63,8 +63,15 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
     } catch { /* the log key-event is best-effort; the pod resource remains the fallback */ }
   }
 
-  /** Build the initial key resource for the current roster (idempotent — no-op if one exists). */
-  async function bootstrap() {
+  /** Build the initial key resource for the current roster (idempotent — no-op if one exists). SINGLE-FLIGHT: the
+   *  check and the write are two awaits apart, so callers that overlapped there each minted their own "version 1"
+   *  key; a second caller now waits for the first instead. */
+  let bootstrapping = null;
+  function bootstrap() {
+    if (!bootstrapping) bootstrapping = bootstrapOnce().finally(() => { bootstrapping = null; });
+    return bootstrapping;
+  }
+  async function bootstrapOnce() {
     if (await keyStore.read()) return null;
     const pubs = recipientsWithController(members.map((m) => m.publicKey));
     const res = buildGroupKeyResource({ version: 1, groupKey: generateGroupKey(), recipients: pubs });

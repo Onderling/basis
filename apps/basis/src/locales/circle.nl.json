@@ -4593,11 +4593,11 @@
       "doc": "objective L — mobile share screen: empty state when the user has no circle other than the source to share into."
     },
     "outbound_title": {
-      "text": "Gedeeld vanuit deze cirkel",
+      "text": "Gedeeld vanuit deze kring",
       "doc": "objective L — admin-panel section heading listing this circle's outbound canonical shares."
     },
     "outbound_empty": {
-      "text": "Deze cirkel heeft nog niets gedeeld.",
+      "text": "Deze kring heeft nog niets gedeeld.",
       "doc": "objective L — empty state for the outbound-shares section."
     },
     "outbound_row": {

@@ -18,15 +18,7 @@ const PERSON = require('./support/contactCard.fixture.json');
 // The circle a fresh install always has: the help circle (its id is a product constant, HELP_CIRCLE_ID = 'cc-help').
 const HELP_TILE = 'circle-tile-cc-help';
 
-async function launch({ fresh }) {
-  // The app's network timers never let RN idle; launch with synchronization off (see circleDefault.test.js).
-  await device.launchApp({ newInstance: true, delete: !!fresh, launchArgs: { detoxEnableSynchronization: 0 } });
-  await device.disableSynchronization();
-}
-
-async function isVisible(matcher) {
-  try { await expect(element(matcher)).toBeVisible(); return true; } catch { return false; }
-}
+const { launch, isVisible, firstOf, backToLauncher } = require('./support/ui');
 
 describe('the walk of 2026-10-08, pinned', () => {
   beforeAll(async () => {
@@ -60,17 +52,16 @@ describe('the walk of 2026-10-08, pinned', () => {
     // The card arrives the way a person gets one — opened as a link (scanned or tapped), not typed: Detox typing a
     // 100-character code into the soft keyboard got mangled. The app's own link path (classifyQrPayload) takes it.
     await device.openURL({ url: PERSON.uri });
-    // adding a person may first ask what they will see of you
-    try {
-      await waitFor(element(by.id('contact-add-sheet'))).toBeVisible().withTimeout(15_000);
-      // The sheet SLIDES in: Detox calls it visible mid-slide, and a tap then can land on the backdrop — which
-      // cancels and adds nothing. Let it settle, tap, and tap again while it is still up.
+    // adding a person may first ask what they will see of you. The sheet SLIDES in: Detox calls it visible mid-slide,
+    // and a tap then can land on the backdrop — which cancels and adds nothing. So: let it settle, press its own
+    // button (by id, not by its words), and press again only while the sheet is still up — never on a timer alone.
+    if (await firstOf([by.id('contact-add-sheet')], 15_000) === 0) {
       for (let i = 0; i < 3 && (await isVisible(by.id('contact-add-sheet'))); i++) {
         await new Promise((r) => setTimeout(r, 1500));
-        await element(by.text('Add').withAncestor(by.id('contact-add-sheet'))).tap();
-        await new Promise((r) => setTimeout(r, 1000));
+        try { await element(by.id('contact-sheet-submit')).tap(); } catch { /* mid-slide: the next round retries */ }
+        await new Promise((r) => setTimeout(r, 1500));
       }
-    } catch { /* this path adds without the sheet */ }
+    }
     // The link path lands in a circle's conversation (the app's chat confirms the add there); step back out to the
     // launcher. Back only while the tab bar is gone, so it never leaves the app.
     for (let i = 0; i < 3 && !(await isVisible(by.id('circle-tab-contacten'))); i++) {
@@ -108,6 +99,7 @@ describe('the walk of 2026-10-08, pinned', () => {
   });
 
   it('a circle opens — the conversation and its composer, no red screen', async () => {
+    await backToLauncher();
     // Vandaag is the landing now, mounted OVER the launcher: the tile can count as visible behind it while a tap never
     // reaches it — go to the Circles tab first.
     await waitFor(element(by.id(HELP_TILE))).toBeVisible().withTimeout(90_000);

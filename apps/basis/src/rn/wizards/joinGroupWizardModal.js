@@ -183,6 +183,7 @@ export default function JoinGroupWizardModal({
                 )}
                 <Checkbox
                   label={t('circle.join.wizard.rules.accept')}
+                  testID="join-rules-accept"
                   checked={state.rulesAccepted}
                   onToggle={(v) => setState((s) => ({ ...s, rulesAccepted: v }))}
                 />
@@ -192,6 +193,7 @@ export default function JoinGroupWizardModal({
               <Body title={t('circle.join.wizard.privacy.title')} intro={t('circle.join.wizard.privacy.notice')}>
                 <Checkbox
                   label={t('circle.join.wizard.privacy.accept')}
+                  testID="join-privacy-accept"
                   checked={state.privacyAccepted}
                   onToggle={(v) => setState((s) => ({ ...s, privacyAccepted: v }))}
                 />
@@ -280,19 +282,19 @@ export default function JoinGroupWizardModal({
           <Actions buttons={(() => {
             if (state.step === 1) return [
               { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('circle.join.wizard.next'),   onPress: () => setStep(2), kind: 'primary',
+              { label: t('circle.join.wizard.next'),   onPress: () => setStep(2), kind: 'primary', testID: 'join-next',
                 disabled: !state.rulesAccepted || !state.rulesText },
             ];
             if (state.step === 2) return [
               { label: t('circle.join.wizard.back'),   onPress: () => setStep(1), kind: 'secondary' },
               { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('circle.join.wizard.next'),   onPress: () => setStep(3), kind: 'primary',
+              { label: t('circle.join.wizard.next'),   onPress: () => setStep(3), kind: 'primary', testID: 'join-next',
                 disabled: !state.privacyAccepted },
             ];
             return [
               { label: t('circle.join.wizard.back'),   onPress: () => setStep(2), kind: 'secondary', disabled: state.submitting },
               { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: t('circle.join.wizard.join'),   onPress: onJoin, kind: 'primary',
+              { label: t('circle.join.wizard.join'),   onPress: onJoin, kind: 'primary', testID: 'join-submit',
                 disabled: !isValidHandle(state.handle) || state.submitting },
             ];
           })()} />

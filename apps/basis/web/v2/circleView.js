@@ -378,6 +378,8 @@ export function renderCircleView(container, {
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
     renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture });
+  } else if (effectiveTab !== 'conversation') {
+    // a tab whose surface has not loaded yet paints nothing — never the conversation's bubbles under its name
   } else if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'circle-view__empty';

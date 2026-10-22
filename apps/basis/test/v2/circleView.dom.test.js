@@ -249,10 +249,10 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(el.querySelector('.circle-view__tab.is-active').dataset.tab).toBe('noticeboard');
   });
 
-  it('non-CONVERSATION tabs render the placeholder body (V0 of SP-13.3)', () => {
+  it('a non-CONVERSATION tab whose surface is not there paints nothing — no placeholder, no bubbles', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'noticeboard' });
-    expect(el.querySelector('.circle-view__placeholder')).not.toBeNull();
+    expect(el.querySelector('.circle-view__placeholder')).toBeNull();
     // Bubble list is suppressed for non-chat tabs.
     expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(0);
   });
@@ -690,11 +690,12 @@ describe('renderCircleView · noticeboard tab → noticeboard (S1 #1)', () => {
     expect(el.querySelector('.circle-view__composer')).toBeNull();
   });
 
-  it('falls back to the tab-coming placeholder when no noticeboard prop is supplied', () => {
+  it('paints nothing (not the conversation) when no noticeboard prop is supplied yet', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: vi.fn(), tabs, activeTab: 'noticeboard' });
     expect(el.querySelector('.cc-noticeboard')).toBeNull();
-    expect(el.querySelector('.circle-view__placeholder')).not.toBeNull();
+    expect(el.querySelector('.circle-view__placeholder')).toBeNull();
+    expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(0);
   });
 });
 

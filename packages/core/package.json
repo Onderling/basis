@@ -36,11 +36,11 @@
     "tweetnacl-util": "^0.15.1"
   },
   "devDependencies": {
-    "@onderling/vault": "workspace:^",
-    "@onderling/transports": "workspace:^",
     "@anthropic-ai/sdk": "^0.36.0",
+    "@onderling/transports": "workspace:^",
+    "@onderling/vault": "workspace:^",
     "vitest": "^2.1.0",
-    "ws": "^8.20.0"
+    "ws": "^8.21.0"
   },
   "optionalDependencies": {
     "node-datachannel": "^0.32.2"

@@ -7,9 +7,13 @@ settings:
 overrides:
   '@noble/hashes': ^2.2.0
   '@scure/bip39': ^2.0.1
-  ws: ^8.20.0
+  ws: ^8.21.0
   '@react-native-async-storage/async-storage': ^1.24.0
   bunyan: 2.0.5
+  axios: ^1.20.0
+  follow-redirects: ^1.16.1
+  fast-uri: ^3.1.7
+  ip-address: ^10.3.1
 
 importers:
 
@@ -415,7 +419,7 @@ packages:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
-      ws: ^8.20.0
+      ws: ^8.21.0
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-node':

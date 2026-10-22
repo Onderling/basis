@@ -318,12 +318,25 @@ jobs:
         run: node scripts/relink-workspace.mjs
       - name: Rebuild native bindings (better-sqlite3, for the relay fixture)
         run: npm rebuild better-sqlite3 --prefix packages/relay
+      # the browser itself (~430 MB) kept between runs, keyed on the lockfile that pins @playwright/test; the install
+      # below then skips the download and only fetches the system packages (the part the retry is for)
+      - name: Browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Browsers
         # its own ceiling: the install fetches the runner's package lists from Ubuntu's mirrors, and a stalled mirror
         # once held a shard (and the release queued behind it) for the whole job's 60 minutes (2026-10-07). A stall
-        # now fails in minutes, and a rerun of the failed job takes over.
-        timeout-minutes: 8
-        run: npx playwright install --with-deps chromium
+        # fails in minutes — and is tried ONCE more inside the step: a rerun of the failed job was meant to take over,
+        # but on the trunk a newer merge cancels it, so three stalls on 2026-10-22 left the tail red with no test run.
+        timeout-minutes: 12
+        run: |
+          for try in 1 2; do
+            timeout 300 npx playwright install --with-deps chromium && exit 0
+            echo "browser install stalled or failed (try $try) — once more"
+          done
+          exit 1
         working-directory: apps/basis
       # ONE retry, not zero: a 3-minute story lost to a slow click under load should not red the whole
       # suite. A retry is a measurement of that flakiness, not a cure for it; the report names every test

@@ -59,11 +59,24 @@ export async function reachable(base) {
  * A suite that proves the ACP writer cannot be judged on a WAC server — it reads red for the one reason
  * that says nothing about the code.
  */
-export async function bootCss({ port, base, config = '@css:config/default.json' }) {
+// The server is fetched by npx on every CI run, inside the boot window below: pinned, so a new release cannot change
+// what the pod suites run against overnight. A boot that times out is tried ONCE more (2026-10-22: two runs in a row
+// timed out while the fetch was slow, then the next ones booted fine) — a second timeout is a real failure.
+const CSS_PACKAGE = '@solid/community-server@7.2.0';
+
+export async function bootCss(opts) {
+  try { return await bootCssOnce(opts); }
+  catch (err) {
+    console.log(`· ${err.message} — trying once more`);
+    return bootCssOnce(opts);
+  }
+}
+
+async function bootCssOnce({ port, base, config = '@css:config/default.json' }) {
   const onDisk = config.includes('file');
   const dataDir = onDisk ? mkdtempSync(join(tmpdir(), 'css-integration-')) : null;
   console.log(`· booting a throwaway CSS on :${port} (${config.replace('@css:config/', '')}) …`);
-  const args = ['-y', '@solid/community-server', '-p', String(port), '-b', base, '-l', 'error', '-c', config];
+  const args = ['-y', CSS_PACKAGE, '-p', String(port), '-b', base, '-l', 'error', '-c', config];
   if (dataDir) args.push('-f', dataDir);
   // `detached` so the server gets its own process GROUP. Killing the `npx` wrapper leaves the node
   // server it spawned holding the port — measured: two orphans still listening on :3838/:3839 after a
@@ -74,7 +87,7 @@ export async function bootCss({ port, base, config = '@css:config/default.json' 
     if (await reachable(base)) return proc;
     await new Promise((r) => setTimeout(r, 1000));
   }
-  proc.kill('SIGKILL');
+  teardown(proc);   // the whole group, so a retry finds the port free
   throw new Error(`CSS did not come up on :${port} within 90s`);
 }
 

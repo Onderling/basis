@@ -5,7 +5,7 @@
  * the moment the process restarted). The bridge says so — `onPollingDown({reason})`, once — so the host can restart.
  */
 import { describe, it, expect } from 'vitest';
-import { TelegramBridge } from '../src/bridges/TelegramBridge.js';
+import { TelegramBridge, telegramErrorCodes } from '../src/bridges/TelegramBridge.js';
 
 function fakeBot({ launch }) {
   const bot = {
@@ -29,6 +29,24 @@ describe('the bridge watches its long-poll', () => {
     reject(Object.assign(new Error('409: Conflict'), { code: 409 }));
     await new Promise((r) => setTimeout(r, 0));
     expect(down).toEqual(['stopped']);
+  });
+
+  it('the host hears the error as CODES, never its message: a fetch error carries the bot URL and so the token', async () => {
+    const down = [];
+    let reject;
+    const bot = fakeBot({ launch: () => new Promise((_, r) => { reject = r; }) });
+    const bridge = new TelegramBridge({ botToken: 'x', mode: 'long-polling', telegrafFactory: () => bot, onPollingDown: (e) => down.push(e), watchdog: { everyMs: 1e9 } });
+    await bridge.start();
+    const conflict = Object.assign(new Error('409: Conflict: terminated by other getUpdates request'), { name: 'TelegramError', response: { error_code: 409 } });
+    reject(conflict);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(down[0].codes).toEqual({ name: 'TelegramError', status: 409 });
+    const fetchErr = Object.assign(new Error('request to https://api.telegram.org/bot123456:SECRET/getUpdates failed, reason: timeout'), { name: 'FetchError', code: 'ETIMEDOUT' });
+    expect(telegramErrorCodes(fetchErr)).toEqual({ name: 'FetchError', code: 'ETIMEDOUT' });
+    expect(JSON.stringify(telegramErrorCodes(fetchErr))).not.toContain('SECRET');
+    // a code that is not a short code is dropped, not passed on
+    expect(telegramErrorCodes({ name: 'X', code: 'https://api.telegram.org/bot123:SECRET' })).toEqual({ name: 'X' });
+    expect(telegramErrorCodes(undefined)).toBeNull();
   });
 
   it('no poll completes for too long: stalled, said once; a poll that completes keeps it quiet', async () => {

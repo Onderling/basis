@@ -30,6 +30,11 @@ import { householdListType, coerceListArgs } from '../v2/circleGate.js';
 import { replyFact, replyLines, isReadFamily } from '../v2/replyLine.js';
 import { createLastReads } from '../v2/lastRead.js';
 import { telegramPlain } from './telegramPlain.js';
+import { scrubSecrets } from '@onderling/logger';
+
+// What an error may say in a chat, a note or the console: its message without credentials (a fetch error's message is
+// the request URL, and a bot's URL carries its token).
+const errorText = (err) => scrubSecrets(err?.message ?? err);
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -102,8 +107,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     return said ? (offer.find((b) => labelKey(b.label) === said)?.id ?? null) : null;
   };
   const speak = (chatId, said, buttons) => {
-    // Telegram shows plain text: the model's markdown leaves here without its marks ("**Taken**" arrived with the stars)
-    const text = telegramPlain(said);
+    // Telegram shows plain text: the model's markdown leaves here without its marks ("**Taken**" arrived with the stars).
+    // And no credential leaves here: whatever path an error's message took into a reply, its URL's token stays behind.
+    const text = scrubSecrets(telegramPlain(said));
     const slashButtons = (buttons ?? []).filter((b) => typeof b?.id === 'string' && b.id.startsWith('/') && b.label);
     if (slashButtons.length) quickOffer.set(chatId, slashButtons); else quickOffer.delete(chatId);
     const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });
@@ -162,7 +168,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       await say(chatId, lines.join('\n'), [...buttons, ...refresh]);
       return;
     }
-    const text = rendered.text ?? (rendered.error ? rendered.error.message : '');
+    const text = rendered.text ?? (rendered.error ? errorText(rendered.error) : '');
     // a reply's quick replies (a settings menu) are buttons; a tap sends the button's slash line, which the person's
     // own gate decides like a typed one
     const quick = (rendered.quickReplies ?? []).map((q) => ({ id: q.slash, label: q.label }));
@@ -196,7 +202,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     note(chatId, { opId: ready.opId, args: ready.args ?? {}, appOrigin: ready.appOrigin });
     // The person this turn is for: every call carries them, so the host's gate decides what they reach.
     try { reply = await runDispatch(ready, callFor(chatId)); }
-    catch (err) { note(chatId, { error: err?.message ?? String(err) }); await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) })); return; }
+    catch (err) { note(chatId, { error: errorText(err) }); await say(chatId, tc(chatId)('circle.telegram.error', { message: errorText(err) })); return; }
     // a greeting answered in the turn that already said the welcome (a first contact's "hoi"): said once, not twice
     if (reply?.payload?.greeting === true && turns.get(chatId)?.welcomed) { note(chatId, { welcomedOnce: true }); return; }
     // a rule that may fall back to the model, whose words named nothing: not said — the line goes to the model
@@ -388,8 +394,8 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       r = await run();
       if (!own) note(chatId, { via: r?.via === 'rule' ? 'gate' : (r?.via ?? 'hint'), ...(r?.cmd ? { picked: r.cmd } : {}) });
     } catch (err) {
-      note(chatId, { error: err?.message ?? String(err) });
-      await say(chatId, tc(chatId)('circle.telegram.error', { message: err?.message ?? String(err) }));
+      note(chatId, { error: errorText(err) });
+      await say(chatId, tc(chatId)('circle.telegram.error', { message: errorText(err) }));
     } finally {
       // the turn's folded lines, said before the turn is remembered
       try { await sayLines(chatId); } catch { /* a reply that cannot be sent is the bridge's to report */ }
@@ -525,7 +531,7 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
       } catch (err) {
         // A failing admission is SAID, never passed off as "I only understand commands": the reason on the console and
         // in the walk log (never the person's id), and the person hears that letting them in went wrong.
-        const reason = err?.message ?? String(err);
+        const reason = errorText(err);
         console.warn(`telegram runner: admission failed (${reason})`);
         if (typeof walkLog === 'function') { try { walkLog({ kind: 'admission-error', error: reason }); } catch { /* a log must never break a turn */ } }
         await say(chatId, tc(chatId)('circle.bot.admission_failed'));

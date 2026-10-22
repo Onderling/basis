@@ -141,6 +141,15 @@ import { createCirclePolicyStore, localStoragePolicyIo } from '../src/v2/circleP
 import { makeGovernanceRail } from '../src/v2/governanceAppWiring.js';
 import { runPendingForget } from '../src/v2/enrolForgets.js';
 import { renamedFrom } from '@onderling-app/pinboard/lib/moveRenamedStore';
+import { scrubSecrets } from '@onderling/logger';
+
+// No credential leaves this process in a console line either (the container's log): an error printed whole prints its
+// message, and a fetch error's message is the request URL, with a bot's token in it.
+for (const level of ['log', 'info', 'warn', 'error']) {
+  const write = console[level].bind(console);
+  console[level] = (...args) => write(...args.map((a) => (typeof a === 'string' ? scrubSecrets(a)
+    : a instanceof Error ? scrubSecrets(a.stack ?? a.message) : a)));
+}
 
 const { values } = parseArgs({ options: {
   'data-dir':   { type: 'string',  default: path.join(homedir(), '.basis-device') },
@@ -332,7 +341,8 @@ const walkLogFile = (() => {
   return /\.jsonl$/.test(given) ? given.replace(/\.jsonl$/, `-${stamp}.jsonl`) : `${given}-${stamp}.jsonl`;
 })();
 try { mkdirSync(path.dirname(walkLogFile), { recursive: true }); } catch { /* said below, once, if the first write fails */ }
-const walkLog = (entry) => { try { appendFileSync(walkLogFile, JSON.stringify(entry) + '\n'); } catch { /* the log is not the product */ } };
+// No credential is written: a line that carries an error's message carries a fetch's URL, and a bot's URL its token.
+const walkLog = (entry) => { try { appendFileSync(walkLogFile, scrubSecrets(JSON.stringify(entry)) + '\n'); } catch { /* the log is not the product */ } };
 
 // ── The add-a-device offer ──────────────────────────────────────────────────────────────────────
 // Box-first: this machine is set up first and then hands its owner's next device the context it
@@ -902,9 +912,10 @@ if (tgToken || inboxDoor.bridge) {
   const tgBridge = tgToken ? new TelegramBridge({
     botToken: tgToken, mode: 'long-polling',
     apiRoot: String(process.env.ONDERLING_TELEGRAM_API_ROOT ?? '').trim() || undefined,
-    onPollingDown: ({ reason, error }) => {
-      console.error(`device-runner: Telegram's long-poll ${reason}${error ? ` (${error?.message ?? error})` : ''} — exiting so the box restarts it`);
-      try { walkLog({ kind: 'telegram-down', reason }); } catch { /* the exit below is what matters */ }
+    // the error as codes only (its message can carry the bot URL, and so the token), in the console and the log alike
+    onPollingDown: ({ reason, codes }) => {
+      console.error(`device-runner: Telegram's long-poll ${reason}${codes ? ` (${JSON.stringify(codes)})` : ''} — exiting so the box restarts it`);
+      try { walkLog({ kind: 'telegram-down', reason, ...(codes ? { error: codes } : {}) }); } catch { /* the exit below is what matters */ }
       setTimeout(() => process.exit(1), 500).unref?.();
     },
   }) : null;

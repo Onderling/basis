@@ -1,11 +1,12 @@
 /**
  * A Bot API server of our own, for booting the real box against (its `ONDERLING_TELEGRAM_API_ROOT`, as Telegram's
  * self-hosted server would be named): it answers who the bot is, hands out the updates a test queues (a person writing),
- * and keeps every call — what the bot said, the menus it set.
+ * and keeps every call — what the bot said, the menus it set. `dropMethods` cuts the connection on those calls, so the
+ * bot sees a network failure (a fetch error, whose message is the request URL) instead of an answer.
  */
 import { createServer } from 'node:http';
 
-export function fakeBotApi() {
+export function fakeBotApi({ dropMethods = [] } = {}) {
   const calls = [];
   const queue = [];
   let nextId = 1;
@@ -16,6 +17,7 @@ export function fakeBotApi() {
       const method = req.url.split('/').pop().split('?')[0];
       let args = {}; try { args = body ? JSON.parse(body) : {}; } catch { /* a form body: not ours */ }
       calls.push({ method, args });
+      if (dropMethods.includes(method)) { req.socket.destroy(); return; }
       const answer = (result) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ ok: true, result })); };
       if (method === 'getMe') return answer({ id: 1, is_bot: true, first_name: 'Huis', username: 'huisbot' });
       if (method === 'getUpdates') { setTimeout(() => answer(queue.splice(0)), queue.length ? 0 : 300); return; }

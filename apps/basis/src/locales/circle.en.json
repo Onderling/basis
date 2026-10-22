@@ -2946,6 +2946,18 @@
       "text": "No matches yet",
       "doc": "Empty state for the skill match list."
     },
+    "matches_for_ask": {
+      "text": "Who offers this",
+      "doc": "Heading over the matches the asker sees under their own ask on the noticeboard (released offerings only)."
+    },
+    "match_ask": {
+      "text": "Ask",
+      "doc": "Under my ask: open the contact thread with this match."
+    },
+    "match_skip": {
+      "text": "Skip",
+      "doc": "Under my ask: hide this match on this device only."
+    },
     "axis": {
       "openness": {
         "text": "Openness",

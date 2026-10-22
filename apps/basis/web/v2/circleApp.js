@@ -312,6 +312,7 @@ import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
+import { askMatchChoices, askMatchThreadId, createAskMatchSkips, localStorageAskMatchSkipsIo } from '../../src/v2/askMatches.js';
 import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
@@ -2129,6 +2130,8 @@ const {
 });
 // per-contact DM thread state: contactId → { name, peerAddr, messages:[{origin,text,buttons?,pending?}] }.
 const contactThreads = new Map();
+// The matches I skipped under my own asks — this device only (localStorage), never the circle.
+const askMatchSkips = createAskMatchSkips(localStorageAskMatchSkipsIo());
 let _activeContactThread = null; // { contactId, rerender } — set while a DM thread is on screen
 let circlePendingFollowUp = null;// a single-field needsForm awaiting the user's next message (conversational elicitation)
 let circlePendingFormFollowUp = null; // a 2+-field needsForm → inline multi-field form (mobile parity); cleared on submit
@@ -6998,6 +7001,7 @@ function showCircle(id, circle, policy) {
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
       // who "me" is HERE: the circle's self (a persona's circle is the persona's)
       const meHere = mySelfIn(id) ?? myWebid ?? null;
+      const skippedMatches = await askMatchSkips.list();
       noticeboardPosts = items.map((it) => ({
         id:           it.id,
         text:         it.text ?? it.label ?? '',
@@ -7021,6 +7025,8 @@ function showCircle(id, circle, policy) {
         mine:         !!(meHere && it.addedBy === meHere),
         // the people who answered my request, each an Accept (the shared projection — web ≡ mobile)
         responders:   responderChoices(it, { viewerId: meHere, members: circleRoster ?? [], policy: policy?.revealPolicy ?? 'pairwise' }),
+        // who here offers what I asked — on my own open ask only, from what they released (the shared projection)
+        matches:      askMatchChoices(it, { viewerId: meHere, members: circleRoster ?? [], policy: policy?.revealPolicy ?? 'pairwise', skipped: skippedMatches }),
         // carry inline-image metadata (thumbnail travels; full bytes on demand).
         attachments:  Array.isArray(it.attachments) ? it.attachments
                       : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
@@ -7304,7 +7310,7 @@ function showCircle(id, circle, policy) {
     if (att && att.thumbnail) showImageModal(att.thumbnail, { pending: true });
   }
 
-  async function noticeboardAction({ action, post, responder = null }) {
+  async function noticeboardAction({ action, post, responder = null, match = null }) {
     // Opened AFTER the board reload below — the reload repaints the circle view, and a thread opened
     // before it was painted over the instant it appeared (browser story 4 found it).
     let openThreadWith = null;
@@ -7329,6 +7335,17 @@ function showCircle(id, circle, policy) {
         await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
         await pinboardCall('pinboard', 'markReturned', { requestId: post.id });
+      } else if (action === 'askMatch' && match) {
+        // Ask: the contact thread with the person who offers it (nothing is sent until I write)
+        const choice = (post.matches ?? []).find((m) => m.webid === match);
+        const threadId = askMatchThreadId(choice, { identityOf: (addr) => _peerAgent?.identityOfAddress?.(addr) ?? addr });
+        if (threadId) {
+          if (!contactThreads.has(threadId)) contactThreads.set(threadId, { name: choice.label, peerAddr: choice.address, messages: [] });
+          await showContactThread(threadId);
+        }
+        return;
+      } else if (action === 'skipMatch' && match) {
+        await askMatchSkips.add(post.id, match);
       } else if (action === 'accept' && responder) {
         await pinboardCall('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
       } else if (action === 'mute') {

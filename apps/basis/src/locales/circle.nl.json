@@ -2946,6 +2946,18 @@
       "text": "Nog geen matches",
       "doc": "Empty state for the skill match list."
     },
+    "matches_for_ask": {
+      "text": "Wie biedt dit aan",
+      "doc": "Heading over the matches the asker sees under their own ask on the noticeboard (released offerings only)."
+    },
+    "match_ask": {
+      "text": "Vragen",
+      "doc": "Under my ask: open the contact thread with this match."
+    },
+    "match_skip": {
+      "text": "Overslaan",
+      "doc": "Under my ask: hide this match on this device only."
+    },
     "axis": {
       "openness": {
         "text": "Openheid",

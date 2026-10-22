@@ -52,3 +52,27 @@ describe('renderCircleNoticeboard — embeds[] surfacing', () => {
     expect(onEmbedOpen).toHaveBeenCalledWith({ type: 'task', ref: 't9', screen: 'tasks' });
   });
 });
+
+describe('renderCircleNoticeboard — who offers what I asked', () => {
+  const matches = [{ webid: 'w-bram', address: 'addr-bram', label: '@bram', offering: 'bike repair' }];
+
+  it('paints the matches under MY ask, each with Ask and Skip routed through onAction', () => {
+    const el = mount();
+    const onAction = vi.fn();
+    renderCircleNoticeboard(el, { t, onAction, posts: [{ id: 'p1', type: 'ask', text: 'bike repair?', mine: true, matches }] });
+    expect(el.querySelector('.cc-noticeboard__matches .circle-offering-matches__title').textContent).toBe('circle.offerings.matches_for_ask');
+    expect(el.querySelector('.circle-offering-matches__offering').textContent).toBe('bike repair');
+    el.querySelector('.circle-offering-matches__ask').click();
+    el.querySelector('.circle-offering-matches__skip').click();
+    expect(onAction.mock.calls.map((c) => [c[0].action, c[0].match])).toEqual([['askMatch', 'w-bram'], ['skipMatch', 'w-bram']]);
+  });
+
+  it("paints nothing under someone else's post, or under mine without matches", () => {
+    const el = mount();
+    renderCircleNoticeboard(el, { t, posts: [
+      { id: 'p1', type: 'ask', text: 'x', mine: false, matches },
+      { id: 'p2', type: 'ask', text: 'y', mine: true, matches: [] },
+    ] });
+    expect(el.querySelector('.cc-noticeboard__matches')).toBeNull();
+  });
+});

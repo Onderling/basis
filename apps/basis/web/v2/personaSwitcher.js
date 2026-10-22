@@ -9,7 +9,7 @@ export function renderPersonaSwitcher(container, { model, t, onAct, onEdit, onCl
   if (!container || !model) return container;
   const tr = translatorOr(t, 'personaSwitcher.js');
   container.innerHTML = '';
-  container.className = 'cc-persona-switcher';
+  container.classList.add('cc-persona-switcher');   // ADD: it paints into a borrowed card whose class carries the theme's background
   const title = document.createElement('h3');
   title.textContent = tr('circle.switcher.title');
   container.appendChild(title);

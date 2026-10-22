@@ -1553,3 +1553,12 @@
    and its attach "+" are the acts — and the floating one covered the composer's send button there */
 .circle-tabbar--hidden ~ .cc-fab { display: none; }
 .circle-vandaag-plus__section h4 { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+
+/* The contact lens (adding a person, and "who are you for this contact"): it had no styles — the title ran out of the
+   card on an unnamed address, "Als"/"Hoeveel" sat glued to native selects (screen walk, 2026-10-22). */
+.cc-lens__title, .cc-lens__intro { overflow-wrap: anywhere; }
+.cc-lens__field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 0; font-size: 13px; }
+.cc-lens__label { color: var(--ink-soft); }
+.cc-lens__field select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
+.cc-lens__hint { font-size: 13px; color: var(--ink-soft); line-height: 1.45; margin: 12px 0 0; }
+.cc-lens__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }

@@ -17,6 +17,7 @@ import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '.
 import { buildAttachControl } from './attachControl.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { NOTICEBOARD_INTENTS } from '../../src/v2/circlePinboardScope.js';
+import { renderOfferingMatches } from './circleOfferingMatches.js';
 
 const INTENTS = NOTICEBOARD_INTENTS;
 
@@ -251,6 +252,20 @@ export function renderCircleNoticeboard(container, {
     if (!p.mine) chip('report', 'circle.noticeboard.action.report', ' cc-noticeboard__chip--muted');
     if (!p.mine) chip('mute', 'circle.noticeboard.action.mute', ' cc-noticeboard__chip--muted');
     li.appendChild(actions);
+
+    // who in this circle offers what I asked (`askMatchChoices`, on my own open ask only): Ask opens the contact
+    // thread, Skip hides the match on this device
+    if (p.mine && Array.isArray(p.matches) && p.matches.length) {
+      const box = document.createElement('div');
+      box.className = 'cc-noticeboard__matches';
+      renderOfferingMatches(box, {
+        matches: p.matches.map((m) => ({ id: m.webid, label: m.label, offering: m.offering, source: 'human' })),
+        t,
+        onAsk:  (row) => { if (typeof onAction === 'function') onAction({ action: 'askMatch', post: p, match: row.id }); },
+        onSkip: (row) => { if (typeof onAction === 'function') onAction({ action: 'skipMatch', post: p, match: row.id }); },
+      });
+      li.appendChild(box);
+    }
 
     list.appendChild(li);
   }

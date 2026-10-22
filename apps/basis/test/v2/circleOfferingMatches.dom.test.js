@@ -47,3 +47,17 @@ describe('renderOfferingMatches', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('renderOfferingMatches — inline under my ask', () => {
+  it('names the offering and gives each match an Ask and a Skip, with no back button', () => {
+    const el = mount();
+    const onAsk = vi.fn(); const onSkip = vi.fn();
+    renderOfferingMatches(el, { matches: [{ id: 'w1', label: '@bram', offering: 'bike repair' }], t, onAsk, onSkip });
+    expect(el.querySelector('.circle-offering-matches__back')).toBeNull();
+    expect(el.querySelector('.circle-offering-matches__offering').textContent).toBe('bike repair');
+    el.querySelector('.circle-offering-matches__ask').click();
+    el.querySelector('.circle-offering-matches__skip').click();
+    expect(onAsk.mock.calls[0][0]).toMatchObject({ id: 'w1', label: '@bram' });
+    expect(onSkip.mock.calls[0][0]).toMatchObject({ id: 'w1' });
+  });
+});

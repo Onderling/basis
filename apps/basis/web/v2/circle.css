@@ -491,6 +491,11 @@
   padding: 12px 14px; background: var(--card);
   border: 1px solid var(--line); border-radius: var(--radius); font-size: 14px;
 }
+/* inline under the asker's own ask: label · badge · what they offer, then Ask / Skip */
+.cc-noticeboard__matches { margin-top: 8px; }
+.cc-noticeboard__matches .circle-offering-matches__title { font-size: 13px; font-weight: 600; margin: 0 0 6px; color: var(--ink-soft); }
+.cc-noticeboard__matches .circle-offering-matches__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; }
+.circle-offering-matches__offering { flex-basis: 100%; color: var(--ink-soft); font-size: 13px; }
 
 /* ───────────────────── folio (board 10) ───────────────────── */
 .circle-folio__filters { display: flex; gap: 8px; margin-bottom: 10px; }

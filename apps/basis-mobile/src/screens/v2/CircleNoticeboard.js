@@ -20,6 +20,9 @@ import { isNoticeboardPost, responderChoices } from '../../../../basis/src/v2/ci
 import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from '../../../../basis/src/v2/circleStream.js';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
+import { askMatchChoices, askMatchThreadId, createAskMatchSkips, asyncStorageAskMatchSkipsIo } from '../../../../basis/src/v2/askMatches.js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CircleOfferingMatchesScreen from './CircleOfferingMatchesScreen.js';
 import { annotateResonantPosts } from '../../../../basis/src/core/handlers/driverMatchNotify.js';
 import { getCirclePodFetch } from '../../core/circlePods.js';
 // Sealed media (2026-07-11): Uint8Array → base64 data-URL for the full-image viewer (reuse the
@@ -31,7 +34,10 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onPinboardEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null,
+// The matches I skipped under my own asks — this device only (AsyncStorage), never the circle (web parity).
+const askMatchSkips = createAskMatchSkips(asyncStorageAskMatchSkipsIo(AsyncStorage));
+
+export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onPinboardEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null, onOpenContact = null,
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
@@ -76,6 +82,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
       // who "me" is HERE: the circle's self (the launcher's per-circle viewer — a persona's circle is the persona's)
       const meHere = viewerId ?? (who || null);
+      const skippedMatches = await askMatchSkips.list();
       const mapped = items.map((it) => ({
         // The INTENT, not the item type — a canonical post's type is 'post', which printed the raw
         // locale key as its badge on both shells (web≡mobile with circleApp's projection).
@@ -84,6 +91,8 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
         addedBy: it.addedBy, mine: !!(meHere && it.addedBy === meHere),
         // the people who answered my request, each an Accept (the shared projection — web ≡ mobile)
         responders: responderChoices(it, { viewerId: meHere, members: members ?? [], policy: revealPolicy }),
+        // who here offers what I asked — on my own open ask only, from what they released (the shared projection)
+        matches: askMatchChoices(it, { viewerId: meHere, members: members ?? [], policy: revealPolicy, skipped: skippedMatches }),
         addedByLabel: memberLabelFor(it.addedBy, { members: members ?? [], viewerId, policy: revealPolicy }),
         // S5 — inline-image metadata (thumbnail travels; full bytes on demand).
         attachments: Array.isArray(it.attachments) ? it.attachments
@@ -186,6 +195,17 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     } catch { /* reload reflects the real state */ }
     reload();
   }, [callSkill, reload, onPeerMuted]);
+
+  // Ask: the contact thread with the person who offers it (nothing is sent until I write). Skip: hidden on this device.
+  const askMatch = useCallback((post, webid) => {
+    const choice = (post.matches ?? []).find((m) => m.webid === webid);
+    const contactId = askMatchThreadId(choice, { identityOf });
+    if (contactId) { try { onOpenContact?.({ contactId, peerAddr: choice.address, name: choice.label }); } catch { /* opening is a courtesy */ } }
+  }, [identityOf, onOpenContact]);
+  const skipMatch = useCallback(async (post, webid) => {
+    await askMatchSkips.add(post.id, webid);
+    reload();
+  }, [reload]);
 
   const submitReply = useCallback(async (post) => {
     const body = replyText.trim();
@@ -307,6 +327,12 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
             {!p.mine && <Chip label={t('circle.noticeboard.action.report')} muted onPress={() => runAction('report', p)} />}
             {!p.mine && <Chip label={t('circle.noticeboard.action.mute')} muted onPress={() => runAction('mute', p)} />}
           </View>
+          {p.mine && Array.isArray(p.matches) && p.matches.length > 0 && (
+            <CircleOfferingMatchesScreen
+              matches={p.matches.map((m) => ({ id: m.webid, label: m.label, offering: m.offering, source: 'human' }))}
+              onAsk={(row) => askMatch(p, row.id)}
+              onSkip={(row) => skipMatch(p, row.id)} />
+          )}
           {replyingTo === p.id && (
             <View style={styles.replyRow}>
               <TextInput style={styles.replyInput} value={replyText} onChangeText={setReplyText} placeholder={t('circle.noticeboard.respond_prompt')} placeholderTextColor={theme.color.inkSoft} onSubmitEditing={() => submitReply(p)} testID={`nb-reply-${p.id}`} autoFocus />

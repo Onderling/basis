@@ -186,13 +186,16 @@ export const SEAMS = Object.freeze([
   // never acted on (`plusLineOutcome`, with each circle's availability from `circleAvailabilityFor`). A shell reading the
   // line any other way is how the sheet would come to act in a circle.
   { id: 'plus-line-outcome', pattern: /plusLineOutcome\(/, shells: ['web', 'mobile'], why: 'the "+" line makes an own act or refers to a circle, and never acts in one' },
+  // Who offers what I asked: the matches under the asker's own open ask, from the members' released offerings only,
+  // computed on the asker's device (`askMatchChoices`). A shell matching any other way could read what was not released.
+  { id: 'ask-matches', pattern: /askMatchChoices\(/, shells: ['web', 'mobile'], why: 'matches under my own ask come from released offerings only, and only the asker sees them' },
   { id: 'contact-person-seal', pattern: /sealFor:\s*agent\.contactSeal\?\.sealFor/, why: 'a contact turn — the bot\'s replies included — is readable only with the contact\'s current person key, never by a device they revoked' },
 ]);
 
 /** A shell is a file SET: the files that together compose the substrate for that surface. */
 export const SHELLS = Object.freeze([
   { name: 'web',    files: ['apps/basis/web/v2/circleApp.js'] },
-  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/App.js'] },
+  { name: 'mobile', files: ['apps/basis-mobile/src/core/agentBundle.js', 'apps/basis-mobile/src/screens/ChatScreen.js', 'apps/basis-mobile/src/screens/v2/CircleLauncherScreen.js', 'apps/basis-mobile/src/screens/v2/CircleMyDataScreen.js', 'apps/basis-mobile/src/screens/v2/CircleProfileScreen.js', 'apps/basis-mobile/src/screens/v2/EnrollDeviceModal.js', 'apps/basis-mobile/src/screens/v2/ContactThreadScreen.js', 'apps/basis-mobile/src/screens/v2/CircleNoticeboard.js', 'apps/basis-mobile/App.js'] },
   { name: 'box',    files: ['apps/basis/bin/device-runner.mjs', 'apps/basis/src/telegram/runner.js'] },   // the runner is the box's Telegram door
 ]);
 

@@ -177,6 +177,7 @@ jobs:
           if ! git diff --quiet -- '*pnpm-lock.yaml'; then
             echo "::error::a lockfile does not say what pnpm resolves: run 'pnpm install --lockfile-only' and commit the result"
             git diff --stat -- '*pnpm-lock.yaml'
+            git diff -- '*pnpm-lock.yaml' | head -120
             exit 1
           fi
           echo "every lockfile says what pnpm resolves"

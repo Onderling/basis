@@ -228,7 +228,7 @@ export default function SettingsWizardModal({
                   </View>
                   <View style={styles.section}>
                     <Field
-                      label="Display name"
+                      label={t('circle.wizard.settings.display_name')}
                       value={displayInput}
                       onChangeText={setDisplayInput}
                       placeholder={t('circle.wizard.settings.display_placeholder')}
@@ -249,9 +249,7 @@ export default function SettingsWizardModal({
                         </Text>
                       </TouchableOpacity>
                     </View>
-                    <Text style={styles.hint}>
-                      Pauses outbound notifications while keeping the substrate alive.
-                    </Text>
+                    <Text style={styles.hint}>{t('circle.wizard.settings.holiday_hint')}</Text>
                   </View>
                   {feedback && (
                     <Text style={[styles.feedback,
@@ -264,7 +262,7 @@ export default function SettingsWizardModal({
                   {/* ── Pod sign-in section ─────────────────────────── */}
                   {podCapable ? (
                     <View style={styles.section} testID="settings-pod-section">
-                      <Text style={styles.sectionHeader}>Solid pod</Text>
+                      <Text style={styles.sectionHeader}>{t('circle.wizard.settings.pod_section')}</Text>
                       {podSession?.webid ? (
                         <>
                           <View style={styles.row}>
@@ -341,7 +339,7 @@ export default function SettingsWizardModal({
                   {/* ── NKN relay section ───────────────────────────── */}
                   {agent?.relay ? (
                     <View style={styles.section} testID="settings-relay-section">
-                      <Text style={styles.sectionHeader}>NKN relay</Text>
+                      <Text style={styles.sectionHeader}>{t('circle.wizard.settings.relay_section')}</Text>
                       <View style={styles.row}>
                         <Text style={styles.rowLabel}>Status</Text>
                         <Text style={styles.rowValue}>{currentStatus}</Text>
@@ -355,7 +353,7 @@ export default function SettingsWizardModal({
                         </View>
                       ) : null}
                       <Field
-                        label="Relay URL"
+                        label={t('circle.wizard.settings.relay_url')}
                         value={relayInput}
                         onChangeText={setRelayInput}
                         placeholder="wss://relay.example.org"
@@ -379,15 +377,11 @@ export default function SettingsWizardModal({
                             style={[styles.saveBtn, styles.saveBtnSecondary, relayBusy && styles.btnDisabled]}
                             accessibilityLabel="settings-relay-clear"
                           >
-                            <Text style={[styles.saveBtnText, styles.saveBtnTextSecondary]}>
-                              Clear
-                            </Text>
+                            <Text style={[styles.saveBtnText, styles.saveBtnTextSecondary]}>{t('circle.settings.relayEndpoint_clear')}</Text>
                           </TouchableOpacity>
                         ) : null}
                       </View>
-                      <Text style={styles.hint}>
-                        Override the auto-selected NKN relay (advanced).  ws:// or wss:// only.
-                      </Text>
+                      <Text style={styles.hint}>{t('circle.wizard.settings.relay_hint')}</Text>
                       {relayError && <Text style={styles.feedbackError}>{relayError}</Text>}
                     </View>
                   ) : null}

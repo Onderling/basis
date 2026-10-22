@@ -7886,6 +7886,24 @@
     }
   },
   "wizard": {
+    "embed": {
+      "duration": {
+        "text": "Duration (e.g. 1h, 90m, 2h30m)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "location": {
+        "text": "Location (optional)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "share_with": {
+        "text": "Share with (optional, a contact's address)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "creating": {
+        "text": "Creating the time block…",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      }
+    },
     "recovery": {
       "after_restore_hint": {
         "text": "Your circles are not in the phrase. After the reload, sign in to your pod or load your recovery file under My data to get them back.",
@@ -8205,6 +8223,26 @@
       }
     },
     "settings": {
+      "holiday_hint": {
+        "text": "Pauses notifications and marks you unavailable.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "pod_section": {
+        "text": "Solid pod",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_section": {
+        "text": "NKN relay",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_url": {
+        "text": "Relay URL",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "relay_hint": {
+        "text": "Override the automatically chosen NKN relay (advanced). ws:// or wss:// only.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "loading": {
         "text": "Loading settings…",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8271,6 +8309,14 @@
       }
     },
     "backup": {
+      "confirm_passphrase": {
+        "text": "Confirm passphrase",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "building": {
+        "text": "Building backup…",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "passphrase_warning": {
         "text": "Lose the passphrase and the backup is gone. There is no recovery. Write it down.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8301,6 +8347,18 @@
       }
     },
     "restore": {
+      "phrase": {
+        "text": "Recovery phrase",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "ack_lost": {
+        "text": "I understand my current identity and local data will be LOST.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "ack_undone": {
+        "text": "I understand this CANNOT be undone.",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "identity_warning": {
         "text": "After restoring, the app uses the recovered identity. Your current handle, contacts, circles and pending invites belong to the old identity and will appear gone. They are not deleted, but you cannot act on them without the old recovery phrase.",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8339,6 +8397,22 @@
       }
     },
     "audience": {
+      "what": {
+        "text": "What do you want to post?",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "trust": {
+        "text": "Trust level",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "recipients": {
+        "text": "Recipients (optional, comma-separated handles)",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
+      "target": {
+        "text": "Target circle",
+        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
+      },
       "max_distance": {
         "text": "How far?",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."

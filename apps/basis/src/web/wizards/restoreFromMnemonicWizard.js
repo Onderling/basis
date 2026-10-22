@@ -42,7 +42,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
 
   function renderMnemonicStep() {
     const body = mkBody(doc, t('circle.wizard.restore.title'), t('circle.wizard.restore.intro'));
-    mkField(body, doc, 'Mnemonic phrase', state.mnemonic, (v) => {
+    mkField(body, doc, t('circle.wizard.restore.phrase'), state.mnemonic, (v) => {
       state.mnemonic = v;
       // No rerender — would lose input focus.  Just refresh the
       // [Next] button's disabled state.
@@ -62,8 +62,8 @@ export function renderRestoreFromMnemonicWizard(opts) {
     warn.className = 'cc-wizard-warn';
     warn.textContent = t('circle.wizard.restore.identity_warning');
     body.appendChild(warn);
-    mkCheck(body, doc, 'I understand this REPLACES my current identity.', state.understandsLoss, (v) => { state.understandsLoss = v; rerender(); });
-    mkCheck(body, doc, 'I have saved my current mnemonic somewhere safe (or I don\'t need it).', state.confirmedNoUndo, (v) => { state.confirmedNoUndo = v; rerender(); });
+    mkCheck(body, doc, t('circle.wizard.restore.ack_lost'), state.understandsLoss, (v) => { state.understandsLoss = v; rerender(); });
+    mkCheck(body, doc, t('circle.wizard.restore.ack_undone'), state.confirmedNoUndo, (v) => { state.confirmedNoUndo = v; rerender(); });
     container.appendChild(body);
     mkActions(container, doc, [
       { label: '← Back',    onClick: () => { state.step = 1; rerender(); }, kind: 'secondary' },

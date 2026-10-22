@@ -233,13 +233,13 @@ export default function CreateGroupWizardModal({
                   </>
                 )}
                 <Field
-                  label="Purpose (optional)"
+                  label={t('circle.wizard.create.purpose')}
                   value={state.purpose}
                   onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
                   placeholder="one-line description"
                 />
                 <Field
-                  label="Tags (optional, comma-separated)"
+                  label={t('circle.wizard.create.tags')}
                   value={state.tags}
                   onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
                   placeholder="quiet, sustainable, tools"
@@ -249,14 +249,14 @@ export default function CreateGroupWizardModal({
             {state.step === 2 && (
               <Body title={t('circle.wizard.create.step_members')} intro={t('circle.wizard.create.step_members_intro')}>
                 <RadioGroup
-                  label="Access policy"
+                  label={t('circle.wizard.create.access')}
                   value={state.accessPolicy}
                   options={attachConsequences('accessPolicy', ACCESS_POLICIES, t)}
                   onChange={(v) => setState((s) => ({ ...s, accessPolicy: v }))}
                   consequenceLabel={t('common.consequences')}
                 />
                 <RadioGroup
-                  label="Leave policy"
+                  label={t('circle.wizard.create.leave')}
                   value={state.leavePolicy}
                   options={attachConsequences('leavePolicy', LEAVE_POLICIES, t)}
                   onChange={(v) => setState((s) => ({ ...s, leavePolicy: v }))}
@@ -302,7 +302,7 @@ export default function CreateGroupWizardModal({
                   />
                 ))}
                 <RadioGroup
-                  label="Conflict policy"
+                  label={t('circle.wizard.create.conflict')}
                   value={state.conflictPolicy}
                   options={attachConsequences('conflictPolicy', CONFLICT_POLICIES, t)}
                   onChange={(v) => setState((s) => ({ ...s, conflictPolicy: v }))}
@@ -316,7 +316,7 @@ export default function CreateGroupWizardModal({
                 {state.offerings.map((row, i) => (
                   <View key={i} style={{ borderWidth: 1, borderColor: wizardPalette(theme).rail, borderRadius: 6, padding: 10, marginBottom: 10 }}>
                     <Field
-                      label="Offering name"
+                      label={t('circle.wizard.create.offering_name')}
                       value={row.name}
                       onChangeText={(v) => setState((s) => {
                         const offerings = s.offerings.slice();
@@ -357,19 +357,19 @@ export default function CreateGroupWizardModal({
             {state.step === 5 && (
               <Body title={t('circle.wizard.create.step_tech')} intro={t('circle.wizard.create.step_tech_intro')}>
                 <RadioGroup
-                  label="Key rotation mode"
+                  label={t('circle.wizard.create.rotation_mode')}
                   value={state.keyRotationMode}
                   options={KEY_ROTATION_MODES}
                   onChange={(v) => setState((s) => ({ ...s, keyRotationMode: v }))}
                 />
                 <Field
-                  label="Rotation interval (days)"
+                  label={t('circle.wizard.create.rotation_days')}
                   value={String(state.rotationDays)}
                   onChangeText={(v) => setState((s) => ({ ...s, rotationDays: Number(v) || 30 }))}
                   placeholder="30"
                 />
                 <Field
-                  label="Invite expiry (hours)"
+                  label={t('circle.wizard.create.invite_expiry')}
                   value={String(state.inviteExpiresInHours)}
                   onChangeText={(v) => setState((s) => ({ ...s, inviteExpiresInHours: Number(v) || 1 }))}
                   placeholder="1"
@@ -388,7 +388,7 @@ export default function CreateGroupWizardModal({
                   hint={t('circle.invite.ceiling_hint')}
                 />
                 <RadioGroup
-                  label="Storage policy"
+                  label={t('circle.wizard.create.storage')}
                   value={state.storagePolicy}
                   options={attachConsequences('storagePolicy', STORAGE_POLICIES, t)}
                   onChange={(v) => setState((s) => setStoragePolicy(s, v))}
@@ -397,7 +397,7 @@ export default function CreateGroupWizardModal({
                 {(state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') && (
                   <>
                     <Field
-                      label="Group pod URI"
+                      label={t('circle.wizard.create.pod_uri')}
                       value={state.groupPodUri}
                       onChangeText={(v) => setState((s) => ({ ...s, groupPodUri: v }))}
                       placeholder="https://group.example/pod/"
@@ -451,7 +451,7 @@ export default function CreateGroupWizardModal({
                     ...(state.groupPodUri  ? [{ label: 'Group pod', value: state.groupPodUri, monospace: true }] : []),
                   ]} />
                   <ErrorBanner message={state.submitError} />
-                  <Submitting visible={state.submitting} label="Creating circle…" />
+                  <Submitting visible={state.submitting} label={t('circle.wizard.create.creating')} />
                 </Body>
               );
             })()}

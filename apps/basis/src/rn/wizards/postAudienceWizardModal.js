@@ -66,7 +66,7 @@ export default function PostAudienceWizardModal({
               intro="Compose a post; pick a trust filter, optional tags, distance, and recipients."
             >
               <Textarea
-                label="What do you want to post?"
+                label={t('circle.wizard.audience.what')}
                 value={state.text}
                 onChangeText={(v) => setState((s) => ({ ...s, text: v }))}
                 placeholder="e.g. Anyone got a ladder I can borrow?"
@@ -79,13 +79,13 @@ export default function PostAudienceWizardModal({
                 onChange={(v) => setState((s) => ({ ...s, kind: v }))}
               />
               <RadioGroup
-                label="Trust level"
+                label={t('circle.wizard.audience.trust')}
                 value={state.minTrust}
                 options={TRUST_OPTS}
                 onChange={(v) => setState((s) => ({ ...s, minTrust: v }))}
               />
               <Field
-                label="Tags (comma-separated)"
+                label={t('circle.wizard.create.tags')}
                 value={state.tags}
                 onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
                 placeholder="ladder, tools"
@@ -108,14 +108,14 @@ export default function PostAudienceWizardModal({
                 })}
               </View>
               <Field
-                label="Recipients (optional, comma-separated webids/handles)"
+                label={t('circle.wizard.audience.recipients')}
                 value={state.recipients}
                 onChangeText={(v) => setState((s) => ({ ...s, recipients: v }))}
                 placeholder="leave blank to use audience filter"
               />
               {state.availableCircles && state.availableCircles.length > 1 && (
                 <RadioGroup
-                  label="Target circle"
+                  label={t('circle.wizard.audience.target')}
                   value={state.selectedCircle ?? ''}
                   options={state.availableCircles.map((b) => ({ id: b.id, label: b.label }))}
                   onChange={(v) => setState((s) => ({ ...s, selectedCircle: v }))}

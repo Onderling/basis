@@ -330,11 +330,18 @@ jobs:
         # once held a shard (and the release queued behind it) for the whole job's 60 minutes (2026-10-07). A stall
         # fails in minutes — and is tried ONCE more inside the step: a rerun of the failed job was meant to take over,
         # but on the trunk a newer merge cancels it, so three stalls on 2026-10-22 left the tail red with no test run.
-        timeout-minutes: 12
+        timeout-minutes: 16
         run: |
+          # apt WAITS for the dpkg lock instead of failing on it: a try that times out leaves its apt-get running (the
+          # timeout ends npx, not its child), and the next try then hit the lock at once (2026-10-22, three shards)
+          echo 'DPkg::Lock::Timeout "240";' | sudo tee /etc/apt/apt.conf.d/99-lock-timeout >/dev/null
           for try in 1 2; do
-            timeout 300 npx playwright install --with-deps chromium && exit 0
-            echo "browser install stalled or failed (try $try) — once more"
+            timeout --kill-after=15 300 npx playwright install --with-deps chromium && exit 0
+            echo "browser install stalled or failed (try $try) — ending what it left running, then once more"
+            # the timeout reaches npx, not the apt-get it started under sudo: end that try's apt-get/dpkg ourselves, and
+            # let dpkg finish any half-done configuration, so the next try starts clean
+            sudo pkill -x apt-get || true; sudo pkill -x dpkg || true; sleep 3
+            sudo dpkg --configure -a || true
           done
           exit 1
         working-directory: apps/basis

@@ -174,13 +174,16 @@ jobs:
             echo "no package.json or lockfile in this change"; exit 0
           fi
           pnpm install --lockfile-only
-          if ! git diff --quiet -- '*pnpm-lock.yaml'; then
+          # what RESOLUTION decides (versions, integrity, specifiers, overrides), not what the registry says about a package
+          # today: a new `deprecated:` notice or a reformatted `engines:` field arrives with fresh metadata and is not drift
+          changed=$(git diff -U0 -- '*pnpm-lock.yaml' | grep -E '^[-+][^-+]' | grep -vE '^[-+][[:space:]]+(deprecated|engines):' || true)
+          if [ -n "$changed" ]; then
             echo "::error::a lockfile does not say what pnpm resolves: run 'pnpm install --lockfile-only' and commit the result"
             git diff --stat -- '*pnpm-lock.yaml'
-            git diff -- '*pnpm-lock.yaml' | head -120
+            echo "$changed" | head -120
             exit 1
           fi
-          echo "every lockfile says what pnpm resolves"
+          echo "every lockfile says what pnpm resolves (registry metadata lines aside: $(git diff -U0 -- '*pnpm-lock.yaml' | grep -cE '^[-+][[:space:]]+(deprecated|engines):' || true))"
 
   # ── Rung 2: structural checks. Cheap, deterministic, first to fail. ─────────
   checks:

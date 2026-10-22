@@ -8558,10 +8558,6 @@
         "text": "Uitlenen (een ding)",
         "doc": "Post-with-audience wizard (web): a lend."
       },
-      "kind_announce": {
-        "text": "Aankondigen",
-        "doc": "Post-with-audience wizard (phone): an announcement."
-      },
       "text_placeholder": {
         "text": "bijv. Heeft iemand een ladder te leen?",
         "doc": "Post-with-audience wizard, both shells: the text placeholder."

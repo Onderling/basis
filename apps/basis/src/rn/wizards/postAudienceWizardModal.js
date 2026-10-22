@@ -12,18 +12,13 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text, TouchableOpacity 
 import {
   TRUST_OPTS, DISTANCE_OPTS,
   initialState, canSubmit, loadAvailableCircles, submitPost,
+  postKindOptions,
 } from '../../core/wizards/postAudienceState.js';
 
 import {
   Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
 } from './_kit.js';
 
-// the kinds by their locale keys — translated where they are painted (`t` is the component's prop, not this module's)
-const KIND_OPTS = [
-  { id: 'ask',      labelKey: 'circle.wizard.audience.kind_ask' },
-  { id: 'offer',    labelKey: 'circle.wizard.audience.kind_offer' },
-  { id: 'announce', labelKey: 'circle.wizard.audience.kind_announce' },
-];
 
 export default function PostAudienceWizardModal({
   visible, theme = null, args, callSkill, onClose, onDispatched, t,
@@ -76,7 +71,7 @@ export default function PostAudienceWizardModal({
               <RadioGroup
                 label={t('circle.wizard.audience.kind')}
                 value={state.kind}
-                options={KIND_OPTS.map((o) => ({ id: o.id, label: t(o.labelKey) }))}
+                options={postKindOptions().map((o) => ({ id: o.id, label: t(o.labelKey) }))}
                 onChange={(v) => setState((s) => ({ ...s, kind: v }))}
               />
               <RadioGroup

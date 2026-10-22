@@ -8,6 +8,14 @@
  */
 
 /** Trust-level options shown in the radio group. */
+/** The kinds a post can be — the noticeboard's DECLARED intents, nothing a shell adds — each with its label key.
+ *  Both shells paint these, so web and phone offer the same list by construction. */
+import { NOTICEBOARD_INTENTS } from '@onderling/item-types';
+
+export function postKindOptions() {
+  return NOTICEBOARD_INTENTS.map((id) => ({ id, labelKey: `circle.wizard.audience.kind_${id}` }));
+}
+
 export const TRUST_OPTS = Object.freeze([
   { id: 'all',     label: 'Everyone in the circle' },
   { id: 'known',   label: 'Known contacts only'    },

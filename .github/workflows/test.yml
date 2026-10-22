@@ -336,8 +336,12 @@ jobs:
           # timeout ends npx, not its child), and the next try then hit the lock at once (2026-10-22, three shards)
           echo 'DPkg::Lock::Timeout "240";' | sudo tee /etc/apt/apt.conf.d/99-lock-timeout >/dev/null
           for try in 1 2; do
-            timeout 300 npx playwright install --with-deps chromium && exit 0
-            echo "browser install stalled or failed (try $try) — once more"
+            timeout --kill-after=15 300 npx playwright install --with-deps chromium && exit 0
+            echo "browser install stalled or failed (try $try) — ending what it left running, then once more"
+            # the timeout reaches npx, not the apt-get it started under sudo: end that try's apt-get/dpkg ourselves, and
+            # let dpkg finish any half-done configuration, so the next try starts clean
+            sudo pkill -x apt-get || true; sudo pkill -x dpkg || true; sleep 3
+            sudo dpkg --configure -a || true
           done
           exit 1
         working-directory: apps/basis

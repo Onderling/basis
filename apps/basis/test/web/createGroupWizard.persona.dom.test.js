@@ -9,11 +9,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderCreateGroupWizard } from '../../src/web/wizards/createGroupWizard.js';
 
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
-function click(root, label) {
-  const btn = [...root.querySelectorAll('button')].find((b) => b.textContent.trim() === label);
-  if (!btn) throw new Error(`button not found: ${label}`);
-  btn.click();
-}
 
 const PERSONAS = { items: [
   { agentId: 'default', name: 'Frits', role: 'profile' },
@@ -62,7 +57,7 @@ describe('create wizard — which persona founds the circle', () => {
     // Through the five steps to the review: each step's forward button is its primary one.
     for (let i = 0; i < 5; i += 1) el.querySelector('.cc-wizard-btn-primary').click();
     expect(el.textContent).toContain('Buurt');                    // the review names the founding persona
-    click(el, 'Create circle');
+    el.querySelector('.cc-wizard-btn-primary').click();          // the review's primary button creates the circle (its words come from the locale)
     await vi.waitFor(() => expect(onDispatched).toHaveBeenCalled());
     const gid = onDispatched.mock.calls[0][0].groupId;
     expect(shareFounderRelease).toHaveBeenCalledWith(gid, 'buurt');

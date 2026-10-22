@@ -4137,6 +4137,30 @@ callers can cleanly drop the message without throwing.
 
 **Returns:** `object|null` — parsed innerOW, or null on failure
 
+## `src/security/untrustedJson.js`
+
+### `UNSAFE_JSON_KEYS`
+
+**Kind:** constant · **Import:** `UNSAFE_JSON_KEYS` from `'@onderling/core'`
+
+The keys a parsed input may not carry.
+
+### `parseUntrustedJson`
+
+**Kind:** function · **Import:** `parseUntrustedJson` from `'@onderling/core'`
+
+```js
+parseUntrustedJson(text)
+```
+
+`JSON.parse` for someone else's JSON: the same result, or a refusal when any key reaches a prototype.
+
+**Parameters**
+
+- `text` `string`
+
+**Returns:** `unknown` — what `JSON.parse(text)` returns
+
 ## `src/skills/SkillRegistry.js`
 
 ### `SkillRegistry`

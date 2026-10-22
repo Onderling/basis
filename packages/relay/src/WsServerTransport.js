@@ -44,6 +44,7 @@ import {
 } from '@onderling/core';
 
 import { ForwardQueue } from './ForwardQueue.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 export class WsServerTransport extends Transport {
   #wss  = null;
@@ -125,7 +126,7 @@ export class WsServerTransport extends Transport {
 
     ws.on('message', raw => {
       let msg;
-      try { msg = JSON.parse(raw); } catch { return; }
+      try { msg = parseUntrustedJson(raw); } catch { return; }
 
       // Register, step 1: ask. Nothing is registered here — `#clients.set` is unreachable from
       // this branch, which is what makes "no unproven address is ever routed to" structural.

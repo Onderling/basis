@@ -67,6 +67,7 @@ import { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCred
   from './senderKey.js';
 import { askSenderAuthorizer }                       from './senderAuthorization.js';
 import { param, PARAM_SCOPE, PARAM_KIND }            from '../params.js';
+import { parseUntrustedJson } from './untrustedJson.js';
 
 // Parameter register (#36) — the anti-replay window + dedup TTL. scope:device, kind:INTERNAL is load-bearing
 // here: these are SECURITY bounds, and kind:internal makes them immutable by construction — a user can never
@@ -775,7 +776,7 @@ export class SecurityLayer {
       throw new SecurityError(SEC.DECRYPT_FAILED, `nacl.box.open failed on envelope ${env._id}`);
     }
 
-    env.payload = JSON.parse(new TextDecoder().decode(plaintext));
+    env.payload = parseUntrustedJson(new TextDecoder().decode(plaintext));
     return env;
   }
 

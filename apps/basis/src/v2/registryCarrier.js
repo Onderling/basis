@@ -30,7 +30,7 @@
  */
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createSealedPodDataSource } from '@onderling/pod-client';
-import { hashHex } from '@onderling/core';
+import { parseUntrustedJson, hashHex } from '@onderling/core';
 import { registryResourceUri, withRegistryWriteLock } from '@onderling/agent-registry';
 import { probeSettingsMediumDetailed } from './settingsRestoreGate.js';
 
@@ -126,13 +126,13 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
     // every upload keeps the pod's tombstones (a write from a device that never saw a revoke must not undo it)
     podUploader: async (_uri, bytes) => {
       let onPod = null;
-      try { const cur = await medium.read(name); onPod = cur == null ? null : JSON.parse(cur); } catch { onPod = null; }
+      try { const cur = await medium.read(name); onPod = cur == null ? null : parseUntrustedJson(cur); } catch { onPod = null; }
       await medium.write(name, JSON.stringify(unionTombstones(bytes, onPod)));
       return {};
     },
     podFetcher: async () => {
       const s = await medium.read(name);
-      return s == null ? null : { bytes: JSON.parse(s) };
+      return s == null ? null : { bytes: parseUntrustedJson(s) };
     },
     isPodReachable: () => state.mode === 'cache',
   });
@@ -155,7 +155,7 @@ export function createRegistryCarrier({ backend, deviceId, medium = null, name =
       const localRec = await pseudoPod.read(resourceUri);
       if (status === 'openable') {
         let podBody = null;
-        try { podBody = typeof value === 'string' ? JSON.parse(value) : value; } catch { podBody = null; }
+        try { podBody = typeof value === 'string' ? parseUntrustedJson(value) : value; } catch { podBody = null; }
         // Resource-level last-write-wins: the pod copy is newer (another device wrote it, or this device
         // was wiped) → it becomes the local copy. Otherwise the local copy is pushed up below.
         if (podBody && (!localRec || updatedAtOf(podBody) >= updatedAtOf(localRec.bytes))) {
@@ -207,13 +207,13 @@ export function sealRecoveryFile({ strategy, body, now = () => new Date().toISOS
 export function openRecoveryFile({ strategy, file } = {}) {
   if (!strategy || typeof strategy.open !== 'function') throw new Error('openRecoveryFile: an open strategy is required');
   let env = null;
-  try { env = JSON.parse(String(file ?? '')); } catch { env = null; }
+  try { env = parseUntrustedJson(String(file ?? '')); } catch { env = null; }
   if (!env || env.kind !== RECOVERY_FILE_KIND || typeof env.sealed !== 'string') {
     throw Object.assign(new Error('unreadable-file: not an onderling recovery file'), { code: 'unreadable-file' });
   }
   let plain;
   try { plain = strategy.open(env.sealed); }
   catch (err) { throw Object.assign(new Error(`not-your-file: ${err?.message ?? err}`), { code: 'not-your-file', cause: err }); }
-  try { return JSON.parse(plain); }
+  try { return parseUntrustedJson(plain); }
   catch { throw Object.assign(new Error('unreadable-file: sealed body is not a registry'), { code: 'unreadable-file' }); }
 }

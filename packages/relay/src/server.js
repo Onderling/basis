@@ -169,6 +169,7 @@ import { envelopeSuppressesWake }            from './push/wakePayload.js';
 import { mountBlobGate }                     from './blobGateMount.js';
 import { mountFeedForward, createFeedSeat }  from './feedForward.js';
 import { logHop }                            from './verbose.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 const DEFAULT_PORT             = 8787;
 // How long the relay holds a message for a peer that is not connected.
@@ -746,7 +747,7 @@ export async function startRelay(opts = {}) {
         return;
       }
       let msg;
-      try { msg = JSON.parse(raw); } catch { return; }
+      try { msg = parseUntrustedJson(raw); } catch { return; }
 
       // ── register — step 1 of 2: the relay CHALLENGES, and registers nothing ──
       //

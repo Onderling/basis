@@ -21,6 +21,7 @@
  *   await t.connect();
  */
 import { Transport } from '@onderling/core';
+import { parseUntrustedJson } from '@onderling/core';
 
 const PREFIX = 'onderling';
 
@@ -73,7 +74,7 @@ export class MqttTransport extends Transport {
 
       this.#client.on('message', (_topic, payload) => {
         let envelope;
-        try { envelope = JSON.parse(payload.toString()); } catch { return; }
+        try { envelope = parseUntrustedJson(payload.toString()); } catch { return; }
         this._receive(envelope);
       });
 

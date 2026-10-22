@@ -36,7 +36,7 @@
  *  - audit log — append-only (one file per entry; never edited).
  */
 
-import { Emitter, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { parseUntrustedJson, Emitter, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { computeStatus } from './lifecycleStatus.js';   // pure status fn, extracted out of this retired class
 
 import { ulid }                        from './ulid.js';
@@ -1101,7 +1101,7 @@ export class ItemStore extends Emitter {
 function parseItem(raw) {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === 'string') {
-    try { return JSON.parse(raw); } catch { return null; }
+    try { return parseUntrustedJson(raw); } catch { return null; }
   }
   // MemorySource may return non-string values directly; pass through.
   if (typeof raw === 'object') return raw;

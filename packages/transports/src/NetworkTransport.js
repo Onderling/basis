@@ -54,6 +54,7 @@
  */
 import { Transport } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { parseUntrustedJson } from '@onderling/core';
 
 /** Wire-frame version + kind — lets a real multiplexed channel demux. */
 const FRAME_V    = 1;
@@ -82,7 +83,7 @@ export function encodeFrame({ to, from, envelope }) {
  * @returns {{ to: string, from: string, envelope: object }}
  */
 export function decodeFrame(frame) {
-  const obj = typeof frame === 'string' ? JSON.parse(frame) : frame;
+  const obj = typeof frame === 'string' ? parseUntrustedJson(frame) : frame;
   if (!obj || obj.kind !== FRAME_KIND || !obj.envelope) {
     throw Object.assign(new Error('NetworkTransport: malformed frame'), { code: 'BAD_FRAME' });
   }

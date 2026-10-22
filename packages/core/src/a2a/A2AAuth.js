@@ -1,3 +1,5 @@
+import { parseUntrustedJson } from '../security/untrustedJson.js';
+
 /**
  * A2AAuth — JWT validation for inbound A2A requests and outbound token management.
  *
@@ -69,7 +71,7 @@ export class A2AAuth {
             // Re-use the proof stored in the claim if provided, else just check claim presence.
             const proof = claims[`x-onderling-proof:${groupId}`];
             if (proof) {
-              const valid = await this.#groupManager.verifyProof(JSON.parse(proof));
+              const valid = await this.#groupManager.verifyProof(parseUntrustedJson(proof));
               if (valid) { tier = 2; break; }
             } else {
               tier = 2; break;
@@ -84,7 +86,7 @@ export class A2AAuth {
     if (tier <= 2 && this.#tokenRegistry && tokenClaim) {
       try {
         const { CapabilityToken } = await import('../permissions/CapabilityToken.js');
-        const ct = JSON.parse(tokenClaim);
+        const ct = parseUntrustedJson(tokenClaim);
         if (CapabilityToken.verify(ct, null)) {
           tier = 3;
         }
@@ -145,5 +147,5 @@ function _decodeJwtPayload(token) {
   const json = typeof atob === 'function'
     ? atob(padded)
     : Buffer.from(padded, 'base64').toString('utf8');
-  return JSON.parse(json);
+  return parseUntrustedJson(json);
 }

@@ -26,6 +26,7 @@
  * device, as signed tokens — so a leaked offer costs nothing. What the nonce buys is that a view
  * can tell "this grant answers the offer I just made" from "this is an older grant replayed at me".
  */
+import { parseUntrustedJson } from '@onderling/core';
 
 /** The scheme. A distinct one from enrolment on purpose: enrolling makes a DEVICE (keys, ceremony,
  *  the recovery phrase); connecting makes a CONNECTION (ticks only). Confusing them at a QR code
@@ -48,7 +49,7 @@ const b64url = {
     const bin = atob(pad + '='.repeat((4 - (pad.length % 4)) % 4));
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return JSON.parse(new TextDecoder().decode(bytes));
+    return parseUntrustedJson(new TextDecoder().decode(bytes));
   },
 };
 

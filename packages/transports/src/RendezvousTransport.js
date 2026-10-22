@@ -56,6 +56,7 @@
  */
 import { Transport } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { parseUntrustedJson } from '@onderling/core';
 
 const CHANNEL_LABEL  = 'onderling';
 // Parameter register (#36) — WebRTC channel-open timeout (scope:device, kind:internal).
@@ -284,7 +285,7 @@ export class RendezvousTransport extends Transport {
       this.emit('peer-connected', peerAddress);
     };
     dc.onmessage = ({ data }) => {
-      try { this._receive(JSON.parse(data)); } catch { /* drop malformed */ }
+      try { this._receive(parseUntrustedJson(data)); } catch { /* drop malformed */ }
     };
     dc.onclose = () => {
       this.#peers.delete(peerAddress);

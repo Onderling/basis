@@ -25,6 +25,7 @@
  */
 import { Transport, DISCOVERABILITY, AgentIdentity } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 /**
  * THE HELLO IS PROVEN. A connection is keyed by a pubKey only when the far end has signed THIS side's nonce with that
@@ -389,7 +390,7 @@ export class MdnsTransport extends Transport {
       this.#emitter.addListener('MdnsDataReceived', ({ connectionId, data }) => {
         let envelope;
         try {
-          envelope = JSON.parse(new TextDecoder().decode(b64Decode(data)));
+          envelope = parseUntrustedJson(new TextDecoder().decode(b64Decode(data)));
         } catch { return; }
 
         // The handshake frames are internal: never passed upstream, and the only way a connection gets a key.

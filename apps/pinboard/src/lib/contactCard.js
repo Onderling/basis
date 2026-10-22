@@ -20,6 +20,7 @@
  * One codec for the writer (pinboard's `getContactShareQr`) and every reader (pinboard's `addContactFromQr`, basis's
  * card checks). Pure, and free of platform APIs, so a browser, Node and the phone's JS engine agree.
  */
+import { parseUntrustedJson } from '@onderling/core';
 
 const VERSION = 1;
 const RAW = 0x80;
@@ -108,8 +109,10 @@ export function decodeContactCard(body) {
       else if (id === F.pkVersion) pk.version = Number(str);
       else if (id === F.pkPubKey) pk.pubKey = str;
       else if (id === F.pkLinkKeyPub) pk.linkKeyPub = str;
-      else if (id === F.personKeyLinks) card.personKeyLinks = JSON.parse(str);
-      else if (id === F.rest) Object.assign(card, JSON.parse(str));
+      else if (id === F.personKeyLinks) card.personKeyLinks = parseUntrustedJson(str);
+      // the extra fields, own keys only: a card is someone else's bytes. A prototype key (`__proto__` would set the
+      // decoded card's prototype: fields that read as present without being on it) refuses the whole card.
+      else if (id === F.rest) for (const [k, v] of Object.entries(parseUntrustedJson(str) ?? {})) card[k] = v;
       // an unknown field id is skipped: a newer writer's addition, not a broken card
     }
   } catch { return null; }

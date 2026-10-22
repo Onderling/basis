@@ -46,6 +46,7 @@ import { argon2id }      from '@noble/hashes/argon2.js';
 import { Bootstrap }                       from './Bootstrap.js';
 import { encode as b64encode,
          decode as b64decode }             from '../crypto/b64.js';
+import { parseUntrustedJson } from '../security/untrustedJson.js';
 
 const ENVELOPE_VERSION = 1;
 const PAYLOAD_VERSION  = 1;
@@ -214,7 +215,7 @@ export class CloudBackup {
     // 2. Parse envelope.
     let env;
     try {
-      env = JSON.parse(utf8decode(bytes));
+      env = parseUntrustedJson(utf8decode(bytes));
     } catch {
       throw _err('CLOUD_BACKUP_MALFORMED', 'envelope is not valid JSON');
     }
@@ -248,7 +249,7 @@ export class CloudBackup {
     // 5. Parse payload.
     let payload;
     try {
-      payload = JSON.parse(utf8decode(plain));
+      payload = parseUntrustedJson(utf8decode(plain));
     } catch {
       throw _err('CLOUD_BACKUP_MALFORMED', 'payload is not valid JSON');
     }

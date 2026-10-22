@@ -33,6 +33,7 @@ export {
 // it directly. `core` no longer re-exports it (kills the core→vault re-export
 // inversion; guarded by test/layering.enforcement.test.js).
 export { AgentIdentity }      from './identity/AgentIdentity.js';
+export { parseUntrustedJson, UNSAFE_JSON_KEYS } from './security/untrustedJson.js';
 export { KeyRotation }        from './identity/KeyRotation.js';
 export { Bootstrap, deriveVaultAtRestKeyFrom } from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)

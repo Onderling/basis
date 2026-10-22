@@ -17,6 +17,7 @@ import { log } from '@onderling/logger';
 import nacl from 'tweetnacl';
 
 import { nknAuthenticatedSender } from './nknSenderBinding.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 /**
  * Derive a peer's NKN address from its base64url chat pubKey. NKN uses the agent's
@@ -258,7 +259,7 @@ export class NknTransport extends Transport {
 
       this.#client.on('message', (msg) => {
         let envelope;
-        try { envelope = JSON.parse(msg.payload.toString()); } catch { return; }
+        try { envelope = parseUntrustedJson(msg.payload.toString()); } catch { return; }
 
         // ── Sender binding — second line, NOT the wall (2026-07-31) ──────────────────────────────
         //

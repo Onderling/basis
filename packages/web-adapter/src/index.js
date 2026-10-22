@@ -38,4 +38,3 @@ export { schemaToFormFields }   from './schemaToFormFields.js';
 // T2-tier helper for hand-coded pages that want
 // to read confirm-severity + labels from the manifest.  Per
 // DESIGN-tier-policy.md, this is the bridge that makes T2 cheap.
-export { createOpBinding }      from './createOpBinding.js';

@@ -3,7 +3,7 @@
 // globalThis.Buffer, Blob.arrayBuffer / .text, or Blob constructor for
 // ArrayBuffer parts will crash silently if this lands second).  Same
 // substrate as pinboard-mobile + folio-mobile + tasks-mobile (see
-// apps/pinboard-mobile/index.js for the canonical comment).
+// the retired pinboard-mobile app's entry, now in the archive tag).
 import '@onderling/react-native/platform/polyfills';
 
 // @expo/metro-runtime adds the fast-refresh + web-only runtime hooks

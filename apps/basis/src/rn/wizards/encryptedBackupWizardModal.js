@@ -51,18 +51,18 @@ export default function EncryptedBackupWizardModal({
           onPress={(e) => e.stopPropagation()}
           testID="encrypted-backup-wizard"
         >
-          <Steps labels={['Passphrase', 'Save']} current={state.step} />
+          <Steps labels={[t('circle.wizard.backup.passphrase_label'), t('circle.wizard.backup.step_save')]} current={state.step} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
               <Body
                 title={t('circle.wizard.backup.title')}
-                intro="Pick a passphrase to encrypt your local pinboard data. Keep it safe — without it the backup is unrecoverable."
+                intro={t('circle.wizard.backup.intro')}
               >
                 <Field
-                  label="Passphrase"
+                  label={t('circle.wizard.backup.passphrase_label')}
                   value={state.passphrase}
                   onChangeText={(v) => setState((s) => ({ ...s, passphrase: v }))}
-                  placeholder="(no length minimum, but use one you'll remember)"
+                  placeholder={t('circle.wizard.backup.passphrase_hint')}
                 />
                 <Field
                   label={t('circle.wizard.backup.confirm_passphrase')}
@@ -86,7 +86,7 @@ export default function EncryptedBackupWizardModal({
           <Actions buttons={(() => {
             if (state.step === 1) return [
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: 'Create backup',    onPress: onCreate, kind: 'primary',
+              { label: t('circle.wizard.backup.create_button'),    onPress: onCreate, kind: 'primary',
                 disabled: !canCreateBackup(state) || state.submitting },
             ];
             return [{ label: t('common.done'), onPress: onClose, kind: 'primary' }];

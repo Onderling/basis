@@ -26,7 +26,7 @@ describe('My-data key-management wizards (reused renderers)', () => {
     pass.value = 'a-strong-passphrase'; pass.dispatchEvent(new Event('input'));
     confirm.value = 'a-strong-passphrase'; confirm.dispatchEvent(new Event('input'));
 
-    const create = [...container.querySelectorAll('button')].find((b) => /create backup/i.test(b.textContent));
+    const create = container.querySelector('.cc-wizard-btn-primary');   // the step's one primary button (its words come from the locale)
     expect(create).toBeTruthy();
     create.click();
     await Promise.resolve(); await Promise.resolve();
@@ -43,14 +43,14 @@ describe('My-data key-management wizards (reused renderers)', () => {
     // step 1 — enter a valid 12-word phrase, then Next →
     const input = container.querySelector('input');
     input.value = phrase; input.dispatchEvent(new Event('input'));
-    [...container.querySelectorAll('button')].find((b) => /next/i.test(b.textContent)).click();
+    container.querySelector('.cc-wizard-btn-primary').click();
 
-    // step 2 — tick both destructive confirms, then Continue →
+    // step 2 — tick both destructive confirms, then Next →
     container.querySelectorAll('input[type="checkbox"]').forEach((c) => { c.checked = true; c.dispatchEvent(new Event('change')); });
-    [...container.querySelectorAll('button')].find((b) => /continue/i.test(b.textContent)).click();
+    container.querySelector('.cc-wizard-btn-primary').click();
 
     // step 3 — Restore now
-    [...container.querySelectorAll('button')].find((b) => /restore now/i.test(b.textContent)).click();
+    container.querySelector('.cc-wizard-btn-primary').click();
     await Promise.resolve(); await Promise.resolve();
 
     expect(callSkill).toHaveBeenCalledWith('pinboard', 'restoreFromMnemonic', { mnemonic: phrase, confirm: true });

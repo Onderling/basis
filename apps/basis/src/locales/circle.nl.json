@@ -7233,9 +7233,18 @@
     }
   },
   "when": {
-    "today_at": { "text": "vandaag om {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
-    "tomorrow_at": { "text": "morgen om {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
-    "closed": { "text": "gesloten", "doc": "A deadline that has passed." }
+    "today_at": {
+      "text": "vandaag om {{time}}",
+      "doc": "A coming moment later today (a vote's deadline)."
+    },
+    "tomorrow_at": {
+      "text": "morgen om {{time}}",
+      "doc": "A coming moment tomorrow (a vote's deadline)."
+    },
+    "closed": {
+      "text": "gesloten",
+      "doc": "A deadline that has passed."
+    }
   },
   "governance": {
     "title": {
@@ -8240,6 +8249,30 @@
       "dot_review": {
         "text": "Nakijken",
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "review_button": {
+        "text": "Controleren →",
+        "doc": "Create wizard, both shells: the button to the last step."
+      },
+      "purpose_placeholder": {
+        "text": "Eén zin: waar is deze kring voor?",
+        "doc": "Create wizard, both shells: the purpose field placeholder."
+      },
+      "tags_placeholder": {
+        "text": "bijv. buurt, gereedschap, kinderen",
+        "doc": "Create wizard, both shells: the tags field placeholder."
+      },
+      "offering_placeholder": {
+        "text": "bijv. loodgieterswerk",
+        "doc": "Create wizard, both shells: an offering name placeholder."
+      },
+      "invite_expiry_hint": {
+        "text": "Hoe lang de uitnodigingscode bruikbaar blijft. Kort is veiliger voor even delen (standaard 1 uur); lang past bij rustiger aansluiten (168 = een week). Een beheerder kan later een nieuwe code maken.",
+        "doc": "Create wizard (web): a field hint."
+      },
+      "pod_uri_hint": {
+        "text": "Nodig voor centrale en gemengde opslag.",
+        "doc": "Create wizard (web): a field hint."
       }
     },
     "settings": {
@@ -8326,6 +8359,22 @@
       "other_url": {
         "text": "Anders (voer URL in)",
         "doc": "Mobile settings wizard: the custom-relay option."
+      },
+      "provider_inrupt": {
+        "text": "Inrupt Pod Spaces",
+        "doc": "Settings wizard (phone): a pod provider (a product name)."
+      },
+      "handle_placeholder": {
+        "text": "bijv. alice",
+        "doc": "Settings wizard (phone): the handle placeholder."
+      },
+      "title": {
+        "text": "Instellingen",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "intro": {
+        "text": "Je naam en vakantiestand.",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
     "backup": {
@@ -8364,6 +8413,22 @@
       "ready_intro": {
         "text": "Download hem en bewaar hem ergens veilig — mail hem naar jezelf, zet hem op een usb-stick, of in een cloud die je vertrouwt. Hij is versleuteld, dus waar hij staat maakt minder uit dan of je hem nog hebt.",
         "doc": "Backup wizard, the final screen."
+      },
+      "passphrase_label": {
+        "text": "Wachtzin",
+        "doc": "Backup wizard, both shells: the passphrase field and its step."
+      },
+      "passphrase_hint": {
+        "text": "Minstens 12 tekens is verstandig — kies er een die je onthoudt.",
+        "doc": "Backup wizard, both shells: the passphrase placeholder."
+      },
+      "step_save": {
+        "text": "Opslaan",
+        "doc": "Backup wizard, both shells: the second step."
+      },
+      "create_button": {
+        "text": "Back-up maken",
+        "doc": "Backup wizard, both shells: the button that builds the backup."
       }
     },
     "restore": {
@@ -8414,6 +8479,38 @@
       "done_intro": {
         "text": "De herstelde identiteit is actief. Herlaad de pagina zodat de rest van de app hem oppakt.",
         "doc": "Restore wizard, the final screen."
+      },
+      "step_phrase": {
+        "text": "Herstelzin",
+        "doc": "Restore wizard, both shells: step 1."
+      },
+      "step_confirm": {
+        "text": "Bevestigen",
+        "doc": "Restore wizard, both shells: step 2."
+      },
+      "step_restore": {
+        "text": "Herstellen",
+        "doc": "Restore wizard, both shells: step 3."
+      },
+      "phrase_placeholder": {
+        "text": "woord1 woord2 woord3 …",
+        "doc": "Restore wizard, both shells: the phrase placeholder."
+      },
+      "phrase_hint": {
+        "text": "Woorden gescheiden door één spatie.",
+        "doc": "Restore wizard (web): under the phrase field."
+      },
+      "button": {
+        "text": "Nu herstellen",
+        "doc": "Restore wizard, both shells: the button that restores."
+      },
+      "restoring": {
+        "text": "Identiteit wordt hersteld…",
+        "doc": "Restore wizard (web): while restoring."
+      },
+      "saved_question": {
+        "text": "Heb je je huidige herstelzin bewaard? Zonder die zin komt de identiteit op dit apparaat niet meer terug.",
+        "doc": "Restore wizard, both shells: one line of copy above the two checks — the person’s CURRENT phrase, before it is replaced."
       }
     },
     "audience": {
@@ -8444,6 +8541,50 @@
       "intro": {
         "text": "Kies wie dit bereikt. Laat je het leeg, dan gaat het naar iedereen in je kring.",
         "doc": "Audience wizard step 1 body."
+      },
+      "kind": {
+        "text": "Soort",
+        "doc": "Post-with-audience wizard, both shells: the kind of post."
+      },
+      "kind_ask": {
+        "text": "Vragen (om hulp)",
+        "doc": "Post-with-audience wizard: an ask."
+      },
+      "kind_offer": {
+        "text": "Aanbieden (iets om te delen)",
+        "doc": "Post-with-audience wizard: an offer."
+      },
+      "kind_lend": {
+        "text": "Uitlenen (een ding)",
+        "doc": "Post-with-audience wizard (web): a lend."
+      },
+      "kind_announce": {
+        "text": "Aankondigen",
+        "doc": "Post-with-audience wizard (phone): an announcement."
+      },
+      "text_placeholder": {
+        "text": "bijv. Heeft iemand een ladder te leen?",
+        "doc": "Post-with-audience wizard, both shells: the text placeholder."
+      },
+      "tags": {
+        "text": "Labels (met komma’s — past bij contacten met een ervan)",
+        "doc": "Post-with-audience wizard, both shells: the tags field."
+      },
+      "tags_placeholder": {
+        "text": "bijv. gereedschap, tuin, kinderen",
+        "doc": "Post-with-audience wizard, both shells: the tags placeholder."
+      },
+      "recipients_placeholder": {
+        "text": "bijv. webid:anne,webid:karl",
+        "doc": "Post-with-audience wizard, both shells: the recipients placeholder."
+      },
+      "recipients_hint": {
+        "text": "Ingevuld: alleen deze ontvangers — vertrouwen en afstand tellen dan niet.",
+        "doc": "Post-with-audience wizard, both shells: under the recipients field."
+      },
+      "posting": {
+        "text": "Plaatsen…",
+        "doc": "Post-with-audience wizard (web): while posting."
       }
     },
     "dispute": {
@@ -8508,6 +8649,38 @@
       "title": {
         "text": "Een tijd toevoegen",
         "doc": "Mobile embed-time wizard heading."
+      },
+      "create_button": {
+        "text": "Maken",
+        "doc": "Embed-a-time wizard (phone): the create button."
+      },
+      "title_placeholder": {
+        "text": "bijv. Kringbarbecue",
+        "doc": "Embed-a-time wizard (phone): the title placeholder."
+      },
+      "when_placeholder": {
+        "text": "morgen 15:00 · 2026-05-30T15:00",
+        "doc": "Embed-a-time wizard (phone): the when placeholder."
+      },
+      "location_placeholder": {
+        "text": "bijv. Vondelpark",
+        "doc": "Embed-a-time wizard (phone): the location placeholder."
+      },
+      "share_placeholder": {
+        "text": "leeg laten om het lokaal te houden",
+        "doc": "Embed-a-time wizard (phone): the share-with placeholder."
+      },
+      "intro": {
+        "text": "Zet een tijdkaart in het gesprek. De datum mag ISO zijn (2026-05-30T15:00) of gewone woorden (morgen 15:00, volgende vrijdag).",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "title_label": {
+        "text": "Titel",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "when_label": {
+        "text": "Wanneer",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     }
   },

@@ -62,19 +62,19 @@ export default function EmbedTimeWizardModal({
           <ScrollView style={styles.scroll}>
             <Body
               title={t('circle.wizard.embed_time.title')}
-              intro="Drops a time card into the active thread. Date accepts ISO format (2026-05-30T15:00) OR natural language (tomorrow 3pm, next Friday)."
+              intro={t('circle.wizard.embed_time.intro')}
             >
               <Field
-                label="Title"
+                label={t('circle.wizard.embed_time.title_label')}
                 value={state.title}
                 onChangeText={(v) => setState((s) => ({ ...s, title: v }))}
-                placeholder="e.g. Circle BBQ"
+                placeholder={t('circle.wizard.embed_time.title_placeholder')}
               />
               <Field
-                label="When"
+                label={t('circle.wizard.embed_time.when_label')}
                 value={state.when}
                 onChangeText={(v) => setState((s) => ({ ...s, when: v }))}
-                placeholder="tomorrow 3pm  ·  2026-05-30T15:00"
+                placeholder={t('circle.wizard.embed_time.when_placeholder')}
               />
               <Field
                 label={t('circle.wizard.embed.duration')}
@@ -86,13 +86,13 @@ export default function EmbedTimeWizardModal({
                 label={t('circle.wizard.embed.location')}
                 value={state.location}
                 onChangeText={(v) => setState((s) => ({ ...s, location: v }))}
-                placeholder="e.g. Vondelpark"
+                placeholder={t('circle.wizard.embed_time.location_placeholder')}
               />
               <Field
                 label={t('circle.wizard.embed.share_with')}
                 value={state.share}
                 onChangeText={(v) => setState((s) => ({ ...s, share: v }))}
-                placeholder="leave blank to keep local"
+                placeholder={t('circle.wizard.embed_time.share_placeholder')}
                 monospace
               />
               <ErrorBanner message={state.submitError} />
@@ -103,7 +103,7 @@ export default function EmbedTimeWizardModal({
             buttons={[
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary',
                 disabled: state.submitting },
-              { label: 'Create',           onPress: onCreate, kind: 'primary',
+              { label: t('circle.wizard.embed_time.create_button'),           onPress: onCreate, kind: 'primary',
                 disabled: !canSubmit(state) },
             ]}
           />

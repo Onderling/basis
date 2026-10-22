@@ -32,7 +32,7 @@ import {
 // creds (pending), startSignIn returns a "no issuer redirect"
 // style error — UI surfaces it without crashing.
 const KNOWN_ISSUERS = [
-  { id: 'inrupt',         label: 'Inrupt Pod Spaces',  url: 'https://login.inrupt.com' },
+  { id: 'inrupt',         labelKey: 'circle.wizard.settings.provider_inrupt',  url: 'https://login.inrupt.com' },
   { id: 'solidcommunity', label: 'SolidCommunity.net', url: 'https://solidcommunity.net' },
   { id: 'solidweb',       label: 'SolidWeb.org',       url: 'https://solidweb.org' },
 ];
@@ -209,17 +209,17 @@ export default function SettingsWizardModal({
           testID="settings-wizard"
         >
           <ScrollView style={styles.scroll}>
-            <Body title="Settings" intro="Pinboard profile + holiday mode.">
+            <Body title={t('circle.wizard.settings.title')} intro={t('circle.wizard.settings.intro')}>
               {state.loading ? (
                 <Text style={styles.loading}>Loading…</Text>
               ) : (
                 <>
                   <View style={styles.section}>
                     <Field
-                      label="Handle"
+                      label={t('circle.wizard.settings.handle')}
                       value={handleInput}
                       onChangeText={setHandleInput}
-                      placeholder="e.g. alice"
+                      placeholder={t('circle.wizard.settings.handle_placeholder')}
                       monospace
                     />
                     <TouchableOpacity onPress={onSaveHandle} style={styles.saveBtn}>
@@ -299,7 +299,7 @@ export default function SettingsWizardModal({
                               accessibilityState={{ selected: pickerIssuer === iss.id }}
                             >
                               <View style={[styles.radio, pickerIssuer === iss.id && styles.radioOn]} />
-                              <Text style={styles.radioLabel}>{iss.label}</Text>
+                              <Text style={styles.radioLabel}>{iss.labelKey ? t(iss.labelKey) : iss.label}</Text>
                             </TouchableOpacity>
                           ))}
                           <TouchableOpacity

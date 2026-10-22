@@ -44,7 +44,7 @@ export function renderConflictDisputeWizard(opts) {
   function rerender() {
     container.innerHTML = '';
     if (state.successResult) return renderSuccessStep(container, doc, state, onClose);
-    mkSteps(container, doc, ['Raise', 'Propose', 'File'], state.step);
+    mkSteps(container, doc, [t('wizards.dispute.step_raise'), t('wizards.dispute.step_propose'), t('wizards.dispute.step_file')], state.step);
     if (state.step === 1) renderRaiseStep();
     if (state.step === 2) renderProposeStep();
     if (state.step === 3) renderFileStep();
@@ -69,22 +69,22 @@ export function renderConflictDisputeWizard(opts) {
       card.appendChild(quote);
       body.appendChild(card);
     } else {
-      mkField(body, doc, 'Related post id (optional)', state.aboutPostId,
+      mkField(body, doc, t('wizards.dispute.about_post_optional'), state.aboutPostId,
         (v) => { state.aboutPostId = v; },
-        { placeholder: 'leave blank for general dispute', monospace: true });
+        { placeholder: t('wizards.dispute.about_post_placeholder'), monospace: true });
     }
-    mkTextarea(body, doc, 'What happened?', state.summary, (v) => {
+    mkTextarea(body, doc, t('wizards.dispute.summary_label'), state.summary, (v) => {
       state.summary = v;
       refreshActions(container, { summaryOk: validSummary });
-    }, { placeholder: 'Be specific. Avoid naming third parties unless necessary.', rows: 5 });
+    }, { placeholder: t('wizards.dispute.summary_placeholder'), rows: 5 });
     // Radio group changes WHICH summary is shown next step — these can
     // safely call rerender (no focus to preserve).
-    mkRadioGroup(body, doc, 'Preferred escalation', state.escalation, ESCALATION_PATHS,
+    mkRadioGroup(body, doc, t('wizards.dispute.escalation_label'), state.escalation, ESCALATION_PATHS,
       (v) => { state.escalation = v; });
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: 'Cancel', onClick: onClose, kind: 'secondary' },
-      { label: 'Next →', onClick: () => { state.step = 2; rerender(); }, kind: 'primary',
+      { label: t('common.cancel'), onClick: onClose, kind: 'secondary' },
+      { label: t('common.next'), onClick: () => { state.step = 2; rerender(); }, kind: 'primary',
         disabled: !validSummary(), validate: 'summaryOk' },
     ]);
   }
@@ -95,12 +95,12 @@ export function renderConflictDisputeWizard(opts) {
     mkTextarea(body, doc, t('circle.wizard.dispute.proposal'), state.proposal, (v) => {
       state.proposal = v;
       refreshActions(container, { proposalOk: validProposal });
-    }, { placeholder: 'e.g. "an apology + agreement not to use my tools without asking"', rows: 4 });
+    }, { placeholder: t('wizards.dispute.proposal_placeholder'), rows: 4 });
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: '← Back', onClick: () => { state.step = 1; rerender(); }, kind: 'secondary' },
-      { label: 'Cancel', onClick: onClose, kind: 'secondary' },
-      { label: 'Next →', onClick: () => { state.step = 3; rerender(); }, kind: 'primary',
+      { label: t('common.back'), onClick: () => { state.step = 1; rerender(); }, kind: 'secondary' },
+      { label: t('common.cancel'), onClick: onClose, kind: 'secondary' },
+      { label: t('common.next'), onClick: () => { state.step = 3; rerender(); }, kind: 'primary',
         disabled: !validProposal(), validate: 'proposalOk' },
     ]);
   }
@@ -121,16 +121,16 @@ export function renderConflictDisputeWizard(opts) {
     body.appendChild(warn);
 
     mkError(body, doc, state.submitError);
-    mkSubmitting(body, doc, state.submitting, 'Filing dispute…');
+    mkSubmitting(body, doc, state.submitting, t('wizards.dispute.filing'));
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: '← Back',     onClick: () => { state.step = 2; rerender(); }, kind: 'secondary', disabled: state.submitting },
-      { label: 'Cancel',     onClick: onClose, kind: 'secondary', disabled: state.submitting },
-      { label: 'File',       onClick: async () => {
+      { label: t('common.back'),     onClick: () => { state.step = 2; rerender(); }, kind: 'secondary', disabled: state.submitting },
+      { label: t('common.cancel'),     onClick: onClose, kind: 'secondary', disabled: state.submitting },
+      { label: t('wizards.dispute.file_button'),       onClick: async () => {
         rerender(); // show submitting state
         const { result } = await submitDispute({ state, callSkill });
         if (result && typeof onDispatched === 'function') {
-          try { onDispatched({ ok: true, message: '✓ Dispute filed.', ...result }); } catch {}
+          try { onDispatched({ ok: true, message: t('wizards.dispute.filed_message'), ...result }); } catch {}
         }
         rerender();
       }, kind: 'primary', disabled: state.submitting },
@@ -141,7 +141,7 @@ export function renderConflictDisputeWizard(opts) {
 function renderSuccessStep(container, doc, state, onClose) {
   const body = mkBody(doc, t('circle.wizard.dispute.filed_title'), t('circle.wizard.dispute.filed_intro'));
   container.appendChild(body);
-  mkActions(container, doc, [{ label: 'Done', onClick: onClose, kind: 'primary' }]);
+  mkActions(container, doc, [{ label: t('common.done'), onClick: onClose, kind: 'primary' }]);
 }
 
 function appendKV(dl, doc, label, value, opts = {}) {

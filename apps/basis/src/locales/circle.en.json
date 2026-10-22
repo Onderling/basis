@@ -7233,9 +7233,18 @@
     }
   },
   "when": {
-    "today_at": { "text": "today at {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
-    "tomorrow_at": { "text": "tomorrow at {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
-    "closed": { "text": "closed", "doc": "A deadline that has passed." }
+    "today_at": {
+      "text": "today at {{time}}",
+      "doc": "A coming moment later today (a vote's deadline)."
+    },
+    "tomorrow_at": {
+      "text": "tomorrow at {{time}}",
+      "doc": "A coming moment tomorrow (a vote's deadline)."
+    },
+    "closed": {
+      "text": "closed",
+      "doc": "A deadline that has passed."
+    }
   },
   "governance": {
     "title": {
@@ -8240,6 +8249,30 @@
       "dot_review": {
         "text": "Review",
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "review_button": {
+        "text": "Review →",
+        "doc": "Create wizard, both shells: the button to the last step."
+      },
+      "purpose_placeholder": {
+        "text": "One sentence: what is this circle for?",
+        "doc": "Create wizard, both shells: the purpose field placeholder."
+      },
+      "tags_placeholder": {
+        "text": "e.g. neighbourhood, tools, kids",
+        "doc": "Create wizard, both shells: the tags field placeholder."
+      },
+      "offering_placeholder": {
+        "text": "e.g. plumbing",
+        "doc": "Create wizard, both shells: an offering name placeholder."
+      },
+      "invite_expiry_hint": {
+        "text": "How long the invite code stays usable. Short is safer for a quick share (1 hour by default); long suits slower joining (168 = a week). An admin can mint a fresh code later.",
+        "doc": "Create wizard (web): a field hint."
+      },
+      "pod_uri_hint": {
+        "text": "Needed for central and mixed storage.",
+        "doc": "Create wizard (web): a field hint."
       }
     },
     "settings": {
@@ -8326,6 +8359,22 @@
       "other_url": {
         "text": "Other (enter URL)",
         "doc": "Mobile settings wizard: the custom-relay option."
+      },
+      "provider_inrupt": {
+        "text": "Inrupt Pod Spaces",
+        "doc": "Settings wizard (phone): a pod provider (a product name)."
+      },
+      "handle_placeholder": {
+        "text": "e.g. alice",
+        "doc": "Settings wizard (phone): the handle placeholder."
+      },
+      "title": {
+        "text": "Settings",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "intro": {
+        "text": "Your handle and holiday mode.",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
     "backup": {
@@ -8364,6 +8413,22 @@
       "ready_intro": {
         "text": "Download it and keep it somewhere safe — mail it to yourself, copy it to a USB stick, put it in a cloud you trust. It is encrypted, so where it sits matters less than whether you still have it.",
         "doc": "Backup wizard, the final screen."
+      },
+      "passphrase_label": {
+        "text": "Passphrase",
+        "doc": "Backup wizard, both shells: the passphrase field and its step."
+      },
+      "passphrase_hint": {
+        "text": "At least 12 characters is wise — pick one you will remember.",
+        "doc": "Backup wizard, both shells: the passphrase placeholder."
+      },
+      "step_save": {
+        "text": "Save",
+        "doc": "Backup wizard, both shells: the second step."
+      },
+      "create_button": {
+        "text": "Create backup",
+        "doc": "Backup wizard, both shells: the button that builds the backup."
       }
     },
     "restore": {
@@ -8414,6 +8479,38 @@
       "done_intro": {
         "text": "The recovered identity is active. Reload the page so the rest of the app picks it up.",
         "doc": "Restore wizard, the final screen."
+      },
+      "step_phrase": {
+        "text": "Recovery phrase",
+        "doc": "Restore wizard, both shells: step 1."
+      },
+      "step_confirm": {
+        "text": "Confirm",
+        "doc": "Restore wizard, both shells: step 2."
+      },
+      "step_restore": {
+        "text": "Restore",
+        "doc": "Restore wizard, both shells: step 3."
+      },
+      "phrase_placeholder": {
+        "text": "word1 word2 word3 …",
+        "doc": "Restore wizard, both shells: the phrase placeholder."
+      },
+      "phrase_hint": {
+        "text": "Words separated by single spaces.",
+        "doc": "Restore wizard (web): under the phrase field."
+      },
+      "button": {
+        "text": "Restore now",
+        "doc": "Restore wizard, both shells: the button that restores."
+      },
+      "restoring": {
+        "text": "Restoring identity…",
+        "doc": "Restore wizard (web): while restoring."
+      },
+      "saved_question": {
+        "text": "Have you saved your current recovery phrase? Without it, the identity on this device cannot come back.",
+        "doc": "Restore wizard, both shells: one line of copy above the two checks — the person’s CURRENT phrase, before it is replaced."
       }
     },
     "audience": {
@@ -8444,6 +8541,50 @@
       "intro": {
         "text": "Pick who this reaches. Leave it empty and it goes to everyone in your circle.",
         "doc": "Audience wizard step 1 body."
+      },
+      "kind": {
+        "text": "Kind",
+        "doc": "Post-with-audience wizard, both shells: the kind of post."
+      },
+      "kind_ask": {
+        "text": "Ask (request help)",
+        "doc": "Post-with-audience wizard: an ask."
+      },
+      "kind_offer": {
+        "text": "Offer (something to share)",
+        "doc": "Post-with-audience wizard: an offer."
+      },
+      "kind_lend": {
+        "text": "Lend (a physical thing)",
+        "doc": "Post-with-audience wizard (web): a lend."
+      },
+      "kind_announce": {
+        "text": "Announce",
+        "doc": "Post-with-audience wizard (phone): an announcement."
+      },
+      "text_placeholder": {
+        "text": "e.g. Anyone got a ladder I can borrow?",
+        "doc": "Post-with-audience wizard, both shells: the text placeholder."
+      },
+      "tags": {
+        "text": "Tags (comma-separated — matches contacts with any of them)",
+        "doc": "Post-with-audience wizard, both shells: the tags field."
+      },
+      "tags_placeholder": {
+        "text": "e.g. tools, gardening, kids",
+        "doc": "Post-with-audience wizard, both shells: the tags placeholder."
+      },
+      "recipients_placeholder": {
+        "text": "e.g. webid:anne,webid:karl",
+        "doc": "Post-with-audience wizard, both shells: the recipients placeholder."
+      },
+      "recipients_hint": {
+        "text": "When set, only these recipients — trust and distance are ignored.",
+        "doc": "Post-with-audience wizard, both shells: under the recipients field."
+      },
+      "posting": {
+        "text": "Posting…",
+        "doc": "Post-with-audience wizard (web): while posting."
       }
     },
     "dispute": {
@@ -8508,6 +8649,38 @@
       "title": {
         "text": "Embed a time",
         "doc": "Mobile embed-time wizard heading."
+      },
+      "create_button": {
+        "text": "Create",
+        "doc": "Embed-a-time wizard (phone): the create button."
+      },
+      "title_placeholder": {
+        "text": "e.g. Circle BBQ",
+        "doc": "Embed-a-time wizard (phone): the title placeholder."
+      },
+      "when_placeholder": {
+        "text": "tomorrow 3pm · 2026-05-30T15:00",
+        "doc": "Embed-a-time wizard (phone): the when placeholder."
+      },
+      "location_placeholder": {
+        "text": "e.g. Vondelpark",
+        "doc": "Embed-a-time wizard (phone): the location placeholder."
+      },
+      "share_placeholder": {
+        "text": "leave blank to keep it local",
+        "doc": "Embed-a-time wizard (phone): the share-with placeholder."
+      },
+      "intro": {
+        "text": "Drops a time card into the conversation. The date takes ISO (2026-05-30T15:00) or plain words (tomorrow 3pm, next Friday).",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "title_label": {
+        "text": "Title",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "when_label": {
+        "text": "When",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     }
   },

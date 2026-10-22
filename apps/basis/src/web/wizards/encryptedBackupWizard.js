@@ -34,7 +34,7 @@ export function renderEncryptedBackupWizard(opts) {
 
   function rerender() {
     container.innerHTML = '';
-    mkSteps(container, doc, ['Passphrase', 'Download'], state.step);
+    mkSteps(container, doc, [t('circle.wizard.backup.passphrase_label'), t('circle.wizard.backup.step_save')], state.step);
     if (state.step === 1) renderPassphraseStep();
     if (state.step === 2) renderDownloadStep();
   }
@@ -42,12 +42,12 @@ export function renderEncryptedBackupWizard(opts) {
   function renderPassphraseStep() {
     const body = mkBody(doc, t('circle.wizard.backup.title'), t('circle.wizard.backup.intro'));
 
-    mkField(body, doc, 'Passphrase', state.passphrase,
+    mkField(body, doc, t('circle.wizard.backup.passphrase_label'), state.passphrase,
       (v) => {
         state.passphrase = v;
         refreshActions(container, { canSubmit: () => canCreateBackup(state) && !state.submitting });
       },
-      { type: 'password', placeholder: 'minimum 12 characters recommended' });
+      { type: 'password', placeholder: t('circle.wizard.backup.passphrase_hint') });
     mkField(body, doc, t('circle.wizard.backup.confirm_passphrase'), state.confirm,
       (v) => {
         state.confirm = v;
@@ -65,8 +65,8 @@ export function renderEncryptedBackupWizard(opts) {
     container.appendChild(body);
 
     mkActions(container, doc, [
-      { label: 'Cancel', onClick: onClose, kind: 'secondary', disabled: state.submitting },
-      { label: 'Create backup', validate: 'canSubmit', kind: 'primary',
+      { label: t('common.cancel'), onClick: onClose, kind: 'secondary', disabled: state.submitting },
+      { label: t('circle.wizard.backup.create_button'), validate: 'canSubmit', kind: 'primary',
         disabled: !canCreateBackup(state) || state.submitting,
         onClick: async () => {
           rerender(); // show submitting state
@@ -116,7 +116,7 @@ export function renderEncryptedBackupWizard(opts) {
 
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: 'Done', onClick: onClose, kind: 'primary' },
+      { label: t('common.done'), onClick: onClose, kind: 'primary' },
     ]);
   }
 }

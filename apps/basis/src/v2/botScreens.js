@@ -167,6 +167,8 @@ export function parseScreenLaunchLink(link) {
  */
 export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
+  // when each person last connected a screen: a code tapped again within the offer's window says "connected"
+  const connectedAt = new Map();
   // a launch's hash, used: kept until no launch that old is taken anyway
   const usedLaunches = new Map();
   const spend = (hash) => {
@@ -271,7 +273,11 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      */
     async confirm(person, answer, { isPrivate = false } = {}) {
       const offer = threads.screenOfferOf(person);
-      if (!offer) return { ok: false, reason: 'nothing-pending' };
+      if (!offer) {
+        // the code tapped again right after the screen connected: say it is connected, not that nothing is waiting
+        const at = connectedAt.get(person);
+        return at != null && now() - at < SCREEN_LINK_TTL_MS ? { ok: true, already: true } : { ok: false, reason: 'nothing-pending' };
+      }
       if (!isPrivate) return { ok: false, reason: 'not-private' };
       threads.setScreenOffer(person, null);   // answered (or late): the offer is gone either way
       const refuse = async () => { refuseSoon(offer.viewPubKey); };
@@ -281,6 +287,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (String(answer ?? '').trim().toUpperCase() !== real) { await refuse(); return { ok: true, declined: true }; }
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       const r = await grantTo(person, { viewPubKey: offer.viewPubKey, label: offer.label, nonce: offer.nonce });
+      if (r.ok) connectedAt.set(person, now());
       return r.ok ? { ...r, reopen: this.reopenLink() } : r;
     },
 

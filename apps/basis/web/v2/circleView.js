@@ -322,7 +322,7 @@ export function renderCircleView(container, {
       if (tab.id === effectiveTab) btn.classList.add('is-active');
       btn.textContent = tab.label ?? tr(tab.labelKey);
       btn.addEventListener('click', () => {
-        if (typeof onTab === 'function' && tab.id !== effectiveTab) onTab(tab.id);
+        if (typeof onTab === 'function') onTab(tab.id);   // the open tab too: a tap re-reads it
       });
       bar.appendChild(btn);
     }

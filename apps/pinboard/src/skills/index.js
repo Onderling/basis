@@ -1451,7 +1451,11 @@ export function buildSkills({
     const webid = typeof row?.webid === 'string' && row.webid ? row.webid : null;
     if (!webid) return drop('sender-not-on-roster');
     const prior = Array.isArray(item.source?.responders) ? item.source.responders : [];
-    if (!prior.includes(webid)) await store.update(item.id, { source: { ...item.source, responders: [...prior, webid] } }, { actor: self });
+    if (!prior.includes(webid)) {
+      await store.update(item.id, { source: { ...item.source, responders: [...prior, webid] } }, { actor: self });
+      // an open board re-reads on this (both shells), so the poster sees the answer without leaving the tab
+      try { bundle?.agent?.emit?.('pinboard:response-recorded', { itemId: item.id }); } catch { /* a listener never breaks ingest */ }
+    }
     return { recorded: true, webid };
   };
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →

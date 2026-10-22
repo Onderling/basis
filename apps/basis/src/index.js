@@ -81,7 +81,7 @@ export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS 
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';
 export { itemCircleId, isInCircle, scopeItems }       from './v2/circleScope.js';
-export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES } from './v2/circlePinboardScope.js';
+export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
 export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from './v2/circlePodProducer.js';
 export { realPodRouting, podRootFromWebid }           from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';

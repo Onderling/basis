@@ -16,7 +16,7 @@ import { pickAndEncodeImage } from '../../v2/attachmentPicker.js';
 // embeds[] — cross-object reference chips ("See also"), shared with web.
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../../../basis/src/v2/embedChips.js';
 import { enrichEmbedsWithTitles } from '../../../../basis/src/v2/embedResolve.js';
-import { isNoticeboardPost, responderChoices } from '../../../../basis/src/v2/circlePinboardScope.js';
+import { isNoticeboardPost, responderChoices, NOTICEBOARD_REFRESH_EVENTS } from '../../../../basis/src/v2/circlePinboardScope.js';
 import { NOTICEBOARD_INTENTS, noticeboardIntentOf } from '@onderling/item-types';
 import { memberLabelFor } from '../../../../basis/src/v2/circleStream.js';
 import { replyToPost } from '../../../../basis/src/v2/replyToPost.js';
@@ -37,7 +37,7 @@ const INTENTS = NOTICEBOARD_INTENTS;
 // The matches I skipped under my own asks — this device only (AsyncStorage), never the circle (web parity).
 const askMatchSkips = createAskMatchSkips(asyncStorageAskMatchSkipsIo(AsyncStorage));
 
-export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onPinboardEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null, onOpenContact = null,
+export default function CircleNoticeboard({ selfProfileId = 'default', callSkill, onPinboardEvent, refreshKey = 0, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null, contactChannel = null, notePeer = null, identityOf = null, onReplied = null, onOpenContact = null,
   // Who posted, through the reveal ladder — the roster + the viewer + the circle's reveal policy, the
   // same three the conversation and the screen-mode noticeboard block are stamped with. Absent (roster
   // still loading) → no byline rather than a wire address.
@@ -125,11 +125,15 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
 
   useEffect(() => { reload(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // S6.4 — refresh when a recipient's requested attachment bytes arrive.
+  // Refresh when a post changed under the open board (requested attachment bytes arrived, an answer was recorded).
   useEffect(() => {
     if (typeof onPinboardEvent !== 'function') return undefined;
-    return onPinboardEvent('pinboard:attachment-fetched', () => { reload(); });
+    const offs = NOTICEBOARD_REFRESH_EVENTS.map((ev) => onPinboardEvent(ev, () => { reload(); }));
+    return () => { for (const off of offs) { try { off?.(); } catch { /* */ } } };
   }, [onPinboardEvent, reload]);
+
+  // a tap on the open tab re-reads the board (web parity)
+  useEffect(() => { if (refreshKey) reload(); }, [refreshKey]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // S5 — pick + encode an image into the inbound-attachment shape, held pending.
   const attachImage = useCallback(async () => {

@@ -46,6 +46,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
+  NOTICEBOARD_REFRESH_EVENTS,
   responderChoices,
   noticeboardIntentOf,
   memberLabelFor,
@@ -7601,9 +7602,11 @@ function showCircle(id, circle, policy) {
         rerender();
       },
       onTab: (tabId) => {
+        // a tap on the open tab re-reads it (the board's answers); only a switch counts as a use
+        const switched = tabId !== activeTab;
         activeTab = tabId;
         // count the tab use so the quickActions row reflects reality.
-        const f = featureForTabId(tabId);
+        const f = switched ? featureForTabId(tabId) : null;
         if (f) actionFrequency.bump(id, f);
         if (tabId === 'noticeboard') loadNoticeboard();   // lazy-load the circle posts
         if (tabId === 'tasks') loadTasks();            // Taken — lazy-load the circle's tasks
@@ -9132,10 +9135,11 @@ async function boot() {
         .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachPinboardPod:', r.error); })
         .catch(() => { /* best-effort; stays local-first */ });
     }
-    // S6.4 — refresh the on-screen noticeboard when a recipient's requested
-    // attachment bytes land (pinboard:attachment-fetched). Subscribed once; the hook
-    // points at the active circle's loader.
-    try { agent.onPinboardEvent?.('pinboard:attachment-fetched', () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
+    // Refresh the on-screen noticeboard when a post changed under it (requested attachment bytes landed, an answer
+    // to my request was recorded). Subscribed once; the hook points at the active circle's loader.
+    for (const ev of NOTICEBOARD_REFRESH_EVENTS) {
+      try { agent.onPinboardEvent?.(ev, () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
+    }
     if (typeof agent?.callSkill === 'function') {
       // Calendar cross-peer fan-out — wrap the bare callSkill so a successful
       // calendar dispatch (schedule/RSVP) fans its invite/RSVP envelopes out

@@ -78,19 +78,19 @@ test('an ask shows the asker who offers it — released offerings only, nobody e
 
     // …and the ask goes the whole way: Bram answers it on his board, Anna accepts him on her post, and the accepted
     // ask is off the open board (story 4's path, now after a match).
+    await openBoard(A.page);   // Anna watches her board from here on: nothing below re-opens it
     await openBoard(B.page);
     const respond = B.page.locator('.cc-noticeboard__chip[data-action="respond"]').first();
     await expect(respond).toBeVisible({ timeout: 30_000 });
     B.page.once('dialog', (d) => d.accept('Ja, ik heb er een — kom maar langs.'));
     await respond.click();
-    await B.page.waitForTimeout(2500);
+    // the answer arriving re-reads the open board (no polling, no re-entry)
     const accept = A.page.locator('.cc-noticeboard__chip[data-action="accept"]');
-    // re-enter the circle: the board re-reads on opening (clicking the tab it is already on does not)
-    const reenter = async () => { await gotoCircles(A.page); await openCircleMatching(A.page, /vraag.?kring/i); await openBoard(A.page); };
-    await expect.poll(async () => { await reenter(); return accept.count(); },
-      { timeout: 60_000, message: "Bram's answer reaches Anna's post as an Accept" }).toBe(1);
+    await expect(accept, "Bram's answer reaches Anna's open board as an Accept").toHaveCount(1, { timeout: 60_000 });
     await accept.first().click();
-    await expect.poll(async () => { await reenter(); return A.page.evaluate(() => document.querySelector('.cc-noticeboard')?.innerText ?? ''); },
+    // a tap on the tab the board is already on re-reads it
+    const boardTab = A.page.locator('.circle-view__tab[data-tab="noticeboard"]').first();
+    await expect.poll(async () => { await boardTab.click(); await A.page.waitForTimeout(1000); return A.page.evaluate(() => document.querySelector('.cc-noticeboard')?.innerText ?? ''); },
       { timeout: 30_000, message: 'the accepted ask is off the open board' }).not.toMatch(/boormachine\?/i);
   } finally { await teardown(peers); }
 });

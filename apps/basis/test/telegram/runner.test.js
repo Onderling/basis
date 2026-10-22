@@ -134,6 +134,14 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(out[0].text).toBe('circle.telegram.unknown');
   });
 
+  it("the model's markdown reaches Telegram as plain text (no stars, no hashes)", async () => {
+    const interpret = async () => ({ reply: '## Vandaag\n* **afwas** — Frits\n* ramen' });
+    const { say } = await boot({ interpret });
+    const out = (await say('wat moet er vandaag gebeuren')).map((m) => m.text).join('\n');
+    expect(out).toContain('Vandaag\n• afwas — Frits\n• ramen');
+    expect(out).not.toMatch(/\*\*|^##/m);
+  });
+
   it('free text (no LLM wired) answers with the help hint, not silence', async () => {
     const { say } = await boot();
     const out = await say('hoi bot');

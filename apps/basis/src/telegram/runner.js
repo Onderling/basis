@@ -29,6 +29,7 @@ import { createAssistantEngine, assistantReplyText } from '../v2/assistantEngine
 import { householdListType, coerceListArgs } from '../v2/circleGate.js';
 import { replyFact, replyLines, isReadFamily } from '../v2/replyLine.js';
 import { createLastReads } from '../v2/lastRead.js';
+import { telegramPlain } from './telegramPlain.js';
 
 const CONFIRM_YES = '__confirm:yes';
 const CONFIRM_NO  = '__confirm:no';
@@ -100,7 +101,9 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     const said = labelKey(text);
     return said ? (offer.find((b) => labelKey(b.label) === said)?.id ?? null) : null;
   };
-  const speak = (chatId, text, buttons) => {
+  const speak = (chatId, said, buttons) => {
+    // Telegram shows plain text: the model's markdown leaves here without its marks ("**Taken**" arrived with the stars)
+    const text = telegramPlain(said);
     const slashButtons = (buttons ?? []).filter((b) => typeof b?.id === 'string' && b.id.startsWith('/') && b.label);
     if (slashButtons.length) quickOffer.set(chatId, slashButtons); else quickOffer.delete(chatId);
     const t0 = turns.get(chatId); if (t0) (t0.replies ??= []).push({ text, ...(buttons?.length ? { buttons: buttons.map((b) => b.id) } : {}) });

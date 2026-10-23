@@ -87,6 +87,19 @@ export class FallbackTable {
   }
 
   /**
+   * Lift a degraded mark early — the transport has evidence the peer is reachable again (it rediscovered it), so the
+   * penalty for a failure that is no longer true must not outlast it. A record without a mark is left as it is.
+   *
+   * @param {string} peerId
+   * @param {string} transportName
+   */
+  clearDegraded(peerId, transportName) {
+    const key = this.#key(peerId, transportName);
+    const existing = this.#records.get(key);
+    if (existing?.degradedUntil) this.#records.set(key, { ...existing, degradedUntil: null });
+  }
+
+  /**
    * Return true if the transport is currently degraded for the given peer.
    *
    * @param {string} peerId

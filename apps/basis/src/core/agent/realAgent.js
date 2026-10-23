@@ -313,6 +313,7 @@ import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapt
 import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 import { parseUntrustedJson } from '@onderling/core';
+import { createInProcessSenderAuthorizer } from '@onderling/core';
 
 // Deterministic seed for the real household store.  Three open items across
 // list types so `/list shopping` + the brief demo are non-empty out of the
@@ -4379,6 +4380,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     const theirs = chatAgent.security.adoptInProcessPeer(chatAgent.transport, peer.transport, peer.identity);
     const ours   = peer.security.adoptInProcessPeer(peer.transport, chatAgent.transport, chatId);
     if (theirs === 'refused' || ours === 'refused') throw new Error('realAgent: an in-process agent could not be adopted');
+    // …and the peer's layer hears ONLY what its bus adopted: a closed roster, read live, fail-closed (it faces no wire)
+    peer.security.setSenderAuthorizer(createInProcessSenderAuthorizer(peer.security));
   };
   adoptInProcess(hostAgent);
   // B1 — seed chatAgent's SecurityLayer with the household agent's key so
@@ -7791,6 +7794,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     inProcessPubKeys: () => {
       const keyOf = (a) => a?.identity?.pubKey ?? a?.bundle?.agent?.identity?.pubKey ?? a?.agent?.identity?.pubKey ?? a?.address ?? null;
       return { host: keyOf(hostAgent), household: keyOf(householdAgent), tasks: keyOf(tasksCircle), pinboard: keyOf(pinboardAgent), folio: keyOf(folioAgent) };
+    },
+    // Each in-process layer's sender authorization, read-only — for the check that none accepts by absence.
+    inProcessAuthorization: () => {
+      const layerOf = (a) => a?.security ?? a?.bundle?.agent?.security ?? a?.agent?.security ?? null;
+      const stat = (a) => { const l = layerOf(a); return l ? { installed: l.hasSenderAuthorizer, byAbsence: l.senderAuthorizationsByAbsence, refused: l.refusedUnauthorizedSenders } : null; };
+      return { host: stat(hostAgent), household: stat(householdAgent), tasks: stat(tasksCircle?.agent), pinboard: stat(pinboardAgent?.bundle?.agent), folio: stat(folioAgent?.agent) };
     },
     // The skill ids each in-process agent registers, read-only — for the check that one op has one owner.
     inProcessSkillIds: () => {

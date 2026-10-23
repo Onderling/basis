@@ -140,6 +140,17 @@ export class BotAgentRegistry {
    * so a check racing boot answers from the real state rather than an empty one — the union in
    * `buildMeshAgent` awaits every source already.
    */
+  /**
+   * Adopt a bot this registry spun up on the tasks agent's bus, both ways (`adoptInProcessPeer`): the tasks layer learns
+   * the key the registry minted, the bot learns the tasks agent's. Refused unless both are on this bus — never widened.
+   */
+  #adoptBot(agent, identity) {
+    const tasks = this.#tasksAgent;
+    const theirs = tasks.security.adoptInProcessPeer(tasks.transport, agent.transport, identity);
+    const ours = agent.security.adoptInProcessPeer(agent.transport, tasks.transport, tasks.identity);
+    if (theirs === 'refused' || ours === 'refused') throw new Error('BotAgentRegistry: the bot could not be adopted on the tasks bus');
+  }
+
   async isRevoked(tokenId) {
     await this.#ready;
     return this.#revoked.has(tokenId);
@@ -192,11 +203,11 @@ export class BotAgentRegistry {
 
     await agent.start();
 
-    // 2. Hello the tasks agent so SecurityLayer establishes a session.
-    //    Bot does not need to be tier-elevated — default 'authenticated'
-    //    is fine for `bot.*` skills' `requires-token` policy (the token
-    //    is what authorises them).
-    await agent.hello(this.#tasksAgent.address);
+    // 2. ADOPT the bot and the tasks agent both ways — the same bus, the objects themselves, no hello (a hello between
+    //    two agents in one process proves nothing). The tasks layer hears only what its bus adopted, so this is also what
+    //    admits the key this registry just minted. Bot does not need to be tier-elevated — default 'authenticated' is fine
+    //    for `bot.*` skills' `requires-token` policy (the token is what authorises them).
+    this.#adoptBot(agent, identity);
 
     // 3. Issue the token. Tasks agent issues; bot holds.
     //    follow-up A — scope to `bot.*` instead of wildcard so
@@ -257,6 +268,8 @@ export class BotAgentRegistry {
     if (!entry) return { error: 'not found' };
     try { await entry.tokenRegistry.revoke(entry.binding.tokenId); } catch { /* noop */ }
     try { await entry.agent.stop(); } catch { /* noop */ }
+    // …and the tasks layer forgets the bot's key: a revoked bot is a stranger on the bus again
+    try { this.#tasksAgent.security?.unregisterPeer?.(entry.agent.address); } catch { /* noop */ }
     // follow-up C — also publish to the issuer-side revocation
     // list so PolicyEngine.checkInbound rejects any in-flight or
     // future call carrying the now-stale token.
@@ -329,7 +342,7 @@ export class BotAgentRegistry {
           label: `Bot(${binding.chatId.slice(0, 8)}→${binding.webid})`,
         });
         await agent.start();
-        await agent.hello(this.#tasksAgent.address);
+        this.#adoptBot(agent, identity);
 
         // with persisted tasks-agent identity (Circle.js writes
         // the agent vault to `mem://tasks/circles/<circleId>/agent/

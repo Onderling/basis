@@ -626,7 +626,8 @@ needs a device log everywhere; it is parked as hygiene, not claimed done.
 **The rule these violations share:** each is a place where the code can no longer tell "did not happen"
 from "happened fine". That is the failure mode this architecture is most exposed to — everything here is
 composed of best-effort seams — so **a seam is not done until something crosses it**, and the guard for
-this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival.
+this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival
+([`apps/basis/test/perTypeSyncMatrix.test.js`](../apps/basis/test/perTypeSyncMatrix.test.js)).
 
 **Reading across circles is ONE projection per noun, rows tagged with their circle.** "My things", "my agenda" —
 any item type across the circles a person is in — is `acrossCircles` (`src/v2/acrossCircles.js`): per circle the

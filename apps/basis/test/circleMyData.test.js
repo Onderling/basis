@@ -3,6 +3,10 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleMyData } from '../web/v2/circleMyData.js';
+import { settingsGroupFor } from '../src/v2/settingsHome.js';
+import { basisManifest as settingsManifest } from '../manifest.js';
+// the Weergave group's sections live on its own screen (under the gear), not the old My data page
+const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
@@ -138,6 +142,7 @@ describe('renderCircleMyData', () => {
   it('renders the push-notification toggle reflecting subscription state', () => {
     const onToggleNotifications = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, notifications: { supported: true, subscribed: false }, onToggleNotifications,
     });
     const enable = off.querySelector('.cc-mydata__notif-toggle');
@@ -146,12 +151,14 @@ describe('renderCircleMyData', () => {
     expect(onToggleNotifications).toHaveBeenCalled();
 
     const on = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, notifications: { supported: true, subscribed: true }, onToggleNotifications,
     });
     expect(on.querySelector('.cc-mydata__notif-toggle').textContent).toBe('circle.mydata.notif_disable');
 
     // unsupported: status shown, no toggle button
     const no = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, notifications: { supported: false }, onToggleNotifications,
     });
     expect(no.querySelector('.cc-mydata__notif-toggle')).toBeNull();
@@ -159,13 +166,14 @@ describe('renderCircleMyData', () => {
   });
 
   it('omits the notifications section when no toggle handler is wired', () => {
-    const el = renderCircleMyData(document.createElement('div'), { t, notifications: { supported: true } });
+    const el = renderCircleMyData(document.createElement('div'), { only: WEERGAVE, t, notifications: { supported: true } });
     expect(el.querySelector('.cc-mydata__notif-status')).toBeNull();
   });
 
   it('S6.C — renders the surface-preference selector with the active option marked + a tap sets it', () => {
     const onSetSurfacePref = vi.fn();
     const el = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, surfacePref: 'screen', onSetSurfacePref,
     });
     const prefs = [...el.querySelectorAll('.cc-mydata__pref')].map((b) => b.dataset.pref);
@@ -177,24 +185,27 @@ describe('renderCircleMyData', () => {
 
   it('S6.D — under "chat", shows whether AI is enriching the conversation', () => {
     const onChat = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, surfacePref: 'chat', onSetSurfacePref: () => {}, chatAi: { enriched: true, reason: 'on' },
     });
     expect(onChat.querySelector('.cc-mydata__chat-ai').textContent).toContain('circle.mydata.chat_ai_on');
 
     const offCircle = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, surfacePref: 'chat', onSetSurfacePref: () => {}, chatAi: { enriched: false, reason: 'circle-off' },
     });
     expect(offCircle.querySelector('.cc-mydata__chat-ai').textContent).toContain('circle.mydata.chat_ai_circle_off');
 
     // not shown when chat isn't the selected projection
     const onInline = renderCircleMyData(document.createElement('div'), {
+      only: WEERGAVE,
       t, surfacePref: 'inline', onSetSurfacePref: () => {}, chatAi: { enriched: true, reason: 'on' },
     });
     expect(onInline.querySelector('.cc-mydata__chat-ai')).toBeNull();
   });
 
   it('omits the surface-preference selector when no setter is wired', () => {
-    const el = renderCircleMyData(document.createElement('div'), { t, surfacePref: 'inline' });
+    const el = renderCircleMyData(document.createElement('div'), { only: WEERGAVE, t, surfacePref: 'inline' });
     expect(el.querySelector('.cc-mydata__pref')).toBeNull();
   });
 

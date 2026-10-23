@@ -117,6 +117,10 @@ export function renderCircleMyData(container, {
   // line, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's build looked
   // like a laptop that receives nothing).
   version,
+  // A settings group's screen: the section ids to paint, in order (from `settingsGroupFor`), and its title. Absent ⇒
+  // the old My data page, which paints every section NOT declared under the gear.
+  only = null,
+  groupTitle = null,
 } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleMyData.js');
@@ -135,9 +139,156 @@ export function renderCircleMyData(container, {
   }
   const title = document.createElement('h2');
   title.className = 'cc-mydata__title';
-  title.textContent = tr('circle.mydata.title');
+  title.textContent = groupTitle ?? tr('circle.mydata.title');
   header.appendChild(title);
   container.appendChild(header);
+
+  // ── the sections that live under the gear (Instellingen), one painter per declared id ──────────────
+  // Painted ONLY on a settings group's screen (`only`, in the manifest's order); the old page paints none of them.
+  const painters = {
+    'theme': () => {
+      // ── display theme (systeem/licht/donker — stored locally, applies live) ──────
+      // Bulletin restyle — a mono pill toggle (mirror of onderling.org's #theme-toggle):
+      // one segmented control, the active option inverts to ink. onSetTheme persists
+      // localStorage['basis.theme'] and stamps/removes document.documentElement.dataset.theme
+      // live (systeem = remove, so prefers-color-scheme wins) — wired in circleApp.
+      if (typeof onSetTheme === 'function') {
+        const sec = section(tr('circle.mydata.theme'));
+        renderThemeToggle(sec, { themePref, onSetTheme, t: tr });   // ONE renderer — settings shows the same control
+        container.appendChild(sec);
+      }
+    },
+    'language': () => {
+      // ── app language (global NL/EN — a user preference, applies app-wide) ───────
+      if (typeof onSetAppLang === 'function') {
+        const sec = section(tr('circle.mydata.language'));
+        for (const lg of ['nl', 'en']) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `cc-mydata__pref${lg === appLang ? ' is-active' : ''}`;
+          b.dataset.lang = lg;
+          b.textContent = lg.toUpperCase();
+          b.addEventListener('click', () => onSetAppLang(lg));
+          sec.appendChild(b);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'start-screen': () => {
+      // where the app opens on this device: Vandaag · the circles list · the tab last used
+      if (startScreen && typeof onSetStartScreen === 'function') {
+        const sec0 = section(tr('circle.mydata.start_title'));
+        const sel = document.createElement('select');
+        sel.dataset.role = 'start-screen';
+        for (const c of startScreen.choices ?? []) {
+          const o = document.createElement('option');
+          o.value = c.value;
+          o.textContent = tr(c.labelKey);
+          if (c.value === startScreen.value) o.selected = true;
+          sel.appendChild(o);
+        }
+        sel.addEventListener('change', () => onSetStartScreen(sel.value));
+        sec0.appendChild(sel);
+        container.appendChild(sec0);
+      }
+    },
+    'bot-actions': () => {
+      // ── how the bot shows actions (S6.C surface preference) ─────────────────────
+      if (typeof onSetSurfacePref === 'function') {
+        const sec = section(tr('circle.mydata.surface_pref'));
+        const current = surfacePref || 'inline';
+        for (const opt of ['inline', 'screen', 'chat']) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `cc-mydata__pref${opt === current ? ' is-active' : ''}`;
+          b.dataset.pref = opt;
+          b.textContent = tr(`circle.mydata.surface_pref_${opt}`);
+          b.addEventListener('click', () => onSetSurfacePref(opt));
+          sec.appendChild(b);
+        }
+        // S6.D — when "chat" is chosen, show whether AI is enriching it here (chat works
+        // without AI; this just tells you if your LLM is helping, or why not).
+        if (current === 'chat' && chatAi && chatAi.reason) {
+          const note = document.createElement('p');
+          note.className = 'cc-mydata__chat-ai';
+          const keyByReason = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
+          note.textContent = `${chatAi.enriched ? '✨ ' : ''}${tr(`circle.mydata.${keyByReason[chatAi.reason] ?? 'chat_ai_no_provider'}`)}`;
+          sec.appendChild(note);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'week-overview': () => {
+      // the person's own week overview: a card of their coming week, switched here
+      if (weekOverview) {
+        const sec = section(tr('circle.profile.week_switch'));
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cc-profile__week-toggle cc-switch';
+        btn.setAttribute('role', 'switch');
+        btn.setAttribute('aria-checked', weekOverview.on ? 'true' : 'false');
+        btn.dataset.on = weekOverview.on ? 'true' : 'false';
+        btn.disabled = weekOverview.on === null;
+        btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
+        btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
+        sec.appendChild(btn);
+        container.appendChild(sec);
+      }
+    },
+    'notifications': () => {
+      // ── notifications (S5 web-push) ─────────────────────────────────────────────
+      if (typeof onToggleNotifications === 'function') {
+        const n = notifications || {};
+        const notif = section(tr('circle.mydata.notifications'));
+        const sub = document.createElement('p');
+        sub.className = 'cc-mydata__notif-status';
+        sub.textContent = !n.supported
+          ? tr('circle.mydata.notif_unsupported')
+          : n.subscribed ? tr('circle.mydata.notif_on') : tr('circle.mydata.notif_off');
+        notif.appendChild(sub);
+        if (n.supported) {
+          // the trade is made by turning this ON, so it is stated HERE, above the button, in both
+          // states: someone reviewing their settings should see what having it on means. Three lines on
+          // purpose — the cost, what is still NOT learned (a bare "affects your privacy" invites imagining
+          // worse than the truth), and the escape. Not framed as a warning: most people should turn
+          // notifications on, they should just know what they are agreeing to. → docs/decisions.md 2026-07-29
+          for (const key of ['notif_privacy', 'notif_privacy_not', 'notif_privacy_escape']) {
+            const line = document.createElement('p');
+            line.className = `cc-mydata__notif-privacy cc-mydata__${key.replace(/_/g, '-')}`;
+            line.textContent = tr(`circle.mydata.${key}`);
+            notif.appendChild(line);
+          }
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'cc-mydata__notif-toggle cc-switch';
+          toggle.setAttribute('role', 'switch');
+          toggle.setAttribute('aria-checked', n.subscribed ? 'true' : 'false');
+          toggle.textContent = n.subscribed ? tr('circle.mydata.notif_disable') : tr('circle.mydata.notif_enable');
+          toggle.addEventListener('click', () => onToggleNotifications());
+          notif.appendChild(toggle);
+        }
+        container.appendChild(notif);
+      }
+    },
+    'assistant': () => {
+      // ── assistant endpoint (the member's own LLM + embedder) ────────────────────
+      if (typeof onSaveUserLlm === 'function') {
+        const holder = document.createElement('div');
+        holder.className = 'cc-mydata__section';
+        renderUserLlmSettings(holder, { current: userLlm || {}, onSave: onSaveUserLlm, validate: validateUserLlm, t: tr });
+        container.appendChild(holder);
+      }
+    },
+  };
+  if (Array.isArray(only)) {
+    container.classList.add('cc-settings-group');
+    for (const id of only) {
+      const before = container.children.length;
+      painters[id]?.();
+      for (let k = before; k < container.children.length; k += 1) container.children[k].dataset.section = id;
+    }
+    return container;
+  }
 
   // ── the doors Mij gave up: availability · connection points · shared with me · blocked ──
   const doorRow = myDataActionsFor(basisManifest, doors);
@@ -577,37 +728,6 @@ export function renderCircleMyData(container, {
   }
 
   // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
-  // where the app opens on this device: Vandaag · the circles list · the tab last used
-  if (startScreen && typeof onSetStartScreen === 'function') {
-    const sec0 = section(tr('circle.mydata.start_title'));
-    const sel = document.createElement('select');
-    sel.dataset.role = 'start-screen';
-    for (const c of startScreen.choices ?? []) {
-      const o = document.createElement('option');
-      o.value = c.value;
-      o.textContent = tr(c.labelKey);
-      if (c.value === startScreen.value) o.selected = true;
-      sel.appendChild(o);
-    }
-    sel.addEventListener('change', () => onSetStartScreen(sel.value));
-    sec0.appendChild(sel);
-    container.appendChild(sec0);
-  }
-
-  // the person's own week overview: a card of their coming week, switched here
-  if (weekOverview) {
-    const sec = section(tr('circle.profile.week_switch'));
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cc-profile__week-toggle cc-btn';
-    btn.dataset.on = weekOverview.on ? 'true' : 'false';
-    btn.disabled = weekOverview.on === null;
-    btn.textContent = tr(weekOverview.on ? 'circle.profile.week_on' : 'circle.profile.week_off');
-    btn.addEventListener('click', () => { if (typeof weekOverview.onToggle === 'function') weekOverview.onToggle(); });
-    sec.appendChild(btn);
-    container.appendChild(sec);
-  }
-
   if (historyMirror && typeof onToggleHistoryMirror === 'function') {
     const h = historyMirror;
     const sec2 = section(tr('circle.mydata.history'));
@@ -637,38 +757,6 @@ export function renderCircleMyData(container, {
       sec2.appendChild(exp);
     }
     container.appendChild(sec2);
-  }
-
-  // ── notifications (S5 web-push) ─────────────────────────────────────────────
-  if (typeof onToggleNotifications === 'function') {
-    const n = notifications || {};
-    const notif = section(tr('circle.mydata.notifications'));
-    const sub = document.createElement('p');
-    sub.className = 'cc-mydata__notif-status';
-    sub.textContent = !n.supported
-      ? tr('circle.mydata.notif_unsupported')
-      : n.subscribed ? tr('circle.mydata.notif_on') : tr('circle.mydata.notif_off');
-    notif.appendChild(sub);
-    if (n.supported) {
-      // the trade is made by turning this ON, so it is stated HERE, above the button, in both
-      // states: someone reviewing their settings should see what having it on means. Three lines on
-      // purpose — the cost, what is still NOT learned (a bare "affects your privacy" invites imagining
-      // worse than the truth), and the escape. Not framed as a warning: most people should turn
-      // notifications on, they should just know what they are agreeing to. → docs/decisions.md 2026-07-29
-      for (const key of ['notif_privacy', 'notif_privacy_not', 'notif_privacy_escape']) {
-        const line = document.createElement('p');
-        line.className = `cc-mydata__notif-privacy cc-mydata__${key.replace(/_/g, '-')}`;
-        line.textContent = tr(`circle.mydata.${key}`);
-        notif.appendChild(line);
-      }
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'cc-mydata__action cc-mydata__notif-toggle';
-      toggle.textContent = n.subscribed ? tr('circle.mydata.notif_disable') : tr('circle.mydata.notif_enable');
-      toggle.addEventListener('click', () => onToggleNotifications());
-      notif.appendChild(toggle);
-    }
-    container.appendChild(notif);
   }
 
   // ── delivery (2026-07-28) ───────────────────────────────────────────────────
@@ -859,65 +947,6 @@ export function renderCircleMyData(container, {
     sec.appendChild(note);
 
     container.appendChild(sec);
-  }
-
-  // ── how the bot shows actions (S6.C surface preference) ─────────────────────
-  if (typeof onSetSurfacePref === 'function') {
-    const sec = section(tr('circle.mydata.surface_pref'));
-    const current = surfacePref || 'inline';
-    for (const opt of ['inline', 'screen', 'chat']) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-mydata__pref${opt === current ? ' is-active' : ''}`;
-      b.dataset.pref = opt;
-      b.textContent = tr(`circle.mydata.surface_pref_${opt}`);
-      b.addEventListener('click', () => onSetSurfacePref(opt));
-      sec.appendChild(b);
-    }
-    // S6.D — when "chat" is chosen, show whether AI is enriching it here (chat works
-    // without AI; this just tells you if your LLM is helping, or why not).
-    if (current === 'chat' && chatAi && chatAi.reason) {
-      const note = document.createElement('p');
-      note.className = 'cc-mydata__chat-ai';
-      const keyByReason = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
-      note.textContent = `${chatAi.enriched ? '✨ ' : ''}${tr(`circle.mydata.${keyByReason[chatAi.reason] ?? 'chat_ai_no_provider'}`)}`;
-      sec.appendChild(note);
-    }
-    container.appendChild(sec);
-  }
-
-  // ── app language (global NL/EN — a user preference, applies app-wide) ───────
-  if (typeof onSetAppLang === 'function') {
-    const sec = section(tr('circle.mydata.language'));
-    for (const lg of ['nl', 'en']) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-mydata__pref${lg === appLang ? ' is-active' : ''}`;
-      b.dataset.lang = lg;
-      b.textContent = lg.toUpperCase();
-      b.addEventListener('click', () => onSetAppLang(lg));
-      sec.appendChild(b);
-    }
-    container.appendChild(sec);
-  }
-
-  // ── display theme (systeem/licht/donker — stored locally, applies live) ──────
-  // Bulletin restyle — a mono pill toggle (mirror of onderling.org's #theme-toggle):
-  // one segmented control, the active option inverts to ink. onSetTheme persists
-  // localStorage['basis.theme'] and stamps/removes document.documentElement.dataset.theme
-  // live (systeem = remove, so prefers-color-scheme wins) — wired in circleApp.
-  if (typeof onSetTheme === 'function') {
-    const sec = section(tr('circle.mydata.theme'));
-    renderThemeToggle(sec, { themePref, onSetTheme, t: tr });   // ONE renderer — settings shows the same control
-    container.appendChild(sec);
-  }
-
-  // ── assistant endpoint (the member's own LLM + embedder) ────────────────────
-  if (typeof onSaveUserLlm === 'function') {
-    const holder = document.createElement('div');
-    holder.className = 'cc-mydata__section';
-    renderUserLlmSettings(holder, { current: userLlm || {}, onSave: onSaveUserLlm, validate: validateUserLlm, t: tr });
-    container.appendChild(holder);
   }
 
   // ── privacy ────────────────────────────────────────────────────────────────

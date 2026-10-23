@@ -6,6 +6,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { startTabFor, START_SCREEN, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderCircleMyData } from '../../web/v2/circleMyData.js';
+import { settingsGroupFor } from '../../src/v2/settingsHome.js';
+import { basisManifest as settingsManifest } from '../../manifest.js';
+const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
 
 const t = (k) => k;
 
@@ -20,10 +23,10 @@ describe('the start screen', () => {
     expect(startTabFor('last', 'nearby'), 'a tab the alpha does not paint: the home').toBe('screens');
   });
 
-  it('My data shows the choice and writes it', () => {
+  it('the Weergave settings screen shows the choice and writes it', () => {
     const onSetStartScreen = vi.fn();
     const el = renderCircleMyData(document.createElement('div'), {
-      t, podStatus: { signedIn: true }, startScreen: { value: 'circles', choices: START_SCREEN_CHOICES }, onSetStartScreen,
+      t, only: WEERGAVE, podStatus: { signedIn: true }, startScreen: { value: 'circles', choices: START_SCREEN_CHOICES }, onSetStartScreen,
     });
     const sel = el.querySelector('[data-role="start-screen"]');
     expect(sel.value).toBe('circles');

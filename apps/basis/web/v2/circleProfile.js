@@ -24,6 +24,8 @@ export function renderCircleProfile(container, {
   // what a block's tap means here: `{ kind: 'edit-me' }` (the identity line's door) · `{ kind: 'open-my-data' }`
   onBlockAction,
   onMyData,
+  // The gear in Me's header: the person's settings (Instellingen). Absent ⇒ no gear.
+  onSettings,
   // The advanced surface — surface-less ops + settable params; given only when the developer switch is on.
   onAdvanced,
   // The Me actions (Share my card · Scan) — DECLARED in the manifest (`meActions`), painted here from the projection;
@@ -63,6 +65,21 @@ export function renderCircleProfile(container, {
     heading.className = 'cc-profile__title';
     heading.textContent = fallbackTitle;
     container.prepend(heading);
+  }
+
+  // ── the gear: the person's settings (Instellingen), top right of Me ──
+  if (typeof onSettings === 'function') {
+    const gear = document.createElement('button');
+    gear.type = 'button';
+    gear.className = 'cc-profile__gear';
+    gear.textContent = '⚙';
+    gear.title = tr('circle.settings_home.title');
+    gear.setAttribute('aria-label', tr('circle.settings_home.title'));
+    gear.addEventListener('click', () => onSettings());
+    const bar = document.createElement('div');
+    bar.className = 'cc-profile__topbar';
+    bar.appendChild(gear);
+    container.prepend(bar);
   }
 
   // ── one door to My data; Advanced only behind the developer switch ──

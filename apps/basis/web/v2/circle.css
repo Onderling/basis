@@ -842,6 +842,7 @@
   background: transparent; border: 1px solid var(--accent); color: var(--accent-ink);
 }
 .cc-contacts__add:hover { background: var(--accent); color: var(--accent-contrast); }
+.cc-contacts__acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .cc-contacts__empty { color: var(--ink-soft); font-size: 14px; padding: 12px 4px; }
 
 /* OBJ-2 — paired devices (no-pod sync) panel inside circle settings. */

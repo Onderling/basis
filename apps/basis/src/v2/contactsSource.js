@@ -91,6 +91,35 @@ export function pinboardContactToRow(c) {
 }
 
 /**
+ * A contact's trust level → its locale word. The book stores the Dutch enum (`bekend`/`vertrouwd`); the chat shell's
+ * English one (`known`/`trusted`) reaches a row too — both read as the same word, never as a raw value.
+ */
+const TRUST_WORD = Object.freeze({ bekend: 'bekend', known: 'bekend', vertrouwd: 'vertrouwd', trusted: 'vertrouwd' });
+export function trustWordKey(level) {
+  const k = TRUST_WORD[level];
+  return k ? `circle.contacts.trust.${k}` : null;
+}
+
+/**
+ * The line under a contact's name, in words — the same on both shells: bot · skills, or the person's trust; connected;
+ * their tags; offline.
+ * @param {object} c   a roster row (`loadContactRoster`)
+ * @param {(k: string, v?: object) => string} t
+ * @returns {string}
+ */
+export function contactRowMeta(c, t) {
+  const bits = [];
+  if (c?.isBot) bits.push(t('circle.contacts.bot'));
+  if (c?.isBot && c.skillCount > 0) bits.push(t('circle.contacts.skills', { count: c.skillCount }));
+  const trust = !c?.isBot ? trustWordKey(c?.trustLevel) : null;
+  if (trust) bits.push(t(trust));
+  if (c?.pairCircleId) bits.push(t('circle.contacts.connected'));   // the pair roster exists
+  if (!c?.isBot && Array.isArray(c?.tags) && c.tags.length) bits.push(c.tags.join(', '));
+  if (c && !c.reachable) bits.push(t('circle.contacts.offline'));
+  return bits.join(' · ');
+}
+
+/**
  * The roster in two: what Contacten lists, and what it folds away at the bottom ("verborgen (n)"). A bot is never
  * hidden here (a bot is removed, not hidden — a different act with a different word).
  * @param {Array<object>} rows

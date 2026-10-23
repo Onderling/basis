@@ -45,6 +45,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
         online: relays.length ? relays.some((r) => r.connected) : undefined,
         deviceId: (() => { try { return sources.deviceId?.() ?? null; } catch { return null; } })(),
+        deviceName: (() => { try { return sources.deviceName?.() ?? null; } catch { return null; } })(),
         ...(typeof sources.openProposals === 'function' ? { openProposals: sources.openProposals } : {}),
         ...(typeof sources.pendingDeviceOffer === 'function' ? { pendingDeviceOffer: sources.pendingDeviceOffer } : {}),
       } }).catch(() => []);

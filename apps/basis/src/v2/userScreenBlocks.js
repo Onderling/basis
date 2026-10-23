@@ -240,7 +240,7 @@ async function materializeIdentityLine(block, activeCircleIds, hostOps = {}) {
  * it is not among the delegations, as a first device is not), the nodes they claimed, the bots linked to them. One
  * row each; read-only — what may be done with one lives in My data.
  */
-async function materializeAgents(block, { callSkill, deviceId: personDeviceId = null, mijSelf = null } = {}) {
+async function materializeAgents(block, { callSkill, deviceId: personDeviceId = null, deviceName = null, mijSelf = null } = {}) {
   // the self Mij shows: a persona's own registry entry and its own device id here; the bots are the person's (default)
   const self = mijSelf && mijSelf.id && mijSelf.id !== 'default' ? mijSelf : null;
   const deviceId = self ? (self.deviceId ?? null) : personDeviceId;
@@ -252,6 +252,9 @@ async function materializeAgents(block, { callSkill, deviceId: personDeviceId = 
     .filter((d) => d && !d.revoked)
     .map((d) => ({ kind: 'device', label: d.label || null, here: Boolean(deviceId) && d.deviceId === deviceId }));
   if (!items.some((d) => d.here)) items.unshift({ kind: 'device', label: null, here: true });
+  // this device by its name when the person never gave it one (the shell's: the phone's own, the browser's)
+  const here = items.find((d) => d.here);
+  if (here && !here.label && typeof deviceName === 'string' && deviceName.trim()) here.label = deviceName.trim();
   for (const n of Object.values(ownedNodesOf(props))) {
     const addr = typeof n?.address === 'string' ? n.address : '';
     items.push({ kind: 'companion', label: n?.label || (addr ? `${addr.slice(0, 8)}…` : null), here: false });

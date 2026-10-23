@@ -45,7 +45,22 @@ const isAsyncGen = x => x && typeof x[Symbol.asyncIterator] === 'function';
  *  streaming skill handlers WITHOUT invoking them (so the B★ fast-path can
  *  cleanly defer streaming skills to the wire path). */
 const AsyncGeneratorFunction = Object.getPrototypeOf(async function* () {}).constructor;
-const _isAsyncGenFn = fn => typeof fn === 'function' && fn instanceof AsyncGeneratorFunction;
+
+/**
+ * Whether a skill must stay on the wire path because it streams.
+ *
+ * The constructor test only means something where async generators are real. A bundle that compiles them to plain
+ * functions (Hermes + Babel on the phone) collapses the constructor to `Function`, and `instanceof Function` is true
+ * of every handler — which sent every in-process call down the sealed wire path. There only the declared
+ * `streaming` flag decides; an undeclared generator that still reaches the fast path is pumped by `_runInProcess`.
+ * @param {object|undefined} skill
+ * @param {Function} [agf]  the AsyncGeneratorFunction constructor (injectable for tests)
+ */
+export function _isStreamingSkill(skill, agf = AsyncGeneratorFunction) {
+  if (!skill) return false;
+  if (skill.streaming === true) return true;
+  return agf !== Function && typeof skill.handler === 'function' && skill.handler instanceof agf;
+}
 
 /**
  * Compute effective TTL: min of what the caller requested and the agent's
@@ -217,7 +232,7 @@ function _fastPathTarget(callerAgent, peerId, skillId, t, opts) {
 
   // Streaming skills stay on the wire path (chunk/cancel machinery lives there).
   const skill = targetAgent.skills.get(skillId);
-  if (skill && (skill.streaming === true || _isAsyncGenFn(skill.handler))) return null;
+  if (_isStreamingSkill(skill)) return null;
 
   return targetAgent;
 }

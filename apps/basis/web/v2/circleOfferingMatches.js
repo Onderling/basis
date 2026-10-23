@@ -6,27 +6,32 @@
  * supplies the matches; no fetching or local discovery happens here. Empty
  * input shows a "no matches" state. Pure render → unit-testable under
  * happy-dom; mirrors circleStream's list renderer.
+ *
+ * Two places paint it: a page of its own (with `onBack`), and inline under the asker's own ask on the noticeboard
+ * (with `onAsk` / `onSkip` — one pair of buttons per match; no back, no empty state, since the ask hides an empty list).
  */
 import { buildOfferingMatches } from '@onderling/kring-host/circleOfferings';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
 export function renderOfferingMatches(container, {
-  matches = [], t, onBack,
+  matches = [], t, onBack, onAsk, onSkip,
 } = {}) {
   const tr = translatorOr(t, 'circleOfferingMatches.js');
   container.innerHTML = '';
   container.classList.add('circle-offering-matches');
 
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.className = 'cc-btn cc-btn--quiet circle-offering-matches__back';
-  back.textContent = tr('circle.back');
-  back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
-  container.appendChild(back);
+  if (typeof onBack === 'function') {
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'cc-btn cc-btn--quiet circle-offering-matches__back';
+    back.textContent = tr('circle.back');
+    back.addEventListener('click', () => onBack());
+    container.appendChild(back);
+  }
 
   const head = document.createElement('h2');
   head.className = 'circle-offering-matches__title';
-  head.textContent = tr('circle.offerings.matches_title');
+  head.textContent = tr(typeof onAsk === 'function' ? 'circle.offerings.matches_for_ask' : 'circle.offerings.matches_title');
   container.appendChild(head);
 
   const rows = buildOfferingMatches({ matches });
@@ -57,6 +62,24 @@ export function renderOfferingMatches(container, {
     badge.dataset.source = row.source;
     badge.textContent = tr(`circle.offerings.source.${row.source}`);
     el.appendChild(badge);
+
+    if (row.offering) {
+      const what = document.createElement('span');
+      what.className = 'circle-offering-matches__offering';
+      what.textContent = row.offering;
+      el.appendChild(what);
+    }
+
+    const act = (cls, labelKey, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `cc-btn ${cls}`;
+      b.textContent = tr(labelKey);
+      b.addEventListener('click', () => fn(row));
+      el.appendChild(b);
+    };
+    if (typeof onAsk === 'function') act('cc-btn--primary circle-offering-matches__ask', 'circle.offerings.match_ask', onAsk);
+    if (typeof onSkip === 'function') act('cc-btn--quiet circle-offering-matches__skip', 'circle.offerings.match_skip', onSkip);
 
     list.appendChild(el);
   }

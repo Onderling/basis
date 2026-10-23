@@ -9,10 +9,10 @@
  */
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
-import { splitShownHidden } from '../../src/v2/contactsSource.js';
+import { splitShownHidden, contactRowMeta } from '../../src/v2/contactsSource.js';
 import { paintFace } from './faceView.js';
 
-export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, resolvePictureFor = null } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -24,14 +24,21 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
   heading.className = 'cc-contacts__title';
   heading.textContent = tr('circle.contacts.title');
   head.appendChild(heading);
-  if (typeof onAdd === 'function') {
-    const add = document.createElement('button');
-    add.type = 'button';
-    add.className = 'cc-contacts__add';
-    add.textContent = tr('circle.contacts.add');
-    add.addEventListener('click', () => onAdd());
-    head.appendChild(add);
-  }
+  // the two ways in: a PERSON (the scanner — their card or link; Me's Scan, the same door) and a bot (its address)
+  const acts = document.createElement('div');
+  acts.className = 'cc-contacts__acts';
+  const addButton = (labelKey, role, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cc-contacts__add';
+    b.dataset.role = role;
+    b.textContent = tr(labelKey);
+    b.addEventListener('click', () => fn());
+    acts.appendChild(b);
+  };
+  if (typeof onAddPerson === 'function') addButton('circle.contacts.add_person', 'add-person', onAddPerson);
+  if (typeof onAdd === 'function') addButton('circle.contacts.add', 'add-bot', onAdd);
+  if (acts.childElementCount) head.appendChild(acts);
   container.appendChild(head);
 
   // Hidden contacts (L106) fold away at the bottom: the row stays, out of sight, until they write again or
@@ -83,16 +90,9 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
 
     const meta = document.createElement('div');
     meta.className = 'cc-contacts__meta';
-    const bits = [];
-    if (c.isBot) bits.push(tr('circle.contacts.bot'));
-    if (c.isBot && c.skillCount > 0) bits.push(tr('circle.contacts.skills', { count: c.skillCount }));
-    // S1 #2 — a ContactBook person's trust level + tags.
-    if (!c.isBot && c.trustLevel) bits.push(tr(`circle.contacts.trust.${c.trustLevel}`));
-    if (c.pairCircleId) bits.push(tr('circle.contacts.connected'));   // the pair roster exists (L105)
-    if (!c.isBot && Array.isArray(c.tags) && c.tags.length) bits.push(c.tags.join(', '));
-    if (!c.reachable) bits.push(tr('circle.contacts.offline'));
-    meta.textContent = bits.join(' · ');
-    if (bits.length) body.appendChild(meta);
+    // the line under the name, worded once for both shells (trust as its word, never a raw level)
+    meta.textContent = contactRowMeta(c, tr);
+    if (meta.textContent) body.appendChild(meta);
     li.appendChild(body);
 
     // What is NEW here (2026-09-21): inbound messages newer than the moment this thread was last opened — the host

@@ -34,7 +34,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
   function rerender() {
     container.innerHTML = '';
     if (state.successResult) return renderSuccessStep(container, doc, state, onClose);
-    mkSteps(container, doc, ['Mnemonic', 'Confirm', 'Restore'], state.step);
+    mkSteps(container, doc, [t('circle.wizard.restore.step_phrase'), t('circle.wizard.restore.step_confirm'), t('circle.wizard.restore.step_restore')], state.step);
     if (state.step === 1) renderMnemonicStep();
     if (state.step === 2) renderConfirmStep();
     if (state.step === 3) renderRestoreStep();
@@ -47,11 +47,11 @@ export function renderRestoreFromMnemonicWizard(opts) {
       // No rerender — would lose input focus.  Just refresh the
       // [Next] button's disabled state.
       refreshActions(container, { mnemonicOk: () => isMnemonicValid(state.mnemonic) });
-    }, { placeholder: 'word1 word2 word3 ...', monospace: true, hint: 'Words separated by single spaces.' });
+    }, { placeholder: t('circle.wizard.restore.phrase_placeholder'), monospace: true, hint: t('circle.wizard.restore.phrase_hint') });
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: 'Cancel', onClick: onClose, kind: 'secondary' },
-      { label: 'Next →', onClick: () => { state.step = 2; rerender(); }, kind: 'primary',
+      { label: t('common.cancel'), onClick: onClose, kind: 'secondary' },
+      { label: t('common.next'), onClick: () => { state.step = 2; rerender(); }, kind: 'primary',
         disabled: !isMnemonicValid(state.mnemonic), validate: 'mnemonicOk' },
     ]);
   }
@@ -62,13 +62,18 @@ export function renderRestoreFromMnemonicWizard(opts) {
     warn.className = 'cc-wizard-warn';
     warn.textContent = t('circle.wizard.restore.identity_warning');
     body.appendChild(warn);
+    // the person's CURRENT phrase, asked once before the two checks (copy, not a third check)
+    const saved = doc.createElement('p');
+    saved.className = 'cc-wizard-field-hint';
+    saved.textContent = t('circle.wizard.restore.saved_question');
+    body.appendChild(saved);
     mkCheck(body, doc, t('circle.wizard.restore.ack_lost'), state.understandsLoss, (v) => { state.understandsLoss = v; rerender(); });
     mkCheck(body, doc, t('circle.wizard.restore.ack_undone'), state.confirmedNoUndo, (v) => { state.confirmedNoUndo = v; rerender(); });
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: '← Back',    onClick: () => { state.step = 1; rerender(); }, kind: 'secondary' },
-      { label: 'Cancel',    onClick: onClose, kind: 'secondary' },
-      { label: 'Continue →',onClick: () => { state.step = 3; rerender(); }, kind: 'primary',
+      { label: t('common.back'),    onClick: () => { state.step = 1; rerender(); }, kind: 'secondary' },
+      { label: t('common.cancel'),    onClick: onClose, kind: 'secondary' },
+      { label: t('common.next'),onClick: () => { state.step = 3; rerender(); }, kind: 'primary',
         disabled: !canAdvanceFromConfirm(state) },
     ]);
   }
@@ -80,12 +85,12 @@ export function renderRestoreFromMnemonicWizard(opts) {
     summary.textContent = `Mnemonic: ${mnemonicWordCount(state.mnemonic)} words.  After restore you'll be using the new identity immediately.`;
     body.appendChild(summary);
     mkError(body, doc, state.submitError);
-    mkSubmitting(body, doc, state.submitting, 'Restoring identity…');
+    mkSubmitting(body, doc, state.submitting, t('circle.wizard.restore.restoring'));
     container.appendChild(body);
     mkActions(container, doc, [
-      { label: '← Back',     onClick: () => { state.step = 2; rerender(); }, kind: 'secondary', disabled: state.submitting },
-      { label: 'Cancel',     onClick: onClose, kind: 'secondary', disabled: state.submitting },
-      { label: 'Restore now',onClick: async () => {
+      { label: t('common.back'),     onClick: () => { state.step = 2; rerender(); }, kind: 'secondary', disabled: state.submitting },
+      { label: t('common.cancel'),     onClick: onClose, kind: 'secondary', disabled: state.submitting },
+      { label: t('circle.wizard.restore.button'),onClick: async () => {
         rerender(); // show submitting state
         await submitRestore({ state, callSkill });
         if (state.successResult && typeof onDispatched === 'function') {
@@ -104,13 +109,9 @@ function renderSuccessStep(container, doc, state, onClose) {
   const hint = doc.createElement('p'); hint.className = 'cc-wizard-blurb';
   hint.textContent = t('circle.wizard.recovery.after_restore_hint');
   body.appendChild(hint);
-  const newKey = doc.createElement('code');
-  newKey.className = 'cc-wizard-code';
-  newKey.textContent = state.successResult?.newPubKey ?? '(unknown)';
-  body.appendChild(newKey);
   container.appendChild(body);
   mkActions(container, doc, [
-    { label: 'Reload', onClick: () => { onClose(); globalThis.location?.reload?.(); }, kind: 'primary' },
-    { label: 'Close',  onClick: onClose, kind: 'secondary' },
+    { label: t('circle.update.reload'), onClick: () => { onClose(); globalThis.location?.reload?.(); }, kind: 'primary' },
+    { label: t('common.close'),  onClick: onClose, kind: 'secondary' },
   ]);
 }

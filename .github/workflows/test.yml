@@ -128,7 +128,7 @@ jobs:
   # unless the bytes were the same). The browser tail is not here: it does not run on pull requests.
   tests-passed:
     name: tests passed
-    needs: [same-bytes, checks, suites, pod, journeys]
+    needs: [same-bytes, checks, suites, pod, journeys, lockfile-drift]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -141,12 +141,49 @@ jobs:
           SUITES: ${{ needs.suites.result }}
           POD: ${{ needs.pod.result }}
           JOURNEYS: ${{ needs.journeys.result }}
+          DRIFT: ${{ needs.lockfile-drift.result }}
         run: |
           if [ "$SAME_RESULT" = "success" ] && [ "$SAME" = "true" ]; then echo "same bytes: the gate passed on them before"; exit 0; fi
           for r in "checks=$CHECKS" "suites=$SUITES" "pod=$POD" "journeys=$JOURNEYS"; do
             [ "${r#*=}" = "success" ] || { echo "not passed: $r"; exit 1; }
           done
+          # the lockfile check runs on pull requests only: skipped on a push is a pass, red anywhere is not
+          [ "$DRIFT" = "success" ] || [ "$DRIFT" = "skipped" ] || { echo "not passed: lockfile-drift=$DRIFT"; exit 1; }
           echo "every gate job passed"
+
+  # ── The lockfiles say what pnpm resolves today. ─────────────────────────────
+  # `--frozen-lockfile` never re-resolves, so a lockfile can record a version no install uses (2026-10-22: four
+  # still said openai 7.10.0 under privatemode-ai while every install, the box included, ran 6.49.0) and nothing
+  # fails. On a pull request that touches a package.json or a lockfile, regenerating them must change nothing.
+  lockfile-drift:
+    needs: same-bytes
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.same-bytes.outputs.same != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Lockfiles match what pnpm resolves
+        run: |
+          if ! git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '(^|/)(package\.json|pnpm-lock\.yaml)$'; then
+            echo "no package.json or lockfile in this change"; exit 0
+          fi
+          pnpm install --lockfile-only
+          # what RESOLUTION decides (versions, integrity, specifiers, overrides), not what the registry says about a package
+          # today: a new `deprecated:` notice or a reformatted `engines:` field arrives with fresh metadata and is not drift
+          changed=$(git diff -U0 -- '*pnpm-lock.yaml' | grep -E '^[-+][^-+]' | grep -vE '^[-+][[:space:]]+(deprecated|engines):' || true)
+          if [ -n "$changed" ]; then
+            echo "::error::a lockfile does not say what pnpm resolves: run 'pnpm install --lockfile-only' and commit the result"
+            git diff --stat -- '*pnpm-lock.yaml'
+            echo "$changed" | head -120
+            exit 1
+          fi
+          echo "every lockfile says what pnpm resolves (registry metadata lines aside: $(git diff -U0 -- '*pnpm-lock.yaml' | grep -cE '^[-+][[:space:]]+(deprecated|engines):' || true))"
 
   # ── Rung 2: structural checks. Cheap, deterministic, first to fail. ─────────
   checks:
@@ -318,12 +355,38 @@ jobs:
         run: node scripts/relink-workspace.mjs
       - name: Rebuild native bindings (better-sqlite3, for the relay fixture)
         run: npm rebuild better-sqlite3 --prefix packages/relay
+      # the browser itself (~430 MB) kept between runs, keyed on the lockfile that pins @playwright/test
+      - name: Browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Browsers
-        # its own ceiling: the install fetches the runner's package lists from Ubuntu's mirrors, and a stalled mirror
-        # once held a shard (and the release queued behind it) for the whole job's 60 minutes (2026-10-07). A stall
-        # now fails in minutes, and a rerun of the failed job takes over.
-        timeout-minutes: 8
-        run: npx playwright install --with-deps chromium
+        # The browser ALONE, then a launch: the runner image already carries chromium's libraries, and the system
+        # packages `--with-deps` fetched were extra fonts from Ubuntu's mirror — whose stalls failed five shards on
+        # 2026-10-22 after the lock was fixed. The packages are fetched only when chromium does not launch without them.
+        timeout-minutes: 16
+        run: |
+          for try in 1 2; do
+            timeout --kill-after=15 300 npx playwright install chromium && break
+            [ "$try" = 2 ] && { echo "browser download failed twice"; exit 1; }
+            echo "browser download stalled or failed (try $try) — once more"
+          done
+          launches() { timeout 60 node -e "import('@playwright/test').then(({ chromium }) => chromium.launch()).then((b) => b.close()).then(() => process.exit(0), (e) => { console.error(e.message.split('\n')[0]); process.exit(1); })"; }
+          launches && { echo "chromium launches with the image's libraries"; exit 0; }
+          echo "chromium does not launch with the image's libraries — fetching its system packages"
+          # apt WAITS for the dpkg lock instead of failing on it: a try that times out leaves its apt-get running (the
+          # timeout ends npx, not its child), and the next try then hit the lock at once (2026-10-22, three shards)
+          echo 'DPkg::Lock::Timeout "240";' | sudo tee /etc/apt/apt.conf.d/99-lock-timeout >/dev/null
+          for try in 1 2; do
+            timeout --kill-after=15 300 npx playwright install-deps chromium && launches && exit 0
+            echo "system packages stalled or failed (try $try) — ending what it left running, then once more"
+            # the timeout reaches npx, not the apt-get it started under sudo: end that try's apt-get/dpkg ourselves, and
+            # let dpkg finish any half-done configuration, so the next try starts clean
+            sudo pkill -x apt-get || true; sudo pkill -x dpkg || true; sleep 3
+            sudo dpkg --configure -a || true
+          done
+          exit 1
         working-directory: apps/basis
       # ONE retry, not zero: a 3-minute story lost to a slow click under load should not red the whole
       # suite. A retry is a measurement of that flakiness, not a cure for it; the report names every test

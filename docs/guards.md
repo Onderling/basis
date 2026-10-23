@@ -7,10 +7,11 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 60
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 63
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
+| `agent-count` | — | the basis agent constructs exactly the listed in-process agents, and the list only SHRINKS |
 | `alpha-surface` | — | a hidden surface cannot creep back into a shell by accident |
 | `api-docs` | — | the API-appendix drift guard (source JSDoc ↔ docs/api/), in the `npm run guards` aggregate |
 | `architecture-reality` | — | docs/architecture.md describes what RUNS. It carries no plans, no considerations, no history of who |
@@ -49,6 +50,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `one-scan-loop` | — | a scanned text is classified by ONE first-match loop (`packages/qr`, `classifyQrPayload`) |
 | `one-sibling-carry` | — | a person's own devices are reached by ONE carry (`apps/basis/src/v2/siblingCarry.js`) |
 | `one-store-per-circle` | — | a circle owns ONE store, so a type cannot reach a peer some other way |
+| `op-owners` | — | one owner per op. The op ids two or more composed manifests BOTH declare are a baseline that only |
 | `plans-structure` | — | the private plans/ folder keeps the shape it was sorted into (2026-09-25) |
 | `platform-exceptions-declared` | — | a surface one shell paints on purpose and the other does not is DECLARED in |
 | `rails-named-verifier` | — | every signed rail is constructed with a NAMED binding verifier, and the name agrees |
@@ -70,6 +72,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |
 | `unreached-exports` | — | a substrate symbol that nothing reaches is a LIABILITY, not an asset |
 | `unstyled-buttons` | — | every web button wears the one button family (`.cc-btn` in web/v2/circle.css) or a |
+| `untrusted-json` | — | JSON that someone else wrote is parsed with `parseUntrustedJson` (@onderling/core) |
 | `web-buttons` | — | no bare <button> in the web shell |
 
 ## Named design guards (`G-*`, in fitness tests) · 10

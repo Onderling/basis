@@ -22,7 +22,7 @@
  * Empty `blocks` array → top-level empty state ("admin hasn't set up
  * a screen yet").
  */
-import { blockEmptyLine } from '../../../../basis/src/v2/blockTitle.js';
+import { blockEmptyLine, blockOpensWhole } from '../../../../basis/src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
@@ -145,7 +145,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     <View style={baseStyle} testID={`screen-block-${block.blockId}`}>
       {body}
       {/* a capped block on the person's pages: "meer" opens it whole (the host's `onMore(blockId)`) */}
-      {typeof onMore === 'function' && block.status === 'ok' ? (
+      {typeof onMore === 'function' && blockOpensWhole(block) ? (
         <Pressable onPress={() => onMore(block.blockId)} testID={`screen-more-${block.blockId}`}>
           <Text style={styles.moreLink}>{t('circle.screen.more')}</Text>
         </Pressable>
@@ -248,7 +248,7 @@ function renderIdentityLine(block, onAction, styles) {
   return (
     <View>
       <View style={styles.identityHead}>
-        <Text style={styles.identityName} testID="mij-name">{block.content?.name || t('circle.profile.title')}</Text>
+        <Text style={styles.identityName} testID="mij-name">{block.content?.name || t('circle.profile.no_name_yet')}</Text>
         {typeof onAction === 'function' ? (
           <Pressable onPress={() => onAction({ kind: 'edit-me' })} accessibilityRole="button" testID="mij-edit">
             <Text style={styles.identityEdit}>{t('circle.profile.edit')}</Text>
@@ -267,7 +267,8 @@ function renderAgents(block, onAction, styles) {
     <View>
       <Text style={styles.blockTitle}>{t('circle.recipe.block.agents')}</Text>
       {items.map((row, i) => (
-        <Pressable key={`${row.kind}-${i}`} style={styles.noticeRow} testID={`mij-agent-${row.kind}`}
+        // a plain line, not a bordered row that reads as a field
+        <Pressable key={`${row.kind}-${i}`} style={styles.agentRow} testID={`mij-agent-${row.kind}`}
           disabled={typeof onAction !== 'function'}
           onPress={() => onAction?.({ kind: 'open-my-data' })}>
           <Text style={styles.noticeText}>{agentRowWords(row, t)}</Text>
@@ -338,8 +339,8 @@ function OnboardingCards({ block, onAction, styles }) {
   const [handle, setHandle] = useState('');
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
   // the family (Btn): the strip's act is the screen's primary, the second choice quiet
-  const OnbBtn = ({ labelKey, a, quiet = false, testID }) => (
-    <Btn variant={quiet ? 'quiet' : 'primary'} label={t(labelKey)} onPress={() => act(a)} testID={testID} style={{ alignSelf: 'flex-start' }} />
+  const OnbBtn = ({ labelKey, a, quiet = false, variant = null, testID }) => (
+    <Btn variant={variant ?? (quiet ? 'quiet' : 'primary')} label={t(labelKey)} onPress={() => act(a)} testID={testID} style={{ alignSelf: 'flex-start' }} />
   );
   return (
     <View>
@@ -353,18 +354,28 @@ function OnboardingCards({ block, onAction, styles }) {
                 accessibilityLabel={t('circle.vandaag.onboarding_handle_title')} testID="onb-handle" />
               <OnbBtn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
             </View>
+          ) : c.id === 'key' ? (
+            // never the words themselves: the card says the key is not saved, and its "Toon" opens them
+            <View>
+              <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_key_hint')}</Text>
+              <View style={styles.onbRow}>
+                <OnbBtn labelKey="circle.vandaag.onboarding_key_show" a={{ kind: 'key-show' }} testID="onb-key-show" />
+                <OnbBtn labelKey="circle.vandaag.onboarding_key_later" a={{ kind: 'key-later' }} quiet testID="onb-key-later" />
+              </View>
+            </View>
           ) : c.id === 'intro' ? (
             <View>
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
               <View style={styles.onbRow}>
                 <OnbBtn labelKey="circle.vandaag.onboarding_intro_more" a={{ kind: 'intro-more' }} testID="onb-intro-more" />
-                <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} quiet testID="onb-intro-seen" />
+                {/* "Lees meer" is the card's one button; "Begrepen" a text link beside it */}
+                <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} variant="ghost" testID="onb-intro-seen" />
               </View>
             </View>
           ) : (
             <View style={styles.onbRow}>
               <OnbBtn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
-              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} quiet testID="onb-join" />
+              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} testID="onb-join" />
             </View>
           )}
         </View>
@@ -542,7 +553,8 @@ const makeStyles = (theme) => StyleSheet.create({
   quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   quickAction:     { paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: theme.color.line, borderRadius: 999, backgroundColor: theme.color.paper2 },
   quickActionText: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
-  blockEmpty:      { backgroundColor: theme.color.paper2, borderColor: theme.color.line },
+  // an empty block is one quiet line of text, not a grey box that reads as disabled (web twin: --empty in circle.css)
+  blockEmpty:      { backgroundColor: 'transparent', borderWidth: 0, paddingVertical: 4, paddingHorizontal: 0 },
   blockEmptyText:  { color: theme.color.inkSoft, fontSize: 14 },
   // "meer" under a capped block: a quiet text link (web: .circle-screen__more)
   moreLink:        { color: theme.color.inkSoft, fontSize: 13, textDecorationLine: 'underline', paddingVertical: 2 },
@@ -563,6 +575,7 @@ const makeStyles = (theme) => StyleSheet.create({
   photoCaption:    { fontSize: 12, color: theme.color.inkSoft, marginTop: 6 },
 
   noticeRow:        { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  agentRow:         { paddingVertical: 4 },
   noticeRowCompact: { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   noticeSender:        { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
   noticeSenderCompact: { fontSize: 10, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 1 },

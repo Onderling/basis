@@ -19,9 +19,19 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
   const tr = translatorOr(t, 'vandaagCustomise.js');
   container.innerHTML = '';
   container.classList.add('vandaag-customise');
+  // the title and Done on one line at the top: the way out is in view without scrolling the sheet
+  const head = document.createElement('div');
+  head.className = 'vandaag-customise__head';
   const h = document.createElement('h3');
   h.textContent = tr('circle.vandaag.customise_title');
-  container.appendChild(h);
+  const done = document.createElement('button');
+  done.type = 'button';
+  done.className = 'cc-btn cc-btn--primary';
+  done.dataset.act = 'done';
+  done.textContent = tr('circle.vandaag.done');
+  done.addEventListener('click', () => onClose?.());
+  head.append(h, done);
+  container.appendChild(head);
   if (!model) return container;
   const button = (label, act, args, extra = {}) => {
     const b = document.createElement('button');
@@ -59,7 +69,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
             box.className = 'vandaag-customise__circles';
             box.dataset.control = c.kind;
             const legend = document.createElement('legend');
-            legend.textContent = tr('circle.vandaag.circles_title');
+            legend.textContent = tr(c.titleKey);
             box.appendChild(legend);
             const picked = new Set(c.value);
             for (const o of c.options) {
@@ -78,6 +88,11 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
             row.appendChild(box);
             continue;
           }
+          // every other control under its heading, so a row of choices says what it sets
+          const heading = document.createElement('label');
+          heading.className = 'vandaag-customise__control-title';
+          heading.textContent = tr(c.titleKey);
+          row.appendChild(heading);
           if (c.text) {
             // labels, typed: "werk, thuis" — applied when the field is left or Enter is pressed
             const input = document.createElement('input');
@@ -85,7 +100,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
             input.dataset.control = c.kind;
             input.value = c.value;
             input.placeholder = tr('circle.vandaag.labels_placeholder');
-            input.setAttribute('aria-label', tr('circle.vandaag.labels_title'));
+            input.setAttribute('aria-label', tr(c.titleKey));
             const apply = () => { if (input.value !== c.value) onAct?.('config', { ...base, kind: c.kind, value: input.value }); };
             input.addEventListener('change', apply);
             row.appendChild(input);
@@ -93,6 +108,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
           }
           const sel = document.createElement('select');
           sel.dataset.control = c.kind;
+          sel.setAttribute('aria-label', tr(c.titleKey));
           for (const o of c.options) {
             const opt = document.createElement('option');
             opt.value = String(o.value);
@@ -154,12 +170,5 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
     PAINT[d.id]?.(sec);
     container.appendChild(sec);
   }
-  const done = document.createElement('button');
-  done.type = 'button';
-  done.className = 'cc-btn cc-btn--primary';
-  done.dataset.act = 'done';
-  done.textContent = tr('circle.vandaag.done');
-  done.addEventListener('click', () => onClose?.());
-  container.appendChild(done);
   return container;
 }

@@ -161,11 +161,9 @@ describe('invariant 8 — every string is translated', () => {
       .toBe('circle.nearbyScreen.own_profile_empty');
   });
 
-  it('back still works', () => {
-    const onBack = vi.fn();
-    const el = render(model(), { onBack });
-    el.querySelector('.circle-nearby__back').click();
-    expect(onBack).toHaveBeenCalled();
+  it('has no back link — Nearby is a tab of its own, not a page under Circles', () => {
+    const el = render(model(), { onBack: vi.fn() });
+    expect(el.querySelector('.circle-nearby__back')).toBe(null);
   });
 });
 

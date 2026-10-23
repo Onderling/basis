@@ -25,19 +25,11 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
-  "new": {
-    "text": "+ nieuwe kring",
-    "doc": "Create-a-new-circle entry on the launcher."
-  },
   "create_unavailable": {
     "text": "Nog geen kring aan te maken — de app is nog aan het starten.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
   },
   "join": {
-    "button": {
-      "text": "Lid worden van een kring",
-      "doc": "OBJ-2 — launcher entry to join an existing circle from an invite."
-    },
     "paste": {
       "text": "Plak de uitnodigingslink van het andere apparaat:",
       "doc": "OBJ-2 — prompt for the onderling-invite:// URL when joining on web (no camera)."
@@ -307,6 +299,14 @@
     "announce_nearby_failed": {
       "text": "Aankondigen is niet gelukt",
       "doc": "The broadcast threw; the QR still works."
+    },
+    "send_link": {
+      "text": "Stuur de link",
+      "doc": "The invite: the invite as a link for someone who is not in the room — the phone's share sheet; web: the browser's share sheet, or copied."
+    },
+    "link_copied": {
+      "text": "Link gekopieerd.",
+      "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
     }
   },
   "members": {
@@ -502,7 +502,7 @@
     "doc": "Shown when the launcher has no circles."
   },
   "loading": {
-    "text": "Kringen laden…",
+    "text": "Laden…",
     "doc": "Shown while circles are being fetched."
   },
   "back_me": {
@@ -950,10 +950,6 @@
       "text": "gisteren",
       "doc": "SP-13.2 — day-divider."
     },
-    "tab_coming": {
-      "text": "{{tab}} komt in een vervolg-slice.",
-      "doc": "SP-13.3 — placeholder voor tabs zonder eigen screen (yet)."
-    },
     "tasks_empty": {
       "text": "Nog geen taken in deze kring.",
       "doc": "tasks tab — lege staat (geen taken)."
@@ -985,10 +981,6 @@
     "view_toggle_label": {
       "text": "Wissel tussen chat en scherm",
       "doc": "SP-13.4 — a11y group label."
-    },
-    "screen_coming": {
-      "text": "Scherm-weergave (admin-recept) komt in een vervolg-slice.",
-      "doc": "SP-13.4 — placeholder."
     },
     "attach": {
       "text": "Foto toevoegen",
@@ -1280,24 +1272,8 @@
       "text": "bijv. werk, thuis",
       "doc": "Placeholder of the labels filter field."
     },
-    "within_any": {
-      "text": "Altijd",
-      "doc": "Relative-date filter: no limit."
-    },
-    "within_1": {
-      "text": "Vandaag",
-      "doc": "Relative-date filter: within a day."
-    },
-    "within_7": {
-      "text": "Deze week",
-      "doc": "Relative-date filter: within 7 days."
-    },
-    "within_30": {
-      "text": "Deze maand",
-      "doc": "Relative-date filter: within 30 days."
-    },
     "customise": {
-      "text": "Pas aan",
+      "text": "Aanpassen",
       "doc": "The button on Vandaag that opens the customise sheet."
     },
     "customise_title": {
@@ -1351,22 +1327,6 @@
     "done": {
       "text": "Klaar",
       "doc": "Close the customise sheet."
-    },
-    "horizon_today": {
-      "text": "Vandaag",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_3days": {
-      "text": "3 dagen",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_week": {
-      "text": "Week",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_month": {
-      "text": "Maand",
-      "doc": "Calendar block horizon preset."
     },
     "scope_mine": {
       "text": "Van mij",
@@ -1433,16 +1393,12 @@
       "doc": "The \"+\" sheet's button that takes an own note/appointment away."
     },
     "plus_line_ph": {
-      "text": "Zeg wat je wilt — \"notitie: melk\", \"afspraak morgen 14:00 tandarts\"",
+      "text": "Zeg wat je wilt — \"notitie: melk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
     "plus_referral": {
       "text": "Dat is iets voor {{name}} → openen",
       "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
-    },
-    "plus_me_title": {
-      "text": "Van jou",
-      "doc": "The \"+\" sheet: the heading over the Me actions (share my card, scan)."
     },
     "pin_to_plus": {
       "text": "Vastzetten in +",
@@ -1453,7 +1409,7 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "pin": {
-      "text": "Vastzetten",
+      "text": "Vastpinnen",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "unpin": {
@@ -1571,6 +1527,62 @@
     "onboarding_begin_join": {
       "text": "Ik heb een uitnodiging",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_key_title": {
+      "text": "Bewaar je sleutel",
+      "doc": "Vandaag's key card: the recovery phrase is not saved on this device yet. Never shows the words."
+    },
+    "onboarding_key_hint": {
+      "text": "Je herstelzin is nog niet opgeschreven. Zonder die zin kom je niet meer bij je dingen als dit apparaat kwijt is. Open hem waar niemand kan meekijken.",
+      "doc": "Vandaag's key card: why, and where to open it."
+    },
+    "onboarding_key_show": {
+      "text": "Toon",
+      "doc": "Vandaag's key card: the explicit step that opens the recovery words."
+    },
+    "onboarding_key_later": {
+      "text": "Later",
+      "doc": "Vandaag's key card: put the card away for a few days."
+    },
+    "plus_line_read": {
+      "text": "Lees",
+      "doc": "The \"+\" sheet: the button beside the free line that reads it (Enter does the same)."
+    },
+    "range_today": {
+      "text": "Vandaag",
+      "doc": "A time range: today."
+    },
+    "range_3days": {
+      "text": "3 dagen",
+      "doc": "A time range: three days."
+    },
+    "range_week": {
+      "text": "Deze week",
+      "doc": "A time range: this week."
+    },
+    "range_month": {
+      "text": "Deze maand",
+      "doc": "A time range: this month."
+    },
+    "range_any": {
+      "text": "Altijd",
+      "doc": "A time range: no limit."
+    },
+    "control_horizon": {
+      "text": "Hoe ver vooruit",
+      "doc": "Customise sheet: heading over the calendar block's time-range chips."
+    },
+    "control_scope": {
+      "text": "Welke taken",
+      "doc": "Customise sheet: heading over the tasks block's mine/all chips."
+    },
+    "control_limit": {
+      "text": "Hoeveel regels",
+      "doc": "Customise sheet: heading over a block's row-cap chips."
+    },
+    "control_within": {
+      "text": "Periode",
+      "doc": "Customise sheet: heading over the relative-date chips of a tasks or notes block."
     }
   },
   "screens": {
@@ -2946,6 +2958,18 @@
       "text": "Nog geen matches",
       "doc": "Empty state for the skill match list."
     },
+    "matches_for_ask": {
+      "text": "Wie biedt dit aan",
+      "doc": "Heading over the matches the asker sees under their own ask on the noticeboard (released offerings only)."
+    },
+    "match_ask": {
+      "text": "Vragen",
+      "doc": "Under my ask: open the contact thread with this match."
+    },
+    "match_skip": {
+      "text": "Overslaan",
+      "doc": "Under my ask: hide this match on this device only."
+    },
     "axis": {
       "openness": {
         "text": "Openheid",
@@ -3522,6 +3546,14 @@
       "text": "Jij ziet wie er is; zij zien jou niet.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "not_chosen_title": {
+      "text": "Nog niet zichtbaar",
+      "doc": "Visibility banner heading while no Nearby level is chosen yet: the device stays unlisted until the person chooses."
+    },
+    "not_chosen_body": {
+      "text": "Niemand hier ziet je tot je kiest wat deze ruimte van je mag zien.",
+      "doc": "Second line of that banner."
+    },
     "radio_off_title": {
       "text": "Nearby staat uit",
       "doc": "Visibility banner heading while the persisted radio switch is off."
@@ -3713,6 +3745,10 @@
     "face_caveat": {
       "text": "Een vast gezicht maakt je herkenbaar op verschillende plekken, ook al wisselt je adres.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."
+    },
+    "no_name_yet": {
+      "text": "jij (nog geen naam)",
+      "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
     }
   },
   "viewAsSplit": {
@@ -4589,11 +4625,11 @@
       "doc": "objective L — mobile share screen: empty state when the user has no circle other than the source to share into."
     },
     "outbound_title": {
-      "text": "Gedeeld vanuit deze cirkel",
+      "text": "Gedeeld vanuit deze kring",
       "doc": "objective L — admin-panel section heading listing this circle's outbound canonical shares."
     },
     "outbound_empty": {
-      "text": "Deze cirkel heeft nog niets gedeeld.",
+      "text": "Deze kring heeft nog niets gedeeld.",
       "doc": "objective L — empty state for the outbound-shares section."
     },
     "outbound_row": {
@@ -5411,6 +5447,7 @@
     "screen_confirm_replaced": "Een eerder koppelverzoek is daarmee vervallen.",
     "screen_confirm_remembered": "Ik vroeg je of een scherm mocht koppelen.",
     "screen_confirmed": "Gekoppeld.",
+    "screen_already": "Dat scherm is al gekoppeld.",
     "screen_confirmed_open": "Gekoppeld. Je beheerscherm staat op deze pagina, en komt terug via deze link (in dezelfde browser; zet hem in je bladwijzers):\n{{link}}",
     "screen_declined": "Niet gekoppeld.",
     "screen_confirm_not_private": "Bevestig dit in je eigen gesprek met mij, niet in een groep.",
@@ -5581,6 +5618,7 @@
     "link_not_an_offer": "Dat is geen koppelregel uit je Basis-app.",
     "link_revoked": "Die koppelregel komt van een apparaat dat je hebt ingetrokken. Maak er een op een ander apparaat.",
     "link_stale": "Die koppelregel is te oud (of een klok staat verkeerd). Maak een nieuwe in de app.",
+    "link_used": "Die koppelregel is al gebruikt. Maak een nieuwe in de app.",
     "companion_set": "Je companion staat ingesteld: agenda-links komen daarvandaan zodra je me de agenda-bestanden daar hebt gegeven.",
     "companion_not_one": "Dat is geen kaartje van een companion (er staat niet op waar agenda-links vandaan komen).",
     "link_done": "Gekoppeld: berichten van je Basis-apps tellen nu als jou; een apparaat dat je in de app intrekt telt niet meer. /ontkoppel maakt het ongedaan.",
@@ -5628,10 +5666,6 @@
     }
   },
   "nearby": {
-    "label": {
-      "text": "In de buurt",
-      "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
-    },
     "count_one": {
       "text": "{{count}} apparaat",
       "doc": "Enkelvoud."
@@ -5643,10 +5677,6 @@
     "count": {
       "text": "{{count}} apparaten",
       "doc": "Device count formatted by formatNearbyLabel; {{count}} interpolated."
-    },
-    "off": {
-      "text": "uit",
-      "doc": "De launcher-rij terwijl de radio uit staat — geen aantal, want een uitgeschakelde radio heeft niets gezien."
     }
   },
   "extension": {
@@ -5943,6 +5973,10 @@
     "share_hint": {
       "text": "Kopieer de tekst hierboven en plak die in een QR-maker. De ander scant hem en voegt je toe met /add-contact, met het vertrouwen dat jij voorstelt.",
       "doc": "Hint in the /share-my-contact record."
+    },
+    "add_person": {
+      "text": "+ Persoon toevoegen",
+      "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     }
   },
   "pairedDevices": {
@@ -6371,6 +6405,18 @@
     "edit": {
       "text": "Aanpassen",
       "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
+    },
+    "logReport": {
+      "text": "Kopieer logboek / Meld een probleem →",
+      "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
+    },
+    "avatar_label": {
+      "text": "Profiel",
+      "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
+    },
+    "no_name_yet": {
+      "text": "Nog geen naam",
+      "doc": "Me's title while the person has no handle — never the tab's own word in its place."
     }
   },
   "blocked": {
@@ -6857,6 +6903,14 @@
     "connection_offer_incomplete": {
       "text": "Deze koppelcode is onvolledig.",
       "doc": "Refusal: sleutel of nonce ontbreekt."
+    },
+    "mnemonic_written": {
+      "text": "Opgeschreven",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."
+    },
+    "mnemonic_later": {
+      "text": "Later",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: put the card away for a few days."
     }
   },
   "admin": {
@@ -7221,9 +7275,18 @@
     }
   },
   "when": {
-    "today_at": { "text": "vandaag om {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
-    "tomorrow_at": { "text": "morgen om {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
-    "closed": { "text": "gesloten", "doc": "A deadline that has passed." }
+    "today_at": {
+      "text": "vandaag om {{time}}",
+      "doc": "A coming moment later today (a vote's deadline)."
+    },
+    "tomorrow_at": {
+      "text": "morgen om {{time}}",
+      "doc": "A coming moment tomorrow (a vote's deadline)."
+    },
+    "closed": {
+      "text": "gesloten",
+      "doc": "A deadline that has passed."
+    }
   },
   "governance": {
     "title": {
@@ -7693,24 +7756,12 @@
   },
   "firstRun": {
     "title": {
-      "text": "Welkom bij basis",
+      "text": "Welkom bij Basis",
       "doc": "Eerste-start welkom: titel."
-    },
-    "lede": {
-      "text": "Een buurtchat die op je telefoon draait.  Je gegevens blijven lokaal; jij bepaalt wie wat ziet.",
-      "doc": "Eerste-start intro."
-    },
-    "bullet_circles": {
-      "text": "Kringen die jij beheert — uitnodigen met code of QR.",
-      "doc": "Bullet 1."
     },
     "bullet_items": {
       "text": "Taken, berichten en notities per kring.",
       "doc": "Bullet 2."
-    },
-    "bullet_pod": {
-      "text": "Synchronisatie via een pod zodra je inlogt.",
-      "doc": "Bullet 3."
     },
     "start": {
       "text": "Start",
@@ -7991,6 +8042,14 @@
       }
     },
     "create": {
+      "create_button": {
+        "text": "Kring maken",
+        "doc": "Create wizard, both shells: the last step's button that makes the circle."
+      },
+      "name_placeholder": {
+        "text": "bv. Kring Westend",
+        "doc": "Create wizard, both shells: the placeholder in the circle-name field."
+      },
       "name": {
         "text": "Naam *",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8220,6 +8279,74 @@
       "dot_review": {
         "text": "Nakijken",
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "review_button": {
+        "text": "Controleren →",
+        "doc": "Create wizard, both shells: the button to the last step."
+      },
+      "purpose_placeholder": {
+        "text": "Eén zin: waar is deze kring voor?",
+        "doc": "Create wizard, both shells: the purpose field placeholder."
+      },
+      "tags_placeholder": {
+        "text": "bijv. buurt, gereedschap, kinderen",
+        "doc": "Create wizard, both shells: the tags field placeholder."
+      },
+      "offering_placeholder": {
+        "text": "bijv. loodgieterswerk",
+        "doc": "Create wizard, both shells: an offering name placeholder."
+      },
+      "invite_expiry_hint": {
+        "text": "Hoe lang de uitnodigingscode bruikbaar blijft. Kort is veiliger voor even delen (standaard 1 uur); lang past bij rustiger aansluiten (168 = een week). Een beheerder kan later een nieuwe code maken.",
+        "doc": "Create wizard (web): a field hint."
+      },
+      "pod_uri_hint": {
+        "text": "Nodig voor centrale en gemengde opslag.",
+        "doc": "Create wizard (web): a field hint."
+      },
+      "default_purpose_household": {
+        "text": "Samen ons huishouden runnen",
+        "doc": "The purpose a household circle gets when the creator typed none."
+      },
+      "default_purpose_neighbourhood": {
+        "text": "Elkaar helpen in de buurt",
+        "doc": "The purpose a neighbourhood circle gets when the creator typed none."
+      },
+      "default_purpose_friends": {
+        "text": "Contact houden en samen dingen regelen",
+        "doc": "The purpose a friends circle gets when the creator typed none."
+      },
+      "default_purpose_team": {
+        "text": "Samen werken aan wat we delen",
+        "doc": "The purpose a team circle gets when the creator typed none."
+      },
+      "default_purpose_other": {
+        "text": "Samen dingen doen",
+        "doc": "The purpose a circle of another kind gets when the creator typed none."
+      },
+      "review_kind": {
+        "text": "Soort",
+        "doc": "Review step: the circle's kind."
+      },
+      "advanced": {
+        "text": "Geavanceerd",
+        "doc": "The one fold on the create wizard's first step: the kind, purpose and the further steps (members, rules, offerings, technical). Closed, the wizard is name → review."
+      },
+      "advanced_hint": {
+        "text": "Soort, doel, wie mag komen, afspraken en opslag. Dicht laten = de standaard.",
+        "doc": "Line under the Advanced fold."
+      },
+      "reveal_label": {
+        "text": "Leden zien elkaars naam",
+        "doc": "Create wizard (under Advanced) and its review: the circle's reveal policy — whether members see each other's real names without an act."
+      },
+      "reveal_pairwise": {
+        "text": "per paar",
+        "doc": "Reveal policy pairwise: a name is shown once two members share it (the default)."
+      },
+      "reveal_open": {
+        "text": "iedereen",
+        "doc": "Reveal policy open: every member sees every other member's name and card."
       }
     },
     "settings": {
@@ -8306,6 +8433,22 @@
       "other_url": {
         "text": "Anders (voer URL in)",
         "doc": "Mobile settings wizard: the custom-relay option."
+      },
+      "provider_inrupt": {
+        "text": "Inrupt Pod Spaces",
+        "doc": "Settings wizard (phone): a pod provider (a product name)."
+      },
+      "handle_placeholder": {
+        "text": "bijv. alice",
+        "doc": "Settings wizard (phone): the handle placeholder."
+      },
+      "title": {
+        "text": "Instellingen",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "intro": {
+        "text": "Je naam en vakantiestand.",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
     "backup": {
@@ -8344,6 +8487,22 @@
       "ready_intro": {
         "text": "Download hem en bewaar hem ergens veilig — mail hem naar jezelf, zet hem op een usb-stick, of in een cloud die je vertrouwt. Hij is versleuteld, dus waar hij staat maakt minder uit dan of je hem nog hebt.",
         "doc": "Backup wizard, the final screen."
+      },
+      "passphrase_label": {
+        "text": "Wachtzin",
+        "doc": "Backup wizard, both shells: the passphrase field and its step."
+      },
+      "passphrase_hint": {
+        "text": "Minstens 12 tekens is verstandig — kies er een die je onthoudt.",
+        "doc": "Backup wizard, both shells: the passphrase placeholder."
+      },
+      "step_save": {
+        "text": "Opslaan",
+        "doc": "Backup wizard, both shells: the second step."
+      },
+      "create_button": {
+        "text": "Back-up maken",
+        "doc": "Backup wizard, both shells: the button that builds the backup."
       }
     },
     "restore": {
@@ -8394,6 +8553,38 @@
       "done_intro": {
         "text": "De herstelde identiteit is actief. Herlaad de pagina zodat de rest van de app hem oppakt.",
         "doc": "Restore wizard, the final screen."
+      },
+      "step_phrase": {
+        "text": "Herstelzin",
+        "doc": "Restore wizard, both shells: step 1."
+      },
+      "step_confirm": {
+        "text": "Bevestigen",
+        "doc": "Restore wizard, both shells: step 2."
+      },
+      "step_restore": {
+        "text": "Herstellen",
+        "doc": "Restore wizard, both shells: step 3."
+      },
+      "phrase_placeholder": {
+        "text": "woord1 woord2 woord3 …",
+        "doc": "Restore wizard, both shells: the phrase placeholder."
+      },
+      "phrase_hint": {
+        "text": "Woorden gescheiden door één spatie.",
+        "doc": "Restore wizard (web): under the phrase field."
+      },
+      "button": {
+        "text": "Nu herstellen",
+        "doc": "Restore wizard, both shells: the button that restores."
+      },
+      "restoring": {
+        "text": "Identiteit wordt hersteld…",
+        "doc": "Restore wizard (web): while restoring."
+      },
+      "saved_question": {
+        "text": "Heb je je huidige herstelzin bewaard? Zonder die zin komt de identiteit op dit apparaat niet meer terug.",
+        "doc": "Restore wizard, both shells: one line of copy above the two checks — the person’s CURRENT phrase, before it is replaced."
       }
     },
     "audience": {
@@ -8424,70 +8615,84 @@
       "intro": {
         "text": "Kies wie dit bereikt. Laat je het leeg, dan gaat het naar iedereen in je kring.",
         "doc": "Audience wizard step 1 body."
-      }
-    },
-    "dispute": {
-      "about": {
-        "text": "Je maakt bezwaar tegen dit bericht:",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
-      "substrate_note": {
-        "text": "Dit legt het bezwaar vast als bericht. De volledige bemiddeling — bezwaar, voorstel, akkoord — komt later.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind": {
+        "text": "Soort",
+        "doc": "Post-with-audience wizard, both shells: the kind of post."
       },
-      "summary": {
-        "text": "Samenvatting",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind_ask": {
+        "text": "Vragen (om hulp)",
+        "doc": "Post-with-audience wizard: an ask."
       },
-      "about_post": {
-        "text": "Over bericht",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind_offer": {
+        "text": "Aanbieden (iets om te delen)",
+        "doc": "Post-with-audience wizard: an offer."
       },
-      "escalation": {
-        "text": "Escalatie",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind_lend": {
+        "text": "Uitlenen (een ding)",
+        "doc": "Post-with-audience wizard (web): a lend."
       },
-      "proposal": {
-        "text": "Voorgestelde oplossing",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "text_placeholder": {
+        "text": "bijv. Heeft iemand een ladder te leen?",
+        "doc": "Post-with-audience wizard, both shells: the text placeholder."
       },
-      "raise_title": {
-        "text": "Bezwaar maken",
-        "doc": "Dispute wizard step 1 title."
+      "tags": {
+        "text": "Labels (met komma’s — past bij contacten met een ervan)",
+        "doc": "Post-with-audience wizard, both shells: the tags field."
       },
-      "raise_intro": {
-        "text": "Beschrijf wat er gebeurd is. Dit gaat naar de kring; beheerders zien het, en twee willekeurige leden ook als de kring conflicten met bemiddeling oplost.",
-        "doc": "Dispute wizard step 1 body."
+      "tags_placeholder": {
+        "text": "bijv. gereedschap, tuin, kinderen",
+        "doc": "Post-with-audience wizard, both shells: the tags placeholder."
       },
-      "propose_title": {
-        "text": "Stel een oplossing voor",
-        "doc": "Dispute wizard step 2 title."
+      "recipients_placeholder": {
+        "text": "bijv. webid:anne,webid:karl",
+        "doc": "Post-with-audience wizard, both shells: the recipients placeholder."
       },
-      "propose_intro": {
-        "text": "Wat zou dit voor jou oplossen? Ook als je het niet zeker weet: schrijf op wat goed genoeg zou voelen, dan heeft een bemiddelaar een begin.",
-        "doc": "Dispute wizard step 2 body."
+      "recipients_hint": {
+        "text": "Ingevuld: alleen deze ontvangers — vertrouwen en afstand tellen dan niet.",
+        "doc": "Post-with-audience wizard, both shells: under the recipients field."
       },
-      "file_title": {
-        "text": "Bezwaar indienen",
-        "doc": "Dispute wizard step 3 title."
-      },
-      "file_intro": {
-        "text": "Kijk het na. Een ingediend bezwaar is zichtbaar voor beheerders, en voor bemiddelaars als de kring bemiddeling gebruikt. Je kunt er later een bericht over plaatsen.",
-        "doc": "Dispute wizard step 3 body."
-      },
-      "filed_title": {
-        "text": "✓ Bezwaar ingediend",
-        "doc": "Dispute wizard, the final screen."
-      },
-      "filed_intro": {
-        "text": "Beheerders zien het in de kring, en bemiddelaars ook als de kring bemiddeling gebruikt.",
-        "doc": "Dispute wizard, the final screen."
+      "posting": {
+        "text": "Plaatsen…",
+        "doc": "Post-with-audience wizard (web): while posting."
       }
     },
     "embed_time": {
       "title": {
         "text": "Een tijd toevoegen",
         "doc": "Mobile embed-time wizard heading."
+      },
+      "create_button": {
+        "text": "Maken",
+        "doc": "Embed-a-time wizard (phone): the create button."
+      },
+      "title_placeholder": {
+        "text": "bijv. Kringbarbecue",
+        "doc": "Embed-a-time wizard (phone): the title placeholder."
+      },
+      "when_placeholder": {
+        "text": "morgen 15:00 · 2026-05-30T15:00",
+        "doc": "Embed-a-time wizard (phone): the when placeholder."
+      },
+      "location_placeholder": {
+        "text": "bijv. Vondelpark",
+        "doc": "Embed-a-time wizard (phone): the location placeholder."
+      },
+      "share_placeholder": {
+        "text": "leeg laten om het lokaal te houden",
+        "doc": "Embed-a-time wizard (phone): the share-with placeholder."
+      },
+      "intro": {
+        "text": "Zet een tijdkaart in het gesprek. De datum mag ISO zijn (2026-05-30T15:00) of gewone woorden (morgen 15:00, volgende vrijdag).",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "title_label": {
+        "text": "Titel",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "when_label": {
+        "text": "Wanneer",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     }
   },
@@ -9931,6 +10136,32 @@
     "save_failed": {
       "text": "Niet opgeslagen.",
       "doc": "A settings value could not be saved."
+    }
+  },
+  "logReport": {
+    "title": {
+      "text": "Logboek van dit apparaat",
+      "doc": "Title of the copy-log screen."
+    },
+    "intro": {
+      "text": "Wat de app op dit apparaat bijhield: gebeurteniscodes en getallen, geen namen, berichten of adressen. Kopieer het en stuur het naar wie je helpt. Vanaf hier wordt niets verstuurd.",
+      "doc": "Copy-log screen: what the text is and that nothing leaves the device from this screen."
+    },
+    "empty": {
+      "text": "Nog niets bijgehouden.",
+      "doc": "Copy-log screen when the log is empty."
+    },
+    "copy": {
+      "text": "Logboek kopiëren",
+      "doc": "Copy-log screen, web: copies the shown text to the clipboard."
+    },
+    "share": {
+      "text": "Logboek delen",
+      "doc": "Copy-log screen, phone: hands the shown text to the share sheet (which has Copy); nothing is added to it."
+    },
+    "copied": {
+      "text": "Gekopieerd.",
+      "doc": "Copy-log screen: confirmation after copying (web)."
     }
   }
 }

@@ -102,8 +102,10 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
       const o = parseLinkOffer(offerText);
       if (!o.ok) return { ok: false, reason: 'not-an-offer' };
       if (o.botAddress !== botAddress()) return { ok: false, reason: 'another-bot' };
-      const v = check(o.statement, LINK_OPS.LINK, { w: o.webid }, o.root);
-      if (!v.ok) return { ok: false, reason: v.reason === 'revoked' || v.reason === 'stale' ? v.reason : 'not-an-offer' };
+      // checked WITHOUT using it up: an offer refused below (or one already linked) stays usable — only the paste that
+      // asks the code question spends it, and a spent one says so ("used"), not that it is no link line (2026-10-09)
+      const v = check(o.statement, LINK_OPS.LINK, { w: o.webid }, o.root, { seen: { has: (n) => nonces.has(n), add: () => {} } });
+      if (!v.ok) return { ok: false, reason: v.reason === 'revoked' || v.reason === 'stale' ? v.reason : v.reason === 'replayed' ? 'used' : 'not-an-offer' };
       const rows = await users.list();
       const row = rows.find((r) => r.id === person);
       if (!row) return { ok: false, reason: 'not-admitted' };
@@ -113,6 +115,9 @@ export function createIdentityLink({ users, botAddress, tombstones, ask, sendPri
       }
       if (rows.some((r) => r.id !== person && (r.linkedRoot === o.root || r.id === o.webid || r.pubKey === o.webid))) return { ok: false, reason: 'key-on-another-row' };
       if (row.linkedRoot) return { ok: false, reason: 'row-has-a-key' };
+      // spent before the question goes out: if sending it fails, the offer is gone with nothing pending — the person makes
+      // a new one, which is the honest outcome for a line that was used to ask
+      nonces.add(o.nonce, o.statement.ts);
       pending.set(person, { root: o.root, webid: o.webid, deviceId: v.deviceId, nonce: o.nonce, until: now() + OFFER_FOR_MS });
       const codes = codeChoices(await linkCode(o.root, o.nonce), rand);
       const asked = await ask(person, question(codes));

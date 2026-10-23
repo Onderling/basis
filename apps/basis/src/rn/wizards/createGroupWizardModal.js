@@ -17,7 +17,9 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
-  KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
+  KEY_ROTATION_MODES,
+  REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
+  REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
   initialState, labelOf,
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl, withinMs, POLICY_WRITE_BOUND_MS,
   newOfferingRow, OFFERING_AXES,
@@ -89,7 +91,8 @@ export default function CreateGroupWizardModal({
   const updateName = useCallback((name) => setState((s) => ({ ...s, name })), []);
 
   const onCreate = useCallback(async () => {
-    let next = { ...state, submitting: true, submitError: null };
+    // what the short path did not ask is filled in now, so the circle and its invite carry it (never an empty purpose)
+    let next = { ...withCreateDefaults(state, t), submitting: true, submitError: null };
     setState(next);
     const { result, state: after } = await finalSubmit({ state: next, callSkill, shareRelease: shareFounderRelease });
     setState({ ...after, successResult: result ?? null });
@@ -148,6 +151,9 @@ export default function CreateGroupWizardModal({
   }, [state, callSkill, onDispatched, onClose, persistPolicy, shareFounderRelease]);
 
   const canAdvance1 = identityComplete(state);
+  // the shared path: name → review, or every step with "Geavanceerd" open — the dots are the steps walked
+  const dots = createStepDots(state);
+  const nextStep = nextCreateStep(state);
 
   return (
     <WizardTheme theme={theme}>
@@ -158,49 +164,16 @@ export default function CreateGroupWizardModal({
           onPress={(e) => e.stopPropagation()}
           testID="create-group-wizard"
         >
-          <Steps labels={STEP_LABEL_KEYS.map((k) => t(k))} current={state.step} />
+          <Steps labels={dots.map((d) => t(d.labelKey))} current={dots.findIndex((d) => d.step === state.step) + 1} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
               <Body title={t('circle.wizard.create.step_identity')} intro={t('circle.wizard.create.step_identity_intro')}>
-                {/* N1+E8 — kind picker.  Applies the matching template
-                    (β.4) in place; for a neighbourhood it also surfaces the size
-                    question + chat advice (noticeboard-first, chat off). */}
-                <RadioGroup
-                  label={t('circle.kindPicker')}
-                  value={state.kind ?? null}
-                  options={attachConsequences('kind',
-                    CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })), t)}
-                  onChange={(k) => setState((s) => setKind(s, k))}
-                  consequenceLabel={t('common.consequences')}
-                />
-                {state.kind === 'neighbourhood' && (
-                  <>
-                    <RadioGroup
-                      label={t('circle.size.label')}
-                      value={state.size ?? null}
-                      options={attachConsequences('size', [
-                        { id: 'small', label: t('circle.size.small') },
-                        { id: 'large', label: t('circle.size.large') },
-                      ], t)}
-                      onChange={(sz) => setState((s) => setSize(s, sz))}
-                      consequenceLabel={t('common.consequences')}
-                    />
-                    {chatAdvice(state).reasonKey ? (
-                      <Warn>{t(chatAdvice(state).reasonKey)}</Warn>
-                    ) : null}
-                    <Checkbox
-                      label={t('circle.chatToggle')}
-                      checked={!!state.features?.chat}
-                      onToggle={() => setState((s) => setChatEnabled(s, !s.features?.chat))}
-                      testID="create-group-chat-toggle"
-                    />
-                  </>
-                )}
                 <Field
-                  label="Name"
+                  label={t('circle.wizard.create.name')}
                   value={state.name}
                   onChangeText={updateName}
-                  placeholder="e.g. Onze Circle"
+                  placeholder={t('circle.wizard.create.name_placeholder')}
+                  testID="create-group-name"
                 />
                 {state.needsHandle ? (
                   <HandleField
@@ -213,37 +186,90 @@ export default function CreateGroupWizardModal({
                     hint={t('circle.join.wizard.handle.intro')}
                   />
                 ) : null}
-                {state.personas.length > 0 && (
+                {/* EVERYTHING ELSE behind one fold: the kind, who founds it, its purpose and tags here — and, opened, the
+                    further steps. Closed, the defaults stand and Next goes to the review. */}
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: state.advanced === true }}
+                  onPress={() => setState((s) => setAdvanced(s, !(s.advanced === true)))} testID="create-group-advanced">
+                  <Text style={styles.foldHead}>{`${state.advanced ? '▾' : '▸'} ${t('circle.wizard.create.advanced')}`}</Text>
+                </Pressable>
+                {state.advanced ? (
                   <>
+                    <Text style={styles.podDisclosure}>{t('circle.wizard.create.advanced_hint')}</Text>
+                    {/* N1+E8 — kind picker.  Applies the matching template
+                        (β.4) in place; for a neighbourhood it also surfaces the size
+                        question + chat advice (noticeboard-first, chat off). */}
                     <RadioGroup
-                      label={t('circle.wizard.create.persona.label')}
-                      value={state.persona ?? ''}
-                      onChange={(id) => setState((s) => ({ ...s, persona: id || null }))}
-                      options={[
-                        { id: '', label: t('circle.wizard.create.persona.minimal') },
-                        ...state.personas.map((p) => ({
-                          id: p.id,
-                          label: personaLabel(p, t),
-                        })),
-                      ]}
+                      label={t('circle.kindPicker')}
+                      value={state.kind ?? null}
+                      options={attachConsequences('kind',
+                        CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })), t)}
+                      onChange={(k) => setState((s) => setKind(s, k))}
+                      consequenceLabel={t('common.consequences')}
                     />
-                    <Text style={styles.podDisclosure} testID="create-founder-persona-hint">
-                      {t('circle.wizard.create.persona.hint')}
-                    </Text>
+                    {state.kind === 'neighbourhood' && (
+                      <>
+                        <RadioGroup
+                          label={t('circle.size.label')}
+                          value={state.size ?? null}
+                          options={attachConsequences('size', [
+                            { id: 'small', label: t('circle.size.small') },
+                            { id: 'large', label: t('circle.size.large') },
+                          ], t)}
+                          onChange={(sz) => setState((s) => setSize(s, sz))}
+                          consequenceLabel={t('common.consequences')}
+                        />
+                        {chatAdvice(state).reasonKey ? (
+                          <Warn>{t(chatAdvice(state).reasonKey)}</Warn>
+                        ) : null}
+                        <Checkbox
+                          label={t('circle.chatToggle')}
+                          checked={!!state.features?.chat}
+                          onToggle={() => setState((s) => setChatEnabled(s, !s.features?.chat))}
+                          testID="create-group-chat-toggle"
+                        />
+                      </>
+                    )}
+                    {/* who sees whose name: per pair unless chosen here — never widened by the kind */}
+                    <RadioGroup
+                      label={t('circle.wizard.create.reveal_label')}
+                      value={state.revealPolicy}
+                      options={attachConsequences('revealPolicy', REVEAL_POLICIES.map((p) => ({ id: p.id, label: t(p.labelKey) })), t)}
+                      onChange={(v) => setState((s) => setRevealPolicy(s, v))}
+                      consequenceLabel={t('common.consequences')}
+                    />
+                    {state.personas.length > 0 && (
+                      <>
+                        <RadioGroup
+                          label={t('circle.wizard.create.persona.label')}
+                          value={state.persona ?? ''}
+                          onChange={(id) => setState((s) => ({ ...s, persona: id || null }))}
+                          options={[
+                            { id: '', label: t('circle.wizard.create.persona.minimal') },
+                            ...state.personas.map((p) => ({
+                              id: p.id,
+                              label: personaLabel(p, t),
+                            })),
+                          ]}
+                        />
+                        <Text style={styles.podDisclosure} testID="create-founder-persona-hint">
+                          {t('circle.wizard.create.persona.hint')}
+                        </Text>
+                      </>
+                    )}
+                    <Field
+                      label={t('circle.wizard.create.purpose')}
+                      value={state.purpose}
+                      onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
+                      placeholder={purposeOrDefault({ kind: state.kind }, t)}
+                    />
+                    <Field
+                      label={t('circle.wizard.create.tags')}
+                      value={state.tags}
+                      onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
+                      placeholder={t('circle.wizard.create.tags_placeholder')}
+                    />
                   </>
-                )}
-                <Field
-                  label={t('circle.wizard.create.purpose')}
-                  value={state.purpose}
-                  onChangeText={(v) => setState((s) => ({ ...s, purpose: v }))}
-                  placeholder="one-line description"
-                />
-                <Field
-                  label={t('circle.wizard.create.tags')}
-                  value={state.tags}
-                  onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
-                  placeholder="quiet, sustainable, tools"
-                />
+                ) : null}
               </Body>
             )}
             {state.step === 2 && (
@@ -323,7 +349,7 @@ export default function CreateGroupWizardModal({
                         offerings[i] = { ...offerings[i], name: v };
                         return { ...s, offerings };
                       })}
-                      placeholder="e.g. plumbing"
+                      placeholder={t('circle.wizard.create.offering_placeholder')}
                     />
                     {Object.keys(OFFERING_AXES).map((axis) => (
                       <RadioGroup
@@ -370,6 +396,7 @@ export default function CreateGroupWizardModal({
                 />
                 <Field
                   label={t('circle.wizard.create.invite_expiry')}
+                  hint={t('circle.wizard.create.invite_expiry_hint')}
                   value={String(state.inviteExpiresInHours)}
                   onChangeText={(v) => setState((s) => ({ ...s, inviteExpiresInHours: Number(v) || 1 }))}
                   placeholder="1"
@@ -398,6 +425,7 @@ export default function CreateGroupWizardModal({
                   <>
                     <Field
                       label={t('circle.wizard.create.pod_uri')}
+                      hint={t('circle.wizard.create.pod_uri_hint')}
                       value={state.groupPodUri}
                       onChangeText={(v) => setState((s) => ({ ...s, groupPodUri: v }))}
                       placeholder="https://group.example/pod/"
@@ -415,18 +443,24 @@ export default function CreateGroupWizardModal({
                 )}
               </Body>
             )}
-            {state.step === 6 && (() => {
+            {state.step === REVIEW_STEP && (() => {
               const rules = buildRulesObjectFromState(state);
               return (
                 <Body title={t('circle.wizard.create.step_review')} intro={t('circle.wizard.create.step_review_intro')}>
+                  {/* what was chosen — the defaults included, so the review never shows an empty value (type, purpose, rules);
+                      the rest only when the person opened "Geavanceerd" and so saw it */}
                   <ReviewList items={[
-                    { label: 'Name',        value: state.name },
+                    { label: t('circle.wizard.create.review_name'),        value: state.name },
+                    { label: t('circle.wizard.create.review_kind'),        value: t(`circle.kind.${state.kind ?? 'other'}`) },
+                    { label: t('circle.wizard.create.purpose'),            value: purposeOrDefault(state, t) },
                     { label: t('circle.wizard.create.review_persona'),
                       value: founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal') },
-                    ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
-                    ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
-                    { label: 'Access',      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
-                    { label: 'Leave',       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
+                    ...(rules.tags         ? [{ label: t('circle.wizard.create.review_tags'),       value: rules.tags.join(', ') }] : []),
+                    { label: t('circle.wizard.create.access'),      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
+                    { label: t('circle.wizard.create.leave'),       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
+                    { label: t('circle.wizard.create.review_conflict'),    value: labelOf(CONFLICT_POLICIES, state.conflictPolicy) },
+                    { label: t('circle.wizard.create.reveal_label'),       value: t(revealPolicyLabelKey(state)) },
+                    ...(state.advanced !== true ? [] : [
                     // 5.5a — surface each non-empty rules-doc field.
                     ...RULES_QUESTIONS.filter((q) => q.key !== 'purpose').flatMap((q) => {
                       const v = rules[q.key];
@@ -435,20 +469,20 @@ export default function CreateGroupWizardModal({
                         ? t(`circle.rules.q.${q.key}`) : q.key;
                       return [{ label, value: v, pre: true }];
                     }),
-                    { label: 'Conflict',    value: labelOf(CONFLICT_POLICIES, state.conflictPolicy) },
                     // 5.5c — surface named offerings (axes inline). Read-accept
                     // the legacy `rules.skills` field on an un-migrated rules blob.
                     ...((rules.offerings ?? rules.skills ?? []).length > 0
-                      ? [{ label: 'Offerings',
+                      ? [{ label: t('circle.wizard.create.review_offerings'),
                           value: (rules.offerings ?? rules.skills).map((s) => `${s.name} — ${s.openness}/${s.posture}/${s.status}/${s.radius}`).join('\n'),
                           pre: true }]
                       : []),
-                    { label: 'Key rotation',value: labelOf(KEY_ROTATION_MODES, state.keyRotationMode) },
-                    { label: 'Rotation interval (days)', value: String(state.rotationDays) },
-                    { label: 'Invite expiry (hours)',    value: String(state.inviteExpiresInHours) },
+                    { label: t('circle.wizard.create.review_rotation'),value: labelOf(KEY_ROTATION_MODES, state.keyRotationMode) },
+                    { label: t('circle.wizard.create.review_rotation_days'), value: String(state.rotationDays) },
+                    { label: t('circle.wizard.create.review_expiry'),    value: String(state.inviteExpiresInHours) },
                     { label: t('circle.invite.ceiling_review'), value: String(state.inviteMaxRedemptions) },
-                    { label: 'Storage',     value: labelOf(STORAGE_POLICIES, state.storagePolicy) },
-                    ...(state.groupPodUri  ? [{ label: 'Group pod', value: state.groupPodUri, monospace: true }] : []),
+                    { label: t('circle.wizard.create.review_storage'),     value: labelOf(STORAGE_POLICIES, state.storagePolicy) },
+                    ...(state.groupPodUri  ? [{ label: t('circle.wizard.create.review_pod'), value: state.groupPodUri, monospace: true }] : []),
+                    ]),
                   ]} />
                   <ErrorBanner message={state.submitError} />
                   <Submitting visible={state.submitting} label={t('circle.wizard.create.creating')} />
@@ -457,20 +491,21 @@ export default function CreateGroupWizardModal({
             })()}
           </ScrollView>
           <Actions buttons={(() => {
+            const nextLabel = t(nextStep === REVIEW_STEP ? 'circle.wizard.create.review_button' : 'common.next');
             if (state.step === 1) return [
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(2), kind: 'primary', disabled: !canAdvance1 },
+              { label: nextLabel,          onPress: () => setStep(nextStep), kind: 'primary', disabled: !canAdvance1, testID: 'create-group-next' },
             ];
-            // 5.5c — six-step wizard.  Steps 2-5 share Back/Next; step 6 is Review.
-            if (state.step < STEP_NAMES.length) return [
-              { label: t('common.back'),   onPress: () => setStep(state.step - 1), kind: 'secondary' },
+            // the steps between share Back/Next; the last is the review
+            if (state.step !== REVIEW_STEP) return [
+              { label: t('common.back'),   onPress: () => setStep(prevCreateStep(state)), kind: 'secondary' },
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(state.step + 1), kind: 'primary' },
+              { label: nextLabel,          onPress: () => setStep(nextStep), kind: 'primary', testID: 'create-group-next' },
             ];
             return [
-              { label: t('common.back'),   onPress: () => setStep(STEP_NAMES.length - 1), kind: 'secondary', disabled: state.submitting },
+              { label: t('common.back'),   onPress: () => setStep(prevCreateStep(state)), kind: 'secondary', disabled: state.submitting },
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: 'Create circle',     onPress: onCreate, kind: 'primary', disabled: state.submitting },
+              { label: t('circle.wizard.create.create_button'), onPress: onCreate, kind: 'primary', disabled: state.submitting, testID: 'create-group-create' },
             ];
           })()} />
         </Pressable>
@@ -494,6 +529,7 @@ function sheetStyles(theme) {
     maxHeight: '92%', minHeight: '60%',
   },
   scroll: { flexGrow: 1 },
+  foldHead: { fontSize: 14, fontWeight: '600', color: p.inkStrong, marginTop: 14, marginBottom: 4 },
   // N3 — extra-roles section.
   roleHeading: { fontSize: 13, fontWeight: '700', color: p.inkStrong, marginTop: 14, marginBottom: 2 },
   roleHint:    { fontSize: 12, lineHeight: 17, color: p.inkSoft, marginBottom: 6 },

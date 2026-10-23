@@ -34,10 +34,10 @@ React Native platform layer + adapters for the onderling agent SDK.
   2026-05-09 — Phase 41.0 L4.
 - `./mnemonic/*` — recovery-phrase substrate. Pure helpers
   (`normaliseMnemonic`, `looksLikeMnemonic`, `statusFor`,
-  `BIP39_WORD_COUNTS`), `useMnemonicReveal({useSkill})` hook, and
-  `<MnemonicView>` (subpath `./mnemonic/view`). Lifted from
-  `apps/pinboard-mobile/src/lib/mnemonic.js` 2026-05-09 — Phase 41.0 L5;
-  the hook + view are new substrate UI for Tasks-mobile.
+  `BIP39_WORD_COUNTS`) and `<MnemonicView>` (subpath `./mnemonic/view`).
+  Lifted from `apps/pinboard-mobile/src/lib/mnemonic.js` 2026-05-09 — Phase 41.0 L5.
+  (The reveal hook went with the pinboard phrase skills it drove, 2026-10-23: the recovery phrase is the
+  owner root's, revealed and restored by the host.)
 - `./push/*` — push opt-in substrate. `setupPush` +
   `requestPushPermission` (imperative — lifted from
   `apps/pinboard-mobile/src/lib/push.js`) plus the new

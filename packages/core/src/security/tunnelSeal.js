@@ -30,6 +30,7 @@
  */
 import nacl                                         from 'tweetnacl';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
+import { parseUntrustedJson } from './untrustedJson.js';
 
 /**
  * Generate a fresh 32-byte session key.  Caller stores it locally and
@@ -95,6 +96,6 @@ export function openTunnelOW({ key, sealed, nonce } = {}) {
   if (!plaintext) return null;
 
   try {
-    return JSON.parse(new TextDecoder().decode(plaintext));
+    return parseUntrustedJson(new TextDecoder().decode(plaintext));
   } catch { return null; }
 }

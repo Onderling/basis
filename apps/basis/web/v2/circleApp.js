@@ -20,7 +20,6 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
-import { meActionsFor } from '../../src/v2/meActionProjection.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -31,6 +30,7 @@ import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
 import { mijScreenBlocks } from '../../src/v2/mijScreen.js';
+import { browserDeviceName } from '../../src/v2/deviceName.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -46,6 +46,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   scopePinboardCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
+  NOTICEBOARD_REFRESH_EVENTS,
   responderChoices,
   noticeboardIntentOf,
   memberLabelFor,
@@ -178,7 +179,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../src/v2/vandaagPlus.js';
-import { handleOp } from '../../src/v2/onboardingStrip.js';
+import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -288,7 +289,7 @@ import {
 } from '../../src/v2/helpCircle.js';
 import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/onboardingTemplate.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
-import { createOnboardingFlags, localStorageOnboardingIo } from '../../src/v2/onboardingFlags.js';
+import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -312,6 +313,8 @@ import { sendA2ATask, PeerGraph, discoverA2A } from '@onderling/core';
 import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
+import { createSingleFlight } from '../../src/v2/singleFlight.js';
+import { askMatchChoices, askMatchThreadId, createAskMatchSkips, localStorageAskMatchSkipsIo } from '../../src/v2/askMatches.js';
 import { applyUserLlmRuntime, validateUserLlmConfig, ownModelClient } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
@@ -824,6 +827,8 @@ import { makeHandleSharedCopy } from '../../src/core/handlers/sharedCopyReceive.
 // open selector. The nav entry lives on the Mij profile (personal, cross-circle inbox).
 import { renderSharedWithMe } from './sharedWithMe.js';
 import { renderBlockedList } from './blockedList.js';
+import { renderLogReport } from './logReport.js';
+import { logReportView } from '../../src/log/logReport.js';
 import { buildBlockedList } from '../../src/v2/blockedList.js';
 import { buildSharedWithMe, openSharedCopy } from '../../src/v2/sharedWithMe.js';
 // SILENT out-of-circle delivery — THIS device's network-derived sealing OPENER (shared web≡mobile). Injects the
@@ -1907,7 +1912,17 @@ const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePo
  * circle this is the producer's control-agent strategy unwrapped with the local device's
  * own per-circle sealing identity (a recipient of the group key). p0/p1 → null (plaintext).
  */
+// One build per circle at a time: a circle opening asks for its producer and its seal strategy from several places at
+// once, and each used to build its own — minting its own "version 1" group key (createSingleFlight says more).
+const circlePodFlight = createSingleFlight();
+const circleStrategyFlight = createSingleFlight();
+
 async function getCircleSealStrategy(circleId, policy) {
+  if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
+  return circleStrategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
+}
+
+async function buildCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
   let strat = null;
   try {
@@ -2040,6 +2055,11 @@ function makeCirclePodClient(circleId) {
  */
 async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
+  return circlePodFlight(circleId, () => buildCirclePod(circleId, policy));
+}
+
+async function buildCirclePod(circleId, policy) {
+  if (circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
   const storagePosture = policy?.storagePosture ?? 'p0';
   // Circle OIDC: when signed in, route a sealed circle to the user's REAL pod; else the
   // in-memory pseudo-pod (offline / not signed in). Verified end-to-end in circlePodProducer.css.test.js.
@@ -2129,6 +2149,8 @@ const {
 });
 // per-contact DM thread state: contactId → { name, peerAddr, messages:[{origin,text,buttons?,pending?}] }.
 const contactThreads = new Map();
+// The matches I skipped under my own asks — this device only (localStorage), never the circle.
+const askMatchSkips = createAskMatchSkips(localStorageAskMatchSkipsIo());
 let _activeContactThread = null; // { contactId, rerender } — set while a DM thread is on screen
 let circlePendingFollowUp = null;// a single-field needsForm awaiting the user's next message (conversational elicitation)
 let circlePendingFormFollowUp = null; // a 2+-field needsForm → inline multi-field form (mobile parity); cleared on submit
@@ -2999,6 +3021,8 @@ async function showContacts() {
     // each row's picture is sealed to ITS pair circle
     resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
     onOpen: showContactThread,
+    // a person: the scanQr op (web: the paste prompt), routed by what it reads — Me's Scan, the same door
+    onAddPerson: () => runMeAction('scan'),
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
       if (input) addBotFromInput(input);
@@ -3888,6 +3912,11 @@ function showConnectionPoints() {
 
 function showNearby() {
   if (!isAlphaTab('nearby')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
+  // the name the room shows ("Je verschijnt hier als …"): read once per open; a later paint picks it up
+  Promise.resolve(rawCallSkill('pinboard', 'getMyProfile', {})).then((p) => {
+    _nearbyHandle = p?.entry?.handle ?? null;
+    if (nearbyScreen) draw(nearbyScreen.model());   // still open: paint the name
+  }).catch(() => {});
   showTabBar('nearby');
   closeNearby();
 
@@ -3895,12 +3924,15 @@ function showNearby() {
   // point: an empty room and "this device cannot find others" are different facts. When a browser transport
   // lands, it is these two lines that change and nothing else.
   const mesh = null;
+  // whether the room self chose a level: until it did, the device is never announced (read below, async)
+  let roomLevelSet = false;
   nearbyScreen = createNearbyScreen({
     ...(ensureNearbyRoom()?.screenDeps() ?? {}),
     // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
     getDrivers: () => (_nearbyIdentity ? _nearbyIdentity.getDrivers() : Promise.resolve({})),
     mySkills:   () => _nearbyIdentity?.mySkills() ?? [],
-    roomLevel:  () => (_nearbyIdentity ? _nearbyIdentity.level() : Promise.resolve('handle')),   // `none` sends no card
+    roomLevel:  () => (_nearbyIdentity ? _nearbyIdentity.level() : Promise.resolve('none')),   // `none` sends no card
+    levelChosen: () => roomLevelSet,
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
@@ -3926,6 +3958,8 @@ function showNearby() {
     const w = await _nearbyIdentity?.setLevel?.(v);
     if (!w?.ok) { notice = { key: 'level_not_set' }; draw(nearbyScreen.model()); return; }
     roomLevel = v;
+    roomLevelSet = true;
+    nearbyScreen.levelChanged();   // chosen now: announced, unless the person went quiet
     if (id) markAsked(id);   // a chosen level answers the first-use question too
     firstUse = null;
     // "Handle" with no handle set announces nothing and looks identical to "Nobody". The binding
@@ -3936,6 +3970,8 @@ function showNearby() {
   };
   const readRoomLevel = () => _nearbyIdentity?.levelState?.().then((st) => {
     roomLevel = st.level;
+    roomLevelSet = st.set === true;
+    nearbyScreen?.levelChanged();
     const id = roomSelfId();
     let asked = true;
     try { asked = id ? !!localStorage.getItem(`basis.${nearbyAskedKey(id)}`) : true; } catch { asked = true; }
@@ -3954,6 +3990,9 @@ function showNearby() {
     roomSelf: {
       view: nearbyRoomSelfNow().view,
       onPick: (id) => {
+        // fail closed: the old self's choice does not carry over — unlisted until the new self's level is read
+        roomLevelSet = false;
+        nearbyScreen.levelChanged();
         writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model());
         _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});   // weighed as the new self
         readRoomLevel();   // …and seen at ITS level
@@ -4060,9 +4099,11 @@ function openNearbyThread(thread, seed = []) {
 // answer here is the default — kept per device, nothing more durable
 function readNearbySelf() { try { return localStorage.getItem('basis.nearbySelf'); } catch { return null; } }
 function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem('basis.nearbySelf', id); } catch { /* best-effort */ } }
+// the general persona's handle, as the room sees it — read when Nearby opens (showNearby)
+let _nearbyHandle = null;
 function nearbyRoomSelfNow() {
   const r = nearbyRoomSelf({ active: _selfSet.on, held: _selfSet.held, remembered: readNearbySelf() });
-  const view = nearbyRoomSelfView(r, _selfSet.held);
+  const view = nearbyRoomSelfView(r, _selfSet.held, { handle: _nearbyHandle });
   return { r, view, self: roomSelfFor(r, _selfSet.held) };
 }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.
@@ -4232,10 +4273,8 @@ async function _showVandaag() {
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'circle-vandaag__customise';
-    // under the ⋯, quiet: the "+" is the page's one accent
-    edit.textContent = '⋯';
-    edit.title = t('circle.vandaag.customise');
-    edit.setAttribute('aria-label', t('circle.vandaag.customise'));
+    // a quiet word, not a bare ⋯ nobody reads as "customise": the "+" is the page's one accent
+    edit.textContent = t('circle.vandaag.customise');
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
     // the "+" is no longer here: one floating button on every tab (`mountPlusButton`)
@@ -4275,7 +4314,7 @@ async function _showVandaag() {
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: mySelfIn,
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(),
+        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
       },
     });
   } catch (err) {
@@ -4387,7 +4426,6 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r.kind === 'own') { actId = r.actId; error = null; paint(); return; }
       _pendingPinOpen = r; close(); showDetail(r.circleId);
     },
-    meActions: meActionsFor(basisManifest), onMeAction: (id) => { close(); runMeAction(id); },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
@@ -4479,6 +4517,9 @@ function onScreenAction(action) {
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
   else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
+  // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
+  else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
+  else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
   else if (action?.kind === 'create-circle') openCreateCircleWizard();
   else if (action?.kind === 'join-circle') showJoinCircle();
   // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -4533,6 +4574,8 @@ async function showMij() {
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
     online: relays.length ? relays.some((r) => r.connected) : undefined,
     deviceId: circleHouseholdAgent?.myDeviceId?.() ?? null,
+    // the browser's own name, for "this device" when the person never named it
+    deviceName: browserDeviceName(globalThis.navigator?.userAgent),
     // "wat wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here
     openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
     pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
@@ -4610,6 +4653,13 @@ async function showBlocked() {
   };
   await paint(true);
   await paint(false);
+}
+
+/** This device's log as the person may copy it (codes + numbers only); nothing is sent from here. */
+function showLogReport() {
+  hideCircleTabBar(tabBarEl);
+  const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
+  renderLogReport(rootEl, { text, n, t, onBack: showMyData });
 }
 
 // "My data": where your data lives (pod/relay) + privacy + usage + key
@@ -4876,7 +4926,7 @@ async function showMyData() {
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
     // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
-    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
+    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview, version: APP_VERSION,
     onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
@@ -5272,6 +5322,24 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
   card.appendChild(code);
+  // for someone who is not in the room: the link itself, through the browser's share sheet where it has one, else copied
+  const send = document.createElement('button');
+  send.type = 'button';
+  send.className = 'cc-btn cc-btn--primary';
+  send.dataset.testid = 'invite-send-link';
+  send.textContent = t('circle.invite.send_link');
+  send.style.cssText = 'margin-top:10px';
+  const sent = document.createElement('p');
+  sent.style.cssText = 'font-size:12px;opacity:.8';
+  send.addEventListener('click', async () => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try { await navigator.share({ url: deepLink }); return; } catch { /* dismissed or refused — fall back to copying */ }
+    }
+    try { await navigator.clipboard.writeText(deepLink); sent.textContent = t('circle.invite.link_copied'); }
+    catch { sent.textContent = ''; }
+  });
+  card.appendChild(send);
+  card.appendChild(sent);
   // The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is listed
   // nearby for 15 minutes. Only an admin reaches this line (a non-admin got `admin-only` above).
   const announce = document.createElement('button');
@@ -5304,13 +5372,22 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
     forBot.addEventListener('click', () => { overlay.remove(); showCircleInvite(circleId, { forFunction: true }); });
     card.appendChild(forBot);
   }
+  // the way out — the backdrop closes it too, but nobody should have to know that
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'cc-btn cc-btn--ghost';
+  close.dataset.testid = 'invite-close';
+  close.textContent = t('common.close');
+  close.style.cssText = 'display:block;margin-top:10px';
+  close.addEventListener('click', () => overlay.remove());
+  card.appendChild(close);
 }
 
 // reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —
 // the one phrase that re-derives every profile incl. the default profile's pseudonym. Shown in
 // the same modal overlay with a destructive warning. (Was the pinboard `getMnemonicOnce`,
 // which revealed the unrelated pinboard sub-agent seed — not the recovery phrase.)
-async function showMnemonicReveal() {
+async function showMnemonicReveal({ fromKeyCard = false } = {}) {
   let res = null;
   try { res = await rawCallSkill('household', 'revealOwnerPhrase', {}); } catch { res = null; }
   const words = (res && !res.error && (res.mnemonic ?? res.phrase ?? res.words)) || '';
@@ -5340,7 +5417,24 @@ async function showMnemonicReveal() {
   done.className = 'cc-wizard-btn cc-wizard-btn-primary';
   done.textContent = t('common.close');
   done.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
-  card.appendChild(done);
+  // opened from Vandaag's key card: the person says what they did with the words — saved ends the card, later
+  // puts it away for a while
+  if (fromKeyCard && words) {
+    const close = () => { try { overlay.remove(); } catch { /* */ } _showVandaag(); };
+    done.textContent = t('circle.mydata.mnemonic_written');
+    done.dataset.testid = 'mnemonic-written';
+    done.addEventListener('click', () => { onboardingFlags.markKeySaved().then(close); });
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'cc-wizard-btn';
+    later.dataset.testid = 'mnemonic-later';
+    later.textContent = t('circle.mydata.mnemonic_later');
+    later.addEventListener('click', () => { onboardingFlags.snoozeKey(keySnoozeUntil()).then(close); });
+    card.appendChild(done);
+    card.appendChild(later);
+  } else {
+    card.appendChild(done);
+  }
   overlay.appendChild(card);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
@@ -6861,8 +6955,7 @@ function showCircle(id, circle, policy) {
   // admin's policy.view sets the landing surface until the user overrides.
   let viewMode = readViewMode(id, policy);
   // α.1c — materialized screen blocks (recipe book → blocks).  Null
-  // until the async load below resolves; replaces 's
-  // "screen_coming" placeholder when present.
+  // until the async load below resolves.
   let screenBlocks = null;
   let seq = 0;
 
@@ -6998,6 +7091,7 @@ function showCircle(id, circle, policy) {
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
       // who "me" is HERE: the circle's self (a persona's circle is the persona's)
       const meHere = mySelfIn(id) ?? myWebid ?? null;
+      const skippedMatches = await askMatchSkips.list();
       noticeboardPosts = items.map((it) => ({
         id:           it.id,
         text:         it.text ?? it.label ?? '',
@@ -7021,6 +7115,8 @@ function showCircle(id, circle, policy) {
         mine:         !!(meHere && it.addedBy === meHere),
         // the people who answered my request, each an Accept (the shared projection — web ≡ mobile)
         responders:   responderChoices(it, { viewerId: meHere, members: circleRoster ?? [], policy: policy?.revealPolicy ?? 'pairwise' }),
+        // who here offers what I asked — on my own open ask only, from what they released (the shared projection)
+        matches:      askMatchChoices(it, { viewerId: meHere, members: circleRoster ?? [], policy: policy?.revealPolicy ?? 'pairwise', skipped: skippedMatches }),
         // carry inline-image metadata (thumbnail travels; full bytes on demand).
         attachments:  Array.isArray(it.attachments) ? it.attachments
                       : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
@@ -7304,7 +7400,7 @@ function showCircle(id, circle, policy) {
     if (att && att.thumbnail) showImageModal(att.thumbnail, { pending: true });
   }
 
-  async function noticeboardAction({ action, post, responder = null }) {
+  async function noticeboardAction({ action, post, responder = null, match = null }) {
     // Opened AFTER the board reload below — the reload repaints the circle view, and a thread opened
     // before it was painted over the instant it appeared (browser story 4 found it).
     let openThreadWith = null;
@@ -7329,6 +7425,17 @@ function showCircle(id, circle, policy) {
         await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
         await pinboardCall('pinboard', 'markReturned', { requestId: post.id });
+      } else if (action === 'askMatch' && match) {
+        // Ask: the contact thread with the person who offers it (nothing is sent until I write)
+        const choice = (post.matches ?? []).find((m) => m.webid === match);
+        const threadId = askMatchThreadId(choice, { identityOf: (addr) => _peerAgent?.identityOfAddress?.(addr) ?? addr });
+        if (threadId) {
+          if (!contactThreads.has(threadId)) contactThreads.set(threadId, { name: choice.label, peerAddr: choice.address, messages: [] });
+          await showContactThread(threadId);
+        }
+        return;
+      } else if (action === 'skipMatch' && match) {
+        await askMatchSkips.add(post.id, match);
       } else if (action === 'accept' && responder) {
         await pinboardCall('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
       } else if (action === 'mute') {
@@ -7569,9 +7676,11 @@ function showCircle(id, circle, policy) {
         rerender();
       },
       onTab: (tabId) => {
+        // a tap on the open tab re-reads it (the board's answers); only a switch counts as a use
+        const switched = tabId !== activeTab;
         activeTab = tabId;
         // count the tab use so the quickActions row reflects reality.
-        const f = featureForTabId(tabId);
+        const f = switched ? featureForTabId(tabId) : null;
         if (f) actionFrequency.bump(id, f);
         if (tabId === 'noticeboard') loadNoticeboard();   // lazy-load the circle posts
         if (tabId === 'tasks') loadTasks();            // Taken — lazy-load the circle's tasks
@@ -9100,10 +9209,11 @@ async function boot() {
         .then((r) => { if (!r?.ok && r?.error) console.warn('[circleApp] attachPinboardPod:', r.error); })
         .catch(() => { /* best-effort; stays local-first */ });
     }
-    // S6.4 — refresh the on-screen noticeboard when a recipient's requested
-    // attachment bytes land (pinboard:attachment-fetched). Subscribed once; the hook
-    // points at the active circle's loader.
-    try { agent.onPinboardEvent?.('pinboard:attachment-fetched', () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
+    // Refresh the on-screen noticeboard when a post changed under it (requested attachment bytes landed, an answer
+    // to my request was recorded). Subscribed once; the hook points at the active circle's loader.
+    for (const ev of NOTICEBOARD_REFRESH_EVENTS) {
+      try { agent.onPinboardEvent?.(ev, () => { try { noticeboardRefreshHook?.(); } catch { /* */ } }); } catch { /* */ }
+    }
     if (typeof agent?.callSkill === 'function') {
       // Calendar cross-peer fan-out — wrap the bare callSkill so a successful
       // calendar dispatch (schedule/RSVP) fans its invite/RSVP envelopes out

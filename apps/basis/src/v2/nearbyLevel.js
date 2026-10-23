@@ -4,7 +4,7 @@
  * `nearby` — the person's, not the device's, so it travels with the persona — written by one op (`setNearbyLevel`) and
  * read by `nearbyLevelFrom`. The preset keys carry the release itself (what `releasedValues(self, 'nearby')` returns);
  * the level is also kept explicitly on a marker entry (`full` cannot be told from `profile` by its keys alone, and
- * `none` by none). Nothing set → `handle` (default-strict).
+ * `none` by none). Nothing set → `none` (default-strict).
  */
 import { REVEAL_PRESETS } from '@onderling/agent-registry';
 import { presetFromDisclosure } from './contactLens.js';
@@ -24,7 +24,7 @@ export const NEARBY_LEVEL_KEY = '_nearby.level';
  */
 export function nearbyLevelFrom(disclosure) {
   const ctx = disclosure?.perContext?.[NEARBY_CONTEXT];
-  if (!ctx) return 'handle';
+  if (!ctx) return 'none';
   const kept = ctx[NEARBY_LEVEL_KEY];
   if (kept && kept.enabled === false) return 'none';
   if (NEARBY_LEVELS.includes(kept?.rung)) return kept.rung;

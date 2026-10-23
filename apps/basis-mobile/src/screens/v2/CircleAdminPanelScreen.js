@@ -40,6 +40,9 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const insets = useSafeAreaInsets();   // clear the status bar: the back link under it could not be tapped
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [members, setMembers] = useState([]);
+  // until the roster is read, the panel says it is loading — not "no members" and not "only an admin can": painting the
+  // empty first state told a circle's founder they were not its admin (walked on the emulator 2026-10-22)
+  const [loaded, setLoaded] = useState(false);
   const [muted, setMuted] = useState([]);
   const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
   const [announce, setAnnounce] = useState('');
@@ -57,6 +60,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     // whose row is mine IN THIS CIRCLE: a persona's circle is the persona's
     setMyWebid((() => { try { return agent?.circleSelf?.(groupId)?.webid ?? null; } catch { return null; } })() ?? who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
+    setLoaded(true);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
     if (typeof outboundFor === 'function') setOutbound(await Promise.resolve(outboundFor()).catch(() => ({ shares: [], revocable: false })));
   }, [callSkill, groupId, outboundFor]);
@@ -138,7 +142,7 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const PAINT = {
     'admin-members': (d) => (
       <Section key={d.id} id={d.id} title={t(d.titleKey)}>
-        {members.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_members')}</Text> : members.map((m) => (
+        {!loaded ? <Text style={styles.muted} testID="admin-loading">{t('circle.loading')}</Text> : members.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_members')}</Text> : members.map((m) => (
           <View key={m.webid || m.handle} style={styles.row} testID={`admin-member-${m.webid}`}>
             {/* The member's face — the persona picture they DISCLOSED to this circle, so its presence on the
                 row is already the permission. web parity: circleAdminPanel.js. */}
@@ -190,7 +194,8 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
       <Section key={d.id} id={d.id} title={t(d.titleKey)}>
         {(() => {
           // Posting the circle's announcement is the admin's (the skill refuses a member): greyed for anyone else, with why.
-          const ann = announceControlFor({ members, myRef: myWebid });
+          // before the roster is in, nothing is decided yet: closed, but without a reason that may not be true
+          const ann = loaded ? announceControlFor({ members, myRef: myWebid }) : { disabled: true };
           return (
             <>
               <TextInput style={styles.area} value={announce} onChangeText={setAnnounce} editable={!ann.disabled}

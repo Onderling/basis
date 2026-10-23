@@ -33,7 +33,7 @@ import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
 import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
 import nacl from 'tweetnacl';
-import { Bootstrap } from '@onderling/core';
+import { parseUntrustedJson, Bootstrap } from '@onderling/core';
 
 /** A persona's id (a minted label, never a name). */
 const PERSONA_ID = /^p-[0-9a-f]{12}$/;
@@ -57,7 +57,7 @@ const b64url = {
     const bin = atob(pad + '='.repeat((4 - (pad.length % 4)) % 4));
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return JSON.parse(new TextDecoder().decode(bytes));
+    return parseUntrustedJson(new TextDecoder().decode(bytes));
   },
 };
 
@@ -219,7 +219,7 @@ export function openOfferPersonas(uri, mnemonic) {
     const raw = bytesFrom(parsed.personasSealed);
     const opened = nacl.secretbox.open(raw.slice(24), raw.slice(0, 24), personasKey(root));
     if (!opened) return [];
-    const list = JSON.parse(new TextDecoder().decode(opened));
+    const list = parseUntrustedJson(new TextDecoder().decode(opened));
     return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.id === 'string' && PERSONA_ID.test(p.id)).map((p) => ({
       id: p.id, name: typeof p.name === 'string' ? p.name : null,
       circles: (Array.isArray(p.c) ? p.c : []).filter((c) => c && typeof c.id === 'string' && c.id && typeof c.a === 'string' && c.a)

@@ -21,6 +21,7 @@ export { REVEAL_PRESETS };
 import { buildJoinConsentModel, optOutsFromDeclined } from '../../v2/circleConsent.js';
 import { endpointToDialForInvite } from '../../v2/connectionPoints.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 /* ─── Locale strings ────────────────────────────────────────── */
 
@@ -150,7 +151,7 @@ export function decodeInvite(invite, state) {
   }
   try {
     if (str.startsWith('{')) {
-      state.invite = JSON.parse(str);
+      state.invite = parseUntrustedJson(str);
       return;
     }
     const padded = str.replace(/-/g, '+').replace(/_/g, '/')
@@ -160,7 +161,7 @@ export function decodeInvite(invite, state) {
     }
     const bin = globalThis.atob(padded);
     try {
-      state.invite = JSON.parse(bin);
+      state.invite = parseUntrustedJson(bin);
     } catch {
       const snippet = bin.slice(0, 50).replace(/[^\x20-\x7e]/g, '·');
       throw new Error(`base64 decoded to non-JSON: "${snippet}…" — likely the URL was corrupted in transit (paste mangled?).  Try copy-pasting the full URL again.`);

@@ -41,7 +41,7 @@ export function canAdvanceFromConfirm(state) {
 }
 
 /**
- * Submit the restore via callSkill('pinboard', 'restoreFromMnemonic', ...).
+ * Submit the restore via callSkill('household', 'restoreOwnerPhrase', ...).
  * Pure function over state + callSkill — easy to unit-test with a stub
  * callSkill.  Returns the mutated state (caller re-renders).
  *
@@ -55,18 +55,14 @@ export async function submitRestore({ state, callSkill }) {
   state.submitError = null;
   try {
     const mnemonic = state.mnemonic.trim();
-    // Step 1b — install the OWNER ROOT first: persist the phrase + re-derive the
-    // default profile (= the feedback pseudonym). Then run the legacy pinboard restore
-    // for pod reattachment. Different identity vaults (cc-owner-root/cc-chat-id vs
-    // cc-pinboard-id) → no conflict; both take effect on the caller's reload.
+    // The phrase restores the OWNER ROOT and, from it, the person's chat identity (the address people reach) — both
+    // take effect on the caller's reload. Nothing else: the in-process agents' keys are device-local and are never in
+    // the phrase. (Until 2026-10-23 a second step wrote the phrase's bytes — the root secret — as the pinboard agent's
+    // seed, and the contact card then named the root's public key.)
     const owner = await callSkill('household', 'restoreOwnerPhrase', { mnemonic });
     if (owner?.error) throw new Error(owner.error);
-    const result = await callSkill('pinboard', 'restoreFromMnemonic', {
-      mnemonic,
-      confirm:  true,
-    });
-    if (result?.error) throw new Error(result.error);
-    state.successResult = result;
+    if (owner?.ok !== true) throw new Error('restore-failed');
+    state.successResult = owner;
   } catch (err) {
     state.submitError = err?.message ?? String(err);
     state.submitting  = false;

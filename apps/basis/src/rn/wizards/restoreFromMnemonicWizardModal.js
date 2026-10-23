@@ -16,7 +16,7 @@ import {
   canAdvanceFromConfirm, submitRestore,
 } from '../../core/wizards/restoreFromMnemonicState.js';
 import {
-  Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
+  Steps, Body, Textarea, Checkbox, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette, Warn,
 } from './_kit.js';
 
 export default function RestoreFromMnemonicWizardModal({
@@ -46,25 +46,25 @@ export default function RestoreFromMnemonicWizardModal({
         >
           {state.successResult ? (
             <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-              <Body title="✓ Restored" intro="Your identity was restored from the mnemonic.">
+              <Body title={t('circle.wizard.restore.done_title')} intro={t('circle.wizard.restore.done_intro')}>
                 <Text style={styles.count}>{t('circle.wizard.recovery.after_restore_hint')}</Text>
               </Body>
               <Actions buttons={[{ label: t('common.done'), onPress: onClose, kind: 'primary' }]} />
             </ScrollView>
           ) : (
             <>
-              <Steps labels={['Mnemonic', 'Confirm', 'Restore']} current={state.step} />
+              <Steps labels={[t('circle.wizard.restore.step_phrase'), t('circle.wizard.restore.step_confirm'), t('circle.wizard.restore.step_restore')]} current={state.step} />
               <ScrollView style={styles.scroll}>
                 {state.step === 1 && (
                   <Body
                     title={t('circle.wizard.restore.title')}
-                    intro="Paste your 12- or 24-word recovery phrase. This WILL replace your current identity — make sure you've backed up anything important first."
+                    intro={t('circle.wizard.restore.intro')}
                   >
                     <Textarea
                       label={t('circle.wizard.restore.phrase')}
                       value={state.mnemonic}
                       onChangeText={(v) => setState((s) => ({ ...s, mnemonic: v }))}
-                      placeholder="word1 word2 word3 …"
+                      placeholder={t('circle.wizard.restore.phrase_placeholder')}
                       rows={4}
                     />
                     <Text style={styles.count}>
@@ -73,7 +73,10 @@ export default function RestoreFromMnemonicWizardModal({
                   </Body>
                 )}
                 {state.step === 2 && (
-                  <Body title="Confirm" intro="This is destructive. Please confirm by ticking both boxes.">
+                  <Body title={t('circle.wizard.restore.confirm_title')} intro={t('circle.wizard.restore.confirm_intro')}>
+                    <Warn>{t('circle.wizard.restore.identity_warning')}</Warn>
+                    {/* the person's CURRENT phrase, asked once before the two checks (copy, not a third check) — web parity */}
+                    <Text style={styles.count}>{t('circle.wizard.restore.saved_question')}</Text>
                     <Checkbox
                       label={t('circle.wizard.restore.ack_lost')}
                       checked={state.understandsLoss}
@@ -88,11 +91,11 @@ export default function RestoreFromMnemonicWizardModal({
                 )}
                 {state.step === 3 && (
                   <Body
-                    title={t('circle.wizard.restore.confirm_title')}
-                    intro="Tap Restore to overwrite your current identity with the phrase above."
+                    title={t('circle.wizard.restore.apply_title')}
+                    intro={t('circle.wizard.restore.apply_intro')}
                   >
                     <ErrorBanner message={state.submitError} />
-                    <Submitting visible={state.submitting} label="Restoring…" />
+                    <Submitting visible={state.submitting} label={t('circle.wizard.restore.restoring')} />
                   </Body>
                 )}
               </ScrollView>
@@ -111,7 +114,7 @@ export default function RestoreFromMnemonicWizardModal({
                 return [
                   { label: t('common.back'),   onPress: () => setStep(2), kind: 'secondary', disabled: state.submitting },
                   { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-                  { label: 'Restore',          onPress: onRestore, kind: 'primary', disabled: state.submitting },
+                  { label: t('circle.wizard.restore.button'),          onPress: onRestore, kind: 'primary', disabled: state.submitting },
                 ];
               })()} />
             </>

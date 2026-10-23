@@ -20,7 +20,7 @@
  * Shared by the bot (it reads an offer, checks a turn, words the start link) and the app (it writes the offer and the
  * statements over its turns, reads the start link).
  */
-import { AgentIdentity, STATEMENT_DOMAINS, verifyDeviceStatement } from '@onderling/core';
+import { parseUntrustedJson, AgentIdentity, STATEMENT_DOMAINS, verifyDeviceStatement } from '@onderling/core';
 import { screenCode } from './botScreens.js';
 
 /** The peer-message subtype of the bot's statement to the linked app (linked, or unlinked). */
@@ -72,7 +72,7 @@ export function encodeLinkOffer({ statement, webid, webidSig } = {}) {
 export function parseLinkOffer(text, { verify = (message, sig, key) => AgentIdentity.verify(message, sig, key) } = {}) {
   const t = String(text ?? '').trim();
   if (!t.startsWith(LINK_OFFER_SCHEME)) return { ok: false, reason: 'not-an-offer' };
-  let d; try { d = JSON.parse(unb64url(t.slice(LINK_OFFER_SCHEME.length))); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(t.slice(LINK_OFFER_SCHEME.length))); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 2) return { ok: false, reason: 'wrong-version' };
   const st = d.st;
   if (typeof d.k !== 'string' || !d.k || typeof d.w !== 'string' || !d.w || !st || typeof st !== 'object'
@@ -123,7 +123,7 @@ export function encodeLinkStartLink(appUrl, { botAddress, relayUrl = null, botNa
 export function parseLinkStartLink(link) {
   const m = /#koppel-bot=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
 }

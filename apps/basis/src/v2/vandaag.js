@@ -55,22 +55,32 @@ export function expandedPage(screen, blockId) {
   return { ...screen, blocks: [{ ...block, config: { ...(block.config ?? {}), limit: EXPANDED_LIMIT, ...(block.type === 'notes' ? { withinDays: 0 } : {}) } }] };
 }
 
-/** The horizon presets a calendar block offers ("pas aan"): today · 3 days · a week · a month. */
+/**
+ * The horizon presets a calendar block offers ("pas aan"): today · 3 days · this week · this month. The time ranges
+ * speak ONE label set (`range_*`): the "within" presets below are these same words, plus "any time".
+ */
 export const HORIZON_PRESETS = Object.freeze([
-  Object.freeze({ value: 1, labelKey: 'circle.vandaag.horizon_today' }),
-  Object.freeze({ value: 3, labelKey: 'circle.vandaag.horizon_3days' }),
-  Object.freeze({ value: 7, labelKey: 'circle.vandaag.horizon_week' }),
-  Object.freeze({ value: 30, labelKey: 'circle.vandaag.horizon_month' }),
+  Object.freeze({ value: 1, labelKey: 'circle.vandaag.range_today' }),
+  Object.freeze({ value: 3, labelKey: 'circle.vandaag.range_3days' }),
+  Object.freeze({ value: 7, labelKey: 'circle.vandaag.range_week' }),
+  Object.freeze({ value: 30, labelKey: 'circle.vandaag.range_month' }),
 ]);
 /** The caps a block offers. */
 export const LIMIT_PRESETS = Object.freeze([3, 5, 10]);
-/** The relative-date presets ("within"): any time · today · this week · this month. */
+/** The relative-date presets ("within"): any time, then the horizon's own ranges. */
 export const WITHIN_PRESETS = Object.freeze([
-  Object.freeze({ value: 0, labelKey: 'circle.vandaag.within_any' }),
-  Object.freeze({ value: 1, labelKey: 'circle.vandaag.within_1' }),
-  Object.freeze({ value: 7, labelKey: 'circle.vandaag.within_7' }),
-  Object.freeze({ value: 30, labelKey: 'circle.vandaag.within_30' }),
+  Object.freeze({ value: 0, labelKey: 'circle.vandaag.range_any' }),
+  ...HORIZON_PRESETS,
 ]);
+/** The heading over each control in the customise sheet, so a row of chips says what it sets. */
+export const CONTROL_TITLES = Object.freeze({
+  horizonDays: 'circle.vandaag.control_horizon',
+  scope:       'circle.vandaag.control_scope',
+  limit:       'circle.vandaag.control_limit',
+  circleIds:   'circle.vandaag.circles_title',
+  labels:      'circle.vandaag.labels_title',
+  withinDays:  'circle.vandaag.control_within',
+});
 /** The blocks that show circles' contents, so may narrow to some of the page's circles. */
 const CIRCLE_AWARE = new Set(['noticeboard', 'calendar', 'tasks', 'notes', 'circlesUnread']);
 const SCOPE_OPTIONS = Object.freeze([
@@ -111,7 +121,8 @@ export function customiseModel(book, { circles = [] } = {}) {
       if (b.type === 'tasks' || b.type === 'notes') controls.push({ kind: 'withinDays', value: Number(cfg.withinDays) || 0, options: WITHIN_PRESETS });
       return {
         blockId: b.id, type: b.type, labelKey: BLOCK_DESCRIPTORS[b.type]?.labelKey ?? b.type,
-        canUp: i > 0, canDown: i < blocks.length - 1, index: i, controls,
+        canUp: i > 0, canDown: i < blocks.length - 1, index: i,
+        controls: controls.map((c) => ({ ...c, titleKey: CONTROL_TITLES[c.kind] })),
       };
     }),
     addable: blockTypesFor('mij').map((type) => ({ type, labelKey: BLOCK_DESCRIPTORS[type].labelKey, descriptionKey: BLOCK_DESCRIPTORS[type].descriptionKey })),

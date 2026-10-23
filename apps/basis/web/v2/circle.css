@@ -12,7 +12,9 @@
 .circle-page {
   max-width: 640px;
   margin: 0 auto;
-  padding: 18px 16px 84px; /* bottom clears the fixed tab bar */
+  /* bottom clears the fixed tab bar AND the floating "+" above it (.cc-fab: bottom 76 + 56 tall + 16 room) — the
+     phone's FAB_CLEARANCE (theme.js) is the same number, pinned by fitness/fabClearance.test.js */
+  padding: 18px 16px 148px;
 }
 
 /* ───────────────── launcher bottom tab bar (board 1/5/6C) ───────────────── */
@@ -278,6 +280,8 @@
 .circle-tile:hover { border-color: var(--accent); }
 /* the customise sheet: a block's name, its controls beside it with room between, wrapping as a row */
 .vandaag-customise__block { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0; }
+.vandaag-customise__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vandaag-customise__control-title { flex-basis: 100%; font-size: 12px; color: var(--ink-soft); }
 .circle-tile__avatar {
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-content: center;
@@ -457,6 +461,11 @@
 .circle-membercard__attr { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
 .circle-membercard__attr-label { color: var(--ink-soft); }
 .circle-membercard__none { color: var(--ink-soft); font-style: italic; padding: 4px 0; }
+/* how much this member shows you: the label and its value side by side, not run together ("ZichtbaarheidAlleen handle") */
+.circle-membercard__preset { display: flex; gap: 8px; align-items: baseline; margin: 0 0 14px; font-size: 14px; }
+.circle-membercard__preset-label { color: var(--ink-soft); }
+/* reporting a member is the last thing on the card, after who they are — and not as wide as the page */
+.circle-membercard__report { display: block; margin-top: 20px; width: auto; align-self: flex-start; }
 
 /* ───────────────────── advisor (board 3D) ───────────────────── */
 .circle-advisor__card { border-left: 3px solid var(--accent); }
@@ -491,6 +500,11 @@
   padding: 12px 14px; background: var(--card);
   border: 1px solid var(--line); border-radius: var(--radius); font-size: 14px;
 }
+/* inline under the asker's own ask: label · badge · what they offer, then Ask / Skip */
+.cc-noticeboard__matches { margin-top: 8px; }
+.cc-noticeboard__matches .circle-offering-matches__title { font-size: 13px; font-weight: 600; margin: 0 0 6px; color: var(--ink-soft); }
+.cc-noticeboard__matches .circle-offering-matches__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; }
+.circle-offering-matches__offering { flex-basis: 100%; color: var(--ink-soft); font-size: 13px; }
 
 /* ───────────────────── folio (board 10) ───────────────────── */
 .circle-folio__filters { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -594,6 +608,10 @@
    a bot-header strip over the message log, in a 2px-ink-bordered --card container. */
 .circle-view__chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-top: 4px; }
 .circle-view__chat-card .circle-view__list { padding: 14px; }
+/* the bulletin's ink frame is a dark line on paper; inverted in dark it became a bright white box around the chat —
+   in dark the frame takes the theme's line colour instead (the same two dark selectors theme.css uses) */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .circle-view__chat-card { border-color: var(--line); } }
+:root[data-theme="dark"] .circle-view__chat-card { border-color: var(--line); }
 /* Bot-header strip: green presence dot + the assistant's name in bold, a --line hairline under it. */
 .circle-view__bot-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
 .circle-view__bot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
@@ -656,17 +674,26 @@
 .circle-view__bubble-delivery--failed  { color: var(--danger); cursor: pointer; }
 .circle-view__bubble-delivery--failed:hover { text-decoration: underline; }
 .circle-view__composer { position: relative; display: flex; gap: 8px; align-items: center; padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+/* the composer's "+" opens as a SHEET above the composer — a card of its own that wraps its acts — never inline in the
+   row, where it squeezed the input to a sliver (screen walk, 2026-10-22) */
+.circle-view__attach-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); }
+.circle-view__attach-menu[hidden] { display: none; }   /* flex would override [hidden] */
+.circle-view__attach-pin { margin-left: -6px; padding-left: 4px; padding-right: 4px; }
 /* Bulletin sketch composer: flat paper input + ink send block (mirror of the site's .chatbox form). */
 .circle-view__composer-input { flex: 1; padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
 .circle-view__composer-input::placeholder { color: var(--ink-soft); }
 .circle-view__composer-input:focus { outline: none; border-color: var(--accent); }
-.circle-view__composer-send { border: none; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 14px; font-weight: 700; line-height: 1; padding: 9px 15px; cursor: pointer; }
-.circle-view__composer-send:hover { background: var(--accent-ink); }
+/* send and attach are one square family (quiet: line border, paper, ink) — they were two looks side by side */
+.circle-view__composer-send {
+  cursor: pointer; font: inherit; font-size: 16px; font-weight: 700; line-height: 1; width: 36px; height: 36px; padding: 0; flex: 0 0 auto;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink);
+}
+.circle-view__composer-send:hover { border-color: var(--accent); }
 
 /* media P1 — sealed-media attach button (only rendered when the circle has a seal strategy). */
 .circle-view__attach {
   cursor: pointer; font-size: 16px; line-height: 1; width: 36px; height: 36px; padding: 0; flex: 0 0 auto;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper, #fff); color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); color: var(--ink);
 }
 .circle-view__attach:hover { border-color: var(--accent); }
 
@@ -735,7 +762,6 @@
 .circle-view__tabs { display: flex; justify-content: space-around; align-items: stretch; border-bottom: 1px solid var(--line); margin: 4px 0 10px; position: sticky; top: 0; z-index: 5; background: var(--paper); }
 .circle-view__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .circle-view__tab.is-active { color: var(--accent-ink); border-bottom-color: var(--accent-ink); }
-.circle-view__placeholder { padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center; }
 
 /* SP-13.4 — Chat ↔ Screen header pill (v2 §4 "De mode switch"). */
 .circle-view__view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--paper); }
@@ -816,6 +842,7 @@
   background: transparent; border: 1px solid var(--accent); color: var(--accent-ink);
 }
 .cc-contacts__add:hover { background: var(--accent); color: var(--accent-contrast); }
+.cc-contacts__acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .cc-contacts__empty { color: var(--ink-soft); font-size: 14px; padding: 12px 4px; }
 
 /* OBJ-2 — paired devices (no-pod sync) panel inside circle settings. */
@@ -916,7 +943,7 @@
 }
 
 .cc-cthread { display: flex; flex-direction: column; height: 100%; padding-bottom: 12px; }
-.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.cc-cthread__header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .cc-cthread__lang { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex: 0 0 auto; }
 .cc-cthread__lang-btn { cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; padding: 3px 9px; background: transparent; border: none; color: var(--ink-soft); }
 .cc-cthread__lang-btn.is-active { background: var(--accent); color: var(--accent-contrast); }
@@ -925,6 +952,9 @@
   background: transparent; border: none; padding: 4px 0; letter-spacing: .02em;
 }
 .cc-cthread__title { font-size: 17px; font-weight: 700; color: var(--ink); margin: 0; }
+/* a long name (or an address nobody named yet) breaks inside the title instead of pushing the sealed mark and Hide
+   off the right edge at laptop width (screen walk, 2026-10-22) */
+.cc-cthread__title { min-width: 0; flex: 1 1 12em; overflow-wrap: anywhere; }
 .cc-cthread__log { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 4px 2px; }
 .cc-cthread__msg { display: flex; flex-direction: column; max-width: 80%; }
 .cc-cthread__msg--user { align-self: flex-end; align-items: flex-end; }
@@ -1126,6 +1156,11 @@
 .cc-mydata__header { display: flex; align-items: baseline; gap: 12px; }
 .cc-mydata__back { cursor: pointer; font: inherit; font-size: 12px; color: var(--ink-soft); background: transparent; border: none; padding: 4px 0; }
 .cc-mydata__title { font-size: 20px; font-weight: 700; color: var(--ink); margin: 0; }
+/* the relay line and its button: side by side with room between, wrapping on a narrow screen ("Relay: ws://…" sat
+   glued against "Relayserver instellen…") */
+.cc-mydata__relay-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cc-mydata__relay-note { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.cc-mydata__relay-hint { font-size: 12px; color: var(--ink-soft); margin: 0; line-height: 1.45; }
 .cc-mydata__section { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--paper); display: flex; flex-direction: column; gap: 8px; }
 .cc-mydata__section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); margin: 0; }
 .cc-mydata__kv { display: flex; gap: 10px; font-size: 13px; }
@@ -1336,6 +1371,10 @@
 .cc-wizard-link { color: var(--accent); text-decoration: underline; cursor: pointer; }
 
 /* Panels that quote something (rules, privacy notice, context) */
+/* the create wizard's one fold ("Geavanceerd"): everything the short path does not ask */
+.cc-wizard-advanced { margin-top: 0.8rem; }
+.cc-wizard-advanced > summary { cursor: pointer; font-weight: 600; }
+.cc-wizard-hint { margin: 0.3rem 0 0.6rem; font-size: 0.85rem; color: var(--ink-soft); }
 .cc-wizard-rules, .cc-wizard-privacy, .cc-wizard-context-card, .cc-wizard-review {
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm);
   padding: 10px 12px; font-size: 13px; color: var(--ink); line-height: 1.5;
@@ -1496,8 +1535,7 @@
 .circle-vandaag__head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .circle-vandaag__plus { margin-left: auto; font: inherit; font-size: 14px; font-weight: 600; padding: 6px 14px; border: 0; border-radius: 999px; background: var(--accent-ink); color: var(--accent-contrast); cursor: pointer; }
 .circle-vandaag__plus:hover { filter: brightness(1.08); }
-.circle-vandaag__customise, .circle-vandaag__back { font: inherit; font-size: 18px; line-height: 1; padding: 2px 6px; border: 0; background: none; color: var(--ink-soft); cursor: pointer; }
-.circle-vandaag__back { font-size: 13px; }
+.circle-vandaag__customise, .circle-vandaag__back { font: inherit; font-size: 13px; line-height: 1; padding: 2px 6px; border: 0; background: none; color: var(--ink-soft); cursor: pointer; }
 .circle-vandaag__customise:hover, .circle-vandaag__back:hover { color: var(--ink); }
 .circle-screen__block--empty { padding: 4px 0; font-size: 14px; color: var(--ink-soft); }
 .circle-screen__more { font: inherit; font-size: 13px; padding: 2px 0; border: 0; background: none; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
@@ -1513,6 +1551,20 @@
 /* the "+" sheet's fields: the theme's paper and ink, so they follow dark mode (the browser default is a light box) */
 .circle-vandaag-plus input, .circle-vandaag-plus textarea, .circle-vandaag-plus select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
 .circle-vandaag-plus__line { width: 100%; box-sizing: border-box; }
+/* each section is a wrapping row of pills with room between them (they sat flush against each other and against the
+   line above at laptop width); a section's title, the free line and an act's form take a whole row */
+.circle-vandaag-plus__section { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.circle-vandaag-plus__section:empty, .circle-vandaag-plus__section[hidden] { display: none; }   /* flex would override [hidden] */
+/* an act's form stacks: each field's words over its box, the box full width, the buttons below */
+.circle-vandaag-plus__form { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.circle-vandaag-plus__form input, .circle-vandaag-plus__form textarea, .circle-vandaag-plus__form select { width: 100%; box-sizing: border-box; }
+.circle-vandaag-plus__form .cc-btn { align-self: flex-start; }
+.circle-vandaag-plus__form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
+.circle-vandaag-plus__section > h4, .circle-vandaag-plus__lineform, .circle-vandaag-plus__form,
+.circle-vandaag-plus__share, .circle-vandaag-plus__referral, .circle-vandaag-plus__error { flex-basis: 100%; }
+/* the ☆ that pins an act sits against its pill, not as a pill of its own */
+.circle-vandaag-plus__pin, .circle-vandaag-plus__unpin { margin-left: -6px; padding-left: 4px; padding-right: 4px; }
+.circle-vandaag-plus__close { margin-top: 14px; }
 
 /* THE "+": one floating button on every tab, bottom-right above the tab bar — the page's one accent (terracotta) */
 .cc-fab { position: fixed; right: 20px; bottom: 76px; z-index: 50; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent-ink); color: var(--accent-contrast); font: inherit; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
@@ -1520,4 +1572,13 @@
 /* the floating "+" shows exactly where the main tab bar shows: inside a circle (bar hidden) the circle's composer
    and its attach "+" are the acts — and the floating one covered the composer's send button there */
 .circle-tabbar--hidden ~ .cc-fab { display: none; }
-.circle-vandaag-plus__section h4 { margin: 12px 0 6px; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+.circle-vandaag-plus__section h4 { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+
+/* The contact lens (adding a person, and "who are you for this contact"): it had no styles — the title ran out of the
+   card on an unnamed address, "Als"/"Hoeveel" sat glued to native selects (screen walk, 2026-10-22). */
+.cc-lens__title, .cc-lens__intro { overflow-wrap: anywhere; }
+.cc-lens__field { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 0; font-size: 13px; }
+.cc-lens__label { color: var(--ink-soft); }
+.cc-lens__field select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 8px; }
+.cc-lens__hint { font-size: 13px; color: var(--ink-soft); line-height: 1.45; margin: 12px 0 0; }
+.cc-lens__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }

@@ -55,12 +55,7 @@ export function renderCircleNearby(container, {
   container.innerHTML = '';
   container.classList.add('circle-nearby');
 
-  const back = document.createElement('button');
-  back.type = 'button';
-  back.className = 'cc-btn cc-btn--quiet circle-nearby__back';
-  back.textContent = tr('circle.back');
-  back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
-  container.appendChild(back);
+  // no "← circles": Nearby is a tab of its own, not a page under Circles
 
   const head = document.createElement('h2');
   head.className = 'circle-nearby__title';
@@ -276,7 +271,7 @@ export function renderCircleNearby(container, {
   } else {
     const askBtn = document.createElement('button');
     askBtn.type = 'button';
-    askBtn.className = 'cc-btn cc-btn--quiet circle-nearby__ask-compose';
+    askBtn.className = 'cc-btn cc-btn--primary circle-nearby__ask-compose';
     askBtn.textContent = tr('circle.nearbyScreen.ask_compose');
     askBtn.addEventListener('click', () => { if (typeof onCompose === 'function') onCompose(); });
     asksBlock.appendChild(askBtn);

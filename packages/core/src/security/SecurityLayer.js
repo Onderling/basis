@@ -61,12 +61,14 @@
  */
 import { P, canonicalize }                          from '../Envelope.js';
 import { AgentIdentity }                             from '../identity/AgentIdentity.js';
+import { InternalTransport }                         from '../transport/InternalTransport.js';
 import { KeyRotation }                               from '../identity/KeyRotation.js';
 import { encode as b64encode, decode as b64decode }  from '../crypto/b64.js';
 import { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential }
   from './senderKey.js';
 import { askSenderAuthorizer }                       from './senderAuthorization.js';
 import { param, PARAM_SCOPE, PARAM_KIND }            from '../params.js';
+import { parseUntrustedJson } from './untrustedJson.js';
 
 // Parameter register (#36) — the anti-replay window + dedup TTL. scope:device, kind:INTERNAL is load-bearing
 // here: these are SECURITY bounds, and kind:internal makes them immutable by construction — a user can never
@@ -127,6 +129,8 @@ export class SecurityLayer {
   #identity;
   /** @type {Map<string, string>} address → Ed25519 pubKey (base64url) */
   #peers = new Map();
+  /** Addresses adopted as in-process peers (`adoptInProcessPeer`) — this process's own, never handed to siblings. */
+  #inProcessPeers = new Set();
   /** @type {Map<string, number>} _id → expiresAt (ms) */
   #dedup = new Map();
   /**
@@ -463,6 +467,33 @@ export class SecurityLayer {
     return 'refused';
   }
 
+  /**
+   * Adopt a peer that lives in THIS process: its key is read from the objects themselves instead of a sealed hello.
+   * A hello between two agents in one process proves nothing — whoever can call this holds both objects already —
+   * so it is replaced, not skipped: the key is bound exactly as a hello's would be (`learnPeerKey`: establish, never
+   * replace), and the gate and the fast path run as after a hello.
+   *
+   * Refused unless every part is provably in-process: both transports are InternalTransports on the SAME bus, the
+   * peer's transport is the one connected on that bus at its address, and `peerIdentity` is an AgentIdentity object
+   * whose key IS that address (a key handed in as a string is refused). An adopted peer is never handed to sibling
+   * devices (`peerBindings`).
+   *
+   * @param {InternalTransport} ownTransport   this agent's transport on the bus
+   * @param {InternalTransport} peerTransport  the peer agent's transport on the same bus
+   * @param {AgentIdentity}     peerIdentity   the peer agent's identity object
+   * @returns {'established'|'unchanged'|'refused'}
+   */
+  adoptInProcessPeer(ownTransport, peerTransport, peerIdentity) {
+    if (!(ownTransport instanceof InternalTransport) || !(peerTransport instanceof InternalTransport)) return 'refused';
+    if (!ownTransport.bus || ownTransport.bus !== peerTransport.bus) return 'refused';
+    const address = peerTransport.address;
+    if (ownTransport.peerTransport(address) !== peerTransport) return 'refused';
+    if (!(peerIdentity instanceof AgentIdentity) || peerIdentity.pubKey !== address) return 'refused';
+    const outcome = this.learnPeerKey(address, peerIdentity.pubKey);
+    if (outcome !== 'refused') this.#inProcessPeers.add(address);
+    return outcome;
+  }
+
   /** @returns {number} — inbound key substitutions refused since construction. */
   get refusedKeySubstitutions() { return this.#refusedSubstitutions; }
 
@@ -483,7 +514,7 @@ export class SecurityLayer {
     const own = new Set([this.#identity.pubKey, ...this.#selfIdentities.keys(), ...this.#selfAddressByPubKey.keys()]);
     const out = [];
     for (const [address, pubKey] of this.#peers) {
-      if (own.has(address) || own.has(pubKey)) continue;
+      if (own.has(address) || own.has(pubKey) || this.#inProcessPeers.has(address)) continue;
       out.push({ address, pubKey });
     }
     return out;
@@ -492,6 +523,7 @@ export class SecurityLayer {
   /** Remove a peer's key so future sends require a fresh hello. */
   unregisterPeer(address) {
     this.#peers.delete(address);
+    this.#inProcessPeers.delete(address);
   }
 
   /**
@@ -775,7 +807,7 @@ export class SecurityLayer {
       throw new SecurityError(SEC.DECRYPT_FAILED, `nacl.box.open failed on envelope ${env._id}`);
     }
 
-    env.payload = JSON.parse(new TextDecoder().decode(plaintext));
+    env.payload = parseUntrustedJson(new TextDecoder().decode(plaintext));
     return env;
   }
 

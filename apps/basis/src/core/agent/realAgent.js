@@ -192,6 +192,10 @@ import { isAwayNow } from '../../v2/memberAvailability.js';
  * agent's vault is selected by createSecureAgent's picker via the
  * identityVaultPrefix opt.
  */
+const _memoryFallbacks = [];
+/** The vault prefixes that fell back to MEMORY in this process (a host without durable storage for them). */
+export function memoryVaultFallbacks() { return _memoryFallbacks.slice(); }
+
 function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
   if (typeof globalThis.localStorage !== 'undefined') {
     try { return new VaultLocalStorage({ prefix }); } catch { /* defensive */ }
@@ -207,6 +211,7 @@ function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
       + 'durable storage must pass its own vault.',
     );
   }
+  _memoryFallbacks.push(prefix);
   return new VaultMemory();
 }
 
@@ -222,6 +227,32 @@ async function restoreOrGenerate(vault) {
     }
   } catch { /* fall through to generate */ }
   return AgentIdentity.generate(vault);
+}
+
+/**
+ * An in-process agent's key must never be the owner root's or the chat identity's. Until 2026-10-23 the restore
+ * wizard wrote the phrase's own bytes — the root secret — as the pinboard agent's seed; a device restored that way
+ * carries it still. Such a vault gets a fresh seed before its agent starts (its stableId re-derives from the new
+ * seed). Counts into `healed`; the caller says it once, with no key in the line. A vault checked once is marked, so
+ * a relaunch reads one small value instead of deriving its key a second time.
+ *
+ * The mark is sound ONLY because nothing writes a root- or chat-derived seed into an in-process agent's vault any
+ * more: the one path that did (pinboard's phrase restore) is deleted. A new path that writes such a seed must clear
+ * this mark — or the check will not run again on a marked vault.
+ */
+const IN_PROCESS_KEY_CHECKED = 'in-process-key-checked';
+async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {
+  try {
+    if ((await vault.get(IN_PROCESS_KEY_CHECKED)) === '1') return;
+    // An empty vault is about to get a freshly generated key, which is never the root's or the chat's.
+    const existing = (await vault.has('agent-privkey')) ? await AgentIdentity.restore(vault) : null;
+    if (existing && forbiddenPubKeys.has(existing.pubKey)) {
+      await vault.delete?.('agent-stable-id');
+      await AgentIdentity.generate(vault);
+      healed.n += 1;
+    }
+    await vault.set(IN_PROCESS_KEY_CHECKED, '1');
+  } catch { /* an unreadable vault is restoreOrGenerate's case, not this one */ }
 }
 
 import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
@@ -281,6 +312,7 @@ import { buildStandardRolePolicy } from '@onderling-app/tasks';                 
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId, isPeopleWritten } from '@onderling/app-manifest';
 import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 // Deterministic seed for the real household store.  Three open items across
 // list types so `/list shopping` + the brief demo are non-empty out of the
@@ -308,6 +340,10 @@ const SEED_HOUSEHOLD_ITEMS = [
  * }>}
  */
 export async function createRealHouseholdAgent(opts = {}) {
+  // Durable storage for every vault this agent makes for itself, when the host has some (the phone hands its
+  // AsyncStorage this way); otherwise the runtime's own (localStorage), and memory only as the last resort.
+  const pickVault = (prefix, o) => (typeof opts.vaultFor === 'function' ? opts.vaultFor(prefix) : null) ?? makeBrowserVault(prefix, o);
+
   // The agent's own words go through the shell's translator — resolved ONCE here (every shell hands `opts.t`; a bare
   // composition without one gets the keys, never English).
   const agentT = typeof opts.t === 'function' ? opts.t : (k) => k;
@@ -435,7 +471,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // persisted. The old vault survives only as the legacy migration source —
   // an install from before the cutover has its cleartext phrase adopted (and
   // removed) on the first boot through here. See ownerRootCustody.js.
-  const ownerRootVault = opts.ownerRootVault ?? makeBrowserVault('cc-owner-root:', { durabilityMatters: true });
+  const ownerRootVault = opts.ownerRootVault ?? pickVault('cc-owner-root:', { durabilityMatters: true });
   const rootKeyStore   = opts.rootKeyStore ?? pickRootKeyStore({ fallbackVault: ownerRootVault });
   // THE CUSTODY FORK (the non-resident root): a CUT-OVER device's key door holds its DELEGATION
   // seed and `ownerRoot` is NULL for the whole boot — the root exists only inside ceremonies,
@@ -487,7 +523,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Host agent — in-process app skills (household, tasks-v0, pinboard,
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
-  const hostVault = await sealedVault(opts.hostVault ?? makeBrowserVault('cc-host-id:'));
+  const hostVault = await sealedVault(opts.hostVault ?? pickVault('cc-host-id:'));
+  // The keys no in-process agent may hold: the owner root's (here) and the chat identity's (added once it exists).
+  const notInProcessKeys = new Set(ownerRoot ? [b64encode(ownerRoot.derivedPubKey())] : []);
+  const inProcessHealed  = { n: 0 };
+  await giveFreshSeedIfShared(hostVault, notInProcessKeys, inProcessHealed);
   const hostId    = await restoreOrGenerate(hostVault);
   const hostTransport = new InternalTransport(bus, hostId.pubKey);
   const hostAgent = new Agent({ identity: hostId, transport: hostTransport });
@@ -519,7 +559,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // silently here). An entry that exists but cannot be read (a plaintext write that
   // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
   // root is the one repair that keeps the person reachable at their roster addresses.
-  const chatVaultBacking = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
+  const chatVaultBacking = opts.chatVault ?? pickVault('cc-chat-id:');
   const chatVault = await sealedVault(chatVaultBacking);
 
   // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
@@ -579,7 +619,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // with the old device's re-derived key and keeps the raw keys here, sealed at rest under this device's
   // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
   // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
-  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? makeBrowserVault('cc-history-keys:'));
+  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault('cc-history-keys:'));
   const historyKeyChainFor = async (circleId) => {
     try { const raw = await historyKeysVault.get(`chain:${circleId}`); return raw ? JSON.parse(raw) : []; }
     catch { return []; }
@@ -635,7 +675,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const persona = personas.get(primaryId);   // the primary's runtime: "this device speaks as"
   persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
-  const currentPersonKey = () => (persona.personKey ? { version: persona.personKey.version, pubKey: personKeyPubKeyB64(persona.personKey.seed) } : null);
+  const currentPersonKey = () => (persona.personKey ? { version: persona.personKey.version, pubKey: persona.personKeyPubOf(persona.personKey) } : null);
   /** The same, with the link key's public half — what a CARD and a chain reply carry, so a contact can pin it and verify rotations. */
   const personKeyForContacts = () => (persona.personKey ? { ...currentPersonKey(), ...(persona.personKey.linkKeyPub ? { linkKeyPub: persona.personKey.linkKeyPub } : {}) } : null);
   // THE PERSON KEY ON THE WIRE (binding-levels §10.5 step 4): an identity the secure agent can sign envelopes with
@@ -760,7 +800,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
     // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
-    trustRegistry: { vault: opts.peerTrustVault ?? makeBrowserVault('cc-peer-trust:') },
+    trustRegistry: { vault: opts.peerTrustVault ?? pickVault('cc-peer-trust:') },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
     // WITH the catch-up exemption that made turning it on safe: a reconnect replay legitimately
     // serves up to 1000 items in one burst, which the chat-pace buckets would silently discard
@@ -839,6 +879,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  notInProcessKeys.add(chatId.pubKey);
   // the persona's chat identity (its webid): the secure agent loaded it from the persona's slot
   persona.chatId = chatId;
   // THE RECOVERY SEAL — what the recovery file and the registry's pod mirror are sealed to: derived from the root where
@@ -852,6 +893,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       return seed ? await AgentIdentity.fromSeed(seed, new VaultMemory()) : null;
     } catch (err) { console.warn(`[recovery-seal] not loaded: ${err?.message ?? err}`); return null; }
   })();
+  // The settings seal strategy over that identity, built once: each build re-ran the identity's ed2curve conversion.
+  let recoverySealStrategyBuilt = false;
+  let recoverySealStrategyValue = null;
+  const recoverySealStrategy = () => {
+    if (!recoverySealStrategyBuilt) {
+      recoverySealStrategyValue = settingsSealStrategyForIdentity(recoverySealIdentity);
+      recoverySealStrategyBuilt = true;
+    }
+    return recoverySealStrategyValue;
+  };
   // A household bot's circle id is its own, derived from its key (`tasksCircleId` is then a function of it). Its rows
   // from before (under the bare `household` id) move there ONCE, beneath the store: item ids unchanged, nothing fanned;
   // a second boot finds the circle holding rows and moves nothing.
@@ -919,7 +970,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // identical on every device of the user whichever personas it holds → settings sealed here open on the user's
       // other devices. The shell supplies the pod (fetch/podRoot); realAgent supplies the key. No key material
       // escapes — only the `{seal, open}` closures. No seal on this device yet → no pod sync, stays local.
-      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      const strategy = recoverySealStrategy();
       const medium   = strategy ? await opts.provisionSettingsMedium(strategy) : null;
       settingsRestoreCtx.medium = medium;
       if (medium) {
@@ -1292,7 +1343,9 @@ export async function createRealHouseholdAgent(opts = {}) {
    *     (householdApp.listOpen) reads the whole store when `type` is absent.  The shared manifest is
    *     untouched (addItem's `type` stays required; the standalone household app is unaffected). */
   {
-    const householdId    = await restoreOrGenerate(await sealedVault(makeBrowserVault('cc-household-agent-id:')));
+    const householdVault = await sealedVault(pickVault('cc-household-agent-id:'));
+    await giveFreshSeedIfShared(householdVault, notInProcessKeys, inProcessHealed);
+    const householdId    = await restoreOrGenerate(householdVault);
     householdAgent       = new Agent({ identity: householdId, transport: new InternalTransport(bus, householdId.pubKey) });
     const hhOp = (id) => {
       const found = householdManifest.operations.find((o) => o.id === id);
@@ -1367,7 +1420,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   let registryCarrierStatus = () => ({ mode: 'local', probe: null });
   const registryPseudoPod = await (async () => {
     try {
-      const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(recoverySealIdentity) : null;
+      const strategy = typeof opts.provisionRegistryMedium === 'function' ? recoverySealStrategy() : null;
       const medium   = strategy ? await opts.provisionRegistryMedium(strategy) : null;
       const carrier  = createRegistryCarrier({
         // Sealed at rest: the registry holds who this device belongs to — the person's curated
@@ -1462,7 +1515,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * behaviour) — never breaks boot. */
     let agentsTokens = null;
     try {
-      const tokenVault = await sealedVault(opts.agentsTokenVault ?? makeBrowserVault('cc-agent-tokens:'));
+      const tokenVault = await sealedVault(opts.agentsTokenVault ?? pickVault('cc-agent-tokens:'));
       const tokenRegistry = new TokenRegistry(tokenVault);
       agentsTokens = {
         issue: async ({ subject, skill, expiresIn, constraints }) => {
@@ -2236,7 +2289,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** The own lanes this device rides: its default's and each persona's it runs. */
   const ownLanes = () => [...personas.keys()].map(ownLaneOf);
-  const ownSeal = settingsSealStrategyForIdentity(recoverySealIdentity);
+  const ownSeal = recoverySealStrategy();
   function wireOwnLane() {
     if (ownLaneWired || !ownStoreNow || !taskEmit) return;
     ownLaneWired = true;
@@ -3718,7 +3771,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const circleSelf = (circleId) => {
     const p = personaOf(circleId);
     const isDefault = p === persona;
-    const pk = p.personKey ? { version: p.personKey.version, pubKey: personKeyPubKeyB64(p.personKey.seed) } : null;
+    const pk = p.personKey ? { version: p.personKey.version, pubKey: p.personKeyPubOf(p.personKey) } : null;
     return { webid: (isDefault ? chatId : p.chatId)?.pubKey ?? null, sendAs: isDefault ? null : (p.chatId?.pubKey ?? null), personKey: pk };
   };
   hostAgent.register('bindCirclePersona', async ({ parts }) => {
@@ -3865,7 +3918,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
   hostAgent.register('exportRecoveryFile', async ({ parts }) => {
     try {
-      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      const strategy = recoverySealStrategy();
       if (!strategy) return [DataPart({ ok: false, error: 'no-recovery-seal' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
@@ -3928,7 +3981,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
-    const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+    const strategy = recoverySealStrategy();
     if (!strategy) return { ok: false, error: 'no-recovery-seal' };
     if (!agentsRegistryRef?.register) return { ok: false, error: 'no-registry' };
     let body;
@@ -4296,7 +4349,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
-    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
+    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? pickVault('cc-host-trust:'));
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,
@@ -4318,10 +4371,19 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // hello-exchange so each agent knows the other.  InternalBus
   // delivers synchronously enough that one hello is sufficient.
-  await chatAgent.hello(hostAgent.address);
+  // The five in-process agents are ADOPTED, not greeted: a sealed hello between two agents in one process proves
+  // nothing (this code holds both objects), and it cost a phone ~0.9 s of boot. Each side learns the other's key from
+  // the objects themselves (SecurityLayer.adoptInProcessPeer — refused unless both are on this bus); the gate and the
+  // fast path run as after a hello, and these keys are never handed to the person's other devices.
+  const adoptInProcess = (peer) => {
+    const theirs = chatAgent.security.adoptInProcessPeer(chatAgent.transport, peer.transport, peer.identity);
+    const ours   = peer.security.adoptInProcessPeer(peer.transport, chatAgent.transport, chatId);
+    if (theirs === 'refused' || ours === 'refused') throw new Error('realAgent: an in-process agent could not be adopted');
+  };
+  adoptInProcess(hostAgent);
   // B1 — seed chatAgent's SecurityLayer with the household agent's key so
   // `chatAgent.invoke(householdAgent.address, …)` takes the S1 fast-path.
-  if (householdAgent) await chatAgent.hello(householdAgent.address);
+  if (householdAgent) adoptInProcess(householdAgent);
 
   // Seed a few household items so `/list shopping` + `/brief` are non-empty
   // out of the box.  Deterministic order (added oldest-first); skip via
@@ -4352,7 +4414,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * from chat identity (per integration-plan decision #2).
    */
   const tasksIdentityVault = await sealedVault(opts.tasksIdentityVault
-    ?? makeBrowserVault('cc-tasks-id:'));
+    ?? pickVault('cc-tasks-id:'));
+  await giveFreshSeedIfShared(tasksIdentityVault, notInProcessKeys, inProcessHealed);
   // Register the chatAgent's pubKey as the local member ("admin")
   // AND keep the legacy webid:* members for demo cross-actor tests.
   // Real tasks-v0 skills use `from` (caller) to look up the actor's
@@ -4434,7 +4497,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!ok) console.warn(`[realAgent] bot ${chatId}: token revoke did not reach the grants lane — it binds on this device; siblings learn it at catch-up/TTL`);
     },
   });
-  await chatAgent.hello(tasksCircle.address);
+  adoptInProcess(tasksCircle.agent);
 
   // The primary tasks circle's single store needs its store<->mirror sync wired
   // so unscoped task ops (which don't carry a circleId, so the per-op wiring at
@@ -4557,7 +4620,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * across page reloads.
    */
   const pinboardIdentityVault = await sealedVault(opts.pinboardIdentityVault
-    ?? makeBrowserVault('cc-pinboard-id:'));
+    ?? pickVault('cc-pinboard-id:'));
+  await giveFreshSeedIfShared(pinboardIdentityVault, notInProcessKeys, inProcessHealed);
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
   // ride its membership lane — signed with the per-circle key, fanned via broadcastCircleMembership,
   // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
@@ -4903,6 +4967,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // ...and pinboard's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
     // about it arrive AS the persona (`pinboardActAs`).
     selfWebidFor: (circleId) => circleSelf(circleId).webid,
+    // The default card and this device's own requests name the CHAT identity — the address people reach. This
+    // agent's own key stays in-process: it is on no card and in no request.
+    selfCard: () => ({ pubKey: chatId.pubKey, stableId: chatId.stableId }),
     membershipEmit,
     membershipRead,
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
@@ -4966,7 +5033,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the item; a received item never echoes). Installed on the store event, so no op has to remember.
   try { pinboardAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
   catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
-  await chatAgent.hello(pinboardAgent.address);
+  adoptInProcess(pinboardAgent.bundle.agent);
 
   // Contacts made before the persona field existed record NONE. Write `default` onto them once — only where the
   // pair circle id PROVES it (`backfillContactPersonas`): a row whose pair circle is not the default identity's is
@@ -5050,7 +5117,11 @@ export async function createRealHouseholdAgent(opts = {}) {
    * shareFolder tokens carry the real pod URI.
    */
   const folioIdentityVault = await sealedVault(opts.folioIdentityVault
-    ?? makeBrowserVault('cc-folio-id:'));
+    ?? pickVault('cc-folio-id:'));
+  await giveFreshSeedIfShared(folioIdentityVault, notInProcessKeys, inProcessHealed);
+  if (inProcessHealed.n > 0) {
+    console.warn(`[realAgent] ${inProcessHealed.n} in-process agent(s) held the owner-root key or the chat key — each was given a fresh seed`);
+  }
   const folioAgent = await createBrowserFolioAgent({
     bus,
     identityVault: folioIdentityVault,
@@ -5063,7 +5134,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // embed call is ever made unless the circle's embed policy permits.
     noteEmbedder:  opts.folioNoteEmbedder,
   });
-  await chatAgent.hello(folioAgent.address);
+  adoptInProcess(folioAgent.agent);
 
   /**
    * basis's CallSkill shape: `(appOrigin, opId, args) → payload`.
@@ -6047,13 +6118,13 @@ export async function createRealHouseholdAgent(opts = {}) {
                               + '=='.slice(0, (4 - b64.length % 4) % 4);
             const json = typeof globalThis.atob === 'function'
               ? globalThis.atob(padded) : padded;
-            realArgs = { ...realArgs, invite: JSON.parse(json) };
+            realArgs = { ...realArgs, invite: parseUntrustedJson(json) };
           } catch (err) {
             return { ok: false, error: tr('circle.tasks.invite.bad_url', { error: err.message ?? String(err) }) };
           }
         } else if (inv.startsWith('{')) {
           try {
-            realArgs = { ...realArgs, invite: JSON.parse(inv) };
+            realArgs = { ...realArgs, invite: parseUntrustedJson(inv) };
           } catch (err) {
             return { ok: false, error: tr('circle.tasks.invite.bad_json', { error: err.message ?? String(err) }) };
           }
@@ -7575,7 +7646,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (historyMirror) return;   // already following
       try {
-        const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+        const strategy = recoverySealStrategy();
         const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
         if (!source) return;
         // INSTANT RESTORE (the ladder): a fresh install's log is empty — hydrate the mirror back
@@ -7715,6 +7786,20 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   const api = {
+    // The in-process agents' PUBLIC keys, read-only — for checks that none of them is the root's or the chat's.
+    // Each agent's CURRENT identity key (an identity can be swapped in place while its bus address stays).
+    inProcessPubKeys: () => {
+      const keyOf = (a) => a?.identity?.pubKey ?? a?.bundle?.agent?.identity?.pubKey ?? a?.agent?.identity?.pubKey ?? a?.address ?? null;
+      return { host: keyOf(hostAgent), household: keyOf(householdAgent), tasks: keyOf(tasksCircle), pinboard: keyOf(pinboardAgent), folio: keyOf(folioAgent) };
+    },
+    // The skill ids each in-process agent registers, read-only — for the check that one op has one owner.
+    inProcessSkillIds: () => {
+      const idsOf = (a) => (a?.skills?.all?.() ?? []).map((d) => d.id).sort();
+      return {
+        host: idsOf(hostAgent), household: idsOf(householdAgent), tasks: idsOf(tasksCircle?.agent),
+        pinboard: idsOf(pinboardAgent?.bundle?.agent), folio: idsOf(folioAgent?.agent),
+      };
+    },
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)
@@ -7733,7 +7818,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      *  the same seal; `archiveSource` + `hydrateHistory` open it again on any future install. */
     exportHistoryArchive: async () => {
       if (!opts.deviceLog) throw new Error('no device log on this composition');
-      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      const strategy = recoverySealStrategy();
       if (!strategy) throw new Error('no-recovery-seal');
       return exportHistoryArchive({
         eventLog: opts.deviceLog,

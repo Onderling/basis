@@ -48,7 +48,7 @@ describe('renderCircleLauncher', () => {
     const el = mount();
     renderCircleLauncher(el, { circles, t });
     expect(el.querySelector('.circle-launcher__title').textContent).toBe('circle.title');
-    expect(el.querySelector('.circle-launcher__new').textContent).toBe('circle.new');
+    expect(el.querySelector('.circle-launcher__new').textContent).toBe('circle.vandaag.onboarding_begin_create');
   });
 
   it('fires onOpenCircle(id) on tile click and onNewCircle on new click', () => {

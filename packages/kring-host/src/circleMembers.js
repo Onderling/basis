@@ -215,6 +215,14 @@ export function memberToChatItem(member) {
  *
  * @param {Member} member
  */
+/** The released properties that are offerings (`{ kind: 'offering', text, tags }`), each with its key. */
+function releasedOfferings(props) {
+  if (!props || typeof props !== 'object') return [];
+  return Object.entries(props)
+    .filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v) && v.kind === 'offering' && typeof v.text === 'string' && v.text.trim())
+    .map(([key, v]) => ({ ...v, key }));
+}
+
 export function memberToViewAs(member) {
   const m = member ?? {};
   const releasedName = (m.personaProperties && typeof m.personaProperties.realName === 'string'
@@ -238,6 +246,10 @@ export function memberToViewAs(member) {
     ...(m.role && m.role !== 'member' ? { role: m.role } : {}),
     // A BOT — a member that says it is a function (a household bot); only then, so a person's row stays byte-identical.
     ...(m.kind === 'function' ? { bot: true } : {}),
+    // WHAT THEY OFFER: the offerings this member RELEASED to this circle (persona drivers of kind 'offering', riding the
+    // release like the name above) — never anything unreleased; the key is kept so a match names which one. Only when
+    // there is one, so a plain row stays byte-identical.
+    ...((() => { const o = releasedOfferings(m.personaProperties); return o.length ? { offerings: o } : {}; })()),
     // THE FACE — the picture this member released to this circle (a sealed media ref; the shell opens it with the
     // circle's opener). Only when released, so a row without one stays byte-identical.
     ...(m.personaProperties?.profilePicture && typeof m.personaProperties.profilePicture === 'object'

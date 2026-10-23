@@ -54,6 +54,17 @@ describe('replyLine, per family', () => {
     expect(replyLine({ ok: true, unchanged: true, message: 'Niets veranderd aan: ramen' }, { opId: 'editTask', t })).toBe('Niets veranderd aan: ramen');
   });
 
+  it('an appointment added WITH its own reminders says them — a second line, in the person\'s words (the tablet, 2026-10-22)', () => {
+    const reminders = { mode: 'replace', rules: ['before:60'] };
+    const line = replyLine({ ok: true, title: 'tandarts', startsAt: at.toISOString(), reminders }, { opId: 'addEvent', t });
+    const [added, said] = line.split('\n');
+    expect(added).toBe('circle.calendar.added:{"title":"tandarts","when":"vr 9 okt 10:00"}');
+    expect(said).toMatch(/^circle\.lists\.reminders_set:/);
+    expect(said).toContain('"text":"tandarts"');
+    // without reminders it stays one line
+    expect(replyLine({ ok: true, title: 'tandarts', startsAt: at.toISOString() }, { opId: 'addEvent', t }).split('\n')).toHaveLength(1);
+  });
+
   it('appointments: the day and the time in the locale\'s date language', () => {
     expect(replyLine({ ok: true, title: 'tandarts', startsAt: at.toISOString() }, { opId: 'addEvent', t }))
       .toBe('circle.calendar.added:{"title":"tandarts","when":"vr 9 okt 10:00"}');

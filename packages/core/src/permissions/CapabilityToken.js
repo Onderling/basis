@@ -24,6 +24,7 @@
 import { AgentIdentity }                            from '../identity/AgentIdentity.js';
 import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 import { genId }                                    from '../Envelope.js';
+import { parseUntrustedJson } from '../security/untrustedJson.js';
 
 /**
  * Immutable wrapper around a signed capability grant: `issuer` gives `subject`
@@ -181,7 +182,7 @@ export class CapabilityToken {
   // ── Parse ─────────────────────────────────────────────────────────────────
 
   static fromJSON(obj) {
-    return new CapabilityToken(typeof obj === 'string' ? JSON.parse(obj) : obj);
+    return new CapabilityToken(typeof obj === 'string' ? parseUntrustedJson(obj) : obj);
   }
 }
 

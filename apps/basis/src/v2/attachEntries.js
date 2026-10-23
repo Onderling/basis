@@ -16,6 +16,7 @@
  * Pure. The shells paint what this returns and dispatch `{appOrigin, opId}` through the waist.
  */
 import { renderAttachments } from '@onderling/app-manifest';
+import { featureHasSurface } from './circleTabs.js';
 
 /**
  * @param {object} a
@@ -36,6 +37,10 @@ export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, 
   for (const [appOrigin, manifest] of Object.entries(manifestsByOrigin ?? {})) {
     if (!manifest || !Array.isArray(manifest.operations)) continue;
     for (const entry of renderAttachments(manifest).attachMenu) {
+      // never offer what doesn't work: an op that needs a feature with no surface (making a list, with nothing that
+      // shows lists) is left out of the "+"
+      const op = manifest.operations.find((o) => o?.id === entry.opId);
+      if ((op?.requires ?? []).some((f) => !featureHasSurface(f))) continue;
       // The dispatch address, carried: an op id alone is not one, since two apps may declare the same
       // id. The shells used to know it only because the menu came from a single manifest.
       out.push({ ...entry, appOrigin });

@@ -33,6 +33,7 @@
 import { whenWords, timeWords, dateLocaleOf } from './whenWords.js';
 import { translatorOr } from '../locales/translatorOr.js';
 import { personasHereRows } from './personasHere.js';
+import { describeRules } from './reminderWords.js';
 
 /** The op families: op id → family. The ops a household bot reaches that act (its reads are painted as lists). */
 export const REPLY_FAMILY = Object.freeze({
@@ -137,7 +138,13 @@ export function replyFact(result, { opId, args = {} } = {}) {
         : id === 'updateEvent' ? 'circle.calendar.updated'
           : `circle.calendar.rsvp_${RSVP[id]}`;
       // a day without a time (local midnight — the whole day) is said without a time, as a chore's day is
-      return { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: 'auto' } };
+      const base = { family, key, vars: { title: result.title }, when: { at: result.startsAt, dayOnly: 'auto' } };
+      // its own reminders, when the add set them: said back, or the person cannot tell they were kept (the tablet,
+      // 2026-10-22) — the same sentence setting them on their own says
+      if (id === 'addEvent' && !result.duplicate && Array.isArray(result.reminders?.rules) && result.reminders.rules.length) {
+        return { family, lines: [base, { key: 'circle.lists.reminders_set', vars: { text: result.title }, reminders: result.reminders }] };
+      }
+      return base;
     }
     default:
       return own;
@@ -318,6 +325,8 @@ function word(fact, t) {
   };
   if (fact.who !== undefined) vars.who = Array.isArray(fact.who) && !fact.who.length && fact.nobody ? t('circle.reply.who_nobody') : peopleWords(fact.who, t);
   if ('time' in vars) vars.time = timeWords(vars.time);
+  // reminder rules, worded in the person's language ("een uur van tevoren", "de avond ervoor")
+  if (fact.reminders) vars.rules = describeRules(fact.reminders.rules, t) + (fact.reminders.mode === 'add' ? ` (${t('circle.lists.reminders_on_top')})` : '');
   if (fact.when) {
     const w = whenWords(fact.when.at, { locale: dateLocaleOf(t), dayOnly: fact.when.dayOnly });
     vars.when = fact.when.suffix ? (w ? `, ${w}` : '') : w;

@@ -25,6 +25,7 @@
 import { sha256Hex } from './botAdmission.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { TELEGRAM_LAUNCH_MAX_AGE_S } from './telegramLaunch.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 /**
  * The calls a household bot takes from its connected screens: per screen a burst, then so many a second; and from all
@@ -98,7 +99,7 @@ export function encodeScreenLink(appUrl, { botAddress, relayUrl = null, nonce, b
 export function parseScreenLink(link) {
   const m = /#scherm=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-screen-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1) return { ok: false, reason: 'wrong-version' };
   if (typeof d.b !== 'string' || !d.b || typeof d.n !== 'string' || !d.n) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, nonce: d.n, botName: typeof d.m === 'string' && d.m ? d.m : null };
@@ -117,7 +118,7 @@ export function encodeScreenStartLink(appUrl, { botAddress, relayUrl = null, bot
 export function parseScreenStartLink(link) {
   const m = /#scherm-nieuw=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-start-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
 }
@@ -134,7 +135,7 @@ export function encodeScreenLaunchLink(appUrl, { botAddress, relayUrl = null, bo
 export function parseScreenLaunchLink(link) {
   const m = /[?&]scherm-tg=([A-Za-z0-9_-]+)/.exec(String(link ?? ''));
   if (!m) return { ok: false, reason: 'not-a-launch-link' };
-  let d; try { d = JSON.parse(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
+  let d; try { d = parseUntrustedJson(unb64url(m[1])); } catch { return { ok: false, reason: 'unreadable' }; }
   if (d?.v !== 1 || typeof d.b !== 'string' || !d.b) return { ok: false, reason: 'incomplete' };
   return { ok: true, botAddress: d.b, relayUrl: typeof d.r === 'string' ? d.r : null, botName: typeof d.m === 'string' && d.m ? d.m : null };
 }
@@ -166,6 +167,8 @@ export function parseScreenLaunchLink(link) {
  */
 export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeView, listGrants, notify = null, ask = null, tellRefused = null, sendPrivately, where, verifyLaunch = null, personOfTelegram = null, launchButton = null, launchLabel = () => 'Telegram', now = Date.now, rand = Math.random }) {
   const mine = async (person) => ((await listGrants()) ?? []).filter((g) => g?.actingAs === person);
+  // when each person last connected a screen: a code tapped again within the offer's window says "connected"
+  const connectedAt = new Map();
   // a launch's hash, used: kept until no launch that old is taken anyway
   const usedLaunches = new Map();
   const spend = (hash) => {
@@ -270,7 +273,11 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
      */
     async confirm(person, answer, { isPrivate = false } = {}) {
       const offer = threads.screenOfferOf(person);
-      if (!offer) return { ok: false, reason: 'nothing-pending' };
+      if (!offer) {
+        // the code tapped again right after the screen connected: say it is connected, not that nothing is waiting
+        const at = connectedAt.get(person);
+        return at != null && now() - at < SCREEN_LINK_TTL_MS ? { ok: true, already: true } : { ok: false, reason: 'nothing-pending' };
+      }
       if (!isPrivate) return { ok: false, reason: 'not-private' };
       threads.setScreenOffer(person, null);   // answered (or late): the offer is gone either way
       const refuse = async () => { refuseSoon(offer.viewPubKey); };
@@ -280,6 +287,7 @@ export function createBotScreens({ threads, isAdmitted, columnOf, grant, revokeV
       if (String(answer ?? '').trim().toUpperCase() !== real) { await refuse(); return { ok: true, declined: true }; }
       if (typeof isAdmitted !== 'function' || !(await isAdmitted(person))) return { ok: false, reason: 'not-admitted' };
       const r = await grantTo(person, { viewPubKey: offer.viewPubKey, label: offer.label, nonce: offer.nonce });
+      if (r.ok) connectedAt.set(person, now());
       return r.ok ? { ...r, reopen: this.reopenLink() } : r;
     },
 

@@ -12,17 +12,13 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text, TouchableOpacity 
 import {
   TRUST_OPTS, DISTANCE_OPTS,
   initialState, canSubmit, loadAvailableCircles, submitPost,
+  postKindOptions,
 } from '../../core/wizards/postAudienceState.js';
 
 import {
   Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting, WizardTheme, wizardPalette,
 } from './_kit.js';
 
-const KIND_OPTS = [
-  { id: 'ask',     label: 'Ask (request help)' },
-  { id: 'offer',   label: 'Offer (something to share)' },
-  { id: 'announce',label: 'Announce' },
-];
 
 export default function PostAudienceWizardModal({
   visible, theme = null, args, callSkill, onClose, onDispatched, t,
@@ -69,13 +65,13 @@ export default function PostAudienceWizardModal({
                 label={t('circle.wizard.audience.what')}
                 value={state.text}
                 onChangeText={(v) => setState((s) => ({ ...s, text: v }))}
-                placeholder="e.g. Anyone got a ladder I can borrow?"
+                placeholder={t('circle.wizard.audience.text_placeholder')}
                 rows={4}
               />
               <RadioGroup
-                label="Kind"
+                label={t('circle.wizard.audience.kind')}
                 value={state.kind}
-                options={KIND_OPTS}
+                options={postKindOptions().map((o) => ({ id: o.id, label: t(o.labelKey) }))}
                 onChange={(v) => setState((s) => ({ ...s, kind: v }))}
               />
               <RadioGroup
@@ -85,10 +81,10 @@ export default function PostAudienceWizardModal({
                 onChange={(v) => setState((s) => ({ ...s, minTrust: v }))}
               />
               <Field
-                label={t('circle.wizard.create.tags')}
+                label={t('circle.wizard.audience.tags')}
                 value={state.tags}
                 onChangeText={(v) => setState((s) => ({ ...s, tags: v }))}
-                placeholder="ladder, tools"
+                placeholder={t('circle.wizard.audience.tags_placeholder')}
               />
               <Text style={styles.subLabel}>Distance</Text>
               <View style={styles.distanceGrid}>
@@ -109,9 +105,10 @@ export default function PostAudienceWizardModal({
               </View>
               <Field
                 label={t('circle.wizard.audience.recipients')}
+                hint={t('circle.wizard.audience.recipients_hint')}
                 value={state.recipients}
                 onChangeText={(v) => setState((s) => ({ ...s, recipients: v }))}
-                placeholder="leave blank to use audience filter"
+                placeholder={t('circle.wizard.audience.recipients_placeholder')}
               />
               {state.availableCircles && state.availableCircles.length > 1 && (
                 <RadioGroup
@@ -122,13 +119,13 @@ export default function PostAudienceWizardModal({
                 />
               )}
               <ErrorBanner message={state.submitError} />
-              <Submitting visible={state.submitting} label="Posting…" />
+              <Submitting visible={state.submitting} label={t('circle.wizard.audience.posting')} />
             </Body>
           </ScrollView>
           <Actions
             buttons={[
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: 'Post', onPress: onPost, kind: 'primary', disabled: !canSubmit(state) },
+              { label: t('circle.noticeboard.post'), onPress: onPost, kind: 'primary', disabled: !canSubmit(state) },
             ]}
           />
         </Pressable>

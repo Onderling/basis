@@ -43,6 +43,7 @@ import { registerTunnelOw }                           from './skills/tunnelOw.js
 import { registerReachablePeersSkill }               from './skills/reachablePeers.js';
 import { PeerDiscovery }                             from './discovery/PeerDiscovery.js';
 import { pullPeerList }                              from './discovery/pullPeerList.js';
+import { parseUntrustedJson } from './security/untrustedJson.js';
 
 /**
  * The developer-facing agent class. Owns the identity, one or more named transports,
@@ -1318,7 +1319,7 @@ export class Agent extends Emitter {
    */
   static async fromJson(json, opts = {}) {
     let obj;
-    try { obj = JSON.parse(json); }
+    try { obj = parseUntrustedJson(json); }
     catch (e) { throw new Error(`Agent.fromJson: invalid JSON — ${e.message}`); }
     return Agent.fromPlainObject(obj, opts);
   }
@@ -1334,7 +1335,7 @@ export class Agent extends Emitter {
   static async fromYaml(yaml, opts = {}) {
     // Try JSON first (YAML is a superset of JSON)
     let obj;
-    try { obj = JSON.parse(yaml); }
+    try { obj = parseUntrustedJson(yaml); }
     catch {
       // Try dynamic import of js-yaml (must be available in the environment)
       let jsYaml;

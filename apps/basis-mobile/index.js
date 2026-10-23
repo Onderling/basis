@@ -3,7 +3,7 @@
 // globalThis.Buffer, Blob.arrayBuffer / .text, or Blob constructor for
 // ArrayBuffer parts will crash silently if this lands second).  Same
 // substrate as pinboard-mobile + folio-mobile + tasks-mobile (see
-// apps/pinboard-mobile/index.js for the canonical comment).
+// the retired pinboard-mobile app's entry, now in the archive tag).
 import '@onderling/react-native/platform/polyfills';
 
 // @expo/metro-runtime adds the fast-refresh + web-only runtime hooks
@@ -14,6 +14,12 @@ import 'expo-dev-client';
 import { registerRootComponent } from 'expo';
 
 import App from './App.js';
+import { attachTestBuildLogMirror, bootMark, startStallWatch } from '@onderling-app/basis';
+
+// A test APK built with EXPO_PUBLIC_TEST_BUILD=1 mirrors the logger's PII-safe lines to logcat; any other
+// build attaches nothing (the flag is in no committed env or config).
+if (attachTestBuildLogMirror(process.env.EXPO_PUBLIC_TEST_BUILD)) startStallWatch();
+bootMark('js.start');
 
 // Background-fetch task definition — MUST be at JS-bundle load time per Expo's
 // TaskManager API (salvaged from tasks-mobile at its retirement). The task body

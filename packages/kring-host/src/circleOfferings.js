@@ -60,7 +60,10 @@ export function offeringsMatchingEnabled(raw) {
 
 export const MATCH_SOURCES = ['human', 'agent', 'via-hop'];
 
-/** Normalise an INJECTED match list into `{ id, label, source }` rows (source coerced into MATCH_SOURCES, default 'human'). */
+/**
+ * Normalise an INJECTED match list into `{ id, label, source, offering }` rows (source coerced into MATCH_SOURCES,
+ * default 'human'; `offering` = the matched offering's text, only when the match names one).
+ */
 export function buildOfferingMatches({ matches = [] } = {}) {
   const list = Array.isArray(matches) ? matches : [];
   return list
@@ -69,5 +72,6 @@ export function buildOfferingMatches({ matches = [] } = {}) {
       id:     typeof m.id === 'string' && m.id ? m.id : `match-${i}`,
       label:  typeof m.label === 'string' ? m.label : '',
       source: MATCH_SOURCES.includes(m.source) ? m.source : 'human',
+      ...(typeof m.offering === 'string' && m.offering ? { offering: m.offering } : {}),
     }));
 }

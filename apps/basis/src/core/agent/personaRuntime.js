@@ -20,7 +20,11 @@ import {
   b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey,
 } from '@onderling/core';
 import { sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
+
+/** How many circle addresses one persona runtime keeps derived; past it the oldest is derived again on next use. */
+const CIRCLE_ADDRESS_MEMO_MAX = param({ key: 'persona.circleAddressMemoMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 
 /**
  * Build one persona's runtime bundle.
@@ -55,6 +59,9 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
   }
   // The persona's seed — the source of its chat identity, its device seed, its person key. Root custody only.
   const profileSeed = ownerRoot ? ownerRoot.deriveAgentSeed(profileId) : null;
+  // The persona's AUTHORITY public key under root custody — derived once here, read below by the record re-sign check
+  // and the ceremony commitment.
+  const rootAuthorityPubKeyB64 = ownerRoot ? authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority(profileId)) : null;
 
   // THE PERSON KEY (rotating, per profile — identity/personKey.js). A root-custody device re-derives the current
   // version each boot; an enrolled device was handed it at its ceremony and keeps it sealed. Absent on an enrolled
@@ -111,7 +118,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
           // A record minted before the persona's authority signed names the ROOT as its signer. The root is resident
           // here, so it is re-signed in place by the authority — same id, same key, so no address moves; the id itself
           // becomes a wire id at this device's next phrase ceremony (the self-enrol migration mints one).
-          if (ownerRoot && blob.record && blob.record.by !== authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority(profileId))) {
+          if (ownerRoot && blob.record && blob.record.by !== rootAuthorityPubKeyB64) {
             try {
               const resigned = signDeviceDelegation(ownerRoot.deriveProfileAuthority(profileId), {
                 profileId: blob.record.profileId ?? profileId, deviceId: blob.deviceId, pubKey: blob.record.pubKey,
@@ -162,14 +169,33 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     }
     return circleIdentities.get(circleId);
   };
-  const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
+  // Memoised on THIS runtime, keyed by circle id: the derivation (sha + an Ed25519 keypair in pure JS) ran dozens of
+  // times per circle during a phone boot. Bounded; dies with the runtime; never persisted.
+  const circleAddresses = new Map();   // circleId → address
+  const circleAddressFor = (circleId) => {
+    let address = circleAddresses.get(circleId);
+    if (address === undefined) {
+      address = deriveCircleAddress(deviceDerivationSeed, circleId);
+      if (circleAddresses.size >= CIRCLE_ADDRESS_MEMO_MAX) circleAddresses.delete(circleAddresses.keys().next().value);
+      circleAddresses.set(circleId, address);
+    }
+    return address;
+  };
+  // The current person key's pubKey, memoised against the key RECORD it was derived from: a rotation replaces
+  // the record, so the next call derives afresh.
+  let personKeyMemo = null;   // { record, pubKey }
+  const personKeyPubOf = (record) => {
+    if (!record) return null;
+    if (personKeyMemo?.record !== record) personKeyMemo = { record, pubKey: personKeyPubKeyB64(record.seed) };
+    return personKeyMemo.pubKey;
+  };
   // ONE sealing key family: this device's per-circle SEALING keypair is the ed2curve image of its per-circle address
   // key — phrase-derivable, one per device, retired with the address.
   const circleSealingKeyPairFor = (circleId) => sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(deviceDerivationSeed, circleId)));
   // THE CEREMONY COMMITMENT (core ceremonyCommitment.js): who may retire this persona's addresses in a circle. Its key
   // is the persona's AUTHORITY, never the root (the root's own key on the wire would link every persona). Under
   // delegation custody it rides the device's own record (`by` — the authority signed it).
-  const authorityPubKeyB64 = ownerRoot ? authorityPubKeyB64Of(ownerRoot.deriveProfileAuthority(profileId)) : (enrolledDevice?.record?.by ?? null);
+  const authorityPubKeyB64 = rootAuthorityPubKeyB64 ?? (enrolledDevice?.record?.by ?? null);
   if (!authorityPubKeyB64 && typeof console !== 'undefined') console.warn('[ceremony] no owner-root public key on this device — its addresses cannot be retired by a ceremony until it re-enrolls');
   const ceremonyCommitmentFor = (circleId) => (authorityPubKeyB64 ? ceremonyCommitment(authorityPubKeyB64, circleId) : null);
   const signCeremonyCommitment = (circleId, address, commitment) =>
@@ -180,7 +206,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
 
   return {
     profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice, internalDeviceId: deviceInternalId,
-    circleIdentityFor, circleAddressFor, circleSealingKeyPairFor,
+    circleIdentityFor, circleAddressFor, circleSealingKeyPairFor, personKeyPubOf,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,
     // The persona's LIVE identities, set by the agent: its chat identity once the secure agent has loaded it from the

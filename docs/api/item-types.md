@@ -9,6 +9,16 @@ README: [`packages/item-types/README.md`](../../packages/item-types/README.md) �
 
 ## `index.js`
 
+### `_defaultRegistryBuilt`
+
+**Kind:** function · **Import:** `_defaultRegistryBuilt` from `'@onderling/item-types'`
+
+```js
+_defaultRegistryBuilt()
+```
+
+Test-only: whether the default registry has been built yet.
+
 ### `validate`
 
 **Kind:** function · **Import:** `validate` from `'@onderling/item-types'`

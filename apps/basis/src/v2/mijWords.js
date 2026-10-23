@@ -9,8 +9,9 @@ const READING_WORDS = {
     ? (r.until ? tr('circle.profile.reading_away', { until: r.until }) : tr('circle.profile.reading_away_open'))
     : r.state === 'quiet' ? tr('circle.profile.reading_quiet', { until: r.until }) : tr('circle.profile.reading_available')),
   online: (r, tr) => tr(r.on ? 'circle.profile.reading_online' : 'circle.profile.reading_offline'),
-  unread: (r, tr) => tr('circle.profile.reading_unread', { count: r.count }),
-  open: (r, tr) => tr('circle.profile.reading_open', { count: r.count }),
+  // a count of nothing says nothing: "0 unread · 0 open" was two words of noise on every Me
+  unread: (r, tr) => (Number(r.count) > 0 ? tr('circle.profile.reading_unread', { count: r.count }) : ''),
+  open: (r, tr) => (Number(r.count) > 0 ? tr('circle.profile.reading_open', { count: r.count }) : ''),
   next: (r, tr, o) => tr('circle.profile.reading_next', { title: r.title, when: whenWords(r.when, o) }),
 };
 

@@ -81,7 +81,7 @@ export { circleSourcesFromAgent, makeResolvingCallSkill, DEFAULT_CIRCLE_ORIGINS 
 export { loadCircleItems, normalizeContentItem }      from './v2/circleContent.js';
 export { quickCreateCircle }                          from './v2/circleCreate.js';
 export { itemCircleId, isInCircle, scopeItems }       from './v2/circleScope.js';
-export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES } from './v2/circlePinboardScope.js';
+export { scopePinboardCallSkill, keepForCircle, SCOPED_WRITE_OPS, SCOPED_LIST_OPS, isNoticeboardPost, responderChoices, noticeboardIntentOf, NOTICEBOARD_INTENTS, SYSTEM_PINBOARD_TYPES, NOTICEBOARD_REFRESH_EVENTS } from './v2/circlePinboardScope.js';
 export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from './v2/circlePodProducer.js';
 export { realPodRouting, podRootFromWebid }           from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
@@ -415,6 +415,9 @@ export { loadMijModel } from './v2/mijLoader.js';
 export { migrateRosterOfferings, offeringKeyFor, OFFERINGS_MIGRATION_KEY } from './core/offeringsMigration.js';
 export { runFind } from './find.js';
 export { EventLog, createEventLog, RETENTION_MS, RETENTION_DEFAULTS, makeAgentTrailEntry } from './eventLog.js';
+export { attachTestBuildLogMirror, TEST_BUILD_LOG_PREFIX } from './log/testBuildMirror.js';
+export { logReportView } from './log/logReport.js';
+export { bootMark, startStallWatch } from './log/bootTimeline.js';
 export {
   buildFormSpec, pickStrategy, validateAndCoerce,
 } from './forms/buildFormSpec.js';

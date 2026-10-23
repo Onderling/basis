@@ -24,8 +24,12 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <ScrollView>
+          {/* the title and Done on one line, above the scroll: the way out is always in view */}
+          <View style={styles.head}>
             <Text style={styles.title}>{t('circle.vandaag.customise_title')}</Text>
+            <Btn variant="primary" label={t('circle.vandaag.done')} onPress={onClose} testID="customise-done" />
+          </View>
+          <ScrollView>
             {/* the sheet's DECLARED sections (`screenSections.js`), in order, each by its id (= testID) */}
             {sectionsOf('vandaagCustomise').map((d) => {
               const PAINT = {
@@ -39,16 +43,21 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                   <View style={styles.row}>
                     <ActBtn label={t('circle.vandaag.up')} act="up" args={base} disabled={!b.canUp} testID={`customise-up-${b.blockId}`} />
                     <ActBtn label={t('circle.vandaag.down')} act="down" args={base} disabled={!b.canDown} testID={`customise-down-${b.blockId}`} />
-                    <ActBtn variant="danger" label={t('circle.vandaag.remove')} act="remove" args={base} testID={`customise-remove-${b.blockId}`} />
+                    {/* neutral, not alarm-red: removing a block is undone by Undo */}
+                    <ActBtn label={t('circle.vandaag.remove')} act="remove" args={base} testID={`customise-remove-${b.blockId}`} />
                   </View>
+                  {/* every control under its heading (the model's), so a row of chips says what it sets */}
                   {b.controls.map((c) => (c.text ? (
                     // labels, typed: "werk, thuis" — applied when the field is left
-                    <LabelsField key={c.kind} control={c} styles={styles}
-                      onApply={(value) => onAct?.('config', { ...base, kind: c.kind, value })} testID={`customise-labels-${b.blockId}`} />
-                  ) : c.multi ? (
-                    // the block's own circles: none ticked = all the page's — under the same label web's legend says
                     <View key={c.kind}>
-                    <Text style={styles.chipText}>{t('circle.vandaag.circles_title')}</Text>
+                    <Text style={styles.controlTitle}>{t(c.titleKey)}</Text>
+                    <LabelsField control={c} styles={styles}
+                      onApply={(value) => onAct?.('config', { ...base, kind: c.kind, value })} testID={`customise-labels-${b.blockId}`} />
+                    </View>
+                  ) : c.multi ? (
+                    // the block's own circles: none ticked = all the page's
+                    <View key={c.kind}>
+                    <Text style={styles.controlTitle}>{t(c.titleKey)}</Text>
                     <View style={styles.row}>
                       {c.options.map((o) => {
                         const on = c.value.includes(o.value);
@@ -56,21 +65,27 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                           <Pressable key={o.value} style={[styles.chip, on && styles.chipOn]} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
                             onPress={() => onAct?.('config', { ...base, kind: c.kind, value: on ? c.value.filter((v) => v !== o.value) : [...c.value, o.value] })}
                             testID={`customise-circle-${b.blockId}-${o.value}`}>
-                            <Text style={styles.chipText}>{o.label}</Text>
+                            <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label}</Text>
                           </Pressable>
                         );
                       })}
                     </View>
                     </View>
                   ) : (
-                    <View key={c.kind} style={styles.row}>
-                      {c.options.map((o) => (
-                        <Pressable key={String(o.value)} style={[styles.chip, o.value === c.value && styles.chipOn]}
-                          onPress={() => onAct?.('config', { ...base, kind: c.kind, value: o.value })}
-                          testID={`customise-${c.kind}-${b.blockId}-${o.value}`}>
-                          <Text style={styles.chipText}>{t(o.labelKey, o.params)}</Text>
-                        </Pressable>
-                      ))}
+                    <View key={c.kind}>
+                    <Text style={styles.controlTitle}>{t(c.titleKey)}</Text>
+                    <View style={styles.row}>
+                      {c.options.map((o) => {
+                        const on = o.value === c.value;
+                        return (
+                          <Pressable key={String(o.value)} style={[styles.chip, on && styles.chipOn]} accessibilityRole="radio" accessibilityState={{ selected: on }}
+                            onPress={() => onAct?.('config', { ...base, kind: c.kind, value: o.value })}
+                            testID={`customise-${c.kind}-${b.blockId}-${o.value}`}>
+                            <Text style={[styles.chipText, on && styles.chipTextOn]}>{t(o.labelKey, o.params)}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                     </View>
                   )))}
                 </View>
@@ -104,9 +119,6 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
               const el = PAINT[d.id]?.();
               return el ? <View key={d.id} testID={d.id}>{el}</View> : null;
             })}
-            <View style={styles.row}>
-              <Btn variant="primary" label={t('circle.vandaag.done')} onPress={onClose} testID="customise-done" />
-            </View>
           </ScrollView>
         </View>
       </View>
@@ -127,14 +139,18 @@ function LabelsField({ control, styles, onApply, testID }) {
 const makeStyles = (theme) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   card: { backgroundColor: theme.color.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 16, maxHeight: '85%' },
-  title: { fontSize: 17, fontWeight: '700', color: theme.color.ink, marginBottom: 8 },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 },
+  title: { flex: 1, fontSize: 17, fontWeight: '700', color: theme.color.ink },
+  controlTitle: { fontSize: 12, color: theme.color.inkSoft, marginTop: 8 },
   heading: { fontSize: 14, fontWeight: '600', color: theme.color.inkSoft, marginTop: 12, marginBottom: 6 },
   block: { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, padding: 8, marginBottom: 8 },
   blockName: { fontSize: 14, color: theme.color.ink, fontWeight: '600' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   chip: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.color.line },
-  chipOn: { borderColor: theme.color.ink },
+  // the chosen chip filled, not just a darker outline: visibly the one that is on
+  chipOn: { borderColor: theme.color.ink, backgroundColor: theme.color.ink },
   chipText: { color: theme.color.ink, fontSize: 12 },
+  chipTextOn: { color: theme.color.card },
   addable: { paddingVertical: 6 },
   why: { fontSize: 12, color: theme.color.inkSoft },
   input: { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, padding: 8, color: theme.color.ink },

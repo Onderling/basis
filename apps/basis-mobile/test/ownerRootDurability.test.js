@@ -87,7 +87,7 @@ describe('a memory fallback for the owner root is at least AUDIBLE', () => {
     );
     // The owner root asks for the loud variant. Without this flag the fallback is silent, and silence is
     // what let a regenerated identity root pass for a network fault for a full day.
-    expect(text).toMatch(/makeBrowserVault\('cc-owner-root:',\s*\{\s*durabilityMatters:\s*true\s*\}\)/);
+    expect(text).toMatch(/pickVault\('cc-owner-root:',\s*\{\s*durabilityMatters:\s*true\s*\}\)/);
     expect(text).toMatch(/durabilityMatters/);
   });
 });

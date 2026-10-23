@@ -73,7 +73,7 @@ export function Body({ title, intro, children }) {
   );
 }
 
-export function Field({ label, value, onChangeText, placeholder, monospace, hint }) {
+export function Field({ label, value, onChangeText, placeholder, monospace, hint, testID }) {
   const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.fieldRow}>
@@ -84,6 +84,7 @@ export function Field({ label, value, onChangeText, placeholder, monospace, hint
         onChangeText={onChangeText}
         placeholder={placeholder}
         autoCorrect
+        testID={testID}
       />
       {/* web's `appendField` has carried a `hint` since C1; mobile's had no slot for one, so any
           field whose NUMBER needs a sentence lost the sentence on mobile (invariant 2). */}
@@ -97,7 +98,7 @@ export function Field({ label, value, onChangeText, placeholder, monospace, hint
  * creating (the founder's, when their profile has none). Its words, its monospace, and its suggestions row (shown only
  * when there is something to suggest) live here, so the two cannot drift.
  */
-export function HandleField({ t, value, onChange, suggestions = [], label = null, hint = null }) {
+export function HandleField({ t, value, onChange, suggestions = [], label = null, hint = null, testID = 'wizard-handle' }) {
   const styles = makeStyles(useWizardPalette());
   return (
     <>
@@ -108,6 +109,7 @@ export function HandleField({ t, value, onChange, suggestions = [], label = null
         placeholder={t('circle.join.wizard.handle.placeholder')}
         monospace
         hint={hint}
+        testID={testID}
       />
       {suggestions.length ? (
         <>
@@ -252,7 +254,7 @@ export function Actions({ buttons }) {
               b.disabled && styles.actionBtnDisabled,
             ]}
             accessibilityRole="button"
-            testID={`wizard-action-${b.label}`}
+            testID={b.testID ?? `wizard-action-${b.label}`}
           >
             <Text
               style={[

@@ -12,7 +12,8 @@
  * The circle's policy arrives from its admins on the governance lane and is applied (the policy lane), so there is
  * no incoming copy to reconcile by hand here — the γ.4 conflict resolver that did so had no source and is gone.
  */
-import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
+import { CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
+import { offeredFeatures } from '../../src/v2/circleTabs.js';
 import { multiControlRows } from '../../src/v2/settingsMultiRows.js';
 import { renderThemeToggle } from './themeToggle.js';
 // Phase 4 §9 — the settings-surface CONTROLS + the `enabledWhen` fold (route × capability).
@@ -195,7 +196,7 @@ export function renderCircleSettings(container, {
 
   // Axis 1 — features (toggles)
   const featSection = section(tr('circle.settings.features'));
-  for (const f of CIRCLE_FEATURES) {
+  for (const f of offeredFeatures()) {   // only features that have a surface — never offer what doesn't work
     const row = document.createElement('label');
     row.className = 'circle-settings__feature';
     const box = document.createElement('input');

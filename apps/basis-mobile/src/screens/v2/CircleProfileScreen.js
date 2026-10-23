@@ -15,6 +15,7 @@ import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js'
 import { basisManifest } from '../../../../basis/src/index.js';
 import { mijScreenBlocks } from '../../../../basis/src/v2/mijScreen.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE, HEADER_AVATAR_CLEARANCE } from './fab.js';
 import CircleScreenView from './CircleScreenView.js';
 
 /**
@@ -44,6 +45,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
         online: relays.length ? relays.some((r) => r.connected) : undefined,
         deviceId: (() => { try { return sources.deviceId?.() ?? null; } catch { return null; } })(),
+        deviceName: (() => { try { return sources.deviceName?.() ?? null; } catch { return null; } })(),
         ...(typeof sources.openProposals === 'function' ? { openProposals: sources.openProposals } : {}),
         ...(typeof sources.pendingDeviceOffer === 'function' ? { pendingDeviceOffer: sources.pendingDeviceOffer } : {}),
       } }).catch(() => []);
@@ -63,7 +65,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
 
   return (
     <View style={styles.wrap}>
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID="circle-profile">
+    <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: FAB_CLEARANCE }]} testID="circle-profile">
       {/* while the blocks load: the page's own title, so Me is never untitled */}
       {hasName ? null : <Text style={styles.title}>{t('circle.profile.title')}</Text>}
 
@@ -96,7 +98,8 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
 const makeStyles = (theme, insets) => StyleSheet.create({
   wrap: { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
   scroll: { flex: 1 },
-  content: { padding: 16, gap: 16, paddingBottom: 80 },
+  // the top leaves the header avatar its room, so it never sits on the Me card's corner
+  content: { padding: 16, paddingTop: HEADER_AVATAR_CLEARANCE, gap: 16, paddingBottom: 80 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   primary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, justifyContent: 'center', alignSelf: 'flex-start' },
   meActions: { flexDirection: 'row', gap: 10 },

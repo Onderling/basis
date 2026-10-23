@@ -16,6 +16,10 @@ export const HELP_CIRCLE_PROVISIONED_KEY = 'cc.helpCircleProvisioned';
 export const ONBOARDING_DONE_KEY = 'cc.onboardingDone';
 /** Vandaag's onboarding strip: the "Nieuw bij Basis?" card was seen (read or put away) on this device. */
 export const INTRO_CARD_SEEN_KEY = 'cc.introCardSeen';
+/** The recovery phrase was written down (or photographed) on this device — the key card is done. */
+export const KEY_SAVED_KEY = 'cc.mnemonicAck';
+/** The key card was put away with "Later" until this moment (epoch ms, as a string). */
+export const KEY_SNOOZED_UNTIL_KEY = 'cc.keyCardSnoozedUntil';
 
 /**
  * A boolean-flag store over an injectable io (`{ get(key), set(key, '1') }`). `get`
@@ -27,8 +31,8 @@ export function createOnboardingFlags(io = {}) {
   const read = async (key) => {
     try { return !!(await io.get?.(key)); } catch { return false; }
   };
-  const write = async (key) => {
-    try { await io.set?.(key, '1'); } catch { /* best-effort persist */ }
+  const write = async (key, value = '1') => {
+    try { await io.set?.(key, value); } catch { /* best-effort persist */ }
   };
   return {
     isHelpCircleProvisioned: () => read(HELP_CIRCLE_PROVISIONED_KEY),
@@ -37,7 +41,25 @@ export function createOnboardingFlags(io = {}) {
     markOnboardingDone: () => write(ONBOARDING_DONE_KEY),
     isIntroSeen: () => read(INTRO_CARD_SEEN_KEY),
     markIntroSeen: () => write(INTRO_CARD_SEEN_KEY),
+    isKeySaved: () => read(KEY_SAVED_KEY),
+    markKeySaved: () => write(KEY_SAVED_KEY),
+    keySnoozedUntil: async () => {
+      let v = null;
+      try { v = await io.get?.(KEY_SNOOZED_UNTIL_KEY); } catch { v = null; }
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    },
+    snoozeKey: (untilMs) => write(KEY_SNOOZED_UNTIL_KEY, String(untilMs)),
   };
+}
+
+/**
+ * Whether Vandaag's key card is due: the phrase is not saved on this device and no "Later" is still running. The card
+ * only SAYS the key is not saved — the words open from its explicit "Toon", never by themselves.
+ */
+export async function keyCardPending(flags, now = Date.now()) {
+  if (await flags.isKeySaved()) return false;
+  return (await flags.keySnoozedUntil()) <= now;
 }
 
 /** localStorage-backed IO (web). */

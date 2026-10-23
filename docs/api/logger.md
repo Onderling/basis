@@ -19,6 +19,24 @@ The marker that stands in for an identifier-shaped value in a log field (see loo
 
 The logging facade. Usage: `log.info('feedback', 'consent.stored', { n: 2 })`. No free-text message param.
 
+### `scrubSecrets`
+
+**Kind:** function · **Import:** `scrubSecrets` from `'@onderling/logger'`
+
+```js
+scrubSecrets(text)
+```
+
+Take the credentials out of a piece of free text before it reaches a log, a console or a chat: a Telegram bot token
+in a URL (`/bot<id>:<secret>`), a password in a URL (`https://user:pass@host`), and a credential-named query value
+(`?token=…`, `api_key=…`). A fetch error's message IS the request URL, so any sink that prints one needs this.
+
+**Parameters**
+
+- `text` `unknown`
+
+**Returns:** `string`
+
 ### `dumpLogs`
 
 **Kind:** function · **Import:** `dumpLogs` from `'@onderling/logger'`

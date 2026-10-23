@@ -87,6 +87,7 @@
 import { createHttpGate } from '@onderling/blob-gateway/http';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { MemoryBlobAclStore } from './blobAclStore.js';
+import { parseUntrustedJson } from '@onderling/core';
 
 const DENY = Object.freeze({ status: 403, body: Object.freeze({ error: 'forbidden' }) });
 // Parameter register (#36) — grant-body byte cap (scope:device, kind:internal).
@@ -240,7 +241,7 @@ function readJsonBody(req) {
     });
     req.on('end', () => {
       if (chunks.length === 0) return resolve(undefined);
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
+      try { resolve(parseUntrustedJson(Buffer.concat(chunks).toString('utf8'))); }
       catch (err) { reject(err); }
     });
     req.on('error', reject);

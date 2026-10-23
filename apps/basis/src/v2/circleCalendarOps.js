@@ -123,7 +123,7 @@ export function makeCircleCalendarOps({ storeFor, activeCircle, t, localActor = 
       if (same) return { ok: true, duplicate: true, itemId: same.id, title: same.title, startsAt: same.startsAt, message: t('circle.calendar.already_there', { title: same.title, when: stamp(same) }) };
       // The Agenda's child, with the event's own id; `text` so the list shows it as an entry too.
       const made = await addChildTo(storeFor(circleId), agenda.id, { ...event, text: event.title, completedAt: null, createdBy: who(args), ...(reminders ? { reminders } : {}) });
-      return { ok: true, itemId: made?.id ?? event.id, title: event.title, startsAt: event.startsAt, message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };
+      return { ok: true, itemId: made?.id ?? event.id, title: event.title, startsAt: event.startsAt, ...(reminders ? { reminders } : {}), message: t('circle.calendar.added', { title: event.title, when: stamp(event) }) };
     },
 
     listEvents: async (args) => {

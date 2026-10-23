@@ -74,7 +74,9 @@ const ATTR = /setAttribute\(\s*['"](?:aria-label|title|placeholder|alt)['"]\s*,\
  * reads it. `<Text>{expr}</Text>` and `title={t('…')}` are untouched — their words come from elsewhere.
  */
 const JSX_TEXT = /<Text\b[^>]*>\s*([A-Z][A-Za-z][^<>{}\n]*\s[^<>{}\n]*)<\/Text>/g;
-const JSX_PROP = /\b(?:placeholder|accessibilityLabel|accessibilityHint|title|label)=["']([A-Z][^"']*\s[^"']*)["']/g;
+// A capitalised value; isProse decides whether it is prose — one word counts too (`label="Kind"`, `label="Posting…"`
+// went through when this demanded a space).
+const JSX_PROP = /\b(?:placeholder|accessibilityLabel|accessibilityHint|title|label|intro|hint)=["']([A-Z][^"']*)["']/g;
 
 /**
  * The REPORT-BUILDER shape: a literal pushed onto an array, or standing alone as an array element.
@@ -99,6 +101,43 @@ const LINES = /(?:\.push\(|^[ \t]*)(['"])((?:\\.|(?!\1)[^\\])*)\1\s*[,)]/gm;
  */
 const DIALOG_OPEN = /(?:\bAlert\.(?:alert|prompt)|\bToastAndroid\.show(?:WithGravity)?|(?:\b(?:globalThis|window)\??\.)?\b(?:prompt|confirm|alert)\??\.?)\(/g;
 const STRING_LIT = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+/**
+ * The WIZARD KIT sink (src/web/wizards/_wizardKit.js): a label handed to a helper becomes the text on the screen, and no
+ * DOM assignment in the calling file ever shows it. The web wizards went in as `mkField(body, doc, 'Passphrase', …)`,
+ * `mkActions(…, [{ label: 'Cancel' }])`, `mkSteps(…, ['Mnemonic', …])` — dozens of English words this guard could not see
+ * until 2026-10-22, while the phone's twins of the same wizards were keyed. The positions: the text after `doc` in
+ * mkField / mkTextarea / mkCheck / mkRadioGroup / mkBody (both of mkBody's), a `label:`, `placeholder:` or `hint:` in any object (buttons, radio
+ * options, a field's extras), a JSX `placeholder="…"` in either case, and every string in a mkSteps list or the phone's `<Steps labels={[…]}>`.
+ */
+const KIT_ARG = /\bmk(?:Field|Textarea|Check|RadioGroup|Body|Submitting)\(\s*(?:[\w.]+\s*,\s*)?doc\s*,\s*(?:[\w.]+\s*,\s*)?(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const MKBODY_BLURB = /\bmkBody\(\s*doc\s*,\s*[^,]+,\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const LABEL_PROP = /\b(?:label|placeholder|hint)\s*:\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const MKSTEPS = /\bmkSteps\(\s*[\w.]+\s*,\s*doc\s*,\s*\[([^\]]*)\]/g;
+// …and the phone kit's twin, `<Steps labels={['Mnemonic', …]} />`
+const STEPS_PROP = /\blabels=\{\[([^\]]*)\]\}/g;
+// …and a JSX placeholder in any case: `placeholder="e.g. plumbing"` starts lowercase, which JSX_PROP (capitals only) misses
+const JSX_PLACEHOLDER = /\bplaceholder="([^"]*)"/g;
+function kitHits(src) {
+  const out = [];
+  for (const re of [KIT_ARG, MKBODY_BLURB, LABEL_PROP]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(src))) out.push({ index: m.index, text: m[2] });
+  }
+  JSX_PLACEHOLDER.lastIndex = 0;
+  for (let m; (m = JSX_PLACEHOLDER.exec(src));) out.push({ index: m.index, text: m[1] });
+  for (const re of [MKSTEPS, STEPS_PROP]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(src))) {
+      STRING_LIT.lastIndex = 0;
+      let s;
+      while ((s = STRING_LIT.exec(m[1]))) out.push({ index: m.index, text: s[2] });
+    }
+  }
+  return out;
+}
 function dialogHits(src) {
   const out = [];
   DIALOG_OPEN.lastIndex = 0;
@@ -184,6 +223,10 @@ export function findHardcoded(files, read = (f) => readFileSync(f, 'utf8')) {
         if (re === LINES && isThrown(src, m.index)) continue;
         hits.push({ file, line: src.slice(0, m.index).split('\n').length, text });
       }
+    }
+    for (const k of kitHits(src)) {
+      if (!isProse(k.text)) continue;
+      hits.push({ file, line: src.slice(0, k.index).split('\n').length, text: k.text });
     }
     for (const d of dialogHits(src)) {
       if (!isProse(d.text)) continue;

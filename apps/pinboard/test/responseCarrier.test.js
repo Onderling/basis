@@ -45,6 +45,17 @@ describe('the response records who answered, on the poster\'s copy', () => {
     expect(r.request.assignee).toBe(MEL);
   });
 
+  it('a newly recorded answer is announced once, so an open board re-reads it (no polling)', async () => {
+    const { bundle, call, request } = await bundleFor();
+    const heard = [];
+    bundle.agent.on('pinboard:response-recorded', (e) => heard.push(e));
+    const req = await request(ME, 'circle-b');
+    await call('recordResponse', { requestId: req.id, senderAddress: MEL_ADDR });
+    await call('recordResponse', { requestId: req.id, senderAddress: MEL_ADDR });   // the same answer again: nothing new
+    await call('recordResponse', { requestId: req.id, senderAddress: 'addr-unknown' });   // not recorded: not announced
+    expect(heard).toEqual([{ itemId: req.id }]);
+  });
+
   it('only the host records: a peer calling it is refused; an address off the roster records nothing', async () => {
     const { call, request, bundle } = await bundleFor();
     const req = await request(ME, 'circle-b');

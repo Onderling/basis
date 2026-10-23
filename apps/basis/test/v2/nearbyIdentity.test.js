@@ -27,7 +27,7 @@ describe('the Nearby identity', () => {
     expect(await face('handle')).toEqual({ label: 'frits' });
     expect(await face('profile')).toEqual({ label: 'Frits' });
     expect(await face('none')).toBe(null);
-    expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ id: 'default' }) }).myFace(), 'nothing set: the floor').toEqual({ label: 'frits' });
+    expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ id: 'default' }) }).myFace(), 'nothing set: nobody (default-strict)').toBeNull();
     // no self entering (none held here): nothing shown, nothing set, nothing prefilled — never the general persona by default
     const nobody = createNearbyIdentity({ callSkill, roomSelf: () => null });
     expect(await nobody.myFace(), 'no self: no face').toBe(null);

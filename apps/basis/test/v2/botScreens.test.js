@@ -140,6 +140,17 @@ describe('a person connects a screen to the bot', () => {
     expect(grants).toHaveLength(1);
   });
 
+  it('the code tapped again right after the screen connected says it is connected, not that nothing is waiting', async () => {
+    const ctx = setup();
+    expect(await connect(ctx, 'VIEW1')).toMatchObject({ ok: true, person: 'telegram:1' });
+    // the household's log, 2026-10-04: the same code button tapped five times after "Gekoppeld"
+    expect(await ctx.screens.confirm('telegram:1', 'ABCD', { isPrivate: true })).toMatchObject({ ok: true, already: true });
+    expect(ctx.grants).toHaveLength(1);
+    // …and only for a while: much later, a stray tap is just nothing waiting
+    ctx.tick(60 * 60 * 1000);
+    expect(await ctx.screens.confirm('telegram:1', 'ABCD', { isPrivate: true })).toMatchObject({ ok: false, reason: 'nothing-pending' });
+  });
+
   it('refused: too late, from another key than it names, a nonce nobody asked for; a new link ends the old one', async () => {
     const ctx = setup(); const { screens, grants, tick } = ctx;
     const late = nonceOf(await start(ctx));

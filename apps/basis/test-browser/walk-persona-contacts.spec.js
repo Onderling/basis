@@ -55,6 +55,8 @@ test('persona on create · opbergen · the add sheet · the lens on the thread �
     const idsOf = async () => ((await call(A.page, 'pinboard', 'listMyCircles', {}))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
     const before = new Set(await idsOf());
     await A.page.locator('.circle-launcher__new').click();
+    // who founds it is asked under "Geavanceerd" (the short path is name → review); opened, every step is walked
+    await A.page.locator('[data-role="advanced"] > summary').click();
     const picker = A.page.locator('[data-testid="create-founder-persona"]');
     await expect(picker, 'the founding persona is asked').toBeVisible({ timeout: 20_000 });
     expect(await picker.inputValue(), 'the default is preselected').toBe('default');

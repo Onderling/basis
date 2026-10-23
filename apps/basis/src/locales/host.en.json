@@ -665,6 +665,14 @@
     "claim": {
       "text": "Claim",
       "doc": "Take on an embed offered to the circle (see circle.settings.verb.claim)."
+    },
+    "next": {
+      "text": "Next →",
+      "doc": "Advance-step button in wizards"
+    },
+    "back": {
+      "text": "← Back",
+      "doc": "Previous-step button in wizards"
     }
   },
   "logs": {
@@ -707,6 +715,122 @@
     "open_in_chat": {
       "text": "Open in chat",
       "doc": "Logs row action: jump to the message it came from."
+    }
+  },
+  "wizards": {
+    "dispute": {
+      "step_raise": {
+        "text": "Raise",
+        "doc": "Step-1 label in dispute wizard stepper (#258)"
+      },
+      "step_propose": {
+        "text": "Propose",
+        "doc": "Step-2 label"
+      },
+      "step_file": {
+        "text": "File",
+        "doc": "Step-3 label"
+      },
+      "raise_title": {
+        "text": "Raise a dispute",
+        "doc": "Step-1 title"
+      },
+      "raise_intro": {
+        "text": "Describe what happened. This goes to the circle; admins see it, and two random members do too if the circle resolves conflicts by mediation.",
+        "doc": "Step-1 intro"
+      },
+      "about_post_label": {
+        "text": "You are disputing this post:",
+        "doc": "Header for the context card showing the disputed post"
+      },
+      "about_post_loading": {
+        "text": "(loading post text…)",
+        "doc": "Placeholder shown until loadAboutPostText resolves"
+      },
+      "about_post_optional": {
+        "text": "Related post id (optional)",
+        "doc": "Field label when no postId pre-filled"
+      },
+      "about_post_placeholder": {
+        "text": "leave blank for general dispute",
+        "doc": "Field placeholder"
+      },
+      "summary_label": {
+        "text": "What happened?",
+        "doc": "Step-1 textarea label"
+      },
+      "summary_placeholder": {
+        "text": "Be specific. Avoid naming third parties unless necessary.",
+        "doc": "Step-1 textarea placeholder"
+      },
+      "escalation_label": {
+        "text": "Preferred escalation",
+        "doc": "Radio group label"
+      },
+      "propose_title": {
+        "text": "Propose a resolution",
+        "doc": "Step-2 title"
+      },
+      "propose_intro": {
+        "text": "What would settle this for you? Even if you are not sure, write what would feel good enough, so a mediator has somewhere to start.",
+        "doc": "Step-2 intro"
+      },
+      "proposal_label": {
+        "text": "Proposed resolution",
+        "doc": "Step-2 textarea label"
+      },
+      "proposal_placeholder": {
+        "text": "e.g. \"an apology + agreement not to use my tools without asking\"",
+        "doc": "Step-2 textarea placeholder"
+      },
+      "file_title": {
+        "text": "File the dispute",
+        "doc": "Step-3 title"
+      },
+      "file_intro": {
+        "text": "Check it over. A filed dispute is visible to admins, and to mediators if the circle uses mediation. You can follow it up with another post.",
+        "doc": "Step-3 intro"
+      },
+      "review_summary": {
+        "text": "Summary",
+        "doc": "Review row label"
+      },
+      "review_about_post": {
+        "text": "About post",
+        "doc": "Review row label"
+      },
+      "review_escalation": {
+        "text": "Escalation",
+        "doc": "Review row label"
+      },
+      "review_proposal": {
+        "text": "Proposed resolution",
+        "doc": "Review row label"
+      },
+      "substrate_warn": {
+        "text": "This records the dispute as a post. The full mediation — raise, propose, accept — comes later.",
+        "doc": "Warning banner about the substrate gap"
+      },
+      "filing": {
+        "text": "Filing dispute…",
+        "doc": "Activity indicator label on Step-3 while submit is in flight"
+      },
+      "file_button": {
+        "text": "File",
+        "doc": "Final submit button"
+      },
+      "filed_message": {
+        "text": "✓ Dispute filed.",
+        "doc": "Bot bubble shown when the dispatch returns from onDispatched"
+      },
+      "success_title": {
+        "text": "✓ Dispute filed",
+        "doc": "Success step title"
+      },
+      "success_intro": {
+        "text": "Admins will see it in the circle, and mediators too if the circle uses mediation.",
+        "doc": "Success step intro"
+      }
     }
   }
 }

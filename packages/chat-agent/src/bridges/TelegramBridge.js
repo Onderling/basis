@@ -88,6 +88,23 @@ export function layoutButtons(buttons) {
  *
  * @implements {import('../types.js').MessagingBridge}
  */
+/**
+ * What a host may log about a Telegram call's error: its class name, a short code (`ETIMEDOUT`) and Telegram's status (409 = a
+ * second poller on the same token). Never the message: a fetch error's message carries the request URL, and the URL
+ * carries the bot token. Null when there is no error.
+ * @param {unknown} error
+ * @returns {{name?: string, code?: string|number, status?: number}|null}
+ */
+export function telegramErrorCodes(error) {
+  if (!error || typeof error !== 'object') return null;
+  const short = (v) => (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'string' && /^[A-Za-z0-9_.-]{1,32}$/.test(v));
+  const out = {};
+  if (short(error.name)) out.name = error.name;
+  if (short(error.code) && error.code !== error.response?.error_code) out.code = error.code;
+  if (Number.isInteger(error.response?.error_code)) out.status = error.response.error_code;
+  return out;
+}
+
 export class TelegramBridge {
   /** @type {string}  */                                                    #botToken;
   /** @type {'webhook'|'long-polling'} */                                   #mode;
@@ -130,7 +147,7 @@ export class TelegramBridge {
    *   webhook modes both honour this.
    * @param {(token: string) => any} [args.telegrafFactory]
    * @param {string} [args.apiRoot]  a Bot API server of one's own (Telegram's self-hosted one); default api.telegram.org
-   * @param {(e: {reason: 'stopped'|'stalled', error?: unknown}) => void} [args.onPollingDown]  the long-poll ended
+   * @param {(e: {reason: 'stopped'|'stalled', error?: unknown, codes?: object|null}) => void} [args.onPollingDown]  the long-poll ended (`codes`: what may be logged)
    *   (Telegraf's loop gave up on an error it does not retry) or stalled (no poll completed for `stallMs`; a fetch
    *   without a socket timeout can hang for ever after a sleep or a network change) — said once; the host restarts
    * @param {{stallMs?: number, everyMs?: number, now?: () => number, setInterval?: Function}} [args.watchdog]
@@ -273,7 +290,7 @@ export class TelegramBridge {
   #pollingDown(reason, error) {
     if (this.#downSaid || this.#stopping) return;
     this.#downSaid = true;
-    try { this.#onPollingDown?.({ reason, ...(error !== undefined ? { error } : {}) }); } catch { /* the host's hook never throws into the bridge */ }
+    try { this.#onPollingDown?.({ reason, ...(error !== undefined ? { error, codes: telegramErrorCodes(error) } : {}) }); } catch { /* the host's hook never throws into the bridge */ }
   }
 
   /**
@@ -490,7 +507,8 @@ export class TelegramBridge {
       } catch (err) {
         // Don't crash the bridge on a single failed send.
         // eslint-disable-next-line no-console
-        console.error('[TelegramBridge.#postReply]', err?.message ?? err);
+        // codes only: a fetch error's message is the request URL, and the URL carries the bot token
+        console.error('[TelegramBridge.#postReply]', JSON.stringify(telegramErrorCodes(err)));
       }
     }
   }

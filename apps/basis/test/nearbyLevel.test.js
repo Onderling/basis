@@ -1,7 +1,7 @@
 /**
  * WHAT THE NEARBY ROOM SEES OF A SELF — its LEVEL (none · handle · profile · full), set on THAT self's disclosure under
  * the reserved context `nearby` by ONE writer (`setNearbyLevel`) and read back by one reader (`nearbyLevelFrom`). It is
- * the person's, not the device's: it travels with the persona. Nothing set → `handle`, the floor (default-strict).
+ * the person's, not the device's: it travels with the persona. Nothing set → `none` (default-strict: the room sees nothing until the self chooses).
  */
 import { describe, it, expect } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
@@ -17,15 +17,15 @@ function memoryPodSource(store = new Map()) {
 const levelOf = async (agent, id) => nearbyLevelFrom((await agent.callSkill('agents', 'getProfileDisclosure', { id }))?.disclosure);
 
 describe('the Nearby level of a self', () => {
-  it('nothing set is the floor; the one writer sets each level; the reader reads it back', async () => {
+  it('nothing set is none; the one writer sets each level; the reader reads it back', async () => {
     const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() });
     const w = (await a.callSkill('agents', 'createProfile', { name: 'Werk' })).id;
-    expect(await levelOf(a, 'default'), 'default-strict: the floor').toBe('handle');
+    expect(await levelOf(a, 'default'), 'default-strict: nothing until chosen').toBe('none');
     for (const level of ['profile', 'none', 'handle', 'full']) {
       expect(await a.callSkill('household', 'setNearbyLevel', { personaId: w, level }), level).toMatchObject({ ok: true, level });
       expect(await levelOf(a, w), level).toBe(level);
     }
-    expect(await levelOf(a, 'default'), 'another self is untouched').toBe('handle');
+    expect(await levelOf(a, 'default'), 'another self is untouched').toBe('none');
     expect((await a.callSkill('household', 'setNearbyLevel', { personaId: w, level: 'everything' }))?.ok).toBe(false);
     await a.shutdown?.();
   }, 120_000);
@@ -60,7 +60,7 @@ describe('the card prefill and the level', () => {
     expect((await a.callSkill('agents', 'setProfileProperty', { id: 'default', key: 'realName', value: 'Frits Thuis' }))?.ok).toBe(true);
     const callSkill = (app, op, args) => a.callSkill(app, op, args);
     const asWerk = createNearbyIdentity({ callSkill, roomSelf: () => ({ id: w, name: 'Werk' }) });
-    expect(await asWerk.cardPrefill(), 'at the floor, no name is released').toEqual({});
+    expect(await asWerk.cardPrefill(), 'nothing chosen, no name is released').toEqual({});
     await a.callSkill('household', 'setNearbyLevel', { personaId: w, level: 'profile' });
     const pre = await asWerk.cardPrefill();
     expect(pre, 'Werk\'s own name').toEqual({ label: 'Frits de Werker' });

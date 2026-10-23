@@ -22,7 +22,9 @@
 // mobile's RN wizard can reuse them.
 import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES,
-  STORAGE_POLICIES, KEY_ROTATION_MODES, STEP_NAMES, STEP_LABEL_KEYS,
+  STORAGE_POLICIES, KEY_ROTATION_MODES,
+  REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
+  REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
   initialState, slugify, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit,
   newOfferingRow, OFFERING_AXES,
@@ -117,13 +119,15 @@ export function renderCreateGroupWizard(opts) {
       renderSuccessStep(container, doc, state, onClose);
       return;
     }
-    renderStepHeader(container, doc, state.step);
+    renderStepHeader(container, doc, state);
     if (state.step === 1) renderIdentityStep(container, doc, state, advance, onClose, rerender);
     if (state.step === 2) renderGovernanceStep(container, doc, state, advance, back, onClose, rerender);
     if (state.step === 3) renderRulesStep(container, doc, state, advance, back, onClose, rerender);
     if (state.step === 4) renderOfferingsStep(container, doc, state, advance, back, onClose, rerender);
     if (state.step === 5) renderTechStep(container, doc, state, advance, back, onClose, rerender);
-    if (state.step === 6) renderReviewStep(container, doc, state, back, onClose, rerender, async () => {
+    if (state.step === REVIEW_STEP) renderReviewStep(container, doc, state, back, onClose, rerender, async () => {
+      // what the short path did not ask is filled in now, so the circle and its invite carry it (never an empty purpose)
+      Object.assign(state, withCreateDefaults(state, t));
       rerender(); // show submitting state
       const { result } = await finalSubmit({ state, callSkill, shareRelease: shareFounderRelease });
       if (result) {
@@ -147,24 +151,21 @@ export function renderCreateGroupWizard(opts) {
       rerender();
     });
   }
-  function advance() { if (state.step < STEP_NAMES.length) { state.step += 1; rerender(); } }
-  function back()    { if (state.step > 1) { state.step -= 1; rerender(); } }
+  // the path through the steps is the shared one: name → review, or every step with "Geavanceerd" open
+  function advance() { const n = nextCreateStep(state); if (n !== state.step) { state.step = n; rerender(); } }
+  function back()    { const p = prevCreateStep(state); if (p !== state.step) { state.step = p; rerender(); } }
 }
 
 /* ─── step renderers ───────────────────────────────────────── */
 
-// STEP_NAMES moved to../../core/wizards/createGroupState.js.
-
-function renderStepHeader(container, doc, step) {
+function renderStepHeader(container, doc, state) {
   const header = doc.createElement('div');
   header.className = 'cc-wizard-steps';
-  // The list decides how many dots there are — it was hardcoded to 5 while the wizard has had 6 steps
-  // since Offerings was slotted in, so Review had no dot on web while mobile (which passes the whole
-  // array) drew one. Two shells, two step counts, in the same wizard.
-  for (let n = 1; n <= STEP_LABEL_KEYS.length; n++) {
+  // The shared path decides the dots — one per step this creation walks, the same list on both shells.
+  for (const { step: n, labelKey } of createStepDots(state)) {
     const dot = doc.createElement('span');
-    dot.className = `cc-wizard-step ${n === step ? 'cc-wizard-step-active' : ''} ${n < step ? 'cc-wizard-step-done' : ''}`;
-    dot.textContent = t(STEP_LABEL_KEYS[n - 1]);
+    dot.className = `cc-wizard-step ${n === state.step ? 'cc-wizard-step-active' : ''} ${n < state.step ? 'cc-wizard-step-done' : ''}`;
+    dot.textContent = t(labelKey);
     header.appendChild(dot);
   }
   container.appendChild(header);
@@ -172,23 +173,6 @@ function renderStepHeader(container, doc, step) {
 
 function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   const wrap = makeBody(doc, t('circle.wizard.create.step_identity'), t('circle.wizard.create.step_identity_intro'));
-
-  // N1+E8 — kind picker.  Picking a kind applies the matching template
-  // (β.4) in place; for a neighbourhood it also surfaces the size question +
-  // chat advice (neighbourhood is noticeboard-first, open chat off by default).
-  appendRadioField(wrap, doc, t('circle.kindPicker'), state.kind ?? null,
-    CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
-    (k) => { Object.assign(state, setKind(state, k)); rerender(); },
-    { consequenceGroup: 'kind' });
-
-  if (state.kind === 'neighbourhood') {
-    appendRadioField(wrap, doc, t('circle.size.label'), state.size ?? null,
-      [{ id: 'small', label: t('circle.size.small') },
-       { id: 'large', label: t('circle.size.large') }],
-      (sz) => { Object.assign(state, setSize(state, sz)); rerender(); },
-      { consequenceGroup: 'size' });
-    appendChatAdvice(wrap, doc, state, rerender);
-  }
 
   // The name input updates the auto-derived groupId field WITHOUT
   // rerendering the panel (which would lose focus).  We grab a
@@ -218,7 +202,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
       // is known the Next button stays off — this used to call a `founderKey()` that was never defined.
       refreshNextBtn();
     },
-    { placeholder: 'e.g. Circle Westend' });
+    { placeholder: t('circle.wizard.create.name_placeholder') });
 
   // The founder's handle, asked only when their profile has none — the join wizard's field (a founder without one
   // reached every member as `peer-xxxxxx`).
@@ -232,19 +216,62 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
     });
   }
 
-  appendFounderPersona(wrap, doc, state);
+  // EVERYTHING ELSE behind one fold: the kind, who founds it, its purpose and tags here — and, opened, the further
+  // steps (members, rules, offerings, technical). Closed, the defaults stand and Next goes to the review.
+  const fold = doc.createElement('details');
+  fold.className = 'cc-wizard-advanced';
+  fold.dataset.role = 'advanced';
+  fold.open = state.advanced === true;
+  const summary = doc.createElement('summary');
+  summary.textContent = t('circle.wizard.create.advanced');
+  fold.appendChild(summary);
+  fold.addEventListener('toggle', () => {
+    if (fold.open === (state.advanced === true)) return;
+    Object.assign(state, setAdvanced(state, fold.open));
+    rerender();
+  });
+  const hint = doc.createElement('p');
+  hint.className = 'cc-wizard-hint';
+  hint.textContent = t('circle.wizard.create.advanced_hint');
+  fold.appendChild(hint);
 
-  appendField(wrap, doc, t('circle.wizard.create.purpose'), 'purpose',
+  // N1+E8 — kind picker.  Picking a kind applies the matching template
+  // (β.4) in place; for a neighbourhood it also surfaces the size question +
+  // chat advice (neighbourhood is noticeboard-first, open chat off by default).
+  appendRadioField(fold, doc, t('circle.kindPicker'), state.kind ?? null,
+    CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
+    (k) => { Object.assign(state, setKind(state, k)); rerender(); },
+    { consequenceGroup: 'kind' });
+
+  if (state.kind === 'neighbourhood') {
+    appendRadioField(fold, doc, t('circle.size.label'), state.size ?? null,
+      [{ id: 'small', label: t('circle.size.small') },
+       { id: 'large', label: t('circle.size.large') }],
+      (sz) => { Object.assign(state, setSize(state, sz)); rerender(); },
+      { consequenceGroup: 'size' });
+    appendChatAdvice(fold, doc, state, rerender);
+  }
+
+  // who sees whose name: per pair unless chosen here — never widened by the kind
+  appendRadioField(fold, doc, t('circle.wizard.create.reveal_label'), state.revealPolicy,
+    REVEAL_POLICIES.map((p) => ({ id: p.id, label: t(p.labelKey) })),
+    (v) => { Object.assign(state, setRevealPolicy(state, v)); rerender(); },
+    { consequenceGroup: 'revealPolicy' });
+
+  appendFounderPersona(fold, doc, state);
+
+  appendField(fold, doc, t('circle.wizard.create.purpose'), 'purpose',
     state.purpose, (v) => { state.purpose = v; },
-    { placeholder: 'One sentence: what is this circle for?' });
-  appendField(wrap, doc, t('circle.wizard.create.tags'), 'tags',
+    { placeholder: purposeOrDefault({ kind: state.kind }, t) });
+  appendField(fold, doc, t('circle.wizard.create.tags'), 'tags',
     state.tags, (v) => { state.tags = v; },
-    { placeholder: 'e.g. neighbourhood, tools, kids' });
+    { placeholder: t('circle.wizard.create.tags_placeholder') });
+  wrap.appendChild(fold);
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: 'Cancel', onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →', onClick: onNext, kind: 'primary',
+    { label: t('common.cancel'), onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'), onClick: onNext, kind: 'primary',
       disabled: !identityComplete(state),
       validate: 'identityOk' },
   ]);
@@ -306,7 +333,7 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
         ? Math.max(1, Math.min(8760, n)) : 1;
     },
     { type: 'number',
-      hint: 'How long the membership-code stays redeemable. Short = safer for ad-hoc shares (1 h default). Long = good for slower onboarding (e.g. 168 = 1 week). Admin can /rotate-code later to mint a fresh one.' });
+      hint: t('circle.wizard.create.invite_expiry_hint') });
 
   // B5 — the invite CEILING, next to the invite expiry because they answer the same worry from two
   // sides: how long a leaked code lives, and how many people it can let in while it does.
@@ -325,9 +352,9 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext,   kind: 'primary' },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'),  onClick: onNext,   kind: 'primary' },
   ]);
 }
 
@@ -360,9 +387,9 @@ function renderRulesStep(container, doc, state, onNext, onBack, onCancel, rerend
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext,   kind: 'primary' },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'),  onClick: onNext,   kind: 'primary' },
   ]);
 }
 
@@ -378,7 +405,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
     card.style.cssText = 'border:1px solid var(--cc-line,#d8d1bc);border-radius:6px;padding:10px;margin-bottom:10px';
 
     appendField(card, doc, t('circle.wizard.create.offering_name'), `offering-${i}-name`,
-      row.name, (v) => { row.name = v; }, { placeholder: 'e.g. plumbing' });
+      row.name, (v) => { row.name = v; }, { placeholder: t('circle.wizard.create.offering_placeholder') });
 
     for (const axis of Object.keys(OFFERING_AXES)) {
       const opts = OFFERING_AXES[axis].map((id) => ({ id, label: id }));
@@ -410,9 +437,9 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext,   kind: 'primary' },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('common.next'),  onClick: onNext,   kind: 'primary' },
   ]);
 }
 
@@ -427,7 +454,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     appendField(wrap, doc, t('circle.wizard.create.pod_uri'), 'groupPodUri',
       state.groupPodUri, (v) => { state.groupPodUri = v; },
       { placeholder: 'https://group-pod.example/onderling/circle/',
-        hint: 'Required for centralised + hybrid storage.', monospace: true });
+        hint: t('circle.wizard.create.pod_uri_hint'), monospace: true });
     // NKN+pod circle (J-NP3) — the CREATE half of the disclosure shown at both ends: choosing a shared
     // pod means its host can see the membership. Said here, next to the choice that causes it, so the
     // creator decides with the fact in view rather than discovering it in a settings screen later.
@@ -451,9 +478,9 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Review →',  onClick: onNext, kind: 'primary', disabled: !uriOk },
+    { label: t('common.back'),  onClick: onBack,   kind: 'secondary' },
+    { label: t('common.cancel'),  onClick: onCancel, kind: 'secondary' },
+    { label: t('circle.wizard.create.review_button'),  onClick: onNext, kind: 'primary', disabled: !uriOk },
   ]);
 }
 
@@ -462,33 +489,39 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
 
   const dl = doc.createElement('dl');
   dl.className = 'cc-wizard-review';
+  // what was chosen — the defaults included, so the review never shows an empty value (type, purpose, rules)
   appendReview(dl, doc, t('circle.wizard.create.review_name'),           state.name);
+  appendReview(dl, doc, t('circle.wizard.create.review_kind'),           t(`circle.kind.${state.kind ?? 'other'}`));
+  appendReview(dl, doc, t('circle.wizard.create.purpose'),               purposeOrDefault(state, t));
   appendReview(dl, doc, t('circle.wizard.create.review_persona'),  founderPersonaName(state, t) ?? t('circle.wizard.create.review_persona_minimal'));
-  if (state.purpose) appendReview(dl, doc, t('circle.wizard.create.purpose'), state.purpose);
   if (state.tags)    appendReview(dl, doc, t('circle.wizard.create.review_tags'), state.tags);
   appendReview(dl, doc, t('circle.wizard.create.access'),   labelOf(ACCESS_POLICIES, state.accessPolicy));
   appendReview(dl, doc, t('circle.wizard.create.leave'),    labelOf(LEAVE_POLICIES, state.leavePolicy));
-  appendReview(dl, doc, t('circle.wizard.create.review_expiry'),   `${state.inviteExpiresInHours} h`);
-  appendReview(dl, doc, t('circle.invite.ceiling_review'), String(state.inviteMaxRedemptions));
-  // 5.5a — render each non-empty rules-doc field on its own row.
-  for (const q of RULES_QUESTIONS) {
-    if (q.key === 'purpose') continue;   // shown above via state.purpose
-    const v = state.rulesDoc?.[q.key];
-    if (v) appendReview(dl, doc, t(`circle.rules.q.${q.key}`), v, { pre: true });
-  }
   appendReview(dl, doc, t('circle.wizard.create.review_conflict'), labelOf(CONFLICT_POLICIES, state.conflictPolicy));
-  // 5.5c — list named offerings with their axes.
-  const namedOfferings = (state.offerings ?? []).filter((s) => s?.name?.trim());
-  if (namedOfferings.length > 0) {
-    const offeringsSummary = namedOfferings
-      .map((s) => `${s.name} — ${s.openness}/${s.posture}/${s.status}/${s.radius}`)
-      .join('\n');
-    appendReview(dl, doc, t('circle.wizard.create.review_offerings'), offeringsSummary, { pre: true });
+  appendReview(dl, doc, t('circle.wizard.create.reveal_label'),    t(revealPolicyLabelKey(state)));
+  // the rest only when the person opened "Geavanceerd" and so saw it
+  if (state.advanced === true) {
+    appendReview(dl, doc, t('circle.wizard.create.review_expiry'),   `${state.inviteExpiresInHours} h`);
+    appendReview(dl, doc, t('circle.invite.ceiling_review'), String(state.inviteMaxRedemptions));
+    // 5.5a — render each non-empty rules-doc field on its own row.
+    for (const q of RULES_QUESTIONS) {
+      if (q.key === 'purpose') continue;   // shown above via state.purpose
+      const v = state.rulesDoc?.[q.key];
+      if (v) appendReview(dl, doc, t(`circle.rules.q.${q.key}`), v, { pre: true });
+    }
+    // 5.5c — list named offerings with their axes.
+    const namedOfferings = (state.offerings ?? []).filter((s) => s?.name?.trim());
+    if (namedOfferings.length > 0) {
+      const offeringsSummary = namedOfferings
+        .map((s) => `${s.name} — ${s.openness}/${s.posture}/${s.status}/${s.radius}`)
+        .join('\n');
+      appendReview(dl, doc, t('circle.wizard.create.review_offerings'), offeringsSummary, { pre: true });
+    }
+    appendReview(dl, doc, t('circle.wizard.create.review_storage'),        labelOf(STORAGE_POLICIES, state.storagePolicy));
+    if (state.groupPodUri) appendReview(dl, doc, t('circle.wizard.create.review_pod'), state.groupPodUri);
+    appendReview(dl, doc, t('circle.wizard.create.review_rotation'),   labelOf(KEY_ROTATION_MODES, state.keyRotationMode));
+    appendReview(dl, doc, t('circle.wizard.create.review_rotation_days'),  String(state.rotationDays));
   }
-  appendReview(dl, doc, t('circle.wizard.create.review_storage'),        labelOf(STORAGE_POLICIES, state.storagePolicy));
-  if (state.groupPodUri) appendReview(dl, doc, t('circle.wizard.create.review_pod'), state.groupPodUri);
-  appendReview(dl, doc, t('circle.wizard.create.review_rotation'),   labelOf(KEY_ROTATION_MODES, state.keyRotationMode));
-  appendReview(dl, doc, t('circle.wizard.create.review_rotation_days'),  String(state.rotationDays));
   wrap.appendChild(dl);
 
   if (state.submitError) {
@@ -506,9 +539,9 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',         onClick: onBack,                       kind: 'secondary', disabled: state.submitting },
-    { label: 'Cancel',         onClick: onCancel,                     kind: 'secondary', disabled: state.submitting },
-    { label: 'Create circle',   onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
+    { label: t('common.back'),         onClick: onBack,                       kind: 'secondary', disabled: state.submitting },
+    { label: t('common.cancel'),         onClick: onCancel,                     kind: 'secondary', disabled: state.submitting },
+    { label: t('circle.wizard.create.create_button'), onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
   ]);
 }
 
@@ -623,7 +656,7 @@ function renderSuccessStep(container, doc, state, onClose) {
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: 'Done', onClick: onClose, kind: 'primary' },
+    { label: t('common.done'), onClick: onClose, kind: 'primary' },
   ]);
 }
 

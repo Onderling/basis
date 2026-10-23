@@ -13,15 +13,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import FaceView from './FaceView.js';
-import { splitShownHidden, loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
+import { splitShownHidden, loadContactRoster, makeContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
 // L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
-export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null,
+export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
   // the contacts of the selves ticked in the header (shared `contactsInSet`); absent = all
   keep = null }) {
   const theme = useTheme();
@@ -109,7 +110,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
           </Text>
           {/* …and one who renamed themselves says what they were, until the thread is opened */}
           {c.wasName ? <Text style={styles.wasName}>{t('circle.contacts.was_named', { name: c.wasName })}</Text> : null}
-          <Text style={styles.meta}>{rosterMeta(c)}</Text>
+          <Text style={styles.meta}>{contactRowMeta(c, t)}</Text>
         </View>
         {n > 0 ? <Text style={styles.unread} accessibilityLabel={t('circle.contacts.unread', { count: n })} testID={`contact-unread-${c.contactId}`}>{String(n)}</Text> : null}
         <Text style={styles.open}>{t('circle.contacts.open')}</Text>
@@ -122,9 +123,17 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       {lens.sheet}
       <View style={styles.head}>
         <Text style={styles.title}>{t('circle.contacts.title')}</Text>
-        <Pressable style={styles.add} onPress={() => setAddOpen((v) => !v)} accessibilityRole="button" testID="contacts-add">
-          <Text style={styles.addText}>{t('circle.contacts.add')}</Text>
-        </Pressable>
+        {/* the two ways in: a PERSON (the scanner — Me's Scan, the same door) and a bot (its address) */}
+        <View style={styles.acts}>
+          {typeof onAddPerson === 'function' ? (
+            <Pressable style={styles.add} onPress={onAddPerson} accessibilityRole="button" testID="contacts-add-person">
+              <Text style={styles.addText}>{t('circle.contacts.add_person')}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable style={styles.add} onPress={() => setAddOpen((v) => !v)} accessibilityRole="button" testID="contacts-add">
+            <Text style={styles.addText}>{t('circle.contacts.add')}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {addOpen && (
@@ -150,7 +159,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       {contacts.length === 0 ? (
         <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
           {shown.map((c) => rowFor(c))}
           {hidden.length > 0 ? (
             <Pressable style={styles.fold} onPress={() => setFoldOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: foldOpen }} testID="contacts-hidden-fold">
@@ -164,22 +173,11 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   );
 }
 
-function rosterMeta(c) {
-  const bits = [];
-  if (c.isBot) bits.push(t('circle.contacts.bot'));
-  if (c.isBot && c.skillCount > 0) bits.push(t('circle.contacts.skills', { count: c.skillCount }));
-  // S1 #2 — a ContactBook person's trust level + tags.
-  if (!c.isBot && c.trustLevel) bits.push(t(`circle.contacts.trust.${c.trustLevel}`));
-  if (c.pairCircleId) bits.push(t('circle.contacts.connected'));   // the pair roster exists (L105)
-  if (!c.isBot && Array.isArray(c.tags) && c.tags.length) bits.push(c.tags.join(', '));
-  if (!c.reachable) bits.push(t('circle.contacts.offline'));
-  return bits.join(' · ');
-}
-
 const makeStyles = (theme, insets) => StyleSheet.create({
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
+  acts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', flexShrink: 1 },
   add: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent },
   addText: { fontSize: 13, fontWeight: '600', color: theme.color.accent },
   addRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },

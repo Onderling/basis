@@ -58,14 +58,13 @@
  */
 
 import {
-  defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink,
+  defineSkill, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
   createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
   verifyCeremonyReveal, isCeremonyKind as isCeremonyStatementKind, ceremonyRevealFacts, PERSON_KEY_KIND, verifyPersonKeyChain,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
-import nacl from 'tweetnacl';
 import { sealingPublicKeyFromNetworkKey as deriveSealingKeyFromAddress } from '@onderling/pod-client';   // one sealing key family: the join grant wraps to the proven address's image
 import { resolve as resolveMember } from '@onderling/identity-resolver';
 import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
@@ -1028,7 +1027,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       const r = await circleSignerFor(groupId);
       const id = r?.identity ?? r;
       if (id?.pubKey) selfBinding = { pubKey: id.pubKey, ref: r?.ref ?? id.pubKey };
-    } catch { selfBinding = null; }
+    } catch (err) {
+      // Said out loud: without its own per-circle key this device reads its own statements as someone else's.
+      console.error(`[pinboard] no per-circle signer for ${groupId}: ${err?.message ?? err} — own statements will not bind to this device`);
+      selfBinding = null;
+    }
   }
   // THE SAME RULE FOR THE LEGACY STORE PATH: a device can always verify its OWN key. Where there is
   // no per-circle signer, statements are signed with the device's global identity, so `author` is
@@ -1284,10 +1287,10 @@ export function buildPinboardScope(deps = {}) {
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfWebidFor = null,
   } = deps;
-  // This device's own key paired with the webid it speaks for. Derived HERE so both routes into the
-  // scope get it — the roster projection needs it to read back statements this same composition
-  // wrote with the global identity, where `author` is a pubKey and `subject` a webid.
-  const selfSigner = deps.selfSigner ?? ((bundle?.agent?.identity?.pubKey && localActor)
+  // This device's own key paired with the webid it speaks for, for reading back statements this same composition
+  // wrote with the global identity (`author` a pubKey, `subject` a webid). Only where there is no per-circle
+  // signer is the bundle's key the one that signs; with one, the bundle key is never guessed in its place.
+  const selfSigner = deps.selfSigner ?? (typeof circleSignerFor !== 'function' && bundle?.agent?.identity?.pubKey && localActor
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   // THIS DEVICE in a circle: its persona there (host-injected `selfWebidFor`), else `localActor`. The cores' "is
@@ -1332,6 +1335,9 @@ export function buildSkills({
   // WHO this device is per circle, `(circleId) => webid|null` (its persona there) — host-injected; the local/foreign
   // line in the cores follows it (`localActorIn`). Absent → `localActor` for every circle.
   selfWebidFor = null,
+  // The identity THIS DEVICE's own card and requests name, `() => ({ pubKey, stableId })` — host-injected (basis: the
+  // chat identity, the address people reach). Absent → this agent's own identity (the standalone app, where it is one).
+  selfCard = null,
   groupId: explicitGroupId,
   dataLocationConfig,
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` (principle 5) — host-injected;
@@ -1405,10 +1411,9 @@ export function buildSkills({
   // `bundleResolver(parts,{envelope,from})`.  `wire(id, coreFn, opts)` looks the
   // op up in `pinboardManifest`, generates the `defineSkill`-shaped handler via
   // `wireSkill`, and re-attaches the same description/visibility.
-  // This device's own key paired with the webid it speaks for. Derived once and shared with the
-  // scope: the roster projection and the role gate both need it to read back statements this
-  // composition wrote with the global identity (`author` a pubKey, `subject` a webid).
-  const selfSigner = (bundle?.agent?.identity?.pubKey && localActor)
+  // This device's own key paired with the webid it speaks for (see buildPinboardScope): the bundle's key only where
+  // there is no per-circle signer, because only then is it the key that signs.
+  const selfSigner = (typeof circleSignerFor !== 'function' && bundle?.agent?.identity?.pubKey && localActor)
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null;
   const scope = buildPinboardScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,
@@ -1451,7 +1456,11 @@ export function buildSkills({
     const webid = typeof row?.webid === 'string' && row.webid ? row.webid : null;
     if (!webid) return drop('sender-not-on-roster');
     const prior = Array.isArray(item.source?.responders) ? item.source.responders : [];
-    if (!prior.includes(webid)) await store.update(item.id, { source: { ...item.source, responders: [...prior, webid] } }, { actor: self });
+    if (!prior.includes(webid)) {
+      await store.update(item.id, { source: { ...item.source, responders: [...prior, webid] } }, { actor: self });
+      // an open board re-reads on this (both shells), so the poster sees the answer without leaving the tab
+      try { bundle?.agent?.emit?.('pinboard:response-recorded', { itemId: item.id }); } catch { /* a listener never breaks ingest */ }
+    }
     return { recorded: true, webid };
   };
   // The invite verdict with the roster's word (both redeem paths), from the requester's LATEST exit: on the roster →
@@ -3570,23 +3579,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * markMnemonicShown()
-     *   — record that the user has been shown their recovery phrase
-     *   at least once.  The next time onboarding resumes, this flag
-     *   prevents nagging.
-     */
-    defineSkill('markMnemonicShown', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const externalIds = { ...(me.externalIds ?? {}), mnemonicShown: 'true' };
-      await members.addMember({ ...me, externalIds });
-      return { ok: true, _sync: simulateSync() };
-    }, {
-      description: 'Mark that the user\'s recovery phrase has been shown.',
-      visibility:  'authenticated',
-    }),
-
     // ── Pinboard V1 Phase 6 (2026-05-06) — handle / displayName / reveal ─────
     // (skill block below — kept in original location for git friendliness)
 
@@ -4512,29 +4504,6 @@ export function buildSkills({
     // ── Pinboard V1 Phase 17 (2026-05-06) — onboarding polish ───────────────
 
     /**
-     * getMnemonicOnce()
-     *   — returns the agent's BIP39 mnemonic ONCE per onboarding flow.
-     *   If `markMnemonicShown` already flipped, returns
-     *   `{shown: true, mnemonic: null}`; otherwise returns the
-     *   mnemonic and atomically marks-shown so a refresh in the
-     *   modal doesn't leak the phrase a second time.
-     */
-    defineSkill('getMnemonicOnce', async ({ from, agent }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = await members.resolveByWebid(from);
-      const alreadyShown = me?.externalIds?.mnemonicShown === 'true';
-      if (alreadyShown) return { shown: true, mnemonic: null };
-      const mnemonic = await agent.identity?.getMnemonic?.() ?? null;
-      const meRow = me ?? { webid: from };
-      const externalIds = { ...(meRow.externalIds ?? {}), mnemonicShown: 'true' };
-      await members.addMember({ ...meRow, externalIds });
-      return { shown: false, mnemonic };
-    }, {
-      description: 'One-time recovery-phrase reveal during first-run; subsequent calls return {shown: true, mnemonic: null}.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * getInviteQrPayload({invite})
      *   — produce the canonical string an invite QR encodes.  Apps
      *   pass this to any QR-rendering library; Pinboard ships no
@@ -4569,10 +4538,11 @@ export function buildSkills({
       // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
       // no fallback to this agent's identity, which every self of the device shares and so would link them.
       const asPersona = !!localActor && from !== localActor;
+      const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       const card = {
         webid:        from,
-        pubKey:       me?.pubKey       ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
-        stableId:     me?.stableId     ?? (asPersona ? null : agent?.identity?.stableId ?? null),
+        pubKey:       own?.pubKey   ?? me?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     own?.stableId ?? me?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
         avatarUrl:    me?.avatarUrl    ?? null,
@@ -4933,7 +4903,7 @@ export function buildSkills({
             itemId:       a.itemId,
             attId:        a.attId,
             fromWebid:    bundle?.agent?.identity ? from : null,
-            fromStableId: bundle?.agent?.identity?.stableId ?? null,
+            fromStableId: (typeof selfCard === 'function' ? selfCard()?.stableId : null) ?? bundle?.agent?.identity?.stableId ?? null,
             sentAt:       Date.now(),
           }}],
         });
@@ -5275,142 +5245,6 @@ export function buildSkills({
       return { list };
     }, {
       description: 'Read one contact list by listId.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * validateMnemonicPhrase({mnemonic})
-     *   — Phase 30.1.  Validate a BIP-39 phrase + derive the agent
-     *   pubKey it would yield.  Pure validation — does NOT swap the
-     *   running bundle's identity.  The UI uses this on /restore.html
-     *   to show "this is what your account will be" before the user
-     *   commits to the restore flow.
-     *
-     *   To actually adopt the mnemonic-derived identity on a new
-     *   device, the user calls `restoreFromMnemonic` (which writes
-     *   the seed into the vault) and then restarts the Pinboard
-     *   process. Mid-flight identity swap is + — too invasive
-     *   for V2.
-     */
-    defineSkill('validateMnemonicPhrase', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.mnemonic !== 'string' || !a.mnemonic.trim()) {
-        return { error: 'mnemonic required' };
-      }
-      try {
-        if (!validateMnemonic(a.mnemonic)) return { error: 'invalid-mnemonic' };
-        const seed = mnemonicToSeed(a.mnemonic);
-        const kp = nacl.sign.keyPair.fromSeed(seed);
-        const pubKey = Buffer.from(kp.publicKey).toString('base64')
-          .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-        return { ok: true, pubKey };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Validate a BIP-39 mnemonic + return the derived agent pubKey.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * restoreFromMnemonic({mnemonic, confirm})
-     *   — Phase 30 + Phase 31 (mid-flight identity swap).
-     *
-     *   Validates the mnemonic, persists the derived seed into the
-     *   bundle's vault under `agent-privkey`, then SWAPS the running
-     *   agent's identity in-place via `agent.swapIdentity`.  No
-     *   restart needed; subsequent skills run under the restored
-     *   identity immediately.
-     *
-     *   Caller MUST pass `confirm: true` — this is destructive: the
-     *   previously-running identity is replaced.
-     *
-     *   The Phase 32 deterministic-stableId derivation means the
-     *   restored bundle produces the SAME stableId as the original
-     *   device, so mute / report / contact-cache state survives the
-     *   restore.
-     */
-    defineSkill('restoreFromMnemonic', async ({ parts, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.mnemonic !== 'string' || !a.mnemonic.trim()) {
-        return { error: 'mnemonic required' };
-      }
-      if (a.confirm !== true) return { error: 'confirm: true required (destructive op)' };
-      if (!validateMnemonic(a.mnemonic)) return { error: 'invalid-mnemonic' };
-
-      const seed = mnemonicToSeed(a.mnemonic);
-      const kp = nacl.sign.keyPair.fromSeed(seed);
-      const newPubKey = Buffer.from(kp.publicKey).toString('base64')
-        .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-
-      const vault = agent?.identity?.vault ?? null;
-      if (!vault) return { error: 'no-vault' };
-
-      // Persist the new seed into the vault.
-      const entry = JSON.stringify({
-        current: Buffer.from(seed).toString('base64')
-          .replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, ''),
-        previous: null,
-      });
-      try {
-        await vault.set('agent-privkey', entry);
-      } catch (err) {
-        return { error: `vault-set: ${err?.message ?? err}` };
-      }
-      // Drop any prior stableId so the new identity re-derives via
-      // Phase 32's HKDF path.  Result: same mnemonic → same stableId
-      // across devices.
-      try { await vault.delete?.('agent-stable-id'); } catch {}
-
-      // mid-flight identity swap. Build a fresh
-      // AgentIdentity (which loads the new seed + new stableId from
-      // the vault) and hand it to the running agent.
-      let newIdentity;
-      try {
-        newIdentity = await AgentIdentity.restore(vault);
-      } catch (err) {
-        return { error: `restore-identity: ${err?.message ?? err}` };
-      }
-      try {
-        agent.swapIdentity(newIdentity);
-      } catch (err) {
-        return { error: `swap-identity: ${err?.message ?? err}` };
-      }
-
-      // Update the local actor's MemberMap entry so `whoAmI` and any
-      // resolveByWebid(localActor) callers report the new pubKey +
-      // stableId immediately.  Skip silently if no map.
-      if (members) {
-        try {
-          const me = (await members.resolveByWebid(localActor)) ?? { webid: localActor };
-          await members.addMember({
-            ...me,
-            pubKey:   newIdentity.pubKey,
-            stableId: newIdentity.stableId,
-          });
-        } catch { /* best-effort */ }
-      }
-
-      // Phase 31 scope: a fresh device's bundle has no peers
-      // yet (restore flow runs before any group-rejoin), so there's
-      // no peer-rebind to do at this point.  The agent's outbound
-      // envelopes are now signed by the new key (handled inside
-      // swapIdentity → SecurityLayer.swapIdentity).
-      //
-      // V3 mobile note: when the restore flow lands on a device with
-      // pre-existing peer subscriptions (rejoining a circle), this is
-      // where we'd `await offeringMatch.stop(); await offeringMatch.start()`
-      // to re-bind topic listeners.  Today it's a no-op.
-
-      metrics?.record?.('identity-restored');
-      return {
-        ok: true,
-        newPubKey,
-        newStableId: newIdentity.stableId,
-        message: 'Restored. You\'re signed in under the recovered identity.',
-      };
-    }, {
-      description: 'Restore the agent identity from a BIP-39 mnemonic; takes effect immediately (Phase 31 mid-flight swap).',
       visibility:  'authenticated',
     }),
 

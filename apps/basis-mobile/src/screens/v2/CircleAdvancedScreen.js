@@ -11,6 +11,7 @@ import { View, Text, TextInput, Pressable, ScrollView, Switch, StyleSheet } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { advancedOpRows, settingsProjection } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import { t } from '../../core/localisation.js';
 import OpPageModal from './OpPageModal.js';
 
@@ -62,7 +63,7 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
   };
 
   return (
-    <ScrollView testID="circle-advanced-screen" style={styles.screen} contentContainerStyle={styles.wrap}>
+    <ScrollView testID="circle-advanced-screen" style={styles.screen} contentContainerStyle={[styles.wrap, { paddingBottom: FAB_CLEARANCE }]}>
       {onBack ? (
         <Pressable onPress={onBack} accessibilityRole="button" testID="circle-advanced-back">
           <Text style={styles.back}>{t('circle.back_me')}</Text>

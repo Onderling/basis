@@ -76,7 +76,9 @@ export function nearbyVisibilityKey(visibility) {
   if (visibility.degraded)    return 'still_visible';
   if (visibility.unavailable) return 'unavailable';
   if (visibility.pending)     return 'becoming_visible';
-  return visibility.publishing ? 'visible' : 'hidden';
+  if (visibility.publishing)  return 'visible';
+  // Unlisted because no level was chosen yet — not because the person asked to be hidden.
+  return visibility.levelChosen === false ? 'not_chosen' : 'hidden';
 }
 
 /**
@@ -99,12 +101,14 @@ export function nearbyVisibilityKey(visibility) {
  * @param {() => string|null} [deps.myRoomAddress]  the ephemeral address I present here
  * @param {() => Promise<Record<string,object>>} [deps.getDrivers]  MY drivers — read on-device, never sent
  * @param {() => Promise<string>} [deps.roomLevel]  the room self's Nearby level (`none` refuses a card)
+ * @param {() => boolean} [deps.levelChosen]  whether the room self chose a Nearby level; until it did, the device is
+ *   never announced (default-strict: absent ⇒ not chosen)
  * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
  * @param {() => number} [deps.now]
  * @param {string} [deps.restingState]   passed through to the session adapter
  * @param {function} [deps.t]
  * @param {(err: Error, phase: string) => void} [deps.onError]
- * @returns {{open, close, isOpen, model, actionsFor, visibility, subscribe, refresh}}
+ * @returns {{open, close, isOpen, model, actionsFor, visibility, levelChanged, subscribe, refresh}}
  */
 export function createNearbyScreen({
   control = null,
@@ -128,6 +132,7 @@ export function createNearbyScreen({
   myRoomAddress = () => null,
   getDrivers = null,
   roomLevel = null,
+  levelChosen = () => false,
   judge,
   now = () => Date.now(),
   restingState,
@@ -151,12 +156,15 @@ export function createNearbyScreen({
   // it resets when the screen closes, so "quiet" can never silently become this device's standing state.
   let quiet = false;
   const radioIsOff = () => { try { return radio?.get?.() === 'off'; } catch { return false; } };
+  // ANNOUNCED ⇔ a level chosen on this self ∧ not quiet ∧ radio on. A port that throws counts as not chosen.
+  const chosen = () => { try { return levelChosen?.() === true; } catch { return false; } };
+  const announceOrQuiet = () => { if (quiet || !chosen()) adapter.goQuiet(); else adapter.startAdvertising(); };
 
   const session = createProximitySession({
     // The radio switch outranks the screen: opening the view must never turn a switched-off radio on.
     startAdvertising: () => {
       if (radioIsOff()) return;
-      if (quiet) adapter.goQuiet(); else adapter.startAdvertising();
+      announceOrQuiet();
     },
     stopAdvertising:  () => { if (radioIsOff()) return; adapter.stopAdvertising(); },
     subscribe:        subscribeToPeers ?? undefined,
@@ -306,6 +314,7 @@ export function createNearbyScreen({
       // The persisted switch: nothing browsed or announced. Outranks every other banner state.
       radioOff: radioIsOff(),
       quiet,
+      levelChosen: chosen(),
       perTransport: report?.perTransport ?? [],
     };
   }
@@ -491,7 +500,18 @@ export function createNearbyScreen({
       if (next === quiet) return;
       quiet = next;
       if (session.isOpen() && !radioIsOff()) {
-        if (quiet) adapter.goQuiet(); else adapter.goVisible();
+        if (quiet || !chosen()) adapter.goQuiet(); else adapter.goVisible();
+      }
+      emit();
+    },
+
+    /**
+     * The room self's level was just chosen or changed (or the self changed): re-read `levelChosen` and announce
+     * or stay unlisted to match — but never over the person's own quiet switch or the radio switch.
+     */
+    levelChanged() {
+      if (session.isOpen() && !radioIsOff() && !quiet) {
+        if (chosen()) adapter.goVisible(); else adapter.goQuiet();
       }
       emit();
     },
@@ -505,7 +525,7 @@ export function createNearbyScreen({
       if (v !== 'on' && v !== 'off') return;
       try { radio?.set?.(v); } catch (err) { try { onError?.(err, 'setRadio'); } catch { /* diagnostics only */ } }
       if (v === 'off') adapter.radioOff();
-      else if (session.isOpen()) { if (quiet) adapter.goQuiet(); else adapter.startAdvertising(); }
+      else if (session.isOpen()) announceOrQuiet();
       else adapter.radioOn();
       emit();
     },

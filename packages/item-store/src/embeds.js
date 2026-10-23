@@ -14,6 +14,7 @@
  *
  * Standardisation Phase 52.6.1.
  */
+import { parseUntrustedJson } from '@onderling/core';
 
 /**
  * @typedef {object} TreeNode
@@ -230,7 +231,7 @@ function _parseItem(bytes) {
     return null;
   }
   try {
-    const o = JSON.parse(text);
+    const o = parseUntrustedJson(text);
     return (o && typeof o === 'object') ? o : null;
   } catch {
     return null;

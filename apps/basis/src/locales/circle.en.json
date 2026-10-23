@@ -25,19 +25,11 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
-  "new": {
-    "text": "+ new circle",
-    "doc": "Create-a-new-circle entry on the launcher."
-  },
   "create_unavailable": {
     "text": "Can't create a circle yet — the app is still starting.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
   },
   "join": {
-    "button": {
-      "text": "Join a circle",
-      "doc": "OBJ-2 — launcher entry to join an existing circle from an invite."
-    },
     "paste": {
       "text": "Paste the invite link from the other device:",
       "doc": "OBJ-2 — prompt for the onderling-invite:// URL when joining on web (no camera)."
@@ -307,6 +299,14 @@
     "announce_nearby_failed": {
       "text": "Could not announce it here",
       "doc": "The broadcast threw; the QR still works."
+    },
+    "send_link": {
+      "text": "Send the link",
+      "doc": "The invite: the invite as a link for someone who is not in the room — the phone's share sheet; web: the browser's share sheet, or copied."
+    },
+    "link_copied": {
+      "text": "Link copied.",
+      "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
     }
   },
   "members": {
@@ -502,7 +502,7 @@
     "doc": "Shown when the launcher has no circles."
   },
   "loading": {
-    "text": "Loading circles…",
+    "text": "Loading…",
     "doc": "Shown while circles are being fetched."
   },
   "back_me": {
@@ -950,10 +950,6 @@
       "text": "yesterday",
       "doc": "SP-13.2 — chat-stream day-divider label."
     },
-    "tab_coming": {
-      "text": "{{tab}} content lands in a follow-up slice.",
-      "doc": "SP-13.3 — placeholder body for a tab whose content surface isn't built yet (e.g. NOTICEBOARD / MEMBERS)."
-    },
     "tasks_empty": {
       "text": "No tasks in this circle yet.",
       "doc": "Taken (tasks) tab — empty state (no tasks)."
@@ -985,10 +981,6 @@
     "view_toggle_label": {
       "text": "Switch between chat and screen view",
       "doc": "SP-13.4 — a11y group label on the Chat | Screen pill."
-    },
-    "screen_coming": {
-      "text": "Screen view (admin's recept'd page) lands in a follow-up slice.",
-      "doc": "SP-13.4 — placeholder until the recept renderer is built."
     },
     "attach": {
       "text": "Attach a photo",
@@ -1280,22 +1272,6 @@
       "text": "e.g. work, home",
       "doc": "Placeholder of the labels filter field."
     },
-    "within_any": {
-      "text": "Any time",
-      "doc": "Relative-date filter: no limit."
-    },
-    "within_1": {
-      "text": "Today",
-      "doc": "Relative-date filter: within a day."
-    },
-    "within_7": {
-      "text": "This week",
-      "doc": "Relative-date filter: within 7 days."
-    },
-    "within_30": {
-      "text": "This month",
-      "doc": "Relative-date filter: within 30 days."
-    },
     "customise": {
       "text": "Customise",
       "doc": "The button on Vandaag that opens the customise sheet."
@@ -1351,22 +1327,6 @@
     "done": {
       "text": "Done",
       "doc": "Close the customise sheet."
-    },
-    "horizon_today": {
-      "text": "Today",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_3days": {
-      "text": "3 days",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_week": {
-      "text": "Week",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_month": {
-      "text": "Month",
-      "doc": "Calendar block horizon preset."
     },
     "scope_mine": {
       "text": "Mine",
@@ -1433,16 +1393,12 @@
       "doc": "The \"+\" sheet's button that takes an own note/appointment away."
     },
     "plus_line_ph": {
-      "text": "Say what you want — \"note: milk\", \"appointment tomorrow 14:00 dentist\"",
+      "text": "Say what you want — \"note: milk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
     "plus_referral": {
       "text": "That is something for {{name}} → open",
       "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
-    },
-    "plus_me_title": {
-      "text": "Yours",
-      "doc": "The \"+\" sheet: the heading over the Me actions (share my card, scan)."
     },
     "pin_to_plus": {
       "text": "Pin to +",
@@ -1571,6 +1527,62 @@
     "onboarding_begin_join": {
       "text": "I have an invitation",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_key_title": {
+      "text": "Save your key",
+      "doc": "Vandaag's key card: the recovery phrase is not saved on this device yet. Never shows the words."
+    },
+    "onboarding_key_hint": {
+      "text": "Your recovery phrase is not written down yet. Without it you cannot get back to your things if this device is lost. Open it somewhere nobody can look along.",
+      "doc": "Vandaag's key card: why, and where to open it."
+    },
+    "onboarding_key_show": {
+      "text": "Show",
+      "doc": "Vandaag's key card: the explicit step that opens the recovery words."
+    },
+    "onboarding_key_later": {
+      "text": "Later",
+      "doc": "Vandaag's key card: put the card away for a few days."
+    },
+    "plus_line_read": {
+      "text": "Read",
+      "doc": "The \"+\" sheet: the button beside the free line that reads it (Enter does the same)."
+    },
+    "range_today": {
+      "text": "Today",
+      "doc": "A time range: today."
+    },
+    "range_3days": {
+      "text": "3 days",
+      "doc": "A time range: three days."
+    },
+    "range_week": {
+      "text": "This week",
+      "doc": "A time range: this week."
+    },
+    "range_month": {
+      "text": "This month",
+      "doc": "A time range: this month."
+    },
+    "range_any": {
+      "text": "Any time",
+      "doc": "A time range: no limit."
+    },
+    "control_horizon": {
+      "text": "How far ahead",
+      "doc": "Customise sheet: heading over the calendar block's time-range chips."
+    },
+    "control_scope": {
+      "text": "Whose tasks",
+      "doc": "Customise sheet: heading over the tasks block's mine/all chips."
+    },
+    "control_limit": {
+      "text": "How many rows",
+      "doc": "Customise sheet: heading over a block's row-cap chips."
+    },
+    "control_within": {
+      "text": "Period",
+      "doc": "Customise sheet: heading over the relative-date chips of a tasks or notes block."
     }
   },
   "screens": {
@@ -2946,6 +2958,18 @@
       "text": "No matches yet",
       "doc": "Empty state for the skill match list."
     },
+    "matches_for_ask": {
+      "text": "Who offers this",
+      "doc": "Heading over the matches the asker sees under their own ask on the noticeboard (released offerings only)."
+    },
+    "match_ask": {
+      "text": "Ask",
+      "doc": "Under my ask: open the contact thread with this match."
+    },
+    "match_skip": {
+      "text": "Skip",
+      "doc": "Under my ask: hide this match on this device only."
+    },
     "axis": {
       "openness": {
         "text": "Openness",
@@ -3522,6 +3546,14 @@
       "text": "You can see who is around; they cannot see you.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "not_chosen_title": {
+      "text": "Not visible yet",
+      "doc": "Visibility banner heading while no Nearby level is chosen yet: the device stays unlisted until the person chooses."
+    },
+    "not_chosen_body": {
+      "text": "Nobody here can see you until you choose what this room may see of you.",
+      "doc": "Second line of that banner."
+    },
     "radio_off_title": {
       "text": "Nearby is off",
       "doc": "Visibility banner heading while the persisted radio switch is off."
@@ -3713,6 +3745,10 @@
     "face_caveat": {
       "text": "A stable face re-identifies you across places, even though your address rotates.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."
+    },
+    "no_name_yet": {
+      "text": "you (no name yet)",
+      "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
     }
   },
   "viewAsSplit": {
@@ -5411,6 +5447,7 @@
     "screen_confirm_replaced": "An earlier request to connect has lapsed.",
     "screen_confirm_remembered": "I asked you whether a screen may connect.",
     "screen_confirmed": "Connected.",
+    "screen_already": "That screen is connected already.",
     "screen_confirmed_open": "Connected. Your management screen is on that page, and comes back with this link (in the same browser; bookmark it):\n{{link}}",
     "screen_declined": "Not connected.",
     "screen_confirm_not_private": "Confirm this in your own chat with me, not in a group.",
@@ -5581,6 +5618,7 @@
     "link_not_an_offer": "That is not a link line from your Basis app.",
     "link_revoked": "That link line comes from a device you revoked. Make one on another device.",
     "link_stale": "That link line is too old (or a clock is off). Make a new one in the app.",
+    "link_used": "That link line was used already. Make a new one in the app.",
     "companion_set": "Your companion is set: agenda links are served from it once you have granted me its agenda files.",
     "companion_not_one": "That is not a companion's card (it does not say where agenda links are served).",
     "link_done": "Linked: messages from your Basis apps now count as you; a device you revoke in the app stops counting. /ontkoppel undoes it.",
@@ -5628,10 +5666,6 @@
     }
   },
   "nearby": {
-    "label": {
-      "text": "Nearby",
-      "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
-    },
     "count_one": {
       "text": "{{count}} device",
       "doc": "Device count, singular."
@@ -5643,10 +5677,6 @@
     "count": {
       "text": "{{count}} device(s)",
       "doc": "Fallback when the plural forms cannot resolve; the _one/_other pair is what renders."
-    },
-    "off": {
-      "text": "off",
-      "doc": "The launcher row while the persisted radio switch is off — no count is claimed, because a radio that is off has seen nothing."
     }
   },
   "extension": {
@@ -5943,6 +5973,10 @@
     "share_hint": {
       "text": "Copy the payload above and paste it into any QR generator. The receiver scans it and uses /add-contact to add you with the proposed trust level.",
       "doc": "Hint in the /share-my-contact record."
+    },
+    "add_person": {
+      "text": "+ Add a person",
+      "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     }
   },
   "pairedDevices": {
@@ -6371,6 +6405,18 @@
     "edit": {
       "text": "Edit",
       "doc": "Mij → the door beside the name that opens the person's own editor (name, handle, location, picture, what each circle sees)."
+    },
+    "logReport": {
+      "text": "Copy log / report a problem →",
+      "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
+    },
+    "avatar_label": {
+      "text": "Profile",
+      "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
+    },
+    "no_name_yet": {
+      "text": "No name yet",
+      "doc": "Me's title while the person has no handle — never the tab's own word in its place."
     }
   },
   "blocked": {
@@ -6857,6 +6903,14 @@
     "connection_offer_incomplete": {
       "text": "This pairing code is incomplete.",
       "doc": "Refusal: key or nonce missing."
+    },
+    "mnemonic_written": {
+      "text": "Written down",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."
+    },
+    "mnemonic_later": {
+      "text": "Later",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: put the card away for a few days."
     }
   },
   "admin": {
@@ -7221,9 +7275,18 @@
     }
   },
   "when": {
-    "today_at": { "text": "today at {{time}}", "doc": "A coming moment later today (a vote's deadline)." },
-    "tomorrow_at": { "text": "tomorrow at {{time}}", "doc": "A coming moment tomorrow (a vote's deadline)." },
-    "closed": { "text": "closed", "doc": "A deadline that has passed." }
+    "today_at": {
+      "text": "today at {{time}}",
+      "doc": "A coming moment later today (a vote's deadline)."
+    },
+    "tomorrow_at": {
+      "text": "tomorrow at {{time}}",
+      "doc": "A coming moment tomorrow (a vote's deadline)."
+    },
+    "closed": {
+      "text": "closed",
+      "doc": "A deadline that has passed."
+    }
   },
   "governance": {
     "title": {
@@ -7693,24 +7756,12 @@
   },
   "firstRun": {
     "title": {
-      "text": "Welcome to basis",
+      "text": "Welcome to Basis",
       "doc": "First-run welcome (5.9b→batch 6): screen title."
-    },
-    "lede": {
-      "text": "A neighbourhood chat that runs on your phone.  Your data stays local; you choose who sees what.",
-      "doc": "First-run lede."
-    },
-    "bullet_circles": {
-      "text": "Circles you control — invite by code or QR.",
-      "doc": "First-run bullet 1."
     },
     "bullet_items": {
       "text": "Tasks, posts, and notes scoped to each circle.",
       "doc": "First-run bullet 2."
-    },
-    "bullet_pod": {
-      "text": "Pod-backed sync when you sign in to a Solid pod.",
-      "doc": "First-run bullet 3."
     },
     "start": {
       "text": "Start",
@@ -7991,6 +8042,14 @@
       }
     },
     "create": {
+      "create_button": {
+        "text": "Create circle",
+        "doc": "Create wizard, both shells: the last step's button that makes the circle."
+      },
+      "name_placeholder": {
+        "text": "e.g. Circle Westend",
+        "doc": "Create wizard, both shells: the placeholder in the circle-name field."
+      },
       "name": {
         "text": "Name *",
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
@@ -8220,6 +8279,74 @@
       "dot_review": {
         "text": "Review",
         "doc": "Create wizard: the step-dot label. Short by design — it sits in a row of six."
+      },
+      "review_button": {
+        "text": "Review →",
+        "doc": "Create wizard, both shells: the button to the last step."
+      },
+      "purpose_placeholder": {
+        "text": "One sentence: what is this circle for?",
+        "doc": "Create wizard, both shells: the purpose field placeholder."
+      },
+      "tags_placeholder": {
+        "text": "e.g. neighbourhood, tools, kids",
+        "doc": "Create wizard, both shells: the tags field placeholder."
+      },
+      "offering_placeholder": {
+        "text": "e.g. plumbing",
+        "doc": "Create wizard, both shells: an offering name placeholder."
+      },
+      "invite_expiry_hint": {
+        "text": "How long the invite code stays usable. Short is safer for a quick share (1 hour by default); long suits slower joining (168 = a week). An admin can mint a fresh code later.",
+        "doc": "Create wizard (web): a field hint."
+      },
+      "pod_uri_hint": {
+        "text": "Needed for central and mixed storage.",
+        "doc": "Create wizard (web): a field hint."
+      },
+      "default_purpose_household": {
+        "text": "Running our home together",
+        "doc": "The purpose a household circle gets when the creator typed none."
+      },
+      "default_purpose_neighbourhood": {
+        "text": "Helping each other out in the neighbourhood",
+        "doc": "The purpose a neighbourhood circle gets when the creator typed none."
+      },
+      "default_purpose_friends": {
+        "text": "Staying in touch and arranging things together",
+        "doc": "The purpose a friends circle gets when the creator typed none."
+      },
+      "default_purpose_team": {
+        "text": "Working together on what we share",
+        "doc": "The purpose a team circle gets when the creator typed none."
+      },
+      "default_purpose_other": {
+        "text": "Doing things together",
+        "doc": "The purpose a circle of another kind gets when the creator typed none."
+      },
+      "review_kind": {
+        "text": "Type",
+        "doc": "Review step: the circle's kind."
+      },
+      "advanced": {
+        "text": "Advanced",
+        "doc": "The one fold on the create wizard's first step: the kind, purpose and the further steps (members, rules, offerings, technical). Closed, the wizard is name → review."
+      },
+      "advanced_hint": {
+        "text": "Type, purpose, who may join, rules and storage. Leave it closed to use the defaults.",
+        "doc": "Line under the Advanced fold."
+      },
+      "reveal_label": {
+        "text": "Members see each other's names",
+        "doc": "Create wizard (under Advanced) and its review: the circle's reveal policy — whether members see each other's real names without an act."
+      },
+      "reveal_pairwise": {
+        "text": "per pair",
+        "doc": "Reveal policy pairwise: a name is shown once two members share it (the default)."
+      },
+      "reveal_open": {
+        "text": "everyone",
+        "doc": "Reveal policy open: every member sees every other member's name and card."
       }
     },
     "settings": {
@@ -8306,6 +8433,22 @@
       "other_url": {
         "text": "Other (enter URL)",
         "doc": "Mobile settings wizard: the custom-relay option."
+      },
+      "provider_inrupt": {
+        "text": "Inrupt Pod Spaces",
+        "doc": "Settings wizard (phone): a pod provider (a product name)."
+      },
+      "handle_placeholder": {
+        "text": "e.g. alice",
+        "doc": "Settings wizard (phone): the handle placeholder."
+      },
+      "title": {
+        "text": "Settings",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "intro": {
+        "text": "Your handle and holiday mode.",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
     "backup": {
@@ -8344,6 +8487,22 @@
       "ready_intro": {
         "text": "Download it and keep it somewhere safe — mail it to yourself, copy it to a USB stick, put it in a cloud you trust. It is encrypted, so where it sits matters less than whether you still have it.",
         "doc": "Backup wizard, the final screen."
+      },
+      "passphrase_label": {
+        "text": "Passphrase",
+        "doc": "Backup wizard, both shells: the passphrase field and its step."
+      },
+      "passphrase_hint": {
+        "text": "At least 12 characters is wise — pick one you will remember.",
+        "doc": "Backup wizard, both shells: the passphrase placeholder."
+      },
+      "step_save": {
+        "text": "Save",
+        "doc": "Backup wizard, both shells: the second step."
+      },
+      "create_button": {
+        "text": "Create backup",
+        "doc": "Backup wizard, both shells: the button that builds the backup."
       }
     },
     "restore": {
@@ -8394,6 +8553,38 @@
       "done_intro": {
         "text": "The recovered identity is active. Reload the page so the rest of the app picks it up.",
         "doc": "Restore wizard, the final screen."
+      },
+      "step_phrase": {
+        "text": "Recovery phrase",
+        "doc": "Restore wizard, both shells: step 1."
+      },
+      "step_confirm": {
+        "text": "Confirm",
+        "doc": "Restore wizard, both shells: step 2."
+      },
+      "step_restore": {
+        "text": "Restore",
+        "doc": "Restore wizard, both shells: step 3."
+      },
+      "phrase_placeholder": {
+        "text": "word1 word2 word3 …",
+        "doc": "Restore wizard, both shells: the phrase placeholder."
+      },
+      "phrase_hint": {
+        "text": "Words separated by single spaces.",
+        "doc": "Restore wizard (web): under the phrase field."
+      },
+      "button": {
+        "text": "Restore now",
+        "doc": "Restore wizard, both shells: the button that restores."
+      },
+      "restoring": {
+        "text": "Restoring identity…",
+        "doc": "Restore wizard (web): while restoring."
+      },
+      "saved_question": {
+        "text": "Have you saved your current recovery phrase? Without it, the identity on this device cannot come back.",
+        "doc": "Restore wizard, both shells: one line of copy above the two checks — the person’s CURRENT phrase, before it is replaced."
       }
     },
     "audience": {
@@ -8424,70 +8615,84 @@
       "intro": {
         "text": "Pick who this reaches. Leave it empty and it goes to everyone in your circle.",
         "doc": "Audience wizard step 1 body."
-      }
-    },
-    "dispute": {
-      "about": {
-        "text": "You are disputing this post:",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       },
-      "substrate_note": {
-        "text": "This records the dispute as a post. The full mediation — raise, propose, accept — comes later.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind": {
+        "text": "Kind",
+        "doc": "Post-with-audience wizard, both shells: the kind of post."
       },
-      "summary": {
-        "text": "Summary",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind_ask": {
+        "text": "Ask (request help)",
+        "doc": "Post-with-audience wizard: an ask."
       },
-      "about_post": {
-        "text": "About post",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind_offer": {
+        "text": "Offer (something to share)",
+        "doc": "Post-with-audience wizard: an offer."
       },
-      "escalation": {
-        "text": "Escalation",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "kind_lend": {
+        "text": "Lend (a physical thing)",
+        "doc": "Post-with-audience wizard (web): a lend."
       },
-      "proposal": {
-        "text": "Proposed resolution",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      "text_placeholder": {
+        "text": "e.g. Anyone got a ladder I can borrow?",
+        "doc": "Post-with-audience wizard, both shells: the text placeholder."
       },
-      "raise_title": {
-        "text": "Raise a dispute",
-        "doc": "Dispute wizard step 1 title."
+      "tags": {
+        "text": "Tags (comma-separated — matches contacts with any of them)",
+        "doc": "Post-with-audience wizard, both shells: the tags field."
       },
-      "raise_intro": {
-        "text": "Describe what happened. This goes to the circle; admins see it, and two random members do too if the circle resolves conflicts by mediation.",
-        "doc": "Dispute wizard step 1 body."
+      "tags_placeholder": {
+        "text": "e.g. tools, gardening, kids",
+        "doc": "Post-with-audience wizard, both shells: the tags placeholder."
       },
-      "propose_title": {
-        "text": "Propose a resolution",
-        "doc": "Dispute wizard step 2 title."
+      "recipients_placeholder": {
+        "text": "e.g. webid:anne,webid:karl",
+        "doc": "Post-with-audience wizard, both shells: the recipients placeholder."
       },
-      "propose_intro": {
-        "text": "What would settle this for you? Even if you are not sure, write what would feel good enough, so a mediator has somewhere to start.",
-        "doc": "Dispute wizard step 2 body."
+      "recipients_hint": {
+        "text": "When set, only these recipients — trust and distance are ignored.",
+        "doc": "Post-with-audience wizard, both shells: under the recipients field."
       },
-      "file_title": {
-        "text": "File the dispute",
-        "doc": "Dispute wizard step 3 title."
-      },
-      "file_intro": {
-        "text": "Check it over. A filed dispute is visible to admins, and to mediators if the circle uses mediation. You can follow it up with another post.",
-        "doc": "Dispute wizard step 3 body."
-      },
-      "filed_title": {
-        "text": "✓ Dispute filed",
-        "doc": "Dispute wizard, the final screen."
-      },
-      "filed_intro": {
-        "text": "Admins will see it in the circle, and mediators too if the circle uses mediation.",
-        "doc": "Dispute wizard, the final screen."
+      "posting": {
+        "text": "Posting…",
+        "doc": "Post-with-audience wizard (web): while posting."
       }
     },
     "embed_time": {
       "title": {
         "text": "Embed a time",
         "doc": "Mobile embed-time wizard heading."
+      },
+      "create_button": {
+        "text": "Create",
+        "doc": "Embed-a-time wizard (phone): the create button."
+      },
+      "title_placeholder": {
+        "text": "e.g. Circle BBQ",
+        "doc": "Embed-a-time wizard (phone): the title placeholder."
+      },
+      "when_placeholder": {
+        "text": "tomorrow 3pm · 2026-05-30T15:00",
+        "doc": "Embed-a-time wizard (phone): the when placeholder."
+      },
+      "location_placeholder": {
+        "text": "e.g. Vondelpark",
+        "doc": "Embed-a-time wizard (phone): the location placeholder."
+      },
+      "share_placeholder": {
+        "text": "leave blank to keep it local",
+        "doc": "Embed-a-time wizard (phone): the share-with placeholder."
+      },
+      "intro": {
+        "text": "Drops a time card into the conversation. The date takes ISO (2026-05-30T15:00) or plain words (tomorrow 3pm, next Friday).",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "title_label": {
+        "text": "Title",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
+      },
+      "when_label": {
+        "text": "When",
+        "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     }
   },
@@ -9931,6 +10136,32 @@
     "save_failed": {
       "text": "Not saved.",
       "doc": "A settings value could not be saved."
+    }
+  },
+  "logReport": {
+    "title": {
+      "text": "Log of this device",
+      "doc": "Title of the copy-log screen."
+    },
+    "intro": {
+      "text": "What the app noted on this device: event codes and numbers, no names, messages or addresses. Copy it and send it to whoever helps you. Nothing is sent from here.",
+      "doc": "Copy-log screen: what the text is and that nothing leaves the device from this screen."
+    },
+    "empty": {
+      "text": "Nothing logged yet.",
+      "doc": "Copy-log screen when the log is empty."
+    },
+    "copy": {
+      "text": "Copy log",
+      "doc": "Copy-log screen, web: copies the shown text to the clipboard."
+    },
+    "share": {
+      "text": "Share log",
+      "doc": "Copy-log screen, phone: hands the shown text to the share sheet (which has Copy); nothing is added to it."
+    },
+    "copied": {
+      "text": "Copied.",
+      "doc": "Copy-log screen: confirmation after copying (web)."
     }
   }
 }

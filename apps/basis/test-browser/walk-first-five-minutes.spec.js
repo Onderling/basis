@@ -6,18 +6,26 @@
  *   PEER_TEST_PORT=5273 PEER_TEST_RELAY=ws://127.0.0.1:8788 npx playwright test --project=relay test-browser/walk-first-five-minutes.spec.js
  */
 import { test, expect } from '@playwright/test';
-import { bootPeer, teardown, gotoCircles, createCircle, openCircleMatching, toChat, getInvite, joinFromInvite, sendChat, waitForBubble, log } from './peerHarness.js';
+import { bootPeer, teardown, gotoCircles, createCircle, openCircleMatching, toChat, getInvite, joinFromInvite, sendChat, waitForBubble, log, sendDirectMessage, waitForContactMessageDetailed } from './peerHarness.js';
 
 const R1 = process.env.PEER_TEST_RELAY || '';
 test.skip(!R1, 'needs PEER_TEST_RELAY');
 
-test('a stranger\'s first five minutes: onboarding, a handle, a note, their card, an invitation, a message, the day', async ({ browser }) => {
+test('a stranger\'s first five minutes: onboarding, a handle, a note, their card, an invitation, a message, the day, feedback', async ({ browser }) => {
   test.setTimeout(420_000);
-  let A = null; let B = null;
+  let A = null; let B = null; let F = null;
   try {
-    // B is the stranger (a fresh install); A is someone who invites them
-    [A, B] = [await bootPeer(browser, 'A', { lang: 'en' }), await bootPeer(browser, 'B', { lang: 'en' })];
+    // B is the stranger (a fresh install); A is someone who invites them; F stands for the alpha's FEEDBACK device —
+    // the maker's own always-on account, whose card every build ships with (`seededContact.js`; the real device and
+    // its enrol are the maker's own). A stub here: an ordinary web peer, so the walk proves the tester's side.
+    [A, B, F] = [await bootPeer(browser, 'A', { lang: 'en' }), await bootPeer(browser, 'B', { lang: 'en' }), await bootPeer(browser, 'F', { lang: 'en' })];
     const page = B.page;
+    // the install's seed: the feedback card goes in through the path the build-time seed takes (`addContactFromQr`)
+    const feedbackCard = await F.page.evaluate(async () => (await window.onderlingCall('pinboard', 'getContactShareQr', {}))?.payload ?? null);
+    expect(feedbackCard, 'the feedback device hands out a card').toBeTruthy();
+    const seeded = await page.evaluate(async (payload) => window.onderlingCall('pinboard', 'addContactFromQr', { payload }), feedbackCard);
+    const feedbackId = seeded?.contact?.webid ?? null;
+    expect(feedbackId, `the seed adds the feedback contact: ${JSON.stringify(seeded).slice(0, 200)}`).toBeTruthy();
 
     // STEP 1 — the app opens on Vandaag with the first steps
     await expect(page.locator('.circle-vandaag__head'), 'the app opens on Vandaag').toBeVisible({ timeout: 30_000 });
@@ -69,7 +77,20 @@ test('a stranger\'s first five minutes: onboarding, a handle, a note, their card
     await page.goto(page.url().split('#')[0]);
     await expect(page.locator('.circle-vandaag__day'), 'Vandaag is a day').not.toBeEmpty({ timeout: 20_000 });
     log('STEP7 Vandaag shows the day', 'PASS', '');
+
+    // STEP 8 — feedback: the contact the app came with is in Contacten; a message to it arrives, and the answer comes back
+    const note = `feedback from a stranger ${Date.now().toString(36)}`;
+    const sent = await sendDirectMessage(page, note, { to: feedbackId });
+    expect(sent.sent, `the stranger writes to the feedback contact: ${sent.why}`).toBe(true);
+    const got = await waitForContactMessageDetailed(F.page, note);
+    expect(got.painted, `the feedback device shows the stranger's message (found: ${got.found})`).toBe(true);
+    const answer = `thanks, read it ${Date.now().toString(36)}`;
+    const back = await sendDirectMessage(F.page, answer, { to: got.contactId });
+    expect(back.sent, `the feedback device answers: ${back.why}`).toBe(true);
+    const returned = await waitForContactMessageDetailed(page, answer);
+    log('STEP8 feedback round trip', returned.painted ? 'PASS' : 'FAIL', returned.painted ? 'written, read, answered' : `answer found=${returned.found}`);
+    expect(returned.painted, 'the answer reaches the stranger\'s screen').toBe(true);
   } finally {
-    await teardown([A, B].filter(Boolean));
+    await teardown([A, B, F].filter(Boolean));
   }
 });

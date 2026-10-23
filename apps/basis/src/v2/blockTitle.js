@@ -32,6 +32,14 @@ export function blockTitle(block, t) {
   return t('circle.screen.block_untitled');
 }
 
+/**
+ * Whether a block on the person's pages offers "meer" (open it whole): a block with rows does; the onboarding strip
+ * does not — its cards are the whole of it, and a "more" under them reads as a second "Lees meer".
+ */
+export function blockOpensWhole(block) {
+  return block?.status === 'ok' && block?.type !== 'onboarding';
+}
+
 /** The one quiet line an empty block shows. */
 export function blockEmptyLine(block, t) {
   const key = EMPTY_KEY[block?.type] ?? (block?.type === 'items' ? EMPTY_KEY_BY_NOUN[block?.content?.noun] : null) ?? 'circle.screen.block_empty';

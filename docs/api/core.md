@@ -3243,7 +3243,7 @@ learned from HI envelopes — established when we hold none for that address, ne
 Also tracks key-rotation grace state so envelopes to/from a recently rotated key
 still validate, and can attach an inline rotation proof to outbound envelopes.
 
-**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
+**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
 
 ## `src/security/authorChain.js`
 

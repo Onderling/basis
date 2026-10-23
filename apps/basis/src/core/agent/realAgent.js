@@ -4352,10 +4352,19 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // hello-exchange so each agent knows the other.  InternalBus
   // delivers synchronously enough that one hello is sufficient.
-  await chatAgent.hello(hostAgent.address);
+  // The five in-process agents are ADOPTED, not greeted: a sealed hello between two agents in one process proves
+  // nothing (this code holds both objects), and it cost a phone ~0.9 s of boot. Each side learns the other's key from
+  // the objects themselves (SecurityLayer.adoptInProcessPeer — refused unless both are on this bus); the gate and the
+  // fast path run as after a hello, and these keys are never handed to the person's other devices.
+  const adoptInProcess = (peer) => {
+    const theirs = chatAgent.security.adoptInProcessPeer(chatAgent.transport, peer.transport, peer.identity);
+    const ours   = peer.security.adoptInProcessPeer(peer.transport, chatAgent.transport, chatId);
+    if (theirs === 'refused' || ours === 'refused') throw new Error('realAgent: an in-process agent could not be adopted');
+  };
+  adoptInProcess(hostAgent);
   // B1 — seed chatAgent's SecurityLayer with the household agent's key so
   // `chatAgent.invoke(householdAgent.address, …)` takes the S1 fast-path.
-  if (householdAgent) await chatAgent.hello(householdAgent.address);
+  if (householdAgent) adoptInProcess(householdAgent);
 
   // Seed a few household items so `/list shopping` + `/brief` are non-empty
   // out of the box.  Deterministic order (added oldest-first); skip via
@@ -4469,7 +4478,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!ok) console.warn(`[realAgent] bot ${chatId}: token revoke did not reach the grants lane — it binds on this device; siblings learn it at catch-up/TTL`);
     },
   });
-  await chatAgent.hello(tasksCircle.address);
+  adoptInProcess(tasksCircle.agent);
 
   // The primary tasks circle's single store needs its store<->mirror sync wired
   // so unscoped task ops (which don't carry a circleId, so the per-op wiring at
@@ -5005,7 +5014,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // the item; a received item never echoes). Installed on the store event, so no op has to remember.
   try { pinboardAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
   catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
-  await chatAgent.hello(pinboardAgent.address);
+  adoptInProcess(pinboardAgent.bundle.agent);
 
   // Contacts made before the persona field existed record NONE. Write `default` onto them once — only where the
   // pair circle id PROVES it (`backfillContactPersonas`): a row whose pair circle is not the default identity's is
@@ -5106,7 +5115,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // embed call is ever made unless the circle's embed policy permits.
     noteEmbedder:  opts.folioNoteEmbedder,
   });
-  await chatAgent.hello(folioAgent.address);
+  adoptInProcess(folioAgent.agent);
 
   /**
    * basis's CallSkill shape: `(appOrigin, opId, args) → payload`.

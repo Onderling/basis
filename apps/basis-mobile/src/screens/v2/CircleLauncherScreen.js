@@ -30,6 +30,7 @@ import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image } from 'react-native';
 import { useTheme } from './themeContext.js';
+import { FAB, FAB_CLEARANCE } from './fab.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -501,7 +502,7 @@ function WithTabBar({ active, onSelect, badges, avatar = null, onAvatar = null, 
       {/* THE "+": one floating button on every tab, bottom-right above the tab bar — the one accent (web twin: .cc-fab) */}
       {onPlus ? (
         <Pressable onPress={onPlus} accessibilityRole="button" accessibilityLabel={t('circle.vandaag.plus')} testID="vandaag-plus-open"
-          style={{ position: 'absolute', right: 20, bottom: 76, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.accentInk, elevation: 4 }}>
+          style={{ position: 'absolute', right: 20, bottom: FAB.bottom, width: FAB.size, height: FAB.size, borderRadius: FAB.size / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.color.accentInk, elevation: 4 }}>
           <Text style={{ color: theme.color.accentContrast, fontSize: 28, lineHeight: 30 }}>+</Text>
         </Pressable>
       ) : null}
@@ -2118,7 +2119,7 @@ export default function CircleLauncherScreen({
             </Pressable>
             {/* the "+" is the floating button on every tab now (WithTabBar) */}
           </View>
-          <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+          <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
             <CircleScreenView blocks={screenViewBlocks} refreshing={screenViewRefreshing}
               onMore={expandedBlockId ? null : setExpandedBlockId}
               onAction={(a) => {
@@ -2234,8 +2235,9 @@ export default function CircleLauncherScreen({
   // Contacten: the bot/peer roster + a 1:1 DM thread (mobile parity with web).
   if (view === 'contacten') {
     if (contactThread) {
+      // the 1:1 thread has no "+": its composer is the act, and the button would float over its send button
       return (
-        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
@@ -2642,7 +2644,7 @@ export default function CircleLauncherScreen({
           <Text style={styles.muted}>{t('circle.loading')}</Text>
         ) : (
           <ScrollView
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]}
             // …and the sibling class of first-tap loss: with this unset a ScrollView spends the first tap
             // dismissing the keyboard instead of hitting the row under it. Same value the other circle
             // list already uses (`CircleListScreen.js`).
@@ -5796,7 +5798,7 @@ function NearbyScreen({
           in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
       {rows.length === 0 ? null : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]}>
           {rows.map((row) => (
             <View
               key={row.id || row.pseudonym}

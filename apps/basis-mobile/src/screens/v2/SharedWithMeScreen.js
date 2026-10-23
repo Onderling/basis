@@ -11,6 +11,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import { buildSharedWithMe, openSharedCopy } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 
@@ -49,7 +50,7 @@ export default function SharedWithMeScreen({
       {rows.length === 0 ? (
         <Text style={styles.empty} testID="shared-with-me-empty">{t('circle.sharedWithMe.empty')}</Text>
       ) : (
-        <ScrollView>
+        <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
           {rows.map((entry) => (
             <Pressable
               key={entry.id}

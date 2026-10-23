@@ -17,6 +17,7 @@ import { QrCodeView } from '@onderling/react-native/qr/view';
 import { loadShareMyContact, CONTACT_QR } from '../../../../basis/src/v2/contactCardLink.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 
 export const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_APP_URL || null;
 
@@ -45,7 +46,7 @@ export default function ShareMyContactScreen({ callSkill, onBack, appUrl = WEB_A
   };
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="share-my-contact-screen">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingBottom: FAB_CLEARANCE }]} testID="share-my-contact-screen">
       <Pressable onPress={onBack} accessibilityRole="button" testID="share-contact-back">
         <Text style={styles.back}>{t('circle.back_me')}</Text>
       </Pressable>

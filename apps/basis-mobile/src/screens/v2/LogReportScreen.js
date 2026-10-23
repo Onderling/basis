@@ -10,6 +10,7 @@ import Constants from 'expo-constants';
 import { logReportView } from '../../../../basis/src/log/logReport.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 
 export default function LogReportScreen({ onBack }) {
   const theme = useTheme();
@@ -19,7 +20,7 @@ export default function LogReportScreen({ onBack }) {
     () => logReportView({ version: Constants.expoConfig?.extra?.appVersion ?? null, at: Date.now() }), []);
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="log-report-screen">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingBottom: FAB_CLEARANCE }]} testID="log-report-screen">
       <Pressable onPress={onBack} testID="log-report-back"><Text style={styles.back}>{t('circle.back_mydata')}</Text></Pressable>
       <Text style={styles.title}>{t('circle.logReport.title')}</Text>
       <Text style={styles.note}>{t(n ? 'circle.logReport.intro' : 'circle.logReport.empty')}</Text>

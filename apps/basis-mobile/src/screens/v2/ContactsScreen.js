@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import FaceView from './FaceView.js';
 import { splitShownHidden, loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
@@ -150,7 +151,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       {contacts.length === 0 ? (
         <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
           {shown.map((c) => rowFor(c))}
           {hidden.length > 0 ? (
             <Pressable style={styles.fold} onPress={() => setFoldOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: foldOpen }} testID="contacts-hidden-fold">

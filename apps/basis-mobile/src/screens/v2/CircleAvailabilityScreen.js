@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import { t } from '../../core/localisation.js';
 
 export default function CircleAvailabilityScreen({ store, onBack }) {
@@ -61,7 +62,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
       ) : null}
       <Text style={styles.title}>{t('circle.availability.title')}</Text>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={[styles.body, { paddingBottom: FAB_CLEARANCE }]}>
         <Text style={styles.section}>{t('circle.availability.holiday')}</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>{t('circle.availability.holiday_on')}</Text>

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildBlockedList } from '../../../../basis/src/v2/blockedList.js';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 
 export default function CircleBlockedScreen({ callSkill, circles = [], onBack }) {
   const theme = useTheme();
@@ -49,7 +50,7 @@ export default function CircleBlockedScreen({ callSkill, circles = [], onBack })
   }, [callSkill, load]);
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content} testID="circle-blocked-screen">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingBottom: FAB_CLEARANCE }]} testID="circle-blocked-screen">
       <Pressable onPress={onBack} testID="blocked-back"><Text style={styles.back}>{t('circle.back_mydata')}</Text></Pressable>
       <Text style={styles.title}>{t('circle.blocked.title')}</Text>
       <Text style={styles.note}>{t('circle.blocked.note')}</Text>

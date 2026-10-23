@@ -12,7 +12,9 @@
 .circle-page {
   max-width: 640px;
   margin: 0 auto;
-  padding: 18px 16px 84px; /* bottom clears the fixed tab bar */
+  /* bottom clears the fixed tab bar AND the floating "+" above it (.cc-fab: bottom 76 + 56 tall + 16 room) — the
+     phone's FAB_CLEARANCE (theme.js) is the same number, pinned by fitness/fabClearance.test.js */
+  padding: 18px 16px 148px;
 }
 
 /* ───────────────── launcher bottom tab bar (board 1/5/6C) ───────────────── */

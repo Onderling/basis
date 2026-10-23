@@ -28,7 +28,7 @@ import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { FAB, FAB_CLEARANCE } from './fab.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
@@ -1986,6 +1986,9 @@ export default function CircleLauncherScreen({
                         : t(inviteFor.announced.reason === 'nobody-nearby' ? 'circle.invite.announce_nearby_nobody' : 'circle.invite.announce_nearby_failed')}
                     </Text>
                   ) : null}
+                  {/* for someone who is not in the room: the invite through the phone's share sheet (web: share sheet or copy) */}
+                  <Btn variant="primary" testID="invite-send-link" label={t('circle.invite.send_link')}
+                    onPress={() => { Share.share({ message: inviteFor.uri }).catch(() => {}); }} />
                   {/* A bot's own invite: single-use; the admin's signed join then says the bot is one (web parity). */}
                   {!inviteFor.forFunction ? (
                     <Btn testID="invite-for-bot" label={t('circle.invite.for_bot')}
@@ -1995,6 +1998,8 @@ export default function CircleLauncherScreen({
               ) : (
                 <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>
               )}
+              {/* the way out — the backdrop closes it too, but nobody should have to know that */}
+              <Btn variant="ghost" testID="invite-close" label={t('common.close')} onPress={() => setInviteFor(null)} />
             </Pressable>
           </Pressable>
         </Modal>
@@ -4599,7 +4604,12 @@ function CircleDetail({
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
         ) : activeTab === 'members' ? (
           // MEMBERS — the circle's member roster (listGroupMembers → normalizeCircleMembers). web≡mobile.
-          tabMembers == null ? (
+          // An admin invites from where the members are: the ⋯ menu's own `invite` act (onInvite), not a second one.
+          <>
+          {mandateViewer.isAdmin && typeof onInvite === 'function' ? (
+            <Btn variant="primary" testID="circle-members-invite" label={t('circle.invite.menu')} onPress={() => onInvite()} />
+          ) : null}
+          {tabMembers == null ? (
             <Text style={styles.placeholder}>{t('circle.members_tab.loading')}</Text>
           ) : tabMembers.length === 0 ? (
             <Text style={styles.placeholder}>{t('circle.members_tab.empty')}</Text>
@@ -4690,7 +4700,8 @@ function CircleDetail({
                 </Pressable>
               );
             })}
-          </>)
+          </>)}
+          </>
         ) : activeTab === 'tasks' ? (
           // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust

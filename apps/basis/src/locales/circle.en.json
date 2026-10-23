@@ -307,6 +307,14 @@
     "announce_nearby_failed": {
       "text": "Could not announce it here",
       "doc": "The broadcast threw; the QR still works."
+    },
+    "send_link": {
+      "text": "Send the link",
+      "doc": "The invite: the invite as a link for someone who is not in the room — the phone's share sheet; web: the browser's share sheet, or copied."
+    },
+    "link_copied": {
+      "text": "Link copied.",
+      "doc": "The invite on web, when the browser has no share sheet: the link went to the clipboard."
     }
   },
   "members": {

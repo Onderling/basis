@@ -65,7 +65,7 @@ export async function run({ relayUrl }) {
     return skill.handler({ parts: args === undefined ? [] : [DataPart(args)], from, agent: b.agent, envelope: null });
   };
   const board = async (b, from) => {
-    const r = await call(b, 'listOpen', {}, from);
+    const r = await call(b, 'listOpenRequests', {}, from);
     return Array.isArray(r?.items) ? r.items : [];
   };
   /** Poll a board until `pred` holds — propagation is asynchronous, so a single read proves nothing. */

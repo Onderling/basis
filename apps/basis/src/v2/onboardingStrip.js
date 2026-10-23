@@ -2,7 +2,8 @@
  * THE ONBOARDING STRIP — a Vandaag block (`onboarding`), cards that go as each is done; never a modal, never in
  * the way (a person can use the app the moment it opens). One model both shells paint:
  *   0. "Bewaar je sleutel" — the recovery phrase is not saved on this device yet; the card never holds the words, its
- *      "Toon" opens them, "Later" puts it away for a while, "Opgeschreven" ends it (onboardingFlags.keyCardPending);
+ *      "Toon" opens them, "Later" puts it away for a while, "Opgeschreven" ends it (onboardingFlags.keyCardPending) —
+ *      for everyone, a returning person included (they lose the most if the device dies);
  *   1. "Zo heet je hier" — the handle: one field, saved through the profile op the identity line reads
  *      (`pinboard.setMyHandle`, which also tells the person's rosters); gone once a handle is set;
  *   2. "Nieuw bij Basis?" — three plain lines and "Lees meer" (the help circle's conversation); gone once seen on THIS

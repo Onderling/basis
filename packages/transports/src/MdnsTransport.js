@@ -156,7 +156,10 @@ export class MdnsTransport extends Transport {
     // for it at the first hello. The kernel's one rule (`createSenderBinding`), as the relay and NKN ask it.
     this.#checkSender = createSenderBinding({
       transportName:       'MdnsTransport',
-      authenticatedSender: (connectionId) => this.#connToPubKey.get(connectionId) ?? null,
+      // FAIL CLOSED: a connection whose handshake has not proven a key refuses the frame — never `null`, which the
+      // kernel reads as "this transport has no sender to offer" and lets through with a warning. (The reader below
+      // also routes an unkeyed connection's data here; the invariant does not depend on that order.)
+      authenticatedSender: (connectionId) => this.#connToPubKey.get(connectionId) ?? { refuse: 'connection-not-proven' },
       onUnauthenticated:   (message) => this.emit('warn', message),
     });
   }
@@ -420,21 +423,24 @@ export class MdnsTransport extends Transport {
           this.#onHandshakeFrame(connectionId, envelope);
           return;
         }
-        // No row, no route, no DATA: a frame from a connection without a key is dropped and the socket refused — it
-        // cannot be replied to, and the hello exists so that nothing arrives from a key nobody proved.
-        if (!this.#connToPubKey.has(connectionId)) { this.#refuse(connectionId); return; }
-
+        // THE SENDER BINDING, for every data frame. No row, no route, no DATA: a frame on a connection whose handshake
+        // has not proven a key is dropped and the socket refused (it cannot be replied to — the hello exists so that
+        // nothing arrives from a key nobody proved). A frame claiming another sender than the key its connection proved
+        // is dropped. Both are counted and reported the way a refused envelope is (`security-error`, so the agent warns
+        // once per sender); nothing is ever re-mapped.
         const mappedPubKey = this.#connToPubKey.get(connectionId);
-        // A frame claiming another sender than the one this connection proved: dropped and counted, reported the way
-        // a refused envelope is (`security-error`, so the agent warns once per sender), never re-mapped.
         const verdict = this.#checkSender(connectionId, envelope);
         if (!verdict.ok) {
           this.#refusedSenders += 1;
+          const unproven = verdict.reason === 'connection-not-proven';
           const err = Object.assign(
-            new Error(`MdnsTransport: dropped a frame whose _from is not the key its connection proved (${verdict.reason})`),
-            { code: 'SENDER_MISMATCH' },
+            new Error(unproven
+              ? 'MdnsTransport: dropped a frame on a connection that has not proven a key'
+              : `MdnsTransport: dropped a frame whose _from is not the key its connection proved (${verdict.reason})`),
+            { code: unproven ? 'CONNECTION_NOT_PROVEN' : 'SENDER_MISMATCH' },
           );
           this.emit('security-error', err, envelope);
+          if (unproven) this.#refuse(connectionId);
           return;
         }
         if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());

@@ -125,6 +125,8 @@ describe('a challenge is never a proof', () => {
     const A = await peer(discovery, await ident());
     const got = [];
     A.on('envelope', (e) => got.push(e));
+    const refused = [];
+    A.on('security-error', (err) => refused.push(err?.code));
     await A.connect();
     let port = null;
     await discovery.browse({ serviceType: SERVICE_TYPE, onFound: (r) => { port = r.port; } });
@@ -136,6 +138,9 @@ describe('a challenge is never a proof', () => {
     await wait(400);
     expect(got, 'no data upstream from a socket with no key').toEqual([]);
     expect(await settle(() => closed), 'the socket is refused').toBe(true);
+    // the sender binding fails closed on a connection with no proven key — dropped AND counted, not passed with a warn
+    expect(A.refusedSenders, 'counted').toBe(1);
+    expect(refused).toEqual(['CONNECTION_NOT_PROVEN']);
     await s.native.stop?.().catch?.(() => {});
   });
 });

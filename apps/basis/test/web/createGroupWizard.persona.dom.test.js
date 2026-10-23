@@ -49,6 +49,10 @@ describe('create wizard — which persona founds the circle', () => {
     const shareFounderRelease = vi.fn(async () => ({ ok: true }));
     const { el, onDispatched } = boot({ shareFounderRelease });
     const sel = await picker(el);
+    // the persona is chosen under "Geavanceerd": opening it walks every step
+    const fold = el.querySelector('[data-role=advanced]');
+    fold.open = true;
+    fold.dispatchEvent(new Event('toggle'));
     sel.value = 'buurt';
     sel.dispatchEvent(new Event('change'));
     const name = el.querySelector('input.cc-wizard-input');   // the first field on the identity step is the name

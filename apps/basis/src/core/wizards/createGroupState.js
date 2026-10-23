@@ -100,6 +100,51 @@ export const STEP_LABEL_KEYS = Object.freeze([
   'circle.wizard.create.dot_review',
 ]);
 
+/**
+ * THE SHORT PATH. Creating a circle asks only what a household needs — its name, then the invite (the success
+ * screen) — and everything else keeps its default: the kind's template, key rotation on, no pod, the default rules.
+ * The other steps are behind one "Geavanceerd" fold on the first step (`state.advanced`); opened, the wizard walks
+ * every step as before. Step numbers keep their meaning (1 = identity … `REVIEW_STEP` = review) on both shells;
+ * only the path through them changes.
+ */
+export const REVIEW_STEP = STEP_NAMES.length;
+/** The steps this creation walks, in order (1-based). */
+export function createSteps(state) {
+  return state?.advanced === true ? STEP_NAMES.map((_, i) => i + 1) : [1, REVIEW_STEP];
+}
+/** The step after `state.step` on this path (the last stays the last). */
+export function nextCreateStep(state) {
+  const steps = createSteps(state);
+  const i = steps.indexOf(state?.step);
+  return steps[Math.min(i < 0 ? 0 : i + 1, steps.length - 1)];
+}
+/** The step before `state.step` on this path (the first stays the first). */
+export function prevCreateStep(state) {
+  const steps = createSteps(state);
+  const i = steps.indexOf(state?.step);
+  return steps[Math.max(i < 0 ? 0 : i - 1, 0)];
+}
+/** The step dots for this path: `{step, labelKey}` per step walked. */
+export function createStepDots(state) {
+  return createSteps(state).map((step) => ({ step, labelKey: STEP_LABEL_KEYS[step - 1] }));
+}
+/** Open or close the "Geavanceerd" fold. Closing it leaves what was set there in place — the person chose it. */
+export function setAdvanced(state, on) {
+  return { ...state, advanced: on === true };
+}
+
+/** The purpose a circle gets when nobody typed one: its kind's own sentence, never an empty value. */
+export function purposeOrDefault(state, t) {
+  const typed = String(state?.purpose ?? '').trim();
+  if (typed) return typed;
+  const kind = CIRCLE_KINDS.includes(state?.kind) ? state.kind : 'other';
+  return typeof t === 'function' ? t(`circle.wizard.create.default_purpose_${kind}`) : '';
+}
+/** The state as it is created: the defaults the short path did not ask for filled in (`t` for the purpose's words). */
+export function withCreateDefaults(state, t) {
+  return { ...state, purpose: purposeOrDefault(state, t) };
+}
+
 /** A fresh blank offering row for the wizard's "+ Add offering" affordance. */
 export function newOfferingRow() {
   return { ...DEFAULT_OFFERING };
@@ -261,8 +306,15 @@ export function policyPatchFromState(state) {
 /* ─── Initial state ─────────────────────────────────────────── */
 
 export function initialState() {
+  // a household by default (the short path asks no kind): the template fills the policy axes, as a pick would
+  return setKind(blankState(), 'household');
+}
+
+function blankState() {
   return {
-    step: 1,                          // 1..5
+    step: 1,                          // 1..REVIEW_STEP
+    // the "Geavanceerd" fold: closed, the wizard is name → review (`createSteps`)
+    advanced:              false,
     // Step 1 — identity & purpose
     name:                  '',
     // The FOUNDER's handle — asked only when their profile has none (`loadFounderHandle`): a founder without one

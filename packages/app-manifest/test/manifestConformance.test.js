@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { manifestConformance } from '../src/index.js';
+import { manifestConformance, VISIBILITY_TIERS } from '../src/index.js';
 
 const appsDir = fileURLToPath(new URL('../../../apps/', import.meta.url));
 
@@ -67,7 +67,7 @@ describe('manifestConformance: the guard bites (negative cases)', () => {
   const baseline = () => ({
     app: 'probe',
     itemTypes: ['thing'],
-    operations: [{ id: 'help', verb: 'help' }],
+    operations: [{ id: 'help', verb: 'help', visibility: 'authenticated' }],
     domainVerbs: { help: 'read' },
   });
 
@@ -95,6 +95,30 @@ describe('manifestConformance: the guard bites (negative cases)', () => {
     const r = manifestConformance(m);
     expect(r.ok).toBe(false);
     expect(r.issues.some((i) => i.code === 'verb-not-atom')).toBe(true);
+  });
+
+  it('rejects an op that declares no visibility (visibility-required)', () => {
+    const m = baseline();
+    delete m.operations[0].visibility;
+    const r = manifestConformance(m);
+    expect(r.ok).toBe(false);
+    expect(r.issues.some((i) => i.code === 'visibility-required' && i.path === '/operations/0/visibility')).toBe(true);
+  });
+
+  it('rejects an op whose visibility is not one of the four tiers (visibility-required)', () => {
+    const m = baseline();
+    m.operations[0].visibility = 'owner';
+    const r = manifestConformance(m);
+    expect(r.ok).toBe(false);
+    expect(r.issues.some((i) => i.code === 'visibility-required')).toBe(true);
+  });
+
+  it('accepts each of the four tiers as an op visibility', () => {
+    for (const tier of VISIBILITY_TIERS) {
+      const m = baseline();
+      m.operations[0].visibility = tier;
+      expect(manifestConformance(m).ok, tier).toBe(true);
+    }
   });
 
   it('rejects a noun-bearing atom op with no `nouns` block (nouns-required, §1a)', () => {
@@ -126,7 +150,7 @@ describe('manifestConformance: the guard bites (negative cases)', () => {
       app: 'probe',
       itemTypes: ['thing'],
       nouns: { thing: { atoms: ['add'] } },
-      operations: [{ id: 'addThing', verb: 'add', appliesTo: { type: 'thing' } }],
+      operations: [{ id: 'addThing', verb: 'add', appliesTo: { type: 'thing' }, visibility: 'authenticated' }],
     };
     expect(manifestConformance(m).ok).toBe(true);
   });

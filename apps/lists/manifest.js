@@ -42,7 +42,7 @@ export const listsManifest = {
   domainVerbs: { 'list-done': 'read' },
   operations: [
     {
-      id:        'createList',
+      id:        'createList', visibility: 'authenticated',
       verb:      'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list' },
@@ -64,7 +64,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'addToList',
+      id:        'addToList', visibility: 'authenticated',
       verb:      'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -105,7 +105,7 @@ export const listsManifest = {
       },
     },
     {
-      id:       'listLists', group: 'data',
+      id:       'listLists', visibility: 'authenticated', group: 'data',
       verb:     'list',
       requires: ['lists'],
       params:   [],
@@ -115,7 +115,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'markListItemDone',
+      id:        'markListItemDone', visibility: 'authenticated',
       verb:      'complete',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -138,7 +138,7 @@ export const listsManifest = {
     {
       // A line becomes a chore in place (the same item, its type now task) — said with who does it or when. List-item
       // and task stay two types (their verbs differ); this is the one verb between them.
-      id:        'makeChore', group: 'compose',
+      id:        'makeChore', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -159,7 +159,7 @@ export const listsManifest = {
     {
       // The reminders EVERYONE it is for gets for one entry (an appointment, a dated chore): the household's statement
       // about it, in a person's words ("60", "ook avond", "7:30"; "gewoon" drops it) — whoever may edit the entry.
-      id:        'entryReminders', group: 'compose',
+      id:        'entryReminders', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -177,7 +177,7 @@ export const listsManifest = {
     },
     {
       // At a shop: the general shopping list and that shop's own lists together (a member's idea, 2026-10-06).
-      id:        'shopVisit', group: 'data',
+      id:        'shopVisit', visibility: 'authenticated', group: 'data',
       verb:      'list',
       requires:  ['lists'],
       params: [
@@ -190,7 +190,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'listEntries', group: 'data',
+      id:        'listEntries', visibility: 'authenticated', group: 'data',
       verb:      'list',
       requires:  ['lists'],
       params: [
@@ -204,7 +204,7 @@ export const listsManifest = {
     {
       // what was done in the last days ("wat is er deze week gedaan"): the ticked and completed entries, on one list or
       // all — what, which list, when; who did it as the household's names setting lets the reader see (the door says)
-      id:        'listDone', group: 'data',
+      id:        'listDone', visibility: 'authenticated', group: 'data',
       verb:      'list-done',
       requires:  ['lists'],
       params: [
@@ -217,7 +217,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'removeFromList', group: 'compose',
+      id:        'removeFromList', visibility: 'authenticated', group: 'compose',
       verb:      'remove',
       writes:    { scope: 'circle' },
       appliesTo: { type: 'list-item' },
@@ -235,7 +235,7 @@ export const listsManifest = {
     {
       // The confirm below is the SURFACE's (a chat asks first; a screen paints it): the waist does not ask. A connected
       // screen that calls this op directly removes the list — on a household bot that is the admin's own screen only.
-      id:        'removeList', group: 'compose',
+      id:        'removeList', visibility: 'authenticated', group: 'compose',
       verb:      'remove',
       writes:    { scope: 'circle' },
       requires:  ['lists'],
@@ -254,7 +254,7 @@ export const listsManifest = {
     {
       // A removed list comes back (within the keep window: 30 days on a household bot) with everything that went with
       // it. Without a name: the lists that can come back, a button each.
-      id:        'restoreList', group: 'compose',
+      id:        'restoreList', visibility: 'authenticated', group: 'compose',
       verb:      'unarchive',
       writes:    { scope: 'circle' },
       requires:  ['lists'],
@@ -269,7 +269,7 @@ export const listsManifest = {
     {
       // The trash: an entry someone took off ANOTHER person's list comes back (within the keep window: 30 days on a
       // household bot) — put back by its maker or an admin. Without words: what this person may put back, a button each.
-      id:        'restoreEntry', group: 'compose',
+      id:        'restoreEntry', visibility: 'authenticated', group: 'compose',
       verb:      'unarchive',
       writes:    { scope: 'circle' },
       requires:  ['lists'],
@@ -282,7 +282,7 @@ export const listsManifest = {
       },
     },
     {
-      id:        'editEntry', group: 'compose',
+      id:        'editEntry', visibility: 'authenticated', group: 'compose',
       verb:      'edit',
       writes:    { scope: 'circle' },
       appliesTo: { type: 'list-item' },

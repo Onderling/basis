@@ -92,7 +92,7 @@ export {
 // structural validity + atom discipline + §1a noun-declaration discipline +
 // projector totality. Runs per manifest; the cross-app fitness test asserts it
 // over every apps/*/manifest.js. See src/conformance.js for the rule rationale.
-export { manifestConformance } from './conformance.js';
+export { manifestConformance, VISIBILITY_TIERS } from './conformance.js';
 
 export { paramsToJsonSchema } from './paramsToJsonSchema.js';
 

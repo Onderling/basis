@@ -281,6 +281,14 @@ The canonical atom verbs available for a given noun (declared ∪ derived), sort
 
 ## `src/conformance.js`
 
+### `VISIBILITY_TIERS`
+
+**Kind:** constant · **Import:** `VISIBILITY_TIERS` from `'@onderling/app-manifest'`
+
+Who may call an op, lowest to highest: anyone · an admitted member · a trusted caller · the owner alone. The same
+four tiers the kernel's skill gate judges by (`defineSkill`); a manifest op declares one so the gate judges every
+op by its own words, never by a default.
+
 ### `manifestConformance`
 
 **Kind:** function · **Import:** `manifestConformance` from `'@onderling/app-manifest'`

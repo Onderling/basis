@@ -110,6 +110,13 @@ function isNounBearingAtomOp(op, itemTypes) {
 }
 
 /**
+ * Who may call an op, lowest to highest: anyone · an admitted member · a trusted caller · the owner alone. The same
+ * four tiers the kernel's skill gate judges by (`defineSkill`); a manifest op declares one so the gate judges every
+ * op by its own words, never by a default.
+ */
+export const VISIBILITY_TIERS = Object.freeze(['public', 'authenticated', 'trusted', 'private']);
+
+/**
  * Assert a single app manifest against the conformance standard.
  *
  * @param {import('./schema.js').Manifest} manifest
@@ -172,6 +179,18 @@ export function manifestConformance(manifest) {
         'manifest declares a `nouns` block but has no noun-bearing atom ops — a shell/unifier manifest must NOT declare a vacuous `nouns` (it would flip it to declared-authoritative and silently drop future noun capabilities; the #81 basis exemption)',
     });
   }
+
+  // Rule 6 — every op declares who may call it. The surface a security review audits is complete only when no op
+  // is left to a default.
+  operations.forEach((op, i) => {
+    if (!VISIBILITY_TIERS.includes(op?.visibility)) {
+      issues.push({
+        code: 'visibility-required',
+        path: `/operations/${i}/visibility`,
+        message: `op "${op?.id}" must declare its visibility, one of ${VISIBILITY_TIERS.join(' · ')}${op?.visibility === undefined ? '' : ` (got ${JSON.stringify(op.visibility)})`}`,
+      });
+    }
+  });
 
   // Rule 5 — projector totality. The literal reading of invariant #4: the one
   // manifest must project to every surface without a projector throwing.

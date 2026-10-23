@@ -7,7 +7,7 @@
  * them too); `/schrap` takes it away, by its number or its words. A person sets their own, never one acting as another.
  * Composed as the box composes it (the announcing box), and the model's route with the stand-in model.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { rm } from 'node:fs/promises';
 import { InMemoryBridge } from '@onderling/chat-agent';
 import { utcInstantForWallClock, wallClockInTz } from '@onderling/notifier';
@@ -26,22 +26,29 @@ const ANN = { caller: 'telegram:1', threadId: 'telegram:1' };
 
 describe('a reminder of your own, at a time', () => {
   let box;
-  // the box's clock runs from the real now: the store stamps a row with the real time, and nothing before a row was made
-  // is ever due
-  const START = Date.now();
+  // a fixed clock, never the real one: the box reads `clock` and Date is faked to the same instant, so a row the store
+  // stamps and the moment the runner asks about agree (on real time the suite passed or failed by the hour it ran)
+  const START = Date.parse('2026-06-10T15:00:00Z');   // a June afternoon: no daylight-saving change in reach
   const today = wallClockInTz(START, TZ);
-  const at = (hour, minute, plusDays = 0) => utcInstantForWallClock({ year: today.year, month: today.month, day: today.day, hour, minute, tz: TZ }) + plusDays * 86_400_000;
+  /** That wall-clock time `plusDays` calendar days from today, in the zone (a day is not always 24 hours). */
+  const at = (hour, minute, plusDays = 0) => {
+    const d = new Date(Date.UTC(today.year, today.month - 1, today.day + plusDays));
+    return utcInstantForWallClock({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), hour, minute, tz: TZ });
+  };
   const MIN = 60_000;
   const hhmm = (ms) => { const w = wallClockInTz(ms, TZ); return `${String(w.hour).padStart(2, '0')}:${String(w.minute).padStart(2, '0')}`; };
   let clock = START;
+  const setClock = (ms) => { clock = ms; vi.setSystemTime(ms); };
   const mine = (who = 'telegram:1') => box.book.rows().filter((r) => r.actsAs === who && r.args?.say);
   const call = (op, args, ctx = ANN) => box.door('assistant', op, args, ctx);
 
   beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    setClock(START);
     await initLocalisation({ lng: 'nl' });
     box = await bootAnnouncingBox({ t, tz: TZ, people: PEOPLE, now: () => clock });
   }, 120_000);
-  afterAll(async () => { await box?.agent?.stop?.().catch(() => {}); if (box?.dir) await rm(box.dir, { recursive: true, force: true }).catch(() => {}); });
+  afterAll(async () => { vi.useRealTimers(); await box?.agent?.stop?.().catch(() => {}); if (box?.dir) await rm(box.dir, { recursive: true, force: true }).catch(() => {}); });
 
   it('the gate takes "herinner me <time>: …" / "remind me <time> to …" — a span, a clock time, a day and a time', () => {
     const rules = listsGateRules('nl', templateLists(t));
@@ -63,10 +70,10 @@ describe('a reminder of your own, at a time', () => {
     expect(row).toMatchObject({ actsAs: 'telegram:1', state: 'open', args: { say: 'gootsteen ontstoppen' } });
     expect(new Date(row.trigger.at).getTime()).toBe(due);
     expect(box.book.scopeOf(row.id)).toBeNull();
-    clock = START + 5 * MIN;
+    setClock(START + 5 * MIN);
     await box.runner.pass();
     expect(box.sent).toEqual([]);
-    clock = START + 11 * MIN;
+    setClock(START + 11 * MIN);
     await box.runner.pass();
     expect(box.sent, JSON.stringify(box.fired)).toEqual([{ id: 'telegram:1', text: t('circle.bot.announce_mine', { title: 'gootsteen ontstoppen' }) }]);
     box.sent.length = 0;
@@ -76,7 +83,7 @@ describe('a reminder of your own, at a time', () => {
   }, 60_000);
 
   it('"morgen 8:00" the same; with no `who` and no appointment named it is still your own; a time that is no time asks again', async () => {
-    clock = START;
+    setClock(START);
     const r = await call('remindMe', { item: 'bel mama', rules: 'morgen om 8:00' });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(new Date(mine().at(-1).trigger.at).getTime()).toBe(at(8, 0, 1));
@@ -95,7 +102,7 @@ describe('a reminder of your own, at a time', () => {
   }, 60_000);
 
   it('/gepland lists it (and a reminder for everyone); /schrap takes it away by its number or its words', async () => {
-    clock = START;
+    setClock(START);
     await call('remindMe', { who: 'me', item: 'planten water geven', rules: 'over 30 minuten' });
     await call('remindMe', { who: 'everyone', item: 'eten', rules: 'over 40 minuten' }, { caller: 'telegram:2', threadId: 'telegram:2' });
     const planned = (await call('assistant-planned', {})).message;
@@ -116,10 +123,10 @@ describe('a reminder of your own, at a time', () => {
   }, 60_000);
 
   it('held through quiet hours, like an announcement', async () => {
-    clock = START;
+    setClock(START);
     box.threads.setQuiet('telegram:1', `${hhmm(START - MIN)}-${hhmm(START + 30 * MIN)}`);
     await call('remindMe', { who: 'me', item: 'thee', rules: 'over 2 minuten' });
-    clock = START + 3 * MIN;
+    setClock(START + 3 * MIN);
     box.sent.length = 0;
     await box.runner.pass();
     expect(box.sent).toEqual([]);
@@ -128,7 +135,7 @@ describe('a reminder of your own, at a time', () => {
   }, 60_000);
 
   it('the model reaches it (the stand-in model), in the person\'s private chat', async () => {
-    clock = START;
+    setClock(START);
     const model = { script: [{ when: 'kwartier', toolCall: { id: 'remindMe', args: { who: 'me', item: 'oven uit', rules: 'over 15 minuten' } } }] };
     const { catalogue, manifestsByOrigin } = composeAssistantCatalogue({ apps: [...HOUSEHOLD_TEMPLATE.apps], slim: true });
     const bridge = new InMemoryBridge({ id: 'telegram' });

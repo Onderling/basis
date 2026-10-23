@@ -10163,5 +10163,11 @@
       "text": "Gekopieerd.",
       "doc": "Copy-log screen: confirmation after copying (web)."
     }
+  },
+  "settings_home": {
+    "title": "Instellingen",
+    "appearance": "Weergave",
+    "per_circle": "Per kring",
+    "no_circles": "Je zit nog in geen enkele kring."
   }
 }

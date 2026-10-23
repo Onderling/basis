@@ -10163,5 +10163,11 @@
       "text": "Copied.",
       "doc": "Copy-log screen: confirmation after copying (web)."
     }
+  },
+  "settings_home": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "per_circle": "Per circle",
+    "no_circles": "You are not in any circle yet."
   }
 }

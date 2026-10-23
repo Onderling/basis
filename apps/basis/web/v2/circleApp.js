@@ -186,6 +186,8 @@ import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } fro
 import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
+import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
+import { settingsGroupFor } from '../../src/v2/settingsHome.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
@@ -4553,6 +4555,8 @@ async function showMij() {
       else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
     onMyData: showMyData,
+    // the gear: the person's settings (Instellingen)
+    onSettings: showSettingsHome,
     // The advanced surface — every surface-less op + the settable params (the default place).
     onAdvanced: developer ? showAdvanced : undefined,   // the developer switch (app.developer)
     // This person's contact as a QR, a code and a link — the way to be reached without a circle.
@@ -4802,7 +4806,9 @@ function ensurePagePanel() {
   return panel;
 }
 
-async function showMyData() {
+async function showMyData(opts) {
+  // a settings group's screen (from the gear on Mij): the same sections and handlers, only that group's, in its order
+  const group = typeof opts?.group === 'string' ? settingsGroupFor(basisManifest, opts.group) : null;
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
@@ -4863,7 +4869,7 @@ async function showMyData() {
     circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
       .catch(() => { /* the cache stands */ });
     mountPlusButton();   // the "+" says its name in the new language
-    showMij();
+    if (group) showMyData({ group: group.id }); else showMij();
   };
   // Display theme: persist + stamp data-theme live (the pre-paint hook in
   // index.html reads the same key at boot; 'system' = follow the OS).
@@ -4923,7 +4929,8 @@ async function showMyData() {
     names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
     labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
   });
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: group ? showSettingsHome : showMij,
+    only: group ? group.sections.map((sec) => sec.id) : null, groupTitle: group ? t(group.labelKey) : null,
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
     // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
@@ -5071,6 +5078,26 @@ async function showMyData() {
   privacy = Array.isArray(priv?.sections) ? priv.sections : [];
   metrics = (met?.snapshot && typeof met.snapshot === 'object') ? met.snapshot : {};
   rerender();
+}
+
+/** The person's settings behind the gear on Mij: the declared groups, then the door to the circles' own settings. */
+function showSettingsHome() {
+  hideCircleTabBar(tabBarEl);
+  renderSettingsHome(rootEl, {
+    t, onBack: showMij,
+    onOpenGroup: (id) => showMyData({ group: id }),
+    onOpenPerCircle: showSettingsCircleChooser,
+  });
+}
+
+/** "Per kring": the person's circles, each opening that circle's own settings screen (a door, never a copy). */
+function showSettingsCircleChooser() {
+  hideCircleTabBar(tabBarEl);
+  renderCircleSettingsChooser(rootEl, {
+    t, onBack: showSettingsHome,
+    circles: (circlesCache ?? []).map((c) => ({ id: c.id, name: c.name ?? '' })),
+    onOpenCircle: (id) => showSettings(id),
+  });
 }
 
 // mount one of the existing wizard renderers (encrypted-backup / restore)

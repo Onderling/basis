@@ -6,6 +6,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderCircleProfile } from '../web/v2/circleProfile.js';
 import { renderProfileBasics } from '../web/v2/profileBasics.js';
 import { renderCircleMyData } from '../web/v2/circleMyData.js';
+import { settingsGroupFor } from '../src/v2/settingsHome.js';
+import { basisManifest as settingsManifest } from '../manifest.js';
+const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
@@ -105,11 +108,14 @@ describe('My data — the doors Mij gave up', () => {
     expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-mydata__doors')).toBeNull();
   });
 
-  it('the week-overview switch is here now', () => {
+  it('the week-overview switch is on the Weergave screen, as a real switch, and gone from the old page', () => {
     const onToggle = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), { t, weekOverview: { on: false, onToggle } });
+    const el = renderCircleMyData(document.createElement('div'), { t, only: WEERGAVE, weekOverview: { on: false, onToggle } });
     const btn = el.querySelector('.cc-profile__week-toggle');
     expect(btn.textContent).toBe('circle.profile.week_off');
+    expect(btn.getAttribute('role')).toBe('switch');
+    expect(btn.getAttribute('aria-checked')).toBe('false');
+    expect(renderCircleMyData(document.createElement('div'), { t, weekOverview: { on: false, onToggle } }).querySelector('.cc-profile__week-toggle')).toBeNull();
     btn.click();
     expect(onToggle).toHaveBeenCalled();
   });

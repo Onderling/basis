@@ -49,13 +49,12 @@ export const SCREEN_SECTIONS = Object.freeze({
   // Vandaag's customise sheet: the page's blocks (move, remove, each one's settings), what can be added, the page itself
   // (rename, add one, remove it), and undo. The block list is the shared customise model; these are its frame.
   // The "+" sheet, the person's always-available entry: the line to their own agent, what they pinned ("Vastgezet":
-  // own acts and bookmarks that open a circle's op there), their own acts (a note, an appointment, …), and the Me
-  // actions (share my card, scan) — one tap from any tab.
+  // own acts and bookmarks that open a circle's op there) and their own acts (a note, an appointment, …). The "+" makes
+  // things; Share my card and Scan live on Mij.
   plusSheet: Object.freeze([
     Object.freeze({ id: 'plus-line', titleKey: null }),
     Object.freeze({ id: 'plus-pinned', titleKey: 'circle.vandaag.pinned_title' }),
     Object.freeze({ id: 'plus-own',  titleKey: null }),
-    Object.freeze({ id: 'plus-me',   titleKey: 'circle.vandaag.plus_me_title' }),
   ]),
   vandaagCustomise: Object.freeze([
     Object.freeze({ id: 'customise-blocks', titleKey: 'circle.vandaag.blocks_title' }),

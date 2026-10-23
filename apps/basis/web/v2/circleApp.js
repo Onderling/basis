@@ -20,7 +20,6 @@
 // installed for side effects, must precede any code that signs a contribution. See the shim's header.
 import { pinsOf, pinKey, paintablePins, openPin } from '../../src/v2/plusPins.js';
 import { usageRows } from '../../src/v2/actionFrequency.js';
-import { meActionsFor } from '../../src/v2/meActionProjection.js';
 import { circleAvailabilityFor } from '../../src/v2/opAvailability.js';
 import { isPairCircleId } from '../../src/v2/pairCircleId.js';
 import { dayHeader, dateLocaleOf } from '../../src/v2/whenWords.js';
@@ -4409,7 +4408,6 @@ function showVandaagPlus({ edit = null } = {}) {
       if (r.kind === 'own') { actId = r.actId; error = null; paint(); return; }
       _pendingPinOpen = r; close(); showDetail(r.circleId);
     },
-    meActions: meActionsFor(basisManifest), onMeAction: (id) => { close(); runMeAction(id); },
     onPickSelf: (id) => { asSelf = id; paint(); },
     onPick: (id) => { actId = id; error = null; paint(); },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle

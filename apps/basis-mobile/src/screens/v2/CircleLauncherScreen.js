@@ -286,7 +286,6 @@ import VandaagPlusModal from './VandaagPlusModal.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
 import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.js';
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
-import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
@@ -2038,7 +2037,7 @@ export default function CircleLauncherScreen({
           setPlusOpen(false); setPlusEdit(null); setPendingPinOpen(r); if (c) openCircle(c);
           return null;
         }}
-        meActions={meActionsMobile(basisManifest)} onMeAction={(id) => { setPlusOpen(false); setPlusEdit(null); onMeAction(id); }} visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
+        visible={plusOpen} onClose={() => { setPlusOpen(false); setPlusEdit(null); }} edit={plusEdit}
         selves={heldSelves.filter((p) => selvesOn.includes(p.id))} writeAsSelf={writeAs(selvesOn)}
         // the free line: the shared reader over the sheet's own acts (never a circle)
         // the free line: the plain reading, else the person's own model (their settings' route only; none set = no model)

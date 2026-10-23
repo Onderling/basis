@@ -616,6 +616,8 @@ the honest tail is named below the table rather than dropped.
 | `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | ✅ RESOLVED — the lightweight `{text, completedAt}` model folded onto the rich shape (`555bdbd5`), and the lane set then closed over every store type, so the route is decided per COMPOSITION rather than per type |
 | Tasks are correctly per-circle, and their store is **not** on the fan-out path | ✅ RESOLVED (wave 2) — the one-store collapse put the tasks store on the `ensureCircleSync` fan-out; a task now crosses A→B, proven + guarded by `appTaskFanTwoDevice` (one store per circle + per-type sync arrival) |
 | `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | ✅ RESOLVED (wave 2) — the circle-infra was renamed (`addCirclePeer`, `getCircleScope`, `ensureCircleSync`, …); the remaining `household` is a legitimate template/app name, not circle machinery |
+| Five **in-process agents** (host, household, tasks, pinboard, folio), each with its own key and vault, two with their own policy engine and trust registry | ❌ OPEN (found 2026-10-23, the one-agent fold is planned: `plans/live/PLAN-after-the-interface.md` §6c) — the Agent home's "one agent per person per process" is the rule; the five are the standalone-app past. Until the fold lands, every op is judged by whichever engine its app happens to carry |
+| The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ❌ OPEN (2026-10-23) — exactly the "filter applied to a shared pile" this section forbids; dissolves into the per-circle stores with the fold (§6c step 5) |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
 still serve compositions that have no device log (test fixtures, the manual-pairing skills). Full dissolution
@@ -1049,6 +1051,16 @@ code — a chapter here is a claim about reality, not a plan.*
 
 *Your agent is the thing that acts as you: it holds your identity, signs what you say, remembers what
 other agents did with your things, and can always be rebuilt from one secret you keep.*
+
+**One agent per person per process — apps are not agents.** A running shell (or the box) holds ONE agent that is
+the person: it owns the identity above, every store, every skill, and the one gate (`PolicyEngine` over one trust
+registry, one revocation resolver, one token-issuing key). An app — household, tasks, the circle engine, folio — is
+a manifest, its cores and the item types it registers on the per-circle stores, all REGISTERED ON that agent;
+an app never gets a key, a vault, a trust registry or a store of its own. Two things in a process are deliberately
+not that agent: the **peer façade** that sits on the wire under the chat identity and carries only the allow-listed
+skills (a remote caller cannot name a host skill, whatever tier it holds — reach is structural before it is gated),
+and, later, a **realm peer** per extension (`extending.md`), which holds its own key and reaches items only
+through token-scoped ops. A fitness test pins the count: two `Agent`s in the bundle, never more.
 
 **One secret, everything derived.** An account has exactly one root secret, shown once to its owner as a
 24-word recovery phrase (the *herstelzin*). Every key the agent uses derives from it deterministically:
@@ -1522,6 +1534,17 @@ your signing key** — one derivation, so knowing where to reach someone *is* ho
 verifies them: no directory, and deliberately no key-id resolver, because a resolver is an observer
 that learns who asks about whom. The full key rides the wire (~14% overhead on a minimal message) as
 the price of first-contact verifiability.
+
+**The Nearby room is the one place a device says "I am here" to strangers, and it says the least it can.** On a
+local network a device may announce itself (mDNS, BLE) so people in the same room can find it; nothing else in
+the system ever announces. Three choices gate it, each the person's: what the room may see of the chosen self (a
+**level**: nothing, the handle, the presented profile, the full card — `none` until chosen on this device), whether
+the device is listed at all (a session-only **quiet** that never becomes a standing state, and a persisted
+**radio** switch that stops browsing and announcing alike), and, per thing done in the room, an allow for cards,
+asks and chat. Looking is not disclosure: a quiet device still sees the room. The banner that says "visible"
+reads the transports' own report, never the screen's intent, because an older binary may still announce when
+asked to be quiet — and saying "hidden" over a device that is listed would be the one lie this surface cannot
+afford.
 
 **Contact reveals, so contact is minimised.** A sender uses the *fewest* connection points that achieve
 delivery — sequential fallback, sticky on what worked, backing off from what fails — never race-them-all,

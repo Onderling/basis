@@ -23,7 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
-import { blockEmptyLine } from '../../src/v2/blockTitle.js';
+import { blockEmptyLine, blockOpensWhole } from '../../src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../src/v2/dayShape.js';
 import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { pickRowText } from '../../src/v2/rowText.js';
@@ -78,7 +78,7 @@ export function renderCircleScreen(container, { blocks = [], t, refreshing = fal
   for (const block of blocks) {
     const section = renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef });
     // a capped block on the person's pages: "meer" opens it whole (`onMore(blockId)`, given by the host)
-    if (typeof onMore === 'function' && block.status === 'ok') {
+    if (typeof onMore === 'function' && blockOpensWhole(block)) {
       const more = document.createElement('button');
       more.type = 'button';
       more.className = 'circle-screen__more';
@@ -455,7 +455,8 @@ function renderOnboarding(section, block, tr, onAction) {
     const b = document.createElement('button');
     b.type = 'button';
     // the family: the strip's act is the screen's primary; a quiet one when it is the second choice
-    b.className = `cc-btn ${cls.includes('--quiet') ? 'cc-btn--quiet' : 'cc-btn--primary'} circle-screen__onb-btn${cls}`;
+    const variant = cls.includes('--quiet') ? 'cc-btn--quiet' : cls.includes('--ghost') ? 'cc-btn--ghost' : 'cc-btn--primary';
+    b.className = `cc-btn ${variant} circle-screen__onb-btn${cls}`;
     b.textContent = tr(labelKey);
     b.addEventListener('click', () => act(a));
     return b;
@@ -492,7 +493,8 @@ function renderOnboarding(section, block, tr, onAction) {
         card.appendChild(p);
       }
       card.appendChild(btn('circle.vandaag.onboarding_intro_more', { kind: 'intro-more' }));
-      card.appendChild(btn('circle.vandaag.onboarding_intro_dismiss', { kind: 'intro-seen' }, ' circle-screen__onb-btn--quiet'));
+      // "Lees meer" is the card's one button; "Begrepen" a text link beside it
+      card.appendChild(btn('circle.vandaag.onboarding_intro_dismiss', { kind: 'intro-seen' }, ' circle-screen__onb-btn--ghost'));
     } else if (c.id === 'key') {
       // never the words themselves: the card says the key is not saved, and its "Toon" opens them
       const p = document.createElement('p');

@@ -4,3 +4,7 @@
  */
 export const FAB = Object.freeze({ bottom: 76, size: 56 });
 export const FAB_CLEARANCE = FAB.bottom + FAB.size + 16;
+
+/** THE HEADER AVATAR, top-right on every tab, and the room a page's top leaves so its first card is not under it. */
+export const HEADER_AVATAR = Object.freeze({ top: 8, right: 12, size: 34 });
+export const HEADER_AVATAR_CLEARANCE = HEADER_AVATAR.top + HEADER_AVATAR.size + 8;

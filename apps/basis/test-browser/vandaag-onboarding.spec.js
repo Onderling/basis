@@ -22,7 +22,7 @@ test('the strip: three cards, each gone once done', async ({ page }) => {
   await card('handle').locator('button[type="submit"]').click();
   await expect(card('handle'), 'a handle set: the card goes').toHaveCount(0, { timeout: 20_000 });
 
-  await card('intro').locator('.circle-screen__onb-btn--quiet').click();
+  await card('intro').locator('.circle-screen__onb-btn--ghost').click();   // "Begrepen": the card's text link
   await expect(card('intro'), 'seen: the card goes').toHaveCount(0, { timeout: 20_000 });
 
   await expect(card('begin'), 'not in a circle yet: begin stays').toBeVisible();

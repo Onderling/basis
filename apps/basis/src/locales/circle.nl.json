@@ -1280,24 +1280,8 @@
       "text": "bijv. werk, thuis",
       "doc": "Placeholder of the labels filter field."
     },
-    "within_any": {
-      "text": "Altijd",
-      "doc": "Relative-date filter: no limit."
-    },
-    "within_1": {
-      "text": "Vandaag",
-      "doc": "Relative-date filter: within a day."
-    },
-    "within_7": {
-      "text": "Deze week",
-      "doc": "Relative-date filter: within 7 days."
-    },
-    "within_30": {
-      "text": "Deze maand",
-      "doc": "Relative-date filter: within 30 days."
-    },
     "customise": {
-      "text": "Pas aan",
+      "text": "Aanpassen",
       "doc": "The button on Vandaag that opens the customise sheet."
     },
     "customise_title": {
@@ -1351,22 +1335,6 @@
     "done": {
       "text": "Klaar",
       "doc": "Close the customise sheet."
-    },
-    "horizon_today": {
-      "text": "Vandaag",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_3days": {
-      "text": "3 dagen",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_week": {
-      "text": "Week",
-      "doc": "Calendar block horizon preset."
-    },
-    "horizon_month": {
-      "text": "Maand",
-      "doc": "Calendar block horizon preset."
     },
     "scope_mine": {
       "text": "Van mij",
@@ -1587,6 +1555,42 @@
     "plus_line_read": {
       "text": "Lees",
       "doc": "The \"+\" sheet: the button beside the free line that reads it (Enter does the same)."
+    },
+    "range_today": {
+      "text": "Vandaag",
+      "doc": "A time range: today."
+    },
+    "range_3days": {
+      "text": "3 dagen",
+      "doc": "A time range: three days."
+    },
+    "range_week": {
+      "text": "Deze week",
+      "doc": "A time range: this week."
+    },
+    "range_month": {
+      "text": "Deze maand",
+      "doc": "A time range: this month."
+    },
+    "range_any": {
+      "text": "Altijd",
+      "doc": "A time range: no limit."
+    },
+    "control_horizon": {
+      "text": "Hoe ver vooruit",
+      "doc": "Customise sheet: heading over the calendar block's time-range chips."
+    },
+    "control_scope": {
+      "text": "Welke taken",
+      "doc": "Customise sheet: heading over the tasks block's mine/all chips."
+    },
+    "control_limit": {
+      "text": "Hoeveel regels",
+      "doc": "Customise sheet: heading over a block's row-cap chips."
+    },
+    "control_within": {
+      "text": "Periode",
+      "doc": "Customise sheet: heading over the relative-date chips of a tasks or notes block."
     }
   },
   "screens": {
@@ -6405,6 +6409,10 @@
     "logReport": {
       "text": "Kopieer logboek / Meld een probleem →",
       "doc": "The door on My data that shows this device's log (event codes and numbers only) and lets the person copy it."
+    },
+    "avatar_label": {
+      "text": "Profiel",
+      "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
     }
   },
   "blocked": {

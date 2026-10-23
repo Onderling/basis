@@ -4253,10 +4253,8 @@ async function _showVandaag() {
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'circle-vandaag__customise';
-    // under the ⋯, quiet: the "+" is the page's one accent
-    edit.textContent = '⋯';
-    edit.title = t('circle.vandaag.customise');
-    edit.setAttribute('aria-label', t('circle.vandaag.customise'));
+    // a quiet word, not a bare ⋯ nobody reads as "customise": the "+" is the page's one accent
+    edit.textContent = t('circle.vandaag.customise');
     edit.addEventListener('click', () => showVandaagCustomise());
     head.appendChild(edit);
     // the "+" is no longer here: one floating button on every tab (`mountPlusButton`)

@@ -22,7 +22,7 @@
  * Empty `blocks` array → top-level empty state ("admin hasn't set up
  * a screen yet").
  */
-import { blockEmptyLine } from '../../../../basis/src/v2/blockTitle.js';
+import { blockEmptyLine, blockOpensWhole } from '../../../../basis/src/v2/blockTitle.js';
 import { agendaGroups, taskGroups } from '../../../../basis/src/v2/dayShape.js';
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Pressable, TextInput } from 'react-native';
@@ -145,7 +145,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     <View style={baseStyle} testID={`screen-block-${block.blockId}`}>
       {body}
       {/* a capped block on the person's pages: "meer" opens it whole (the host's `onMore(blockId)`) */}
-      {typeof onMore === 'function' && block.status === 'ok' ? (
+      {typeof onMore === 'function' && blockOpensWhole(block) ? (
         <Pressable onPress={() => onMore(block.blockId)} testID={`screen-more-${block.blockId}`}>
           <Text style={styles.moreLink}>{t('circle.screen.more')}</Text>
         </Pressable>
@@ -338,8 +338,8 @@ function OnboardingCards({ block, onAction, styles }) {
   const [handle, setHandle] = useState('');
   const act = (a) => { if (typeof onAction === 'function') onAction(a); };
   // the family (Btn): the strip's act is the screen's primary, the second choice quiet
-  const OnbBtn = ({ labelKey, a, quiet = false, testID }) => (
-    <Btn variant={quiet ? 'quiet' : 'primary'} label={t(labelKey)} onPress={() => act(a)} testID={testID} style={{ alignSelf: 'flex-start' }} />
+  const OnbBtn = ({ labelKey, a, quiet = false, variant = null, testID }) => (
+    <Btn variant={variant ?? (quiet ? 'quiet' : 'primary')} label={t(labelKey)} onPress={() => act(a)} testID={testID} style={{ alignSelf: 'flex-start' }} />
   );
   return (
     <View>
@@ -367,7 +367,8 @@ function OnboardingCards({ block, onAction, styles }) {
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}
               <View style={styles.onbRow}>
                 <OnbBtn labelKey="circle.vandaag.onboarding_intro_more" a={{ kind: 'intro-more' }} testID="onb-intro-more" />
-                <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} quiet testID="onb-intro-seen" />
+                {/* "Lees meer" is the card's one button; "Begrepen" a text link beside it */}
+                <OnbBtn labelKey="circle.vandaag.onboarding_intro_dismiss" a={{ kind: 'intro-seen' }} variant="ghost" testID="onb-intro-seen" />
               </View>
             </View>
           ) : (
@@ -551,7 +552,8 @@ const makeStyles = (theme) => StyleSheet.create({
   quickActionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   quickAction:     { paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: theme.color.line, borderRadius: 999, backgroundColor: theme.color.paper2 },
   quickActionText: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
-  blockEmpty:      { backgroundColor: theme.color.paper2, borderColor: theme.color.line },
+  // an empty block is one quiet line of text, not a grey box that reads as disabled (web twin: --empty in circle.css)
+  blockEmpty:      { backgroundColor: 'transparent', borderWidth: 0, paddingVertical: 4, paddingHorizontal: 0 },
   blockEmptyText:  { color: theme.color.inkSoft, fontSize: 14 },
   // "meer" under a capped block: a quiet text link (web: .circle-screen__more)
   moreLink:        { color: theme.color.inkSoft, fontSize: 13, textDecorationLine: 'underline', paddingVertical: 2 },

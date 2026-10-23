@@ -30,7 +30,7 @@ import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
 import { useTheme } from './themeContext.js';
-import { FAB, FAB_CLEARANCE } from './fab.js';
+import { FAB, FAB_CLEARANCE, HEADER_AVATAR } from './fab.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -516,11 +516,11 @@ function HeaderAvatar({ avatar, onPress }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('circle.profile.edit')} testID="header-avatar"
-      style={{ position: 'absolute', top: (insets?.top ?? 0) + 8, right: 12, width: 34, height: 34, borderRadius: 17, overflow: 'hidden',
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={t('circle.profile.avatar_label')} testID="header-avatar"
+      style={{ position: 'absolute', top: (insets?.top ?? 0) + HEADER_AVATAR.top, right: HEADER_AVATAR.right, width: HEADER_AVATAR.size, height: HEADER_AVATAR.size, borderRadius: HEADER_AVATAR.size / 2, overflow: 'hidden',
         backgroundColor: theme.color.accent, alignItems: 'center', justifyContent: 'center' }}>
       {avatar.uri
-        ? <Image source={{ uri: avatar.uri }} style={{ width: 34, height: 34 }} accessibilityLabel={avatar.name ?? ''} />
+        ? <Image source={{ uri: avatar.uri }} style={{ width: HEADER_AVATAR.size, height: HEADER_AVATAR.size }} accessibilityLabel={avatar.name ?? ''} />
         : <Text style={{ color: theme.color.white, fontWeight: '700', fontSize: 13 }}>{avatar.initials ?? '?'}</Text>}
     </Pressable>
   );
@@ -2124,12 +2124,12 @@ export default function CircleLauncherScreen({
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 16 }}>
-            {/* quiet: the ⋯ (Customise) and the way back; the "+" is the page's ONE accent (web twin: circle.css) */}
+            {/* quiet: the Customise word and the way back; the "+" is the page's ONE accent (web twin: circle.css) */}
             <Pressable onPress={() => (expandedBlockId ? setExpandedBlockId(null) : setCustomiseOpen(true))} accessibilityRole="button"
               accessibilityLabel={expandedBlockId ? t('circle.screen.more_back') : t('circle.vandaag.customise')}
               testID={expandedBlockId ? 'vandaag-more-back' : 'vandaag-customise'}>
-              <Text style={{ color: theme.color.inkSoft, fontSize: expandedBlockId ? 13 : 20, marginBottom: 8 }}>
-                {expandedBlockId ? `← ${t('circle.screen.more_back')}` : '⋯'}
+              <Text style={{ color: theme.color.inkSoft, fontSize: 13, marginBottom: 8 }}>
+                {expandedBlockId ? `← ${t('circle.screen.more_back')}` : t('circle.vandaag.customise')}
               </Text>
             </Pressable>
             {/* the "+" is the floating button on every tab now (WithTabBar) */}

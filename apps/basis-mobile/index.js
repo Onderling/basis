@@ -14,6 +14,11 @@ import 'expo-dev-client';
 import { registerRootComponent } from 'expo';
 
 import App from './App.js';
+import { attachTestBuildLogMirror } from '@onderling-app/basis';
+
+// A test APK built with EXPO_PUBLIC_TEST_BUILD=1 mirrors the logger's PII-safe lines to logcat; any other
+// build attaches nothing (the flag is in no committed env or config).
+attachTestBuildLogMirror(process.env.EXPO_PUBLIC_TEST_BUILD);
 
 // Background-fetch task definition — MUST be at JS-bundle load time per Expo's
 // TaskManager API (salvaged from tasks-mobile at its retirement). The task body

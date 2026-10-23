@@ -827,6 +827,8 @@ import { makeHandleSharedCopy } from '../../src/core/handlers/sharedCopyReceive.
 // open selector. The nav entry lives on the Mij profile (personal, cross-circle inbox).
 import { renderSharedWithMe } from './sharedWithMe.js';
 import { renderBlockedList } from './blockedList.js';
+import { renderLogReport } from './logReport.js';
+import { logReportView } from '../../src/log/logReport.js';
 import { buildBlockedList } from '../../src/v2/blockedList.js';
 import { buildSharedWithMe, openSharedCopy } from '../../src/v2/sharedWithMe.js';
 // SILENT out-of-circle delivery — THIS device's network-derived sealing OPENER (shared web≡mobile). Injects the
@@ -4632,6 +4634,13 @@ async function showBlocked() {
   await paint(false);
 }
 
+/** This device's log as the person may copy it (codes + numbers only); nothing is sent from here. */
+function showLogReport() {
+  hideCircleTabBar(tabBarEl);
+  const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
+  renderLogReport(rootEl, { text, n, t, onBack: showMyData });
+}
+
 // "My data": where your data lives (pod/relay) + privacy + usage + key
 // management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
 /**
@@ -4896,7 +4905,7 @@ async function showMyData() {
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij,
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
     // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
-    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked },
+    doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview, version: APP_VERSION,
     onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's

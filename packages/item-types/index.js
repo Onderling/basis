@@ -16,21 +16,32 @@ export { SYSTEM_PINBOARD_TYPES, NOTICEBOARD_POST_TYPES, NOTICEBOARD_INTENTS, not
 export { LISTS_TYPES } from './src/canonical.js';;
 import { registerCanonicalTypes }   from './src/canonical.js';
 
-// Pre-load the default canonical registry.
-const _defaultRegistry = createRegistry();
-registerCanonicalTypes(_defaultRegistry);
+// The default canonical registry, built on first use (not at import: building it — a new Ajv, its formats, the
+// canonical set — was the one large module cost of ours on a phone's path to the first paint). The first call builds
+// it fully before answering, so a half-built registry is never observable.
+let _defaultRegistryValue = null;
+function _defaultRegistry() {
+  if (!_defaultRegistryValue) {
+    const registry = createRegistry();
+    registerCanonicalTypes(registry);
+    _defaultRegistryValue = registry;
+  }
+  return _defaultRegistryValue;
+}
+/** Test-only: whether the default registry has been built yet. */
+export const _defaultRegistryBuilt = () => _defaultRegistryValue !== null;
 
 /** Validate an item against its declared type via the default registry. */
-export const validate     = (item) => _defaultRegistry.validate(item);
+export const validate     = (item) => _defaultRegistry().validate(item);
 /** Get the raw schema for a type via the default registry. */
-export const schema       = (typeName) => _defaultRegistry.schema(typeName);
+export const schema       = (typeName) => _defaultRegistry().schema(typeName);
 /** Get metadata for a type via the default registry. */
-export const metadata     = (typeName) => _defaultRegistry.metadata(typeName);
+export const metadata     = (typeName) => _defaultRegistry().metadata(typeName);
 /** List every registered canonical type name. */
-export const list         = () => _defaultRegistry.list();
+export const list         = () => _defaultRegistry().list();
 /** Register a new type on the default registry (app-extension path). */
 export const registerType = (name, schemaDef, opts) =>
-  _defaultRegistry.registerType(name, schemaDef, opts);
+  _defaultRegistry().registerType(name, schemaDef, opts);
 
 // Lower-level surface for callers that want a fresh registry.
 export { createRegistry }         from './src/registry.js';
@@ -46,7 +57,7 @@ import { adaptForCanonical }            from './src/adapter.js';
 export { adaptForCanonical, makeValidateCanonical } from './src/adapter.js';
 
 /** Adapt + validate via the default registry. Returns `{ok, errors?}`. */
-export const validateCanonical = (item) => _defaultRegistry.validate(adaptForCanonical(item));
+export const validateCanonical = (item) => _defaultRegistry().validate(adaptForCanonical(item));
 export { INBOX_ITEM_SCHEMA, INBOX_KIND, isInboxItem } from './src/types/inbox-item.js';
 // The reminder rules (a closed vocabulary) and the time anchors they apply to.
 export { REMINDER_RULE_KINDS, parseReminderRule, isReminderRule, TIME_ANCHORS, timeAnchorOf, ITEM_REMINDERS_SCHEMA } from './src/reminderRules.js';

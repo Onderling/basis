@@ -86,6 +86,7 @@ describe('a device restored before the fix heals at the next boot', () => {
       // sealed at rest the way every key vault is.
       const pinboardVault = new VaultEncrypted({ backing: device.vaultFor('cc-pinboard-id:'), key: root.deriveVaultAtRestKey() });
       await AgentIdentity.fromSeed(mnemonicToSeed(phrase), pinboardVault);
+      await pinboardVault.delete('in-process-key-checked');   // the old build never marked a vault as checked
       expect((await AgentIdentity.restore(pinboardVault)).pubKey).toBe(rootPub);
 
       const lines = [];

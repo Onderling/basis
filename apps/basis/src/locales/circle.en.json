@@ -8307,6 +8307,50 @@
       "pod_uri_hint": {
         "text": "Needed for central and mixed storage.",
         "doc": "Create wizard (web): a field hint."
+      },
+      "default_purpose_household": {
+        "text": "Running our home together",
+        "doc": "The purpose a household circle gets when the creator typed none."
+      },
+      "default_purpose_neighbourhood": {
+        "text": "Helping each other out in the neighbourhood",
+        "doc": "The purpose a neighbourhood circle gets when the creator typed none."
+      },
+      "default_purpose_friends": {
+        "text": "Staying in touch and arranging things together",
+        "doc": "The purpose a friends circle gets when the creator typed none."
+      },
+      "default_purpose_team": {
+        "text": "Working together on what we share",
+        "doc": "The purpose a team circle gets when the creator typed none."
+      },
+      "default_purpose_other": {
+        "text": "Doing things together",
+        "doc": "The purpose a circle of another kind gets when the creator typed none."
+      },
+      "review_kind": {
+        "text": "Type",
+        "doc": "Review step: the circle's kind."
+      },
+      "advanced": {
+        "text": "Advanced",
+        "doc": "The one fold on the create wizard's first step: the kind, purpose and the further steps (members, rules, offerings, technical). Closed, the wizard is name → review."
+      },
+      "advanced_hint": {
+        "text": "Type, purpose, who may join, rules and storage. Leave it closed to use the defaults.",
+        "doc": "Line under the Advanced fold."
+      },
+      "reveal_label": {
+        "text": "Members see each other's names",
+        "doc": "Create wizard (under Advanced) and its review: the circle's reveal policy — whether members see each other's real names without an act."
+      },
+      "reveal_pairwise": {
+        "text": "per pair",
+        "doc": "Reveal policy pairwise: a name is shown once two members share it (the default)."
+      },
+      "reveal_open": {
+        "text": "everyone",
+        "doc": "Reveal policy open: every member sees every other member's name and card."
       }
     },
     "settings": {

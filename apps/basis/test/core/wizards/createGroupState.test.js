@@ -11,17 +11,16 @@ import {
 import { CIRCLE_TEMPLATES } from '../../../src/v2/circleTemplates.js';
 
 describe('initialState', () => {
-  it('starts with kind=null + no policy axes set', () => {
+  it('starts as a household — the short path asks no kind, so the household template fills the policy axes', () => {
     const s = initialState();
-    expect(s.kind).toBe(null);
-    expect(s.features).toBeUndefined();
-    expect(s.revealPolicy).toBeUndefined();
-    expect(s.pod).toBeUndefined();
-    expect(s.llmTool).toBeUndefined();
-    expect(s.agents).toBeUndefined();
-    // consensusRequired is also unset until a kind picks (or the user
-    // toggles it explicitly).  Identity / governance defaults remain.
-    expect(s.consensusRequired).toBeUndefined();
+    expect(s.kind).toBe('household');
+    expect(s.advanced).toBe(false);
+    expect(s.features).toEqual(CIRCLE_TEMPLATES.household.features);
+    // …but not who sees whose name: a create that never asked does not widen that
+    expect(s.revealPolicy).toBe('pairwise');
+    // the storage radio stays the authority: no pod, whatever the template prefers
+    expect(s.pod).toBe('none');
+    expect(s.storagePosture).toBe('p2');
     expect(s.accessPolicy).toBe('invite-only');
   });
 });
@@ -32,7 +31,8 @@ describe('setKind — fills policy axes from the template', () => {
     const s1 = setKind(s0, 'household');
     expect(s1.kind).toBe('household');
     expect(s1.features).toEqual(CIRCLE_TEMPLATES.household.features);
-    expect(s1.revealPolicy).toBe('open');
+    // who sees whose name is not the kind's to set in the wizard: it stays per pair until the reveal choice itself moves it
+    expect(s1.revealPolicy).toBe('pairwise');
     expect(s1.pod, 'the pod axis follows the storage radio (default: no pod), never the template').toBe(s1.storagePolicy);
     expect(s1.llmTool).toBe('local');
     expect(s1.agents).toBe('admin-approval');

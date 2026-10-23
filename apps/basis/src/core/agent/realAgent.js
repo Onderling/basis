@@ -235,6 +235,10 @@ async function restoreOrGenerate(vault) {
  * carries it still. Such a vault gets a fresh seed before its agent starts (its stableId re-derives from the new
  * seed). Counts into `healed`; the caller says it once, with no key in the line. A vault checked once is marked, so
  * a relaunch reads one small value instead of deriving its key a second time.
+ *
+ * The mark is sound ONLY because nothing writes a root- or chat-derived seed into an in-process agent's vault any
+ * more: the one path that did (pinboard's phrase restore) is deleted. A new path that writes such a seed must clear
+ * this mark — or the check will not run again on a marked vault.
  */
 const IN_PROCESS_KEY_CHECKED = 'in-process-key-checked';
 async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {

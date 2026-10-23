@@ -8,8 +8,6 @@
  *   - `archiveCircle()`    — admin only. Sets `circle.archived = true`.
  *                          Reversible — does NOT delete items.
  *   - `unarchiveCircle()`  — admin only. Clears `circle.archived`.
- *   - `getPrivacyNotice({lang?})` — returns the localised
- *                          closed-beta privacy notice; default `en`.
  *
  * The pause/archive flags are honoured by `addTask` (in
  * `src/skills/index.js`) — when paused or archived, addTask returns
@@ -28,7 +26,6 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
-import { privacyNoticeFor } from '../lib/privacyNotice.js';
 import { makeRoleOf } from './roleOf.js';
 
 /**
@@ -93,12 +90,5 @@ export function buildCircleControlSkills({ bundleResolver, roleOf = makeRoleOf(n
       description: 'Reverse an archive.',
     }),
 
-    defineSkill('getPrivacyNotice', async ({ parts }) => {
-      const a = argsFromParts(parts);
-      const lang = typeof a.lang === 'string' && a.lang ? a.lang : 'en';
-      return { lang, items: privacyNoticeFor(lang) };
-    }, {
-      description: 'Return the localised closed-beta privacy notice.',
-    }),
   ];
 }

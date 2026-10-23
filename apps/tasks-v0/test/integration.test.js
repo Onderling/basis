@@ -205,18 +205,7 @@ describe('H4 — listMine + identity resolution', () => {
     expect(r.items).toHaveLength(1);
   });
 
-  it('resolveMember resolves Telegram uid → webid', async () => {
-    const r = await callSkill(bundle.agent, 'resolveMember',
-      { externalIdNs: 'telegramUid', externalIdValue: '1' }, ANNE);
-    expect(r.member.webid).toBe(ANNE);
-    expect(r.member.displayName).toBe('Anne');
-  });
 
-  it('resolveMember returns null for unknown external id', async () => {
-    const r = await callSkill(bundle.agent, 'resolveMember',
-      { externalIdNs: 'telegramUid', externalIdValue: '999' }, ANNE);
-    expect(r.member).toBeNull();
-  });
 });
 
 describe('H4 — itemStore events (fan-out)', () => {
@@ -283,26 +272,6 @@ describe('H4 — mountLocalUi + LocalAgentClient (HTTP exposure)', () => {
 });
 
 describe('H4 — pod-backed roster (MemberMap.fromPodConfig)', () => {
-  it('builds members from a pod config blob; resolveMember works against pod-loaded members', async () => {
-    // Duck-typed PodClient that returns the H4 households config shape.
-    const podClient = {
-      async read(uri) {
-        expect(uri).toBe('https://h4.example/config.json');
-        return { content: { members: MEMBERS } };
-      },
-    };
-    const podBundle = await createTasksAgent({
-      roles: ROLES,
-      pod:   { client: podClient, configUri: 'https://h4.example/config.json' },
-    });
-    // Roster came from the pod, not from a hand-built array.
-    expect((await podBundle.members.list()).map((m) => m.webid).sort())
-      .toEqual([ANNE, FRITS, KID, OBS].sort());
-    // resolveMember works against the pod-loaded members.
-    const r = await callSkill(podBundle.agent, 'resolveMember',
-      { externalIdNs: 'telegramUid', externalIdValue: '1' }, ANNE);
-    expect(r.member.webid).toBe(ANNE);
-  });
 
   it('NOT_FOUND tolerance: bootstrap-time empty-pod returns the supplied fallback', async () => {
     const podClient = {

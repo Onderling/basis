@@ -132,27 +132,6 @@
     "result_intro":    { "text": "You're now a member of the circle. The proof below is your membership certificate; keep it as a record. The circle agent has been notified of your membership.", "doc": "Lead paragraph under the success heading." },
     "result_footer":   { "text": "Open <a href=\"/\">Workspace</a> to see the circle's tasks.", "doc": "Footer hint under the success card." }
   },
-  "pod_settings": {
-    "page_title":                  { "text": "Tasks — Pod settings", "doc": "Browser tab title for /pod-settings.html." },
-    "heading":                     { "text": "Pod settings", "doc": "H2 on /pod-settings.html." },
-    "intro":                       { "text": "Where the active circle's state lives, and how this device is attached to it. The full state-mapping editor lives in the Hub-web-console (post-P5).", "doc": "Lead paragraph on /pod-settings.html." },
-    "storage_heading":             { "text": "Circle storage policy", "doc": "H3 of the storage-policy card." },
-    "storage_loading":             { "text": "Loading…", "doc": "Initial placeholder under the storage heading." },
-    "storage_upgrade_oneway":      { "text": "Once pod-having → no way back to no-pod. Substrate handles config rewrite only; data migration is your job.", "doc": "Note shown above the upgrade row when the circle is no-pod (and the upgrade option is visible)." },
-    "new_policy_label":            { "text": "New storage form", "doc": "Label of the upgrade-target select." },
-    "policy_centralised_short":    { "text": "Centralised on a pod", "doc": "Short label of the centralised option in the upgrade select." },
-    "policy_decentralised_short":  { "text": "Each member on own pod", "doc": "Short label of the decentralised option in the upgrade select." },
-    "policy_hybrid_short":         { "text": "Hybrid", "doc": "Short label of the hybrid option in the upgrade select." },
-    "pod_uri_label":               { "text": "Pod URI", "doc": "Label of the groupPodUri input on the upgrade row." },
-    "upgrade_btn":                 { "text": "Upgrade", "doc": "CTA that calls setCircleStoragePolicy." },
-    "signin_heading":              { "text": "Solid pod sign-in", "doc": "H3 of the pod-sign-in card." },
-    "signin_intro":                { "text": "Pod sign-in lets the circle's state mirror through to your own pod for stronger persistence. Pick an issuer (the Solid provider that holds your pod) and authorize the redirect.", "doc": "Lead paragraph under the pod-sign-in heading." },
-    "signin_issuer_label":         { "text": "Issuer", "doc": "Label of the issuer URL input on /pod-settings.html. Default value points at login.inrupt.com." },
-    "signin_btn":                  { "text": "Sign in to pod", "doc": "CTA that calls startPodSignIn." },
-    "signout_btn":                 { "text": "Sign out", "doc": "CTA shown when already signed in; calls signOutOfPod." },
-    "registry_heading":            { "text": "Agent registry", "doc": "H3 of the agent-registry status card." },
-    "registry_intro":              { "text": "This device is registered in the circle's local agent registry under <code>pseudo-pod://&lt;deviceId&gt;/private/agent-registry</code>. Other agents can look up this device by pubKey, deviceId, or agentUri.", "doc": "Lead paragraph under the agent-registry heading. Contains an inline <code> example URI." }
-  },
   "dashboard": {
     "page_title":      { "text": "Tasks — Circles", "doc": "Browser tab title for /circles.html." },
     "heading":         { "text": "Your circles", "doc": "H2 on /circles.html." },
@@ -235,17 +214,6 @@
     "propose_mode_intro": { "text": "Adding scope after submission needs the assignee's consent. They'll see this proposal in their inbox.", "doc": "Hint shown next to the propose-sub-task button." }
   },
   "web": {
-    "chat": {
-      "page_title":         { "text": "Tasks — Chat", "doc": "Browser tab title for /chat.html." },
-      "no_thread":          { "text": "No thread specified. Add ?threadId=… to the URL.", "doc": "Error state shown when /chat.html is opened without a threadId query parameter." },
-      "unknown_peer":       { "text": "(unknown peer)", "doc": "Placeholder shown in the chat header before the counterparty has been resolved (empty thread + no `counterparty` query param)." },
-      "loading":             { "text": "Loading…", "doc": "Placeholder shown in the message scroll while the first getChatThread call is in flight." },
-      "empty":              { "text": "No messages yet. Say hi.", "doc": "Empty-state copy on a non-appeal thread with zero messages." },
-      "appeal_empty":       { "text": "Send a message to open the appeal thread with the master.", "doc": "Empty-state copy on an appeal thread that has no messages yet. Mirrors mobile.chat.appeal_empty." },
-      "load_failed":        { "text": "Could not load thread", "doc": "Prefix used in the error state when getChatThread returns an error or throws." },
-      "input_placeholder":  { "text": "Write a message…", "doc": "Placeholder shown inside the chat compose textarea." },
-      "send":               { "text": "Send", "doc": "Label for the chat compose Send button." }
-    },
     "task": {
       "page_title":         { "text": "Tasks — Task", "doc": "Browser tab title for /task.html." },
       "no_task":            { "text": "No task specified. Add ?taskId=… to the URL.", "doc": "Error state shown when /task.html is opened without a taskId query parameter." },

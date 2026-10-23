@@ -53,15 +53,6 @@ export function buildObservabilitySkills({ bundleResolver, userSettings: fallbac
   }
 
   return [
-    defineSkill('getMetrics', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      const tracker = circle.metricsTracker;
-      if (!tracker?.snapshot) return { error: 'metricsTracker not wired for this circle' };
-      return { snapshot: tracker.snapshot() };
-    }, {
-      description: 'Read the local MetricsTracker snapshot (counters + latency p50/p90).',
-    }),
 
     defineSkill('getCircleCadences', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });

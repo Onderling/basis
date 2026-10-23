@@ -68,23 +68,13 @@ export const tasksManifest = {
    * NavModel category tag for routing the `inbox` view + the
    * `clearInboxItem` itemAction.
    */
-  /*
-   * .4 (2026-05-20) — `'circle-storage-policy'` joins as an
-   * app-local (non-canonical, F-SP1-a) item type so the `pod-settings`
-   * view can declare `view.type: 'circle-storage-policy'`
-   * (validateView pins `view.type` ∈ `manifest.itemTypes`).  Like
-   * pinboard's `'group-rules'` placeholder for its settings view, the
-   * circle storage policy is a SINGLETON record (one merged object:
-   * `{policy, groupPodUri?}`), not a list of items. See
-   * (`shape: 'record'`) — the view encodes that reality.
-   */
   // Part G (2026-06-17) — 'schedule-slot' + 'member' folded in from the former
   // mockTasksManifest (the suggest/acceptSchedule + listCircleMembers ops gate on
   // them).  'subtask-request' / 'subtask-proposal' already model the inbox-kind
   // subtask ops via `appliesTo.kind` on 'inbox-item'; the mock's standalone
   // subtask ops (addSubtask / proposeSubtask) gate on 'task', so no new type is
   // needed for those.
-  itemTypes: ['task', 'inbox-item', 'circle-storage-policy', 'circle', 'schedule-slot', 'member'],
+  itemTypes: ['task', 'inbox-item', 'circle', 'schedule-slot', 'member'],
 
   // B · Layer 1 — domain (non-atom) verb: `tree` (DAG traversal of the task
   // graph — structural, not a plain `list`).  All other ops map to SDK atoms.
@@ -1220,89 +1210,6 @@ export const tasksManifest = {
       title:      'Notifications',
       type:       'inbox-item',
       dataSource: { skillId: 'listMyInbox', args: { limit: 200 } },
-    },
-    /*
-     * .4 (2026-05-20) — pod-settings view consumed by
-     * `apps/tasks-v0/web/pod-settings.html`. Mirrors pinboard's
-     * adopt settings view (commit 9e7003b): the manifest models the
-     * data shape (record + per-field patch declarations); the page
-     * keeps its rich custom UI (pod-sign-in flow, conditional
-     * groupPodUri row, localisation labels — auto-rendering would regress).
-     *
-     * (`shape: 'record'`) — `getCircleStoragePolicy` returns a
-     * singleton `{policy, groupPodUri?}` object, NOT a list.
-     * (`argsFromContext`) — `circleId` is a RUNTIME-derived arg
-     * (URL `?circle=...`), not static; the page (or its host) supplies
-     * `$circleId` via the fetch-section context.
-     *
-     * (`view.fields[]`) — declares the two editable fields
-     * of the storage policy with their patch ops.  Both target
-     * `setCircleStoragePolicy({circleId, storagePolicy, groupPodUri?})`
-     * — a FLAT skill (no nested `{patch: {...}}` wrapper), so
-     * `argWrapper` is NOT needed here (omitted).  Same flat shape
-     * as pinboard's `setHopMode({global})` field.
-     *
-     * `setCircleStoragePolicy` and `getCircleStoragePolicy` are NOT
-     * declared in `operations[]` (same choice pinboard made for
-     * `getSettings`/`updateSettings`/`setHopMode`).  They are
-     * pod-plumbing skills, not chat/slash-callable primary flows.
-     * Non-strict `validateManifest` permits `dataSource.skillId` and
-     * `field.patch.opId` to reference any string (-strict would
-     * tighten this — opt-in only). The drift canary therefore
-     * doesn't need to know about them.
-     *
-     * The page's pod-sign-in surface (`startPodSignIn`,
-     * `completePodSignIn`, `signOutOfPod`, `podSignInStatus`,
-     * `whoAmI`) is an interactive OIDC flow — explicitly OUT OF
-     * SCOPE for B.2.4.  Modelling that as manifest ops would require
-     * a redirect-flow primitive the substrate doesn't yet have.
-     */
-    {
-      id:    'pod-settings',
-      title: 'Pod settings',
-      type:  'circle-storage-policy',
-      shape: 'record',                              // singleton
-      dataSource: {
-        skillId:         'getCircleStoragePolicy',
-        // `circleId` is runtime-derived (browser URL); the
-        // page supplies it via the fetch-section context.  Omitted
-        // when the host has no active circle (the skill itself replies
-        // `{error: 'circleId required'}` in that case).
-        argsFromContext: { circleId: '$circleId' },
-      },
-      // two representative editable fields of the storage
-      // policy.  Both dispatch through `setCircleStoragePolicy` (one-way
-      // upgrade; admin/coordinator gated server-side).
-      fields: [
-        {
-          name:    'policy',
-          type:    'enum',
-          label:   'Storage form',
-          // Mirrors the page's <select> options (no-pod intentionally
-          // omitted — the skill rejects downgrade once a pod-having
-          // policy is active).
-          choices: ['shared', 'personal', 'hybrid'],
-          // Flat patch — dispatch is
-          // `setCircleStoragePolicy({circleId, storagePolicy: <value>})`.
-          // No `argWrapper` (skill takes flat args, not `{patch: ...}`).
-          patch:   { opId: 'setCircleStoragePolicy', argName: 'storagePolicy' },
-        },
-        {
-          name:  'groupPodUri',
-          type:  'string',
-          label: 'Pod URI',
-          // (adopted 2026-05-20) — conditional-display gate:
-          // groupPodUri is only meaningful when policy ∈ {shared,
-          // hybrid}.  Auto-rendered consumers hide the field for
-          // policy='personal' (own pod, no group URI).  The
-          // hand-coded page enforces the same rule via a separate
-          // show/hide branch; the manifest now declares it once.
-          // B.2.4 was the originating signal; closed the
-          // substrate gap.
-          requiresField: { policy: ['shared', 'hybrid'] },
-          patch: { opId: 'setCircleStoragePolicy', argName: 'groupPodUri' },
-        },
-      ],
     },
   ],
 };

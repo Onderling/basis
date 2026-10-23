@@ -144,7 +144,6 @@
       deriveTaskActions,
       formatReviewEntry,
       shortWebid,
-      buildAppealUrl,
     } from '/lib/taskDetail.js';
     import { describeTaskStatus } from '/lib/taskStatus.js';
     import { t as i18nT, bootI18n } from '/lib/i18nBootstrap.js';
@@ -388,13 +387,6 @@
               if (Object.keys(patch).length === 1) return; // no-op
               dispatch('editTask', patch);
             },
-            'secondary',
-          ));
-        }
-        if (acts.canAppeal) {
-          primary.appendChild(makeButton(
-            localised('web.task.action_appeal', 'Appeal'),
-            () => { window.location.href = buildAppealUrl(task.id); },
             'secondary',
           ));
         }

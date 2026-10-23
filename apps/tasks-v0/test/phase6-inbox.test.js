@@ -178,7 +178,8 @@ describe('Phase 6 — issuer notifications via createCircleAgent', () => {
     const revoked = inbox.find((e) => e.source.meta?.eventType === 'task-revoked');
     expect(revoked).toBeTruthy();
     expect(revoked.source.meta.reason).toBe('overcommitted');
-    expect(revoked.source.buttons?.[0]?.id).toMatch(/^appeal:/);
+    // no Appeal button: the appeal opened a chat thread only the retired standalone chat page could show
+    expect(revoked.source.buttons ?? []).toEqual([]);
   });
 
   it('item-rejected → assignee receives a "rejected" inbox entry with the note', async () => {

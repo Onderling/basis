@@ -44,7 +44,6 @@ describe('Slice B.1: renderWeb(tasksManifest) NavModel', () => {
       'review',       // .2 (2026-05-20) — review.html reviewer queue
       'dag',          // (2026-05-20)
       'inbox',        // .3 (2026-05-20) — inbox.html notification feed
-      'pod-settings', // .4 (2026-05-20) — pod-settings.html -adopt
     ]);
   });
 

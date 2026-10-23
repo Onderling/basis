@@ -61,8 +61,15 @@ describe('an op is registered at the visibility its manifest declares', () => {
     household: ['revealOwnerPhrase', 'restoreOwnerPhrase', 'exportRecoveryFile', 'importRecoveryFile', 'revokeDevice',
       'replaceDevice', 'enrollDevice', 'buildEnrollOffer', 'grantCompanion', 'revokeCompanionGrant', 'grantSurface',
       'revokeSurface'],
-    // `settings` writes the relay endpoint among the device's controls
-    basis: ['rotate-identity', 'debug-dump', 'audit-tail', 'set-relay', 'settings'],
+    // `settings` writes the relay endpoint among the device's controls; then the owner's session, the transport wiring,
+    // what this device says about itself, and the person's own screen layout
+    basis: ['rotate-identity', 'debug-dump', 'audit-tail', 'set-relay', 'settings',
+      'signin', 'signout',
+      'transport-mode', 'transports', 'peer-connect', 'test-peer',
+      'security-status', 'logs',
+      'screen-add-page', 'screen-remove-page', 'screen-rename-page', 'screen-set-active', 'screen-set-personas',
+      'screen-set-circles', 'screen-pin', 'screen-unpin', 'screen-add-block', 'screen-remove-block', 'screen-move-block',
+      'screen-set-block-config', 'screen-undo'],
     pinboard: ['restoreFromMnemonicWizard', 'encryptedBackupWizard'],
   };
   for (const [app, ids] of Object.entries(OWNER_ONLY)) {

@@ -242,7 +242,7 @@ export const basisManifest = {
      * events.
      */
     {
-      id:    'logs', visibility: 'authenticated',
+      id:    'logs', visibility: 'private',
       verb:  'list',
       params: [
         { name: 'app',   kind: 'string', required: false },
@@ -330,7 +330,7 @@ export const basisManifest = {
      * is composed into the chat-shell (v0.7+).
      */
     {
-      id:    'signin', visibility: 'authenticated',
+      id:    'signin', visibility: 'private',
       group: 'identity',
       verb:  'add',
       writes: { scope: 'device' },
@@ -497,7 +497,7 @@ export const basisManifest = {
      * has wired.
      */
     {
-      id:    'security-status', visibility: 'authenticated',
+      id:    'security-status', visibility: 'private',
       group: 'diagnostics',
       verb:  'list',
       params: [],
@@ -542,7 +542,7 @@ export const basisManifest = {
      * connected, picks which one sendToPeer uses.
      */
     {
-      id:    'transport-mode', visibility: 'authenticated',
+      id:    'transport-mode', visibility: 'private',
       group: 'device',
       verb:  'submit',
       writes: { scope: 'device' },
@@ -560,7 +560,7 @@ export const basisManifest = {
      * state side-by-side: connected? address? URL? + current mode.
      */
     {
-      id:    'transports', visibility: 'authenticated',
+      id:    'transports', visibility: 'private',
       group: 'device',
       verb:  'list',
       params: [],
@@ -776,7 +776,7 @@ export const basisManifest = {
      * this command.
      */
     {
-      id:    'peer-connect', visibility: 'authenticated',
+      id:    'peer-connect', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'device' },
@@ -794,7 +794,7 @@ export const basisManifest = {
      * incoming bubble in their Main thread.
      */
     {
-      id:    'test-peer', visibility: 'authenticated',
+      id:    'test-peer', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
@@ -815,7 +815,7 @@ export const basisManifest = {
      * `/signout` — v0.7.. Clears the local OIDC session.
      */
     {
-      id:    'signout', visibility: 'authenticated',
+      id:    'signout', visibility: 'private',
       group: 'identity',
       verb:  'remove',
       writes: { scope: 'device' },
@@ -830,7 +830,7 @@ export const basisManifest = {
      * `/page-add` — a new page of the person's own (Vandaag), optionally showing only some circles.
      */
     {
-      id:    'screen-add-page', visibility: 'authenticated',
+      id:    'screen-add-page', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -851,7 +851,7 @@ export const basisManifest = {
      * `/page-remove` — remove one of the person's pages.
      */
     {
-      id:    'screen-remove-page', visibility: 'authenticated',
+      id:    'screen-remove-page', visibility: 'private',
       group: 'device',
       verb:  'remove',
       writes: { scope: 'device' },
@@ -869,7 +869,7 @@ export const basisManifest = {
      * `/page-rename` — rename a page.
      */
     {
-      id:    'screen-rename-page', visibility: 'authenticated',
+      id:    'screen-rename-page', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -890,7 +890,7 @@ export const basisManifest = {
      * `/page-show` — the page the home opens on.
      */
     {
-      id:    'screen-set-active', visibility: 'authenticated',
+      id:    'screen-set-active', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -911,7 +911,7 @@ export const basisManifest = {
      * the screens book, so it is a page change like the others: logged, undoable.
      */
     {
-      id:    'screen-set-personas', visibility: 'authenticated',
+      id:    'screen-set-personas', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -929,7 +929,7 @@ export const basisManifest = {
      * `/page-circles` — which circles a page shows (none named = all).
      */
     {
-      id:    'screen-set-circles', visibility: 'authenticated',
+      id:    'screen-set-circles', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -952,7 +952,7 @@ export const basisManifest = {
      * its circle with that op's form; it is never invoked from the sheet.
      */
     {
-      id:    'screen-pin', visibility: 'authenticated',
+      id:    'screen-pin', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -974,7 +974,7 @@ export const basisManifest = {
      * `/unpin` — take a pin off the "+" sheet, by its key (`pinKey`).
      */
     {
-      id:    'screen-unpin', visibility: 'authenticated',
+      id:    'screen-unpin', visibility: 'private',
       group: 'device',
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'remove',
@@ -991,7 +991,7 @@ export const basisManifest = {
      * `/page-block-add` — add a block from the block table (only those the person's pages may hold).
      */
     {
-      id:    'screen-add-block', visibility: 'authenticated',
+      id:    'screen-add-block', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -1013,7 +1013,7 @@ export const basisManifest = {
      * `/page-block-remove` — remove a block from a page.
      */
     {
-      id:    'screen-remove-block', visibility: 'authenticated',
+      id:    'screen-remove-block', visibility: 'private',
       group: 'device',
       verb:  'remove',
       writes: { scope: 'device' },
@@ -1032,7 +1032,7 @@ export const basisManifest = {
      * `/page-block-move` — move a block to another place on its page.
      */
     {
-      id:    'screen-move-block', visibility: 'authenticated',
+      id:    'screen-move-block', visibility: 'private',
       group: 'device',
       verb:  'move',
       writes: { scope: 'device' },
@@ -1052,7 +1052,7 @@ export const basisManifest = {
      * `/page-block-set` — change a block's settings (its circles, mine/all, horizon, limit…).
      */
     {
-      id:    'screen-set-block-config', visibility: 'authenticated',
+      id:    'screen-set-block-config', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -1074,7 +1074,7 @@ export const basisManifest = {
      * `/page-undo` — undo the newest change to the person's pages (each change is kept as a version and logged).
      */
     {
-      id:    'screen-undo', visibility: 'authenticated',
+      id:    'screen-undo', visibility: 'private',
       group: 'device',
       verb:  'undo',
       writes: { scope: 'device' },

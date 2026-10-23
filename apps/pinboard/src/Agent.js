@@ -404,22 +404,16 @@ export async function createNeighbourhoodAgent({
     agent = new Agent({ identity: id, transport: tx, label });
   }
 
-  // Phase 14 fix (2026-05-06): ensure the local actor has a MemberMap
-  // entry with THIS agent's pubKey + stableId, so chat.send /
-  // resolveByWebid round-trips work the moment the bundle is up
-  // (with no dependency on setMyHandle).  Browsers also call the
-  // `whoAmI` skill for the canonical {webid, pubKey, stableId} tuple.
+  // The local actor has a MemberMap row from the moment the bundle is up (chat.send, resolveByWebid and `whoAmI` read
+  // it, with no dependency on setMyHandle). The row names the identity this device's card names (`selfCard`, host-injected; this agent's own
+  // when none is handed in) and is written at every boot, so a row written with another key says the same as the card
+  // again.
   if (offeringMatchOpts.localActor) {
     const existing = await members.resolveByWebid(offeringMatchOpts.localActor);
-    if (!existing?.pubKey || !existing?.stableId) {
-      try {
-        await members.addMember({
-          ...(existing ?? { webid: offeringMatchOpts.localActor }),
-          pubKey:   id.pubKey,
-          stableId: id.stableId ?? existing?.stableId,
-        });
-      } catch { /* ignore — bad initial entry */ }
-    }
+    const own = typeof selfCard === 'function' ? selfCard() : { pubKey: id.pubKey, stableId: id.stableId };
+    try {
+      await members.addMember({ ...(existing ?? { webid: offeringMatchOpts.localActor }), pubKey: own.pubKey, stableId: own.stableId ?? null });
+    } catch { /* ignore — bad initial entry */ }
   }
 
   // ── L1e OfferingMatch — composes the real agent + pubSub ─────────────────────

@@ -402,7 +402,6 @@
     "location_clear":         { "text": "Wissen", "doc": "Ghost button on mobile ProfileMineScreen that drops the user's location." },
     "recovery_heading":       { "text": "Herstelzin", "doc": "H2 above the recovery section on mobile ProfileMineScreen." },
     "recovery_intro":         { "text": "Bewaar je herstelzin op een veilige plek. Je hebt hem nodig om Prikbord op een ander toestel te installeren.", "doc": "Body explanation under the recovery heading." },
-    "recovery_show":          { "text": "Toon herstelzin", "doc": "CTA that reveals the user's mnemonic in a confirm modal." },
     "recovery_close":         { "text": "Sluiten", "doc": "Confirm-modal label on the recovery-reveal modal." },
     "recovery_unavailable":   { "text": "Recovery-export niet beschikbaar in deze build.", "doc": "Inline error when the recovery skill is missing or unwired." },
     "handle_empty":           { "text": "Handle is verplicht.", "doc": "Inline error on mobile ProfileMineScreen for empty handle." },
@@ -445,10 +444,6 @@
 
     "recovery_heading":       { "text": "Herstel & back-up", "doc": "H2 above the recovery section." },
     "recovery_intro_html":    { "text": "Je <strong>herstelzin</strong> is de enige manier om je account terug te krijgen op een nieuw apparaat. We tonen hem <em>één keer</em> — schrijf hem op en bewaar hem ergens veilig (geen schermafbeelding).", "doc": "Lead paragraph for the recovery section. Contains <strong> + <em> tags." },
-    "show_mnemonic":          { "text": "Toon herstelzin", "doc": "Button to reveal the BIP-39 mnemonic phrase. Pressing it irreversibly marks the phrase as 'shown'." },
-    "mnemonic_already_shown": { "text": "Herstelzin is al eerder getoond — uit veiligheid kan dat niet opnieuw.", "doc": "Status shown when the user has already revealed the mnemonic in this install." },
-    "mnemonic_write_now":     { "text": "Schrijf deze 12 woorden nu over. Hij wordt niet opnieuw getoond.", "doc": "Status shown right after the mnemonic is revealed. Reminds the user to copy it down — no second chance." },
-    "mnemonic_unknown":       { "text": "Onbekend resultaat.", "doc": "Defensive fallback shown when the getMnemonicOnce skill returned neither shown:true nor a phrase." },
 
     "backup_heading":         { "text": "Versleutelde back-up", "doc": "H3 above the encrypted-backup form." },
     "backup_intro":           { "text": "Maak een back-upbestand dat alleen jij met je wachtwoord kunt openen. Het wachtwoord verlaat dit apparaat niet.", "doc": "Lead paragraph for the encrypted-backup form. Explains client-side encryption." },

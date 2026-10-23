@@ -6139,9 +6139,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       return adapted;
     }
     if (appOrigin === 'pinboard') {
-      // The phrase restores the OWNER ROOT (`household.restoreOwnerPhrase`), never an in-process agent: pinboard's own
-      // restore writes the phrase's bytes — the root secret — as its seed, and this agent's key must never be the root.
-      if (opId === 'restoreFromMnemonic') return { error: 'restore-with-owner-phrase' };
       // Derived: briefSummary builds a summary from listOpen since
       // pinboard doesn't expose its own briefSummary skill.
       if (opId === 'briefSummary' || opId === 'pinboard_briefSummary') {

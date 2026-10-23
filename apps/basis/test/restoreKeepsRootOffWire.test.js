@@ -9,9 +9,9 @@
  * Every vault the agent opens is handed in here (`vaultFor`), so a second boot over the same storage is the relaunch.
  */
 import { describe, it, expect } from 'vitest';
-import { VaultMemory, RootKeyStoreVault } from '@onderling/vault';
+import { VaultMemory, VaultEncrypted, RootKeyStoreVault } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
-import { Bootstrap, b64encode, DataPart } from '@onderling/core';
+import { AgentIdentity, Bootstrap, b64encode, mnemonicToSeed } from '@onderling/core';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
 import { initialState, submitRestore } from '../src/core/wizards/restoreFromMnemonicState.js';
 import { decodeContactCard } from '../src/v2/contactCardLink.js';
@@ -60,9 +60,10 @@ describe('the restore wizard keeps the owner root off the wire', () => {
       expect(c.pubKey).toBe(chat.pubKey);
       expect(c.stableId).toBe(chat.stableId);
       expect(inProcess(agent)).not.toContain(c.pubKey);
-      // …and the old second step cannot be reached through basis any more.
-      expect((await agent.callSkill('pinboard', 'restoreFromMnemonic', { mnemonic: phrase, confirm: true }))?.error)
-        .toBe('restore-with-owner-phrase');
+      expect((await agent.callSkill('pinboard', 'whoAmI', {}))?.pubKey).toBe(chat.pubKey);
+      // …and the old second step does not exist any more.
+      await expect(agent.callSkill('pinboard', 'restoreFromMnemonic', { mnemonic: phrase, confirm: true })).rejects.toThrow(/Unknown skill/);
+      expect(inProcess(agent)).not.toContain(rootPub);
     });
 
   it('a fresh profile\'s card already names the chat identity, never an in-process agent', { timeout: 120_000 }, async () => {
@@ -79,10 +80,13 @@ describe('a device restored before the fix heals at the next boot', () => {
       const device = deviceStorage();
       const first = await boot(device);
       const phrase = (await first.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
-      const rootPub = b64encode(Bootstrap.fromMnemonic(phrase).derivedPubKey());
-      // What the old wizard left behind: its second step, sent straight to the pinboard agent (basis now refuses it).
-      await first.sa.agent.invoke(first.inProcessPubKeys().pinboard, 'restoreFromMnemonic', [DataPart({ mnemonic: phrase, confirm: true })]);
-      expect(Object.values(first.inProcessPubKeys())).toContain(rootPub);
+      const root = Bootstrap.fromMnemonic(phrase);
+      const rootPub = b64encode(root.derivedPubKey());
+      // What the old wizard left on a device: the phrase's own bytes as the pinboard agent's seed, in its vault
+      // sealed at rest the way every key vault is.
+      const pinboardVault = new VaultEncrypted({ backing: device.vaultFor('cc-pinboard-id:'), key: root.deriveVaultAtRestKey() });
+      await AgentIdentity.fromSeed(mnemonicToSeed(phrase), pinboardVault);
+      expect((await AgentIdentity.restore(pinboardVault)).pubKey).toBe(rootPub);
 
       const lines = [];
       const original = console.warn;
@@ -93,6 +97,12 @@ describe('a device restored before the fix heals at the next boot', () => {
       expect(inProcess(second)).toHaveLength(5);
       expect(inProcess(second)).not.toContain(rootPub);
       expect(inProcess(second)).not.toContain(second.sa.agent.identity.pubKey);
+      // This device's own row in the member map (what `whoAmI`, `resolveByWebid` and the roster read) says the
+      // same as the card: the chat identity — not the root's key the old step wrote there.
+      const me = await second.callSkill('pinboard', 'whoAmI', {});
+      expect(me?.pubKey).not.toBe(rootPub);
+      expect(me?.pubKey).toBe(second.sa.agent.identity.pubKey);
+      expect(me?.stableId).toBe(second.sa.agent.identity.stableId);
       const said = lines.filter((l) => l.includes('owner-root key'));
       expect(said.length).toBe(1);
       expect(said[0]).not.toContain(rootPub);   // counts only — the key itself is never logged

@@ -36,7 +36,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
 }
 
 describe('Pinboard V1 Phase 19 — closed-beta smoke', () => {
-  it('runbook flow: gate → mnemonic → backup → post → metrics', async () => {
+  it('runbook flow: gate → backup → post → metrics', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
     const tx = new InternalTransport(new InternalBus(), id.pubKey);
     const bundle = await createNeighbourhoodAgent({
@@ -53,14 +53,6 @@ describe('Pinboard V1 Phase 19 — closed-beta smoke', () => {
       rulesAccepted:   true,
     });
     expect(gate.ok).toBe(true);
-
-    // 2. Recovery phrase: shown once, then locked.
-    const m1 = await callSkill(bundle.agent, 'getMnemonicOnce');
-    expect(typeof m1.mnemonic).toBe('string');
-    expect(m1.shown).toBe(false);
-    const m2 = await callSkill(bundle.agent, 'getMnemonicOnce');
-    expect(m2.shown).toBe(true);
-    expect(m2.mnemonic).toBeNull();
 
     // 3. Encrypted backup → round-trip with the same passphrase decodes.
     const back = await callSkill(bundle.agent, 'encryptedBackup', { passphrase: 'correct horse battery staple' });

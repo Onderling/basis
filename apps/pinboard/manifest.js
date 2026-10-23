@@ -16,7 +16,7 @@
  *
  * Admin-only flows (`createGroupV2`, `editGroupRules`, `removeMember`,
  * `rotateMyGroupCode`, `postAnnouncement`) and plumbing
- * (`encryptedBackup`, `getMnemonicOnce`, `startPodSignIn`, attachments,
+ * (`encryptedBackup`, `startPodSignIn`, attachments,
  * push subscription, contact-QR exchange, …) stay un-manifested in D.1
  * — they are not slash-natural and the chat surface doesn't need
  * them.  They can be added in a follow-on D.x slice if the LLM layer
@@ -1096,20 +1096,6 @@ export const pinboardManifest = {
       params: [{ name: 'passphrase', kind: 'secret', required: true }],
       surfaces: {
         chat: { hint: "Produce a passphrase-sealed backup of this person's data." },
-        ui:   { control: 'button' },
-      },
-    },
-    {
-      id:   'restoreFromMnemonic', verb: 'set',
-      writes: { scope: 'device' },   // restores the identity onto this device
-      // Destructive: adopts an identity from a phrase. `confirm` exists so a single stray call cannot
-      // overwrite the identity in place.
-      params: [
-        { name: 'mnemonic', kind: 'secret',  required: true },
-        { name: 'confirm',  kind: 'boolean' },
-      ],
-      surfaces: {
-        chat: { hint: 'Restore this person\u2019s identity from a recovery phrase. Requires confirm:true.' },
         ui:   { control: 'button' },
       },
     },

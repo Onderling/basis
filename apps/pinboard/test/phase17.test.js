@@ -1,8 +1,7 @@
 /**
  * Pinboard V1 — Phase 17 tests.
  *
- * Onboarding polish: getMnemonicOnce, getInviteQrPayload, gated
- * redeemInviteWithGate.
+ * Onboarding polish: getInviteQrPayload, gated redeemInviteWithGate.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -35,29 +34,6 @@ async function buildAgent() {
   await bundle.offeringMatch.start();
   return bundle;
 }
-
-// ── getMnemonicOnce ──────────────────────────────────────────────────────
-
-describe('Pinboard V1 Phase 17 — getMnemonicOnce', () => {
-  it('first call returns the mnemonic + flips shown; second call returns shown:true', async () => {
-    const bundle = await buildAgent();
-    const r1 = await callSkill(bundle.agent, 'getMnemonicOnce');
-    expect(r1.shown).toBe(false);
-    expect(typeof r1.mnemonic).toBe('string');
-    expect(r1.mnemonic.split(' ').length).toBeGreaterThanOrEqual(12);
-
-    const r2 = await callSkill(bundle.agent, 'getMnemonicOnce');
-    expect(r2.shown).toBe(true);
-    expect(r2.mnemonic).toBeNull();
-  });
-
-  it('atomic mark-shown survives a re-issued skill call', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'getMnemonicOnce');
-    const me = await bundle.members.resolveByWebid(ANNE);
-    expect(me.externalIds.mnemonicShown).toBe('true');
-  });
-});
 
 // ── getInviteQrPayload ───────────────────────────────────────────────────
 

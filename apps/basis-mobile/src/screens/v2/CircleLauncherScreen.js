@@ -155,7 +155,7 @@ import { securityStatus } from '../../../../basis/src/core/localBuiltins.js';
 import {
   HELP_CIRCLE_ID, helpCircleSpec, helpCircleRoster, onderlingBotMember, provisionHelpCircle,
 } from '../../../../basis/src/v2/helpCircle.js';
-import { createOnboardingFlags, asyncStorageOnboardingIo } from '../../../../basis/src/v2/onboardingFlags.js';
+import { createOnboardingFlags, asyncStorageOnboardingIo, keyCardPending } from '../../../../basis/src/v2/onboardingFlags.js';
 import { alphaViewModes, alphaViewMode, isAlphaTab } from '../../../../basis/src/v2/alphaSurface.js';
 import { chatComposerVisible } from '../../../../basis/src/v2/circleTabs.js';
 import { buildOnboardingTemplate } from '../../../../basis/src/v2/onboardingTemplate.js';
@@ -287,7 +287,8 @@ import { circleAvailabilityFor } from '../../../../basis/src/v2/opAvailability.j
 import { usageRows } from '../../../../basis/src/v2/actionFrequency.js';
 import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
 import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
-import { handleOp } from '../../../../basis/src/v2/onboardingStrip.js';
+import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
+import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
@@ -778,6 +779,8 @@ export default function CircleLauncherScreen({
   // OBJ-2 — join a circle: scan an invite QR → run the shared join wizard. Invite modal: show this
   // circle's membership QR. Both reuse the classic membership core; nothing new below the surface.
   const [joinScanOpen, setJoinScanOpen] = useState(false);
+  // the recovery words, opened ONLY by the key card's explicit "Toon" (null = closed; the phrase is read on that tap)
+  const [keyPhrase, setKeyPhrase] = useState(null);
   // What a scan opened that is a FLOW with its own painter here (enrol · claim): its declared id + the needs it starts with.
   const [scanTask, setScanTask] = useState(null);
   const [scanForm, setScanForm] = useState(null);   // a scanned code's op, asking what the code did not say (`opFormOrRun`)
@@ -1322,7 +1325,7 @@ export default function CircleLauncherScreen({
             // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
             selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
             // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-            allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen() },
+            allCircles: circles, introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags) },
         });
         if (!alive) return;
         setScreenViewBlocks(blocks);
@@ -1884,6 +1887,14 @@ export default function CircleLauncherScreen({
   const scanOverlays = (
     <>
       <QrScannerModal visible={joinScanOpen} onClose={() => setJoinScanOpen(false)} onResult={onScan} t={t} />
+      <Modal visible={keyPhrase !== null} animationType="slide" onRequestClose={() => setKeyPhrase(null)}>
+        <MnemonicCreateScreen
+          mnemonic={keyPhrase ?? ''}
+          onWritten={() => { onboardingFlags.markKeySaved().then(() => { setKeyPhrase(null); refreshScreensBook(); }); }}
+          onPhoto={() => { onboardingFlags.markKeySaved().then(() => { setKeyPhrase(null); refreshScreensBook(); }); }}
+          onLater={() => { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => { setKeyPhrase(null); refreshScreensBook(); }); }}
+        />
+      </Modal>
       {scanForm ? (
         <OpPageModal visible appOrigin={scanForm.target.app} op={{ id: scanForm.form.opId }} spec={scanForm.form} choices={scanForm.choices}
           // a refusal stays in the form, in the shared words; done closes it and says so
@@ -2132,6 +2143,14 @@ export default function CircleLauncherScreen({
                 }
                 else if (a?.kind === 'intro-seen') onboardingFlags.markIntroSeen().then(() => refreshScreensBook());
                 else if (a?.kind === 'intro-more') onboardingFlags.markIntroSeen().then(() => { const c = circles.find((x) => x.id === HELP_CIRCLE_ID); if (c) openCircle(c); });
+                // the key card: its explicit "Toon" reads the owner phrase and opens it; "Later" puts the card away
+                else if (a?.kind === 'key-show') {
+                  Promise.resolve(bundle?.callSkill?.('household', 'revealOwnerPhrase', {})).catch(() => null).then((res) => {
+                    const w = res && !res.error ? (res.mnemonic ?? res.phrase ?? res.words ?? '') : '';
+                    setKeyPhrase(Array.isArray(w) ? w.join(' ') : String(w || ''));
+                  });
+                }
+                else if (a?.kind === 'key-later') onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => refreshScreensBook());
                 else if (a?.kind === 'create-circle') setCreating(true);
                 else if (a?.kind === 'join-circle') setJoinScanOpen(true);
                 // a card's one action that IS an op (a chore done): through the waist, then the page repaints

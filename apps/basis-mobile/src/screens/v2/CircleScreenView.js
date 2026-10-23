@@ -353,6 +353,15 @@ function OnboardingCards({ block, onAction, styles }) {
                 accessibilityLabel={t('circle.vandaag.onboarding_handle_title')} testID="onb-handle" />
               <OnbBtn labelKey="circle.vandaag.onboarding_handle_save" a={{ kind: 'set-handle', value: handle }} testID="onb-handle-save" />
             </View>
+          ) : c.id === 'key' ? (
+            // never the words themselves: the card says the key is not saved, and its "Toon" opens them
+            <View>
+              <Text style={styles.onbLine}>{t('circle.vandaag.onboarding_key_hint')}</Text>
+              <View style={styles.onbRow}>
+                <OnbBtn labelKey="circle.vandaag.onboarding_key_show" a={{ kind: 'key-show' }} testID="onb-key-show" />
+                <OnbBtn labelKey="circle.vandaag.onboarding_key_later" a={{ kind: 'key-later' }} quiet testID="onb-key-later" />
+              </View>
+            </View>
           ) : c.id === 'intro' ? (
             <View>
               {['onboarding_intro_1', 'onboarding_intro_2', 'onboarding_intro_3'].map((k) => <Text key={k} style={styles.onbLine}>{t(`circle.vandaag.${k}`)}</Text>)}

@@ -1563,6 +1563,22 @@
     "onboarding_begin_join": {
       "text": "I have an invitation",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_key_title": {
+      "text": "Save your key",
+      "doc": "Vandaag's key card: the recovery phrase is not saved on this device yet. Never shows the words."
+    },
+    "onboarding_key_hint": {
+      "text": "Your recovery phrase is not written down yet. Without it you cannot get back to your things if this device is lost. Open it somewhere nobody can look along.",
+      "doc": "Vandaag's key card: why, and where to open it."
+    },
+    "onboarding_key_show": {
+      "text": "Show",
+      "doc": "Vandaag's key card: the explicit step that opens the recovery words."
+    },
+    "onboarding_key_later": {
+      "text": "Later",
+      "doc": "Vandaag's key card: put the card away for a few days."
     }
   },
   "screens": {
@@ -6867,6 +6883,14 @@
     "connection_offer_incomplete": {
       "text": "This pairing code is incomplete.",
       "doc": "Refusal: key or nonce missing."
+    },
+    "mnemonic_written": {
+      "text": "Written down",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."
+    },
+    "mnemonic_later": {
+      "text": "Later",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: put the card away for a few days."
     }
   },
   "admin": {

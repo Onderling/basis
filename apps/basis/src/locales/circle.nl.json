@@ -1563,6 +1563,22 @@
     "onboarding_begin_join": {
       "text": "Ik heb een uitnodiging",
       "doc": "Vandaag's onboarding strip (three cards that go as each is done)."
+    },
+    "onboarding_key_title": {
+      "text": "Bewaar je sleutel",
+      "doc": "Vandaag's key card: the recovery phrase is not saved on this device yet. Never shows the words."
+    },
+    "onboarding_key_hint": {
+      "text": "Je herstelzin is nog niet opgeschreven. Zonder die zin kom je niet meer bij je dingen als dit apparaat kwijt is. Open hem waar niemand kan meekijken.",
+      "doc": "Vandaag's key card: why, and where to open it."
+    },
+    "onboarding_key_show": {
+      "text": "Toon",
+      "doc": "Vandaag's key card: the explicit step that opens the recovery words."
+    },
+    "onboarding_key_later": {
+      "text": "Later",
+      "doc": "Vandaag's key card: put the card away for a few days."
     }
   },
   "screens": {
@@ -6867,6 +6883,14 @@
     "connection_offer_incomplete": {
       "text": "Deze koppelcode is onvolledig.",
       "doc": "Refusal: sleutel of nonce ontbreekt."
+    },
+    "mnemonic_written": {
+      "text": "Opgeschreven",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: the words are saved; the card goes."
+    },
+    "mnemonic_later": {
+      "text": "Later",
+      "doc": "The recovery-phrase dialog opened from Vandaag's key card: put the card away for a few days."
     }
   },
   "admin": {

@@ -1,20 +1,11 @@
 /**
- * basis-mobile — first-run mnemonic CREATE screen.
+ * basis-mobile — the recovery-phrase screen.
  *
- * Shown ONCE on a fresh install after the agent identity has been
- * generated.  Surfaces the BIP39 phrase the vault holds + three CTAs:
- *   - "Written down"  → persist ack, dismiss
- *   - "Photo taken"   → persist ack, dismiss
- *   - "Later"         → dismiss WITHOUT persisting (a banner can nudge
- *                       on a future boot)
+ * Opened ONLY by Vandaag's key card ("Toon") — never by itself: the phrase is the owner root, and a phrase on screen in
+ * a café is a key handed to whoever looks. Three CTAs: "Written down" / "Photo taken" end the key card; "Later" puts
+ * it away for a while (the marks live in the shared onboardingFlags; the parent sets them).
  *
- * Pure presentation: parent owns the boot-side dance (read mnemonic
- * from agent.identity.getMnemonic(), persist via `markMnemonicAck`).
- * The screen itself doesn't touch storage — testable + reusable.
- *
- * Wiring into App.js (calling agent.identity.getMnemonic() after boot,
- * gating the welcome state) lands in; this slice ships the screen
- * file + helpers + tests so the rest of the flow can plug in.
+ * Pure presentation: the parent reads the phrase (`household.revealOwnerPhrase`) on the card's tap and owns the marks.
  */
 import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';

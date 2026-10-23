@@ -44,7 +44,6 @@ import {
 } from '@onderling-app/basis';
 import FirstRunWelcomeScreen from './src/screens/FirstRunWelcomeScreen.js';
 import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
-import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
 import { initLocalisation, subscribeLang, t } from './src/core/localisation.js';
 import { bootAgentBundle } from './src/core/agentBundle.js';
 import { bootMark } from '../basis/src/log/bootTimeline.js';
@@ -55,10 +54,6 @@ import {
   shouldShowFirstRunWelcome, markWelcomeDismissed,
 } from './src/core/firstRun.js';
 import { restoreFromMnemonic } from './src/core/restoreFromMnemonic.js';
-// first-run CREATE-side mnemonic display.
-import {
-  shouldShowCreateMnemonic, markMnemonicAck,
-} from './src/core/mnemonicCreate.js';
 import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
 import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/circleChatRehydrate.js';
@@ -135,14 +130,6 @@ export default function App() {
   // A phrase ceremony ran on this device and the restore-finish flow has not asked yet (web parity).
   const [restoreFinishPending, setRestoreFinishPending] = useState(false);
   const [bootError, setBootError] = useState(null);
-  // CREATE-side mnemonic display. States:
-  //  - 'pending'   — not probed yet (or skipped while bundle still booting).
-  //  - 'show'      — ack marker missing → render MnemonicCreateScreen with
-  //                  the agent's BIP39 phrase.
-  //  - 'dismissed' — user acknowledged (or restore-path already ack'd a
-  //                  different identity) → normal app render proceeds.
-  const [mnemonicState, setMnemonicState] = useState('pending');
-  const [mnemonic, setMnemonic] = useState('');
 
   // Shared EventLog: boot-time agent events + ChatScreen's inbound peer
   // events land in one log so /logs shows everything.
@@ -684,44 +671,6 @@ export default function App() {
             },
           }).catch(() => { /* logged inside */ });
         }
-        // probe whether we should display the CREATE-side
-        // mnemonic.  Skipped silently when the identity / mnemonic isn't
-        // available (e.g. restore-from-mnemonic path already acknowledged
-        // a different identity).  Any failure inside the probe falls
-        // through to 'dismissed' so the app boot never blocks.
-        try {
-          const show = await shouldShowCreateMnemonic(AsyncStorage);
-          if (!show) { setMnemonicState('dismissed'); return; }
-          // The OWNER ROOT's phrase — the one secret everything derives from — via the same skill the
-          // in-app "show my recovery phrase" screen uses.
-          //
-          // 2026-08-02: this used to read `b.agent.sa.agent.identity.getMnemonic()`, which is the CHAT
-          // identity. Its seed is `root.deriveAgentSeed('default')` — a CHILD of the root — so
-          // `getMnemonic()` re-encoded the child and the app showed 24 words that were NOT the recovery
-          // phrase. Writing them down and typing them back installed them as a brand-new root: a
-          // different person, at addresses nobody had ever seen.
-          // Same defensive read as CircleMyDataScreen, the consumer that already had this right — whose
-          // own comment records that it too once read the wrong seed ("was pinboard getMnemonicOnce").
-          let phrase = null;
-          try {
-            const res = await b.callSkill?.('household', 'revealOwnerPhrase', {});
-            if (res && !res.error) {
-              const w = res.mnemonic ?? res.phrase ?? res.words ?? '';
-              phrase = Array.isArray(w) ? w.join(' ') : String(w || '');
-            }
-          } catch { phrase = null; }
-          if (typeof phrase === 'string' && phrase.trim()) {
-            if (!cancelled) {
-              setMnemonic(phrase);
-              setMnemonicState('show');
-            }
-          } else {
-            setMnemonicState('dismissed');
-          }
-        } catch (probeErr) {
-          dlog.warn('mnemonic probe failed (App)', probeErr?.message ?? probeErr);
-          setMnemonicState('dismissed');
-        }
       } catch (err) {
         dlog.warn('boot failed (App)', err?.message ?? err);
         if (!cancelled) setBootError(err?.message ?? String(err));
@@ -745,29 +694,6 @@ export default function App() {
       <SafeAreaProvider>
         <StatusBar style="auto" />
         <MnemonicEntryScreen onSubmit={submitMnemonic} onCancel={cancelRestore} />
-      </SafeAreaProvider>
-    );
-  }
-
-  // show the CREATE-side mnemonic screen once after the
-  // identity has been seeded.  Renders ABOVE the normal app overlay so
-  // the user has to acknowledge (or pick "Later") before reaching the
-  // launcher.  The screen never reappears once "Written down" or
-  // "Photo taken" is tapped.
-  if (mnemonicState === 'show') {
-    const dismissMnemonic = async (kind) => {
-      try { await markMnemonicAck(AsyncStorage, kind); } catch { /* non-fatal */ }
-      setMnemonicState('dismissed');
-    };
-    return (
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <MnemonicCreateScreen
-          mnemonic={mnemonic}
-          onWritten={() => dismissMnemonic('written')}
-          onPhoto={() => dismissMnemonic('photo')}
-          onLater={() => dismissMnemonic('later')}
-        />
       </SafeAreaProvider>
     );
   }

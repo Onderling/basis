@@ -72,6 +72,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
     // different phrase — so a kept flag is a safety record making a false claim, and a redundant prompt is the
     // cheaper mistake.
     'cc.mnemonicAck',
+    'cc.keyCardSnoozedUntil',  // a "Later" on the key card belongs to the former key too
     'cc.contactNames',          // who the former self saw renamed
     'cc.contactSeenAt',
     'cc.circleSeenAt',          // when the former self last read a thread: kept, every thread opens already-read

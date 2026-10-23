@@ -12,7 +12,8 @@ import { InternalBus, InternalTransport } from '../../src/transport/InternalTran
 import { AgentIdentity } from '../../src/identity/AgentIdentity.js';
 import { RendezvousTransport } from '@onderling/transports';
 import { VaultMemory } from '@onderling/vault';
-import { createFakeRtcLib } from '../support/fakeRtc.js';
+import { createFakeRtcLib, securedSignalPair } from '../support/fakeRtc.js';
+import { Agent } from '../../src/Agent.js';
 
 // ── Reference adapter 1: InternalTransport ──────────────────────────────────
 describe('Transport port — InternalTransport (reference adapter)', () => {
@@ -86,19 +87,16 @@ dRdv('Transport port — RendezvousTransport (reference adapter)', () => {
 describe('Transport port — RendezvousTransport sender binding', () => {
   it('a DataChannel frame claiming another sender than the channel\'s peer is dropped', async () => {
     await assertSenderBindingConformance(async () => {
-      const bus = new InternalBus();
-      const [aId, bId, otherId] = await Promise.all([1, 2, 3].map(() => AgentIdentity.generate(new VaultMemory())));
-      const aSig = new InternalTransport(bus, aId.pubKey, { identity: aId });
-      const bSig = new InternalTransport(bus, bId.pubKey, { identity: bId });
-      await aSig.connect(); await bSig.connect();
+      const pair = await securedSignalPair({ Agent, AgentIdentity, InternalBus, InternalTransport, VaultMemory });
+      const other = await AgentIdentity.generate(new VaultMemory());
       const fake = createFakeRtcLib();
-      const a = new RendezvousTransport({ signalingTransport: aSig, identity: aId, rtcLib: fake });
-      const b = new RendezvousTransport({ signalingTransport: bSig, identity: bId, rtcLib: fake });
+      const a = new RendezvousTransport({ signalingTransport: pair.a.sig, identity: pair.a.identity, rtcLib: fake });
+      const b = new RendezvousTransport({ signalingTransport: pair.b.sig, identity: pair.b.identity, rtcLib: fake });
       await a.connect(); await b.connect();
-      await a.connectToPeer(bId.pubKey, 5_000);
+      await a.connectToPeer(pair.b.identity.pubKey, 5_000);
       return {
-        a, b, addrA: aId.pubKey, addrB: bId.pubKey, forgedAddr: otherId.pubKey,
-        async teardown() { await a.disconnect(); await b.disconnect(); await aSig.disconnect(); await bSig.disconnect(); },
+        a, b, addrA: pair.a.identity.pubKey, addrB: pair.b.identity.pubKey, forgedAddr: other.pubKey,
+        async teardown() { await a.disconnect(); await b.disconnect(); await pair.stop(); },
       };
     }, { label: 'RendezvousTransport', timeout: 8_000 });
   }, 30_000);

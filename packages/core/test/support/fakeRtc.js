@@ -51,3 +51,21 @@ export function createFakeRtcLib() {
     RTCIceCandidate: class { constructor(c) { Object.assign(this, c); } },
   };
 }
+
+/**
+ * Two SIGNING signalling transports on one bus — the shape production signalling has (a secured transport: every
+ * envelope sealed and signed, verified on arrival). Each is a kernel agent's own transport, the agents greeted, so
+ * a RendezvousTransport over it sees envelopes whose signer is verified. Unsigned signalling is refused.
+ */
+export async function securedSignalPair({ Agent, AgentIdentity, InternalBus, InternalTransport, VaultMemory }) {
+  const bus = new InternalBus();
+  const mk = async () => {
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const agent = new Agent({ identity, transport: new InternalTransport(bus, identity.pubKey, { identity }) });
+    await agent.start();
+    return { identity, agent, sig: agent.transport };
+  };
+  const a = await mk(); const b = await mk();
+  await a.agent.hello(b.agent.address);
+  return { bus, a, b, mk, async stop() { await a.agent.stop?.(); await b.agent.stop?.(); } };
+}

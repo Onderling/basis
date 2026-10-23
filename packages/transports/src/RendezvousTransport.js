@@ -54,7 +54,7 @@
  *   await rdv.connectToPeer(peerAddress);  // initiates WebRTC handshake
  *   await rdv._put(peerAddress, envelope); // send via DataChannel
  */
-import { Transport, createSenderBinding } from '@onderling/core';
+import { Transport, createSenderBinding, resolveSenderKey, carriedSenderCredential } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { parseUntrustedJson } from '@onderling/core';
 
@@ -221,10 +221,19 @@ export class RendezvousTransport extends Transport {
 
   async #onSignal(envelope) {
     const p    = envelope.payload ?? {};
-    // NOTE: the channel's peer is the offer's own `from` (the identity key), because the signalling transport's
-    // wire address can differ from it (NKN derives its address from the key). Binding that claim to the key that
-    // SIGNED the signalling envelope is a separate decision; frames on the channel are bound to this peer below.
-    const from = p.from ?? envelope._from;
+    // WHO is signalling is the key that SIGNED this envelope — verified by the signalling transport's security layer —
+    // and the offer's `from` must be exactly that key: it becomes the channel's peer, and every frame on the channel
+    // is bound to it. Not the envelope's `_from`: over NKN that is an address DERIVED from the key, so equality would
+    // refuse every honest offer. And never an unverified credential: a carrier with no security layer could carry
+    // any key in that field, so unsigned signalling is refused (fail closed; every production composition signals
+    // over a secured transport — `sa.enableSecureRendezvous`, the agent's `enableRendezvous`).
+    const verified = !!this.#sig?.securityLayer;
+    const signer = verified ? resolveSenderKey(carriedSenderCredential(envelope)) : null;
+    const from = p.from;
+    if (!signer || typeof from !== 'string' || from !== signer) {
+      this.#refuseSender(verified ? 'signal-from-not-signer' : 'signal-unsigned', envelope);
+      return;
+    }
 
     switch (p.type) {
 

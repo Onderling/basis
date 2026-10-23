@@ -3040,7 +3040,7 @@ A transport is "degraded" for a peer if markDegraded() was called and the
 `until` timestamp has not elapsed.  Degraded transports are ranked after
 all healthy transports.
 
-**Methods:** `record()` · `getBest()` · `markDegraded()` · `isDegraded()` · `getAll()` · `clear()`
+**Methods:** `record()` · `getBest()` · `markDegraded()` · `clearDegraded()` · `isDegraded()` · `getAll()` · `clear()`
 
 ## `src/routing/ReachabilityOracle.js`
 
@@ -3178,7 +3178,7 @@ priority order to pick the best transport; tierFor() additionally classifies the
 selection into 'direct' | 'mesh' | 'hop' reachability tiers, and routeLadder()
 exposes the full 'direct → mesh → hop → companion' rung ladder.
 
-**Methods:** `attachPeerGraph()` · `selectTransport()` · `onTransportFailure()` · `setPreferredTransport()` · `clearPreferredTransport()` · `getPreferredTransport()` · `addTransport()` · `removeTransport()` · `tierFor()` · `routeLadder()`
+**Methods:** `attachPeerGraph()` · `selectTransport()` · `onTransportFailure()` · `onTransportRecovered()` · `setPreferredTransport()` · `clearPreferredTransport()` · `getPreferredTransport()` · `addTransport()` · `removeTransport()` · `tierFor()` · `routeLadder()`
 
 ## `src/routing/invokeWithHop.js`
 

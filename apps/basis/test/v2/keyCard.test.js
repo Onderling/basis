@@ -2,8 +2,8 @@
  * THE RECOVERY PHRASE NEVER SHOWS BY ITSELF. It is the owner root: on screen in a café is a key handed to whoever
  * looks. The phone used to open the full phrase on every start until "Written down" was tapped ("Later" stored
  * nothing). Now a card on Vandaag says the key is not saved yet, and only its explicit "Toon" opens the words;
- * "Later" snoozes the card; "Opgeschreven" ends it. A returning person (a restored device: a handle and a circle —
- * they just typed the phrase) is not asked.
+ * "Later" snoozes the card; "Opgeschreven" ends it. It shows for EVERYONE whose phrase is not saved on this device —
+ * a person with a handle and circles loses the most if the device dies, and the card holds no words.
  */
 import { describe, it, expect } from 'vitest';
 import { onboardingCards, materializeOnboarding } from '../../src/v2/onboardingStrip.js';
@@ -12,10 +12,10 @@ import { createOnboardingFlags, KEY_SAVED_KEY, KEY_SNOOZED_UNTIL_KEY, keyCardPen
 const memIo = (init = {}) => { const m = new Map(Object.entries(init)); return { m, get: (k) => m.get(k) ?? null, set: (k, v) => { m.set(k, v); } }; };
 
 describe('the key card', () => {
-  it('comes first while the key is not saved, and is never shown to a returning person', () => {
+  it('comes first while the key is not saved — for everyone, a returning person included', () => {
     expect(onboardingCards({ handle: null, inCircle: false, introSeen: false, keyPending: true }).map((c) => c.id)).toEqual(['key', 'handle', 'intro', 'begin']);
     expect(onboardingCards({ handle: 'anna', inCircle: false, introSeen: true, keyPending: false }).map((c) => c.id)).toEqual(['begin']);
-    expect(onboardingCards({ handle: 'anna', inCircle: true, introSeen: false, keyPending: true })).toEqual([]);
+    expect(onboardingCards({ handle: 'anna', inCircle: true, introSeen: false, keyPending: true }).map((c) => c.id)).toEqual(['key']);
   });
 
   it('is pending until saved, and a snooze hides it until it runs out', async () => {

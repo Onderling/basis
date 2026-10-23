@@ -30,7 +30,7 @@ export function onboardingCards({ handle, inCircle, introSeen, keyPending = fals
   const hasHandle = typeof handle === 'string' && handle.trim() !== '';
   const returning = hasHandle && inCircle;
   return [
-    ...(keyPending && !returning ? [{ id: 'key' }] : []),
+    ...(keyPending ? [{ id: 'key' }] : []),
     ...(hasHandle ? [] : [{ id: 'handle' }]),
     ...(introSeen || returning ? [] : [{ id: 'intro' }]),
     ...(inCircle ? [] : [{ id: 'begin' }]),

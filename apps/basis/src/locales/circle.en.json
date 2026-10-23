@@ -7748,24 +7748,12 @@
   },
   "firstRun": {
     "title": {
-      "text": "Welcome to basis",
+      "text": "Welcome to Basis",
       "doc": "First-run welcome (5.9b→batch 6): screen title."
-    },
-    "lede": {
-      "text": "A neighbourhood chat that runs on your phone.  Your data stays local; you choose who sees what.",
-      "doc": "First-run lede."
-    },
-    "bullet_circles": {
-      "text": "Circles you control — invite by code or QR.",
-      "doc": "First-run bullet 1."
     },
     "bullet_items": {
       "text": "Tasks, posts, and notes scoped to each circle.",
       "doc": "First-run bullet 2."
-    },
-    "bullet_pod": {
-      "text": "Pod-backed sync when you sign in to a Solid pod.",
-      "doc": "First-run bullet 3."
     },
     "start": {
       "text": "Start",

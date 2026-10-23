@@ -138,5 +138,15 @@
       "text": "Bereikt de bredere stad. Grootste bereik, minst lokaal.",
       "doc": "N2.b — consequence note for a radio option."
     }
+  },
+  "revealPolicy": {
+    "pairwise": {
+      "text": "Een lid ziet je echte naam pas als jullie die met elkaar delen; tot dan je handle.",
+      "doc": "Consequence note for the create wizard's \"members see each other's names\" choice."
+    },
+    "open": {
+      "text": "Elk lid ziet de naam en kaart van alle andere leden, zonder dat iemand iets hoeft te doen.",
+      "doc": "Consequence note for the create wizard's \"members see each other's names\" choice."
+    }
   }
 }

@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderCreateGroupWizard } from '../../src/web/wizards/createGroupWizard.js';
 import {
   initialState, createSteps, nextCreateStep, prevCreateStep, setAdvanced, purposeOrDefault, withCreateDefaults, REVIEW_STEP,
+  setKind, setRevealPolicy, policyPatchFromState,
 } from '../../src/core/wizards/createGroupState.js';
 import { buildRulesObjectFromState } from '../../src/core/wizards/createGroupState.js';
 
@@ -33,6 +34,14 @@ describe('the path through the create wizard (shared)', () => {
     expect(purposeOrDefault(s, t)).toBe('T:circle.wizard.create.default_purpose_household');
     expect(purposeOrDefault({ ...s, purpose: '  Samen koken ' }, t)).toBe('Samen koken');
     expect(buildRulesObjectFromState(withCreateDefaults(s, t)).purpose).toBe('T:circle.wizard.create.default_purpose_household');
+  });
+  it('who sees whose name stays per pair: not widened by the household default, nor by a kind picked later — only by the choice', () => {
+    const s = initialState();
+    expect(s.revealPolicy).toBe('pairwise');
+    expect(policyPatchFromState(s).revealPolicy).toBe('pairwise');
+    expect(setKind(setKind(s, 'friends'), 'household').revealPolicy).toBe('pairwise');
+    expect(setRevealPolicy(s, 'open').revealPolicy).toBe('open');
+    expect(setRevealPolicy(s, 'everyone-ish').revealPolicy).toBe('pairwise');
   });
 });
 
@@ -69,6 +78,7 @@ describe('the web create wizard', () => {
     expect(r['circle.wizard.create.purpose']).toBe('circle.wizard.create.default_purpose_household');
     expect(r['circle.wizard.create.access']).toBeTruthy();
     expect(r['circle.wizard.create.review_conflict']).toBeTruthy();
+    expect(r['circle.wizard.create.reveal_label']).toBe('circle.wizard.create.reveal_pairwise');
     for (const [k, v] of Object.entries(r)) expect(v.trim(), k).not.toBe('');
     // what the short path never showed is not in its review
     expect(r['circle.wizard.create.review_storage']).toBeUndefined();

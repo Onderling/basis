@@ -138,5 +138,15 @@
       "text": "Reaches the wider city. Largest reach, least local.",
       "doc": "N2.b — consequence note for a radio option."
     }
+  },
+  "revealPolicy": {
+    "pairwise": {
+      "text": "A member sees your real name only once the two of you share it; until then, your handle.",
+      "doc": "Consequence note for the create wizard's \"members see each other's names\" choice."
+    },
+    "open": {
+      "text": "Every member sees every other member's name and card, without anyone having to do anything.",
+      "doc": "Consequence note for the create wizard's \"members see each other's names\" choice."
+    }
   }
 }

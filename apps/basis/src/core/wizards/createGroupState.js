@@ -306,8 +306,26 @@ export function policyPatchFromState(state) {
 /* ─── Initial state ─────────────────────────────────────────── */
 
 export function initialState() {
-  // a household by default (the short path asks no kind): the template fills the policy axes, as a pick would
-  return setKind(blankState(), 'household');
+  // a household by default (the short path asks no kind): its template fills what the circle can DO, as a pick would —
+  // but not who sees whose name. A create that never asked must not widen that: members see each other's names per
+  // pair until someone chooses "everyone" under Geavanceerd (`setRevealPolicy`) or in settings afterwards. Held as a
+  // touched axis, so no kind picked in the fold moves it either — only the reveal choice itself does.
+  return markAxisTouched({ ...setKind(blankState(), 'household'), revealPolicy: 'pairwise' }, 'revealPolicy');
+}
+
+/** Who sees whose name in the circle — the choice under Geavanceerd, worded for both shells and the review. */
+export const REVEAL_POLICIES = Object.freeze([
+  Object.freeze({ id: 'pairwise', labelKey: 'circle.wizard.create.reveal_pairwise' }),
+  Object.freeze({ id: 'open',     labelKey: 'circle.wizard.create.reveal_open' }),
+]);
+/** The person's reveal choice — marked as theirs, so a later kind pick does not move it. */
+export function setRevealPolicy(state, value) {
+  if (!REVEAL_POLICIES.some((p) => p.id === value)) return state;
+  return markAxisTouched({ ...state, revealPolicy: value }, 'revealPolicy');
+}
+/** The reveal policy in words ("per paar"), for the review — never empty. */
+export function revealPolicyLabelKey(state) {
+  return (REVEAL_POLICIES.find((p) => p.id === state?.revealPolicy) ?? REVEAL_POLICIES[0]).labelKey;
 }
 
 function blankState() {

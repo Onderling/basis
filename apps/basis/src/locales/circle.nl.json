@@ -8335,6 +8335,18 @@
       "advanced_hint": {
         "text": "Soort, doel, wie mag komen, afspraken en opslag. Dicht laten = de standaard.",
         "doc": "Line under the Advanced fold."
+      },
+      "reveal_label": {
+        "text": "Leden zien elkaars naam",
+        "doc": "Create wizard (under Advanced) and its review: the circle's reveal policy — whether members see each other's real names without an act."
+      },
+      "reveal_pairwise": {
+        "text": "per paar",
+        "doc": "Reveal policy pairwise: a name is shown once two members share it (the default)."
+      },
+      "reveal_open": {
+        "text": "iedereen",
+        "doc": "Reveal policy open: every member sees every other member's name and card."
       }
     },
     "settings": {

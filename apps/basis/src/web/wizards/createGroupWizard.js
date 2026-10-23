@@ -24,6 +24,7 @@ import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES,
   STORAGE_POLICIES, KEY_ROTATION_MODES,
   REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
+  REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
   initialState, slugify, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit,
   newOfferingRow, OFFERING_AXES,
@@ -250,6 +251,12 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
       { consequenceGroup: 'size' });
     appendChatAdvice(fold, doc, state, rerender);
   }
+
+  // who sees whose name: per pair unless chosen here — never widened by the kind
+  appendRadioField(fold, doc, t('circle.wizard.create.reveal_label'), state.revealPolicy,
+    REVEAL_POLICIES.map((p) => ({ id: p.id, label: t(p.labelKey) })),
+    (v) => { Object.assign(state, setRevealPolicy(state, v)); rerender(); },
+    { consequenceGroup: 'revealPolicy' });
 
   appendFounderPersona(fold, doc, state);
 
@@ -491,6 +498,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   appendReview(dl, doc, t('circle.wizard.create.access'),   labelOf(ACCESS_POLICIES, state.accessPolicy));
   appendReview(dl, doc, t('circle.wizard.create.leave'),    labelOf(LEAVE_POLICIES, state.leavePolicy));
   appendReview(dl, doc, t('circle.wizard.create.review_conflict'), labelOf(CONFLICT_POLICIES, state.conflictPolicy));
+  appendReview(dl, doc, t('circle.wizard.create.reveal_label'),    t(revealPolicyLabelKey(state)));
   // the rest only when the person opened "Geavanceerd" and so saw it
   if (state.advanced === true) {
     appendReview(dl, doc, t('circle.wizard.create.review_expiry'),   `${state.inviteExpiresInHours} h`);

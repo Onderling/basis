@@ -19,6 +19,7 @@ import {
   ACCESS_POLICIES, LEAVE_POLICIES, CONFLICT_POLICIES, STORAGE_POLICIES,
   KEY_ROTATION_MODES,
   REVIEW_STEP, nextCreateStep, prevCreateStep, createStepDots, setAdvanced, withCreateDefaults, purposeOrDefault,
+  REVEAL_POLICIES, setRevealPolicy, revealPolicyLabelKey,
   initialState, labelOf,
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl, withinMs, POLICY_WRITE_BOUND_MS,
   newOfferingRow, OFFERING_AXES,
@@ -228,6 +229,14 @@ export default function CreateGroupWizardModal({
                         />
                       </>
                     )}
+                    {/* who sees whose name: per pair unless chosen here — never widened by the kind */}
+                    <RadioGroup
+                      label={t('circle.wizard.create.reveal_label')}
+                      value={state.revealPolicy}
+                      options={attachConsequences('revealPolicy', REVEAL_POLICIES.map((p) => ({ id: p.id, label: t(p.labelKey) })), t)}
+                      onChange={(v) => setState((s) => setRevealPolicy(s, v))}
+                      consequenceLabel={t('common.consequences')}
+                    />
                     {state.personas.length > 0 && (
                       <>
                         <RadioGroup
@@ -450,6 +459,7 @@ export default function CreateGroupWizardModal({
                     { label: t('circle.wizard.create.access'),      value: labelOf(ACCESS_POLICIES, state.accessPolicy) },
                     { label: t('circle.wizard.create.leave'),       value: labelOf(LEAVE_POLICIES,  state.leavePolicy)  },
                     { label: t('circle.wizard.create.review_conflict'),    value: labelOf(CONFLICT_POLICIES, state.conflictPolicy) },
+                    { label: t('circle.wizard.create.reveal_label'),       value: t(revealPolicyLabelKey(state)) },
                     ...(state.advanced !== true ? [] : [
                     // 5.5a — surface each non-empty rules-doc field.
                     ...RULES_QUESTIONS.filter((q) => q.key !== 'purpose').flatMap((q) => {

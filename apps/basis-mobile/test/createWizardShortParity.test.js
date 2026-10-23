@@ -22,7 +22,7 @@ describe('the phone create wizard: the short path', () => {
   it('the kind, persona, purpose and tags sit behind the one fold', () => {
     const fold = src.indexOf('testID="create-group-advanced"');
     expect(fold).toBeGreaterThan(0);
-    for (const marker of ["label={t('circle.kindPicker')}", "label={t('circle.wizard.create.persona.label')}", "label={t('circle.wizard.create.purpose')}", "label={t('circle.wizard.create.tags')}"]) {
+    for (const marker of ["label={t('circle.kindPicker')}", "label={t('circle.wizard.create.reveal_label')}", "label={t('circle.wizard.create.persona.label')}", "label={t('circle.wizard.create.purpose')}", "label={t('circle.wizard.create.tags')}"]) {
       expect(src.indexOf(marker), marker).toBeGreaterThan(fold);
     }
     expect(src.indexOf('testID="create-group-name"')).toBeLessThan(fold);
@@ -30,6 +30,8 @@ describe('the phone create wizard: the short path', () => {
   it('the review names type and purpose; the create carries the defaults', () => {
     expect(src).toMatch(/review_kind'\),\s+value: t\(`circle\.kind\.\$\{state\.kind \?\? 'other'\}`\)/);
     expect(src).toMatch(/purpose'\),\s+value: purposeOrDefault\(state, t\)/);
+    expect(src).toMatch(/reveal_label'\),\s+value: t\(revealPolicyLabelKey\(state\)\)/);
+    expect(src).toMatch(/onChange=\{\(v\) => setState\(\(s\) => setRevealPolicy\(s, v\)\)\}/);
     expect(src).toMatch(/\.\.\.withCreateDefaults\(state, t\), submitting: true/);
   });
 });

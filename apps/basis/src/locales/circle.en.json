@@ -3542,6 +3542,14 @@
       "text": "You can see who is around; they cannot see you.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "not_chosen_title": {
+      "text": "Not visible yet",
+      "doc": "Visibility banner heading while no Nearby level is chosen yet: the device stays unlisted until the person chooses."
+    },
+    "not_chosen_body": {
+      "text": "Nobody here can see you until you choose what this room may see of you.",
+      "doc": "Second line of that banner."
+    },
     "radio_off_title": {
       "text": "Nearby is off",
       "doc": "Visibility banner heading while the persisted radio switch is off."

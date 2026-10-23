@@ -3921,12 +3921,15 @@ function showNearby() {
   // point: an empty room and "this device cannot find others" are different facts. When a browser transport
   // lands, it is these two lines that change and nothing else.
   const mesh = null;
+  // whether the room self chose a level: until it did, the device is never announced (read below, async)
+  let roomLevelSet = false;
   nearbyScreen = createNearbyScreen({
     ...(ensureNearbyRoom()?.screenDeps() ?? {}),
     // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
     getDrivers: () => (_nearbyIdentity ? _nearbyIdentity.getDrivers() : Promise.resolve({})),
     mySkills:   () => _nearbyIdentity?.mySkills() ?? [],
-    roomLevel:  () => (_nearbyIdentity ? _nearbyIdentity.level() : Promise.resolve('handle')),   // `none` sends no card
+    roomLevel:  () => (_nearbyIdentity ? _nearbyIdentity.level() : Promise.resolve('none')),   // `none` sends no card
+    levelChosen: () => roomLevelSet,
     allows:             readNearbyAllows(),   // per device, kept across opens
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
@@ -3952,6 +3955,8 @@ function showNearby() {
     const w = await _nearbyIdentity?.setLevel?.(v);
     if (!w?.ok) { notice = { key: 'level_not_set' }; draw(nearbyScreen.model()); return; }
     roomLevel = v;
+    roomLevelSet = true;
+    nearbyScreen.levelChanged();   // chosen now: announced, unless the person went quiet
     if (id) markAsked(id);   // a chosen level answers the first-use question too
     firstUse = null;
     // "Handle" with no handle set announces nothing and looks identical to "Nobody". The binding
@@ -3962,6 +3967,8 @@ function showNearby() {
   };
   const readRoomLevel = () => _nearbyIdentity?.levelState?.().then((st) => {
     roomLevel = st.level;
+    roomLevelSet = st.set === true;
+    nearbyScreen?.levelChanged();
     const id = roomSelfId();
     let asked = true;
     try { asked = id ? !!localStorage.getItem(`basis.${nearbyAskedKey(id)}`) : true; } catch { asked = true; }

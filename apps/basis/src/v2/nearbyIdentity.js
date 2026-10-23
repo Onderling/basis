@@ -37,7 +37,7 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
     },
     /** The room self's offerings, as the shared-skills line shows them (from the last `getDrivers`). */
     mySkills() { return offeringsNow; },
-    /** The room self's Nearby level (its disclosure under `nearby`; nothing set → `handle`). While the room asks: none. */
+    /** The room self's Nearby level (its disclosure under `nearby`; nothing set → `none`). While the room asks: none. */
     async level() { return (await this.levelState()).level; },
     /** The level and whether the self chose one (`set`) — the first-use question asks only when it did not. */
     async levelState() {
@@ -47,7 +47,7 @@ export function createNearbyIdentity({ callSkill, relayUrl = () => null, shareNk
       try {
         const disclosure = (await callSkill?.('agents', 'getProfileDisclosure', { id: self.id }))?.disclosure;
         return { level: nearbyLevelFrom(disclosure), set: nearbyLevelIsSet(disclosure) };
-      } catch { return { level: 'handle', set: false }; }
+      } catch { return { level: 'none', set: false }; }
     },
     /**
      * Set the room self's level — through the one writer (`setNearbyLevel`), for THAT self. While the room asks who

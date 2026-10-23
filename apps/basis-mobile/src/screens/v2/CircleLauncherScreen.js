@@ -5552,6 +5552,10 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   const [roomLevel, setRoomLevel] = useState(null);
   // the once-per-self-per-device question ("what may this room see of you?"), while it is open
   const [askLevel, setAskLevel] = useState(false);
+  // whether the room self chose a level — read by the screen's `levelChosen` port (sync), so kept in a ref;
+  // until it is true the device is never announced
+  const roomLevelSetRef = useRef(false);
+  const screenRef = useRef(null);
   // which self the level is for: null while the room still asks who enters
   const roomSelfId = useMemo(() => { const s = roomSelfFor(roomR, heldSelves); return s?.asking ? null : (s?.id ?? null); }, [roomR, heldSelves]);
   useEffect(() => {
@@ -5560,6 +5564,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
       const st = (await bundle?.nearbyIdentity?.levelState?.()) ?? null;
       if (!live || !st) return;
       setRoomLevel(st.level);
+      roomLevelSetRef.current = st.set === true;
+      screenRef.current?.levelChanged?.();
       const asked = roomSelfId ? await readNearbyAsked(roomSelfId) : true;
       const fu = nearbyFirstUse({ self: roomSelfId ? { id: roomSelfId } : { asking: true }, asked, levelSet: st.set });
       if (fu.mark) markNearbyAsked(roomSelfId);
@@ -5571,6 +5577,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     const w = await bundle?.nearbyIdentity?.setLevel?.(v);
     if (!w?.ok) { setNotice({ key: 'level_not_set' }); return; }
     setRoomLevel(v);
+    roomLevelSetRef.current = true;
+    screenRef.current?.levelChanged?.();   // chosen now: announced, unless the person went quiet
     if (roomSelfId) markNearbyAsked(roomSelfId);   // a chosen level answers the first-use question too
     setAskLevel(false);
     // Same as web: a face that resolves to nothing is announced as a retraction, and the person is
@@ -5594,7 +5602,8 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     // an ask is weighed against THE ROOM SELF's drivers (on this device, never sent); the shared-skills line shows its offerings
     getDrivers:         () => (bundle?.nearbyIdentity ? bundle.nearbyIdentity.getDrivers() : Promise.resolve({})),
     mySkills:           () => bundle?.nearbyIdentity?.mySkills?.() ?? [],
-    roomLevel:          () => (bundle?.nearbyIdentity ? bundle.nearbyIdentity.level() : Promise.resolve('handle')),   // `none` sends no card
+    roomLevel:          () => (bundle?.nearbyIdentity ? bundle.nearbyIdentity.level() : Promise.resolve('none')),   // `none` sends no card
+    levelChosen:        () => roomLevelSetRef.current,
     t,
     // Only what this host can actually carry out today. `request-join` needs the ask/invite exchange
     // (Nearby steps F + H) and is deliberately NOT offered until it works.
@@ -5602,6 +5611,7 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   }), [bundle]);
 
+  screenRef.current = screen;
   useEffect(() => {
     const off = screen.subscribe(setModel);
     screen.open();

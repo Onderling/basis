@@ -3542,6 +3542,14 @@
       "text": "Jij ziet wie er is; zij zien jou niet.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "not_chosen_title": {
+      "text": "Nog niet zichtbaar",
+      "doc": "Visibility banner heading while no Nearby level is chosen yet: the device stays unlisted until the person chooses."
+    },
+    "not_chosen_body": {
+      "text": "Niemand hier ziet je tot je kiest wat deze ruimte van je mag zien.",
+      "doc": "Second line of that banner."
+    },
     "radio_off_title": {
       "text": "Nearby staat uit",
       "doc": "Visibility banner heading while the persisted radio switch is off."

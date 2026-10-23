@@ -86,18 +86,23 @@ export function createRegistry() {
       );
     }
 
-    let compiled;
+    // A meta-schema check only: a malformed schema still fails here, but the compile — the expensive part, ~1.4 s
+    // for the canonical set on a phone — waits for the type's first validate (see `_validatorFor`).
+    let wellFormed;
     try {
-      compiled = ajv.compile(schema);
+      wellFormed = ajv.validateSchema(schema);
     } catch (err) {
+      wellFormed = false;
+      ajv.errors = [{ message: err?.message ?? String(err) }];
+    }
+    if (!wellFormed) {
       throw Object.assign(
-        new Error(`registerType: schema for "${name}" failed to compile: ${err?.message ?? err}`),
-        { code: 'INVALID_SCHEMA', cause: err },
+        new Error(`registerType: schema for "${name}" failed to compile: ${ajv.errorsText(ajv.errors)}`),
+        { code: 'INVALID_SCHEMA', cause: ajv.errors },
       );
     }
 
     types.set(name, { schema, iri: schema.iri ?? null });
-    validators.set(name, compiled);
 
     if (Array.isArray(opts.aliases)) {
       for (const alias of opts.aliases) {
@@ -106,6 +111,24 @@ export function createRegistry() {
         }
       }
     }
+  }
+
+  /**
+   * The compiled validator for a canonical type, compiled on first use. A schema that passed the meta check but
+   * cannot compile (an unresolvable `$ref`, say) yields a validator that always fails and says why — never one
+   * that passes.
+   */
+  function _validatorFor(canonical) {
+    let v = validators.get(canonical);
+    if (v) return v;
+    try {
+      v = ajv.compile(types.get(canonical).schema);
+    } catch (err) {
+      const errors = [{ instancePath: '', message: `schema for "${canonical}" failed to compile: ${err?.message ?? err}` }];
+      v = Object.assign(() => false, { errors });
+    }
+    validators.set(canonical, v);
+    return v;
   }
 
   /**
@@ -136,7 +159,7 @@ export function createRegistry() {
       return { ok: false, errors: [{ instancePath: '/type', message: `unknown type: "${item.type}"` }] };
     }
 
-    const v = validators.get(canonical);
+    const v = _validatorFor(canonical);
     // Validate against the canonical schema. If the item came in
     // under an alias name, we don't rewrite item.type — the schema's
     // `type` const allows the canonical value, and aliases are a
@@ -180,6 +203,11 @@ export function createRegistry() {
     return Object.fromEntries(aliases);
   }
 
+  /** Test-only: how many validators have been compiled so far. */
+  function _compiledCount() {
+    return validators.size;
+  }
+
   /** Test-only: clear the registry. */
   function _clear() {
     types.clear();
@@ -194,6 +222,7 @@ export function createRegistry() {
     metadata,
     list,
     listAliases,
+    _compiledCount,
     _clear,
   };
 }

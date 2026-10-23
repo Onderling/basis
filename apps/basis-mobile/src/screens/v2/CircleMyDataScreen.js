@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -374,7 +375,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const usage = Object.entries(metrics || {});
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }]} testID="circle-mydata">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-mydata">
       <View style={styles.header}>
         {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
         <Text style={styles.title}>{t('circle.mydata.title')}</Text>

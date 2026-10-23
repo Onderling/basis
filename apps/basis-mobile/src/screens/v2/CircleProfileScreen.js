@@ -15,6 +15,7 @@ import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js'
 import { basisManifest } from '../../../../basis/src/index.js';
 import { mijScreenBlocks } from '../../../../basis/src/v2/mijScreen.js';
 import { useTheme } from './themeContext.js';
+import { FAB_CLEARANCE } from './fab.js';
 import CircleScreenView from './CircleScreenView.js';
 
 /**
@@ -63,7 +64,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
 
   return (
     <View style={styles.wrap}>
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID="circle-profile">
+    <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, { paddingBottom: FAB_CLEARANCE }]} testID="circle-profile">
       {/* while the blocks load: the page's own title, so Me is never untitled */}
       {hasName ? null : <Text style={styles.title}>{t('circle.profile.title')}</Text>}
 

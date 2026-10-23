@@ -7,11 +7,12 @@
  * of "compatible with the @onderling SDK". See docs/conventions/ports.md.
  */
 import { describe, it } from 'vitest';
-import { assertTransportConformance } from '@onderling/core/conformance';
+import { assertTransportConformance, assertSenderBindingConformance } from '@onderling/core/conformance';
 import { InternalBus, InternalTransport } from '../../src/transport/InternalTransport.js';
 import { AgentIdentity } from '../../src/identity/AgentIdentity.js';
 import { RendezvousTransport } from '@onderling/transports';
 import { VaultMemory } from '@onderling/vault';
+import { createFakeRtcLib } from '../support/fakeRtc.js';
 
 // ── Reference adapter 1: InternalTransport ──────────────────────────────────
 describe('Transport port — InternalTransport (reference adapter)', () => {
@@ -74,6 +75,30 @@ dRdv('Transport port — RendezvousTransport (reference adapter)', () => {
           await a.disconnect(); await b.disconnect();
           await aSig.disconnect(); await bSig.disconnect();
         },
+      };
+    }, { label: 'RendezvousTransport', timeout: 8_000 });
+  }, 30_000);
+});
+
+// The sender-binding case: a frame on the DataChannel claiming another address than the channel's peer is dropped.
+// Run over a fake WebRTC library (test/support/fakeRtc.js), so it RUNS here and on CI instead of skipping with the
+// native polyfill: the case is about what the transport does with frames on an open channel, which the fake carries.
+describe('Transport port — RendezvousTransport sender binding', () => {
+  it('a DataChannel frame claiming another sender than the channel\'s peer is dropped', async () => {
+    await assertSenderBindingConformance(async () => {
+      const bus = new InternalBus();
+      const [aId, bId, otherId] = await Promise.all([1, 2, 3].map(() => AgentIdentity.generate(new VaultMemory())));
+      const aSig = new InternalTransport(bus, aId.pubKey, { identity: aId });
+      const bSig = new InternalTransport(bus, bId.pubKey, { identity: bId });
+      await aSig.connect(); await bSig.connect();
+      const fake = createFakeRtcLib();
+      const a = new RendezvousTransport({ signalingTransport: aSig, identity: aId, rtcLib: fake });
+      const b = new RendezvousTransport({ signalingTransport: bSig, identity: bId, rtcLib: fake });
+      await a.connect(); await b.connect();
+      await a.connectToPeer(bId.pubKey, 5_000);
+      return {
+        a, b, addrA: aId.pubKey, addrB: bId.pubKey, forgedAddr: otherId.pubKey,
+        async teardown() { await a.disconnect(); await b.disconnect(); await aSig.disconnect(); await bSig.disconnect(); },
       };
     }, { label: 'RendezvousTransport', timeout: 8_000 });
   }, 30_000);

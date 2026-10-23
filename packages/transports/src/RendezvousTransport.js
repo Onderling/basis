@@ -54,7 +54,7 @@
  *   await rdv.connectToPeer(peerAddress);  // initiates WebRTC handshake
  *   await rdv._put(peerAddress, envelope); // send via DataChannel
  */
-import { Transport } from '@onderling/core';
+import { Transport, createSenderBinding } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { parseUntrustedJson } from '@onderling/core';
 
@@ -94,6 +94,26 @@ export class RendezvousTransport extends Transport {
     this.#pending = new Map();
 
     this._iceServers = iceServers;
+    // THE SENDER IS THE CHANNEL'S PEER. A DataChannel is opened to one peer, named by the authenticated signalling
+    // envelope (`envelope._from`, bound by the signalling transport — the relay's key-proof). A frame on it claiming
+    // any other `_from` is dropped. Fails closed: a channel with no known peer refuses (never `null`, which the kernel
+    // would let through with a warning).
+    this.#checkSender = createSenderBinding({
+      transportName:       'RendezvousTransport',
+      authenticatedSender: (peerAddress) => (typeof peerAddress === 'string' && peerAddress ? peerAddress : { refuse: 'channel-without-peer' }),
+      onUnauthenticated:   (message) => this.emit('warn', message),
+    });
+  }
+
+  #checkSender;
+  #refusedSenders = 0;
+  /** Frames (and signalling) dropped because their claimed sender was not the one the channel/envelope proved. */
+  get refusedSenders() { return this.#refusedSenders; }
+
+  #refuseSender(reason, envelope) {
+    this.#refusedSenders += 1;
+    const err = Object.assign(new Error(`RendezvousTransport: dropped a frame whose sender is not the channel's peer (${reason})`), { code: 'SENDER_MISMATCH' });
+    this.emit('security-error', err, envelope);
   }
 
   /**
@@ -201,6 +221,9 @@ export class RendezvousTransport extends Transport {
 
   async #onSignal(envelope) {
     const p    = envelope.payload ?? {};
+    // NOTE: the channel's peer is the offer's own `from` (the identity key), because the signalling transport's
+    // wire address can differ from it (NKN derives its address from the key). Binding that claim to the key that
+    // SIGNED the signalling envelope is a separate decision; frames on the channel are bound to this peer below.
     const from = p.from ?? envelope._from;
 
     switch (p.type) {
@@ -287,6 +310,8 @@ export class RendezvousTransport extends Transport {
     dc.onmessage = ({ data }) => {
       let env;
       try { env = parseUntrustedJson(data); } catch (err) { this._frameRefused(err); return; }
+      const verdict = this.#checkSender(peerAddress, env);
+      if (!verdict.ok) { this.#refuseSender(verdict.reason, env); return; }
       try { this._receive(env); } catch { /* a receive that throws must not take the channel down */ }
     };
     dc.onclose = () => {

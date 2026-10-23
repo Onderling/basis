@@ -233,16 +233,25 @@ async function restoreOrGenerate(vault) {
  * An in-process agent's key must never be the owner root's or the chat identity's. Until 2026-10-23 the restore
  * wizard wrote the phrase's own bytes — the root secret — as the pinboard agent's seed; a device restored that way
  * carries it still. Such a vault gets a fresh seed before its agent starts (its stableId re-derives from the new
- * seed). Counts into `healed`; the caller says it once, with no key in the line.
+ * seed). Counts into `healed`; the caller says it once, with no key in the line. A vault checked once is marked, so
+ * a relaunch reads one small value instead of deriving its key a second time.
+ *
+ * The mark is sound ONLY because nothing writes a root- or chat-derived seed into an in-process agent's vault any
+ * more: the one path that did (pinboard's phrase restore) is deleted. A new path that writes such a seed must clear
+ * this mark — or the check will not run again on a marked vault.
  */
+const IN_PROCESS_KEY_CHECKED = 'in-process-key-checked';
 async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {
   try {
-    if (!(await vault.has('agent-privkey'))) return;
-    const existing = await AgentIdentity.restore(vault);
-    if (!forbiddenPubKeys.has(existing.pubKey)) return;
-    await vault.delete?.('agent-stable-id');
-    await AgentIdentity.generate(vault);
-    healed.n += 1;
+    if ((await vault.get(IN_PROCESS_KEY_CHECKED)) === '1') return;
+    // An empty vault is about to get a freshly generated key, which is never the root's or the chat's.
+    const existing = (await vault.has('agent-privkey')) ? await AgentIdentity.restore(vault) : null;
+    if (existing && forbiddenPubKeys.has(existing.pubKey)) {
+      await vault.delete?.('agent-stable-id');
+      await AgentIdentity.generate(vault);
+      healed.n += 1;
+    }
+    await vault.set(IN_PROCESS_KEY_CHECKED, '1');
   } catch { /* an unreadable vault is restoreOrGenerate's case, not this one */ }
 }
 
@@ -884,6 +893,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       return seed ? await AgentIdentity.fromSeed(seed, new VaultMemory()) : null;
     } catch (err) { console.warn(`[recovery-seal] not loaded: ${err?.message ?? err}`); return null; }
   })();
+  // The settings seal strategy over that identity, built once: each build re-ran the identity's ed2curve conversion.
+  let recoverySealStrategyBuilt = false;
+  let recoverySealStrategyValue = null;
+  const recoverySealStrategy = () => {
+    if (!recoverySealStrategyBuilt) {
+      recoverySealStrategyValue = settingsSealStrategyForIdentity(recoverySealIdentity);
+      recoverySealStrategyBuilt = true;
+    }
+    return recoverySealStrategyValue;
+  };
   // A household bot's circle id is its own, derived from its key (`tasksCircleId` is then a function of it). Its rows
   // from before (under the bare `household` id) move there ONCE, beneath the store: item ids unchanged, nothing fanned;
   // a second boot finds the circle holding rows and moves nothing.
@@ -951,7 +970,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // identical on every device of the user whichever personas it holds → settings sealed here open on the user's
       // other devices. The shell supplies the pod (fetch/podRoot); realAgent supplies the key. No key material
       // escapes — only the `{seal, open}` closures. No seal on this device yet → no pod sync, stays local.
-      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      const strategy = recoverySealStrategy();
       const medium   = strategy ? await opts.provisionSettingsMedium(strategy) : null;
       settingsRestoreCtx.medium = medium;
       if (medium) {
@@ -1401,7 +1420,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   let registryCarrierStatus = () => ({ mode: 'local', probe: null });
   const registryPseudoPod = await (async () => {
     try {
-      const strategy = typeof opts.provisionRegistryMedium === 'function' ? settingsSealStrategyForIdentity(recoverySealIdentity) : null;
+      const strategy = typeof opts.provisionRegistryMedium === 'function' ? recoverySealStrategy() : null;
       const medium   = strategy ? await opts.provisionRegistryMedium(strategy) : null;
       const carrier  = createRegistryCarrier({
         // Sealed at rest: the registry holds who this device belongs to — the person's curated
@@ -2270,7 +2289,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   /** The own lanes this device rides: its default's and each persona's it runs. */
   const ownLanes = () => [...personas.keys()].map(ownLaneOf);
-  const ownSeal = settingsSealStrategyForIdentity(recoverySealIdentity);
+  const ownSeal = recoverySealStrategy();
   function wireOwnLane() {
     if (ownLaneWired || !ownStoreNow || !taskEmit) return;
     ownLaneWired = true;
@@ -3899,7 +3918,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * phrase refuses as `not-your-file`; anything that is not a recovery file as `unreadable-file`. */
   hostAgent.register('exportRecoveryFile', async ({ parts }) => {
     try {
-      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      const strategy = recoverySealStrategy();
       if (!strategy) return [DataPart({ ok: false, error: 'no-recovery-seal' })];
       if (!agentsRegistryRef?.reload) return [DataPart({ ok: false, error: 'no-registry' })];
       const { body } = await agentsRegistryRef.reload();
@@ -3962,7 +3981,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   const importRecoveryFileText = async (file) => {
     if (!String(file ?? '').trim()) return { ok: false, error: 'unreadable-file' };
-    const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+    const strategy = recoverySealStrategy();
     if (!strategy) return { ok: false, error: 'no-recovery-seal' };
     if (!agentsRegistryRef?.register) return { ok: false, error: 'no-registry' };
     let body;
@@ -7627,7 +7646,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (historyMirror) return;   // already following
       try {
-        const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+        const strategy = recoverySealStrategy();
         const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
         if (!source) return;
         // INSTANT RESTORE (the ladder): a fresh install's log is empty — hydrate the mirror back
@@ -7791,7 +7810,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      *  the same seal; `archiveSource` + `hydrateHistory` open it again on any future install. */
     exportHistoryArchive: async () => {
       if (!opts.deviceLog) throw new Error('no device log on this composition');
-      const strategy = settingsSealStrategyForIdentity(recoverySealIdentity);
+      const strategy = recoverySealStrategy();
       if (!strategy) throw new Error('no-recovery-seal');
       return exportHistoryArchive({
         eventLog: opts.deviceLog,

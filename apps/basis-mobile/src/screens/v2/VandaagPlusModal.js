@@ -22,8 +22,6 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   selves = [], writeAsSelf = null,
   // the line named something that lives in a circle: the sheet opens it there (`onOpenCircle(id)`), never acts on it
   onOpenCircle = null,
-  // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section
-  meActions = [], onMeAction = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // Vastgezet: the pins to paint (each with `label` and `key`); `onOpenPin(pin)` → `{actId}` (an own act), a line (why
@@ -79,8 +77,12 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
           {sectionsOf('plusSheet').map((d) => {
             const piece = {
               'plus-line': () => (!edit && onRead && !(selves.length > 1 && !asSelf) ? (
-            <TextInput style={styles.input} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1}
-              placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TextInput style={[styles.input, { flex: 1 }]} value={line} onChangeText={setLine} onSubmitEditing={read} returnKeyType="go" numberOfLines={1}
+                placeholder={t('circle.vandaag.plus_line_ph')} accessibilityLabel={t('circle.vandaag.plus_line_ph')} testID="vandaag-plus-line" />
+              {/* Enter reads it, and so does this (a phone keyboard's Enter is not where a person looks) */}
+              <Btn variant="primary" onPress={read} testID="vandaag-plus-read" label={t('circle.vandaag.plus_line_read')} />
+            </View>
           ) : null),
               'plus-own': () => (selves.length > 1 && !asSelf ? (
             <View>
@@ -140,10 +142,6 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
                   ) : null}
                 </View>
               )) : null),
-              // the Me actions — on a fresh sheet only (not while an own row is being changed, nor before the self is picked)
-              'plus-me': () => (!edit && !act && !(selves.length > 1 && !asSelf) && meActions.length ? meActions.map((m) => (
-                <Btn key={m.id} label={t(m.labelKey)} onPress={() => onMeAction?.(m.id)} testID={`vandaag-plus-me-${m.id}`} style={styles.btnAt} />
-              )) : null),
             }[d.id]?.();
             if (!piece) return null;
             return (
@@ -158,7 +156,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
               onPress={() => onOpenCircle?.(r.circleId)} testID={`vandaag-plus-referral-${r.circleId}`} style={styles.btnAt} />
           )) : null}
           {error ? <Text style={styles.error} testID="vandaag-plus-error">{error}</Text> : null}
-          <Btn onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
+          {/* the way out, not one of the acts */}
+          <Btn variant="ghost" onPress={onClose} testID="vandaag-plus-close" label={t('circle.vandaag.done')} style={styles.btnAt} />
         </View>
       </View>
     </Modal>

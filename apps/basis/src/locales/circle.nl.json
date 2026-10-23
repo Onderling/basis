@@ -1425,16 +1425,12 @@
       "doc": "The \"+\" sheet's button that takes an own note/appointment away."
     },
     "plus_line_ph": {
-      "text": "Zeg wat je wilt — \"notitie: melk\", \"afspraak morgen 14:00 tandarts\"",
+      "text": "Zeg wat je wilt — \"notitie: melk\"",
       "doc": "The free line at the top of the \"+\" sheet: placeholder with two examples of what can be typed."
     },
     "plus_referral": {
       "text": "Dat is iets voor {{name}} → openen",
       "doc": "The \"+\" line named something that lives in a circle: a chip that OPENS that circle (never acts there from the own sheet)."
-    },
-    "plus_me_title": {
-      "text": "Van jou",
-      "doc": "The \"+\" sheet: the heading over the Me actions (share my card, scan)."
     },
     "pin_to_plus": {
       "text": "Vastzetten in +",
@@ -1445,7 +1441,7 @@
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "pin": {
-      "text": "Vastzetten",
+      "text": "Vastpinnen",
       "doc": "The \"+\" sheet's Vastgezet: pinned own acts and bookmarks (a bookmark opens its circle with that op, never runs it)."
     },
     "unpin": {
@@ -1579,6 +1575,10 @@
     "onboarding_key_later": {
       "text": "Later",
       "doc": "Vandaag's key card: put the card away for a few days."
+    },
+    "plus_line_read": {
+      "text": "Lees",
+      "doc": "The \"+\" sheet: the button beside the free line that reads it (Enter does the same)."
     }
   },
   "screens": {

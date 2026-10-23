@@ -15,8 +15,6 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   selves = null, asSelf = null, onPickSelf,
   // the line named something that lives in a circle: where it lives (`[{circleId, name}]`) — opened, never acted on
   referral = null, onOpenCircle,
-  // the Me actions (the manifest's `meActions`: share my card, scan) — the sheet's own section, one tap from any tab
-  meActions = [], onMeAction,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
   // Vastgezet: the pins to paint (`paintablePins`, each with its `label` and `key`); a tap → `onOpenPin(pin)`, × →
@@ -66,6 +64,12 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       li.placeholder = tr('circle.vandaag.plus_line_ph');
       li.setAttribute('aria-label', tr('circle.vandaag.plus_line_ph'));
       lf.appendChild(li);
+      // Enter reads it, and so does the button beside it (a phone keyboard's Enter is not where a person looks)
+      const go = document.createElement('button');
+      go.type = 'submit';
+      go.className = 'cc-btn cc-btn--primary circle-vandaag-plus__read';
+      go.textContent = tr('circle.vandaag.plus_line_read');
+      lf.appendChild(go);
       lf.addEventListener('submit', (e) => { e.preventDefault(); onRead(li.value); });
       sec['plus-line'].appendChild(lf);
     }
@@ -74,13 +78,16 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
     /* the self is asked first */
   } else if (!act) {
     for (const a of acts) {
+      // one row per act: the act, and its ☆ inside the row
+      const row = document.createElement('span');
+      row.className = 'circle-vandaag-plus__act-row';
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__act';
       b.dataset.act = a.id;
       b.textContent = plusLabel(tr, a);
       b.addEventListener('click', () => onPick?.(a.id));
-      sec['plus-own'].appendChild(b);
+      row.appendChild(b);
       if (typeof onTogglePin === 'function') {
         const on = pinnedActIds.includes(a.id);
         const star = document.createElement('button');
@@ -91,8 +98,9 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
         star.textContent = on ? '★' : '☆';
         star.setAttribute('aria-label', tr(on ? 'circle.vandaag.unpin' : 'circle.vandaag.pin'));
         star.addEventListener('click', () => onTogglePin(a.id));
-        sec['plus-own'].appendChild(star);
+        row.appendChild(star);
       }
+      sec['plus-own'].appendChild(row);
     }
   } else {
     const form = document.createElement('form');
@@ -179,18 +187,6 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
       sec['plus-pinned'].appendChild(row);
     }
   }
-  // the Me actions — on a fresh sheet only (not while an own row is being changed, nor before the self is picked)
-  if (!editing && !asking && !act) {
-    for (const m of Array.isArray(meActions) ? meActions : []) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__me';
-      b.dataset.me = m.id;
-      b.textContent = tr(m.labelKey);
-      b.addEventListener('click', () => onMeAction?.(m.id));
-      sec['plus-me'].appendChild(b);
-    }
-  }
   // a section with nothing in it is not shown (its heading over nothing would be noise)
   for (const el of Object.values(sec)) if (!el.querySelector('button, form, input')) el.hidden = true;
   if (Array.isArray(referral) && referral.length) {
@@ -215,7 +211,7 @@ export function renderVandaagPlus(container, { t, actId = null, values = {}, lin
   }
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'cc-btn cc-btn--quiet circle-vandaag-plus__close';
+  close.className = 'cc-btn cc-btn--ghost circle-vandaag-plus__close';   // the way out, not one of the acts
   close.textContent = tr('circle.vandaag.done');
   close.addEventListener('click', () => onClose?.());
   container.appendChild(close);

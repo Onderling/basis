@@ -116,14 +116,24 @@ test('a Vandaag row is a card with ONE button — the action its noun declares',
   expect(errs).toEqual([]);
 });
 
-test('the "+" is on every tab — its sheet holds the own acts and the Me actions', async ({ page }) => {
+test('the "+" is on every tab — its sheet makes things; Share my card and Scan live on Mij', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   await page.locator('[data-tab="circles"]').first().click();
   await expect(page.locator('.cc-fab'), 'the floating "+" on the Circles tab').toHaveCount(1);
   await page.locator('.cc-fab').click();
   await expect(page.locator('[data-section="plus-own"] .circle-vandaag-plus__act').first()).toBeVisible();
-  await expect(page.locator('[data-section="plus-me"] .circle-vandaag-plus__me[data-me="share-contact"]')).toBeVisible();
+  await expect(page.locator('[data-section="plus-me"]'), 'no Me actions in the "+"').toHaveCount(0);
+  await expect(page.locator('.circle-vandaag-plus__read'), 'a button reads the free line').toBeVisible();
+});
+
+test('the free line: its button reads it, as Enter does', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  await page.locator('.cc-fab').click();
+  await page.locator('.circle-vandaag-plus__line').fill('notitie: melk halen');
+  await page.locator('.circle-vandaag-plus__read').click();
+  await expect(page.locator('.circle-vandaag-plus__form[data-act="household.note"]'), 'the line picked the note').toBeVisible({ timeout: 10_000 });
 });
 
 test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circle', async ({ page }) => {

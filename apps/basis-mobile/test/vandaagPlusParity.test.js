@@ -29,3 +29,13 @@ describe('Vandaag "+" — parity', () => {
     expect(code(read('../src/screens/v2/CircleScreenView.js')).match(/whereTag\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('Vandaag "+" — the sheet makes things (web twin: test/vandaagPlusSheet.dom.test.js)', () => {
+  const sheet = code(read('../src/screens/v2/VandaagPlusModal.js'));
+  it('a button beside the free line reads it; Klaar is the ghost way out; no Me actions in the sheet', () => {
+    expect(sheet).toMatch(/testID="vandaag-plus-read"/);
+    expect(sheet).toMatch(/variant="ghost" onPress=\{onClose\}/);
+    expect(sheet).not.toMatch(/meActions|onMeAction|'plus-me'/);
+    expect(code(read('../src/screens/v2/CircleLauncherScreen.js'))).not.toMatch(/meActions=\{/);
+  });
+});

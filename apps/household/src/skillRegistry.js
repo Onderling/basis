@@ -30,9 +30,6 @@ export const HOUSEHOLD_SKILL_REGISTRY = Object.freeze({
   markComplete:        Skills.markComplete,
   removeItem:          Skills.removeItem,
   // 
-  listTasks:           Skills.listTasks,
-  claim:               Skills.claim,
-  reassign:            Skills.reassign,
   registerName:        Skills.registerName,
   // basis /brief contributor; declared by listOpen's
   // surfaces.chat.brief.summarySkill in manifest.js.

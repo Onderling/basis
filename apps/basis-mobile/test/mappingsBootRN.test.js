@@ -30,8 +30,10 @@ describe('bootAgentBundle — extension mappings (mobile P2)', () => {
     const store = asyncStorageMappingsStore(fakeAsyncStorage());
     // pick a real base op to compose onto (whatever the mock catalogue exposes)
     const base = await bootAgentBundle({ skillStub: stub });
-    const someOp = [...base.catalogue.opsById.keys()][0];
-    const [appOrigin, opId] = someOp.includes('/') ? someOp.split('/') : ['household', someOp];
+    const [someOp, entry] = [...base.catalogue.opsById.entries()][0];
+    // the op's own app and id (the catalogue key is prefixed only on a collision)
+    const appOrigin = entry.appOrigin;
+    const opId = entry.op?.id ?? (someOp.includes('/') ? someOp.split('/')[1] : someOp);
 
     await put(store, { id: 'ext-demo', scope: 'app',
       ops: [{ id: 'extOp', verb: 'submit', steps: [{ appOrigin, opId }] }] });

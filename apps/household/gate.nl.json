@@ -41,43 +41,6 @@
       "verwijder melk"
     ]
   },
-  "household.help": {
-    "doc": "Show the commands.",
-    "verbs": [
-      "help",
-      "hulp"
-    ],
-    "examples": [
-      "hulp"
-    ]
-  },
-  "household.addTask": {
-    "doc": "Add a chore (it can be given to someone, and have a day); the rest of the line is the chore.",
-    "verbs": [
-      "taak"
-    ],
-    "examples": [
-      "taak ramen lappen"
-    ]
-  },
-  "household.listTasks": {
-    "doc": "Show the open chores.",
-    "verbs": [
-      "taken"
-    ],
-    "examples": [
-      "taken"
-    ]
-  },
-  "household.claim": {
-    "doc": "Take on a chore.",
-    "verbs": [
-      "oppakken"
-    ],
-    "examples": [
-      "oppakken ramen"
-    ]
-  },
   "household.registerName": {
     "doc": "Tell the household your name.",
     "verbs": [

@@ -78,18 +78,14 @@ const typeOptional = (op) => ({
 /**
  * The one wiring table — `[opId, adaptedCore, opDeclaration]` — driving BOTH
  * routes, mirroring realAgent.js's `wire('addItem', …)` block op-for-op so the
- * test exercises production's exact adapters.  Full 8-op set (not just the
+ * test exercises production's exact adapters.  Full 4-op set (tasks are the tasks app's; not just the
  * representative cases) so the parity check covers every wired core.
  */
 const WIRED = [
   ['addItem',      withBy(householdApp.addItem),      hhOp('addItem')],
-  ['addTask',      withBy(householdApp.addTask),      hhOp('addTask')],
   ['markComplete', withBy(householdApp.markComplete), hhOp('markComplete')],
-  ['claim',        withBy(householdApp.claim),        hhOp('claim')],
-  ['reassign',     withBy(householdApp.reassign),     hhOp('reassign')],
   ['removeItem',   withBy(householdApp.removeItem),   hhOp('removeItem')],       // gated + attributed like the other writes
   ['listOpenItems',     listWrap(householdApp.listOpen),   typeOptional(hhOp('listOpenItems'))],
-  ['listTasks',    listWrap(householdApp.listTasks),  hhOp('listTasks')],
 ];
 
 /**
@@ -142,23 +138,10 @@ describeLocalWireFitness(
         volatile: HH_VOLATILE,
       },
       {
-        name:     'addTask (create task)',
-        run:      (invoke) => invoke('addTask', { text: 'vacuum living room' }),
-        volatile: HH_VOLATILE,
-      },
-      {
         name: 'markComplete (mutate, match chained from addItem)',
         run:  async (invoke) => {
           await invoke('addItem', { type: 'errand', text: 'post a parcel' });
           return invoke('markComplete', { match: 'post a parcel' });
-        },
-        volatile: HH_VOLATILE,
-      },
-      {
-        name: 'claim (lifecycle, match chained from addTask)',
-        run:  async (invoke) => {
-          await invoke('addTask', { text: 'water the plants' });
-          return invoke('claim', { match: 'water the plants' });
         },
         volatile: HH_VOLATILE,
       },
@@ -168,14 +151,6 @@ describeLocalWireFitness(
           await invoke('addItem', { type: 'shopping', text: 'apples' });
           await invoke('addItem', { type: 'shopping', text: 'bread' });
           return invoke('listOpenItems', { type: 'shopping' });
-        },
-        volatile: HH_VOLATILE,
-      },
-      {
-        name: 'listTasks (read, after an addTask)',
-        run:  async (invoke) => {
-          await invoke('addTask', { text: 'sweep the floor' });
-          return invoke('listTasks', {});
         },
         volatile: HH_VOLATILE,
       },

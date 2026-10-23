@@ -86,29 +86,32 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
     expect(list.items.find((c) => c.label === 'Milk')).toBeUndefined();
   });
 
-  it("claim with >1 candidate surfaces the disambiguation list (acts on NONE)", async () => {
+  // A task is the tasks app's (one owner per op): it is claimed by its id. (Household's claim-by-words, which asked
+  // which one when two matched, went with household's task noun; claiming by words is its own row.)
+  it("two tasks with the same word: claiming one by its id claims that one only", async () => {
     const a = await createRealHouseholdAgent({ t: tEn });
-    await a.callSkill('household', 'addTask', { text: 'paint the fence' });
-    await a.callSkill('household', 'addTask', { text: 'mend the fence' });
-    const r = await a.callSkill('household', 'claim', { match: 'fence' });
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/More than one match/);
-    // neither task was claimed
-    const tasks = (await a.callSkill('household', 'listTasks', {})).items;
-    expect(tasks.filter((t) => /fence/.test(t.label)).every((t) => !t.claimedBy)).toBe(true);
+    const paint = await a.callSkill('tasks', 'addTask', { text: 'paint the fence' });
+    await a.callSkill('tasks', 'addTask', { text: 'mend the fence' });
+    const items = (await a.callSkill('tasks', 'listOpen', { text: 'fence' })).items;
+    const target = items.find((t) => (t.label ?? t.text) === 'paint the fence') ?? paint;
+    const r = await a.callSkill('tasks', 'claimTask', { id: target.id ?? target.itemId });
+    expect(r.ok).not.toBe(false);
+    const after = (await a.callSkill('tasks', 'listOpen', { text: 'fence' })).items;
+    const mend = after.find((t) => (t.label ?? t.text) === 'mend the fence');
+    expect(mend.claimedBy ?? mend.assignee ?? null).toBeFalsy();
   });
 
-  it("addItem + addTask + claim round-trip through the real skills", async () => {
+  it("addItem + a task (the tasks app's addTask) + its claim round-trip through the real skills", async () => {
     const a = await createRealHouseholdAgent({ t: tEn });
     const add = await a.callSkill('household', 'addItem', { type: 'shopping', text: 'Bread' });
     expect(add).toMatchObject({ ok: true, text: 'Bread' });
     expect(add.message).toMatch(/Bread/);
 
-    const task = await a.callSkill('household', 'addTask', { text: 'Fix the leaky tap' });
-    expect(task).toMatchObject({ ok: true, text: 'Fix the leaky tap' });
-
-    const claim = await a.callSkill('household', 'claim', { match: 'leaky' });
-    expect(claim).toMatchObject({ ok: true, text: 'Fix the leaky tap' });
+    await a.callSkill('tasks', 'addTask', { text: 'Fix the leaky tap' });
+    const task = (await a.callSkill('tasks', 'listOpen', { text: 'leaky' })).items[0];
+    expect(task.label ?? task.text).toBe('Fix the leaky tap');
+    const claim = await a.callSkill('tasks', 'claimTask', { id: task.id });
+    expect(claim.ok).not.toBe(false);
     expect(claim.message).toMatch(/claimed/i);
   });
 
@@ -376,10 +379,6 @@ describe('createRealHouseholdAgent — L3 uniform wired path (default; legacy re
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'milk' });
     const open = await a.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(open.items.map((i) => i.label)).toContain('milk');          // adapted render shape {items:[{label}]}
-    const t = await a.callSkill('household', 'addTask', { text: 'fix fence' });
-    expect(t.ok).toBe(true);                                            // chat-shell action shape {ok,message,text,itemId}
-    expect(t.text).toBe('fix fence');
-    expect((await a.callSkill('household', 'listTasks', {})).items.map((i) => i.label)).toContain('fix fence');
   });
 
   it('listOpen without a type returns every OPEN item across list-types (the legacy no-type call)', async () => {

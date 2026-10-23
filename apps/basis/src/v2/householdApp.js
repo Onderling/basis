@@ -14,11 +14,10 @@
 import {
   createCircleStores, memoryDataSource, createGenericAtomHandlers, resolutionRegistryFromManifests,
   param, PARAM_SCOPE, PARAM_KIND,
-  // The canonical task functions — the household ops resolve a `match` and then delegate to these, so a
-  // household claim/reassign/complete carries the SAME claim cluster (claimSeq, confirmation, CAS) as any
-  // other task write. Aliased: household exposes its own match-based ops under the same names.
-  addTasks, removeItems,
-  claim as claimTask, reassign as reassignTask, markComplete as markCompleteItems,
+  // The canonical item functions — household's ops resolve a `match` and then delegate to these, so a
+  // household complete/remove is the same write as any other. Aliased: household's own ops share the names.
+  removeItems,
+  markComplete as markCompleteItems,
 } from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
 import { dispatchCapability } from '@onderling/app-manifest';
@@ -109,34 +108,9 @@ export async function removeItem(store, { match }, { by } = {}) {
   // The item too, so the reply can say WHAT was removed (the walk showed "✓ removed: " with nothing after it).
   return { ok: true, removed: hits[0].id, item: hits[0] };
 }
-// addTask materialises through the canonical add (id, `addedBy`/`addedAt`, `master`, cycle check); a task
-// created pre-assigned is add + an authoritative reassign, so the assignee holds a REAL claim (cluster set)
-// rather than a bare `assignee` field no lifecycle op recognises.
-export async function addTask(store, { text, assignee, dueAt }, { by } = {}) {
-  const [task] = await addTasks(store, [{ text, ...(dueAt ? { dueAt } : {}) }], { actor: by });
-  if (!assignee) return task;
-  const res = await reassignTask(store, task.id, assignee, { actor: by });
-  return res?.error ? task : res;   // a CAS conflict on the fresh task is near-impossible; fall back to the created task
-}
-export const listTasks = async (store) => (await store.listByType('task')).filter((i) => i.completedAt == null);
-export async function claim(store, { match }, { by } = {}) {
-  const hits = await findOpenMatches(store, match, ['task']);
-  if (hits.length === 0) return { ok: false, error: 'item not found' };
-  if (hits.length > 1)   return { ok: false, ambiguous: hits };
-  const res = await claimTask(store, hits[0].id, { actor: by });
-  if (res?.error) return { ok: false, error: res.error, current: res.current };
-  return { ok: true, item: res };
-}
-export async function reassign(store, { match, assignee }, { by } = {}) {
-  const hits = await findOpenMatches(store, match, ['task']);
-  if (hits.length === 0) return { ok: false, error: 'item not found' };
-  if (hits.length > 1)   return { ok: false, ambiguous: hits };
-  const res = await reassignTask(store, hits[0].id, assignee, { actor: by });
-  if (res?.error) return { ok: false, error: res.error, current: res.current };
-  return { ok: true, item: res };
-}
 
-const OPS = { addItem, listOpen, markComplete, removeItem, addTask, listTasks, claim, reassign };
+// household's open-items read is `listOpenItems` (the chores' `listOpen` is the tasks app's); tasks are the tasks app's whole
+const OPS = { addItem, listOpenItems: listOpen, markComplete, removeItem };
 
 /**
  * createHouseholdService — the existing `household` ops callable via the standard callSkill shape, now backed

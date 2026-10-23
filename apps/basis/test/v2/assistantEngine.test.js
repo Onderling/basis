@@ -130,7 +130,7 @@ describe('createAssistantEngine', () => {
   });
 
   it('loadAssistantItems shapes household open items for the retriever', async () => {
-    const load = loadAssistantItems({ callSkill: async (_app, op) => (op === 'listOpen'
+    const load = loadAssistantItems({ callSkill: async (_app, op) => (op === 'listOpenItems'
       ? { items: [{ id: 9, type: 'shopping', label: 'Milk' }, { id: 10, text: '' }] }
       : { items: [] }) });
     // the open list items (an empty line dropped), then the household's notes (none here)

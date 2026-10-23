@@ -43,42 +43,6 @@
       "remove milk"
     ]
   },
-  "household.help": {
-    "doc": "Show the commands.",
-    "verbs": [
-      "help"
-    ],
-    "examples": [
-      "help"
-    ]
-  },
-  "household.addTask": {
-    "doc": "Add a chore (it can be given to someone, and have a day); the rest of the line is the chore.",
-    "verbs": [
-      "task"
-    ],
-    "examples": [
-      "task clean the windows"
-    ]
-  },
-  "household.listTasks": {
-    "doc": "Show the open chores.",
-    "verbs": [
-      "tasks"
-    ],
-    "examples": [
-      "tasks"
-    ]
-  },
-  "household.claim": {
-    "doc": "Take on a chore.",
-    "verbs": [
-      "grab"
-    ],
-    "examples": [
-      "grab windows"
-    ]
-  },
   "household.registerName": {
     "doc": "Tell the household your name.",
     "verbs": [

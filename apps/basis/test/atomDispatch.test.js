@@ -56,10 +56,10 @@ describe('atom-dispatch consistency (B · Layer 1 §1b)', () => {
   }
 
   it('canonicalises an alias atom to the same op as its canonical form', async () => {
-    // household: create→add, task noun → the add op for task
+    // household: create→add, shopping noun → the add op for shopping
     const spy = vi.fn(async (opId) => opId);
-    const viaAlias = await dispatchAtom(householdManifest, { atom: 'create', noun: 'task' }, spy);
-    const viaCanon = await dispatchAtom(householdManifest, { atom: 'add', noun: 'task' }, spy);
+    const viaAlias = await dispatchAtom(householdManifest, { atom: 'create', noun: 'shopping' }, spy);
+    const viaCanon = await dispatchAtom(householdManifest, { atom: 'add', noun: 'shopping' }, spy);
     expect(viaAlias.ok && viaAlias.opId).toBe(viaCanon.opId);
   });
 });

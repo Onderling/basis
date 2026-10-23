@@ -48,7 +48,7 @@ export const householdManifest = {
   // The network hosts this app's code reaches: the language-model providers the household web server
   // can be started with (a local model needs no host). The person's pod is theirs to configure.
   hosts:     ['api.anthropic.com', 'api.openai.com'],
-  itemTypes: [...LIST_TYPES, 'task', 'contact', 'note'],
+  itemTypes: [...LIST_TYPES, 'contact', 'note'],
 
   // B · Layer 1 — domain (non-atom) verbs this manifest ships (F-SP1-e).
   // `help` (meta) + `register` (identity act, not a plain `add contact`) +
@@ -105,7 +105,6 @@ export const householdManifest = {
     errand:   { atoms: ['add', 'list', 'complete', 'remove'] },
     repair:   { atoms: ['add', 'list', 'complete', 'remove'] },
     schedule: { atoms: ['add', 'list', 'complete', 'remove'] },
-    task:     { atoms: ['add', 'list', 'complete', 'remove', 'claim', 'reassign'] },
     contact:  { atoms: [] },   // only the `register` domain verb
     // §1b "declare a noun → get CRUD free" — a free-form circle note. Declares CRUD atoms with NO
     // implementing op: `createHouseholdService.callCapability` serves it via `createGenericAtomHandlers`
@@ -175,7 +174,7 @@ export const householdManifest = {
       // surface as per-item button across all list-type
       // sections + tasks.  Multi-type via F-SP3-a; safe vs renderChat
       // byte-equivalence (toolCatalogue ignores appliesTo).
-      appliesTo: { type: [...LIST_TYPES, 'task'] },
+      appliesTo: { type: [...LIST_TYPES] },
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
       ],
@@ -195,7 +194,7 @@ export const householdManifest = {
       id:        'removeItem', visibility: 'authenticated',
       verb:      'remove',
       writes: { scope: 'circle' },
-      appliesTo: { type: [...LIST_TYPES, 'task'] },   // same as markComplete
+      appliesTo: { type: [...LIST_TYPES] },   // same as markComplete
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
       ],
@@ -213,63 +212,6 @@ export const householdManifest = {
     },
 
     // ── ops (tasks + contacts; co-equal to the list ops) ───────
-    {
-      id:        'listTasks', visibility: 'authenticated', group: 'data',
-      verb:      'list',
-      appliesTo: { type: 'task' },
-      params: [],
-      surfaces: {
-        chat:  { hint: 'List open tasks.' },
-        slash: {
-          command: '/tasks',
-          match: { body: 'none' },
-        },
-      },
-    },
-    {
-      id:        'claim', visibility: 'authenticated',
-      verb:      'claim',
-      writes: { scope: 'circle' },
-      appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/pinboard)
-      // DECLARATION LAYER (#34) — grabbing a household task writes `assignee` under the CLAIM policy
-      // (first-wins). Same declared (task, assignee)→claim the receiver enforces for every app's task.
-      resolves: [{ field: 'assignee', policy: 'claim' }],
-      params: [
-        { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
-      ],
-      surfaces: {
-        chat:  { hint: 'Grab an open task to do it.  match = id, id-prefix, or keyword.' },
-        slash: {
-          // `/grab` (not `/claim`): in basis's unified catalogue, `/claim`
-          // + the "claim/pak/neem" gate verbs are owned by tasks-v0 (the
-          // dedicated circle-task system).  Household's task-claim uses a distinct
-          // command + verbs so the two never collide (Part G de-ambiguation
-          // 2026-06-18; backwards-compat intentionally dropped).
-          command: '/grab',
-          match: {
-            body:    'match',
-          },
-        },
-        ui:    { control: 'button', labelKey: 'circle.button.household.claim', label: "I'll do this" },
-      },
-    },
-    {
-      id:        'reassign', visibility: 'authenticated', group: 'admin',
-      verb:      'reassign',
-      writes: { scope: 'circle' },
-      appliesTo: { type: 'task' },
-      // DECLARATION LAYER (#34) — reassigning writes `assignee`, part of the CLAIM cluster (first-wins).
-      resolves: [{ field: 'assignee', policy: 'claim' }],
-      params: [
-        { name: 'match',    kind: 'string', required: true, ...STR_NONEMPTY },
-        { name: 'assignee', kind: 'string', required: true, ...STR_NONEMPTY },
-      ],
-      surfaces: {
-        // No slash match for V0 — two-arg slash forms aren't in the V0
-        // grammar.  LLM-only entry point.
-        chat: { hint: 'Reassign a task to a different webid.  match = id/keyword; assignee = webid.' },
-      },
-    },
     {
       id:        'registerName', visibility: 'authenticated', group: 'compose',
       verb:      'register',                                   // F-SP1-e
@@ -788,10 +730,8 @@ export const householdManifest = {
     // rely on `fetchSectionItems`'s rule-b default
     // (`listOpen({type, ...filter})`) but the manifest-author intent
     // is to drive section→skill mapping declaratively; this also
-    // future-proofs against any default-fallback change.  `tasks`
-    // MUST declare `listTasks` because the fallback would call
-    // `listOpen({type:'task'})` which listOpen.js's KNOWN_TYPES
-    // guard rejects.
+    // future-proofs against any default-fallback change.  (Tasks
+    // are the tasks app's: its own sections list them.)
     {
       id: 'shopping', title: 'Shopping', type: 'shopping', filter: { open: true },
       dataSource: { skillId: 'listOpenItems', args: { type: 'shopping' } },
@@ -807,10 +747,6 @@ export const householdManifest = {
     {
       id: 'schedule', title: 'Schedule', type: 'schedule', filter: { open: true },
       dataSource: { skillId: 'listOpenItems', args: { type: 'schedule' } },
-    },
-    {
-      id: 'tasks',    title: 'Tasks',    type: 'task',     filter: { open: true },
-      dataSource: { skillId: 'listTasks' },
     },
     // Members section — LIMITATION (signal for):
     //

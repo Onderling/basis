@@ -160,15 +160,26 @@ describe('CC-HH.1 — add a task', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 
-  it('/task haal-brood appends + shows in /tasks', async () => {
+  // One owner per op (2026-10-24): a task is the tasks app's whole — '/task' (an alias on tasks' addTask) adds it and
+  // '/tasks' (tasks' listOpen) lists it, over ONE store (the active circle's), then claim, reassign and complete.
+  it('/task haal-brood → /tasks lists it → claim → reassign → complete, all through the tasks ops on one store', async () => {
     const before = await ws.userInput('/tasks');
-    const beforeCount = before.payload.items.length;
+    const beforeCount = (before.payload.items ?? []).length;
     const add = await ws.userInput('/task haal-brood');
-    expect(add.payload.ok).toBe(true);
-    expect(add.payload.message).toMatch(/added task.*haal-brood/i);
+    expect(add.payload.ok, JSON.stringify(add.payload)).not.toBe(false);
     const after = await ws.userInput('/tasks');
-    expect(after.payload.items.length).toBe(beforeCount + 1);
-    expect(after.payload.items.some((c) => c.label === 'haal-brood')).toBe(true);
+    const items = after.payload.items ?? [];
+    expect(items.length).toBe(beforeCount + 1);
+    const task = items.find((c) => (c.label ?? c.text) === 'haal-brood');
+    expect(task, JSON.stringify(items)).toBeTruthy();
+    const claimed = await ws.callSkill('tasks', 'claimTask', { id: task.id });
+    expect(claimed.ok).not.toBe(false);
+    const moved = await ws.callSkill('tasks', 'reassignTask', { id: task.id, newAssignee: 'webid:maria' });
+    expect(moved.ok, JSON.stringify(moved)).not.toBe(false);
+    const done = await ws.callSkill('tasks', 'completeTask', { id: task.id });
+    expect(done.ok, JSON.stringify(done)).not.toBe(false);
+    const open = ((await ws.userInput('/tasks')).payload.items ?? []).map((c) => c.label ?? c.text);
+    expect(open).not.toContain('haal-brood');
   });
 
   it('addItem(shopping, bananas) appends to the shopping list', async () => {
@@ -824,9 +835,10 @@ describe('CC-HH.X — /task (household slash-test audit)', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 
-  it('/task "buy milk" dispatches addTask via household namespace', async () => {
+  it('/task "buy milk" dispatches tasks\' addTask (the alias household\'s word kept)', async () => {
     const r = await ws.userInput('/task buy milk');
     expect(r.error).toBeFalsy();
+    expect(r.payload?.ok).not.toBe(false);
   });
 });
 
@@ -834,7 +846,7 @@ describe('CC-HH.Y — /tasks (household slash-test audit)', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 
-  it('/tasks dispatches listOpen on household + returns a list-shaped reply', async () => {
+  it('/tasks dispatches tasks\' listOpen + returns a list-shaped reply', async () => {
     // First seed a task so the list isn't empty.
     await ws.userInput('/task seed-task');
     const r = await ws.userInput('/tasks');

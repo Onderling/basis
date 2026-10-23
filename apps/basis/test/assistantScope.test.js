@@ -83,7 +83,7 @@ describe('the box scopes its catalogue to its app list before the model interpre
     const withTasks = await whatTheModelSees(['household', 'lists', 'tasks']);
     const householdIds = (r) => r.tools.map((x) => x.id).filter((id) => r.originOf(id) === 'household').sort();
     expect(householdIds(withTasks)).toEqual(householdIds(without));
-    expect(householdIds(without)).toContain('addTask');
+    expect(householdIds(without)).toContain('addItem');
   });
 
   it('what the owner set is what the box composes — read from the agent\'s register, the way the box reads it', async () => {

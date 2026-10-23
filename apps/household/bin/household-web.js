@@ -58,9 +58,6 @@ import {
   listOpen,
   markComplete,
   removeItem,
-  addTask,
-  listTasks,
-  claim,
   registerName,
 } from '../src/skills/index.js';
 
@@ -173,13 +170,6 @@ export async function startHouseholdWeb(opts = {}) {
     }),
   ));
 
-  agent.register('listTasks', adaptHouseholdSkill(
-    listTasks, store, getAgent,
-    async () => ({
-      items: await store.listOpen({ type: 'task' }),
-    }),
-  ));
-
   agent.register('addItem', adaptHouseholdSkill(
     addItem, store, getAgent,
     // After addItem, surface the freshly-added item (last one in the
@@ -190,17 +180,8 @@ export async function startHouseholdWeb(opts = {}) {
     },
   ));
 
-  agent.register('addTask', adaptHouseholdSkill(
-    addTask, store, getAgent,
-    async () => {
-      const items = await store.listOpen({ type: 'task' });
-      return { items, added: items[items.length - 1] ?? null };
-    },
-  ));
-
   agent.register('markComplete', adaptHouseholdSkill(markComplete, store, getAgent));
   agent.register('removeItem',   adaptHouseholdSkill(removeItem,   store, getAgent));
-  agent.register('claim',        adaptHouseholdSkill(claim,        store, getAgent));
   agent.register('registerName', adaptHouseholdSkill(registerName, store, getAgent));
 
   // ──: `chat` skill — free-text passthrough ──────────────

@@ -415,6 +415,8 @@ export const tasksManifest = {
         { name: 'text',          kind: 'string' },
       ],
       surfaces: {
+        // '/tasks': the circle's open chores (the household's word for it, kept when household's own list of tasks went)
+        slash: { command: '/tasks', body: 'none' },
         chat: {
           hint: 'List open tasks with computed status; filters: type/requiredSkill/assignee/status/text. Who does a task, and when: text = words of the task ("who does the lamp" → text: lamp).',
           // (DESIGN gap, closed 2026-05-27) — tasks-v0's slot in

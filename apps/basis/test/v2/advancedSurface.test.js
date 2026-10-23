@@ -90,7 +90,7 @@ describe('advancedOpRows — the app an op belongs to', () => {
       { app: 'pinboard', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
       { app: 'household', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
     ] });
-    expect(rows.map((r) => `${r.app}:${r.op}`).sort()).toEqual(['household:listOpenItems', 'pinboard:listOpen']);
+    expect(rows.map((r) => `${r.app}:${r.op}`).sort()).toEqual(['household:listOpen', 'pinboard:listOpen']);
   });
 });
 

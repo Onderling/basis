@@ -66,7 +66,7 @@ describe('requestOffering (live) — the REQUESTABLE BRIDGE host-wiring seam', (
     expect(res.task.source.offering.key).toBe(OFFER_KEY);
 
     // Independent read-back: the task actually PERSISTED in THAT circle's store.
-    const tasks = await a.callSkill('household', 'listTasks', { circleId: CIRCLE });
+    const tasks = await a.callSkill('tasks', 'listOpen', { circleId: CIRCLE });
     expect(tasks.items.some((it) => it.id === res.taskId)).toBe(true);
     expect(tasks.items.length).toBe(1);
   });
@@ -86,7 +86,7 @@ describe('requestOffering (live) — the REQUESTABLE BRIDGE host-wiring seam', (
     expect(denied.taskId).toBeUndefined();
 
     // No second task was minted — still exactly the one from the positive call.
-    const tasks = await a.callSkill('household', 'listTasks', { circleId: CIRCLE });
+    const tasks = await a.callSkill('tasks', 'listOpen', { circleId: CIRCLE });
     expect(tasks.items.length).toBe(1);
   });
 });

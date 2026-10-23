@@ -9591,10 +9591,6 @@
       "text": "Meer dan één treffer voor '{{match}}'. Antwoord met het begin van de id:\n{{options}}",
       "doc": "/done, /remove, /grab or a reassign whose words fit several open items; {{options}} lists them, one per line."
     },
-    "not_found_task": {
-      "text": "Geen open taak gevonden die past bij '{{match}}'.",
-      "doc": "/grab or a reassign whose words fit no open task."
-    },
     "not_found_item": {
       "text": "Geen open item gevonden dat past bij '{{match}}'.",
       "doc": "/done or /remove whose words fit no open item."
@@ -9606,14 +9602,6 @@
     "removed": {
       "text": "✓ Weggehaald: {{text}}",
       "doc": "Confirmation of /remove."
-    },
-    "claimed": {
-      "text": "✓ Opgepakt: {{text}}",
-      "doc": "Confirmation of /grab."
-    },
-    "reassigned": {
-      "text": "✓ Doorgegeven: {{text}} → {{who}}",
-      "doc": "Confirmation of a reassign; {{who}} is who has it now."
     },
     "added_to": {
       "text": "✓ Toegevoegd aan {{list}}: {{text}}",

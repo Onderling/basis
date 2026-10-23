@@ -112,14 +112,11 @@ describe('the door gate decides on the qualified op', () => {
     expect((await agent.callSkill('pinboard', 'listOpenRequests', {}, { caller: PEOPLE.member }))?.refusal).toMatchObject({ layer: 'door-map' });
   });
 
-  it('a bare id two apps declare is refused as ambiguous, not resolved to one of them', async () => {
-    expect(declarers('listOpen').length).toBeGreaterThan(1);
-    expect(botOpLevel('listOpen')).toBeNull();
-    expect(botRoleAllows('member', 'listOpen')).toBe(false);
-    for (const role of ['member', 'observer', 'admin']) {
-      expect(await agent.doorRefusal('listOpen', PEOPLE[role]), role).toMatchObject({ layer: 'door-map' });
-    }
-    // a bare id ONE app declares is that app's op
+  it('a bare id names one app\'s op: since one owner per op, no op id is declared by two apps', async () => {
+    const shared = [...new Set(allManifests().flatMap((m) => (m.operations ?? []).map((o) => o.id)))].filter((id) => declarers(id).length > 1);
+    expect(shared).toEqual([]);
+    // the chores' read, once three apps' id, is the tasks app's alone (household's is listOpenItems, pinboard's listOpenRequests)
+    expect(declarers('listOpen')).toEqual(['tasks']);
     expect(declarers('addToList')).toEqual(['lists']);
     expect(await agent.doorRefusal('addToList', PEOPLE.member)).toBeNull();
   });

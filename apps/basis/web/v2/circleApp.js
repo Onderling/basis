@@ -179,7 +179,7 @@ import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
 import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../src/v2/vandaagPlus.js';
-import { handleOp } from '../../src/v2/onboardingStrip.js';
+import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
 import { activeSelves, circlesInSet, contactsInSet, writeAs, switcherModel } from '../../src/v2/personaSet.js';
@@ -289,7 +289,7 @@ import {
 } from '../../src/v2/helpCircle.js';
 import { buildOnboardingTemplate, loadOnboardingTemplate } from '../../src/v2/onboardingTemplate.js';
 import { onboardingTurn, answerOnboarding, parseOnboardingAction } from '../../src/v2/onboardingChat.js';
-import { createOnboardingFlags, localStorageOnboardingIo } from '../../src/v2/onboardingFlags.js';
+import { createOnboardingFlags, localStorageOnboardingIo, keyCardPending } from '../../src/v2/onboardingFlags.js';
 // Task #13 Phase 2 — the standing help Q&A: the tag-to-address gate + the deterministic-answer router
 // (both pure, shared src/). The web shell only posts the descriptors they return + runs the LLM leg.
 import { botIsAddressed, namesAFunctionMember } from '../../src/v2/botAddress.js';
@@ -4297,7 +4297,7 @@ async function _showVandaag() {
         // "mine" in each circle is the self this device speaks as there (a persona's circle is the persona's)
         selfIn: mySelfIn,
         // the onboarding strip: every circle (not only the shown ones), and this device's mark for the intro card
-        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(),
+        allCircles: circlesCache ?? [], introSeen: () => onboardingFlags.isIntroSeen(), keyPending: () => keyCardPending(onboardingFlags),
       },
     });
   } catch (err) {
@@ -4501,6 +4501,9 @@ function onScreenAction(action) {
   }
   else if (action?.kind === 'intro-seen') { onboardingFlags.markIntroSeen().then(() => _showVandaag()); }
   else if (action?.kind === 'intro-more') { onboardingFlags.markIntroSeen().then(() => showDetail(HELP_CIRCLE_ID)); }
+  // the key card: its explicit "Toon" is the only way the words open from Vandaag; "Later" puts it away for a while
+  else if (action?.kind === 'key-show') showMnemonicReveal({ fromKeyCard: true });
+  else if (action?.kind === 'key-later') { onboardingFlags.snoozeKey(keySnoozeUntil()).then(() => _showVandaag()); }
   else if (action?.kind === 'create-circle') openCreateCircleWizard();
   else if (action?.kind === 'join-circle') showJoinCircle();
   // a card's one action that IS an op (a chore done): through the waist, then the page repaints
@@ -5339,7 +5342,7 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
 // the one phrase that re-derives every profile incl. the default profile's pseudonym. Shown in
 // the same modal overlay with a destructive warning. (Was the pinboard `getMnemonicOnce`,
 // which revealed the unrelated pinboard sub-agent seed — not the recovery phrase.)
-async function showMnemonicReveal() {
+async function showMnemonicReveal({ fromKeyCard = false } = {}) {
   let res = null;
   try { res = await rawCallSkill('household', 'revealOwnerPhrase', {}); } catch { res = null; }
   const words = (res && !res.error && (res.mnemonic ?? res.phrase ?? res.words)) || '';
@@ -5369,7 +5372,24 @@ async function showMnemonicReveal() {
   done.className = 'cc-wizard-btn cc-wizard-btn-primary';
   done.textContent = t('common.close');
   done.addEventListener('click', () => { try { overlay.remove(); } catch { /* */ } });
-  card.appendChild(done);
+  // opened from Vandaag's key card: the person says what they did with the words — saved ends the card, later
+  // puts it away for a while
+  if (fromKeyCard && words) {
+    const close = () => { try { overlay.remove(); } catch { /* */ } _showVandaag(); };
+    done.textContent = t('circle.mydata.mnemonic_written');
+    done.dataset.testid = 'mnemonic-written';
+    done.addEventListener('click', () => { onboardingFlags.markKeySaved().then(close); });
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'cc-wizard-btn';
+    later.dataset.testid = 'mnemonic-later';
+    later.textContent = t('circle.mydata.mnemonic_later');
+    later.addEventListener('click', () => { onboardingFlags.snoozeKey(keySnoozeUntil()).then(close); });
+    card.appendChild(done);
+    card.appendChild(later);
+  } else {
+    card.appendChild(done);
+  }
   overlay.appendChild(card);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);

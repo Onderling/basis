@@ -1,5 +1,6 @@
 /**
- * The first-run screen must show the OWNER ROOT phrase, not the chat identity's mnemonic.
+ * The recovery-phrase screen must show the OWNER ROOT phrase, not the chat identity's mnemonic — and it opens only
+ * from Vandaag's key card ("Toon"), never by itself at start (2026-10-23: App.js reads no phrase at all).
  *
  * ── Why this is a text guard, stated plainly ─────────────────────────────────────────────────────────────
  * `App.js` has no runtime coverage, so nothing here executes the screen. This asserts the WIRING and
@@ -26,13 +27,21 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const APP = readFileSync(fileURLToPath(new URL('../../App.js', import.meta.url)), 'utf8');
-/** App.js with comments stripped — the header above quotes the wrong expression on purpose. */
-const CODE = APP.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+/** App.js with comments stripped — it must not open the phrase at start. */
+const APP_CODE = strip(readFileSync(fileURLToPath(new URL('../../App.js', import.meta.url)), 'utf8'));
+/** The key card's host — where the phrase is read, on the card's explicit "Toon". */
+const CODE = strip(readFileSync(fileURLToPath(new URL('../../src/screens/v2/CircleLauncherScreen.js', import.meta.url)), 'utf8'));
 
-describe('the first-run recovery phrase comes from the owner root', () => {
-  it('reads it through the `revealOwnerPhrase` skill', () => {
-    expect(CODE).toMatch(/revealOwnerPhrase/);
+describe('the recovery phrase comes from the owner root, and only on the key card\'s "Toon"', () => {
+  it('App.js reads no phrase and shows no phrase screen at start', () => {
+    expect(APP_CODE).not.toMatch(/revealOwnerPhrase|MnemonicCreateScreen|getMnemonic/);
+  });
+
+  it('the key card\'s host reads it through the `revealOwnerPhrase` skill, on the `key-show` act', () => {
+    const at = CODE.indexOf("'key-show'");
+    expect(at).toBeGreaterThan(-1);
+    expect(CODE.slice(at, at + 400)).toMatch(/revealOwnerPhrase/);
   });
 
   it('does NOT read the chat identity\'s mnemonic', () => {
@@ -41,11 +50,11 @@ describe('the first-run recovery phrase comes from the owner root', () => {
     expect(CODE).not.toMatch(/sa\s*\??\.\s*agent\s*\??\.\s*identity/);
   });
 
-  it('tolerates the skill being unavailable rather than showing nothing quietly', () => {
-    // a first run that cannot read the phrase must fall through to 'dismissed', never render an empty grid
-    const near = CODE.slice(Math.max(0, CODE.indexOf('revealOwnerPhrase') - 400),
-      CODE.indexOf('revealOwnerPhrase') + 900);
-    expect(near).toMatch(/dismissed/);
+  it('tolerates the skill being unavailable: an error reads as no words (the screen then says so), never a throw', () => {
+    const at = CODE.indexOf("'key-show'");
+    const near = CODE.slice(at, at + 500);
+    expect(near).toMatch(/res\.error/);
+    expect(near).toMatch(/catch\(/);
   });
 });
 
@@ -55,7 +64,7 @@ describe('the two screens that show a recovery phrase agree', () => {
   ).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
   it('both go through the same skill — one host getting a fix is how this broke', () => {
-    for (const [name, src] of [['App.js', CODE], ['CircleMyDataScreen.js', MYDATA]]) {
+    for (const [name, src] of [['CircleLauncherScreen.js', CODE], ['CircleMyDataScreen.js', MYDATA]]) {
       expect(src, `${name} does not read the owner phrase through revealOwnerPhrase`)
         .toMatch(/revealOwnerPhrase/);
     }

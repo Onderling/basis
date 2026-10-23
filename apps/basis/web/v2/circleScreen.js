@@ -493,6 +493,13 @@ function renderOnboarding(section, block, tr, onAction) {
       }
       card.appendChild(btn('circle.vandaag.onboarding_intro_more', { kind: 'intro-more' }));
       card.appendChild(btn('circle.vandaag.onboarding_intro_dismiss', { kind: 'intro-seen' }, ' circle-screen__onb-btn--quiet'));
+    } else if (c.id === 'key') {
+      // never the words themselves: the card says the key is not saved, and its "Toon" opens them
+      const p = document.createElement('p');
+      p.textContent = tr('circle.vandaag.onboarding_key_hint');
+      card.appendChild(p);
+      card.appendChild(btn('circle.vandaag.onboarding_key_show', { kind: 'key-show' }));
+      card.appendChild(btn('circle.vandaag.onboarding_key_later', { kind: 'key-later' }, ' circle-screen__onb-btn--quiet'));
     } else if (c.id === 'begin') {
       card.appendChild(btn('circle.vandaag.onboarding_begin_create', { kind: 'create-circle' }));
       card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }, ' circle-screen__onb-btn--quiet'));

@@ -34,8 +34,8 @@ describe('My-data key-management wizards (reused renderers)', () => {
     expect(callSkill).toHaveBeenCalledWith('pinboard', 'encryptedBackup', { passphrase: 'a-strong-passphrase' });
   });
 
-  it('restore wizard reaches pinboard.restoreFromMnemonic after the destructive confirms', async () => {
-    const callSkill = vi.fn(async () => ({ newPubKey: 'pk-new' }));
+  it('restore wizard restores the owner root after the destructive confirms — and nothing else', async () => {
+    const callSkill = vi.fn(async () => ({ ok: true, reloadRequired: true }));
     const container = document.createElement('div');
     renderRestoreFromMnemonicWizard({ container, doc: document, callSkill, onClose: () => {}, onDispatched: () => {} });
     const phrase = 'alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima';
@@ -53,6 +53,10 @@ describe('My-data key-management wizards (reused renderers)', () => {
     container.querySelector('.cc-wizard-btn-primary').click();
     await Promise.resolve(); await Promise.resolve();
 
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'restoreFromMnemonic', { mnemonic: phrase, confirm: true });
+    expect(callSkill).toHaveBeenCalledWith('household', 'restoreOwnerPhrase', { mnemonic: phrase });
+    // the phrase never reaches an in-process agent (its bytes are the root secret)
+    expect(callSkill.mock.calls.map((c) => c[1])).not.toContain('restoreFromMnemonic');
+    // …and the success screen shows no key
+    expect(container.querySelector('.cc-wizard-code')).toBe(null);
   });
 });

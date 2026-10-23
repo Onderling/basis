@@ -229,6 +229,23 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
+/**
+ * An in-process agent's key must never be the owner root's or the chat identity's. Until 2026-10-23 the restore
+ * wizard wrote the phrase's own bytes — the root secret — as the pinboard agent's seed; a device restored that way
+ * carries it still. Such a vault gets a fresh seed before its agent starts (its stableId re-derives from the new
+ * seed). Counts into `healed`; the caller says it once, with no key in the line.
+ */
+async function giveFreshSeedIfShared(vault, forbiddenPubKeys, healed) {
+  try {
+    if (!(await vault.has('agent-privkey'))) return;
+    const existing = await AgentIdentity.restore(vault);
+    if (!forbiddenPubKeys.has(existing.pubKey)) return;
+    await vault.delete?.('agent-stable-id');
+    await AgentIdentity.generate(vault);
+    healed.n += 1;
+  } catch { /* an unreadable vault is restoreOrGenerate's case, not this one */ }
+}
+
 import { restoreOwnerRoot, handPersonasInto, personaWireAt, newDeviceId, DEVICE_DELEGATION_VAULT_KEY, RESTORE_PENDING_KEY } from './ownerRootRestore.js';
 import { createPersonaRuntime } from './personaRuntime.js';
 import { personaVault, PERSONA_SLOT_KEYS, HELD_PERSONAS_VAULT_KEY, PAUSED_PERSONAS_VAULT_KEY, RECOVERY_SEAL_VAULT_KEY, RECOVERY_SEAL_LABEL } from './personaVault.js';
@@ -498,6 +515,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
   const hostVault = await sealedVault(opts.hostVault ?? pickVault('cc-host-id:'));
+  // The keys no in-process agent may hold: the owner root's (here) and the chat identity's (added once it exists).
+  const notInProcessKeys = new Set(ownerRoot ? [b64encode(ownerRoot.derivedPubKey())] : []);
+  const inProcessHealed  = { n: 0 };
+  await giveFreshSeedIfShared(hostVault, notInProcessKeys, inProcessHealed);
   const hostId    = await restoreOrGenerate(hostVault);
   const hostTransport = new InternalTransport(bus, hostId.pubKey);
   const hostAgent = new Agent({ identity: hostId, transport: hostTransport });
@@ -849,6 +870,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   registerPersonIdentity();   // the person key speaks on the wire from here (relays take its address when they connect)
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+  notInProcessKeys.add(chatId.pubKey);
   // the persona's chat identity (its webid): the secure agent loaded it from the persona's slot
   persona.chatId = chatId;
   // THE RECOVERY SEAL — what the recovery file and the registry's pod mirror are sealed to: derived from the root where
@@ -1302,7 +1324,9 @@ export async function createRealHouseholdAgent(opts = {}) {
    *     (householdApp.listOpen) reads the whole store when `type` is absent.  The shared manifest is
    *     untouched (addItem's `type` stays required; the standalone household app is unaffected). */
   {
-    const householdId    = await restoreOrGenerate(await sealedVault(pickVault('cc-household-agent-id:')));
+    const householdVault = await sealedVault(pickVault('cc-household-agent-id:'));
+    await giveFreshSeedIfShared(householdVault, notInProcessKeys, inProcessHealed);
+    const householdId    = await restoreOrGenerate(householdVault);
     householdAgent       = new Agent({ identity: householdId, transport: new InternalTransport(bus, householdId.pubKey) });
     const hhOp = (id) => {
       const found = householdManifest.operations.find((o) => o.id === id);
@@ -4363,6 +4387,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   const tasksIdentityVault = await sealedVault(opts.tasksIdentityVault
     ?? pickVault('cc-tasks-id:'));
+  await giveFreshSeedIfShared(tasksIdentityVault, notInProcessKeys, inProcessHealed);
   // Register the chatAgent's pubKey as the local member ("admin")
   // AND keep the legacy webid:* members for demo cross-actor tests.
   // Real tasks-v0 skills use `from` (caller) to look up the actor's
@@ -4568,6 +4593,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   const pinboardIdentityVault = await sealedVault(opts.pinboardIdentityVault
     ?? pickVault('cc-pinboard-id:'));
+  await giveFreshSeedIfShared(pinboardIdentityVault, notInProcessKeys, inProcessHealed);
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
   // ride its membership lane — signed with the per-circle key, fanned via broadcastCircleMembership,
   // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
@@ -4913,6 +4939,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // ...and pinboard's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
     // about it arrive AS the persona (`pinboardActAs`).
     selfWebidFor: (circleId) => circleSelf(circleId).webid,
+    // The default card and this device's own requests name the CHAT identity — the address people reach. This
+    // agent's own key stays in-process: it is on no card and in no request.
+    selfCard: () => ({ pubKey: chatId.pubKey, stableId: chatId.stableId }),
     membershipEmit,
     membershipRead,
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
@@ -5061,6 +5090,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   const folioIdentityVault = await sealedVault(opts.folioIdentityVault
     ?? pickVault('cc-folio-id:'));
+  await giveFreshSeedIfShared(folioIdentityVault, notInProcessKeys, inProcessHealed);
+  if (inProcessHealed.n > 0) {
+    console.warn(`[realAgent] ${inProcessHealed.n} in-process agent(s) held the owner-root key or the chat key — each was given a fresh seed`);
+  }
   const folioAgent = await createBrowserFolioAgent({
     bus,
     identityVault: folioIdentityVault,
@@ -7725,6 +7758,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   const api = {
+    // The in-process agents' PUBLIC keys, read-only — for checks that none of them is the root's or the chat's.
+    // Each agent's CURRENT identity key (an identity can be swapped in place while its bus address stays).
+    inProcessPubKeys: () => {
+      const keyOf = (a) => a?.identity?.pubKey ?? a?.bundle?.agent?.identity?.pubKey ?? a?.agent?.identity?.pubKey ?? a?.address ?? null;
+      return { host: keyOf(hostAgent), household: keyOf(householdAgent), tasks: keyOf(tasksCircle), pinboard: keyOf(pinboardAgent), folio: keyOf(folioAgent) };
+    },
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)

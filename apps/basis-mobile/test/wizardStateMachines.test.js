@@ -86,7 +86,7 @@ describe('Bundle F P2 — restoreFromMnemonic state machine', () => {
     )).toBe(false);
   });
 
-  it('submitRestore installs the owner root then calls pinboard.restoreFromMnemonic', async () => {
+  it('submitRestore installs the owner root and nothing else', async () => {
     const calls = [];
     const callSkill = async (o, op, args) => {
       calls.push({ o, op, args });
@@ -95,11 +95,9 @@ describe('Bundle F P2 — restoreFromMnemonic state machine', () => {
     const s = restoreFromMnemonicState.initialState();
     s.mnemonic = Array(12).fill('a').join(' ');
     const after = await restoreFromMnemonicState.submitRestore({ state: { ...s }, callSkill });
-    // step 1b — the owner root (household.restoreOwnerPhrase) is installed FIRST, then the legacy pinboard restore
-    expect(calls).toHaveLength(2);
+    // the owner root only — the phrase's bytes are the root secret, so no in-process agent ever receives them
+    expect(calls).toHaveLength(1);
     expect(calls[0].op).toBe('restoreOwnerPhrase');
-    expect(calls[1].op).toBe('restoreFromMnemonic');
-    expect(calls[1].args.confirm).toBe(true);
     expect(after.successResult).toBeTruthy();
   });
 });

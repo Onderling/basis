@@ -135,9 +135,9 @@ describe('Pinboard V1 — getOnboardingState', () => {
   });
 });
 
-// ── getDataLocation + getPrivacyNotice + markMnemonicShown ─────────────────
+// ── getDataLocation + getPrivacyNotice ─────────────────────────────────────
 
-describe('Pinboard V1 — privacy / data-location / mnemonic', () => {
+describe('Pinboard V1 — privacy / data-location', () => {
   it('getDataLocation returns the configured values', async () => {
     const bundle = await buildAgent({
       dataLocationConfig: {
@@ -176,10 +176,4 @@ describe('Pinboard V1 — privacy / data-location / mnemonic', () => {
     expect(fb.sections[0].heading).toMatch(/encrypted/i);   // fallback
   });
 
-  it('markMnemonicShown writes a flag onto the MemberMap entry', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'markMnemonicShown');
-    const me = await bundle.members.resolveByWebid(ANNE);
-    expect(me.externalIds.mnemonicShown).toBe('true');
-  });
 });

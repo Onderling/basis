@@ -402,7 +402,6 @@
     "location_clear":         { "text": "Clear", "doc": "Ghost button on mobile ProfileMineScreen that drops the user's location." },
     "recovery_heading":       { "text": "Recovery phrase", "doc": "H2 above the recovery section on mobile ProfileMineScreen." },
     "recovery_intro":         { "text": "Keep your recovery phrase somewhere safe. You'll need it to install Pinboard on another device.", "doc": "Body explanation under the recovery heading." },
-    "recovery_show":          { "text": "Show recovery phrase", "doc": "CTA that reveals the user's mnemonic in a confirm modal." },
     "recovery_close":         { "text": "Close", "doc": "Confirm-modal label on the recovery-reveal modal." },
     "recovery_unavailable":   { "text": "Recovery export not available in this build.", "doc": "Inline error when the recovery skill is missing or unwired." },
     "handle_empty":           { "text": "Handle is required.", "doc": "Inline error on mobile ProfileMineScreen for empty handle." },
@@ -445,10 +444,6 @@
 
     "recovery_heading":       { "text": "Recovery & backup", "doc": "H2 above the recovery section." },
     "recovery_intro_html":    { "text": "Your <strong>recovery phrase</strong> is the only way to get your account back on a new device. We show it <em>once</em> — write it down and keep it somewhere safe (don't screenshot).", "doc": "Lead paragraph for the recovery section. Contains <strong> + <em> tags." },
-    "show_mnemonic":          { "text": "Show recovery phrase", "doc": "Button to reveal the BIP-39 mnemonic phrase. Pressing it irreversibly marks the phrase as 'shown'." },
-    "mnemonic_already_shown": { "text": "Recovery phrase already revealed — for safety it can't be shown again.", "doc": "Status shown when the user has already revealed the mnemonic in this install." },
-    "mnemonic_write_now":     { "text": "Write these 12 words down now. They will not be shown again.", "doc": "Status shown right after the mnemonic is revealed." },
-    "mnemonic_unknown":       { "text": "Unknown result.", "doc": "Defensive fallback." },
 
     "backup_heading":         { "text": "Encrypted backup", "doc": "H3 above the encrypted-backup form." },
     "backup_intro":           { "text": "Create a backup file that only you can open with your password. The password never leaves this device.", "doc": "Lead paragraph for the encrypted-backup form." },

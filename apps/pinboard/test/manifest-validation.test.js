@@ -156,8 +156,10 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // admin statement, caught up by joiners (the broadcast fired only on a settings save and never reached them).
   // 2026-10-15: -3, the per-person offering writers (setMyOfferings, addMyOffering, removeMyOffering) retired —
   // offerings are the person's drivers, matched on their own device (the host's `matchesMine`) → 93.
-  it('ships the full chat+slash surface (one pinboard manifest, 93 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(93);
+  // 2026-10-23: -1, `restoreFromMnemonic` retired — the recovery phrase is the owner root's, restored by the host
+  // (`restoreOwnerPhrase`); this agent's key is never in the phrase → 92.
+  it('ships the full chat+slash surface (one pinboard manifest, 92 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(92);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

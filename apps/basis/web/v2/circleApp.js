@@ -3909,6 +3909,11 @@ function showConnectionPoints() {
 
 function showNearby() {
   if (!isAlphaTab('nearby')) { showTabBar(ALPHA_FALLBACK_TAB); return; }   // hidden in the alpha (alphaSurface.js)
+  // the name the room shows ("Je verschijnt hier als …"): read once per open; a later paint picks it up
+  Promise.resolve(rawCallSkill('pinboard', 'getMyProfile', {})).then((p) => {
+    _nearbyHandle = p?.entry?.handle ?? null;
+    if (nearbyScreen) draw(nearbyScreen.model());   // still open: paint the name
+  }).catch(() => {});
   showTabBar('nearby');
   closeNearby();
 
@@ -4081,9 +4086,11 @@ function openNearbyThread(thread, seed = []) {
 // answer here is the default — kept per device, nothing more durable
 function readNearbySelf() { try { return localStorage.getItem('basis.nearbySelf'); } catch { return null; } }
 function writeNearbySelf(id) { try { if (typeof id === 'string' && id) localStorage.setItem('basis.nearbySelf', id); } catch { /* best-effort */ } }
+// the general persona's handle, as the room sees it — read when Nearby opens (showNearby)
+let _nearbyHandle = null;
 function nearbyRoomSelfNow() {
   const r = nearbyRoomSelf({ active: _selfSet.on, held: _selfSet.held, remembered: readNearbySelf() });
-  const view = nearbyRoomSelfView(r, _selfSet.held);
+  const view = nearbyRoomSelfView(r, _selfSet.held, { handle: _nearbyHandle });
   return { r, view, self: roomSelfFor(r, _selfSet.held) };
 }
 // The room's per-device allows (card / chat) — kept across opens, this browser only.

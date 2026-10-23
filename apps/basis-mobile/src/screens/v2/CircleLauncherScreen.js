@@ -231,7 +231,6 @@ import { createClarifyingDispatch } from '../../../../basis/src/v2/clarifyingDis
 import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../basis/src/v2/userLlmDefault.js';
 import { buildUserLlmRuntime, validateUserLlmConfig, ownModelOf } from '../../../../basis/src/v2/userLlmRuntime.js';
-import { formatNearbyLabel } from '../../core/nearbyLabel.js';
 import { t, lang } from '../../core/localisation.js';
 import {
   makeCirclePolicyStoreRN, makeMemberOverrideStoreRN, makeAvailabilityStoreRN,
@@ -887,19 +886,6 @@ export default function CircleLauncherScreen({
     return () => { alive = false; };
   }, [selectedPolicy]);
 
-  // 5.9c — passive "Nearby N device(s)" signal from MdnsTransport.  When the
-  // bundle exposes mdns we mirror its connectionCount into state, subscribed
-  // to peer-discovered + peer-disconnected so the row updates as peers come
-  // and go.  When bundle.mdns is null (vitest, iOS, Expo Go, Wi-Fi off) the
-  // row hides via the `bundle?.mdns` gate at render time.
-  const [nearbyCount, setNearbyCount] = useState(0);
-  useEffect(() => {
-    // The count comes from the SURFACE (every discovering transport, merged), not from one adapter's
-    // connection count — the same source the Nearby screen lists, so the row and the room agree.
-    const src = bundle?.nearbyPeers;
-    if (!src?.subscribe) return undefined;
-    return src.subscribe((rows) => setNearbyCount(Array.isArray(rows) ? rows.length : 0));
-  }, [bundle]);
 
   // M3 — AsyncStorage-backed circle stores (keys match web's localStorage
   // convention).  Created once; the sub-screens load/save through them.
@@ -2673,13 +2659,7 @@ export default function CircleLauncherScreen({
             // list already uses (`CircleListScreen.js`).
             keyboardShouldPersistTaps="handled"
           >
-            {isAlphaTab('nearby', { hasMesh: !!bundle?.mdns }) ? (
-              <Pressable style={styles.nearbyRow} testID="circle-nearby" accessibilityRole="button" onPress={() => setView('nearby')}>
-                <Text style={styles.nearbyText}>
-                  {formatNearbyLabel(nearbyCount, t, { radioOff: readNearbyRadio() === 'off' })}
-                </Text>
-              </Pressable>
-            ) : null}
+            {/* no "Nearby: N devices" row: the Nearby tab is the place for the room */}
 
             {/* β.1 — Nearby + Mijn dingen launcher shortcuts removed.
                 Nearby lives under the Mij tab; My-things is a seeded screen
@@ -2716,19 +2696,10 @@ export default function CircleLauncherScreen({
 
             {/* The inline name row is gone — "+ new circle" now opens the 5-step wizard (mounted below),
                 so the button stays visible while the wizard is up. */}
-            {(
-              <Pressable
-                style={styles.newBtn}
-                accessibilityRole="button"
-                onPress={() => setCreating(true)}
-              >
-                <Text style={styles.newText}>{t('circle.new')}</Text>
-              </Pressable>
-            )}
+            {/* one wording pair, one style, everywhere (Vandaag's Begin card says the same) */}
+            <Btn variant="primary" testID="launcher-new" label={t('circle.vandaag.onboarding_begin_create')} onPress={() => setCreating(true)} style={{ marginTop: 12 }} />
             {!creating ? (
-              <Pressable style={styles.joinBtn} accessibilityRole="button" onPress={() => setJoinScanOpen(true)}>
-                <Text style={styles.joinText}>{t('circle.join.button')}</Text>
-              </Pressable>
+              <Btn variant="primary" testID="launcher-join" label={t('circle.vandaag.onboarding_begin_join')} onPress={() => setJoinScanOpen(true)} style={{ marginTop: 8 }} />
             ) : null}
           </ScrollView>
         )}
@@ -5561,7 +5532,14 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   // here, else the one question. The bundle's face reads it through the getter handed in here.
   const [roomPick, setRoomPick] = useState(() => readNearbySelf());
   const roomR = useMemo(() => nearbyRoomSelf({ active: selvesOn, held: heldSelves, remembered: roomPick }), [selvesOn, heldSelves, roomPick]);
-  const roomView = useMemo(() => nearbyRoomSelfView(roomR, heldSelves), [roomR, heldSelves]);
+  // the general persona's handle, as the room sees it ("Je verschijnt hier als …"), read when the room opens
+  const [roomHandle, setRoomHandle] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve(bundle?.callSkill?.('pinboard', 'getMyProfile', {})).then((p) => { if (alive) setRoomHandle(p?.entry?.handle ?? null); }).catch(() => {});
+    return () => { alive = false; };
+  }, [bundle]);
+  const roomView = useMemo(() => nearbyRoomSelfView(roomR, heldSelves, { handle: roomHandle }), [roomR, heldSelves, roomHandle]);
   useEffect(() => {
     bundle?.setNearbyRoomSelf?.(() => roomSelfFor(roomR, heldSelves));   // asking is a state: no face until the answer
   }, [bundle, roomR, heldSelves]);
@@ -5771,11 +5749,7 @@ function NearbyScreen({
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   return (
     <View style={styles.page} testID="circle-nearby-screen">
-      <View style={styles.bar}>
-        <Pressable onPress={onBack} accessibilityRole="button" testID="circle-nearby-back">
-          <Text style={styles.back}>{t('circle.back')}</Text>
-        </Pressable>
-      </View>
+      {/* no "← circles": Nearby is a tab of its own, not a page under Circles */}
       <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
       {firstUse ? (
         // The first-use question, before anything else: what may this room see of the self entering it.
@@ -5905,9 +5879,7 @@ function NearbyScreen({
             </Pressable>
           </View>
         ) : (
-          <Pressable onPress={onCompose} accessibilityRole="button" testID="nearby-ask-compose" style={styles.nearbyAction}>
-            <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.ask_compose')}</Text>
-          </Pressable>
+          <Btn variant="primary" onPress={onCompose} testID="nearby-ask-compose" label={t('circle.nearbyScreen.ask_compose')} />
         )}
         {notice ? (
           <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
@@ -6208,8 +6180,6 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   availText:  { fontSize: 13, color: theme.color.inkSoft, fontWeight: '600' },
   detailActions:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 6 },
   // 5.9c — passive Nearby row at the top of the circles list.
-  nearbyRow:       { paddingHorizontal: 2, paddingVertical: 6, marginBottom: 2 },
-  nearbyText:      { fontSize: 12, color: theme.color.inkSoft, fontStyle: 'italic' },
   // 5.9d — passive Proof-of-Location row (placeholder; not tappable).
   polRow:          { flexDirection: 'row', gap: 6, alignItems: 'baseline', marginTop: 4, marginBottom: 8, paddingHorizontal: 2 },
   polLabel:        { fontSize: 12, color: theme.color.inkSoft, fontWeight: '600' },
@@ -6250,10 +6220,6 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   shortcutText: { fontSize: 13, color: theme.color.ink },
   bootFailed: { color: theme.color.ink, fontSize: 14, marginVertical: 10, lineHeight: 20 },
   muted:      { color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 10 },
-  newBtn:     { marginTop: 12, padding: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.color.line, borderRadius: 8, alignItems: 'center' },
-  newText:    { color: theme.color.inkSoft },
-  joinBtn:    { marginTop: 8, padding: 12, borderWidth: 1, borderColor: theme.color.accent, borderRadius: 8, alignItems: 'center' },
-  joinText:   { color: theme.color.accent, fontWeight: '600' },
   inviteBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   inviteCard: { backgroundColor: theme.color.paper, borderRadius: 14, padding: 20, alignItems: 'center', maxWidth: 320 },
   inviteTitle:{ fontSize: 16, fontWeight: '700', color: theme.color.ink, marginBottom: 12 },

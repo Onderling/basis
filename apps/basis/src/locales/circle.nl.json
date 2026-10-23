@@ -25,19 +25,11 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
-  "new": {
-    "text": "+ nieuwe kring",
-    "doc": "Create-a-new-circle entry on the launcher."
-  },
   "create_unavailable": {
     "text": "Nog geen kring aan te maken — de app is nog aan het starten.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
   },
   "join": {
-    "button": {
-      "text": "Lid worden van een kring",
-      "doc": "OBJ-2 — launcher entry to join an existing circle from an invite."
-    },
     "paste": {
       "text": "Plak de uitnodigingslink van het andere apparaat:",
       "doc": "OBJ-2 — prompt for the onderling-invite:// URL when joining on web (no camera)."
@@ -3741,6 +3733,10 @@
     "face_caveat": {
       "text": "Een vast gezicht maakt je herkenbaar op verschillende plekken, ook al wisselt je adres.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."
+    },
+    "no_name_yet": {
+      "text": "jij (nog geen naam)",
+      "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
     }
   },
   "viewAsSplit": {
@@ -5658,10 +5654,6 @@
     }
   },
   "nearby": {
-    "label": {
-      "text": "In de buurt",
-      "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
-    },
     "count_one": {
       "text": "{{count}} apparaat",
       "doc": "Enkelvoud."
@@ -5673,10 +5665,6 @@
     "count": {
       "text": "{{count}} apparaten",
       "doc": "Device count formatted by formatNearbyLabel; {{count}} interpolated."
-    },
-    "off": {
-      "text": "uit",
-      "doc": "De launcher-rij terwijl de radio uit staat — geen aantal, want een uitgeschakelde radio heeft niets gezien."
     }
   },
   "extension": {

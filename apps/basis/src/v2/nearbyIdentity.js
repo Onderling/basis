@@ -120,13 +120,16 @@ export function nearbyRoomSelf({ active = [], held = [], remembered = null } = {
 }
 
 /**
- * The room self as a painter shows it: "Je verschijnt hier als <naam>" (the general persona by the switcher's word), or
- * the one question when several selves are ticked and none was chosen yet — each choice named the same way.
+ * The room self as a painter shows it: "Je verschijnt hier als <naam>" — the general persona by its handle (what the
+ * room actually sees), or "jij (nog geen naam)" while it has none — or the one question when several selves are ticked
+ * and none was chosen yet, each choice named the same way.
  * @param {{self: string|null, ask: boolean, choices: string[]}} r  `nearbyRoomSelf`'s answer
  * @param {Array<{id: string, name?: string|null}>} held
+ * @param {{handle?: string|null}} [o]  the general persona's handle
  */
-export function nearbyRoomSelfView(r, held = []) {
-  const named = (id) => (id === 'default' ? { id, nameKey: 'circle.switcher.you' } : { id, name: (held ?? []).find((h) => h?.id === id)?.name ?? id });
+export function nearbyRoomSelfView(r, held = [], { handle = null } = {}) {
+  const general = (id) => (typeof handle === 'string' && handle.trim() ? { id, name: handle.trim() } : { id, nameKey: 'circle.nearbyScreen.no_name_yet' });
+  const named = (id) => (id === 'default' ? general(id) : { id, name: (held ?? []).find((h) => h?.id === id)?.name ?? id });
   return { ask: r?.ask === true, self: r?.self ? named(r.self) : null, choices: (r?.choices ?? []).map(named) };
 }
 

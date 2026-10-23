@@ -177,8 +177,8 @@ export function renderCircleLauncher(container, {
 
   const newBtn = document.createElement('button');
   newBtn.type = 'button';
-  newBtn.className = 'circle-launcher__new';
-  newBtn.textContent = tr('circle.new');
+  newBtn.className = 'cc-btn cc-btn--primary circle-launcher__new';   // one wording pair, one style, everywhere
+  newBtn.textContent = tr('circle.vandaag.onboarding_begin_create');
   newBtn.addEventListener('click', () => {
     if (typeof onNewCircle === 'function') onNewCircle();
   });
@@ -188,8 +188,8 @@ export function renderCircleLauncher(container, {
   if (typeof onJoinCircle === 'function') {
     const joinBtn = document.createElement('button');
     joinBtn.type = 'button';
-    joinBtn.className = 'circle-launcher__join';
-    joinBtn.textContent = tr('circle.join.button');
+    joinBtn.className = 'cc-btn cc-btn--primary circle-launcher__join';
+    joinBtn.textContent = tr('circle.vandaag.onboarding_begin_join');
     joinBtn.addEventListener('click', () => onJoinCircle());
     container.appendChild(joinBtn);
   }

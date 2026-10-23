@@ -5558,8 +5558,15 @@ function NearbyScreenHost({ bundle, heldSelves = [], selvesOn = ['default'], onB
   const screenRef = useRef(null);
   // which self the level is for: null while the room still asks who enters
   const roomSelfId = useMemo(() => { const s = roomSelfFor(roomR, heldSelves); return s?.asking ? null : (s?.id ?? null); }, [roomR, heldSelves]);
+  const levelSelfRef = useRef(roomSelfId);
   useEffect(() => {
     let live = true;
+    // fail closed on a self switch: the old self's choice does not carry over — unlisted until the new self's level is read
+    if (levelSelfRef.current !== roomSelfId) {
+      levelSelfRef.current = roomSelfId;
+      roomLevelSetRef.current = false;
+      screenRef.current?.levelChanged?.();
+    }
     (async () => {
       const st = (await bundle?.nearbyIdentity?.levelState?.()) ?? null;
       if (!live || !st) return;

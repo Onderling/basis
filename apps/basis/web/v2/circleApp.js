@@ -3987,6 +3987,9 @@ function showNearby() {
     roomSelf: {
       view: nearbyRoomSelfNow().view,
       onPick: (id) => {
+        // fail closed: the old self's choice does not carry over — unlisted until the new self's level is read
+        roomLevelSet = false;
+        nearbyScreen.levelChanged();
         writeNearbySelf(id); _nearbyRoom?.announceFace?.(); draw(nearbyScreen.model());
         _nearbyIdentity?.getDrivers?.().then(() => draw(nearbyScreen.model())).catch(() => {});   // weighed as the new self
         readRoomLevel();   // …and seen at ITS level

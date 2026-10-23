@@ -23,7 +23,7 @@
  * Do not construct this directly on a phone. `@onderling/react-native` exports a subclass with the Android
  * MdnsModule already injected (and the `isAvailable()` guard the mesh builder uses).
  */
-import { Transport, DISCOVERABILITY, AgentIdentity } from '@onderling/core';
+import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
 import { parseUntrustedJson } from '@onderling/core';
 
@@ -121,6 +121,9 @@ export class MdnsTransport extends Transport {
   // by routing to detect zombie TCP connections (present in the maps but
   // not actually delivering).  A value of 0 means "never seen activity".
   #lastActivity = new Map();
+  /** The kernel's sender binding: a frame's `_from` must be the key its connection proved (set in the constructor). */
+  #checkSender;
+  #refusedSenders = 0;
 
   #eventSubs    = [];
   #started      = false;
@@ -147,7 +150,19 @@ export class MdnsTransport extends Transport {
     this.#hostname = hostname ?? `dw-${identity.pubKey.slice(0, 8)}`;
     this.#native   = native;
     this.#emitter  = emitter;
+    // THE SENDER IS THE KEY THE CONNECTION PROVED. The challenged hello proves who is on the other end; a frame's
+    // `_from` is only a claim. Without this, a device on the Wi-Fi with its own honestly proven key could push a
+    // frame naming another listed peer, and a receiver not yet bound to that address would take the forger's key
+    // for it at the first hello. The kernel's one rule (`createSenderBinding`), as the relay and NKN ask it.
+    this.#checkSender = createSenderBinding({
+      transportName:       'MdnsTransport',
+      authenticatedSender: (connectionId) => this.#connToPubKey.get(connectionId) ?? null,
+      onUnauthenticated:   (message) => this.emit('warn', message),
+    });
   }
+
+  /** Frames dropped because their `_from` was not the key their connection proved. */
+  get refusedSenders() { return this.#refusedSenders; }
 
   async connect() {
     if (this.#started) return;
@@ -410,6 +425,18 @@ export class MdnsTransport extends Transport {
         if (!this.#connToPubKey.has(connectionId)) { this.#refuse(connectionId); return; }
 
         const mappedPubKey = this.#connToPubKey.get(connectionId);
+        // A frame claiming another sender than the one this connection proved: dropped and counted, reported the way
+        // a refused envelope is (`security-error`, so the agent warns once per sender), never re-mapped.
+        const verdict = this.#checkSender(connectionId, envelope);
+        if (!verdict.ok) {
+          this.#refusedSenders += 1;
+          const err = Object.assign(
+            new Error(`MdnsTransport: dropped a frame whose _from is not the key its connection proved (${verdict.reason})`),
+            { code: 'SENDER_MISMATCH' },
+          );
+          this.emit('security-error', err, envelope);
+          return;
+        }
         if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());
 
         try { this._receive(envelope); } catch {}

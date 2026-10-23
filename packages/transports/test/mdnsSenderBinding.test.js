@@ -38,6 +38,8 @@ describe('mDNS sender binding', () => {
     expect(await settle(() => T.canReach(a.pubKey) && T.canReach(m.pubKey) && M.canReach(t.pubKey)), 'all on the LAN').toBe(true);
     const got = [];
     T.on('envelope', (e) => got.push(e));
+    const refused = [];
+    T.on('security-error', (err, raw) => refused.push({ code: err?.code, from: raw?._from }));
 
     // M, over ITS OWN proven connection, pushes a hello that names A as the sender
     await M._put(t.pubKey, { _p: 'HI', _id: 'forged-1', _from: a.pubKey, _to: t.pubKey, _ts: Date.now(), payload: { hello: true } });
@@ -46,5 +48,8 @@ describe('mDNS sender binding', () => {
     await settle(() => got.some((e) => e._from === m.pubKey));
     expect(got.some((e) => e._from === m.pubKey), 'M speaking as M arrives').toBe(true);
     expect(got.some((e) => e._from === a.pubKey), 'M speaking as A does not').toBe(false);
+    expect(T.refusedSenders, 'counted').toBe(1);
+    expect(refused, 'reported the way a refused envelope is').toEqual([{ code: 'SENDER_MISMATCH', from: a.pubKey }]);
+    expect(T.canReach(a.pubKey) && T.canReach(m.pubKey), 'nobody is re-mapped: A and M each keep their own connection').toBe(true);
   });
 });

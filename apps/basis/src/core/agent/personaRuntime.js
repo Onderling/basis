@@ -20,7 +20,11 @@ import {
   b64encode, derivePersonKeySeed, derivePersonLinkKeySeed, personKeyPubKeyB64, loadPersonKey,
 } from '@onderling/core';
 import { sealingKeyPairFromNetworkKey } from '@onderling/pod-client';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { DEVICE_DELEGATION_VAULT_KEY, personaVault } from './personaVault.js';
+
+/** How many circle addresses one persona runtime keeps derived; past it the oldest is derived again on next use. */
+const CIRCLE_ADDRESS_MEMO_MAX = param({ key: 'persona.circleAddressMemoMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 
 /**
  * Build one persona's runtime bundle.
@@ -162,7 +166,26 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
     }
     return circleIdentities.get(circleId);
   };
-  const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
+  // Memoised on THIS runtime, keyed by circle id: the derivation (sha + an Ed25519 keypair in pure JS) ran dozens of
+  // times per circle during a phone boot. Bounded; dies with the runtime; never persisted.
+  const circleAddresses = new Map();   // circleId → address
+  const circleAddressFor = (circleId) => {
+    let address = circleAddresses.get(circleId);
+    if (address === undefined) {
+      address = deriveCircleAddress(deviceDerivationSeed, circleId);
+      if (circleAddresses.size >= CIRCLE_ADDRESS_MEMO_MAX) circleAddresses.delete(circleAddresses.keys().next().value);
+      circleAddresses.set(circleId, address);
+    }
+    return address;
+  };
+  // The current person key's pubKey, memoised against the key RECORD it was derived from: a rotation replaces
+  // the record, so the next call derives afresh.
+  let personKeyMemo = null;   // { record, pubKey }
+  const personKeyPubOf = (record) => {
+    if (!record) return null;
+    if (personKeyMemo?.record !== record) personKeyMemo = { record, pubKey: personKeyPubKeyB64(record.seed) };
+    return personKeyMemo.pubKey;
+  };
   // ONE sealing key family: this device's per-circle SEALING keypair is the ed2curve image of its per-circle address
   // key — phrase-derivable, one per device, retired with the address.
   const circleSealingKeyPairFor = (circleId) => sealingKeyPairFromNetworkKey(b64encode(deriveCircleSeed(deviceDerivationSeed, circleId)));
@@ -180,7 +203,7 @@ export async function createPersonaRuntime({ profileId = 'default', ownerRoot = 
 
   return {
     profileId, vault, profileSeed, deviceDerivationSeed, enrolledDevice, internalDeviceId: deviceInternalId,
-    circleIdentityFor, circleAddressFor, circleSealingKeyPairFor,
+    circleIdentityFor, circleAddressFor, circleSealingKeyPairFor, personKeyPubOf,
     authorityPubKeyB64, ceremonyCommitmentFor, signCeremonyCommitment,
     initialPersonKey, derivedLinkKeyPub,
     // The persona's LIVE identities, set by the agent: its chat identity once the secure agent has loaded it from the

@@ -645,7 +645,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const persona = personas.get(primaryId);   // the primary's runtime: "this device speaks as"
   persona.personKey = persona.initialPersonKey;   // the persona's CURRENT person key — a rotation replaces it
   /** The current person key as a circle learns it: `{ version, pubKey }`, or null. */
-  const currentPersonKey = () => (persona.personKey ? { version: persona.personKey.version, pubKey: personKeyPubKeyB64(persona.personKey.seed) } : null);
+  const currentPersonKey = () => (persona.personKey ? { version: persona.personKey.version, pubKey: persona.personKeyPubOf(persona.personKey) } : null);
   /** The same, with the link key's public half — what a CARD and a chain reply carry, so a contact can pin it and verify rotations. */
   const personKeyForContacts = () => (persona.personKey ? { ...currentPersonKey(), ...(persona.personKey.linkKeyPub ? { linkKeyPub: persona.personKey.linkKeyPub } : {}) } : null);
   // THE PERSON KEY ON THE WIRE (binding-levels §10.5 step 4): an identity the secure agent can sign envelopes with
@@ -3728,7 +3728,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const circleSelf = (circleId) => {
     const p = personaOf(circleId);
     const isDefault = p === persona;
-    const pk = p.personKey ? { version: p.personKey.version, pubKey: personKeyPubKeyB64(p.personKey.seed) } : null;
+    const pk = p.personKey ? { version: p.personKey.version, pubKey: p.personKeyPubOf(p.personKey) } : null;
     return { webid: (isDefault ? chatId : p.chatId)?.pubKey ?? null, sendAs: isDefault ? null : (p.chatId?.pubKey ?? null), personKey: pk };
   };
   hostAgent.register('bindCirclePersona', async ({ parts }) => {

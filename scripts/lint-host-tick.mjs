@@ -24,9 +24,11 @@ const SCOPE = ['apps/basis', 'apps/basis-mobile'];
 const THE_TICK = 'apps/basis/src/v2/hostTick.js';
 const NOT_APP_CODE = /\/node_modules\/|\/test\/|\/test-browser\/|\/e2e\/|__tests__|\.test\.|\.spec\.|\/dist\/|\/build\/|\/android\/|\/ios\//;
 
+// What git would keep — tracked files and new ones not yet added — never gitignored output: a Playwright report or a
+// build directory holds bundled third-party timers that are not app code.
 function files() {
   const out = execSync(
-    `grep -rlE "setInterval\\s*\\(" ${SCOPE.join(' ')} --include=*.js --include=*.mjs --include=*.jsx --include=*.ts --include=*.tsx 2>/dev/null || true`,
+    `git grep --untracked -lE "setInterval\\s*\\(" -- ${SCOPE.map((d) => `'${d}/*.js' '${d}/*.mjs' '${d}/*.jsx' '${d}/*.ts' '${d}/*.tsx'`).join(' ')} 2>/dev/null || true`,
     { cwd: ROOT, encoding: 'utf8' },
   ).trim();
   return out ? out.split('\n').filter((f) => !NOT_APP_CODE.test(`/${f}`)) : [];

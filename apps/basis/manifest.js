@@ -1159,6 +1159,32 @@ export const basisManifest = {
   ],
 
   /**
+   * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
+   * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
+   * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
+   * My data page. Kinds say how a row behaves, so it looks like what it is:
+   *   door    — opens another screen (text + →)            switch  — on or off (a real switch)
+   *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
+   * `custody: true` marks a section painted behind the custody guard (keys, devices, sign-in) on both shells.
+   * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
+   */
+  settingsGroups: [
+    {
+      id: 'appearance', labelKey: 'circle.settings_home.appearance',
+      sections: [
+        { id: 'theme',         kind: 'control' },
+        { id: 'language',      kind: 'control' },
+        { id: 'start-screen',  kind: 'control' },
+        { id: 'bot-actions',   kind: 'control' },
+        { id: 'week-overview', kind: 'switch'  },
+        { id: 'notifications', kind: 'switch'  },
+        { id: 'assistant',     kind: 'control' },
+      ],
+    },
+    { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
+  ],
+
+  /**
    * Me is ONE declared screen: below the actions above, these blocks, in order — filled by the one screen materializer
    * (`mijScreenBlocks`) and painted by each shell's block painter. No shell lists a section of Me by hand.
    *   identityLine — the person's name, and the readings named here (each answers one thing about now)

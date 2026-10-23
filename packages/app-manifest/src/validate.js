@@ -134,6 +134,9 @@ export const PRESENT_FACETS = Object.freeze(['label', 'moment', 'order', 'mine',
 /** A merged view's ONE action on a row (`presents.primary`). */
 export const PRIMARY_ACTIONS = Object.freeze(['complete', 'edit', 'open']);
 
+/** How a settings row behaves (and so how it looks): opens a screen · on/off · a picker or small form · plain text. */
+const SETTINGS_SECTION_KINDS = Object.freeze(['door', 'switch', 'control', 'fact']);
+
 /**
  * Validate a manifest.
  *
@@ -383,6 +386,62 @@ export function validateManifest(manifest, opts = {}) {
       const ids = new Set();
       manifest[key].forEach((item, i) => {
         validateNavItem(item, `/${key}/${i}`, manifest, errors, ids, strict);
+      });
+    }
+  }
+
+  // The person's settings (behind the gear on Mij) — `manifest.settingsGroups`: groups of sections, each a door,
+  // switch, control or fact (custody-guarded ones marked), then the door to the chooser of the person's circles.
+  // A section id is declared once across every group: a section lives in one place. Forward-additive: absent → none.
+  if (manifest.settingsGroups !== undefined) {
+    if (!Array.isArray(manifest.settingsGroups)) {
+      errors.push({ path: '/settingsGroups', message: 'settingsGroups must be an array if present' });
+    } else {
+      const groupIds = new Set();
+      const sectionIds = new Set();
+      manifest.settingsGroups.forEach((g, i) => {
+        const at = `/settingsGroups/${i}`;
+        if (g?.id === 'per-circle') {
+          validateNavItem(g, at, manifest, errors, groupIds, strict);
+          if (g.kind !== 'door' || g.target?.kind !== 'nav' || g.target?.to !== 'circleSettingsChooser') {
+            errors.push({ path: at, message: 'the per-circle row is a door ({kind: "door"}) to the circle chooser (target {kind: "nav", to: "circleSettingsChooser"})' });
+          }
+          return;
+        }
+        if (!g || typeof g !== 'object' || typeof g.id !== 'string' || g.id === '') {
+          errors.push({ path: `${at}/id`, message: 'a settings group needs a non-empty id' });
+          return;
+        }
+        if (groupIds.has(g.id)) errors.push({ path: `${at}/id`, message: `settings group "${g.id}" declared twice` });
+        groupIds.add(g.id);
+        if (typeof g.labelKey !== 'string' || g.labelKey === '') {
+          errors.push({ path: `${at}/labelKey`, message: `settings group "${g.id}" needs a labelKey` });
+        }
+        if (!Array.isArray(g.sections) || g.sections.length === 0) {
+          errors.push({ path: `${at}/sections`, message: `settings group "${g.id}" needs at least one section` });
+          return;
+        }
+        g.sections.forEach((sec, j) => {
+          const sp = `${at}/sections/${j}`;
+          if (!sec || typeof sec.id !== 'string' || sec.id === '') {
+            errors.push({ path: `${sp}/id`, message: 'a settings section needs a non-empty id' });
+            return;
+          }
+          if (sectionIds.has(sec.id)) errors.push({ path: `${sp}/id`, message: `settings section "${sec.id}" declared twice (a section lives in one place)` });
+          sectionIds.add(sec.id);
+          if (!SETTINGS_SECTION_KINDS.includes(sec.kind)) {
+            errors.push({ path: `${sp}/kind`, message: `settings section "${sec.id}": kind must be one of ${SETTINGS_SECTION_KINDS.join(' · ')}` });
+          }
+          if (sec.kind === 'door' && (sec.target?.kind !== 'nav' || typeof sec.target?.to !== 'string' || sec.target.to === '')) {
+            errors.push({ path: `${sp}/target`, message: `settings section "${sec.id}" is a door: it needs a target {kind: "nav", to}` });
+          }
+          if (sec.kind !== 'door' && sec.target !== undefined) {
+            errors.push({ path: `${sp}/target`, message: `settings section "${sec.id}" is a ${sec.kind}: only a door has a target` });
+          }
+          if (sec.custody !== undefined && typeof sec.custody !== 'boolean') {
+            errors.push({ path: `${sp}/custody`, message: `settings section "${sec.id}": custody must be a boolean if present` });
+          }
+        });
       });
     }
   }

@@ -47,6 +47,7 @@ import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
 import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
 import { initLocalisation, subscribeLang, t } from './src/core/localisation.js';
 import { bootAgentBundle } from './src/core/agentBundle.js';
+import { bootMark } from '../basis/src/log/bootTimeline.js';
 import { attachSurfacePrefAgent } from './src/core/surfacePrefStore.js';
 import { attachThemeAgent } from './src/screens/v2/themeContext.js';
 import { asyncStorageRelayIo, resolveRelayUrl } from '../basis/src/v2/relayPref.js';
@@ -396,7 +397,7 @@ export default function App() {
   // silently skip on a real first run.
   useEffect(() => {
     shouldShowFirstRunWelcome(AsyncStorage)
-      .then((show) => setFirstRun(show ? 'show' : 'dismissed'))
+      .then((show) => { bootMark('firstrun.checked', { welcome: !!show }); setFirstRun(show ? 'show' : 'dismissed'); })
       .catch(() => setFirstRun('show'));
   }, []);
 
@@ -501,6 +502,7 @@ export default function App() {
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;
+        bootMark('agent.boot');
         const b = await bootAgentBundle({
           // the agent's own lines (list and calendar defaults, task confirmations) in the person's language — as web
           t,
@@ -649,6 +651,7 @@ export default function App() {
           .catch(() => { /* defaults stand */ });
         // web ≡ mobile: same attach as circleApp.js — the roster feed fills the membrane's index.
         if (b?.agent) b.agent._circleGroupsIndex = circleGroupsIndexRef.current;
+        bootMark('agent.ready');
         setBundle(b);
         // Ask once, after the reload the ceremony asked for — but only after a RESTORE (web parity): an add-a-device
         // from an offer is not one (the offer brings the circles; "your circles are not here" would be wrong). The

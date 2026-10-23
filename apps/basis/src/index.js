@@ -417,6 +417,7 @@ export { runFind } from './find.js';
 export { EventLog, createEventLog, RETENTION_MS, RETENTION_DEFAULTS, makeAgentTrailEntry } from './eventLog.js';
 export { attachTestBuildLogMirror, TEST_BUILD_LOG_PREFIX } from './log/testBuildMirror.js';
 export { logReportView } from './log/logReport.js';
+export { bootMark, startStallWatch } from './log/bootTimeline.js';
 export {
   buildFormSpec, pickStrategy, validateAndCoerce,
 } from './forms/buildFormSpec.js';

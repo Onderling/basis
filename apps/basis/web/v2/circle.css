@@ -280,6 +280,8 @@
 .circle-tile:hover { border-color: var(--accent); }
 /* the customise sheet: a block's name, its controls beside it with room between, wrapping as a row */
 .vandaag-customise__block { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0; }
+.vandaag-customise__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vandaag-customise__control-title { flex-basis: 100%; font-size: 12px; color: var(--ink-soft); }
 .circle-tile__avatar {
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-content: center;
@@ -1528,8 +1530,7 @@
 .circle-vandaag__head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .circle-vandaag__plus { margin-left: auto; font: inherit; font-size: 14px; font-weight: 600; padding: 6px 14px; border: 0; border-radius: 999px; background: var(--accent-ink); color: var(--accent-contrast); cursor: pointer; }
 .circle-vandaag__plus:hover { filter: brightness(1.08); }
-.circle-vandaag__customise, .circle-vandaag__back { font: inherit; font-size: 18px; line-height: 1; padding: 2px 6px; border: 0; background: none; color: var(--ink-soft); cursor: pointer; }
-.circle-vandaag__back { font-size: 13px; }
+.circle-vandaag__customise, .circle-vandaag__back { font: inherit; font-size: 13px; line-height: 1; padding: 2px 6px; border: 0; background: none; color: var(--ink-soft); cursor: pointer; }
 .circle-vandaag__customise:hover, .circle-vandaag__back:hover { color: var(--ink); }
 .circle-screen__block--empty { padding: 4px 0; font-size: 14px; color: var(--ink-soft); }
 .circle-screen__more { font: inherit; font-size: 13px; padding: 2px 0; border: 0; background: none; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

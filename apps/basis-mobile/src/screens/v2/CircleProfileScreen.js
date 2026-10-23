@@ -15,7 +15,7 @@ import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js'
 import { basisManifest } from '../../../../basis/src/index.js';
 import { mijScreenBlocks } from '../../../../basis/src/v2/mijScreen.js';
 import { useTheme } from './themeContext.js';
-import { FAB_CLEARANCE } from './fab.js';
+import { FAB_CLEARANCE, HEADER_AVATAR_CLEARANCE } from './fab.js';
 import CircleScreenView from './CircleScreenView.js';
 
 /**
@@ -97,7 +97,8 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
 const makeStyles = (theme, insets) => StyleSheet.create({
   wrap: { flex: 1, paddingTop: insets?.top ?? 0, backgroundColor: theme.color.paper },
   scroll: { flex: 1 },
-  content: { padding: 16, gap: 16, paddingBottom: 80 },
+  // the top leaves the header avatar its room, so it never sits on the Me card's corner
+  content: { padding: 16, paddingTop: HEADER_AVATAR_CLEARANCE, gap: 16, paddingBottom: 80 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },
   primary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, justifyContent: 'center', alignSelf: 'flex-start' },
   meActions: { flexDirection: 'row', gap: 10 },

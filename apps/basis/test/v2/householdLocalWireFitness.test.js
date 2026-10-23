@@ -88,7 +88,7 @@ const WIRED = [
   ['claim',        withBy(householdApp.claim),        hhOp('claim')],
   ['reassign',     withBy(householdApp.reassign),     hhOp('reassign')],
   ['removeItem',   withBy(householdApp.removeItem),   hhOp('removeItem')],       // gated + attributed like the other writes
-  ['listOpen',     listWrap(householdApp.listOpen),   typeOptional(hhOp('listOpen'))],
+  ['listOpenItems',     listWrap(householdApp.listOpen),   typeOptional(hhOp('listOpenItems'))],
   ['listTasks',    listWrap(householdApp.listTasks),  hhOp('listTasks')],
 ];
 
@@ -163,11 +163,11 @@ describeLocalWireFitness(
         volatile: HH_VOLATILE,
       },
       {
-        name: 'listOpen (read, all open after two shopping adds)',
+        name: 'listOpenItems (read, all open after two shopping adds)',
         run:  async (invoke) => {
           await invoke('addItem', { type: 'shopping', text: 'apples' });
           await invoke('addItem', { type: 'shopping', text: 'bread' });
-          return invoke('listOpen', { type: 'shopping' });
+          return invoke('listOpenItems', { type: 'shopping' });
         },
         volatile: HH_VOLATILE,
       },

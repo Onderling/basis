@@ -10,7 +10,7 @@
  * named members.  Adds canonical `task` + `contact` item types, five new
  * operations (addTask, listTasks, claim, reassign, registerName) and
  * two views (tasks, members). The surface stays byte-equal because
- * `addItem`/`listOpen` declare their type enum **explicitly** (not via
+ * `addItem`/`listOpenItems` declare their type enum **explicitly** (not via
  * the `'itemTypes'` reference) — growing the manifest's itemTypes does
  * not affect their emitted JSON Schema.
  *
@@ -141,13 +141,12 @@ export const householdManifest = {
           match: {
             body:       'type+text',
             splitItems: true,
-            onEmpty:    { skillId: 'help', args: {} },
           },
         },
       },
     },
     {
-      id:   'listOpen', visibility: 'authenticated', group: 'data',
+      id:   'listOpenItems', visibility: 'authenticated', group: 'data',
       verb: 'list',
       params: [
         { name: 'type', kind: 'enum', of: LIST_TYPES, required: true },
@@ -165,7 +164,6 @@ export const householdManifest = {
           command: '/list',
           match: {
             body:    'type-only',
-            onEmpty: { skillId: 'help', args: {} },
           },
         },
       },
@@ -188,7 +186,6 @@ export const householdManifest = {
           match: {
             body:       'match',
             splitItems: true,
-            onEmpty:    { skillId: 'help', args: {} },
           },
         },
         ui: { control: 'button', labelKey: 'circle.button.household.markComplete', label: 'Done' },   // web surface
@@ -209,55 +206,13 @@ export const householdManifest = {
           match: {
             body:       'match',
             splitItems: true,
-            onEmpty:    { skillId: 'help', args: {} },
           },
         },
         ui: { control: 'button', labelKey: 'circle.button.household.removeItem', label: 'Remove' },  // web surface
       },
     },
-    {
-      id:   'help', visibility: 'authenticated', group: 'help',
-      verb: 'help',                              // F-SP1-e: non-canonical
-      params: [],
-      surfaces: {
-        chat:  { hint: 'Print the command list.' },
-        slash: {
-          command: '/help',
-          match:   { body: 'none' },
-          // Slash dedup (2026-06-19): `/help` stays for STANDALONE household (the
-          // bot + the byte-equivalence grammar + the bare-command fallback
-          // target). But in a merged circle the basis SHELL owns the global
-          // `/help` (it introspects every app, including household), so this one
-          // is NOT contributed to the unified catalogue — `standaloneOnly` makes
-          // mergeManifests skip it (no /help collision). See manifestMerge.js.
-          standaloneOnly: true,
-        },
-      },
-    },
 
     // ── ops (tasks + contacts; co-equal to the list ops) ───────
-    {
-      id:        'addTask', visibility: 'authenticated', group: 'compose',
-      verb:      'add',
-      writes: { scope: 'circle' },
-      appliesTo: { type: 'task' },
-      params: [
-        { name: 'text',     kind: 'string', required: true, ...STR_NONEMPTY },
-        { name: 'assignee', kind: 'string' },                  // optional
-        { name: 'dueAt',    kind: 'number' },                  // optional
-      ],
-      surfaces: {
-        chat:  { hint: 'Add a CHORE/TASK to do (assignable, has a due date) — NOT a shopping/errand/repair/schedule list item (use addItem for those).' },
-        slash: {
-          command: '/task',
-          match: {
-            body:       'text-only',                         // F-SP2-a
-            splitItems: true,
-            onEmpty:    { skillId: 'help', args: {} },
-          },
-        },
-      },
-    },
     {
       id:        'listTasks', visibility: 'authenticated', group: 'data',
       verb:      'list',
@@ -293,7 +248,6 @@ export const householdManifest = {
           command: '/grab',
           match: {
             body:    'match',
-            onEmpty: { skillId: 'help', args: {} },
           },
         },
         ui:    { control: 'button', labelKey: 'circle.button.household.claim', label: "I'll do this" },
@@ -332,7 +286,6 @@ export const householdManifest = {
           command: '/register',
           match: {
             body:    'text-only',                            // F-SP2-a
-            onEmpty: { skillId: 'help', args: {} },
           },
         },
       },
@@ -841,19 +794,19 @@ export const householdManifest = {
     // guard rejects.
     {
       id: 'shopping', title: 'Shopping', type: 'shopping', filter: { open: true },
-      dataSource: { skillId: 'listOpen', args: { type: 'shopping' } },
+      dataSource: { skillId: 'listOpenItems', args: { type: 'shopping' } },
     },
     {
       id: 'errand',   title: 'Errands',  type: 'errand',   filter: { open: true },
-      dataSource: { skillId: 'listOpen', args: { type: 'errand'   } },
+      dataSource: { skillId: 'listOpenItems', args: { type: 'errand'   } },
     },
     {
       id: 'repair',   title: 'Repairs',  type: 'repair',   filter: { open: true },
-      dataSource: { skillId: 'listOpen', args: { type: 'repair'   } },
+      dataSource: { skillId: 'listOpenItems', args: { type: 'repair'   } },
     },
     {
       id: 'schedule', title: 'Schedule', type: 'schedule', filter: { open: true },
-      dataSource: { skillId: 'listOpen', args: { type: 'schedule' } },
+      dataSource: { skillId: 'listOpenItems', args: { type: 'schedule' } },
     },
     {
       id: 'tasks',    title: 'Tasks',    type: 'task',     filter: { open: true },
@@ -896,7 +849,7 @@ export const householdManifest = {
     specials: [{
       pattern: '^(?:what\\s+do\\s+we\\s+need|wat\\s+hebben\\s+we\\s+nodig)\\b.*$',
       flags:   'i',
-      skillId: 'listOpen',
+      skillId: 'listOpenItems',
       args:    { type: 'shopping' },
     }],
 

@@ -9615,10 +9615,6 @@
       "text": "✓ Reassigned: {{text}} → {{who}}",
       "doc": "Confirmation of a reassign; {{who}} is who has it now."
     },
-    "added_task": {
-      "text": "✓ Added task: {{text}}",
-      "doc": "Confirmation of /task."
-    },
     "added_to": {
       "text": "✓ Added to {{list}}: {{text}}",
       "doc": "Confirmation of /add; {{list}} is the kind of item (shopping, errand, …)."

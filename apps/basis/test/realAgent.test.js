@@ -30,7 +30,7 @@ import { tEn } from './support/bundleTranslator.js';
 describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   it("listOpen returns the 3 seed household items via real Agent.invoke roundtrip", async () => {
     const a = await createRealHouseholdAgent();
-    const r = await a.callSkill('household', 'listOpen', {});
+    const r = await a.callSkill('household', 'listOpenItems', {});
     expect(r.items.length).toBe(3);
     expect(r.items.map((c) => c.label).sort()).toEqual([
       'Milk', 'Post a parcel', 'Vacuum living room',
@@ -41,7 +41,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
 
   it("listOpen({type}) filters to one list-type", async () => {
     const a = await createRealHouseholdAgent();
-    const r = await a.callSkill('household', 'listOpen', { type: 'shopping' });
+    const r = await a.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(r.items.map((it) => it.label)).toEqual(['Milk']);
   });
 
@@ -53,7 +53,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
     });
     expect(typeof done.itemId).toBe('string');
     expect(done._sync).toBeTruthy();
-    const list = await a.callSkill('household', 'listOpen', {});
+    const list = await a.callSkill('household', 'listOpenItems', {});
     expect(list.items.length).toBe(2);
     expect(list.items.find((c) => c.label === 'Milk')).toBeUndefined();
   });
@@ -72,7 +72,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/More than one match/);
     // …and NOTHING was completed — both candidates are still open.
-    const list = await a.callSkill('household', 'listOpen', {});
+    const list = await a.callSkill('household', 'listOpenItems', {});
     expect(list.items.find((c) => c.label === 'Post a parcel')).toBeTruthy();
     expect(list.items.find((c) => c.label === 'Vacuum living room')).toBeTruthy();
   });
@@ -82,7 +82,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
     // 'Milk' is unique → completes it (single-match resolve, not a disambiguation prompt).
     const r = await a.callSkill('household', 'markComplete', { match: 'Milk' });
     expect(r).toMatchObject({ ok: true, message: '✓ Marked complete: Milk', text: 'Milk' });
-    const list = await a.callSkill('household', 'listOpen', {});
+    const list = await a.callSkill('household', 'listOpenItems', {});
     expect(list.items.find((c) => c.label === 'Milk')).toBeUndefined();
   });
 
@@ -347,7 +347,7 @@ describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', (
     });
     expect(consumed).toBe(true);
     await new Promise((r) => setTimeout(r, 15));
-    const open = await a.callSkill('household', 'listOpen', {});
+    const open = await a.callSkill('household', 'listOpenItems', {});
     expect(open.items.some((i) => i.label === 'Synced eggs')).toBe(true);
   });
 
@@ -374,7 +374,7 @@ describe('createRealHouseholdAgent — L3 uniform wired path (default; legacy re
   it('household ops route to the dissolved CircleItemStore cores by default', async () => {
     const a = await createRealHouseholdAgent();
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'milk' });
-    const open = await a.callSkill('household', 'listOpen', { type: 'shopping' });
+    const open = await a.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(open.items.map((i) => i.label)).toContain('milk');          // adapted render shape {items:[{label}]}
     const t = await a.callSkill('household', 'addTask', { text: 'fix fence' });
     expect(t.ok).toBe(true);                                            // chat-shell action shape {ok,message,text,itemId}
@@ -384,7 +384,7 @@ describe('createRealHouseholdAgent — L3 uniform wired path (default; legacy re
 
   it('listOpen without a type returns every OPEN item across list-types (the legacy no-type call)', async () => {
     const a = await createRealHouseholdAgent();
-    const open = await a.callSkill('household', 'listOpen', {});
+    const open = await a.callSkill('household', 'listOpenItems', {});
     // seed: Milk (shopping) + Post a parcel (errand) + Vacuum living room (task) — all three.
     expect(open.items.map((i) => i.label).sort()).toEqual(['Milk', 'Post a parcel', 'Vacuum living room']);
   });

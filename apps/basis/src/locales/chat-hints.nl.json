@@ -4,7 +4,7 @@
       "text": "Zet iets op een lijst van het huishouden — type is shopping (boodschappen), errand (klusjes), repair (reparaties) of schedule (agenda). Gebruik dit voor \"zet X op de boodschappen\".",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },
-    "listOpen": {
+    "listOpenItems": {
       "text": "Laat de open items van een lijst zien.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     },

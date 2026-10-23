@@ -28,7 +28,7 @@ describe('ollama — parseOpenAIChatResponse', () => {
       choices: [{
         message: {
           tool_calls: [{
-            function: { name: 'listOpen', arguments: { type: 'shopping' } },
+            function: { name: 'listOpenItems', arguments: { type: 'shopping' } },
           }],
         },
       }],

@@ -204,7 +204,7 @@ export function botOffers(appOrigin, op, role, preset = 'standard') {
     return op?.visibility !== 'trusted' || role == null || role === 'admin';
   }
   // the map names each op with its app, so household's ops (the bot's template, not an app it offers) are off it by
-  // construction: `household.listOpen` is not the chores' `tasks.listOpen`
+  // construction: `household.listOpenItems` is not the chores' `tasks.listOpen`
   if (!botOpLevel(q)) return false;
   // one rule for what a role reaches — the same the host gate asks
   return botRoleAllows(role, q, preset);

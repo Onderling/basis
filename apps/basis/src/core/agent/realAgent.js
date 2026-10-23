@@ -438,7 +438,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
   const HOUSEHOLD_WIRED_OPS = new Set([
-    'addItem', 'addTask', 'markComplete', 'removeItem', 'claim', 'reassign', 'listOpen', 'listTasks',
+    'addItem', 'markComplete', 'removeItem', 'claim', 'reassign', 'listOpenItems', 'listTasks',
   ]);
   // v0.7.7 — optional event publisher.  When supplied, mutation
   // skills publish item-changed events via this callback so the
@@ -1372,12 +1372,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     const wire     = (id, coreFn, op = hhOp(id)) => hostAgent.register(id, wireSkill(coreFn, op, { storeFor }), { visibility: op.visibility });
 
     wire('addItem',      withBy(householdApp.addItem));
-    wire('addTask',      withBy(householdApp.addTask));
     wire('markComplete', withBy(householdApp.markComplete));
     wire('claim',        withBy(householdApp.claim));
     wire('reassign',     withBy(householdApp.reassign));
     wire('removeItem',   withBy(householdApp.removeItem));  // removal is gated + attributed like the other writes
-    wire('listOpen',     listWrap(householdApp.listOpen), typeOptional(hhOp('listOpen')));
+    wire('listOpenItems', listWrap(householdApp.listOpen), typeOptional(hhOp('listOpenItems')));
     wire('listTasks',    listWrap(householdApp.listTasks));
   }
 
@@ -3946,7 +3945,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         let rows = [];
         let members = [];
         try {
-          const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
+          const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
           const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
           rows = items.filter((it) => it?.source?.groupId === circleId);
         } catch { rows = []; }
@@ -5079,7 +5078,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   if (seedDemoData && opts.seedPinboardPosts !== false) {
     let alreadySeeded = false;
     try {
-      const probe = await chatAgent.invoke(pinboardAgent.address, 'listOpen', [DataPart({})]);
+      const probe = await chatAgent.invoke(pinboardAgent.address, 'listOpenRequests', [DataPart({})]);
       const data  = Array.isArray(probe) ? probe[0]?.data : null;
       const items = Array.isArray(data?.items) ? data.items : [];
       alreadySeeded = items.length > 0;
@@ -6752,7 +6751,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   /** Adapt a wired household-core reply (list OR mutation) to the chat-shell shape. */
   function adaptWiredHouseholdReply(opId, data, args, tr = agentT) {
-    if (opId === 'listOpen' || opId === 'listTasks') {
+    if (opId === 'listOpenItems' || opId === 'listTasks') {
       const items = Array.isArray(data?.items) ? data.items : [];
       // v0.6 — annotate every-other row with a synthetic `_lastSync` so the per-row
       // 'stale Xh ago' badge has something to render (demo parity).
@@ -6814,10 +6813,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       return { ok: true, message, ...(text ? { text } : {}), ...(itemId ? { itemId } : {}), _sync: simulateSync() };
     }
 
-    // addItem / addTask — `data` is the stored item.
+    // addItem — `data` is the stored item.
     const item    = data ?? {};
     const text    = item.text ?? '';
-    const message = opId === 'addTask' ? tr('circle.household.added_task', { text }) : tr('circle.household.added_to', { list: item.type, text });
+    const message = tr('circle.household.added_to', { list: item.type, text });
     publish(item.id, message);
     return { ok: true, message, ...(text ? { text } : {}), ...(item.id ? { itemId: item.id } : {}), _sync: simulateSync() };
   }
@@ -7360,11 +7359,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         _sync:   simulateSync(),
       };
     }
-    // listFeed / listOpen / listMyRequests / getBulletin: items[] of
+    // listFeed / listOpenRequests / listMyRequests / getBulletin: items[] of
     // {id, text, ...} → add a `label` alias on each row + add _sync
     // envelope so the chat shell's renderer picks up the standard
     // chat shapes.
-    if ((opId === 'listFeed' || opId === 'listOpen' || opId === 'listMyRequests'
+    if ((opId === 'listFeed' || opId === 'listOpenRequests' || opId === 'listMyRequests'
          || opId === 'getBulletin')
         && Array.isArray(data.items)) {
       return {

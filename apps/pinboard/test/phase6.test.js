@@ -128,7 +128,7 @@ describe('Pinboard V1 — setPeerReveal / setGroupReveal', () => {
       members: [{ webid: ANNE }, { webid: BOB, handle: 'bob-fix-it', displayName: 'Bob Janssen' }],
     });
 
-    const before = await callSkill(bundle.agent, 'listOpen');
+    const before = await callSkill(bundle.agent, 'listOpenRequests');
     expect(reveals.decide({ peerWebid: BOB }).showDisplayName).toBe(false);
 
     const r = await callSkill(bundle.agent, 'setPeerReveal', { peerWebid: BOB });

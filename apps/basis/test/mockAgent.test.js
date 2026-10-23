@@ -8,19 +8,19 @@ import {
 } from '../src/core/agent/mockAgent.js';
 
 describe('mockHouseholdManifest', () => {
-  it('declares listOpen + markComplete with right surfaces', () => {
+  it('declares listOpenItems + markComplete with right surfaces', () => {
     const ops = Object.fromEntries(
       mockHouseholdManifest.operations.map((o) => [o.id, o]),
     );
-    expect(ops.listOpen.verb).toBe('list');
-    expect(ops.listOpen.surfaces.slash.command).toBe('/mine');
-    expect(ops.listOpen.surfaces.chat.reply).toBe('list');
+    expect(ops.listOpenItems.verb).toBe('list');
+    expect(ops.listOpenItems.surfaces.slash.command).toBe('/mine');
+    expect(ops.listOpenItems.surfaces.chat.reply).toBe('list');
     expect(ops.markComplete.verb).toBe('complete');
     expect(ops.markComplete.surfaces.slash.command).toBe('/done');
     // (v0.7) added pickerSource — markComplete picks via listOpen.
     expect(ops.markComplete.params[0]).toEqual({
       name: 'choreId', kind: 'string', required: true,
-      pickerSource: { listOp: 'listOpen' },
+      pickerSource: { listOp: 'listOpenItems' },
     });
   });
 });
@@ -28,7 +28,7 @@ describe('mockHouseholdManifest', () => {
 describe('createMockHouseholdAgent — listOpen', () => {
   it('returns 3 seed chores in open state', async () => {
     const a = createMockHouseholdAgent();
-    const r = await a.callSkill('household', 'listOpen', {});
+    const r = await a.callSkill('household', 'listOpenItems', {});
     expect(r.items.length).toBe(3);
     expect(r.items.map((c) => c.label).sort()).toEqual([
       'Bins out', 'Dishwasher', 'Vacuum living room',
@@ -39,7 +39,7 @@ describe('createMockHouseholdAgent — listOpen', () => {
   it('omits chores marked complete', async () => {
     const a = createMockHouseholdAgent();
     await a.callSkill('household', 'markComplete', { choreId: 'c-1' });
-    const r = await a.callSkill('household', 'listOpen', {});
+    const r = await a.callSkill('household', 'listOpenItems', {});
     expect(r.items.length).toBe(2);
     expect(r.items.find((c) => c.id === 'c-1')).toBeUndefined();
   });
@@ -73,7 +73,7 @@ describe('createMockHouseholdAgent — markComplete', () => {
 describe('createMockHouseholdAgent — error paths', () => {
   it('throws on unknown appOrigin', async () => {
     const a = createMockHouseholdAgent();
-    await expect(a.callSkill('pinboard', 'listOpen', {})).rejects.toThrow(
+    await expect(a.callSkill('pinboard', 'listOpenRequests', {})).rejects.toThrow(
       /unknown appOrigin/,
     );
   });
@@ -99,7 +99,7 @@ describe('createMockHouseholdAgent — reset + custom seed', () => {
     const a = createMockHouseholdAgent({ seed: [
       { id: 'x', label: 'Custom', type: 'chore', state: 'open' },
     ] });
-    const r = await a.callSkill('household', 'listOpen', {});
+    const r = await a.callSkill('household', 'listOpenItems', {});
     expect(r.items.length).toBe(1);
     expect(r.items[0].label).toBe('Custom');
   });

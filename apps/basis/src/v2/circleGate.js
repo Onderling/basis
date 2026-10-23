@@ -310,7 +310,7 @@ const CIRCLE_RULES = [
   } },
   // "kaas is gekocht" · "the dishes are done" — a statement, not a command
   { id: 'circle.markComplete.stated', name: 'household:markComplete(stated-done)', build: (m) => (m.item ? { opId: 'markComplete', args: { match: m.item } } : null) },
-  { id: 'circle.listOpen.typed', name: 'household:listOpen(typed-list-read)', build: (m) => { const type = householdListType(m.list); return type ? { opId: 'listOpen', args: { type } } : null; } },
+  { id: 'circle.listOpen.typed', name: 'household:listOpenItems(typed-list-read)', build: (m) => { const type = householdListType(m.list); return type ? { opId: 'listOpenItems', args: { type } } : null; } },
   { id: 'circle.listTasks.read', name: 'household:listTasks(read)', build: () => ({ opId: 'listTasks', args: {} }) },
 ];
 /** The circle rules' ids, in order — what the words guard checks each language against. */

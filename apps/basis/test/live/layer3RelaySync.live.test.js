@@ -65,7 +65,7 @@ async function buildRelayAgent(label) {
 }
 
 const openItems = async (agent) => {
-  const r = await agent.callSkill('household', 'listOpen', {});
+  const r = await agent.callSkill('household', 'listOpenItems', {});
   return (r?.items ?? []).map((i) => String(i.text ?? i.label ?? ''));
 };
 const waitFor = async (fn, { tries = 40, gapMs = 250 } = {}) => {

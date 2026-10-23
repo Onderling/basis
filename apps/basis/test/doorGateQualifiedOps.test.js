@@ -1,7 +1,7 @@
 /**
  * The household bot's door gate decides on the op the call actually REACHES: its app and its op (`app.op`), never the
  * op's bare id. The catalogue keeping household's `listOpen` off a person's menu is a convention — a different client
- * names `household.listOpen` anyway — so the gate is where it binds. The map's columns name each op with its app; a
+ * names `household.listOpenItems` anyway — so the gate is where it binds. The map's columns name each op with its app; a
  * bare id two apps declare is ambiguous and refused, never resolved to one of them.
  *
  * Composed as the box composes a household bot: the real agent with the bot's map and role rule, and the door's own
@@ -48,7 +48,7 @@ describe('the columns name each op with its app', () => {
     }
     // the chores' open read is on the member's column — as the tasks app's, never household's or pinboard's
     expect(BOT_OP_MAP.member).toContain('tasks.listOpen');
-    expect(BOT_OP_MAP.member).not.toContain('household.listOpen');
+    expect(BOT_OP_MAP.member).not.toContain('household.listOpenItems');
   });
 });
 
@@ -83,8 +83,8 @@ describe('the door gate decides on the qualified op', () => {
   it('a door call naming household\'s `listOpen` is refused for a member and an observer — so is every household op', async () => {
     for (const role of ['member', 'observer']) {
       const caller = PEOPLE[role];
-      const r = await door('household', 'listOpen', {}, { caller, threadId: caller });
-      expect(r?.refusal, `${role}: household.listOpen → ${JSON.stringify(r)}`).toMatchObject({ layer: 'door-map' });
+      const r = await door('household', 'listOpenItems', {}, { caller, threadId: caller });
+      expect(r?.refusal, `${role}: household.listOpenItems → ${JSON.stringify(r)}`).toMatchObject({ layer: 'door-map' });
       for (const op of householdManifest.operations.map((o) => o.id)) {
         expect(await agent.doorRefusal(`household.${op}`, caller), `${role}: household.${op}`).toBeTruthy();
       }
@@ -109,7 +109,7 @@ describe('the door gate decides on the qualified op', () => {
       }
     }
     // the pinboard app's own `listOpen` too: one name, three apps, one of them the bot's
-    expect((await agent.callSkill('pinboard', 'listOpen', {}, { caller: PEOPLE.member }))?.refusal).toMatchObject({ layer: 'door-map' });
+    expect((await agent.callSkill('pinboard', 'listOpenRequests', {}, { caller: PEOPLE.member }))?.refusal).toMatchObject({ layer: 'door-map' });
   });
 
   it('a bare id two apps declare is refused as ambiguous, not resolved to one of them', async () => {

@@ -80,9 +80,9 @@ describe('withCalendarOutbound', () => {
     const sendPeer = vi.fn(async () => {});
     const inner = vi.fn(async () => ({ ok: true, items: [] }));
     const cs = withCalendarOutbound(inner, { sendPeer, isPeerConnected: () => true });
-    const r = await cs('pinboard', 'listOpen', {});
+    const r = await cs('pinboard', 'listOpenRequests', {});
     expect(r).toEqual({ ok: true, items: [] });
-    expect(inner).toHaveBeenCalledWith('pinboard', 'listOpen', {});
+    expect(inner).toHaveBeenCalledWith('pinboard', 'listOpenRequests', {});
     expect(sendPeer).not.toHaveBeenCalled();
   });
 

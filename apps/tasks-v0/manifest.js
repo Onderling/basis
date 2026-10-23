@@ -115,7 +115,8 @@ export const tasksManifest = {
       ],
       surfaces: {
         // Part G (2026-06-17) — slash/gate folded in from the former mockTasksManifest.
-        slash: { command: '/addtask', body: 'flags',
+        // '/task' too: the household's word for it, kept when household's own addTask went (one owner per op)
+        slash: { command: '/addtask', aliases: ['/task'], body: 'flags',
           // F-SP2 (2026-06-11) — the deterministic NL gate (renderSlash/renderGate): "add X" routes
           // here without the LLM. `text-only` → the body is the task text; dropTrailing strips the
           // "… to/op the list" qualifier so "add milk to the list" → text "milk".

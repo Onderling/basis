@@ -86,7 +86,7 @@ describe('content is sealed at rest — a person\'s words are nowhere on this di
     await new Promise((r) => setTimeout(r, 1200));
 
     // ── The person still has their things. Sealing that loses content is not sealing. ────────────────
-    const items = await node.agent.callSkill('household', 'listOpen', { type: 'shopping' });
+    const items = await node.agent.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(JSON.stringify(items), 'the item must still be readable through the app').toContain(SECRET_ITEM);
 
     // ── And the disk gives nothing away. ─────────────────────────────────────────────────────────────

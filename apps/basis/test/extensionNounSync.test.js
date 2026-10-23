@@ -24,7 +24,7 @@ const plantsOn = async (node) => {
 };
 // what a member's circle store holds, whatever the type (household's open listing reads the store whole)
 const rowsOn = async (node) => {
-  const r = await node.agent.callSkill('household', 'listOpen', { circleId: CIRCLE }).catch(() => null);
+  const r = await node.agent.callSkill('household', 'listOpenItems', { circleId: CIRCLE }).catch(() => null);
   return r?.items ?? r?.result?.items ?? [];
 };
 

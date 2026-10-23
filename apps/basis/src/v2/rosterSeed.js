@@ -109,7 +109,7 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
       if (!(await verify({ author: by, ref, payload: { delegation: payload.delegation ?? null } }))) return;
     } catch { return; }
     try {
-      const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
+      const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
       const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
       const rows = items.filter((it) => it?.source?.groupId === body.circleId);
       if (rows.length === 0) return;   // nothing to seed — silence, not an empty parcel
@@ -220,7 +220,7 @@ export function makeRosterSeedReceiver({ callSkill, verifyDeviceSet, selfPubKey,
           else if (typeof console !== 'undefined') {
             let rowsNow = null;
             try {
-              const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
+              const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
               const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
               rowsNow = items.filter((it) => it?.source?.groupId === body.circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? '').slice(0, 6), addr: String(it.source?.circleAddress ?? '').slice(0, 6), proof: !!it.source?.circleAddressProof, set: (it.source?.circleAddresses ?? []).map((p) => `${String(p?.address).slice(0, 6)}${p?.proof ? '+p' : '-p'}`) }));
             } catch { rowsNow = null; }

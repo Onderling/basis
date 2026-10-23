@@ -211,7 +211,7 @@ export const pinboardManifest = {
       },
     },
     {
-      id:   'listOpen', visibility: 'authenticated', group: 'data',
+      id:   'listOpenRequests', visibility: 'authenticated', group: 'data',
       circleScoped: true,
       verb: 'list',
       // listOpen spans the three noticeboard types — no appliesTo.type
@@ -2075,7 +2075,7 @@ export const pinboardManifest = {
       id:            'noticeboard',
       title:         'Noticeboard',
       type:          'post',
-      dataSource:    { skillId: 'listOpen' },
+      dataSource:    { skillId: 'listOpenRequests' },
       categoryField: 'kind',
       // D-mig-2 — the free-text filter grammar.  A noticeboard post row (the
       // listOpen reply adapter, realAgent.js) sets `label = post.text` —

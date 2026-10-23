@@ -45,14 +45,14 @@ describe('a headless device still has its list after a restart', () => {
     const first = await boot();
     await first.callSkill('household', 'addItem', { type: 'shopping', text: SECRET });
     await new Promise((r) => setTimeout(r, 1200));   // past the persist adapter's debounce
-    expect(JSON.stringify(await first.callSkill('household', 'listOpen', { type: 'shopping' })),
+    expect(JSON.stringify(await first.callSkill('household', 'listOpenItems', { type: 'shopping' })),
       'the item was never stored — the restart half would be vacuous').toContain(SECRET);
     await first.stop?.().catch(() => {});
 
     // ── The box restarts. ───────────────────────────────────────────────────────────────────────
     const second = await boot();
     try {
-      expect(JSON.stringify(await second.callSkill('household', 'listOpen', { type: 'shopping' })),
+      expect(JSON.stringify(await second.callSkill('household', 'listOpenItems', { type: 'shopping' })),
         'the list did not survive the restart — the content key was not durable').toContain(SECRET);
     } finally {
       await second.stop?.().catch(() => {});

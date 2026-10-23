@@ -56,7 +56,7 @@ describe('buildSkills (group-aware mode)', () => {
     const getBundle = vi.fn((args) => args.groupId === 'grA' ? groupA : null);
     const skills = buildSkills({ getBundle });
 
-    const listOpen = skills.find(s => s.id === 'listOpen');
+    const listOpen = skills.find(s => s.id === 'listOpenRequests');
     const r = await listOpen.handler({
       parts: [{ type: 'DataPart', data: { groupId: 'grA' } }],
       from:  'urn:me',
@@ -86,7 +86,7 @@ describe('buildSkills (group-aware mode)', () => {
       args.groupId === 'grA' ? groupA :
       args.groupId === 'grB' ? groupB : null;
     const skills = buildSkills({ getBundle });
-    const listOpen = skills.find(s => s.id === 'listOpen');
+    const listOpen = skills.find(s => s.id === 'listOpenRequests');
 
     const rA = await listOpen.handler({
       parts: [{ type: 'DataPart', data: { groupId: 'grA' } }], from: 'urn:me',
@@ -101,7 +101,7 @@ describe('buildSkills (group-aware mode)', () => {
 
   it('rejects with `groupId required` when getBundle returns null', async () => {
     const skills = buildSkills({ getBundle: () => null });
-    const listOpen = skills.find(s => s.id === 'listOpen');
+    const listOpen = skills.find(s => s.id === 'listOpenRequests');
     const r = await listOpen.handler({
       parts: [{ type: 'DataPart', data: {} }], from: 'urn:me',
     });
@@ -117,7 +117,7 @@ describe('buildSkills (group-aware mode)', () => {
       return groupA;
     };
     const skills = buildSkills({ getBundle });
-    const listOpen = skills.find(s => s.id === 'listOpen');
+    const listOpen = skills.find(s => s.id === 'listOpenRequests');
 
     await listOpen.handler({
       parts: [{ type: 'DataPart', data: { groupId: 'grA' } }], from: 'urn:me',

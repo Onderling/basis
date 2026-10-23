@@ -30,7 +30,7 @@
  *     whole device); this app only READS it, through `scope.muted`.
  *   - `reportPost({itemId, reason})` — appends a `kind: 'report'`
  *     item referencing the original.
- *   - `listOpen` / `listMyRequests` outputs hydrate each item's
+ *   - `listOpenRequests` / `listMyRequests` outputs hydrate each item's
  *     author into a `display: {handle, displayName?, isRevealed, render}`
  *     block when a `Reveals` store is wired.  Legacy callers without
  *     a reveals store get the raw item shape unchanged.
@@ -2015,13 +2015,13 @@ export function buildSkills({
      *   - 'report'  → type=report (bespoke; pass-through)
      *   - other     → type=<intent>             (bespoke pass-through)
      *
-     * Item-store's `listOpen` only filters by `type`; the `kind`
+     * Item-store's `listOpenRequests` only filters by `type`; the `kind`
      * post-filter happens in JS.
      */
     // B★ B3 NOT wired (conflict c): a test pins `listOpen({intent:'report'})`
     // (web.test.js) — 'report' is outside the op's `intent` enum
     // (ask/offer/lend), so wireSkill would throw. Kept hand-written.
-    defineSkill('listOpen', async ({ parts, from }) => {
+    defineSkill('listOpenRequests', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const filter = {};
       if (a.skill) filter.requiredSkill = a.skill;

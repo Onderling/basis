@@ -56,7 +56,7 @@ describe('cache-mode mirroring — a task crosses two REAL agents via the shared
 
     // B has never seen this item and shares NO peer channel with A — opening the circle runs catch-up, which
     // enumerates the pod + reads through, so B's listOpen discovers A's item. (Guards the pod feed end-to-end.)
-    const listed = await B.agent.callSkill('household', 'listOpen', { circleId: CIRCLE });
+    const listed = await B.agent.callSkill('household', 'listOpenItems', { circleId: CIRCLE });
     const items = Array.isArray(listed?.items) ? listed.items : (Array.isArray(listed) ? listed : []);
     expect(items.some((i) => i?.text === 'buy milk'), 'B discovered A\'s item through the pod').toBe(true);
   });

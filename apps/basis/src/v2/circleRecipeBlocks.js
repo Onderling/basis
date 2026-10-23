@@ -176,7 +176,7 @@ async function materializeNoticeboard(block, circleId, { callSkill, eventLog, ci
   let listOpenSucceeded = false;
   if (typeof callSkill === 'function') {
     try {
-      const res = await callSkill('pinboard', 'listOpen', {});
+      const res = await callSkill('pinboard', 'listOpenRequests', {});
       // Keep only real asks/offers — drop system items (rules / membership lifecycle)
       // that listOpen returns alongside posts.
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);

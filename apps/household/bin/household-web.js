@@ -166,7 +166,7 @@ export async function startHouseholdWeb(opts = {}) {
   // drive the UI — every button on the page traces to an op the
   // server knows how to dispatch.
 
-  agent.register('listOpen', adaptHouseholdSkill(
+  agent.register('listOpenItems', adaptHouseholdSkill(
     listOpen, store, getAgent,
     async (_reply, args) => ({
       items: await store.listOpen({ type: args?.type }),
@@ -246,7 +246,7 @@ export async function startHouseholdWeb(opts = {}) {
     });
   });
 
-  // (no need to register `listOpen` for type=contact specifically — the
+  // (no need to register `listOpenItems` for type=contact specifically — the
   // members section's adapter calls listOpen({type: 'contact'}) and
   // the household skill's KNOWN_TYPES guard rejects it.  V0 surfaces
   // the members tab as empty until a follow-on adds a contact-list

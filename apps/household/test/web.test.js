@@ -128,7 +128,7 @@ describe('household web UI smoke (Slice A.3)', () => {
 
     // Now fetch the list — must include the freshly added bread.
     const listBody = {
-      skillId: 'listOpen',
+      skillId: 'listOpenItems',
       message: { parts: [{ type: 'DataPart', data: { type: 'shopping' } }] },
     };
     const listRes = await fetch(`${baseUrl}/tasks/send`, {
@@ -160,7 +160,7 @@ describe('household web UI smoke (Slice A.3)', () => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        skillId: 'listOpen',
+        skillId: 'listOpenItems',
         message: { parts: [{ type: 'DataPart', data: { type: 'errand' } }] },
       }),
     });
@@ -185,7 +185,7 @@ describe('household web UI smoke (Slice A.3)', () => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        skillId: 'listOpen',
+        skillId: 'listOpenItems',
         message: { parts: [{ type: 'DataPart', data: { type: 'errand' } }] },
       }),
     });

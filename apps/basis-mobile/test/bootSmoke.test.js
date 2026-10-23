@@ -112,7 +112,7 @@ describe('#222 basis-mobile portable-core boot', () => {
 
     // Smoke-call a household skill so we know the factory actually
     // routes a request (not just constructed shells).
-    const r = await bundle.callSkill('household', 'listOpen', {});
+    const r = await bundle.callSkill('household', 'listOpenItems', {});
     expect(r).toBeTruthy();
     expect(r.ok !== false || r.items).toBeTruthy(); // either ok-shaped reply or items
 

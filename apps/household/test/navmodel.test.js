@@ -64,10 +64,8 @@ describe('household manifest → NavModel (Slice A.2)', () => {
   describe('tasks section (SP-2 appliesTo + multi-type lifecycle)', () => {
     const tasks = navModel.sections.find((s) => s.id === 'tasks');
 
-    it('addTask surfaces as section affordance (no prefilledParams; explicit appliesTo)', () => {
-      const addTask = tasks.affordances.find((a) => a.opId === 'addTask');
-      expect(addTask).toBeTruthy();
-      expect(addTask).not.toHaveProperty('prefilledParams');
+    it('no addTask affordance: a chore is added through the tasks app (one owner per op)', () => {
+      expect(tasks.affordances.find((a) => a.opId === 'addTask')).toBeUndefined();
     });
 
     it('claim surfaces as itemAction with state="open"', () => {
@@ -106,7 +104,7 @@ describe('household manifest → NavModel (Slice A.2)', () => {
         ...s.itemActions.map((a) => a.opId),
       ]);
       // listOpen + listTasks: skipped by verb=list rule.
-      expect(allOpIds).not.toContain('listOpen');
+      expect(allOpIds).not.toContain('listOpenItems');
       expect(allOpIds).not.toContain('listTasks');
       // classifyAndExtract: not in manifest, sanity-check.
       expect(allOpIds).not.toContain('classifyAndExtract');

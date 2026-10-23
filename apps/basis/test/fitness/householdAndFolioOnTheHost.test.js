@@ -20,7 +20,7 @@ describe('household and folio fold onto the host', () => {
     expect(shared.share.issuer).toBe(agent.inProcessPubKeys().host);
     // ...and a household write still lands and reads back through the host
     await agent.callSkill('household', 'addItem', { type: 'shopping', text: 'melk' });
-    const open = await agent.callSkill('household', 'listOpen', { type: 'shopping' });
+    const open = await agent.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(JSON.stringify(open)).toContain('melk');
   });
 });

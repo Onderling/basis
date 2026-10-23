@@ -62,7 +62,7 @@ SUITE('pinboard attachPod → real pod (CSS)', () => {
     expect(posted?.error).toBeUndefined();
 
     // and it's readable back (through the cache + pod round-trip)
-    const open = await callSkill(pinboard.bundle.agent, 'listOpen', {}, me);
+    const open = await callSkill(pinboard.bundle.agent, 'listOpenRequests', {}, me);
     expect((open?.items ?? []).some((i) => (i.text ?? i.label) === marker)).toBe(true);
 
     await pinboard.close();

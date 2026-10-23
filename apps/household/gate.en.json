@@ -8,7 +8,7 @@
       "add milk"
     ]
   },
-  "household.listOpen": {
+  "household.listOpenItems": {
     "doc": "Show what is open on a household list.",
     "verbs": [
       "list",

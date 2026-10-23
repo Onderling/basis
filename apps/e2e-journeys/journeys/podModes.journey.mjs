@@ -53,7 +53,7 @@ async function corridor({ relayUrl, circleId, pod, check, label }) {
       // is what a person does (re-enter the screen, pull to refresh); asserting without it would be
       // asserting a reactive delivery this mode does not claim to have.
       if (pod) await bram.agent.catchUpCircle?.(circleId);
-      const r = await bram.agent.callSkill('household', 'listOpen', { circleId });
+      const r = await bram.agent.callSkill('household', 'listOpenItems', { circleId });
       const items = Array.isArray(r?.items) ? r.items : (Array.isArray(r) ? r : []);
       return items.some((i) => (i?.text ?? '') === 'melk halen');
     }, 10000);

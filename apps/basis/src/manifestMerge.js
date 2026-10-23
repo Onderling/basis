@@ -180,8 +180,11 @@ export function mergeManifests(sources, opts = {}) {
       // equivalence) but defer to the shell's equivalent in a merged circle
       // (e.g. household's /help → the basis shell's global /help, which
       // already introspects every app). Skipped here = no collision, no warning.
-      if (op?.surfaces?.slash?.command && !op.surfaces.slash.standaloneOnly) {
-        const command = op.surfaces.slash.command;
+      // a slash command and its aliases (`aliases: ['/task']`): each one a menu entry for the same op
+      const slashCommands = op?.surfaces?.slash?.command && !op.surfaces.slash.standaloneOnly
+        ? [op.surfaces.slash.command, ...(Array.isArray(op.surfaces.slash.aliases) ? op.surfaces.slash.aliases : [])]
+        : [];
+      for (const command of slashCommands) {
         // Objective D — record EVERY declarer (winner + losers) so the
         // post-pass can project qualified forms + apply the collision policy.
         recordDeclarer(command, op.id, m.app, op.surfaces.slash.body);

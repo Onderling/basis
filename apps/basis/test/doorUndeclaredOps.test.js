@@ -16,9 +16,9 @@ describe('a door reaches declared ops only', () => {
     expect(opDeclared('pinboard.scorePostRelevance')).toBe(false);
     expect(opDeclared('household.__generic__:household:add:nonsense')).toBe(false);
     expect(opDeclared('scorePostRelevance')).toBe(false);
-    // a bare id: one declarer counts (as the door map reads it), two is ambiguous and does not
+    // a bare id: one declarer counts (as the door map reads it); since every op has one owner, the chores' listOpen does
     expect(opDeclared('addToList')).toBe(true);
-    expect(opDeclared('listOpen')).toBe(false);
+    expect(opDeclared('listOpen')).toBe(true);
   });
 
   it('an admin at a door asking an undeclared op is refused by name; a declared op answers; the device itself still reaches it', async () => {

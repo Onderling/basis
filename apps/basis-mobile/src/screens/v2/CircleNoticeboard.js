@@ -76,7 +76,7 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
     let who = myWebid;
     if (who == null) { try { const r = await callSkill('pinboard', 'whoAmI', {}); who = r?.webid ?? r?.webId ?? ''; } catch { who = ''; } setMyWebid(who); }
     try {
-      const res = await callSkill('pinboard', 'listOpen', {});
+      const res = await callSkill('pinboard', 'listOpenRequests', {});
       // Keep only real asks/offers — listOpen (no intent) also returns system items
       // (rules / membership) which aren't noticeboard posts.
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);

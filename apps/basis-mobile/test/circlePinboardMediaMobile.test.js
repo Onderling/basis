@@ -96,7 +96,7 @@ describe('mobile pinboard media — seals a picked noticeboard image per-circle 
       { id: '1', text: 'x', groupId: 'circle-a', source: { groupId: 'circle-a', attachments: [sealedAtt] } },
     ] });
     const scopedList = scopePinboardCallSkill(csList, 'circle-a', async () => strategy, getMedia);
-    const res = await scopedList('pinboard', 'listOpen', {});
+    const res = await scopedList('pinboard', 'listOpenRequests', {});
     const openedAtt = res.items[0].source.attachments[0];
     expect(openedAtt.thumbnail).toMatch(/^data:image\/jpeg;base64,/);   // opened for the chip
     expect(openedAtt.source.type).toBe('blob');                          // sealed pointer preserved

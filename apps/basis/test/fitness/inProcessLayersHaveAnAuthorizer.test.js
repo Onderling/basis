@@ -14,7 +14,7 @@ describe('in-process layers', () => {
   it('each has an authorizer, and after traffic none accepted by absence', { timeout: 120_000 }, async () => {
     const agent = await createRealHouseholdAgent({ seedHousehold: true });
     // traffic through every in-process agent the boot adopted
-    await agent.callSkill('household', 'listOpen', {}).catch(() => {});
+    await agent.callSkill('household', 'listOpenItems', {}).catch(() => {});
     await agent.callSkill('pinboard', 'listMyCircles', {}).catch(() => {});
     await agent.callSkill('tasks', 'listOpen', {}).catch(() => {});
     await agent.callSkill('folio', 'listFiles', {}).catch(() => {});

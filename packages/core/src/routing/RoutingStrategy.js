@@ -196,6 +196,17 @@ export class RoutingStrategy {
   }
 
   /**
+   * Called when a transport has fresh evidence it reaches a peer again (it rediscovered it on the LAN): lifts the
+   * degraded mark a send failure left, so the peer is routed there again now rather than after the penalty runs out.
+   *
+   * @param {string} peerId
+   * @param {string} transportName
+   */
+  onTransportRecovered(peerId, transportName) {
+    this.#fallback.clearDegraded(peerId, transportName);
+  }
+
+  /**
    * Pin a transport as the first choice for a specific peer. Used by
    * Agent-layer upgrade hooks (e.g. rendezvous DataChannel opened).
    *

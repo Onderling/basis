@@ -98,6 +98,12 @@ the need named beside them.
 mobile, never on the box; WebRTC rendezvous on web and mobile; mDNS on mobile (browse by default) and on a companion
 started with `--nearby`.
 
+**Switching between them (the LAN/relay hybrid):** the secure send path's one picker routes a peer over mDNS while the
+transport holds a live connection to it, over the relay when it leaves, and back when mDNS rediscovers it; a send that
+fails on the way is resent on the next tier, and the peer's return lifts that penalty at once
+(`packages/secure-agent/test/lanRelayHybrid.test.js`). **No order is kept across a switch:** one-way sends promise
+none, so what rode the relay can land after what rode the LAN later — the app orders by time, never by arrival.
+
 ## Where servers keep things
 
 - **The relay:** the forward queue (SQLite at `QUEUE_DB`, else memory), push tokens (SQLite at `PUSH_TOKENS_DB`, else

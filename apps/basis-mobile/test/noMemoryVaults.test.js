@@ -28,13 +28,13 @@ describe('the phone keeps every vault', () => {
     const before = memoryVaultFallbacks().length;
     const first = await bootAgentBundle({ asyncStorage });
     expect(memoryVaultFallbacks().slice(before)).toEqual([]);
-    const agentSlots = () => Object.fromEntries([...asyncStorage.store.entries()].filter(([k]) => /^cc-(household-agent|tasks|pinboard|folio)-id:/.test(k)).sort());
+    const agentSlots = () => Object.fromEntries([...asyncStorage.store.entries()].filter(([k]) => /^cc-(host|tasks|pinboard)-id:/.test(k)).sort());
     const keysFirst = agentSlots();
     try { await first.agent?.stop?.(); } catch { /* the process died */ }
     const second = await bootAgentBundle({ asyncStorage });
     const keysSecond = agentSlots();
     const prefixes = new Set(Object.keys(keysFirst).map((k) => k.split(':')[0]));
-    expect([...prefixes].sort()).toEqual(['cc-folio-id', 'cc-household-agent-id', 'cc-pinboard-id', 'cc-tasks-id']);
+    expect([...prefixes].sort()).toEqual(['cc-host-id', 'cc-pinboard-id', 'cc-tasks-id']);
     expect(keysSecond).toEqual(keysFirst);   // the same stored keys: restored, not minted again
     try { await second.agent?.stop?.(); } catch { /* */ }
   });

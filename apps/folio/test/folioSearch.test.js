@@ -137,7 +137,7 @@ describe('browser folio agent — /zoek (searchNotes) op', () => {
     const bus = new InternalBus();
     const embedder = mockEmbedder();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(), label: 'TestFolio',
+      agent: await makePeer(bus),
       seedFiles: NOTES, noteEmbedder: embedder,
     });
     const peer = await makePeer(bus);
@@ -154,7 +154,7 @@ describe('browser folio agent — /zoek (searchNotes) op', () => {
   it('no embedder ⇒ /zoek semantic degrades to lexical (degraded flag, no embed)', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(), label: 'TestFolio',
+      agent: await makePeer(bus),
       seedFiles: NOTES, /* noteEmbedder omitted — llmTool:'off' */
     });
     const peer = await makePeer(bus);
@@ -173,7 +173,7 @@ describe('browser folio agent — /zoek (searchNotes) op', () => {
   it('setNoteEmbedder lights up semantic after boot', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(), label: 'TestFolio', seedFiles: NOTES,
+      agent: await makePeer(bus), seedFiles: NOTES,
     });
     const peer = await makePeer(bus);
     await peer.hello(folio.address);

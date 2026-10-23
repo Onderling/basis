@@ -30,7 +30,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
   it('boots on a shared bus and serves listFiles with seed files', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(), label: 'TestFolio',
+      agent: (await makePeer(bus)).agent,
     });
     const { agent: peer } = await makePeer(bus);
     await peer.hello(folio.address);
@@ -46,7 +46,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
   it('shareFolder issues a real PodCapabilityToken (not a placeholder)', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(),
+      agent: (await makePeer(bus)).agent,
       podRoot: 'https://alice.example.com/',
     });
     const { agent: peer } = await makePeer(bus);
@@ -71,7 +71,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
   it('shareFolder errors clearly without folder / with args', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(),
+      agent: (await makePeer(bus)).agent,
     });
     const { agent: peer } = await makePeer(bus);
     await peer.hello(folio.address);
@@ -94,7 +94,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
   it('getFileSnapshot + readNote return chat-shell-shaped replies', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(),
+      agent: (await makePeer(bus)).agent,
     });
     const { agent: peer } = await makePeer(bus);
     await peer.hello(folio.address);
@@ -113,7 +113,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
   it('folioStatus + folio_briefSummary surface aggregate counts', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(),
+      agent: (await makePeer(bus)).agent,
     });
     const { agent: peer } = await makePeer(bus);
     await peer.hello(folio.address);
@@ -132,7 +132,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
   it('seedFiles:[] yields empty index', async () => {
     const bus = new InternalBus();
     const folio = await createBrowserFolioAgent({
-      bus, identityVault: new VaultMemory(), seedFiles: [],
+      agent: (await makePeer(bus)).agent, seedFiles: [],
     });
     const { agent: peer } = await makePeer(bus);
     await peer.hello(folio.address);
@@ -162,7 +162,7 @@ describe('createBrowserFolioAgent — boot + skill dispatch', () => {
     };
 
     const bus = new InternalBus();
-    const folio = await createBrowserFolioAgent({ bus, identityVault: new VaultMemory() });
+    const folio = await createBrowserFolioAgent({ agent: (await makePeer(bus)).agent });
     const { agent: peer } = await makePeer(bus);
     await peer.hello(folio.address);
 

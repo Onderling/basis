@@ -1028,7 +1028,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       const r = await circleSignerFor(groupId);
       const id = r?.identity ?? r;
       if (id?.pubKey) selfBinding = { pubKey: id.pubKey, ref: r?.ref ?? id.pubKey };
-    } catch { selfBinding = null; }
+    } catch (err) {
+      // Said out loud: without its own per-circle key this device reads its own statements as someone else's.
+      console.error(`[pinboard] no per-circle signer for ${groupId}: ${err?.message ?? err} — own statements will not bind to this device`);
+      selfBinding = null;
+    }
   }
   // THE SAME RULE FOR THE LEGACY STORE PATH: a device can always verify its OWN key. Where there is
   // no per-circle signer, statements are signed with the device's global identity, so `author` is
@@ -1284,10 +1288,10 @@ export function buildPinboardScope(deps = {}) {
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfWebidFor = null,
   } = deps;
-  // This device's own key paired with the webid it speaks for. Derived HERE so both routes into the
-  // scope get it — the roster projection needs it to read back statements this same composition
-  // wrote with the global identity, where `author` is a pubKey and `subject` a webid.
-  const selfSigner = deps.selfSigner ?? ((bundle?.agent?.identity?.pubKey && localActor)
+  // This device's own key paired with the webid it speaks for, for reading back statements this same composition
+  // wrote with the global identity (`author` a pubKey, `subject` a webid). Only where there is no per-circle
+  // signer is the bundle's key the one that signs; with one, the bundle key is never guessed in its place.
+  const selfSigner = deps.selfSigner ?? (typeof circleSignerFor !== 'function' && bundle?.agent?.identity?.pubKey && localActor
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   // THIS DEVICE in a circle: its persona there (host-injected `selfWebidFor`), else `localActor`. The cores' "is
@@ -1405,10 +1409,9 @@ export function buildSkills({
   // `bundleResolver(parts,{envelope,from})`.  `wire(id, coreFn, opts)` looks the
   // op up in `pinboardManifest`, generates the `defineSkill`-shaped handler via
   // `wireSkill`, and re-attaches the same description/visibility.
-  // This device's own key paired with the webid it speaks for. Derived once and shared with the
-  // scope: the roster projection and the role gate both need it to read back statements this
-  // composition wrote with the global identity (`author` a pubKey, `subject` a webid).
-  const selfSigner = (bundle?.agent?.identity?.pubKey && localActor)
+  // This device's own key paired with the webid it speaks for (see buildPinboardScope): the bundle's key only where
+  // there is no per-circle signer, because only then is it the key that signs.
+  const selfSigner = (typeof circleSignerFor !== 'function' && bundle?.agent?.identity?.pubKey && localActor)
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null;
   const scope = buildPinboardScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,

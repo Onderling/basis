@@ -192,6 +192,10 @@ import { isAwayNow } from '../../v2/memberAvailability.js';
  * agent's vault is selected by createSecureAgent's picker via the
  * identityVaultPrefix opt.
  */
+const _memoryFallbacks = [];
+/** The vault prefixes that fell back to MEMORY in this process (a host without durable storage for them). */
+export function memoryVaultFallbacks() { return _memoryFallbacks.slice(); }
+
 function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
   if (typeof globalThis.localStorage !== 'undefined') {
     try { return new VaultLocalStorage({ prefix }); } catch { /* defensive */ }
@@ -207,6 +211,7 @@ function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
       + 'durable storage must pass its own vault.',
     );
   }
+  _memoryFallbacks.push(prefix);
   return new VaultMemory();
 }
 
@@ -309,6 +314,10 @@ const SEED_HOUSEHOLD_ITEMS = [
  * }>}
  */
 export async function createRealHouseholdAgent(opts = {}) {
+  // Durable storage for every vault this agent makes for itself, when the host has some (the phone hands its
+  // AsyncStorage this way); otherwise the runtime's own (localStorage), and memory only as the last resort.
+  const pickVault = (prefix, o) => (typeof opts.vaultFor === 'function' ? opts.vaultFor(prefix) : null) ?? makeBrowserVault(prefix, o);
+
   // The agent's own words go through the shell's translator — resolved ONCE here (every shell hands `opts.t`; a bare
   // composition without one gets the keys, never English).
   const agentT = typeof opts.t === 'function' ? opts.t : (k) => k;
@@ -436,7 +445,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // persisted. The old vault survives only as the legacy migration source —
   // an install from before the cutover has its cleartext phrase adopted (and
   // removed) on the first boot through here. See ownerRootCustody.js.
-  const ownerRootVault = opts.ownerRootVault ?? makeBrowserVault('cc-owner-root:', { durabilityMatters: true });
+  const ownerRootVault = opts.ownerRootVault ?? pickVault('cc-owner-root:', { durabilityMatters: true });
   const rootKeyStore   = opts.rootKeyStore ?? pickRootKeyStore({ fallbackVault: ownerRootVault });
   // THE CUSTODY FORK (the non-resident root): a CUT-OVER device's key door holds its DELEGATION
   // seed and `ownerRoot` is NULL for the whole boot — the root exists only inside ceremonies,
@@ -488,7 +497,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Host agent — in-process app skills (household, tasks-v0, pinboard,
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
-  const hostVault = await sealedVault(opts.hostVault ?? makeBrowserVault('cc-host-id:'));
+  const hostVault = await sealedVault(opts.hostVault ?? pickVault('cc-host-id:'));
   const hostId    = await restoreOrGenerate(hostVault);
   const hostTransport = new InternalTransport(bus, hostId.pubKey);
   const hostAgent = new Agent({ identity: hostId, transport: hostTransport });
@@ -520,7 +529,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // silently here). An entry that exists but cannot be read (a plaintext write that
   // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
   // root is the one repair that keeps the person reachable at their roster addresses.
-  const chatVaultBacking = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
+  const chatVaultBacking = opts.chatVault ?? pickVault('cc-chat-id:');
   const chatVault = await sealedVault(chatVaultBacking);
 
   // ── CONTENT at rest ────────────────────────────────────────────────────────────────────────────
@@ -580,7 +589,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // with the old device's re-derived key and keeps the raw keys here, sealed at rest under this device's
   // own key, so sealed history opens on the replacement with nobody else online. Keys wrapped only to a
   // retired device's random vault key are not recoverable this way — an admin re-grant is the route.
-  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? makeBrowserVault('cc-history-keys:'));
+  const historyKeysVault = await sealedVault(opts.historyKeysVault ?? pickVault('cc-history-keys:'));
   const historyKeyChainFor = async (circleId) => {
     try { const raw = await historyKeysVault.get(`chain:${circleId}`); return raw ? JSON.parse(raw) : []; }
     catch { return []; }
@@ -761,7 +770,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
     // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
-    trustRegistry: { vault: opts.peerTrustVault ?? makeBrowserVault('cc-peer-trust:') },
+    trustRegistry: { vault: opts.peerTrustVault ?? pickVault('cc-peer-trust:') },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
     // WITH the catch-up exemption that made turning it on safe: a reconnect replay legitimately
     // serves up to 1000 items in one burst, which the chat-pace buckets would silently discard
@@ -1293,7 +1302,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *     (householdApp.listOpen) reads the whole store when `type` is absent.  The shared manifest is
    *     untouched (addItem's `type` stays required; the standalone household app is unaffected). */
   {
-    const householdId    = await restoreOrGenerate(await sealedVault(makeBrowserVault('cc-household-agent-id:')));
+    const householdId    = await restoreOrGenerate(await sealedVault(pickVault('cc-household-agent-id:')));
     householdAgent       = new Agent({ identity: householdId, transport: new InternalTransport(bus, householdId.pubKey) });
     const hhOp = (id) => {
       const found = householdManifest.operations.find((o) => o.id === id);
@@ -1463,7 +1472,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * behaviour) — never breaks boot. */
     let agentsTokens = null;
     try {
-      const tokenVault = await sealedVault(opts.agentsTokenVault ?? makeBrowserVault('cc-agent-tokens:'));
+      const tokenVault = await sealedVault(opts.agentsTokenVault ?? pickVault('cc-agent-tokens:'));
       const tokenRegistry = new TokenRegistry(tokenVault);
       agentsTokens = {
         issue: async ({ subject, skill, expiresIn, constraints }) => {
@@ -4297,7 +4306,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * a failure leaves the gate absent (prior behaviour) — never breaks boot. */
   try {
     // Vault-backed TrustRegistry: unknown peers → 'authenticated'; the owner's chat identity → 'private' (self).
-    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? makeBrowserVault('cc-host-trust:'));
+    hostTrustRegistry = new TrustRegistry(opts.hostTrustVault ?? pickVault('cc-host-trust:'));
     hostAgent.policyEngine = new PolicyEngine({
       trustRegistry: hostTrustRegistry,
       skillRegistry: hostAgent.skills,
@@ -4353,7 +4362,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * from chat identity (per integration-plan decision #2).
    */
   const tasksIdentityVault = await sealedVault(opts.tasksIdentityVault
-    ?? makeBrowserVault('cc-tasks-id:'));
+    ?? pickVault('cc-tasks-id:'));
   // Register the chatAgent's pubKey as the local member ("admin")
   // AND keep the legacy webid:* members for demo cross-actor tests.
   // Real tasks-v0 skills use `from` (caller) to look up the actor's
@@ -4558,7 +4567,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * across page reloads.
    */
   const pinboardIdentityVault = await sealedVault(opts.pinboardIdentityVault
-    ?? makeBrowserVault('cc-pinboard-id:'));
+    ?? pickVault('cc-pinboard-id:'));
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
   // ride its membership lane — signed with the per-circle key, fanned via broadcastCircleMembership,
   // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
@@ -5051,7 +5060,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * shareFolder tokens carry the real pod URI.
    */
   const folioIdentityVault = await sealedVault(opts.folioIdentityVault
-    ?? makeBrowserVault('cc-folio-id:'));
+    ?? pickVault('cc-folio-id:'));
   const folioAgent = await createBrowserFolioAgent({
     bus,
     identityVault: folioIdentityVault,

@@ -220,6 +220,14 @@ const contentPaths = {
 const stores = boxStores(dataDir);
 contentPaths.deviceLog = stores.paths.deviceLog;
 contentPaths.contactDm = stores.paths.contactDm;
+// Every other vault the agent makes for itself (the in-process agents' identities, history keys, trust registries,
+// agent tokens): one sealed file each, here. Without them each was a MEMORY vault (no localStorage on a box), so the
+// in-process agents minted new keys and the history keys were forgotten on every restart.
+contentPaths.agentVaults = path.join(dataDir, 'agent-vaults');
+const agentVaultFor = (prefix) => {
+  mkdirSync(contentPaths.agentVaults, { recursive: true });
+  return new VaultNodeFs(path.join(contentPaths.agentVaults, `${prefix.replace(/[^a-z0-9-]/gi, '')}.json`), vaultPassphrase());
+};
 // The device log is the record every lane rides: a device that forgets it on restart would re-admit a connection
 // its owner revoked, and would come back to its circles as if it had never been in them. It is SEALED, so the agent
 // hydrates it (`deviceLogIo`) the moment its content key exists and before anything appends — as on web.
@@ -305,6 +313,7 @@ const agent = await createRealHouseholdAgent({
   ownStore: () => (ownStoreOnDisk.ref ??= (async () => createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }))()),
   ownerRootVault: vault,
   chatVault,
+  vaultFor: agentVaultFor,
   registryBackend: createNodeFsBackend({ dir: contentPaths.registry }),
   pinboardPersistDb:     { path: contentPaths.pinboard },
   householdPersistDb: { path: contentPaths.household },

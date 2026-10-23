@@ -319,6 +319,10 @@ export async function bootAgentBundle(opts = {}) {
       chatVault,
       hostVault,
       ownerRootVault,
+      // Every other vault realAgent makes for itself (the in-process agents' identities, history keys, trust
+      // registries, agent tokens): on the phone there is no localStorage, so without this each became a MEMORY
+      // vault and the four in-process agents minted a new key on every start. One AsyncStorage vault per prefix.
+      vaultFor: opts.asyncStorage ? (prefix) => new VaultAsyncStorage({ prefix, asyncStorage: opts.asyncStorage }) : undefined,
       rootKeyStore,
       pinboardPersistDb,
       tasksPersistDb,

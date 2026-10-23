@@ -9,7 +9,7 @@
  */
 import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share, Switch } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
@@ -73,7 +73,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // the doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here
   doors = {},
   // the person's own week overview (a row in their own store, switched here): the clock, or null on a shell without one
-  personClock = null }) {
+  personClock = null,
+  // a settings group's screen: the section ids to paint, in order (`settingsGroupFor`), and its title; absent ⇒ the
+  // old My data page, which paints every section NOT declared under the gear
+  only = null, groupTitle = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -374,6 +377,624 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const relay = [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ');
   const usage = Object.entries(metrics || {});
 
+  // The sections that live under the gear (Instellingen), one painter per declared id. Painted ONLY on a settings
+  // group's screen (`only`, in the manifest's order); the old page paints none of them. Web: circleMyData.js.
+  const painters = {
+    'theme': () => (
+      <>
+        {/* Display theme (systeem / licht / donker) — a mono pill segmented control,
+            mirror of web's Mij toggle + onderling.org's header toggle. Reuses the
+            shared circle.mydata.theme(_system/_light/_dark) keys; switches live. */}
+        <Section title={t('circle.mydata.theme')}>
+          <View style={styles.themeToggle} accessibilityLabel={t('circle.mydata.theme')} testID="mydata-theme-toggle">
+            {['system', 'light', 'dark'].map((opt) => (
+              <Pressable
+                key={opt}
+                accessibilityRole="button"
+                accessibilityState={{ selected: opt === themePref }}
+                style={[styles.themeBtn, opt === themePref && styles.themeBtnActive]}
+                onPress={() => setThemePref(opt)}
+                testID={`mydata-theme-${opt}`}
+              >
+                <Text style={[styles.themeBtnText, opt === themePref && styles.themeBtnTextActive]}>
+                  {t(`circle.mydata.theme_${opt}`)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Section>
+      </>
+    ),
+    'language': () => (
+      <>
+        {/* global app language (NL/EN) — a user preference, applies app-wide (web≡mobile). */}
+        <Section title={t('circle.mydata.language')}>
+          {['nl', 'en'].map((lg) => (
+            <Pressable
+              key={lg}
+              style={[styles.action, lg === lang() && styles.actionActive]}
+              onPress={() => {
+                setLang(lg);   // the pre-boot cache — i18n initialises before the agent exists
+                // …and the register, which is the authority. Without this the choice reverts the moment
+                // something reconciles from the register, the same way the relay setting did.
+                callSkill?.('params', 'set-param', { key: 'app.lang', value: lg })?.catch?.(() => {});
+              }}
+              testID={`mydata-lang-${lg}`}
+            >
+              <Text style={[styles.actionLabel, lg === lang() && styles.actionActiveLabel]}>{lg.toUpperCase()}</Text>
+            </Pressable>
+          ))}
+        </Section>
+      </>
+    ),
+    'start-screen': () => (
+      <>
+        {/* Where the app opens on this device — the start-screen setting (startScreen.js), written through set-param like
+            every setting. Web parity: circleMyData.js. Omitted without an agent. */}
+        {agent && typeof agent.getParamValue === 'function' ? (
+          <Section title={t('circle.mydata.start_title')}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {START_SCREEN_CHOICES.map((c) => {
+                const on = (agent.getParamValue('home.startScreen') ?? 'vandaag') === c.value;
+                return (
+                  <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-start-${c.value}`}
+                    accessibilityState={{ selected: on }}
+                    onPress={async () => {
+                      try { await callSkill('params', 'set-param', { key: 'home.startScreen', value: c.value }); } catch { /* the row re-reads the truth */ }
+                      setHistoryTick((n) => n + 1);
+                    }}>
+                    <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Section>
+        ) : null}
+      </>
+    ),
+    'bot-actions': () => (
+      <>
+        <Section title={t('circle.mydata.surface_pref')}>
+          {['inline', 'screen', 'chat'].map((opt) => (
+            <Pressable
+              key={opt}
+              style={[styles.action, opt === surfacePref && styles.actionActive]}
+              onPress={() => setPref(opt)}
+              testID={`mydata-pref-${opt}`}
+            >
+              <Text style={[styles.actionLabel, opt === surfacePref && styles.actionActiveLabel]}>
+                {t(`circle.mydata.surface_pref_${opt}`)}
+              </Text>
+            </Pressable>
+          ))}
+          {/* S6.D — when "chat" is chosen, show whether AI is enriching it here. */}
+          {surfacePref === 'chat' && chatAi?.reason ? (
+            <Text style={styles.privacyBody}>
+              {chatAi.enriched ? '✨ ' : ''}{t(`circle.mydata.${CHAT_AI_KEY[chatAi.reason] ?? 'chat_ai_no_provider'}`)}
+            </Text>
+          ) : null}
+        </Section>
+      </>
+    ),
+    'week-overview': () => (
+      <>
+        {weekOn !== undefined ? (
+          <Section title={t('circle.profile.week_switch')}>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
+              <Switch testID="profile-week-toggle" value={weekOn === true} disabled={weekOn === null} onValueChange={() => toggleWeek()} />
+            </View>
+          </Section>
+        ) : null}
+
+        <Section title={t('circle.mydata.storage')}>
+          <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
+          {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
+          {!podSignedIn && (
+            <Text style={styles.relayHint} testID="pod-local-consequence">
+              {t('circle.mydata.pod_local_consequence')}
+            </Text>
+          )}
+          {dataLocation.podRoot ? <KV k={t('circle.mydata.pod_root')} v={dataLocation.podRoot} /> : null}
+          {relay ? <KV k={t('circle.mydata.relay')} v={relay} /> : null}
+
+          {/* In-app relay setting — no-server cross-device sync, configurable without a rebuild. */}
+          <View style={styles.relayEdit}>
+            <TextInput
+              style={styles.relayInput}
+              value={relayInput}
+              onChangeText={setRelayInput}
+              placeholder={process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL || 'ws://…:8787'}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              testID="relay-input"
+            />
+            <Pressable style={styles.relaySave} onPress={saveRelay} testID="relay-save">
+              <Text style={styles.relaySaveText}>{t('circle.mydata.relay_save')}</Text>
+            </Pressable>
+          </View>
+          {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
+          <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
+
+          {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
+              tells you what others see about your receipt setting, because nothing in the model reveals it.
+              A "they cannot tell" reassurance here would be the first place that leaked. */}
+          <Text style={styles.sectionTitle}>{t('circle.nearbyScreen.delivery_section')}</Text>
+          <Text style={styles.relayHint} testID="delivery-receipts-state">
+            {t(delivery.sendReceipts
+              ? 'circle.nearbyScreen.delivery_receipts_on'
+              : 'circle.nearbyScreen.delivery_receipts_off')}
+          </Text>
+          <Pressable
+            style={styles.relaySave}
+            onPress={() => toggleDelivery({ sendReceipts: !delivery.sendReceipts })}
+            testID="delivery-receipts-toggle"
+          >
+            <Text style={styles.relaySaveText}>
+              {t(delivery.sendReceipts
+                ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
+                : 'circle.nearbyScreen.delivery_receipts_toggle_off')}
+            </Text>
+          </Pressable>
+
+          <Text style={styles.relayHint} testID="delivery-fallback-state">
+            {t(delivery.allowFallback
+              ? 'circle.nearbyScreen.delivery_fallback_on'
+              : 'circle.nearbyScreen.delivery_fallback_off')}
+          </Text>
+          {/* The cost rides WITH the option to enable it — never the fix alone. */}
+          <Text style={styles.relayHint}>{t('circle.nearbyScreen.delivery_fallback_cost')}</Text>
+          {/* The toggle is GONE until the stored setting reaches the send path (2026-08-02) — it wrote a
+              preference nothing read, so both states behaved identically. A control that changes nothing is a
+              stronger false claim than the sentence above it. web ≡ mobile: circleMyData.js does the same. */}
+          <Text style={styles.relayHint} testID="delivery-fallback-note">
+            {t('circle.nearbyScreen.delivery_fallback_note')}
+          </Text>
+
+          {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
+          {podCapable && !podSignedIn && (
+            <View style={styles.signin}>
+              <TextInput
+                style={styles.signinInput}
+                value={issuer}
+                onChangeText={setIssuer}
+                placeholder={t('circle.mydata.pod_issuer')}
+                placeholderTextColor={theme.color.inkSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="mydata-pod-issuer"
+              />
+              <Pressable style={[styles.action, signingIn && styles.actionMuted]} onPress={doSignIn} disabled={signingIn} testID="mydata-pod-signin">
+                <Text style={styles.actionLabel}>{signingIn ? t('circle.mydata.pod_connecting') : t('circle.mydata.pod_sign_in')}</Text>
+              </Pressable>
+              {signInErr ? <Text style={styles.signinErr}>{signInErr}</Text> : null}
+            </View>
+          )}
+          {podCapable && podSignedIn && (
+            <Pressable style={[styles.action, styles.actionMuted]} onPress={doSignOut} testID="mydata-pod-signout">
+              <Text style={styles.actionMutedLabel}>{t('circle.mydata.pod_signout')}</Text>
+            </Pressable>
+          )}
+        </Section>
+
+        <Section title={t('circle.mydata.keys')}>
+          <Pressable style={styles.action} onPress={() => setWizard('backup')} testID="mydata-backup">
+            <Text style={styles.actionLabel}>{t('circle.mydata.backup')}</Text>
+          </Pressable>
+          <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
+            <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
+          </Pressable>
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
+          </Pressable>
+          {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
+          </Pressable>
+          {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
+          </Pressable>
+          {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
+          <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
+            <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
+          </Pressable>
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
+          </Pressable>
+          {/* The replace ceremony: after a restore, retire every other device in one act. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
+          </Pressable>
+          {/* A companion node of your own: claim it with the line it prints in its log. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
+            <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
+          </Pressable>
+          {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
+          {agent?.identityLinks ? (
+            <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
+              <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
+            </Pressable>
+          ) : null}
+          {botLink ? (
+            <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
+              {!botLink.view?.bot?.ok ? (
+                <View>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
+                  <TextInput
+                    style={styles.relayInput}
+                    value={botLink.text}
+                    onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    testID="mydata-link-bot-input"
+                  />
+                  {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
+                </View>
+              ) : null}
+              {botLink.view?.bot?.ok && !botLink.made ? (
+                <View>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
+                  <Pressable
+                    style={styles.action}
+                    testID="mydata-link-bot-make"
+                    onPress={async () => {
+                      const made = await botLink.view.offer().catch(() => ({ ok: false }));
+                      setBotLink((b) => ({ ...b, made }));
+                    }}
+                  >
+                    <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
+              {botLink.made?.ok && !botLink.linked ? (
+                <View>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
+                  <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
+                  <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
+                    <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
+                  </Pressable>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
+                  <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
+                </View>
+              ) : null}
+              {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
+            </View>
+          ) : null}
+          {/* The member's choice of which device others deliver to first — their primary contact address. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
+          </Pressable>
+        </Section>
+
+        {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
+            no door. The revoke button opens the phrase-proven ceremony for that device. */}
+        {devices.length > 0 && (
+          <Section title={t('circle.mydata.devices')}>
+            {/* without the recovery seal this device carries nothing of the person's own scope to the others */}
+            {agent?.hasRecoverySeal?.() === false ? (
+              <Text style={styles.privacyBody} testID="mydata-devices-needs-phrase">{t('circle.mydata.devices_needs_phrase')}</Text>
+            ) : null}
+            {devices.map((d) => (
+              <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
+                  {d.label || d.deviceId}
+                </Text>
+                {!d.revoked && (
+                  <Pressable onPress={() => setRevokeTarget(d.deviceId)} testID={`mydata-revoke-${d.deviceId}`}>
+                    <Text style={styles.actionMutedLabel}>{t('circle.revoke.title')}</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))}
+          </Section>
+        )}
+
+        {/* MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there: "give
+            access" asks the node what it can give, then who (a contact — a bot linked above is one) and the ticks. Web
+            parity: circleMyData.js. */}
+        {companions.length > 0 && (
+          <Section title={t('circle.companionGrant.nodes')}>
+            {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
+            {companions.map((c) => {
+              const open = grant?.node === c.node ? grant : null;
+              const picker = open?.picker ?? null;
+              return (
+                <View key={c.node} style={{ paddingVertical: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.privacyBody}>{t('circle.companionGrant.node_row', { short: c.short })}</Text>
+                    <Pressable
+                      testID={`mydata-companion-give-${c.node.slice(0, 8)}`}
+                      onPress={async () => {
+                        setGrant({ node: c.node, picker: null, to: null, picked: [], line: null });
+                        const p = await loadCompanionGrantPicker({ callSkill, node: c.node, t });
+                        setGrant({ node: c.node, picker: p, to: p.ok ? (p.targets[0]?.key ?? null) : null, picked: [], line: null });
+                      }}
+                    >
+                      <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.give')}</Text>
+                    </Pressable>
+                  </View>
+                  {/* who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken" */}
+                  {holders[c.node]?.said ? <Text style={styles.privacyBody}>{holders[c.node].said}</Text> : null}
+                  {holders[c.node] && !holders[c.node].ok && <Text style={styles.privacyBody}>{holders[c.node].message}</Text>}
+                  {(holders[c.node]?.rows ?? []).map((h) => (
+                    <View key={h.to} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
+                      <Text style={[styles.privacyBody, { flex: 1, paddingRight: 8 }]}>{`${h.label} — ${h.may}`}</Text>
+                      <Pressable
+                        testID={`mydata-companion-revoke-${h.to.slice(0, 8)}`}
+                        onPress={async () => {
+                          const r = await callSkill('household', 'revokeCompanionGrant', { node: c.node, to: h.to }).catch(() => null);
+                          loadHolders(c.node, companionRevokeText(r, t));
+                        }}
+                      >
+                        <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.revoke')}</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                  {open && !picker && <Text style={styles.privacyBody}>{t('circle.companionGrant.loading')}</Text>}
+                  {open && open.line && <Text style={styles.privacyBody} testID="mydata-companion-line">{open.line}</Text>}
+                  {open && picker && !open.line && !picker.ok && <Text style={styles.privacyBody}>{picker.message}</Text>}
+                  {open && picker?.ok && !open.line && picker.targets.length === 0 && (
+                    <Text style={styles.privacyBody}>{t('circle.companionGrant.to_none')}</Text>
+                  )}
+                  {open && picker?.ok && !open.line && picker.targets.length > 0 && (
+                    <View>
+                      <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.to_label')}</Text>
+                      {picker.targets.map((tg) => (
+                        <Pressable key={tg.key} testID={`mydata-companion-to-${tg.key.slice(0, 8)}`} onPress={() => setGrant({ ...open, to: tg.key })}>
+                          <Text style={styles.privacyBody}>{(open.to === tg.key ? '◉ ' : '○ ') + tg.label}</Text>
+                        </Pressable>
+                      ))}
+                      <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.may_do')}</Text>
+                      {picker.choices.map((ch) => (
+                        <Pressable
+                          key={ch.id}
+                          testID={`mydata-companion-family-${ch.id}`}
+                          onPress={() => setGrant({ ...open, picked: open.picked.includes(ch.id) ? open.picked.filter((x) => x !== ch.id) : [...open.picked, ch.id] })}
+                        >
+                          <Text style={styles.privacyBody}>{(open.picked.includes(ch.id) ? '☑ ' : '☐ ') + ch.label}</Text>
+                        </Pressable>
+                      ))}
+                      <Pressable
+                        testID="mydata-companion-confirm"
+                        onPress={async () => {
+                          if (!open.to || open.picked.length === 0) { setGrant({ ...open, note: t('circle.companionGrant.nothing_ticked') }); return; }
+                          const r = await callSkill('household', 'grantCompanion', { node: c.node, to: open.to, families: open.picked }).catch(() => null);
+                          setGrant({ ...open, line: companionGrantText(r, t) });
+                          loadHolders(c.node);
+                        }}
+                      >
+                        <Text style={styles.actionLabel}>{t('circle.companionGrant.confirm')}</Text>
+                      </Pressable>
+                      {open.note ? <Text style={styles.privacyBody}>{open.note}</Text> : null}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </Section>
+        )}
+
+        {/* CONNECTIONS — screens that are yours, somewhere else. Beside the devices list because it
+            answers the same question ("what else of mine is out there"); the two differ in what they
+            can DO — a device holds your keys, a connection holds only the ticks you gave it. */}
+        {connections.length > 0 && (
+          <Section title={t('circle.mydata.connections')}>
+            {connectionRows({ surfaces: connections }).map((c) => (
+              <View key={c.viewPubKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6 }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.privacyBody}>{c.label || c.short}</Text>
+                  <Text style={styles.privacyBody}>
+                    {c.sees
+                      ? t('circle.mydata.connection_sees', { what: [...c.sees.circles, ...(c.sees.device ? [t('circle.mydata.connection_device_section')] : [])].join(', ') })
+                      /* NOT "0 onderdelen": a connection that cannot read is a real shape. */
+                      : t('circle.mydata.connection_acts_only')}
+                  </Text>
+                  <Text style={styles.privacyBody}>{t('circle.mydata.connection_does', { count: c.opCount })}</Text>
+                </View>
+                <Pressable
+                  testID={`mydata-unpair-${c.viewPubKey.slice(0, 8)}`}
+                  onPress={async () => {
+                    try { await callSkill('household', 'revokeSurface', { viewPubKey: c.viewPubKey }); } catch { /* the list re-reads */ }
+                    load();
+                  }}
+                >
+                  <Text style={styles.actionMutedLabel}>{t('circle.mydata.connection_unpair')}</Text>
+                </Pressable>
+              </View>
+            ))}
+          </Section>
+        )}
+
+        {/* Pair a new one. Two steps, as on web: paste what the other screen shows, and only THEN
+            see what you are about to hand over — deciding before you can see the choices is not
+            consent. Refusals name their own reason; a newer version is told to update, never guessed. */}
+        <Section title={t('circle.mydata.connection_add')}>
+          <TextInput
+            testID="mydata-connection-offer"
+            value={offerText}
+            onChangeText={setOfferText}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={t('circle.mydata.connection_offer_placeholder')}
+            placeholderTextColor={theme.muted}
+            style={styles.relayInput}
+          />
+          {offerText.trim() !== '' && (() => {
+            const parsed = parsePairingOffer(offerText.trim());
+            if (!parsed.ok) {
+              return <Text style={styles.privacyBody}>{t(`circle.mydata.connection_offer_${parsed.reason}`)}</Text>;
+            }
+            const opChoices = connectionOpChoices({ manifests: manifestsForConnections });
+            const sectionChoices = connectionSectionChoices({ circles: circlesForConnections });
+            const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+            return (
+              <View>
+                <Text style={styles.privacyBody}>
+                  {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
+                </Text>
+                <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_do')}</Text>
+                {opChoices.map((o) => (
+                  <Pressable key={o.id} testID={`mydata-op-${o.id}`} onPress={() => toggle(pickedOps, setPickedOps, o.id)}>
+                    <Text style={styles.privacyBody}>{(pickedOps.includes(o.id) ? '☑ ' : '☐ ') + (o.label || o.id)}</Text>
+                  </Pressable>
+                ))}
+                <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_see')}</Text>
+                {sectionChoices.map((sc) => (
+                  <Pressable key={sc.id} testID={`mydata-section-${sc.id}`} onPress={() => toggle(pickedSections, setPickedSections, sc.id)}>
+                    <Text style={styles.privacyBody}>
+                      {(pickedSections.includes(sc.id) ? '☑ ' : '☐ ') + (sc.label || t('circle.mydata.connection_device_section'))}
+                    </Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  testID="mydata-connection-confirm"
+                  onPress={async () => {
+                    const args = compileConnectionGrant({
+                      viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label,
+                    });
+                    if (!args) return;                 // a pick that grants nothing creates nothing
+                    try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
+                    catch { /* the list re-reads; a failure leaves no half-connection */ }
+                    setOfferText(''); setPickedOps([]); setPickedSections([]);
+                    load();
+                  }}
+                >
+                  <Text style={styles.actionLabel}>{t('circle.mydata.connection_confirm')}</Text>
+                </Pressable>
+              </View>
+            );
+          })()}
+        </Section>
+
+        {/* What this device keeps (sync-policy §11, web parity): a device's own choice about itself; never on the wire. */}
+        {syncSel ? (
+          <Section title={t('circle.mydata.sync')}>
+            <Text style={styles.privacyBody}>{t('circle.mydata.sync_intro')}</Text>
+            {SYNC_SILOS.map((silo) => {
+              const on = syncSel.siloOn(silo);
+              return (
+                <Pressable key={silo} onPress={() => setSync({ silo, value: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-silo-${silo}`}>
+                  <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${t(`circle.mydata.sync_silo_${silo}`)}`}</Text>
+                </Pressable>
+              );
+            })}
+            <Pressable onPress={() => setSync({ fileBytes: syncSel.fileBytes() === 'full' ? 'description' : 'full' })} accessibilityRole="button" style={styles.action} testID="sync-files-mode">
+              <Text style={styles.actionLabel}>{`${t('circle.mydata.sync_files')}: ${t(`circle.mydata.sync_files_${syncSel.fileBytes()}`)}`}</Text>
+            </Pressable>
+            <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen')}</Text>
+            {circlesForConnections.length === 0 ? <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen_none')}</Text> : null}
+            {circlesForConnections.map((k) => {
+              const on = syncSel.kringOn(k.id);
+              return (
+                <Pressable key={k.id} onPress={() => setSync({ kringId: k.id, on: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-kring-${k.id}`}>
+                  <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${k.name}`}</Text>
+                </Pressable>
+              );
+            })}
+          </Section>
+        ) : null}
+
+        {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
+        {shareNknAddress != null ? (
+          <Section title={t('circle.mydata.address_sharing')}>
+            <Text style={styles.privacyBody}>
+              {t(shareNknAddress ? 'circle.mydata.address_sharing_on' : 'circle.mydata.address_sharing_off')}
+            </Text>
+            <Text style={styles.privacyBody}>{t('circle.mydata.address_sharing_cost')}</Text>
+            <Pressable onPress={toggleShareAddress} accessibilityRole="button" style={styles.action} testID="address-sharing-toggle">
+              <Text style={styles.actionLabel}>
+                {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
+              </Text>
+            </Pressable>
+          </Section>
+        ) : null}
+
+        {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
+            confirmed deletion. The note says what is NOT touched: decisions/reports compact into a
+            counted summary rather than disappearing. */}
+        <Section title={t('circle.mydata.cleanup')}>
+          <View style={styles.retentionRow}>
+            {RETENTION_CHOICES_DAYS.map((days) => (
+              <Pressable
+                key={days}
+                onPress={() => { setCleanupDays(days); setCleanupResult(null); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: days === cleanupDays }}
+                style={[styles.retentionChoice, days === cleanupDays && styles.retentionChoiceOn]}
+                testID={`cleanup-${days}`}
+              >
+                <Text style={[styles.retentionChoiceText, days === cleanupDays && styles.retentionChoiceTextOn]}>
+                  {t('circle.mydata.cleanup_older_than', { days })}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={runCleanup} accessibilityRole="button" style={styles.action} testID="cleanup-run">
+            <Text style={styles.actionLabel}>{t('circle.mydata.cleanup_button', { days: cleanupDays })}</Text>
+          </Pressable>
+          {cleanupResult != null ? (
+            <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_done', { count: cleanupResult })}</Text>
+          ) : null}
+          <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
+        </Section>
+      </>
+    ),
+    'notifications': () => (
+      <>
+        <Section title={t('circle.mydata.notifications')}>
+          <Text style={styles.privacyBody}>
+            {!push.supported ? t('circle.mydata.notif_unsupported')
+              : push.granted ? t('circle.mydata.notif_on') : t('circle.mydata.notif_off')}
+          </Text>
+          {/* J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in
+              both states: someone reviewing their settings should be able to see what having it on means.
+              Three lines on purpose — the cost, what is still not learned (a bare "affects your privacy"
+              invites imagining worse than the truth), and the escape. Deliberately not framed as a
+              warning: most people should turn notifications on. → docs/decisions.md 2026-07-29 */}
+          {push.supported ? (
+            <>
+              <Text style={styles.privacyBody} testID="mydata-notif-privacy">{t('circle.mydata.notif_privacy')}</Text>
+              <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_not')}</Text>
+              <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_escape')}</Text>
+            </>
+          ) : null}
+          {push.supported ? (
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>
+              <Switch testID="mydata-notif-toggle" value={push.granted === true} onValueChange={() => toggleNativePush()} />
+            </View>
+          ) : null}
+        </Section>
+      </>
+    ),
+    'assistant': () => (
+      <>
+        {typeof onSaveUserLlm === 'function' && (
+          <Section title={t('circle.userLlm.title')}>
+            <UserLlmSettings current={userLlm || {}} onSave={onSaveUserLlm} validate={validateUserLlm} />
+          </Section>
+        )}
+      </>
+    ),
+  };
+
+  if (Array.isArray(only)) {
+    return (
+      <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
+        <View style={styles.header}>
+          {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
+          <Text style={styles.title}>{groupTitle ?? t('circle.mydata.title')}</Text>
+        </View>
+        {only.map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-mydata">
       <View style={styles.header}>
@@ -391,494 +1012,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           ))}
         </Section>
       ) : null}
-      {weekOn !== undefined ? (
-        <Section title={t('circle.profile.week_switch')}>
-          <Pressable testID="profile-week-toggle" accessibilityRole="switch"
-            accessibilityState={{ checked: weekOn === true, disabled: weekOn === null }}
-            disabled={weekOn === null} onPress={toggleWeek} style={styles.relaySave}>
-            <Text style={styles.relaySaveText}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
-          </Pressable>
-        </Section>
-      ) : null}
-
-      <Section title={t('circle.mydata.storage')}>
-        <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
-        {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
-        {!podSignedIn && (
-          <Text style={styles.relayHint} testID="pod-local-consequence">
-            {t('circle.mydata.pod_local_consequence')}
-          </Text>
-        )}
-        {dataLocation.podRoot ? <KV k={t('circle.mydata.pod_root')} v={dataLocation.podRoot} /> : null}
-        {relay ? <KV k={t('circle.mydata.relay')} v={relay} /> : null}
-
-        {/* In-app relay setting — no-server cross-device sync, configurable without a rebuild. */}
-        <View style={styles.relayEdit}>
-          <TextInput
-            style={styles.relayInput}
-            value={relayInput}
-            onChangeText={setRelayInput}
-            placeholder={process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL || 'ws://…:8787'}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            testID="relay-input"
-          />
-          <Pressable style={styles.relaySave} onPress={saveRelay} testID="relay-save">
-            <Text style={styles.relaySaveText}>{t('circle.mydata.relay_save')}</Text>
-          </Pressable>
-        </View>
-        {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
-        <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
-
-        {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
-            tells you what others see about your receipt setting, because nothing in the model reveals it.
-            A "they cannot tell" reassurance here would be the first place that leaked. */}
-        <Text style={styles.sectionTitle}>{t('circle.nearbyScreen.delivery_section')}</Text>
-        <Text style={styles.relayHint} testID="delivery-receipts-state">
-          {t(delivery.sendReceipts
-            ? 'circle.nearbyScreen.delivery_receipts_on'
-            : 'circle.nearbyScreen.delivery_receipts_off')}
-        </Text>
-        <Pressable
-          style={styles.relaySave}
-          onPress={() => toggleDelivery({ sendReceipts: !delivery.sendReceipts })}
-          testID="delivery-receipts-toggle"
-        >
-          <Text style={styles.relaySaveText}>
-            {t(delivery.sendReceipts
-              ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
-              : 'circle.nearbyScreen.delivery_receipts_toggle_off')}
-          </Text>
-        </Pressable>
-
-        <Text style={styles.relayHint} testID="delivery-fallback-state">
-          {t(delivery.allowFallback
-            ? 'circle.nearbyScreen.delivery_fallback_on'
-            : 'circle.nearbyScreen.delivery_fallback_off')}
-        </Text>
-        {/* The cost rides WITH the option to enable it — never the fix alone. */}
-        <Text style={styles.relayHint}>{t('circle.nearbyScreen.delivery_fallback_cost')}</Text>
-        {/* The toggle is GONE until the stored setting reaches the send path (2026-08-02) — it wrote a
-            preference nothing read, so both states behaved identically. A control that changes nothing is a
-            stronger false claim than the sentence above it. web ≡ mobile: circleMyData.js does the same. */}
-        <Text style={styles.relayHint} testID="delivery-fallback-note">
-          {t('circle.nearbyScreen.delivery_fallback_note')}
-        </Text>
-
-        {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
-        {podCapable && !podSignedIn && (
-          <View style={styles.signin}>
-            <TextInput
-              style={styles.signinInput}
-              value={issuer}
-              onChangeText={setIssuer}
-              placeholder={t('circle.mydata.pod_issuer')}
-              placeholderTextColor={theme.color.inkSoft}
-              autoCapitalize="none"
-              autoCorrect={false}
-              testID="mydata-pod-issuer"
-            />
-            <Pressable style={[styles.action, signingIn && styles.actionMuted]} onPress={doSignIn} disabled={signingIn} testID="mydata-pod-signin">
-              <Text style={styles.actionLabel}>{signingIn ? t('circle.mydata.pod_connecting') : t('circle.mydata.pod_sign_in')}</Text>
-            </Pressable>
-            {signInErr ? <Text style={styles.signinErr}>{signInErr}</Text> : null}
-          </View>
-        )}
-        {podCapable && podSignedIn && (
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={doSignOut} testID="mydata-pod-signout">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.pod_signout')}</Text>
-          </Pressable>
-        )}
-      </Section>
-
-      <Section title={t('circle.mydata.keys')}>
-        <Pressable style={styles.action} onPress={() => setWizard('backup')} testID="mydata-backup">
-          <Text style={styles.actionLabel}>{t('circle.mydata.backup')}</Text>
-        </Pressable>
-        <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
-          <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
-        </Pressable>
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
-        </Pressable>
-        {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
-        </Pressable>
-        {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
-        </Pressable>
-        {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
-        <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
-          <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
-        </Pressable>
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
-        </Pressable>
-        {/* The replace ceremony: after a restore, retire every other device in one act. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
-        </Pressable>
-        {/* A companion node of your own: claim it with the line it prints in its log. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
-          <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
-        </Pressable>
-        {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
-        {agent?.identityLinks ? (
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
-            <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
-          </Pressable>
-        ) : null}
-        {botLink ? (
-          <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
-            {!botLink.view?.bot?.ok ? (
-              <View>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
-                <TextInput
-                  style={styles.relayInput}
-                  value={botLink.text}
-                  onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  testID="mydata-link-bot-input"
-                />
-                {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
-              </View>
-            ) : null}
-            {botLink.view?.bot?.ok && !botLink.made ? (
-              <View>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
-                <Pressable
-                  style={styles.action}
-                  testID="mydata-link-bot-make"
-                  onPress={async () => {
-                    const made = await botLink.view.offer().catch(() => ({ ok: false }));
-                    setBotLink((b) => ({ ...b, made }));
-                  }}
-                >
-                  <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
-                </Pressable>
-              </View>
-            ) : null}
-            {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
-            {botLink.made?.ok && !botLink.linked ? (
-              <View>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
-                <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
-                <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
-                  <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
-                </Pressable>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
-                <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
-              </View>
-            ) : null}
-            {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
-          </View>
-        ) : null}
-        {/* The member's choice of which device others deliver to first — their primary contact address. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
-        </Pressable>
-      </Section>
-
-      {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
-          no door. The revoke button opens the phrase-proven ceremony for that device. */}
-      {devices.length > 0 && (
-        <Section title={t('circle.mydata.devices')}>
-          {/* without the recovery seal this device carries nothing of the person's own scope to the others */}
-          {agent?.hasRecoverySeal?.() === false ? (
-            <Text style={styles.privacyBody} testID="mydata-devices-needs-phrase">{t('circle.mydata.devices_needs_phrase')}</Text>
-          ) : null}
-          {devices.map((d) => (
-            <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-              <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
-                {d.label || d.deviceId}
-              </Text>
-              {!d.revoked && (
-                <Pressable onPress={() => setRevokeTarget(d.deviceId)} testID={`mydata-revoke-${d.deviceId}`}>
-                  <Text style={styles.actionMutedLabel}>{t('circle.revoke.title')}</Text>
-                </Pressable>
-              )}
-            </View>
-          ))}
-        </Section>
-      )}
-
-      {/* MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there: "give
-          access" asks the node what it can give, then who (a contact — a bot linked above is one) and the ticks. Web
-          parity: circleMyData.js. */}
-      {companions.length > 0 && (
-        <Section title={t('circle.companionGrant.nodes')}>
-          {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
-          {companions.map((c) => {
-            const open = grant?.node === c.node ? grant : null;
-            const picker = open?.picker ?? null;
-            return (
-              <View key={c.node} style={{ paddingVertical: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={styles.privacyBody}>{t('circle.companionGrant.node_row', { short: c.short })}</Text>
-                  <Pressable
-                    testID={`mydata-companion-give-${c.node.slice(0, 8)}`}
-                    onPress={async () => {
-                      setGrant({ node: c.node, picker: null, to: null, picked: [], line: null });
-                      const p = await loadCompanionGrantPicker({ callSkill, node: c.node, t });
-                      setGrant({ node: c.node, picker: p, to: p.ok ? (p.targets[0]?.key ?? null) : null, picked: [], line: null });
-                    }}
-                  >
-                    <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.give')}</Text>
-                  </Pressable>
-                </View>
-                {/* who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken" */}
-                {holders[c.node]?.said ? <Text style={styles.privacyBody}>{holders[c.node].said}</Text> : null}
-                {holders[c.node] && !holders[c.node].ok && <Text style={styles.privacyBody}>{holders[c.node].message}</Text>}
-                {(holders[c.node]?.rows ?? []).map((h) => (
-                  <View key={h.to} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
-                    <Text style={[styles.privacyBody, { flex: 1, paddingRight: 8 }]}>{`${h.label} — ${h.may}`}</Text>
-                    <Pressable
-                      testID={`mydata-companion-revoke-${h.to.slice(0, 8)}`}
-                      onPress={async () => {
-                        const r = await callSkill('household', 'revokeCompanionGrant', { node: c.node, to: h.to }).catch(() => null);
-                        loadHolders(c.node, companionRevokeText(r, t));
-                      }}
-                    >
-                      <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.revoke')}</Text>
-                    </Pressable>
-                  </View>
-                ))}
-                {open && !picker && <Text style={styles.privacyBody}>{t('circle.companionGrant.loading')}</Text>}
-                {open && open.line && <Text style={styles.privacyBody} testID="mydata-companion-line">{open.line}</Text>}
-                {open && picker && !open.line && !picker.ok && <Text style={styles.privacyBody}>{picker.message}</Text>}
-                {open && picker?.ok && !open.line && picker.targets.length === 0 && (
-                  <Text style={styles.privacyBody}>{t('circle.companionGrant.to_none')}</Text>
-                )}
-                {open && picker?.ok && !open.line && picker.targets.length > 0 && (
-                  <View>
-                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.to_label')}</Text>
-                    {picker.targets.map((tg) => (
-                      <Pressable key={tg.key} testID={`mydata-companion-to-${tg.key.slice(0, 8)}`} onPress={() => setGrant({ ...open, to: tg.key })}>
-                        <Text style={styles.privacyBody}>{(open.to === tg.key ? '◉ ' : '○ ') + tg.label}</Text>
-                      </Pressable>
-                    ))}
-                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.may_do')}</Text>
-                    {picker.choices.map((ch) => (
-                      <Pressable
-                        key={ch.id}
-                        testID={`mydata-companion-family-${ch.id}`}
-                        onPress={() => setGrant({ ...open, picked: open.picked.includes(ch.id) ? open.picked.filter((x) => x !== ch.id) : [...open.picked, ch.id] })}
-                      >
-                        <Text style={styles.privacyBody}>{(open.picked.includes(ch.id) ? '☑ ' : '☐ ') + ch.label}</Text>
-                      </Pressable>
-                    ))}
-                    <Pressable
-                      testID="mydata-companion-confirm"
-                      onPress={async () => {
-                        if (!open.to || open.picked.length === 0) { setGrant({ ...open, note: t('circle.companionGrant.nothing_ticked') }); return; }
-                        const r = await callSkill('household', 'grantCompanion', { node: c.node, to: open.to, families: open.picked }).catch(() => null);
-                        setGrant({ ...open, line: companionGrantText(r, t) });
-                        loadHolders(c.node);
-                      }}
-                    >
-                      <Text style={styles.actionLabel}>{t('circle.companionGrant.confirm')}</Text>
-                    </Pressable>
-                    {open.note ? <Text style={styles.privacyBody}>{open.note}</Text> : null}
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </Section>
-      )}
-
-      {/* CONNECTIONS — screens that are yours, somewhere else. Beside the devices list because it
-          answers the same question ("what else of mine is out there"); the two differ in what they
-          can DO — a device holds your keys, a connection holds only the ticks you gave it. */}
-      {connections.length > 0 && (
-        <Section title={t('circle.mydata.connections')}>
-          {connectionRows({ surfaces: connections }).map((c) => (
-            <View key={c.viewPubKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6 }}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={styles.privacyBody}>{c.label || c.short}</Text>
-                <Text style={styles.privacyBody}>
-                  {c.sees
-                    ? t('circle.mydata.connection_sees', { what: [...c.sees.circles, ...(c.sees.device ? [t('circle.mydata.connection_device_section')] : [])].join(', ') })
-                    /* NOT "0 onderdelen": a connection that cannot read is a real shape. */
-                    : t('circle.mydata.connection_acts_only')}
-                </Text>
-                <Text style={styles.privacyBody}>{t('circle.mydata.connection_does', { count: c.opCount })}</Text>
-              </View>
-              <Pressable
-                testID={`mydata-unpair-${c.viewPubKey.slice(0, 8)}`}
-                onPress={async () => {
-                  try { await callSkill('household', 'revokeSurface', { viewPubKey: c.viewPubKey }); } catch { /* the list re-reads */ }
-                  load();
-                }}
-              >
-                <Text style={styles.actionMutedLabel}>{t('circle.mydata.connection_unpair')}</Text>
-              </Pressable>
-            </View>
-          ))}
-        </Section>
-      )}
-
-      {/* Pair a new one. Two steps, as on web: paste what the other screen shows, and only THEN
-          see what you are about to hand over — deciding before you can see the choices is not
-          consent. Refusals name their own reason; a newer version is told to update, never guessed. */}
-      <Section title={t('circle.mydata.connection_add')}>
-        <TextInput
-          testID="mydata-connection-offer"
-          value={offerText}
-          onChangeText={setOfferText}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t('circle.mydata.connection_offer_placeholder')}
-          placeholderTextColor={theme.muted}
-          style={styles.relayInput}
-        />
-        {offerText.trim() !== '' && (() => {
-          const parsed = parsePairingOffer(offerText.trim());
-          if (!parsed.ok) {
-            return <Text style={styles.privacyBody}>{t(`circle.mydata.connection_offer_${parsed.reason}`)}</Text>;
-          }
-          const opChoices = connectionOpChoices({ manifests: manifestsForConnections });
-          const sectionChoices = connectionSectionChoices({ circles: circlesForConnections });
-          const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-          return (
-            <View>
-              <Text style={styles.privacyBody}>
-                {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
-              </Text>
-              <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_do')}</Text>
-              {opChoices.map((o) => (
-                <Pressable key={o.id} testID={`mydata-op-${o.id}`} onPress={() => toggle(pickedOps, setPickedOps, o.id)}>
-                  <Text style={styles.privacyBody}>{(pickedOps.includes(o.id) ? '☑ ' : '☐ ') + (o.label || o.id)}</Text>
-                </Pressable>
-              ))}
-              <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_see')}</Text>
-              {sectionChoices.map((sc) => (
-                <Pressable key={sc.id} testID={`mydata-section-${sc.id}`} onPress={() => toggle(pickedSections, setPickedSections, sc.id)}>
-                  <Text style={styles.privacyBody}>
-                    {(pickedSections.includes(sc.id) ? '☑ ' : '☐ ') + (sc.label || t('circle.mydata.connection_device_section'))}
-                  </Text>
-                </Pressable>
-              ))}
-              <Pressable
-                testID="mydata-connection-confirm"
-                onPress={async () => {
-                  const args = compileConnectionGrant({
-                    viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label,
-                  });
-                  if (!args) return;                 // a pick that grants nothing creates nothing
-                  try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
-                  catch { /* the list re-reads; a failure leaves no half-connection */ }
-                  setOfferText(''); setPickedOps([]); setPickedSections([]);
-                  load();
-                }}
-              >
-                <Text style={styles.actionLabel}>{t('circle.mydata.connection_confirm')}</Text>
-              </Pressable>
-            </View>
-          );
-        })()}
-      </Section>
-
-      {/* What this device keeps (sync-policy §11, web parity): a device's own choice about itself; never on the wire. */}
-      {syncSel ? (
-        <Section title={t('circle.mydata.sync')}>
-          <Text style={styles.privacyBody}>{t('circle.mydata.sync_intro')}</Text>
-          {SYNC_SILOS.map((silo) => {
-            const on = syncSel.siloOn(silo);
-            return (
-              <Pressable key={silo} onPress={() => setSync({ silo, value: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-silo-${silo}`}>
-                <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${t(`circle.mydata.sync_silo_${silo}`)}`}</Text>
-              </Pressable>
-            );
-          })}
-          <Pressable onPress={() => setSync({ fileBytes: syncSel.fileBytes() === 'full' ? 'description' : 'full' })} accessibilityRole="button" style={styles.action} testID="sync-files-mode">
-            <Text style={styles.actionLabel}>{`${t('circle.mydata.sync_files')}: ${t(`circle.mydata.sync_files_${syncSel.fileBytes()}`)}`}</Text>
-          </Pressable>
-          <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen')}</Text>
-          {circlesForConnections.length === 0 ? <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen_none')}</Text> : null}
-          {circlesForConnections.map((k) => {
-            const on = syncSel.kringOn(k.id);
-            return (
-              <Pressable key={k.id} onPress={() => setSync({ kringId: k.id, on: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-kring-${k.id}`}>
-                <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${k.name}`}</Text>
-              </Pressable>
-            );
-          })}
-        </Section>
-      ) : null}
-
-      {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
-      {shareNknAddress != null ? (
-        <Section title={t('circle.mydata.address_sharing')}>
-          <Text style={styles.privacyBody}>
-            {t(shareNknAddress ? 'circle.mydata.address_sharing_on' : 'circle.mydata.address_sharing_off')}
-          </Text>
-          <Text style={styles.privacyBody}>{t('circle.mydata.address_sharing_cost')}</Text>
-          <Pressable onPress={toggleShareAddress} accessibilityRole="button" style={styles.action} testID="address-sharing-toggle">
-            <Text style={styles.actionLabel}>
-              {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
-            </Text>
-          </Pressable>
-        </Section>
-      ) : null}
-
-      {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
-          confirmed deletion. The note says what is NOT touched: decisions/reports compact into a
-          counted summary rather than disappearing. */}
-      <Section title={t('circle.mydata.cleanup')}>
-        <View style={styles.retentionRow}>
-          {RETENTION_CHOICES_DAYS.map((days) => (
-            <Pressable
-              key={days}
-              onPress={() => { setCleanupDays(days); setCleanupResult(null); }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: days === cleanupDays }}
-              style={[styles.retentionChoice, days === cleanupDays && styles.retentionChoiceOn]}
-              testID={`cleanup-${days}`}
-            >
-              <Text style={[styles.retentionChoiceText, days === cleanupDays && styles.retentionChoiceTextOn]}>
-                {t('circle.mydata.cleanup_older_than', { days })}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable onPress={runCleanup} accessibilityRole="button" style={styles.action} testID="cleanup-run">
-          <Text style={styles.actionLabel}>{t('circle.mydata.cleanup_button', { days: cleanupDays })}</Text>
-        </Pressable>
-        {cleanupResult != null ? (
-          <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_done', { count: cleanupResult })}</Text>
-        ) : null}
-        <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
-      </Section>
-
-      {/* Where the app opens on this device — the start-screen setting (startScreen.js), written through set-param like
-          every setting. Web parity: circleMyData.js. Omitted without an agent. */}
-      {agent && typeof agent.getParamValue === 'function' ? (
-        <Section title={t('circle.mydata.start_title')}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {START_SCREEN_CHOICES.map((c) => {
-              const on = (agent.getParamValue('home.startScreen') ?? 'vandaag') === c.value;
-              return (
-                <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-start-${c.value}`}
-                  accessibilityState={{ selected: on }}
-                  onPress={async () => {
-                    try { await callSkill('params', 'set-param', { key: 'home.startScreen', value: c.value }); } catch { /* the row re-reads the truth */ }
-                    setHistoryTick((n) => n + 1);
-                  }}>
-                  <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Section>
-      ) : null}
-
       {/* The personal history mirror — live health from the agent; the toggle flips the
           history.mirror register param through the one kind-gated write (the agent starts/stops
           the sink LIVE). Web parity: circleMyData.js's history section. Omitted without an agent. */}
@@ -913,98 +1046,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           </Section>
         );
       })() : null}
-
-      <Section title={t('circle.mydata.notifications')}>
-        <Text style={styles.privacyBody}>
-          {!push.supported ? t('circle.mydata.notif_unsupported')
-            : push.granted ? t('circle.mydata.notif_on') : t('circle.mydata.notif_off')}
-        </Text>
-        {/* J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in
-            both states: someone reviewing their settings should be able to see what having it on means.
-            Three lines on purpose — the cost, what is still not learned (a bare "affects your privacy"
-            invites imagining worse than the truth), and the escape. Deliberately not framed as a
-            warning: most people should turn notifications on. → docs/decisions.md 2026-07-29 */}
-        {push.supported ? (
-          <>
-            <Text style={styles.privacyBody} testID="mydata-notif-privacy">{t('circle.mydata.notif_privacy')}</Text>
-            <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_not')}</Text>
-            <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_escape')}</Text>
-          </>
-        ) : null}
-        {push.supported ? (
-          <Pressable style={styles.action} onPress={toggleNativePush} testID="mydata-notif-toggle">
-            <Text style={styles.actionLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>
-          </Pressable>
-        ) : null}
-      </Section>
-
-      {/* Display theme (systeem / licht / donker) — a mono pill segmented control,
-          mirror of web's Mij toggle + onderling.org's header toggle. Reuses the
-          shared circle.mydata.theme(_system/_light/_dark) keys; switches live. */}
-      <Section title={t('circle.mydata.theme')}>
-        <View style={styles.themeToggle} accessibilityLabel={t('circle.mydata.theme')} testID="mydata-theme-toggle">
-          {['system', 'light', 'dark'].map((opt) => (
-            <Pressable
-              key={opt}
-              accessibilityRole="button"
-              accessibilityState={{ selected: opt === themePref }}
-              style={[styles.themeBtn, opt === themePref && styles.themeBtnActive]}
-              onPress={() => setThemePref(opt)}
-              testID={`mydata-theme-${opt}`}
-            >
-              <Text style={[styles.themeBtnText, opt === themePref && styles.themeBtnTextActive]}>
-                {t(`circle.mydata.theme_${opt}`)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </Section>
-
-      <Section title={t('circle.mydata.surface_pref')}>
-        {['inline', 'screen', 'chat'].map((opt) => (
-          <Pressable
-            key={opt}
-            style={[styles.action, opt === surfacePref && styles.actionActive]}
-            onPress={() => setPref(opt)}
-            testID={`mydata-pref-${opt}`}
-          >
-            <Text style={[styles.actionLabel, opt === surfacePref && styles.actionActiveLabel]}>
-              {t(`circle.mydata.surface_pref_${opt}`)}
-            </Text>
-          </Pressable>
-        ))}
-        {/* S6.D — when "chat" is chosen, show whether AI is enriching it here. */}
-        {surfacePref === 'chat' && chatAi?.reason ? (
-          <Text style={styles.privacyBody}>
-            {chatAi.enriched ? '✨ ' : ''}{t(`circle.mydata.${CHAT_AI_KEY[chatAi.reason] ?? 'chat_ai_no_provider'}`)}
-          </Text>
-        ) : null}
-      </Section>
-
-      {/* global app language (NL/EN) — a user preference, applies app-wide (web≡mobile). */}
-      <Section title={t('circle.mydata.language')}>
-        {['nl', 'en'].map((lg) => (
-          <Pressable
-            key={lg}
-            style={[styles.action, lg === lang() && styles.actionActive]}
-            onPress={() => {
-              setLang(lg);   // the pre-boot cache — i18n initialises before the agent exists
-              // …and the register, which is the authority. Without this the choice reverts the moment
-              // something reconciles from the register, the same way the relay setting did.
-              callSkill?.('params', 'set-param', { key: 'app.lang', value: lg })?.catch?.(() => {});
-            }}
-            testID={`mydata-lang-${lg}`}
-          >
-            <Text style={[styles.actionLabel, lg === lang() && styles.actionActiveLabel]}>{lg.toUpperCase()}</Text>
-          </Pressable>
-        ))}
-      </Section>
-
-      {typeof onSaveUserLlm === 'function' && (
-        <Section title={t('circle.userLlm.title')}>
-          <UserLlmSettings current={userLlm || {}} onSave={onSaveUserLlm} validate={validateUserLlm} />
-        </Section>
-      )}
 
       {privacy.length > 0 && (
         <Section title={t('circle.mydata.privacy')}>
@@ -1096,6 +1137,8 @@ const makeStyles = (theme) => StyleSheet.create({
   privacy: { gap: 2 },
   privacyTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
   privacyBody: { fontSize: 13, color: theme.color.inkSoft, lineHeight: 18 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
+  switchLabel: { fontSize: 14, color: theme.color.ink, flex: 1, marginRight: 12 },
   // P1 §4 tail — the retention choice row (web parity).
   retentionRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   retentionChoice:      { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },

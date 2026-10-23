@@ -304,6 +304,8 @@ import LogReportScreen from './LogReportScreen.js';
 import CircleAdvancedScreen from './CircleAdvancedScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
+import SettingsHomeScreen, { CircleSettingsChooserScreen } from './SettingsHomeScreen.js';
+import { settingsGroupFor } from '../../../../basis/src/v2/settingsHome.js';
 import { resolveMobileRelayUrl } from '../../core/agentBundle.js';
 // invite parity (J-NP3 + the invite-carries-endpoint decision) — the same policy/storage reads web's
 // showCircleInvite does, so a mobile-built invite carries the SAME disclosure + endpoint fields.
@@ -592,6 +594,7 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
+  const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
   // The member's saved assistant endpoint config (settings → My data). Persisted to AsyncStorage;
   // CircleDetail re-reads it on mount, so a save applies the next time a circle opens.
   const [userLlmCfg, setUserLlmCfg] = useState({});
@@ -2164,7 +2167,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2223,13 +2226,44 @@ export default function CircleLauncherScreen({
       </WithTabBar>
     );
   }
+  // My data, and a settings group's screen: ONE element with every section's handlers — a group passes `only`,
+  // `groupTitle` and its own back (the gear's home), and paints just its declared sections.
+  const myDataScreen = (extra = {}) => (
+    <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
+          doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
+          personClock={personClockRef.current} {...extra} />
+  );
   // S5 — "My data": data-location + privacy + usage (read-only); sub-view of Mij.
   if (view === 'mydata') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleMyDataScreen frequent={usageRows(actionFrequency.snapshot(), { names: { ...Object.fromEntries((circles ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t, labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; } })} onClearFrequent={() => { actionFrequency.clear(); setFrequencyTick((n) => n + 1); }} callSkill={bundle?.callSkill} agent={bundle?.agent} eventLog={eventLog} onBack={() => setView('profile')} onSetRelay={(args) => onCircleControl('set-relay', args)} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer}
-          doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
-          personClock={personClockRef.current} />
+        {myDataScreen()}
+      </WithTabBar>
+    );
+  }
+  // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
+  if (view === 'settingsHome') {
+    return (
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <SettingsHomeScreen onBack={() => setView('profile')}
+          onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
+          onOpenPerCircle={() => setView('settingsCircles')} />
+      </WithTabBar>
+    );
+  }
+  if (view === 'settingsGroup') {
+    const group = settingsGroupFor(basisManifest, settingsGroupId);
+    return (
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        {myDataScreen({ only: group ? group.sections.map((sec) => sec.id) : [], groupTitle: group ? t(group.labelKey) : null, onBack: () => setView('settingsHome') })}
+      </WithTabBar>
+    );
+  }
+  if (view === 'settingsCircles') {
+    return (
+      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
+        <CircleSettingsChooserScreen circles={circles ?? []} onBack={() => setView('settingsHome')}
+          onOpenCircle={(c) => { setSelected(c); setView('settings'); }} />
       </WithTabBar>
     );
   }

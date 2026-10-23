@@ -663,12 +663,13 @@ test('corpus 6.1 — one person, two devices', async ({ browser }) => {
     const annaOnPhone = (await call(phone.page, 'pinboard', 'whoAmI', {}))?.webid ?? null;
 
     // …and takes her recovery phrase to the laptop. This is the only route one person has to two devices.
-    const m = await call(phone.page, 'pinboard', 'getMnemonicOnce', {});
+    // The phrase the person is shown (the owner root), restored the way the wizard does it — never the pinboard agent's.
+    const m = await call(phone.page, 'household', 'revealOwnerPhrase', {});
     log('corpus 6.1 · can she get her recovery phrase?', m?.mnemonic ? 'PASS' : 'FINDING',
       m?.mnemonic ? `${String(m.mnemonic).split(' ').length} words` : JSON.stringify(m));
     test.skip(!m?.mnemonic, 'no mnemonic to carry to the second device');
 
-    const restored = await call(laptop.page, 'pinboard', 'restoreFromMnemonic', { mnemonic: m.mnemonic, confirm: true });
+    const restored = await call(laptop.page, 'household', 'restoreOwnerPhrase', { mnemonic: m.mnemonic });
     log('corpus 6.1 · restoring it on the laptop', restored?.error ? 'FINDING' : 'OBSERVED',
       JSON.stringify(restored)?.slice(0, 140));
     await laptop.page.waitForTimeout(8000);

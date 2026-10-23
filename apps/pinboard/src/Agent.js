@@ -237,6 +237,9 @@ export async function createNeighbourhoodAgent({
   // host's own calls about a persona's circle arrive AS it (`invoke(…, { actAs })`); the skills' local/foreign line
   // follows it (`localActorIn`). Absent → the default throughout.
   selfWebidFor = null,
+  // The identity this device's own card and requests name, `() => ({ pubKey, stableId })` (host-injected; absent → this
+  // agent's own).
+  selfCard = null,
   // "a post matches what I offer" — the host's local closure over the drivers of the self it is in that circle
   // (`(circleId, post) => Promise<boolean>`); reachable by no op and no wire. Absent = no offering match.
   matchesMine = null,
@@ -624,6 +627,7 @@ export async function createNeighbourhoodAgent({
       muted,
       localActor: offeringMatchOpts.localActor,
       selfWebidFor,   // who this device is per circle — the cores' local/foreign line follows it
+      selfCard,       // whom this device's own card and requests name
       groupId:    offeringMatchOpts.group,
       dataLocationConfig,
       chat,           // Phase 14 — used by sendChatMessage / respondToItem

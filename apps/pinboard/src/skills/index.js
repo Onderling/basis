@@ -1336,6 +1336,9 @@ export function buildSkills({
   // WHO this device is per circle, `(circleId) => webid|null` (its persona there) — host-injected; the local/foreign
   // line in the cores follows it (`localActorIn`). Absent → `localActor` for every circle.
   selfWebidFor = null,
+  // The identity THIS DEVICE's own card and requests name, `() => ({ pubKey, stableId })` — host-injected (basis: the
+  // chat identity, the address people reach). Absent → this agent's own identity (the standalone app, where it is one).
+  selfCard = null,
   groupId: explicitGroupId,
   dataLocationConfig,
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` (principle 5) — host-injected;
@@ -4576,10 +4579,11 @@ export function buildSkills({
       // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
       // no fallback to this agent's identity, which every self of the device shares and so would link them.
       const asPersona = !!localActor && from !== localActor;
+      const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       const card = {
         webid:        from,
-        pubKey:       me?.pubKey       ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
-        stableId:     me?.stableId     ?? (asPersona ? null : agent?.identity?.stableId ?? null),
+        pubKey:       own?.pubKey   ?? me?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     own?.stableId ?? me?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
         avatarUrl:    me?.avatarUrl    ?? null,
@@ -4940,7 +4944,7 @@ export function buildSkills({
             itemId:       a.itemId,
             attId:        a.attId,
             fromWebid:    bundle?.agent?.identity ? from : null,
-            fromStableId: bundle?.agent?.identity?.stableId ?? null,
+            fromStableId: (typeof selfCard === 'function' ? selfCard()?.stableId : null) ?? bundle?.agent?.identity?.stableId ?? null,
             sentAt:       Date.now(),
           }}],
         });

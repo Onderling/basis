@@ -109,10 +109,6 @@ function renderSuccessStep(container, doc, state, onClose) {
   const hint = doc.createElement('p'); hint.className = 'cc-wizard-blurb';
   hint.textContent = t('circle.wizard.recovery.after_restore_hint');
   body.appendChild(hint);
-  const newKey = doc.createElement('code');
-  newKey.className = 'cc-wizard-code';
-  newKey.textContent = state.successResult?.newPubKey ?? '(unknown)';
-  body.appendChild(newKey);
   container.appendChild(body);
   mkActions(container, doc, [
     { label: t('circle.update.reload'), onClick: () => { onClose(); globalThis.location?.reload?.(); }, kind: 'primary' },

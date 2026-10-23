@@ -494,6 +494,20 @@ export class SecurityLayer {
     return outcome;
   }
 
+  /**
+   * The keys bound through `adoptInProcessPeer`, read now — the closed roster of this layer's bus
+   * (`createInProcessSenderAuthorizer`). A key a rotation migrated is the current one.
+   * @returns {Set<string>}
+   */
+  inProcessPeerKeys() {
+    const keys = new Set();
+    for (const address of this.#inProcessPeers) {
+      const key = this.#peers.get(address);
+      if (key) keys.add(key);
+    }
+    return keys;
+  }
+
   /** @returns {number} — inbound key substitutions refused since construction. */
   get refusedKeySubstitutions() { return this.#refusedSubstitutions; }
 

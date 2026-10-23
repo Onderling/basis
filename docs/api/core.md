@@ -3243,7 +3243,7 @@ learned from HI envelopes — established when we hold none for that address, ne
 Also tracks key-rotation grace state so envelopes to/from a recently rotated key
 still validate, and can attach an inline rotation proof to outbound envelopes.
 
-**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
+**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `inProcessPeerKeys()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
 
 ## `src/security/authorChain.js`
 
@@ -3506,6 +3506,31 @@ Short-circuits on the first accept.
 **Parameters**
 
 - `gates` `...((envelope: object) => boolean | Promise<boolean>)`
+
+## `src/security/inProcessAuthorization.js`
+
+### `IN_PROCESS_SENDER`
+
+**Kind:** constant · **Import:** `IN_PROCESS_SENDER` from `'@onderling/core'`
+
+The verdict reasons this authorizer gives.
+
+### `createInProcessSenderAuthorizer`
+
+**Kind:** function · **Import:** `createInProcessSenderAuthorizer` from `'@onderling/core'`
+
+```js
+createInProcessSenderAuthorizer(layer)
+```
+
+The sender authorizer for an in-process layer: admits a key only if the layer adopted it on its bus
+(`adoptInProcessPeer`), read at check time; refuses everything while nothing is adopted.
+
+**Parameters**
+
+- `layer` `{inProcessPeerKeys: () => Set<string>}` — the layer it is installed on
+
+**Returns:** `(context: {senderKey: string}) => {allow: boolean, reason: string}`
 
 ## `src/security/originSignature.js`
 

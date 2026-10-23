@@ -27,10 +27,11 @@ describe('own addresses cover every persona', () => {
   }, 60_000);
 
   it('the sender check admits a persona\'s current person key as our own, as it does the default\'s', async () => {
-    // the authorizer the agent installs at its security layer (captured as it is installed)
+    // the authorizer the agent installs at the PEER agent's security layer (captured as it is installed): the first one —
+    // the in-process layers get theirs later, at adoption (each closed to its own bus)
     let authorize = null;
     const orig = SecurityLayer.prototype.setSenderAuthorizer;
-    SecurityLayer.prototype.setSenderAuthorizer = function (fn) { if (typeof fn === 'function') authorize = fn; return orig.call(this, fn); };
+    SecurityLayer.prototype.setSenderAuthorizer = function (fn) { if (typeof fn === 'function' && !authorize) authorize = fn; return orig.call(this, fn); };
     let agent;
     try {
       agent = await createRealHouseholdAgent({

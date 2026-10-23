@@ -27,6 +27,14 @@ import { theme } from './v2/theme.js';
 // the same fact My-data states, worded once (the C4b copy), so welcome and settings cannot drift.
 import { t } from '../core/localisation.js';
 
+/** What the welcome says, in order — Vandaag's onboarding lines, then what a circle holds. */
+export const WELCOME_LINES = Object.freeze([
+  'circle.vandaag.onboarding_intro_1',
+  'circle.vandaag.onboarding_intro_2',
+  'circle.vandaag.onboarding_intro_3',
+  'circle.firstRun.bullet_items',
+]);
+
 export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
   // 5.9b-followup (2026-05-30): boot-time restore now has a real entry
   // path (MnemonicEntryScreen) gated through App.js — when the host
@@ -43,12 +51,10 @@ export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
   return (
     <ScrollView contentContainerStyle={styles.root} testID="first-run-welcome">
       <Text style={styles.title}>{t('circle.firstRun.title')}</Text>
-      <Text style={styles.lede}>{t('circle.firstRun.lede')}</Text>
 
+      {/* the plain lines, the same words Vandaag's first card says (one source): encrypted, no account, what a circle is */}
       <View style={styles.bullets}>
-        <Bullet>{t('circle.firstRun.bullet_circles')}</Bullet>
-        <Bullet>{t('circle.firstRun.bullet_items')}</Bullet>
-        <Bullet>{t('circle.firstRun.bullet_pod')}</Bullet>
+        {WELCOME_LINES.map((k) => <Bullet key={k}>{t(k)}</Bullet>)}
       </View>
 
       {/* The no-pod truth, stated up front in the SAME words My-data uses (one key, two doors). */}

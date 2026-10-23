@@ -7748,24 +7748,12 @@
   },
   "firstRun": {
     "title": {
-      "text": "Welkom bij basis",
+      "text": "Welkom bij Basis",
       "doc": "Eerste-start welkom: titel."
-    },
-    "lede": {
-      "text": "Een buurtchat die op je telefoon draait.  Je gegevens blijven lokaal; jij bepaalt wie wat ziet.",
-      "doc": "Eerste-start intro."
-    },
-    "bullet_circles": {
-      "text": "Kringen die jij beheert — uitnodigen met code of QR.",
-      "doc": "Bullet 1."
     },
     "bullet_items": {
       "text": "Taken, berichten en notities per kring.",
       "doc": "Bullet 2."
-    },
-    "bullet_pod": {
-      "text": "Synchronisatie via een pod zodra je inlogt.",
-      "doc": "Bullet 3."
     },
     "start": {
       "text": "Start",

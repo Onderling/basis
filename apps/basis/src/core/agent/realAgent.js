@@ -524,6 +524,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
   const hostVault = await sealedVault(opts.hostVault ?? pickVault('cc-host-id:'));
+  // The household and folio agents are gone — their ops are the host's, and the host key is the one issuer. An install
+  // from before still holds the private keys they kept at rest; nothing owns those now, so they are forgotten here, at
+  // every boot (an emptied prefix lists nothing, so after the first boot this does nothing).
+  for (const prefix of ['cc-household-agent-id:', 'cc-folio-id:']) {
+    try {
+      const retired = pickVault(prefix);
+      for (const key of await retired.list()) await retired.delete(key);
+    } catch (e) { console.warn(`[realAgent] could not forget the retired keys under ${prefix}:`, e?.message ?? e); }
+  }
   // The keys no in-process agent may hold: the owner root's (here) and the chat identity's (added once it exists).
   const notInProcessKeys = new Set(ownerRoot ? [b64encode(ownerRoot.derivedPubKey())] : []);
   const inProcessHealed  = { n: 0 };

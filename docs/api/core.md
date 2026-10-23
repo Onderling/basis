@@ -541,6 +541,36 @@ Assert that `makePair` yields a Transport implementation satisfying the port.
 - `[opts.label='transport']` `string`
 - `[opts.timeout=5000]` `number`
 
+### `assertSenderBindingConformance`
+
+**Kind:** function · **Import:** `assertSenderBindingConformance` from `'@onderling/core/conformance'`
+
+```js
+async assertSenderBindingConformance(makePair, { label = 'transport', timeout = 5000 } = {})
+```
+
+SENDER BINDING — the case every transport that PROVES a sender must pass (a transport that cannot prove one,
+like the in-process bus, has nothing to bind and is not run against it).
+
+A connection's sender is proven somehow — a challenged hello (mDNS), a key-proof at registration (the relay), an
+authenticated `src` (NKN). An envelope's `_from` is only a claim, and a signature proves a key, never that the
+key belongs at the address the envelope names. So a transport that proves who is on the other end must bind
+`_from` to that proof: a frame claiming any other address is DROPPED, never delivered. Without it, a peer who can
+reach you at all can speak as anyone a receiver has not yet bound (trust on first use takes the forger's key for
+that address). The rule is the kernel's (`createSenderBinding` / `senderVerdict`); this asserts it holds over the
+adapter's own wire.
+
+The factory returns a connected pair plus `forgedAddr`, an address `a` is NOT proven as. The harness pushes a
+frame from `a` over its own connection claiming `forgedAddr` (`a._put` — below the base class, so nothing stamps
+the real sender), then an honest one, and asserts `b` dispatched the honest frame and never the forged one.
+
+**Parameters**
+
+- `makePair` `() => Promise<{ a: object, b: object, addrA: string, addrB: string, forgedAddr: string, teardown?: () => (void|Promise<void>) }>`
+- `[opts]` `object`
+- `[opts.label='transport']` `string`
+- `[opts.timeout=5000]` `number`
+
 ## `src/crypto/b64.js`
 
 ### `b64encode`

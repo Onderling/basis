@@ -98,6 +98,11 @@ the need named beside them.
 mobile, never on the box; WebRTC rendezvous on web and mobile; mDNS on mobile (browse by default) and on a companion
 started with `--nearby`.
 
+**Sender bound** (a frame's `_from` must be what its connection proved — `assertSenderBindingConformance`): the relay
+yes (server-side: key-proof at register, refused `send` from an unregistered address); NKN yes (its authenticated
+`src`); mDNS yes (the key its challenged hello proved — a mismatching frame is dropped and counted as a
+`security-error`); WebRTC rendezvous not yet (its DataChannel frames are next); the in-process bus has no sender to prove.
+
 **Switching between them (the LAN/relay hybrid):** the secure send path's one picker routes a peer over mDNS while the
 transport holds a live connection to it, over the relay when it leaves, and back when mDNS rediscovers it; a send that
 fails on the way is resent on the next tier, and the peer's return lifts that penalty at once

@@ -14,6 +14,7 @@
  */
 export {
   assertTransportConformance,
+  assertSenderBindingConformance,
   REQUIRED_TRANSPORT_METHODS,
 } from './transportConformance.js';
 

@@ -7792,6 +7792,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       const keyOf = (a) => a?.identity?.pubKey ?? a?.bundle?.agent?.identity?.pubKey ?? a?.agent?.identity?.pubKey ?? a?.address ?? null;
       return { host: keyOf(hostAgent), household: keyOf(householdAgent), tasks: keyOf(tasksCircle), pinboard: keyOf(pinboardAgent), folio: keyOf(folioAgent) };
     },
+    // The skill ids each in-process agent registers, read-only — for the check that one op has one owner.
+    inProcessSkillIds: () => {
+      const idsOf = (a) => (a?.skills?.all?.() ?? []).map((d) => d.id).sort();
+      return {
+        host: idsOf(hostAgent), household: idsOf(householdAgent), tasks: idsOf(tasksCircle?.agent),
+        pinboard: idsOf(pinboardAgent?.bundle?.agent), folio: idsOf(folioAgent?.agent),
+      };
+    },
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)

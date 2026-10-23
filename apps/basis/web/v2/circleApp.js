@@ -5302,6 +5302,24 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
   card.appendChild(code);
+  // for someone who is not in the room: the link itself, through the browser's share sheet where it has one, else copied
+  const send = document.createElement('button');
+  send.type = 'button';
+  send.className = 'cc-btn cc-btn--primary';
+  send.dataset.testid = 'invite-send-link';
+  send.textContent = t('circle.invite.send_link');
+  send.style.cssText = 'margin-top:10px';
+  const sent = document.createElement('p');
+  sent.style.cssText = 'font-size:12px;opacity:.8';
+  send.addEventListener('click', async () => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try { await navigator.share({ url: deepLink }); return; } catch { /* dismissed or refused — fall back to copying */ }
+    }
+    try { await navigator.clipboard.writeText(deepLink); sent.textContent = t('circle.invite.link_copied'); }
+    catch { sent.textContent = ''; }
+  });
+  card.appendChild(send);
+  card.appendChild(sent);
   // The door into the Nearby room (PLAN-nearby §5): the same invite, announced to whoever is listed
   // nearby for 15 minutes. Only an admin reaches this line (a non-admin got `admin-only` above).
   const announce = document.createElement('button');
@@ -5334,6 +5352,15 @@ async function showCircleInvite(circleId, { forFunction = false } = {}) {
     forBot.addEventListener('click', () => { overlay.remove(); showCircleInvite(circleId, { forFunction: true }); });
     card.appendChild(forBot);
   }
+  // the way out — the backdrop closes it too, but nobody should have to know that
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'cc-btn cc-btn--ghost';
+  close.dataset.testid = 'invite-close';
+  close.textContent = t('common.close');
+  close.style.cssText = 'display:block;margin-top:10px';
+  close.addEventListener('click', () => overlay.remove());
+  card.appendChild(close);
 }
 
 // reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —

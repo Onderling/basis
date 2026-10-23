@@ -377,7 +377,9 @@ export function renderCircleView(container, {
     });
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture });
+    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules, resolvePicture,
+      // an admin invites from where the members are — the ⋯ menu's own `invite` act, not a second one
+      onInvite: viewerIsAdmin && typeof more?.invite === 'function' ? () => more.invite() : null });
   } else if (effectiveTab !== 'conversation') {
     // a tab whose surface has not loaded yet paints nothing — never the conversation's bubbles under its name
   } else if (!rows.length) {
@@ -697,7 +699,15 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null } = {}) {
+function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null, resolvePicture = null, onInvite = null } = {}) {
+  if (typeof onInvite === 'function') {
+    const inv = document.createElement('button');
+    inv.type = 'button';
+    inv.className = 'cc-btn cc-btn--primary circle-view__members-invite';
+    inv.textContent = tr('circle.invite.menu');
+    inv.addEventListener('click', () => onInvite());
+    body.appendChild(inv);
+  }
   const wrap = document.createElement('div');
   wrap.className = 'circle-view__members';
 

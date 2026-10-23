@@ -353,7 +353,14 @@ export class MdnsTransport extends Transport {
       this.#emitter.addListener('MdnsServiceDiscovered', async ({ host, port, pubKey }) => {
         console.log('[MdnsTransport] ServiceDiscovered:', pubKey?.slice(0,12), host, port);
         if (pubKey === this.#pubKey) { console.log('[MdnsTransport] skipping self'); return; }
-        if (this.#pubKeyToConn.has(pubKey)) { console.log('[MdnsTransport] already connected'); return; }
+        // Mapped already: leave a live connection alone — a re-announcement is not a reason for a second socket. But a
+        // mapped connection that has gone SILENT past the freshness window may be a dead socket to a peer that
+        // restarted (its close can take minutes to reach us), and that peer, now the responder, waits for our dial:
+        // dial again, and the proven handshake re-maps the peer to the live socket (as an inbound one already does).
+        if (this.#pubKeyToConn.has(pubKey)) {
+          if (!this.isStale(pubKey)) { console.log('[MdnsTransport] already connected'); return; }
+          console.log('[MdnsTransport] mapped but silent — dialling the rediscovered peer again');
+        }
         // Tiebreaker — but only when BOTH sides can see each other. It exists to stop two peers opening
         // duplicate sockets, and that can only happen if they can each discover the other. In ghost mode
         // nobody can discover us, so deferring to the peer means waiting for a connection that will never

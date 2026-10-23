@@ -297,6 +297,7 @@ import CircleListsScreen from './CircleListsScreen.js';   // composable lists (w
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
 import CircleProfileScreen from './CircleProfileScreen.js';
 import ShareMyContactScreen from './ShareMyContactScreen.js';
+import { bootMark } from '../../../../basis/src/log/bootTimeline.js';
 import CircleBlockedScreen from './CircleBlockedScreen.js';
 import LogReportScreen from './LogReportScreen.js';
 import CircleAdvancedScreen from './CircleAdvancedScreen.js';
@@ -564,6 +565,9 @@ export default function CircleLauncherScreen({
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [circles, setCircles] = useState([]);
+  // the boot timeline's last steps: the launcher mounted, and the first time it had circles read from the agent
+  useEffect(() => { bootMark('launcher.mount', { bundle: !!bundle }); }, []);
+  const circlesMarked = useRef(false);
   // The persona the Me tab's pointers open (the general one — there is no circle context here).
   const [myPersona, setMyPersona] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1358,6 +1362,7 @@ export default function CircleLauncherScreen({
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
+      if (!circlesMarked.current) { circlesMarked.current = true; bootMark('launcher.circles', { n: _l.length }); }
       // G13 — feed the bundle's per-circle relay registration fresh ids (fire-and-forget, self-catching).
       bundle?.registerCirclePresence?.(_l.map((c) => c?.id).filter(Boolean));
       return _l.length;

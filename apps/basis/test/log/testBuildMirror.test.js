@@ -64,3 +64,30 @@ describe('the copy-log door text', () => {
     expect(logReportView({ at: 0 }).text).toBe('bug-report · basis dev · 1970-01-01T00:00:00.000Z · 0');
   });
 });
+
+describe('the boot timeline and the stall watch', () => {
+  beforeEach(() => { clearLogs(); configureLog({ min: 'debug', sink: null }); });
+
+  it('marks each step with ms since the first mark and dt since the previous', async () => {
+    const { bootMark, resetBootTimeline } = await import('../../src/log/bootTimeline.js');
+    const { dumpLogs } = await import('@onderling/logger');
+    resetBootTimeline();
+    bootMark('js.start', {}, 1000);
+    bootMark('agent.ready', {}, 1800);
+    bootMark('launcher.paint', { circles: 2 }, 2100);
+    const recs = dumpLogs().filter((r) => r.tag === 'boot');
+    expect(recs.map((r) => [r.code, r.f.ms, r.f.dt])).toEqual([['js.start', 0, 0], ['agent.ready', 800, 800], ['launcher.paint', 1100, 300]]);
+    expect(recs[2].f.circles).toBe(2);
+  });
+
+  it('logs a stall only when the timer fires later than allowed', async () => {
+    const { startStallWatch } = await import('../../src/log/bootTimeline.js');
+    const { dumpLogs } = await import('@onderling/logger');
+    let tick = null; let t = 0;
+    startStallWatch({ everyMs: 100, overMs: 200, now: () => t, setInterval: (fn) => { tick = fn; return 1; }, clearInterval: () => {} });
+    t = 150; tick();          // 50 ms late: fine
+    t = 650; tick();          // 400 ms late: a stall
+    const stalls = dumpLogs().filter((r) => r.tag === 'jsthread');
+    expect(stalls.map((r) => r.f.lag)).toEqual([400]);
+  });
+});

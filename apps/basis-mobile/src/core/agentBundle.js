@@ -32,6 +32,7 @@ import { connectionManifests } from '../../../basis/src/v2/connectionManifests.j
 import { getCircleVersionStore } from './circleVersioning.js';
 // Shared extension-mapping loader (feedback-extension) — web≡mobile core.
 import { loadVerifyMappings } from '../../../basis/src/v2/mappingsLoader.js';
+import { bootMark } from '../../../basis/src/log/bootTimeline.js';
 import { getActiveCircle } from '../../../basis/src/v2/activeCircle.js';
 import { PERSON_NODE_STORE_OPTS } from '../../../basis/src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../../basis/src/v2/ownDevicesStore.js';
@@ -305,6 +306,7 @@ export async function bootAgentBundle(opts = {}) {
   let agent;
   try {
     const createRealHouseholdAgent = await loadCreateRealHouseholdAgent();
+    bootMark('agent.module');
     agent = await createRealHouseholdAgent({
       // the shell's translator (App.js hands it): the agent's own lines follow the person's language
       t: opts.t,
@@ -395,6 +397,7 @@ export async function bootAgentBundle(opts = {}) {
       // L3 — household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
     });
+    bootMark('agent.created');
   } catch (err) {
     // Wrap with a localised-error-friendly shape so the RN UI can
     // surface it via `t('boot.boot_failed', { message: err.message })`.
@@ -524,6 +527,7 @@ export async function bootAgentBundle(opts = {}) {
       // from, so peers see one consistent identifier.
       const chatIdentity = agent?.sa?.agent?.identity;
       if (!chatIdentity?.pubKey) return;
+      bootMark('mesh.start');
       const built = await buildMeshTransports({
         identity: chatIdentity,
         enable: { ble: false, relay: false },
@@ -537,6 +541,7 @@ export async function bootAgentBundle(opts = {}) {
         permissions: { ble: false },
         surface: meshSurface,
       });
+      bootMark('mesh.built');
       if (!built?.mdns) return;   // no radio / Wi-Fi off / native module absent — Nearby row hides
       const inst = built.mdns;
       mdns = inst;
@@ -660,8 +665,10 @@ export async function bootAgentBundle(opts = {}) {
                 || msg.startsWith('Aborted(ReferenceError: Property \'WebAssembly\''));
           console.warn = (...a) => { if (!isWasmNoise(a[0])) originalWarn(...a); };
           try {
+            bootMark('nkn.import');
             const mod = await import('nkn-sdk');
             nknLib = mod.default ?? mod;
+            bootMark('nkn.loaded');
           } catch (err) {
             console.warn = originalWarn;
             originalWarn('[cc/boot] nkn-sdk import failed:', err?.message ?? err);
@@ -688,6 +695,7 @@ export async function bootAgentBundle(opts = {}) {
         const bootRelays = await resolveBootRelayUrls();
         _activeRelayUrl = bootRelays[0] ?? null;
         try { _pointsList = (await loadConnectionPoints()).list(); } catch { /* no store yet */ }
+        bootMark('peer.connect');
         await agent.connectPeerTransport({
           nknLib,
           onPeerMessage: (addr, payload) => peerWiringRef.onPeerMessage?.(addr, payload),
@@ -700,6 +708,7 @@ export async function bootAgentBundle(opts = {}) {
           rtcLib,
         });
         console.log('[cc/boot] peer transport connected, address:', agent.peer?.address);
+        bootMark('peer.connected');
         registerCirclePresence();   // G13 — fire-and-forget; never awaited (self-catching)
       } catch (err) {
         // Connect failures are non-fatal — local-only flows stay live.

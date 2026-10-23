@@ -38,7 +38,7 @@ describe('whether a self chose a level', () => {
       return { disclosure: args?.id === 'p-aaaaaaaaaaaa' ? { perContext: { nearby: { [NEARBY_LEVEL_KEY]: { enabled: true, rung: 'profile' } } } } : {} };
     };
     expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ id: 'p-aaaaaaaaaaaa', name: 'Werk' }) }).levelState()).toEqual({ level: 'profile', set: true });
-    expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ id: 'default' }) }).levelState()).toEqual({ level: 'handle', set: false });
+    expect(await createNearbyIdentity({ callSkill, roomSelf: () => ({ id: 'default' }) }).levelState()).toEqual({ level: 'none', set: false });
     expect(await createNearbyIdentity({ callSkill, roomSelf: () => null }).levelState(), 'no self entering: nothing, and nothing read').toEqual({ level: 'none', set: false });
     expect(seen).toEqual(['p-aaaaaaaaaaaa', 'default']);
   });

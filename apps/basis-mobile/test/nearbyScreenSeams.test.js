@@ -32,6 +32,7 @@ describe('nearbyVisibilityKey — the shared banner rule', () => {
   it('otherwise it is simply whether we are announcing', () => {
     expect(nearbyVisibilityKey({ degraded: false, publishing: true,  unavailable: false })).toBe('visible');
     expect(nearbyVisibilityKey({ degraded: false, publishing: false, unavailable: false })).toBe('hidden');
+    expect(nearbyVisibilityKey({ degraded: false, publishing: false, unavailable: false, levelChosen: false })).toBe('not_chosen');
   });
 
   it('no visibility ⇒ no banner', () => {

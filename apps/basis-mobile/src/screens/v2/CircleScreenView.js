@@ -374,7 +374,7 @@ function OnboardingCards({ block, onAction, styles }) {
           ) : (
             <View style={styles.onbRow}>
               <OnbBtn labelKey="circle.vandaag.onboarding_begin_create" a={{ kind: 'create-circle' }} testID="onb-create" />
-              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} quiet testID="onb-join" />
+              <OnbBtn labelKey="circle.vandaag.onboarding_begin_join" a={{ kind: 'join-circle' }} testID="onb-join" />
             </View>
           )}
         </View>

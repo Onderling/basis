@@ -25,19 +25,11 @@
       "doc": "Global tab bar: the Nearby screen (the room this device is in)."
     }
   },
-  "new": {
-    "text": "+ new circle",
-    "doc": "Create-a-new-circle entry on the launcher."
-  },
   "create_unavailable": {
     "text": "Can't create a circle yet — the app is still starting.",
     "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
   },
   "join": {
-    "button": {
-      "text": "Join a circle",
-      "doc": "OBJ-2 — launcher entry to join an existing circle from an invite."
-    },
     "paste": {
       "text": "Paste the invite link from the other device:",
       "doc": "OBJ-2 — prompt for the onderling-invite:// URL when joining on web (no camera)."
@@ -3554,6 +3546,14 @@
       "text": "You can see who is around; they cannot see you.",
       "doc": "Visibility banner body in ghost mode."
     },
+    "not_chosen_title": {
+      "text": "Not visible yet",
+      "doc": "Visibility banner heading while no Nearby level is chosen yet: the device stays unlisted until the person chooses."
+    },
+    "not_chosen_body": {
+      "text": "Nobody here can see you until you choose what this room may see of you.",
+      "doc": "Second line of that banner."
+    },
     "radio_off_title": {
       "text": "Nearby is off",
       "doc": "Visibility banner heading while the persisted radio switch is off."
@@ -3745,6 +3745,10 @@
     "face_caveat": {
       "text": "A stable face re-identifies you across places, even though your address rotates.",
       "doc": "The re-identification caveat, stated at the picker (PLAN-nearby §3)."
+    },
+    "no_name_yet": {
+      "text": "you (no name yet)",
+      "doc": "Nearby's \"You appear here as …\" while the general persona has no handle yet."
     }
   },
   "viewAsSplit": {
@@ -5662,10 +5666,6 @@
     }
   },
   "nearby": {
-    "label": {
-      "text": "Nearby",
-      "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
-    },
     "count_one": {
       "text": "{{count}} device",
       "doc": "Device count, singular."
@@ -5677,10 +5677,6 @@
     "count": {
       "text": "{{count}} device(s)",
       "doc": "Fallback when the plural forms cannot resolve; the _one/_other pair is what renders."
-    },
-    "off": {
-      "text": "off",
-      "doc": "The launcher row while the persisted radio switch is off — no count is claimed, because a radio that is off has seen nothing."
     }
   },
   "extension": {

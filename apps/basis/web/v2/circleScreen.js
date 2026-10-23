@@ -504,7 +504,7 @@ function renderOnboarding(section, block, tr, onAction) {
       card.appendChild(btn('circle.vandaag.onboarding_key_later', { kind: 'key-later' }, ' circle-screen__onb-btn--quiet'));
     } else if (c.id === 'begin') {
       card.appendChild(btn('circle.vandaag.onboarding_begin_create', { kind: 'create-circle' }));
-      card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }, ' circle-screen__onb-btn--quiet'));
+      card.appendChild(btn('circle.vandaag.onboarding_begin_join', { kind: 'join-circle' }));   // the pair in one style
     }
     section.appendChild(card);
   }

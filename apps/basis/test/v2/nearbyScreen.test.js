@@ -37,6 +37,7 @@ function build({ transports = { ble: mk(Discovering) }, peers = [], ...rest } = 
     mySkills: () => ['fietsband plakken', 'soep maken'],
     myPseudonym: 'ik',
     t: (k) => k,
+    levelChosen: () => true,   // a self that chose its level; the unchosen case has its own tests
     ...rest,
   });
   return { screen, control, setPeers: (p) => push?.(p), peers };
@@ -830,7 +831,7 @@ describe('the seconds between opening and the radio answering', () => {
       set: () => new Promise((r) => { resolveSet = r; }),
       subscribe: () => () => {},
     };
-    const screen = createNearbyScreen({ control, t: (k) => k });
+    const screen = createNearbyScreen({ control, t: (k) => k, levelChosen: () => true });
     screen.open();
     expect(screen.model().visibility.pending).toBe(true);
     expect(nearbyVisibilityKey(screen.model().visibility)).toBe('becoming_visible');

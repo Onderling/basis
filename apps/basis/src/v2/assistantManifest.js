@@ -29,7 +29,7 @@ export const assistantManifest = {
   },
   operations: [
     {
-      id:     'assistant-memory',
+      id:     'assistant-memory', visibility: 'authenticated',
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-memory',
@@ -45,13 +45,13 @@ export const assistantManifest = {
       // The person empties their own thread, now (`/vergeet`): every turn of it on the door's device goes. What the turns
       // did — a list line, an appointment, a setting — is the household's and stays. Their act, from their own private
       // chat only (never a group, never a screen), and slash only: the model is never handed a tool that deletes.
-      id:     'assistant-forget',
+      id:     'assistant-forget', visibility: 'authenticated',
       verb:   'forget-conversation',
       writes: { scope: 'device' },
       params: [],
       surfaces: { slash: { command: '/vergeet', body: 'none' } },
     },    {
-      id:     'weekOverview',
+      id:     'weekOverview', visibility: 'authenticated',
       verb:   'week-overview',
       // a person's week, asked as that person (the gate, the role and the names ceiling apply): their open chores, the
       // coming appointments, how many open on the shopping list, how many chores nobody holds. With a `day` ("zaterdag",
@@ -65,7 +65,7 @@ export const assistantManifest = {
     {
       // the planned Sunday overview (`/overzicht aan` writes the row): the week overview sent to the caller's OWN door.
       // No surface: the host's runner calls it as the person whose row it is; anyone calling it reaches only themself.
-      id:     'sendWeekOverview',
+      id:     'sendWeekOverview', visibility: 'authenticated',
       verb:   'send-week-overview',
       params: [{ name: 'occurrence', kind: 'string', required: false }],
       surfaces: {},
@@ -73,7 +73,7 @@ export const assistantManifest = {
     {
       // feedback about the APP ("feedback voor Frits: …"): one honest line naming where app feedback goes (the admin's
       // channel), never a promise, nothing stored or sent. The gate takes "feedback …" lines; the model has it as a tool.
-      id:     'assistant-feedback',
+      id:     'assistant-feedback', visibility: 'authenticated',
       verb:   'hand-off-feedback',
       // no params: the op carries none of the person's words, so it asks for none
       params: [],
@@ -85,7 +85,7 @@ export const assistantManifest = {
       // a greeting and nothing else ("hoi", "goedemorgen", "hello"): the bot's greeting line, in the person's language (or
       // the greeting's own, `lang`). No surface: the deterministic gate takes it (`circleGate.js`), so a greeting never
       // reaches the model — it is not a tool, and nothing to type.
-      id:     'assistant-hello',
+      id:     'assistant-hello', visibility: 'authenticated',
       verb:   'greet',
       params: [{ name: 'lang', kind: 'string', required: false }],
       surfaces: {},
@@ -94,13 +94,13 @@ export const assistantManifest = {
       // the household's announce rows (event triggers on appointments and chores) call it: the HOST's runner, as itself
       // — the door refuses it from a person, a screen or the model. It changes no store; it tells the people a change
       // concerns, never the one who made it.
-      id:     'announceChange',
+      id:     'announceChange', visibility: 'authenticated',
       verb:   'announce-change',
       params: [{ name: 'occurrence', kind: 'string', required: false }],
       surfaces: {},
     },
     {
-      id:     'assistant-reminders',
+      id:     'assistant-reminders', visibility: 'authenticated',
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-reminders',
@@ -119,7 +119,7 @@ export const assistantManifest = {
       // tevoren aan de tandarts" → item "tandarts", rules "60"; "ook de avond ervoor" → rules "ook avond". With `who:
       // everyone`, a reminder for the whole household at a time: "herinner iedereen om 19:45: eten" → item "eten",
       // rules "19:45" — a household row the host runs, said to everyone at its moment (it names nobody)
-      id:     'remindMe',
+      id:     'remindMe', visibility: 'authenticated',
       verb:   'remind-me',
       writes: { scope: 'device' },
       params: [{ name: 'item', kind: 'string', required: true }, { name: 'rules', kind: 'string', required: true }, { name: 'who', kind: 'string', required: false }],
@@ -130,14 +130,14 @@ export const assistantManifest = {
     {
       // a reminder a person set for themselves ("herinner me over 10 minuten: …"), at its moment. No surface: the host's
       // runner calls it, as the person whose row it is; anyone calling it reaches only themself (their own chat)
-      id:     'sayReminder',
+      id:     'sayReminder', visibility: 'authenticated',
       verb:   'say-reminder',
       params: [{ name: 'say', kind: 'string', required: false }, { name: 'occurrence', kind: 'string', required: false }],
       surfaces: {},
     },
     {
       // one of a person's own reminders away (`/schrap 1`, `/schrap gootsteen`): by its number in `/gepland`, or its words
-      id:     'cancelReminder',
+      id:     'cancelReminder', visibility: 'authenticated',
       verb:   'cancel-reminder',
       writes: { scope: 'device' },
       params: [{ name: 'which', kind: 'string', required: false }],
@@ -148,7 +148,7 @@ export const assistantManifest = {
     },
     {
       // a person's own quiet hours ("23:00-09:00"), or `huis`: the household's; their reminders follow theirs
-      id:     'assistant-quiet',
+      id:     'assistant-quiet', visibility: 'authenticated',
       group:  'settings',
       verb:   'set-quiet',
       writes: { scope: 'device' },
@@ -156,7 +156,7 @@ export const assistantManifest = {
       surfaces: { slash: { command: '/stil', body: 'argline' } },
     },
     {
-      id:     'assistant-overview',
+      id:     'assistant-overview', visibility: 'authenticated',
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-overview',
@@ -170,7 +170,7 @@ export const assistantManifest = {
     },
 
     {
-      id:     'assistant-language',
+      id:     'assistant-language', visibility: 'authenticated',
       // a setting: `/instellingen` paints a row for it (the menu is derived from this group)
       group:  'settings',
       verb:   'set-language',

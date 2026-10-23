@@ -52,7 +52,7 @@ export const calendarManifest = {
      * (comma-separated webids), notes.
      */
     {
-      id:    'addEvent', group: 'compose',
+      id:    'addEvent', visibility: 'authenticated', group: 'compose',
       verb:  'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event' },
@@ -95,7 +95,7 @@ export const calendarManifest = {
      * Optional `days` flag (default 7).
      */
     {
-      id:    'listEvents', group: 'data',
+      id:    'listEvents', visibility: 'authenticated', group: 'data',
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
@@ -121,7 +121,7 @@ export const calendarManifest = {
      * response isn't already 'accepted'.
      */
     {
-      id:    'rsvpAccept',
+      id:    'rsvpAccept', visibility: 'authenticated',
       verb:  'claim',
       writes: { scope: 'circle' },
       // Receiver-only: appears on open events the viewer is invited to.
@@ -142,7 +142,7 @@ export const calendarManifest = {
       },
     },
     {
-      id:    'rsvpDecline',
+      id:    'rsvpDecline', visibility: 'authenticated',
       verb:  'reject',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -161,7 +161,7 @@ export const calendarManifest = {
       },
     },
     {
-      id:    'rsvpTentative',
+      id:    'rsvpTentative', visibility: 'authenticated',
       verb:  'submit',     // approximate; ItemStore.submit is the closest contract
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -180,7 +180,7 @@ export const calendarManifest = {
       },
     },
     {
-      id:    'cancelEvent',
+      id:    'cancelEvent', visibility: 'authenticated',
       verb:  'remove',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -203,7 +203,7 @@ export const calendarManifest = {
       },
     },
     {
-      id:    'updateEvent',
+      id:    'updateEvent', visibility: 'authenticated',
       verb:  'edit',
       writes: { scope: 'circle' },
       // a person's words and moment, like an entry's edited text: the newer change wins
@@ -223,7 +223,7 @@ export const calendarManifest = {
     // An own appointment shared with a CONTACT: a copy in their pair circle (title, when, length), re-shared on a move
     // or a cancel. A person's own act: a button, no chat tool — the model never decides what crosses to a contact.
     {
-      id:    'shareEvent',
+      id:    'shareEvent', visibility: 'authenticated',
       verb:  'share',
       writes: { scope: 'circle' },
       appliesTo: { type: 'calendar-event', state: ['open'] },
@@ -241,7 +241,7 @@ export const calendarManifest = {
     // Whom an own appointment can be shared with: exactly the contacts `shareEvent` accepts — the source of its `with`
     // pick, never a row a person taps. `internal` takes it out of coverage and the Other shelf.
     {
-      id:    'shareTargets',
+      id:    'shareTargets', visibility: 'authenticated',
       verb:  'list',
       params: [],
       surfaces: { internal: true },
@@ -252,7 +252,7 @@ export const calendarManifest = {
      * `getEventSnapshot(id)` — cardSnapshotSkill for /embed-time.
      */
     {
-      id:    'getEventSnapshot',
+      id:    'getEventSnapshot', visibility: 'authenticated',
       verb:  'list',
       appliesTo: { type: 'calendar-event' },
       params: [
@@ -271,7 +271,7 @@ export const calendarManifest = {
      * `briefSummary` — contributor.
      */
     {
-      id:    'briefSummary', group: 'data',
+      id:    'briefSummary', visibility: 'authenticated', group: 'data',
       verb:  'list',
       params: [],
       surfaces: {
@@ -284,7 +284,7 @@ export const calendarManifest = {
      * location.
      */
     {
-      id:    'searchEvents', group: 'data',
+      id:    'searchEvents', visibility: 'authenticated', group: 'data',
       verb:  'list',
       params: [
         { name: 'query', kind: 'string', required: true },

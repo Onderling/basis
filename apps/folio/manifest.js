@@ -104,7 +104,7 @@ export const folioManifest = {
     /* ── Destructive ops (confirm) ─────────────────────────────── */
 
     {
-      id:        'deleteFromPod',
+      id:        'deleteFromPod', visibility: 'authenticated',
       verb:      'remove',
       writes: { scope: 'person' },
       // (basis v0.4, 2026-05-22) — pod-side delete is HTTPS;
@@ -133,7 +133,7 @@ export const folioManifest = {
     },
 
     {
-      id:        'deleteLocally',
+      id:        'deleteLocally', visibility: 'authenticated',
       verb:      'remove',
       writes: { scope: 'device' },
       // local-fs delete needs Node; basis in browser
@@ -157,7 +157,7 @@ export const folioManifest = {
     },
 
     {
-      id:     'forceRepush',
+      id:     'forceRepush', visibility: 'authenticated',
       verb:   'sync',  // F-SP1-e: app-local verb.  Distinct from runOnce
                        // (a normal bi-directional sync) — forceRepush
                        // overwrites pod versions wholesale.
@@ -188,7 +188,7 @@ export const folioManifest = {
     /* ── Non-destructive ops (shape coverage) ──────────────────────── */
 
     {
-      id:        'syncOnce',
+      id:        'syncOnce', visibility: 'authenticated',
       verb:      'sync',
       writes: { scope: 'person' },
       // bi-directional fs ↔ pod sync; needs Node.
@@ -213,7 +213,7 @@ export const folioManifest = {
     },
 
     {
-      id:        'watchStart',
+      id:        'watchStart', visibility: 'authenticated',
       verb:      'watch',
       writes: { scope: 'device' },
       // local-fs watcher (chokidar); Node-only.
@@ -234,7 +234,7 @@ export const folioManifest = {
     },
 
     {
-      id:        'watchStop',
+      id:        'watchStop', visibility: 'authenticated',
       verb:      'watch',  // F-SP1-e: same verb as watchStart, opposite
                            // semantics — distinguished by skill id.
       writes: { scope: 'device' },
@@ -253,7 +253,7 @@ export const folioManifest = {
     },
 
     {
-      id:        'verifyPodState',
+      id:        'verifyPodState', visibility: 'authenticated',
       verb:      'read',
       // HEAD-equivalent pod check + hash compare; HTTPS only,
       // browser-doable.
@@ -277,7 +277,7 @@ export const folioManifest = {
      * manifest.  The destructive ops above deliberately carry NO chat. */
 
     {
-      id:    'readNote', group: 'data', verb: 'list',
+      id:    'readNote', visibility: 'authenticated', group: 'data', verb: 'list',
       params: [{ name: 'path', kind: 'string', required: true }],
       runtime: 'browser',
       surfaces: {
@@ -289,7 +289,7 @@ export const folioManifest = {
       },
     },
     {
-      id:    'shareFolder', group: 'compose', verb: 'add',
+      id:    'shareFolder', visibility: 'authenticated', group: 'compose', verb: 'add',
       writes: { scope: 'person' },   // a share token over the person's own pod
       params: [
         { name: 'folder', kind: 'string', required: true },
@@ -309,7 +309,7 @@ export const folioManifest = {
      * when the user picks an existing folio file by name/path.
      */
     {
-      id:    'getFileSnapshot', verb: 'list',
+      id:    'getFileSnapshot', visibility: 'authenticated', verb: 'list',
       appliesTo: { type: 'file' },
       params: [{ name: 'path', kind: 'string', required: true }],
       runtime: 'browser',
@@ -324,7 +324,7 @@ export const folioManifest = {
      * this on every file-card embed.
      */
     {
-      id:    'downloadFile', verb: 'list',
+      id:    'downloadFile', visibility: 'authenticated', verb: 'list',
       appliesTo: { type: 'file' },
       params: [{ name: 'path', kind: 'string', required: true,
         pickerSource: { listOp: 'listFiles' } }],          // Part C — label→path resolution
@@ -345,7 +345,7 @@ export const folioManifest = {
      * /shared-with-me/<name>.
      */
     {
-      id:    'saveToMyPod', verb: 'add',
+      id:    'saveToMyPod', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'person' },
       appliesTo: { type: 'file' },
       params: [
@@ -366,7 +366,7 @@ export const folioManifest = {
      * current sharing.  Mirrors `bin/folio status`.
      */
     {
-      id:    'folioStatus', group: 'data', verb: 'list',
+      id:    'folioStatus', visibility: 'authenticated', group: 'data', verb: 'list',
       params: [],
       runtime: 'browser',
       surfaces: {
@@ -380,7 +380,7 @@ export const folioManifest = {
      * buttons (Download / Save to my pod) via appliesTo:{type:'file'}.
      */
     {
-      id:    'listFiles', group: 'data', verb: 'list',
+      id:    'listFiles', visibility: 'authenticated', group: 'data', verb: 'list',
       params: [],
       runtime: 'browser',
       surfaces: {
@@ -399,7 +399,7 @@ export const folioManifest = {
      * result when semantic was asked for but unavailable.
      */
     {
-      id:    'searchNotes', group: 'data', verb: 'list',
+      id:    'searchNotes', visibility: 'authenticated', group: 'data', verb: 'list',
       params: [
         { name: 'query', kind: 'string', required: true },
         { name: 'mode',  kind: 'string', required: false },   // 'lexical' | 'semantic' | 'hybrid'

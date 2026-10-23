@@ -108,7 +108,7 @@ export const tasksManifest = {
 
   operations: [
     {
-      id:        'addTask',
+      id:        'addTask', visibility: 'authenticated',
       verb:      'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
@@ -145,7 +145,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'claimTask',
+      id:        'claimTask', visibility: 'authenticated',
       verb:      'claim',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['open'] },                      // F-SP3-a
@@ -188,7 +188,7 @@ export const tasksManifest = {
       // ratification. Auto-confirm tasks never surface this (claimTask already confirms). Verb `confirm`
       // (lifecycle atom). appliesTo the `claimed` state (a claim exists); the gate + the "am I the master?"
       // visibility live in the rolePolicy the projector reads.
-      id:        'confirmClaim',
+      id:        'confirmClaim', visibility: 'authenticated',
       verb:      'confirm',
       writes: { scope: 'circle' },
       // Shows on a PENDING claim (explicit-confirm, not yet ratified) — the state `effectiveStatus` reports
@@ -209,7 +209,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'completeTask',
+      id:        'completeTask', visibility: 'authenticated',
       verb:      'complete',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['claimed'] },                   // F-SP3-a
@@ -251,7 +251,7 @@ export const tasksManifest = {
      * /embed against tasks ops surfaces a real task-card.
      */
     {
-      id:        'getTaskSnapshot',
+      id:        'getTaskSnapshot', visibility: 'authenticated',
       verb:      'get',   // one task, by id — not a list (the list atom of a task is listOpen)
       appliesTo: { type: 'task' },
       params: [
@@ -263,7 +263,7 @@ export const tasksManifest = {
       surfaces: { internal: true },
     },
     {
-      id:        'removeTask', group: 'compose',
+      id:        'removeTask', visibility: 'authenticated', group: 'compose',
       verb:      'remove',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
@@ -294,7 +294,7 @@ export const tasksManifest = {
      * embeds/dependencies), so the LLM surface declares just taskId + member.
      */
     {
-      id:        'attachTaskGrant',
+      id:        'attachTaskGrant', visibility: 'authenticated',
       verb:      'update',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
@@ -317,7 +317,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'reassignTask', group: 'admin',
+      id:        'reassignTask', visibility: 'authenticated', group: 'admin',
       verb:      'reassign',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
@@ -330,7 +330,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'submitTask',
+      id:        'submitTask', visibility: 'authenticated',
       verb:      'submit',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['claimed', 'rejected'] },        // F-SP3-a
@@ -351,7 +351,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'approveTask',
+      id:        'approveTask', visibility: 'authenticated',
       verb:      'approve',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['submitted'] },                  // F-SP3-a
@@ -372,7 +372,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'rejectTask',
+      id:        'rejectTask', visibility: 'authenticated',
       verb:      'reject',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['submitted'] },                  // F-SP3-a
@@ -398,7 +398,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'revokeTask',
+      id:        'revokeTask', visibility: 'authenticated',
       verb:      'revoke',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['claimed', 'submitted', 'rejected'] },  // F-SP3-a
@@ -412,7 +412,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'listOpen', group: 'data',
+      id:        'listOpen', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params: [
@@ -437,7 +437,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'listMine',
+      id:        'listMine', visibility: 'authenticated',
       verb:      'list',
       appliesTo: { type: 'task' },
       // `who`: someone else's open tasks, by the name the person uses for them (resolved through the people the
@@ -466,7 +466,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'listClaimable', group: 'data',
+      id:        'listClaimable', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params: [
@@ -486,7 +486,7 @@ export const tasksManifest = {
      * the already-declared task atoms (`list` / `reassign`).
      */
     {
-      id:        'listClaimConflicts', group: 'data',
+      id:        'listClaimConflicts', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -495,7 +495,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'resolveClaim', group: 'admin',
+      id:        'resolveClaim', visibility: 'authenticated', group: 'admin',
       verb:      'reassign',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task' },
@@ -519,7 +519,7 @@ export const tasksManifest = {
      * `src/skills/workspace.js` (registered via buildWorkspaceSkills).
      */
     {
-      id:        'listAwaitingApproval', group: 'data',
+      id:        'listAwaitingApproval', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -539,7 +539,7 @@ export const tasksManifest = {
      * hint mirrors the JSDoc on workspace.js's defineSkill body.
      */
     {
-      id:        'listMyMasteredTasks', group: 'data',
+      id:        'listMyMasteredTasks', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -550,7 +550,7 @@ export const tasksManifest = {
     {
       // The pending-claims approvals list — data source for the `pending-claims` view. Rows carry
       // `status:'pending-confirmation'`, so the confirmClaim button surfaces on each (its appliesTo).
-      id:        'listMyPendingClaims', group: 'data',
+      id:        'listMyPendingClaims', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'task' },
       params:    [],
@@ -585,7 +585,7 @@ export const tasksManifest = {
      *                                 belongs ON the section).
      */
     {
-      id:        'listMyInbox', group: 'data',
+      id:        'listMyInbox', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'inbox-item' },
       params: [
@@ -597,7 +597,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'clearInboxItem',
+      id:        'clearInboxItem', visibility: 'authenticated',
       verb:      'remove',
       writes: { scope: 'person' },   // the inbox is per person and cross-app, not the circle's
       appliesTo: { type: 'inbox-item' },
@@ -632,7 +632,7 @@ export const tasksManifest = {
      * slice).
      */
     {
-      id:        'approveSubtaskRequest',
+      id:        'approveSubtaskRequest', visibility: 'authenticated',
       verb:      'approve',
       writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-request' },
@@ -647,7 +647,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'declineSubtaskRequest',
+      id:        'declineSubtaskRequest', visibility: 'authenticated',
       verb:      'reject',
       writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-request' },
@@ -663,7 +663,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'approveSubtaskProposal',
+      id:        'approveSubtaskProposal', visibility: 'authenticated',
       verb:      'approve',
       writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-proposal' },
@@ -678,7 +678,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'declineSubtaskProposal',
+      id:        'declineSubtaskProposal', visibility: 'authenticated',
       verb:      'reject',
       writes: { scope: 'circle' },
       appliesTo: { type: 'inbox-item', kind: 'subtask-proposal' },
@@ -694,7 +694,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'clearInbox',
+      id:        'clearInbox', visibility: 'authenticated',
       verb:      'remove',
       writes: { scope: 'person' },   // the inbox is per person and cross-app, not the circle's
       appliesTo: { type: 'inbox-item' },          // matches every event in the section
@@ -738,7 +738,7 @@ export const tasksManifest = {
      * `dag` view (no per-item buttons in V0 — itemActions[] is empty).
      */
     {
-      id:        'getDagTree', group: 'data',
+      id:        'getDagTree', visibility: 'authenticated', group: 'data',
       verb:      'tree',
       appliesTo: { type: 'task' },
       params: [
@@ -763,7 +763,7 @@ export const tasksManifest = {
      * Chat surface lets the chat agent dispatch them by name.
      */
     {
-      id:        'archiveCircle',
+      id:        'archiveCircle', visibility: 'authenticated',
       verb:      'archive',
       writes: { scope: 'circle' },
       // Part G (2026-06-17) — the mock declared a `confirm` flag; realAgent's
@@ -791,7 +791,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:        'unarchiveCircle',
+      id:        'unarchiveCircle', visibility: 'authenticated',
       verb:      'unarchive',
       writes: { scope: 'circle' },
       params:    [],
@@ -821,7 +821,7 @@ export const tasksManifest = {
      * on open OR claimed tasks (post-completion edits are out of scope).
      */
     {
-      id:    'editTask', verb: 'edit',
+      id:    'editTask', visibility: 'authenticated', verb: 'edit',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['open', 'claimed'] },
       // DECLARATION LAYER (#34) — an edit to the task's `text` (body content) resolves under the CONTENT policy
@@ -852,7 +852,7 @@ export const tasksManifest = {
      * suggested next ops (invite a member, add the first task).
      */
     {
-      id:    'provisionMyCircle', group: 'admin', verb: 'add',
+      id:    'provisionMyCircle', visibility: 'authenticated', group: 'admin', verb: 'add',
       writes: { scope: 'circle' },
       params: [
         { name: 'name', kind: 'string', required: true },
@@ -871,7 +871,7 @@ export const tasksManifest = {
      * (a product-semantic alias, not drift).
      */
     {
-      id:    'myInbox', group: 'overview', verb: 'list',
+      id:    'myInbox', visibility: 'authenticated', group: 'overview', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/inbox' },
@@ -883,7 +883,7 @@ export const tasksManifest = {
      * tasks-v0's per-member availability hints.
      */
     {
-      id:    'getMyAvailability', group: 'overview', verb: 'list',
+      id:    'getMyAvailability', visibility: 'authenticated', group: 'overview', verb: 'list',
       params: [
         { name: 'week', kind: 'string', required: false },
       ],
@@ -893,7 +893,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'setMyAvailability', group: 'compose', verb: 'submit',
+      id:    'setMyAvailability', visibility: 'authenticated', group: 'compose', verb: 'submit',
       writes: { scope: 'circle' },
       params: [
         { name: 'cellKey', kind: 'string', required: true },
@@ -904,7 +904,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'setAvailabilityOptIn', group: 'compose', verb: 'submit',
+      id:    'setAvailabilityOptIn', visibility: 'authenticated', group: 'compose', verb: 'submit',
       writes: { scope: 'circle' },
       params: [
         { name: 'on', kind: 'enum', of: ['on', 'off'], required: true },
@@ -921,7 +921,7 @@ export const tasksManifest = {
      * buttons dispatch all three args.
      */
     {
-      id:    'suggestSchedule', group: 'data', verb: 'list',
+      id:    'suggestSchedule', visibility: 'authenticated', group: 'data', verb: 'list',
       appliesTo: { type: 'schedule-slot' },
       params: [
         { name: 'lookahead-days', kind: 'number', required: false },
@@ -932,7 +932,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'acceptSchedule', verb: 'add',
+      id:    'acceptSchedule', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'schedule-slot' },
       params: [
@@ -949,7 +949,7 @@ export const tasksManifest = {
      * per-circle counters (open / overdue / mine / awaitingApproval).
      */
     {
-      id:    'getMyCircles', group: 'data', verb: 'list',
+      id:    'getMyCircles', visibility: 'authenticated', group: 'data', verb: 'list',
       appliesTo: { type: 'circle' },
       params: [],
       surfaces: {
@@ -967,7 +967,7 @@ export const tasksManifest = {
      * getMyCircles).
      */
     {
-      id:    'listMyTasksAcrossCircles', group: 'overview', verb: 'list',
+      id:    'listMyTasksAcrossCircles', visibility: 'authenticated', group: 'overview', verb: 'list',
       appliesTo: { type: 'task' },
       params: [],
       surfaces: {
@@ -981,7 +981,7 @@ export const tasksManifest = {
      * from opts.tasksCircleConfig.circleId by realAgent.
      */
     {
-      id:    'getCircleConfig', group: 'admin', verb: 'list',
+      id:    'getCircleConfig', visibility: 'authenticated', group: 'admin', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/circle-info' },
@@ -993,7 +993,7 @@ export const tasksManifest = {
      * member.  Derived from getCircleConfig (realAgent unpacks members[]).
      */
     {
-      id:    'listCircleMembers', group: 'data', verb: 'list',
+      id:    'listCircleMembers', visibility: 'authenticated', group: 'data', verb: 'list',
       appliesTo: { type: 'member' },
       params: [],
       surfaces: {
@@ -1002,7 +1002,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'pauseCircle', group: 'admin', verb: 'submit',
+      id:    'pauseCircle', visibility: 'authenticated', group: 'admin', verb: 'submit',
       writes: { scope: 'circle' },
       params: [],
       surfaces: {
@@ -1011,7 +1011,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'unpauseCircle', group: 'admin', verb: 'submit',
+      id:    'unpauseCircle', visibility: 'authenticated', group: 'admin', verb: 'submit',
       writes: { scope: 'circle' },
       params: [],
       surfaces: {
@@ -1025,7 +1025,7 @@ export const tasksManifest = {
      * joins the circle that issued the token.
      */
     {
-      id:    'issueInvite', group: 'admin', verb: 'add',
+      id:    'issueInvite', visibility: 'authenticated', group: 'admin', verb: 'add',
       writes: { scope: 'circle' },
       params: [
         { name: 'role',      kind: 'enum',   of: ['member', 'admin'], required: false },
@@ -1037,7 +1037,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'redeemInvite', group: 'admin', verb: 'add',
+      id:    'redeemInvite', visibility: 'public', group: 'admin', verb: 'add',
       writes: { scope: 'circle' },
       params: [
         { name: 'invite',      kind: 'string', required: true },
@@ -1057,7 +1057,7 @@ export const tasksManifest = {
      *   - forceSpawnSubtask — admin override w/ mandatory reason
      */
     {
-      id:    'addSubtask', verb: 'add',
+      id:    'addSubtask', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'circle' },
       // Also on a PENDING claim: the claimant may decompose optimistically (a provisional subtree, §2.5).
       appliesTo: { type: 'task', state: ['open', 'claimed', 'pending-confirmation'] },
@@ -1077,7 +1077,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'proposeSubtask', verb: 'add',
+      id:    'proposeSubtask', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'circle' },
       appliesTo: { type: 'task', state: ['submitted'] },
       params: [
@@ -1095,7 +1095,7 @@ export const tasksManifest = {
       },
     },
     {
-      id:    'forceSpawnSubtask', group: 'compose', verb: 'add',
+      id:    'forceSpawnSubtask', visibility: 'authenticated', group: 'compose', verb: 'add',
       writes: { scope: 'circle' },
       // Admin-only escape hatch — no row button (admins use the slash).
       params: [

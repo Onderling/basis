@@ -64,7 +64,7 @@ export const agentsManifest = {
 
   operations: [
     {
-      id:        'listAgents', group: 'data',
+      id:        'listAgents', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'agent' },
       params:    [],
@@ -78,7 +78,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'viewAgent', group: 'data',
+      id:        'viewAgent', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'agent' },
       params: [
@@ -106,7 +106,7 @@ export const agentsManifest = {
      * own circle.
      */
     {
-      id:        'setAgentSkillExposure', group: 'admin',
+      id:        'setAgentSkillExposure', visibility: 'authenticated', group: 'admin',
       verb:      'update',
       writes: { scope: 'person' },   // the exposure lives on the agent's registry entry, the owner's own; a circle admin's narrowing is stored there too
       appliesTo: { type: 'agent' },
@@ -128,7 +128,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'getAgentSkillExposure', group: 'data',
+      id:        'getAgentSkillExposure', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'agent' },
       params: [
@@ -152,7 +152,7 @@ export const agentsManifest = {
      * `agent`-type entry).
      */
     {
-      id:        'createProfile',
+      id:        'createProfile', visibility: 'trusted',
       verb:      'add',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -184,7 +184,7 @@ export const agentsManifest = {
     /* Property layer — curate a coarse property ONCE on a profile (place/ageBand/…), readable by any app
      * (cross-app reuse). setProfileProperty writes an OWN value; getProfileProperties reads the map. */
     {
-      id:        'setProfileProperty', group: 'compose',
+      id:        'setProfileProperty', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -198,7 +198,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Set a coarse property (e.g. place) on a profile — curated once, reusable across apps.' } },
     },
     {
-      id:        'getProfileProperties', group: 'data',
+      id:        'getProfileProperties', visibility: 'authenticated', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -211,7 +211,7 @@ export const agentsManifest = {
      * string, so it has its own set/get. Curated once, governed by the same per-persona disclosure; the
      * on-device matcher reads them via getProfileDrivers. */
     {
-      id:        'setProfileDriver', group: 'compose',
+      id:        'setProfileDriver', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -225,7 +225,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Set a personal driver (goal/hobby/…) on a profile: a phrase + comma-separated tags.' } },
     },
     {
-      id:        'getProfileDrivers', group: 'data',
+      id:        'getProfileDrivers', visibility: 'authenticated', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -237,7 +237,7 @@ export const agentsManifest = {
      * restored device knows its circles + the handle it used. The join wizard writes through this on a
      * successful join; the wrapped-key ref is written later (group-key event) and is optional. */
     {
-      id:        'setProfileCircleMembership', group: 'compose',
+      id:        'setProfileCircleMembership', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -254,7 +254,7 @@ export const agentsManifest = {
     /* …and its removal: a circle the person LEFT comes off the restore-data (2026-09-22), or a restored device
      * re-opens it. The agent's leave writes through this; a leave that follows a sibling's does too. */
     {
-      id:        'removeProfileCircleMembership', group: 'compose',
+      id:        'removeProfileCircleMembership', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -271,7 +271,7 @@ export const agentsManifest = {
     /* Personas — persist what a persona SHARES per context (circle/project). The general per-persona version
      * of the feedback charter consent; the "About me" surface + join wizard write through these. */
     {
-      id:        'setProfileDisclosure', group: 'compose',
+      id:        'setProfileDisclosure', visibility: 'authenticated', group: 'compose',
       verb:      'update',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -285,7 +285,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Choose whether a persona shares a property in a given circle/context.' } },
     },
     {
-      id:        'getProfileDisclosure', group: 'data',
+      id:        'getProfileDisclosure', visibility: 'authenticated', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -294,7 +294,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Read a persona\'s per-context disclosure policy.' } },
     },
     {
-      id:        'getPersonaView', group: 'data',
+      id:        'getPersonaView', visibility: 'authenticated', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -303,7 +303,7 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'The "About me" view — a persona\'s properties + per-context sharing in one call.' } },
     },
     {
-      id:        'getPersonaRelease', group: 'data',
+      id:        'getPersonaRelease', visibility: 'authenticated', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },
       params: [
@@ -320,7 +320,7 @@ export const agentsManifest = {
      * discipline: see the header comment (decision 2).
      */
     {
-      id:        'revokeAgent',
+      id:        'revokeAgent', visibility: 'trusted',
       verb:      'revoke',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -348,7 +348,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'grantAgent', group: 'admin',
+      id:        'grantAgent', visibility: 'trusted', group: 'admin',
       verb:      'update',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -390,7 +390,7 @@ export const agentsManifest = {
      * PolicyEngine (`requiredRole` + cap-token verify) — no second gate.
      */
     {
-      id:        'grantRole', group: 'admin',
+      id:        'grantRole', visibility: 'authenticated', group: 'admin',
       verb:      'update',
       writes: { scope: 'circle' },
       appliesTo: { type: 'agent' },
@@ -418,7 +418,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'revokeGrant', group: 'admin',
+      id:        'revokeGrant', visibility: 'trusted', group: 'admin',
       verb:      'revoke',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -437,7 +437,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'purgeAgent',
+      id:        'purgeAgent', visibility: 'trusted',
       verb:      'remove',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -473,7 +473,7 @@ export const agentsManifest = {
      * trust/curation is designed separately — here it is a data source.
      */
     {
-      id:        'listCatalogue', group: 'data',
+      id:        'listCatalogue', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'catalogue-entry' },
       params:    [],
@@ -489,7 +489,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'installAgent',
+      id:        'installAgent', visibility: 'trusted',
       verb:      'add',
       writes: { scope: 'person' },
       appliesTo: { type: 'agent' },
@@ -537,7 +537,7 @@ export const agentsManifest = {
      * "revoke the misbehaving agent → restore what it touched".
      */
     {
-      id:        'listDataVersions', group: 'data',
+      id:        'listDataVersions', visibility: 'authenticated', group: 'data',
       verb:      'list',
       appliesTo: { type: 'data-version' },
       params: [
@@ -557,7 +557,7 @@ export const agentsManifest = {
       },
     },
     {
-      id:        'restoreDataVersion',
+      id:        'restoreDataVersion', visibility: 'trusted',
       verb:      'update',
       writes: { scope: 'circle' },
       appliesTo: { type: 'data-version' },

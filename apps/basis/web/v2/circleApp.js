@@ -30,6 +30,7 @@ import { isScreenAddress } from '../../src/v2/screenView.js';
 import { PERSON_NODE_STORE_OPTS } from '../../src/v2/personNodeStore.js';
 import { lazyOwnStore } from '../../src/v2/ownDevicesStore.js';
 import { mijScreenBlocks } from '../../src/v2/mijScreen.js';
+import { browserDeviceName } from '../../src/v2/deviceName.js';
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
@@ -3020,6 +3021,8 @@ async function showContacts() {
     // each row's picture is sealed to ITS pair circle
     resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
     onOpen: showContactThread,
+    // a person: the scanQr op (web: the paste prompt), routed by what it reads — Me's Scan, the same door
+    onAddPerson: () => runMeAction('scan'),
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
       if (input) addBotFromInput(input);
@@ -4571,6 +4574,8 @@ async function showMij() {
     // this device is reachable when it is connected at one of its relays (unknown before the peer is up: no reading)
     online: relays.length ? relays.some((r) => r.connected) : undefined,
     deviceId: circleHouseholdAgent?.myDeviceId?.() ?? null,
+    // the browser's own name, for "this device" when the person never named it
+    deviceName: browserDeviceName(globalThis.navigator?.userAgent),
     // "wat wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here
     openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
     pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),

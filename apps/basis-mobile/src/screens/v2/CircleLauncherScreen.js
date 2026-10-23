@@ -28,6 +28,7 @@ import { NEARBY_LEVELS, nearbyLevelLabelKey, nearbyFirstUse } from '../../../../
 import { pushContactReply, subscribeContactReplies } from '../../core/contactReplyInbox.js';
 import { buildContactUnread, totalUnread, makeContactSeenStore } from '../../../../basis/src/v2/contactUnread.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import Constants from 'expo-constants';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState, Image, Share } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { FAB, FAB_CLEARANCE, HEADER_AVATAR } from './fab.js';
@@ -1041,6 +1042,8 @@ export default function CircleLauncherScreen({
     pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
+    // the phone's own name, for "this device" when the person never named it
+    deviceName: () => Constants.deviceName ?? null,
     selfIn: (cid) => { try { return bundle?.agent?.circleSelf?.(cid ?? null)?.webid ?? null; } catch { return null; } },
     // Mij follows the switcher: with one persona ticked, that persona's name and devices; otherwise the person's
     ...(() => {
@@ -2260,6 +2263,7 @@ export default function CircleLauncherScreen({
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
+          onAddPerson={() => onMeAction('scan')}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>
     );

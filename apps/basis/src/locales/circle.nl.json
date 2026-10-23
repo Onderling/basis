@@ -5973,6 +5973,10 @@
     "share_hint": {
       "text": "Kopieer de tekst hierboven en plak die in een QR-maker. De ander scant hem en voegt je toe met /add-contact, met het vertrouwen dat jij voorstelt.",
       "doc": "Hint in the /share-my-contact record."
+    },
+    "add_person": {
+      "text": "+ Persoon toevoegen",
+      "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     }
   },
   "pairedDevices": {
@@ -6409,6 +6413,10 @@
     "avatar_label": {
       "text": "Profiel",
       "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
+    },
+    "no_name_yet": {
+      "text": "Nog geen naam",
+      "doc": "Me's title while the person has no handle — never the tab's own word in its place."
     }
   },
   "blocked": {

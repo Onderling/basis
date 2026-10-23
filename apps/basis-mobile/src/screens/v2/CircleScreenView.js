@@ -248,7 +248,7 @@ function renderIdentityLine(block, onAction, styles) {
   return (
     <View>
       <View style={styles.identityHead}>
-        <Text style={styles.identityName} testID="mij-name">{block.content?.name || t('circle.profile.title')}</Text>
+        <Text style={styles.identityName} testID="mij-name">{block.content?.name || t('circle.profile.no_name_yet')}</Text>
         {typeof onAction === 'function' ? (
           <Pressable onPress={() => onAction({ kind: 'edit-me' })} accessibilityRole="button" testID="mij-edit">
             <Text style={styles.identityEdit}>{t('circle.profile.edit')}</Text>
@@ -267,7 +267,8 @@ function renderAgents(block, onAction, styles) {
     <View>
       <Text style={styles.blockTitle}>{t('circle.recipe.block.agents')}</Text>
       {items.map((row, i) => (
-        <Pressable key={`${row.kind}-${i}`} style={styles.noticeRow} testID={`mij-agent-${row.kind}`}
+        // a plain line, not a bordered row that reads as a field
+        <Pressable key={`${row.kind}-${i}`} style={styles.agentRow} testID={`mij-agent-${row.kind}`}
           disabled={typeof onAction !== 'function'}
           onPress={() => onAction?.({ kind: 'open-my-data' })}>
           <Text style={styles.noticeText}>{agentRowWords(row, t)}</Text>
@@ -574,6 +575,7 @@ const makeStyles = (theme) => StyleSheet.create({
   photoCaption:    { fontSize: 12, color: theme.color.inkSoft, marginTop: 6 },
 
   noticeRow:        { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  agentRow:         { paddingVertical: 4 },
   noticeRowCompact: { paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   noticeSender:        { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
   noticeSenderCompact: { fontSize: 10, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 1 },

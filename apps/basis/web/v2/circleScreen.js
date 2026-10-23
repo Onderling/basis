@@ -288,7 +288,8 @@ function renderIdentityLine(section, block, tr, onAction) {
   head.className = 'circle-screen__identity-head';
   const name = document.createElement('h2');
   name.className = 'cc-profile__title';
-  name.textContent = block.content?.name || tr('circle.profile.title');
+  // no handle yet: say so, rather than the tab's own word ("Mij") as if it were a name
+  name.textContent = block.content?.name || tr('circle.profile.no_name_yet');
   head.appendChild(name);
   if (typeof onAction === 'function') {
     const edit = document.createElement('button');

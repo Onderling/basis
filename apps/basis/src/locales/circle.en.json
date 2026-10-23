@@ -5973,6 +5973,10 @@
     "share_hint": {
       "text": "Copy the payload above and paste it into any QR generator. The receiver scans it and uses /add-contact to add you with the proposed trust level.",
       "doc": "Hint in the /share-my-contact record."
+    },
+    "add_person": {
+      "text": "+ Add a person",
+      "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
     }
   },
   "pairedDevices": {
@@ -6409,6 +6413,10 @@
     "avatar_label": {
       "text": "Profile",
       "doc": "The header avatar's accessible name, top-right on every tab: it opens the person's profile (or the switcher with several selves)."
+    },
+    "no_name_yet": {
+      "text": "No name yet",
+      "doc": "Me's title while the person has no handle — never the tab's own word in its place."
     }
   },
   "blocked": {

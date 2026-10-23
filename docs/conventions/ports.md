@@ -118,7 +118,7 @@ actually hold:
 | Port | Helper | Reference impls it runs against |
 |---|---|---|
 | `Transport` | `assertTransportConformance(makePair, {label})` | `InternalTransport`, `RendezvousTransport` |
-| `Transport` — sender binding | `assertSenderBindingConformance(makePair, {label})` | `MdnsTransport`, `NknTransport`, the relay (server-side) |
+| `Transport` — sender binding | `assertSenderBindingConformance(makePair, {label})` | `MdnsTransport`, `NknTransport`, `RendezvousTransport` (over a fake WebRTC lib), the relay (server-side) |
 | `DataSource` | `assertDataSourceConformance(makeSource, {label, supportsQuery})` | `MemorySource` |
 | `StorageBackend` | `assertStorageBackendConformance(makeBackend, {label})` | `MemoryStorageBackend` |
 | `ActorResolver` | `assertActorResolverConformance(makeResolver, {label})` | `createInMemoryActorResolver` |

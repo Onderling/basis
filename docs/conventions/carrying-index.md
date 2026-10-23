@@ -101,7 +101,8 @@ started with `--nearby`.
 **Sender bound** (a frame's `_from` must be what its connection proved — `assertSenderBindingConformance`): the relay
 yes (server-side: key-proof at register, refused `send` from an unregistered address); NKN yes (its authenticated
 `src`); mDNS yes (the key its challenged hello proved — a mismatching frame is dropped and counted as a
-`security-error`); WebRTC rendezvous not yet (its DataChannel frames are next); the in-process bus has no sender to prove.
+`security-error`); WebRTC rendezvous yes (the channel's peer is the key that signed the offer, verified by the signalling transport's
+security layer — unsigned signalling is refused; every frame on the channel is bound to that peer); the in-process bus has no sender to prove.
 
 **Switching between them (the LAN/relay hybrid):** the secure send path's one picker routes a peer over mDNS while the
 transport holds a live connection to it, over the relay when it leaves, and back when mDNS rediscovers it; a send that

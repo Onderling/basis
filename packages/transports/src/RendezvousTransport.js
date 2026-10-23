@@ -54,7 +54,7 @@
  *   await rdv.connectToPeer(peerAddress);  // initiates WebRTC handshake
  *   await rdv._put(peerAddress, envelope); // send via DataChannel
  */
-import { Transport } from '@onderling/core';
+import { Transport, createSenderBinding, resolveSenderKey, carriedSenderCredential } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { parseUntrustedJson } from '@onderling/core';
 
@@ -94,6 +94,26 @@ export class RendezvousTransport extends Transport {
     this.#pending = new Map();
 
     this._iceServers = iceServers;
+    // THE SENDER IS THE CHANNEL'S PEER. A DataChannel is opened to one peer, named by the authenticated signalling
+    // envelope (`envelope._from`, bound by the signalling transport — the relay's key-proof). A frame on it claiming
+    // any other `_from` is dropped. Fails closed: a channel with no known peer refuses (never `null`, which the kernel
+    // would let through with a warning).
+    this.#checkSender = createSenderBinding({
+      transportName:       'RendezvousTransport',
+      authenticatedSender: (peerAddress) => (typeof peerAddress === 'string' && peerAddress ? peerAddress : { refuse: 'channel-without-peer' }),
+      onUnauthenticated:   (message) => this.emit('warn', message),
+    });
+  }
+
+  #checkSender;
+  #refusedSenders = 0;
+  /** Frames (and signalling) dropped because their claimed sender was not the one the channel/envelope proved. */
+  get refusedSenders() { return this.#refusedSenders; }
+
+  #refuseSender(reason, envelope) {
+    this.#refusedSenders += 1;
+    const err = Object.assign(new Error(`RendezvousTransport: dropped a frame whose sender is not the channel's peer (${reason})`), { code: 'SENDER_MISMATCH' });
+    this.emit('security-error', err, envelope);
   }
 
   /**
@@ -201,7 +221,19 @@ export class RendezvousTransport extends Transport {
 
   async #onSignal(envelope) {
     const p    = envelope.payload ?? {};
-    const from = p.from ?? envelope._from;
+    // WHO is signalling is the key that SIGNED this envelope — verified by the signalling transport's security layer —
+    // and the offer's `from` must be exactly that key: it becomes the channel's peer, and every frame on the channel
+    // is bound to it. Not the envelope's `_from`: over NKN that is an address DERIVED from the key, so equality would
+    // refuse every honest offer. And never an unverified credential: a carrier with no security layer could carry
+    // any key in that field, so unsigned signalling is refused (fail closed; every production composition signals
+    // over a secured transport — `sa.enableSecureRendezvous`, the agent's `enableRendezvous`).
+    const verified = !!this.#sig?.securityLayer;
+    const signer = verified ? resolveSenderKey(carriedSenderCredential(envelope)) : null;
+    const from = p.from;
+    if (!signer || typeof from !== 'string' || from !== signer) {
+      this.#refuseSender(verified ? 'signal-from-not-signer' : 'signal-unsigned', envelope);
+      return;
+    }
 
     switch (p.type) {
 
@@ -287,6 +319,8 @@ export class RendezvousTransport extends Transport {
     dc.onmessage = ({ data }) => {
       let env;
       try { env = parseUntrustedJson(data); } catch (err) { this._frameRefused(err); return; }
+      const verdict = this.#checkSender(peerAddress, env);
+      if (!verdict.ok) { this.#refuseSender(verdict.reason, env); return; }
       try { this._receive(env); } catch { /* a receive that throws must not take the channel down */ }
     };
     dc.onclose = () => {

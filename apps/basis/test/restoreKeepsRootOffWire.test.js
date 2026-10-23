@@ -52,7 +52,7 @@ describe('the restore wizard keeps the owner root off the wire', () => {
       expect(state.successResult?.ok).toBe(true);
       const agent = await boot(device);
 
-      expect(inProcess(agent)).toHaveLength(5);
+      expect(inProcess(agent)).toHaveLength(3);
       expect(inProcess(agent)).not.toContain(rootPub);
 
       const chat = agent.sa.agent.identity;
@@ -95,7 +95,7 @@ describe('a device restored before the fix heals at the next boot', () => {
       let second;
       try { second = await boot(device); } finally { console.warn = original; }
 
-      expect(inProcess(second)).toHaveLength(5);
+      expect(inProcess(second)).toHaveLength(3);
       expect(inProcess(second)).not.toContain(rootPub);
       expect(inProcess(second)).not.toContain(second.sa.agent.identity.pubKey);
       // This device's own row in the member map (what `whoAmI`, `resolveByWebid` and the roster read) says the

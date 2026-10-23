@@ -1,7 +1,7 @@
 /**
  * One owner per skill among the in-process agents: today's collisions are a baseline that only SHRINKS.
  *
- * The in-process agents (host, household, tasks, pinboard, folio) register skills by name; when two register the same
+ * The in-process agents (host, tasks, pinboard; household and folio register on the host) register skills by name; when two register the same
  * id, which one a call reaches is decided by registration order, and folding the agents into one would overwrite one
  * silently. The collisions are removed one owner at a time, and none may be added meanwhile. (The manifest-level rule
  * is scripts/lint-op-owners.mjs; this covers the runtime registrations, which include ops no manifest declares.)
@@ -11,8 +11,8 @@ import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 
 /** The skill ids two or more in-process agents register today, with their owners. Only ever remove from this. */
 const BASELINE = {
-  addTask: ['household', 'tasks'],
-  listOpen: ['household', 'tasks', 'pinboard'],
+  addTask: ['host', 'tasks'],
+  listOpen: ['host', 'tasks', 'pinboard'],
   completePodSignIn: ['tasks', 'pinboard'],
   getChatThread: ['tasks', 'pinboard'],
   getCircleStoragePolicy: ['tasks', 'pinboard'],

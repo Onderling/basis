@@ -10,7 +10,7 @@
  *   - chatAgent   — user-facing surface (via @onderling/secure-agent)
  *   - tasksCircle   — real tasks-v0 Circle agent
  *   - pinboardAgent  — real Pinboard NeighbourhoodAgent
- *   - folioAgent  — real Folio browser agent (web-only handlers today)
+ *   - folio       — Folio's ops, registered on the host agent (no agent of its own)
  *
  * Portability rules (per Project Files/conventions/node-portability):
  *   - NO direct browser DOM globals (window / location / document)
@@ -411,7 +411,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   // is accepted but no longer gates anything — the wired path is unconditional (there is no legacy fallback).
   const householdApp = await import('../../v2/householdApp.js');   // pure cores for the wireSkill registration below
   const { wireStoreMirror, wireCircleStoreInbound } = await import('@onderling/item-store');
-  let householdAgent = null;           // B1 — dedicated in-process agent hosting the wireSkill-wrapped pure cores
   const circleSyncWired = new Set();   // circleIds whose store↔mirror sync (publish + inbound) is wired (once each)
   // Cache-mode mirroring: a pod-backed circle's store runs over a per-circle cache-mode MEDIUM (write-through
   // to the pod). The platform provisions it (`opts.provisionCircleMedium`, web-woven) at circle-open, keyed
@@ -435,7 +434,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The chat lane (same handover point).
   let chatRail = null;
   let chatEmit = null;
-  // The wired household ops (dissolved cores on `householdAgent`). Everything else on the 'household'
+  // The wired household ops (dissolved cores on the host). Everything else on the 'household'
   // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
   const HOUSEHOLD_WIRED_OPS = new Set([
@@ -525,6 +524,15 @@ export async function createRealHouseholdAgent(opts = {}) {
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
   const hostVault = await sealedVault(opts.hostVault ?? pickVault('cc-host-id:'));
+  // The household and folio agents are gone — their ops are the host's, and the host key is the one issuer. An install
+  // from before still holds the private keys they kept at rest; nothing owns those now, so they are forgotten here, at
+  // every boot (an emptied prefix lists nothing, so after the first boot this does nothing).
+  for (const prefix of ['cc-household-agent-id:', 'cc-folio-id:']) {
+    try {
+      const retired = pickVault(prefix);
+      for (const key of await retired.list()) await retired.delete(key);
+    } catch (e) { console.warn(`[realAgent] could not forget the retired keys under ${prefix}:`, e?.message ?? e); }
+  }
   // The keys no in-process agent may hold: the owner root's (here) and the chat identity's (added once it exists).
   const notInProcessKeys = new Set(ownerRoot ? [b64encode(ownerRoot.derivedPubKey())] : []);
   const inProcessHealed  = { n: 0 };
@@ -1326,11 +1334,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   /* ─────────── L3 — household via the uniform route + wireSkill (the DEFAULT, legacy retired) ───────────
-   * The dissolved-onto-CircleItemStore cores in `v2/householdApp.js` are registered on a DEDICATED
-   * in-process household agent via `wireSkill(core, householdOp, { storeFor })` — the same
-   * manifest-op-derives-the-handler mechanism B2 (tasks-v0) uses — and the `'household'` branch of
-   * callSkill routes through `chatAgent.invoke(householdAgent.address, opId, parts)` so household ops
-   * take the merged S1 InternalTransport fast-path AND pass the callSkill security gate.
+   * The dissolved-onto-CircleItemStore cores in `v2/householdApp.js` are registered on the HOST agent via
+   * `wireSkill(core, householdOp, { storeFor })` — the same manifest-op-derives-the-handler mechanism tasks-v0
+   * uses — and the `'household'` branch of callSkill routes through `chatAgent.invoke(hostAgent.address, opId,
+   * parts)`, so household ops take the in-process fast path and the host's gate like every host skill. No agent
+   * of their own: one key, one gate (an app is a manifest + cores registered on the host).
    *
    *   • storeFor — the per-circle CircleItemStore: `householdService.stores.getStore(circleId)`.
    *     circleId is injected into the DataPart args at invoke time (below), so it resolves identically here.
@@ -1344,10 +1352,6 @@ export async function createRealHouseholdAgent(opts = {}) {
    *     (householdApp.listOpen) reads the whole store when `type` is absent.  The shared manifest is
    *     untouched (addItem's `type` stays required; the standalone household app is unaffected). */
   {
-    const householdVault = await sealedVault(pickVault('cc-household-agent-id:'));
-    await giveFreshSeedIfShared(householdVault, notInProcessKeys, inProcessHealed);
-    const householdId    = await restoreOrGenerate(householdVault);
-    householdAgent       = new Agent({ identity: householdId, transport: new InternalTransport(bus, householdId.pubKey) });
     const hhOp = (id) => {
       const found = householdManifest.operations.find((o) => o.id === id);
       if (!found) throw new Error(`realAgent L3: no household manifest op "${id}"`);
@@ -1365,7 +1369,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const withBy   = (coreFn) => (store, a, ctx) => coreFn(store, a, { ...ctx, by: ctx.from ?? chatId?.pubKey });
     // Box the bare-array list cores so invoke returns a DataPart, not an array-mistaken-for-Parts.
     const listWrap = (coreFn) => async (store, a, ctx) => ({ items: await coreFn(store, a, ctx) });
-    const wire     = (id, coreFn, op = hhOp(id)) => householdAgent.register(id, wireSkill(coreFn, op, { storeFor }));
+    const wire     = (id, coreFn, op = hhOp(id)) => hostAgent.register(id, wireSkill(coreFn, op, { storeFor }), { visibility: op.visibility });
 
     wire('addItem',      withBy(householdApp.addItem));
     wire('addTask',      withBy(householdApp.addTask));
@@ -4367,7 +4371,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   await Promise.all([
     hostAgent.start(),
     chatAgent.start(),
-    ...(householdAgent ? [householdAgent.start()] : []),   // B1 — the wireSkill household agent (flag-on)
   ]);
 
   // hello-exchange so each agent knows the other.  InternalBus
@@ -4384,9 +4387,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     peer.security.setSenderAuthorizer(createInProcessSenderAuthorizer(peer.security));
   };
   adoptInProcess(hostAgent);
-  // B1 — seed chatAgent's SecurityLayer with the household agent's key so
-  // `chatAgent.invoke(householdAgent.address, …)` takes the S1 fast-path.
-  if (householdAgent) adoptInProcess(householdAgent);
 
   // Seed a few household items so `/list shopping` + `/brief` are non-empty
   // out of the box.  Deterministic order (added oldest-first); skip via
@@ -5113,21 +5113,17 @@ export async function createRealHouseholdAgent(opts = {}) {
    * preserve their mock-era reply shapes (real pod-IO + Blob bytes
    * stay deferred per the slice-4 scope reduction).
    *
-   * Separate identity vault prefix (`cc-folio-id:`) so folio's web
-   * identity is isolated from chat / tasks / pinboard (decision #2).
+   * Folio's ops register on the HOST agent (no agent or key of its own):
+   * shareFolder's tokens are signed by the host key, the one issuer.
    * podRoot is reserved — when basis lands real pod-attached
    * folio writes (mobile), pass `opts.folioPodRoot` so
    * shareFolder tokens carry the real pod URI.
    */
-  const folioIdentityVault = await sealedVault(opts.folioIdentityVault
-    ?? pickVault('cc-folio-id:'));
-  await giveFreshSeedIfShared(folioIdentityVault, notInProcessKeys, inProcessHealed);
   if (inProcessHealed.n > 0) {
     console.warn(`[realAgent] ${inProcessHealed.n} in-process agent(s) held the owner-root key or the chat key — each was given a fresh seed`);
   }
   const folioAgent = await createBrowserFolioAgent({
-    bus,
-    identityVault: folioIdentityVault,
+    agent:         hostAgent,
     podRoot:       opts.folioPodRoot,
     seedFiles:     opts.folioSeedFiles,   // pass [] for clean-slate fixtures
     label:         'FolioAgent(cc)',
@@ -5137,7 +5133,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // embed call is ever made unless the circle's embed policy permits.
     noteEmbedder:  opts.folioNoteEmbedder,
   });
-  adoptInProcess(folioAgent.agent);
 
   /**
    * basis's CallSkill shape: `(appOrigin, opId, args) → payload`.
@@ -5152,7 +5147,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *                    by `m.app`.  The directory / npm package
    *                    (`@onderling-app/tasks`) keep their names.
    *   - 'pinboard'      → pinboardAgent.address (slice-2b NeighbourhoodAgent)
-   *   - 'folio'      → folioAgent.address (slice-4 web-only agent)
+   *   - 'folio'      → hostAgent.address (folio's ops are host skills)
    *
    * Some opIds are renamed across the boundary (the chat surface
    * uses `myInbox` historically; the real tasks circle exposes
@@ -5968,7 +5963,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (HOUSEHOLD_WIRED_OPS.has(opId)) {
         // Wire this circle's CircleItemStore ↔ its peer mirror (publish + inbound), once per circle.
         await ensureCircleSync(circleId);
-        const parts = await chatAgent.invoke(householdAgent.address, opId, [DataPart({ ...(args ?? {}), circleId })]);
+        const parts = await chatAgent.invoke(hostAgent.address, opId, [DataPart({ ...(args ?? {}), circleId })]);
         const data  = Array.isArray(parts) ? parts[0]?.data : null;
         return adaptWiredHouseholdReply(opId, data, args, tr);
       }
@@ -6483,7 +6478,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // /brief op reaches folio's named briefSummary skill.
       const realOpId = (opId === 'briefSummary') ? 'folio_briefSummary' : opId;
       const parts = [DataPart(args ?? {})];
-      const result = await chatAgent.invoke(folioAgent.address, realOpId, parts);
+      const result = await chatAgent.invoke(hostAgent.address, realOpId, parts);
       const first  = Array.isArray(result) ? result[0] : null;
       return first?.data ?? null;
     }
@@ -7793,20 +7788,19 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Each agent's CURRENT identity key (an identity can be swapped in place while its bus address stays).
     inProcessPubKeys: () => {
       const keyOf = (a) => a?.identity?.pubKey ?? a?.bundle?.agent?.identity?.pubKey ?? a?.agent?.identity?.pubKey ?? a?.address ?? null;
-      return { host: keyOf(hostAgent), household: keyOf(householdAgent), tasks: keyOf(tasksCircle), pinboard: keyOf(pinboardAgent), folio: keyOf(folioAgent) };
+      return { host: keyOf(hostAgent), tasks: keyOf(tasksCircle), pinboard: keyOf(pinboardAgent) };
     },
     // Each in-process layer's sender authorization, read-only — for the check that none accepts by absence.
     inProcessAuthorization: () => {
       const layerOf = (a) => a?.security ?? a?.bundle?.agent?.security ?? a?.agent?.security ?? null;
       const stat = (a) => { const l = layerOf(a); return l ? { installed: l.hasSenderAuthorizer, byAbsence: l.senderAuthorizationsByAbsence, refused: l.refusedUnauthorizedSenders } : null; };
-      return { host: stat(hostAgent), household: stat(householdAgent), tasks: stat(tasksCircle?.agent), pinboard: stat(pinboardAgent?.bundle?.agent), folio: stat(folioAgent?.agent) };
+      return { host: stat(hostAgent), tasks: stat(tasksCircle?.agent), pinboard: stat(pinboardAgent?.bundle?.agent) };
     },
     // The skill ids each in-process agent registers, read-only — for the check that one op has one owner.
     inProcessSkillIds: () => {
       const idsOf = (a) => (a?.skills?.all?.() ?? []).map((d) => d.id).sort();
       return {
-        host: idsOf(hostAgent), household: idsOf(householdAgent), tasks: idsOf(tasksCircle?.agent),
-        pinboard: idsOf(pinboardAgent?.bundle?.agent), folio: idsOf(folioAgent?.agent),
+        host: idsOf(hostAgent), tasks: idsOf(tasksCircle?.agent), pinboard: idsOf(pinboardAgent?.bundle?.agent),
       };
     },
     // Part G — the REAL household app manifest (item/task vocab) is now the

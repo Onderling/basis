@@ -1,7 +1,7 @@
 /**
  * Every in-process layer has a sender authorizer, and none accepts an envelope by ABSENCE of one.
  *
- * A real boot used to print "NO ROSTER AUTHORIZER INSTALLED" five times — once per in-process app agent, each
+ * A real boot used to print "NO ROSTER AUTHORIZER INSTALLED" once per in-process app agent, each
  * accepting any key that signed correctly. Each is now closed to the keys its bus adopted (the chat agent's), so this
  * counts, per layer, what the warning only said once: the authorizer is installed, and after real traffic through
  * every agent nothing passed without one. A count, not a grep of the warning text — the text can change, the
@@ -19,13 +19,13 @@ describe('in-process layers', () => {
     await agent.callSkill('tasks', 'listOpen', {}).catch(() => {});
     await agent.callSkill('folio', 'listFiles', {}).catch(() => {});
     const layers = agent.inProcessAuthorization();
-    expect(Object.keys(layers).sort()).toEqual(['folio', 'host', 'household', 'pinboard', 'tasks']);
+    expect(Object.keys(layers).sort()).toEqual(['host', 'pinboard', 'tasks']);
     for (const [name, stat] of Object.entries(layers)) {
       if (stat === null) continue;   // an agent this composition does not build (none today, but say which)
       expect(stat.installed, `${name}: no sender authorizer`).toBe(true);
       expect(stat.byAbsence, `${name}: envelopes accepted with no authorizer`).toBe(0);
       expect(stat.refused, `${name}: an adopted peer was refused`).toBe(0);
     }
-    expect(Object.values(layers).filter(Boolean).length, 'the accessor reaches every layer').toBe(5);
+    expect(Object.values(layers).filter(Boolean).length, 'the accessor reaches every layer').toBe(3);
   });
 });

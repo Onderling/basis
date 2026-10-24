@@ -27,7 +27,7 @@
  */
 import { expect } from 'vitest';
 import { Transport } from '../transport/Transport.js';
-import { P }         from '../Envelope.js';
+import { P, mkEnvelope } from '../Envelope.js';
 
 /** Methods every Transport (base + adapter) must expose. */
 export const REQUIRED_TRANSPORT_METHODS = Object.freeze([
@@ -106,6 +106,51 @@ export async function assertTransportConformance(makePair, { label = 'transport'
     expect(ak._p, `${label}: sendAck() resolves with an AK envelope`).toBe(P.AK);
     await waitFor(() => inbox.some(e => e._p === P.AS && e.payload?.ping === 1),
       timeout, `${label}: AS envelope is also dispatched to the app layer`);
+  } finally {
+    await teardown?.();
+  }
+}
+
+/**
+ * SENDER BINDING — the case every transport that PROVES a sender must pass (a transport that cannot prove one,
+ * like the in-process bus, has nothing to bind and is not run against it).
+ *
+ * A connection's sender is proven somehow — a challenged hello (mDNS), a key-proof at registration (the relay), an
+ * authenticated `src` (NKN). An envelope's `_from` is only a claim, and a signature proves a key, never that the
+ * key belongs at the address the envelope names. So a transport that proves who is on the other end must bind
+ * `_from` to that proof: a frame claiming any other address is DROPPED, never delivered. Without it, a peer who can
+ * reach you at all can speak as anyone a receiver has not yet bound (trust on first use takes the forger's key for
+ * that address). The rule is the kernel's (`createSenderBinding` / `senderVerdict`); this asserts it holds over the
+ * adapter's own wire.
+ *
+ * The factory returns a connected pair plus `forgedAddr`, an address `a` is NOT proven as. The harness pushes a
+ * frame from `a` over its own connection claiming `forgedAddr` (`a._put` — below the base class, so nothing stamps
+ * the real sender), then an honest one, and asserts `b` dispatched the honest frame and never the forged one.
+ *
+ * @param {() => Promise<{ a: object, b: object, addrA: string, addrB: string, forgedAddr: string,
+ *   teardown?: () => (void|Promise<void>) }>} makePair
+ * @param {object} [opts]
+ * @param {string} [opts.label='transport']
+ * @param {number} [opts.timeout=5000]
+ */
+export async function assertSenderBindingConformance(makePair, { label = 'transport', timeout = 5000 } = {}) {
+  const { a, b, addrA, addrB, forgedAddr, teardown } = await makePair();
+  try {
+    expect(typeof forgedAddr === 'string' && forgedAddr && forgedAddr !== addrA,
+      `${label}: the factory names an address a is not`).toBe(true);
+    const inbox = [];
+    b.setReceiveHandler((env) => { inbox.push(env); });
+    const forged = mkEnvelope(P.OW, forgedAddr, addrB, { forged: true });
+    const forgedId = forged._id;
+    try { await a._put(addrB, forged); } catch { /* a transport may refuse it at the sender's side too — that also binds */ }
+    await a.sendOneWay(addrB, { honest: true });
+    await waitFor(() => inbox.some((e) => e.payload?.honest === true), timeout, `${label}: the honest frame`);
+    // give a forged frame the same chance to arrive as the honest one had
+    await new Promise((r) => setTimeout(r, 100));
+    const honest = inbox.find((e) => e.payload?.honest === true);
+    expect(honest._from, `${label}: the honest frame names its sender`).toBe(addrA);
+    expect(inbox.some((e) => e._id === forgedId || e._from === forgedAddr),
+      `${label}: a frame claiming an address its connection is not proven as is dropped`).toBe(false);
   } finally {
     await teardown?.();
   }

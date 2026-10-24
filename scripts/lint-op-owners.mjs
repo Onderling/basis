@@ -14,12 +14,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The op ids declared by more than one manifest today, with their owners. Only ever remove from this. */
-export const OP_OWNER_BASELINE = {
-  help: ['basis', 'household'],
-  addTask: ['tasks', 'household'],
-  listOpen: ['tasks', 'household', 'pinboard'],
-};
+/** The op ids declared by more than one manifest: none, since every op has one owner (2026-10-24). Keep it empty. */
+export const OP_OWNER_BASELINE = {};
 
 /** Op id → the manifests that declare it, for those declared more than once. */
 export function opCollisions(manifests) {

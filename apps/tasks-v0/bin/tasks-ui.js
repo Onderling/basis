@@ -492,18 +492,9 @@ const dagFlattenJs = await readFile(
   'utf8',
 );
 
-// Slice (2026-05-27) — overlay the chat-thread helpers at
-// `/lib/chatThread.js` so the web chat page (`chat.html`) can import
-// the same pure-JS glue tasks-mobile's `ChatThreadScreen.jsx`
-// consumes. Source-of-truth: `src/ui/chatThread.js`.
-const chatThreadJs = await readFile(
-  join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'ui', 'chatThread.js'),
-  'utf8',
-);
-
 // task.html (2026-05-27) — overlay the per-task detail helpers at
 // `/lib/taskDetail.js` so the web per-task page can import the
-// shared pure-JS glue. Mirrors `src/ui/chatThread.js`. The page also
+// shared pure-JS glue. The page also
 // pulls `describeTaskStatus` from `taskStatus.js`; that lives at
 // `/lib/taskStatus.js` (overlayed alongside) so the import path is
 // stable rather than relative-into-parent (which the static handler
@@ -555,7 +546,6 @@ const ui = await mountLocalUi(bundle.agent, {
     '/tasks-config.json':     tasksConfig,
     '/navmodel.json':         JSON.stringify(navModel),
     '/lib/dagFlatten.js':     dagFlattenJs,
-    '/lib/chatThread.js':     chatThreadJs,
     '/lib/taskDetail.js':     taskDetailJs,
     '/lib/taskStatus.js':     taskStatusJs,
     '/lib/i18nBootstrap.js':  i18nBootstrapJs,

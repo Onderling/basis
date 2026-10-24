@@ -16,44 +16,29 @@ describe('household app over the circle store (L3 faithful dissolve)', () => {
     await svc.callSkill('addItem', { type: 'shopping', text: 'bread' }, c);
     await svc.callSkill('addItem', { type: 'errand', text: 'post office' }, c);
 
-    expect((await svc.callSkill('listOpen', { type: 'shopping' }, c)).map((i) => i.text).sort()).toEqual(['bread', 'milk']);
-    expect((await svc.callSkill('listOpen', { type: 'errand' }, c)).map((i) => i.text)).toEqual(['post office']);
+    expect((await svc.callSkill('listOpenItems', { type: 'shopping' }, c)).map((i) => i.text).sort()).toEqual(['bread', 'milk']);
+    expect((await svc.callSkill('listOpenItems', { type: 'errand' }, c)).map((i) => i.text)).toEqual(['post office']);
 
     const done = await svc.callSkill('markComplete', { match: 'milk' }, c);
     expect(done.ok).toBe(true);
     expect(done.item.completedAt).toBeGreaterThan(0);
-    expect((await svc.callSkill('listOpen', { type: 'shopping' }, c)).map((i) => i.text)).toEqual(['bread']);  // milk gone from open
+    expect((await svc.callSkill('listOpenItems', { type: 'shopping' }, c)).map((i) => i.text)).toEqual(['bread']);  // milk gone from open
   });
 
-  it('tasks: addTask validates against the CANONICAL task type, listTasks, claim assigns the caller', async () => {
-    const svc = createHouseholdService();
-    const c = ctx('c1', 'webid:bob');
-    const t = await svc.callSkill('addTask', { text: 'fix the fence' }, c);
-    expect(t.type).toBe('task');
-    expect(t.createdBy).toBe('webid:bob');               // store-stamped base metadata (canonical-required)
-    expect(t.createdAt).toMatch(/\d{4}-\d{2}-\d{2}T/);   // ISO timestamp
 
-    expect((await svc.callSkill('listTasks', {}, c)).map((i) => i.text)).toEqual(['fix the fence']);
-    const claimed = await svc.callSkill('claim', { match: 'fence' }, c);
-    expect(claimed.item.assignee).toBe('webid:bob');
-  });
-
-  it('removeItem by match; reassign a task', async () => {
+  it('removeItem by match', async () => {
     const svc = createHouseholdService();
     const c = ctx('c1');
     await svc.callSkill('addItem', { type: 'repair', text: 'leaky tap' }, c);
     expect((await svc.callSkill('removeItem', { match: 'leaky' }, c)).ok).toBe(true);
-    expect(await svc.callSkill('listOpen', { type: 'repair' }, c)).toEqual([]);
+    expect(await svc.callSkill('listOpenItems', { type: 'repair' }, c)).toEqual([]);
 
-    await svc.callSkill('addTask', { text: 'mow lawn' }, c);
-    const r = await svc.callSkill('reassign', { match: 'mow', assignee: 'webid:carol' }, c);
-    expect(r.item.assignee).toBe('webid:carol');
   });
 
   it('per-circle isolation + not-found + the registry rejects an unregistered list type', async () => {
     const svc = createHouseholdService();
     await svc.callSkill('addItem', { type: 'shopping', text: 'in A' }, ctx('A'));
-    expect(await svc.callSkill('listOpen', { type: 'shopping' }, ctx('B'))).toEqual([]);   // isolated
+    expect(await svc.callSkill('listOpenItems', { type: 'shopping' }, ctx('B'))).toEqual([]);   // isolated
     expect((await svc.callSkill('markComplete', { match: 'nope' }, ctx('A'))).ok).toBe(false);
     // 'bogus' isn't a registered type → store validation rejects
     await expect(svc.callSkill('addItem', { type: 'bogus', text: 'x' }, ctx('A'))).rejects.toThrow(/invalid "bogus"/);
@@ -79,13 +64,14 @@ describe('household callCapability — atom-dispatch over the live service (§1b
 
     const added = await svc.callCapability('add', 'shopping', { text: 'milk' }, c);
     expect(added).toMatchObject({ ok: true, via: 'op', opId: 'addItem' });        // routed to household's own op
-    expect((await svc.callSkill('listOpen', { type: 'shopping' }, c)).map((i) => i.text)).toEqual(['milk']);  // really stored
+    expect((await svc.callSkill('listOpenItems', { type: 'shopping' }, c)).map((i) => i.text)).toEqual(['milk']);  // really stored
 
     const done = await svc.callCapability('complete', 'shopping', { match: 'milk' }, c);
     expect(done).toMatchObject({ ok: true, via: 'op', opId: 'markComplete' });
-    expect(await svc.callSkill('listOpen', { type: 'shopping' }, c)).toEqual([]);
+    expect(await svc.callSkill('listOpenItems', { type: 'shopping' }, c)).toEqual([]);
 
-    expect(await svc.callCapability('add', 'task', { text: 'fix fence' }, c)).toMatchObject({ ok: true, via: 'op', opId: 'addTask' });
+    // adding a task is not household's (the tasks app's addTask is): the noun declares no 'add'
+    expect(await svc.callCapability('add', 'task', { text: 'fix fence' }, c)).toMatchObject({ ok: false, code: 'unimplemented' });
     expect(await svc.callCapability('create', 'shopping', { text: 'eggs' }, c)).toMatchObject({ ok: true, via: 'op', opId: 'addItem' }); // alias
   });
 

@@ -85,13 +85,17 @@ export function wallClockInTz(instantMs, tz) {
 
 export function utcInstantForWallClock({ year, month, day, hour, minute, tz }) {
   const naiveUtcMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-  const wall       = wallClockInTz(naiveUtcMs, tz);
-  const wallAsUtcMs = Date.UTC(
-    wall.year, wall.month - 1, wall.day,
-    wall.hour, wall.minute, wall.second || 0, 0,
-  );
-  const offsetMs = wallAsUtcMs - naiveUtcMs;
-  return naiveUtcMs - offsetMs;
+  // The zone's offset (wall clock minus UTC) at an instant.
+  const offsetAt = (ms) => {
+    const w = wallClockInTz(ms, tz);
+    return Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second || 0, 0) - ms;
+  };
+  // The offset that applies is the one AT the answer, not at the naive instant: on the day the clocks change they
+  // differ by an hour (01:03 on the night summer time ends is still summer time, while 01:03 UTC already is not). So
+  // guess with the naive instant's offset, then correct with the offset at the guess.
+  const first = naiveUtcMs - offsetAt(naiveUtcMs);
+  const second = naiveUtcMs - offsetAt(first);
+  return second;
 }
 
 function addDaysUtc({ year, month, day }, n) {

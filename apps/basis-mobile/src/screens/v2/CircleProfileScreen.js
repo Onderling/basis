@@ -15,7 +15,7 @@ import { meActionsMobile } from '../../../../basis/src/v2/meActionProjection.js'
 import { basisManifest } from '../../../../basis/src/index.js';
 import { mijScreenBlocks } from '../../../../basis/src/v2/mijScreen.js';
 import { useTheme } from './themeContext.js';
-import { FAB_CLEARANCE, HEADER_AVATAR_CLEARANCE } from './fab.js';
+import { FAB_CLEARANCE, HEADER_AVATAR, HEADER_AVATAR_CLEARANCE } from './fab.js';
 import CircleScreenView from './CircleScreenView.js';
 
 /**
@@ -24,7 +24,7 @@ import CircleScreenView from './CircleScreenView.js';
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
  *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
  */
-export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
+export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onSettings = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -91,6 +91,12 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         <Pressable style={styles.secondary} onPress={onAdvanced} testID="profile-advanced"><Text style={styles.secondaryText}>{t('circle.advanced.title')}</Text></Pressable>
       )}
     </ScrollView>
+    {/* the gear: the person's settings (Instellingen), in the header beside the avatar (web: circleProfile.js) */}
+    {typeof onSettings === 'function' ? (
+      <Pressable style={styles.gear} onPress={onSettings} accessibilityRole="button" accessibilityLabel={t('circle.settings_home.title')} testID="profile-settings">
+        <Text style={styles.gearText}>⚙</Text>
+      </Pressable>
+    ) : null}
     </View>
   );
 }
@@ -107,4 +113,6 @@ const makeStyles = (theme, insets) => StyleSheet.create({
   primaryText: { fontSize: 14, fontWeight: '600', color: theme.color.white },
   secondary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.color.accent, alignSelf: 'flex-start' },
   secondaryText: { fontSize: 14, fontWeight: '600', color: theme.color.accent },
+  gear: { position: 'absolute', top: (insets?.top ?? 0) + HEADER_AVATAR.top, right: HEADER_AVATAR.right + HEADER_AVATAR.size + 8, width: HEADER_AVATAR.size, height: HEADER_AVATAR.size, alignItems: 'center', justifyContent: 'center' },
+  gearText: { fontSize: 22, color: theme.color.ink },
 });

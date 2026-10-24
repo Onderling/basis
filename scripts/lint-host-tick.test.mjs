@@ -35,4 +35,16 @@ describe('lint-host-tick', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('reads only what git would keep: a gitignored build output (a Playwright report) is not app code', () => {
+    const dir = path.join(ROOT, 'apps', 'basis', 'playwright-report', 'trace');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, 'bundle.js'), 'export const poll = () => setInterval(() => {}, 1000);\n');
+    try {
+      const r = run();
+      expect(r.ok, r.out).toBe(true);
+    } finally {
+      rmSync(path.join(ROOT, 'apps', 'basis', 'playwright-report'), { recursive: true, force: true });
+    }
+  });
 });

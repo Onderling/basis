@@ -19,9 +19,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'apps/basis/src/core/agent/realAgent.js';
 
 /** The in-process agents adopted today. Only ever remove from this list. */
-export const ADOPTED_BASELINE = ['hostAgent', 'householdAgent', 'tasksCircle.agent', 'pinboardAgent.bundle.agent', 'folioAgent.agent'];
+export const ADOPTED_BASELINE = ['hostAgent', 'tasksCircle.agent', 'pinboardAgent.bundle.agent'];
 /** How many constructions of each kind build them today. Only ever lower these. */
-export const CONSTRUCTION_BASELINE = { 'new Agent({': 2, 'createBrowser…Agent(': 3, 'new InternalTransport(bus': 2 };
+export const CONSTRUCTION_BASELINE = { 'new Agent({': 1, 'createBrowser…Agent(': 3, 'new InternalTransport(bus': 1 };
 
 /** The arguments of every `adoptInProcess(...)` call in one file's text (the helper's own definition excluded). */
 export function adoptions(text) {

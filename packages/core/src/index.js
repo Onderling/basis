@@ -94,6 +94,9 @@ export { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCred
   from './security/senderKey.js';
 export { SENDER_AUTHORIZATION, allowSender, refuseSender, askSenderAuthorizer }
   from './security/senderAuthorization.js';
+// The internal bus's roster: an in-process layer admits exactly the keys it adopted (`adoptInProcessPeer`).
+export { createInProcessSenderAuthorizer, IN_PROCESS_SENDER }
+  from './security/inProcessAuthorization.js';
 export {
   signReachabilityClaim,
   verifyReachabilityClaim,

@@ -1,8 +1,8 @@
 /**
  * The chat agent ADOPTS its in-process agents instead of greeting them.
  *
- * Measured on a phone (2026-10-23): the five sealed hellos from the chat agent to the host, household, tasks, pinboard
- * and folio agents — each signed, encrypted, verified and decrypted in pure JS — cost ~0.9 s of boot, and proved
+ * Measured on a phone (2026-10-23): the sealed hellos from the chat agent to its in-process agents (then five: host, household, tasks, pinboard
+ * and folio) — each signed, encrypted, verified and decrypted in pure JS — cost ~0.9 s of boot, and proved
  * nothing: both ends are objects in one process. The boot now sends none of them; the keys are bound from the objects
  * (SecurityLayer.adoptInProcessPeer), calls still pass the gate, and those keys are not among the bindings a device
  * hands its sibling devices.
@@ -19,7 +19,7 @@ describe('the boot adopts its in-process agents', () => {
       const hellos = vi.spyOn(InternalTransport.prototype, 'sendHello');
       const agent = await createRealHouseholdAgent({ seedHousehold: false });
       const inProcess = Object.values(agent.inProcessPubKeys()).filter(Boolean);
-      expect(inProcess).toHaveLength(5);
+      expect(inProcess).toHaveLength(3);   // host, tasks, pinboard (household and folio register on the host)
 
       const greeted = hellos.mock.calls.map((c) => c[0]).filter((to) => inProcess.includes(to));
       expect(greeted, 'a hello was sent to an in-process agent').toEqual([]);

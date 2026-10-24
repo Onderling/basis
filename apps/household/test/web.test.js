@@ -3,7 +3,7 @@
  *
  * Boots the household-web bootstrap programmatically, then verifies:
  *   1. Every static asset (`/`, `/main.js`, `/style.css`) is served + non-empty.
- *   2. `/navmodel.json` carries the 6 declared sections (4 list types + tasks + members).
+ *   2. `/navmodel.json` carries the 5 declared sections (4 list types + members).
  *   3. `/household-config.json` carries the actor.
  *   4. The agent card is reachable.
  *   5. The skill-dispatch path round-trips: `addItem({type:'shopping', text:'bread'})`
@@ -86,14 +86,14 @@ describe('household web UI smoke (Slice A.3)', () => {
     expect(card).toHaveProperty('skills');
   });
 
-  it('serves /navmodel.json with the 6 declared sections', async () => {
+  it('serves /navmodel.json with the 5 declared sections', async () => {
     const res = await fetch(`${baseUrl}/navmodel.json`);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toMatch(/application\/json/);
     const nav = await res.json();
     expect(nav.app).toBe('household');
     expect(nav.sections.map((s) => s.id)).toEqual([
-      'shopping', 'errand', 'repair', 'schedule', 'tasks', 'members',
+      'shopping', 'errand', 'repair', 'schedule', 'members',
     ]);
     // Spot-check prefilledParams plumbing — shopping section's
     // addItem affordance must carry { type: 'shopping' } so the web
@@ -128,7 +128,7 @@ describe('household web UI smoke (Slice A.3)', () => {
 
     // Now fetch the list — must include the freshly added bread.
     const listBody = {
-      skillId: 'listOpen',
+      skillId: 'listOpenItems',
       message: { parts: [{ type: 'DataPart', data: { type: 'shopping' } }] },
     };
     const listRes = await fetch(`${baseUrl}/tasks/send`, {
@@ -160,7 +160,7 @@ describe('household web UI smoke (Slice A.3)', () => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        skillId: 'listOpen',
+        skillId: 'listOpenItems',
         message: { parts: [{ type: 'DataPart', data: { type: 'errand' } }] },
       }),
     });
@@ -185,7 +185,7 @@ describe('household web UI smoke (Slice A.3)', () => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        skillId: 'listOpen',
+        skillId: 'listOpenItems',
         message: { parts: [{ type: 'DataPart', data: { type: 'errand' } }] },
       }),
     });

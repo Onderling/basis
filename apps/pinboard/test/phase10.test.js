@@ -74,7 +74,7 @@ describe('Pinboard V1 — leaveGroup', () => {
     expect(marker.source.leftBy).toBe(ANNE);
 
     // The original ask is still there.
-    const open = await callSkill(bundle.agent, 'listOpen', { kind: 'ask' }, ANNE);
+    const open = await callSkill(bundle.agent, 'listOpenRequests', { kind: 'ask' }, ANNE);
     expect(open.items.some(i => i.text === 'paint')).toBe(true);
   });
 
@@ -90,7 +90,7 @@ describe('Pinboard V1 — leaveGroup', () => {
     const r = await callSkill(bundle.agent, 'leaveGroup', { groupId: 'oosterpoort', deletePosts: true }, ANNE);
     expect(r.deletedItems).toBe(2);
 
-    const open = await callSkill(bundle.agent, 'listOpen', undefined, ANNE);
+    const open = await callSkill(bundle.agent, 'listOpenRequests', undefined, ANNE);
     const texts = open.items.map(i => i.text);
     expect(texts).not.toContain('mine-1');
     expect(texts).not.toContain('mine-2');

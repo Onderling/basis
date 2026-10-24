@@ -6,7 +6,7 @@
  * reply: numbered list of open tasks; with one `[take — <id-prefix>]`
  *        inline button per task when the list is small (≤10).
  *
- * Emits no stateUpdates.  Mirrors `listOpen`'s shape; the difference
+ * Emits no stateUpdates.  Mirrors `listOpenItems`'s shape; the difference
  * is the buttons map to `claim <id>` (the verb) instead of
  * `done <id>`.
  */

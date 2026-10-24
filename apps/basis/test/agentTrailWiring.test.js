@@ -53,7 +53,7 @@ describe('trail emitters at the waist', () => {
   it('the owner\'s own ops cross the membrane without an agent-action entry', async () => {
     const deviceLog = new EventLog({ initial: [], muted: [] });
     const a = await boot(deviceLog);
-    await a.callSkill('household', 'listOpen', { type: 'shopping' });   // a real in-process dispatch
+    await a.callSkill('household', 'listOpenItems', { type: 'shopping' });   // a real in-process dispatch
     expect(deviceLog.query().filter((e) => e.type === 'agent-action')).toHaveLength(0);
   });
 

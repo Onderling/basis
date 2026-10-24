@@ -219,7 +219,6 @@ export function wireIssuerNotifications({
     if (!previousAssignee) return;
     await notify(previousAssignee, {
       text: `Your assignment on "${item.text}" was revoked`,
-      buttons: [{ id: `appeal:${item.id}`, label: 'Appeal' }],
       meta: {
         eventType: 'task-revoked',
         itemId:    item.id,

@@ -34,10 +34,6 @@
  * the audit in integration-plan-2026-05-23.md §Audit.
  */
 
-import {
-  Agent, AgentIdentity, InternalTransport,
-} from '@onderling/core';
-
 import { mintShareToken } from './autoShare.js';
 import { listPodFolio } from './folioPodList.js';
 import { buildFolioNoteSearch, indexFolioNotes, searchFolioNotes } from './folioSearch.js';
@@ -99,14 +95,12 @@ function simulateSync() {
 }
 
 /**
- * Build a folio web-surface agent on the shared bus.
+ * Register folio's ops on an agent the host already runs. Folio has no agent or key of its own: its ops are the
+ * host's skills, and shareFolder's tokens are signed with that agent's key (the one issuer). The caller starts and
+ * closes the agent.
  *
  * @param {object} args
- * @param {InternalBus}    args.bus              shared bus (basis owns it)
- * @param {object}         args.identityVault    Vault for the folio agent's identity
- *                                               (browser convention: VaultLocalStorage
- *                                               prefixed `cc-folio-id:`)
- * @param {string}         [args.label='FolioAgent']
+ * @param {Agent}          args.agent            the agent folio's ops register on (basis: the host agent)
  * @param {object}         [args.podClient]      reserved for future pod-backed reads
  * @param {string}         [args.podRoot]        reserved; used as the token's `pod` field
  *                                               in shareFolder when set
@@ -126,13 +120,10 @@ function simulateSync() {
  *   identity: AgentIdentity,
  *   address:  string,
  *   files:    Array,            mutable in-process index
- *   close:    () => Promise<void>,
  * }>}
  */
 export async function createBrowserFolioAgent({
-  bus,
-  identityVault,
-  label = 'FolioAgent',
+  agent,
   podClient,
   podRoot,
   seedFiles,
@@ -140,18 +131,8 @@ export async function createBrowserFolioAgent({
   noteVectorStore,
   noteAudit,
 }) {
-  if (!bus)           throw new TypeError('createBrowserFolioAgent: bus required');
-  if (!identityVault) throw new TypeError('createBrowserFolioAgent: identityVault required');
-
-  const identity = await (async () => {
-    if (await identityVault.has('agent-privkey')) {
-      return AgentIdentity.restore(identityVault);
-    }
-    return AgentIdentity.generate(identityVault);
-  })();
-
-  const transport = new InternalTransport(bus, identity.pubKey);
-  const agent = new Agent({ identity, transport, label });
+  if (!agent || typeof agent.register !== 'function') throw new TypeError('createBrowserFolioAgent: agent required');
+  const identity = agent.identity;
 
   const files = Array.isArray(seedFiles)
     ? seedFiles.map((f) => ({ ...f }))
@@ -228,12 +209,10 @@ export async function createBrowserFolioAgent({
   agent.register('searchFiles', async ({ parts }) => searchFilesCore(store, parts?.[0]?.data ?? {}));
   agent.register('folio_briefSummary', async () => folioBriefSummary(store));
 
-  await agent.start();
-
   return {
     agent,
     identity,
-    address: identity.pubKey,
+    address: agent.address ?? identity.pubKey,
     files,
     // N5 — attach / detach the live pod source after sign-in.  Pass
     // `{ podClient, containerUri }` to light up `listFiles({ source:'pod' })`;
@@ -252,6 +231,5 @@ export async function createBrowserFolioAgent({
     // A changed embedder identity rebuilds the index on the next `/zoek`.
     setNoteEmbedder: (e) => { noteEmbedder = e ?? undefined; return noteEmbedder ?? null; },
     getNoteSearch:   () => noteSearch,
-    close:   () => agent.close?.(),
   };
 }

@@ -132,27 +132,6 @@
     "result_intro":    { "text": "Je bent nu lid van de kring. Het bewijs hieronder is je lidmaatschapscertificaat; bewaar het. De kring-agent is op de hoogte van je lidmaatschap.", "doc": "Lead paragraph under the success heading." },
     "result_footer":   { "text": "Open <a href=\"/\">Workspace</a> om de taken te zien.", "doc": "Footer hint under the success card." }
   },
-  "pod_settings": {
-    "page_title":                  { "text": "Tasks — Pod-instellingen", "doc": "Browser tab title for /pod-settings.html." },
-    "heading":                     { "text": "Pod-instellingen", "doc": "H2 on /pod-settings.html." },
-    "intro":                       { "text": "Waar de staat van de actieve kring leeft, en hoe dit toestel daaraan vasthangt. De volledige state-mapping-editor leeft in de Hub-web-console (post-P5).", "doc": "Lead paragraph on /pod-settings.html." },
-    "storage_heading":             { "text": "Opslag van de kring", "doc": "H3 of the storage-policy card." },
-    "storage_loading":             { "text": "Aan het laden…", "doc": "Initial placeholder under the storage heading." },
-    "storage_upgrade_oneway":      { "text": "Eenmaal pod-having → niet meer terug naar no-pod. Het substraat herschrijft alleen de config; data-migratie is aan jou.", "doc": "Note shown above the upgrade row when the circle is no-pod." },
-    "new_policy_label":            { "text": "Nieuwe opslagvorm", "doc": "Label of the upgrade-target select." },
-    "policy_centralised_short":    { "text": "Centraal op een pod", "doc": "Short label of the centralised option in the upgrade select." },
-    "policy_decentralised_short":  { "text": "Op ieders eigen pod", "doc": "Short label of the decentralised option in the upgrade select." },
-    "policy_hybrid_short":         { "text": "Gemengd", "doc": "Short label of the hybrid option in the upgrade select." },
-    "pod_uri_label":               { "text": "Pod-URI", "doc": "Label of the groupPodUri input on the upgrade row." },
-    "upgrade_btn":                 { "text": "Upgrade", "doc": "CTA that calls setCircleStoragePolicy." },
-    "signin_heading":              { "text": "Solid-pod-aanmelding", "doc": "H3 of the pod-sign-in card." },
-    "signin_intro":                { "text": "Pod-aanmelden laat de kring-staat doorlopen naar je eigen pod voor sterkere persistentie. Kies een issuer (de Solid-provider die je pod host) en bevestig de redirect.", "doc": "Lead paragraph under the pod-sign-in heading." },
-    "signin_issuer_label":         { "text": "Issuer", "doc": "Label of the issuer URL input on /pod-settings.html. Default value points at login.inrupt.com." },
-    "signin_btn":                  { "text": "Aanmelden bij pod", "doc": "CTA that calls startPodSignIn." },
-    "signout_btn":                 { "text": "Uitloggen", "doc": "CTA shown when already signed in; calls signOutOfPod." },
-    "registry_heading":            { "text": "Agent-registry", "doc": "H3 of the agent-registry status card." },
-    "registry_intro":              { "text": "Dit toestel is geregistreerd in de lokale agent-registry van de kring onder <code>pseudo-pod://&lt;deviceId&gt;/private/agent-registry</code>. Andere agents kunnen dit toestel opzoeken via pubKey, deviceId, of agentUri.", "doc": "Lead paragraph under the agent-registry heading." }
-  },
   "dashboard": {
     "page_title":      { "text": "Tasks — Kringen", "doc": "Tab-titel voor /circles.html." },
     "heading":         { "text": "Jouw kringen", "doc": "H2 op /circles.html." },
@@ -235,17 +214,6 @@
     "propose_mode_intro": { "text": "Scope toevoegen na indiening vereist toestemming van de uitvoerder. Het voorstel komt in hun inbox terecht.", "doc": "Helper-tekst naast de voorstel-knop." }
   },
   "web": {
-    "chat": {
-      "page_title":         { "text": "Tasks — Chat", "doc": "Browser-tabtitel voor /chat.html." },
-      "no_thread":          { "text": "Geen gesprek opgegeven. Voeg ?threadId=… toe aan de URL.", "doc": "Foutstaat wanneer /chat.html zonder threadId-query-parameter wordt geopend." },
-      "unknown_peer":       { "text": "(onbekende gesprekspartner)", "doc": "Placeholder in de chat-kop totdat de counterparty bekend is (lege thread + geen `counterparty` query)." },
-      "loading":             { "text": "Laden…", "doc": "Placeholder in de berichtenlijst terwijl de eerste getChatThread-aanroep loopt." },
-      "empty":              { "text": "Nog geen berichten. Stuur er gerust een.", "doc": "Empty-state op een normale thread zonder berichten." },
-      "appeal_empty":       { "text": "Stuur een bericht om het bezwaarschrift te openen bij de master.", "doc": "Empty-state op een appeal-thread zonder berichten. Mirror van mobile.chat.appeal_empty." },
-      "load_failed":        { "text": "Kon gesprek niet laden", "doc": "Prefix in de foutstaat wanneer getChatThread een fout teruggeeft of gooit." },
-      "input_placeholder":  { "text": "Schrijf een bericht…", "doc": "Placeholder in de chat-compose-textarea." },
-      "send":               { "text": "Versturen", "doc": "Label van de Send-knop in chat-compose." }
-    },
     "task": {
       "page_title":         { "text": "Tasks — Taak", "doc": "Browser-tabtitel voor /task.html." },
       "no_task":            { "text": "Geen taak opgegeven. Voeg ?taskId=… toe aan de URL.", "doc": "Foutstaat wanneer /task.html zonder taskId-query-parameter wordt geopend." },

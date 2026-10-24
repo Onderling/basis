@@ -43,7 +43,6 @@ import { buildAppealSkill }            from '../src/skills/appeal.js';
 import { buildAvailabilitySkills }     from '../src/skills/availability.js';
 import { buildBotBindingSkills }       from '../src/skills/botBindings.js';
 import { buildCalendarEmissionSkills } from '../src/skills/calendarEmission.js';
-import { buildChatSkills }             from '../src/skills/chat.js';
 import { buildCustomRoleSkills }       from '../src/skills/customRoles.js';
 import { buildDashboardSkills }        from '../src/skills/dashboard.js';
 import { buildForceCompleteSkill }     from '../src/skills/forceComplete.js';
@@ -106,7 +105,6 @@ function collectRealSkillIds() {
     ...buildAvailabilitySkills(stub),
     ...buildBotBindingSkills(stub),
     ...buildCalendarEmissionSkills(stub),
-    ...buildChatSkills(stub),
     ...buildCustomRoleSkills(stub),
     ...buildDashboardSkills({ ...stub, circlesProvider: () => [] }),
     ...buildForceCompleteSkill(stub),

@@ -75,6 +75,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `createAuthorChain` | function | [`core.md`](core.md#createauthorchain) |
 | `createDiscoverabilityControl` | function | [`core.md`](core.md#creatediscoverabilitycontrol) |
 | `createInMemoryActorResolver` | function | [`core.md`](core.md#createinmemoryactorresolver) |
+| `createInProcessSenderAuthorizer` | function | [`core.md`](core.md#createinprocesssenderauthorizer) |
 | `createMemorySeqStore` | function | [`core.md`](core.md#creatememoryseqstore) |
 | `createMeshSurface` | function | [`core.md`](core.md#createmeshsurface) |
 | `createNearbyPeerSource` | function | [`core.md`](core.md#createnearbypeersource) |
@@ -140,6 +141,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `hashHex` | function | [`core.md`](core.md#hashhex) |
 | `hasRoleBundle` | function | [`core.md`](core.md#hasrolebundle) |
 | `ImagePart` | function | [`core.md`](core.md#imagepart) |
+| `IN_PROCESS_SENDER` | constant | [`core.md`](core.md#in_process_sender) |
 | `IndexedDBSource` | class | [`core.md`](core.md#indexeddbsource) |
 | `InternalBus` | class | [`core.md`](core.md#internalbus) |
 | `InternalTransport` | class | [`core.md`](core.md#internaltransport) |

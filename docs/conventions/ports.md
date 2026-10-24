@@ -118,6 +118,7 @@ actually hold:
 | Port | Helper | Reference impls it runs against |
 |---|---|---|
 | `Transport` | `assertTransportConformance(makePair, {label})` | `InternalTransport`, `RendezvousTransport` |
+| `Transport` — sender binding | `assertSenderBindingConformance(makePair, {label})` | `MdnsTransport`, `NknTransport`, `RendezvousTransport` (over a fake WebRTC lib), the relay (server-side) |
 | `DataSource` | `assertDataSourceConformance(makeSource, {label, supportsQuery})` | `MemorySource` |
 | `StorageBackend` | `assertStorageBackendConformance(makeBackend, {label})` | `MemoryStorageBackend` |
 | `ActorResolver` | `assertActorResolverConformance(makeResolver, {label})` | `createInMemoryActorResolver` |
@@ -126,6 +127,15 @@ actually hold:
 and exercises one-way delivery, request/response correlation, and `AS` auto-ACK end-to-end over the adapter's
 own `_put`. (The `RendezvousTransport` run is gated on the `node-datachannel` WebRTC polyfill being installable,
 and skips cleanly where it isn't — same as the existing rendezvous suite.)
+
+**A transport that proves a sender must bind `_from` to that proof** — `assertSenderBindingConformance`. A connection's
+sender is proven somehow (mDNS: the challenged hello; NKN: its authenticated `src`; the relay: a key-proof at
+`register`); an envelope's `_from` is only a claim. The factory adds `forgedAddr` (an address `a` is not proven as); the
+harness pushes a frame from `a` over its own connection claiming it, and asserts `b` never dispatches it. A transport
+cannot pass without the kernel's rule (`createSenderBinding` / `senderVerdict`) where its proof lives — in the adapter
+for mDNS and NKN, in the SERVER for the relay (`WsServerTransport`'s per-socket registered set; the client
+`RelayTransport` carries none, and its run in `packages/relay/test/` is what proves the relay binds). A transport that
+proves no sender (the in-process bus) has nothing to bind and is not run against it.
 
 A third party writing a new adapter wires the matching helper into their own test suite by importing the
 first-class `@onderling/core/conformance` subpath — no relative paths, no copying:

@@ -40,7 +40,7 @@ export const basisManifest = {
      * to produce its reply, so it picks up new apps automatically.
      */
     {
-      id:    'help',
+      id:    'help', visibility: 'authenticated',
       group: 'help',
       verb:  'help',
       params: [],
@@ -53,7 +53,7 @@ export const basisManifest = {
       },
     },
     {
-      id:    'help-with',
+      id:    'help-with', visibility: 'authenticated',
       group: 'help',
       verb:  'add',
       writes: { scope: 'device' },   // a thread on this device; the post itself is not touched
@@ -118,7 +118,7 @@ export const basisManifest = {
      * receiver claims via the [Claim] button on the rendered card.
      */
     {
-      id:    'embed',
+      id:    'embed', visibility: 'authenticated',
       verb:  'add',
       writes: { scope: 'circle' },
       params: [
@@ -169,7 +169,7 @@ export const basisManifest = {
      * --share=<peer> routes the card to the peer's thread.
      */
     {
-      id:    'embed-file',
+      id:    'embed-file', visibility: 'authenticated',
       verb:  'add',
       writes: { scope: 'circle' },
       params: [
@@ -207,13 +207,13 @@ export const basisManifest = {
     {
       // The person's own week overview: their clock runs it — a planned row in their own store, switched on Mij →
       // Gepland — while the app is open. Not typed, not a button: `internal` keeps it out of coverage and the drawer.
-      id:    'personWeekOverview',
+      id:    'personWeekOverview', visibility: 'authenticated',
       verb:  'list',
       params: [{ name: 'occurrence', kind: 'string', required: false }],
       surfaces: { internal: true },
     },
     {
-      id:    'embed-time',
+      id:    'embed-time', visibility: 'authenticated',
       verb:  'add',
       writes: { scope: 'circle' },
       params: [
@@ -242,7 +242,7 @@ export const basisManifest = {
      * events.
      */
     {
-      id:    'logs',
+      id:    'logs', visibility: 'private',
       verb:  'list',
       params: [
         { name: 'app',   kind: 'string', required: false },
@@ -270,7 +270,7 @@ export const basisManifest = {
      * via getUserMedia + jsQR if desired).
      */
     {
-      id:    'scanQr',
+      id:    'scanQr', visibility: 'authenticated',
       group: 'device',
       verb:  'list',
       params: [],
@@ -288,7 +288,7 @@ export const basisManifest = {
      * when those skills land.
      */
     {
-      id:    'find',
+      id:    'find', visibility: 'authenticated',
       verb:  'list',
       params: [
         { name: 'query', kind: 'string', required: true },
@@ -308,7 +308,7 @@ export const basisManifest = {
      * bypass).
      */
     {
-      id:    'brief',
+      id:    'brief', visibility: 'authenticated',
       verb:  'list',
       params: [
         { name: 'refresh', kind: 'boolean', required: false },
@@ -330,7 +330,7 @@ export const basisManifest = {
      * is composed into the chat-shell (v0.7+).
      */
     {
-      id:    'signin',
+      id:    'signin', visibility: 'private',
       group: 'identity',
       verb:  'add',
       writes: { scope: 'device' },
@@ -371,7 +371,7 @@ export const basisManifest = {
      * signed in) or a hint to /signin.
      */
     {
-      id:    'whoami',
+      id:    'whoami', visibility: 'authenticated',
       group: 'identity',
       verb:  'list',
       params: [],
@@ -398,7 +398,7 @@ export const basisManifest = {
      * a t() (renderWeb's Page.title passthrough).
      */
     {
-      id:    'me',
+      id:    'me', visibility: 'authenticated',
       group: 'identity',
       verb:  'list',
       params: [],
@@ -419,7 +419,7 @@ export const basisManifest = {
      * resolution succeeds) a webid.
      */
     {
-      id:    'send-file',
+      id:    'send-file', visibility: 'authenticated',
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
@@ -440,7 +440,7 @@ export const basisManifest = {
      * to paste raw NKN addresses).
      */
     {
-      id:    'lookup-peer',
+      id:    'lookup-peer', visibility: 'authenticated',
       group: 'connectivity',
       verb:  'list',
       params: [
@@ -459,7 +459,7 @@ export const basisManifest = {
      * changes the address).
      */
     {
-      id:    'publish-peer',
+      id:    'publish-peer', visibility: 'authenticated',
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'person' },
@@ -478,7 +478,7 @@ export const basisManifest = {
      * need to update.  Use /me to see the new address afterwards.
      */
     {
-      id:    'rotate-identity',
+      id:    'rotate-identity', visibility: 'private',
       group: 'identity',
       verb:  'add',
       writes: { scope: 'device' },   // this device's chat key; peers are told, nothing shared is written
@@ -497,7 +497,7 @@ export const basisManifest = {
      * has wired.
      */
     {
-      id:    'security-status',
+      id:    'security-status', visibility: 'private',
       group: 'diagnostics',
       verb:  'list',
       params: [],
@@ -517,7 +517,7 @@ export const basisManifest = {
      *   /set-relay --clear          disconnect + clear persisted URL
      */
     {
-      id:    'set-relay',
+      id:    'set-relay', visibility: 'private',
       group: 'device',
       verb:  'submit',
       writes: { scope: 'device' },
@@ -542,7 +542,7 @@ export const basisManifest = {
      * connected, picks which one sendToPeer uses.
      */
     {
-      id:    'transport-mode',
+      id:    'transport-mode', visibility: 'private',
       group: 'device',
       verb:  'submit',
       writes: { scope: 'device' },
@@ -560,7 +560,7 @@ export const basisManifest = {
      * state side-by-side: connected? address? URL? + current mode.
      */
     {
-      id:    'transports',
+      id:    'transports', visibility: 'private',
       group: 'device',
       verb:  'list',
       params: [],
@@ -578,7 +578,7 @@ export const basisManifest = {
      * audit, identity rotation date) layer in.
      */
     {
-      id:    'settings',
+      id:    'settings', visibility: 'private',
       group: 'device',
       verb:  'list',
       params: [
@@ -685,7 +685,7 @@ export const basisManifest = {
      * "muted" wording unchanged), so only the user-facing command moved.
      */
     {
-      id:    'mute',
+      id:    'mute', visibility: 'authenticated',
       group: 'people',
       verb:  'add',
       writes: { scope: 'device' },
@@ -703,7 +703,7 @@ export const basisManifest = {
      * same identifier you blocked with (NKN addr / pubKey / webid).
      */
     {
-      id:    'unmute',
+      id:    'unmute', visibility: 'authenticated',
       group: 'people',
       verb:  'add',
       writes: { scope: 'device' },
@@ -720,7 +720,7 @@ export const basisManifest = {
      * `/blocked` — list everyone in the block set.
      */
     {
-      id:    'muted',
+      id:    'muted', visibility: 'authenticated',
       group: 'people',
       verb:  'list',
       params: [],
@@ -739,7 +739,7 @@ export const basisManifest = {
      * audit chain size, vault prefix.
      */
     {
-      id:    'debug-dump',
+      id:    'debug-dump', visibility: 'private',
       group: 'diagnostics',
       verb:  'list',
       params: [],
@@ -756,7 +756,7 @@ export const basisManifest = {
      * point + reason.
      */
     {
-      id:    'audit-tail',
+      id:    'audit-tail', visibility: 'private',
       group: 'diagnostics',
       verb:  'list',
       params: [
@@ -776,7 +776,7 @@ export const basisManifest = {
      * this command.
      */
     {
-      id:    'peer-connect',
+      id:    'peer-connect', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'device' },
@@ -794,7 +794,7 @@ export const basisManifest = {
      * incoming bubble in their Main thread.
      */
     {
-      id:    'test-peer',
+      id:    'test-peer', visibility: 'private',
       group: 'connectivity',
       verb:  'add',
       writes: { scope: 'circle' },   // delivered to another person: it leaves this person, the widest reach of the three
@@ -815,7 +815,7 @@ export const basisManifest = {
      * `/signout` — v0.7.. Clears the local OIDC session.
      */
     {
-      id:    'signout',
+      id:    'signout', visibility: 'private',
       group: 'identity',
       verb:  'remove',
       writes: { scope: 'device' },
@@ -830,7 +830,7 @@ export const basisManifest = {
      * `/page-add` — a new page of the person's own (Vandaag), optionally showing only some circles.
      */
     {
-      id:    'screen-add-page',
+      id:    'screen-add-page', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -851,7 +851,7 @@ export const basisManifest = {
      * `/page-remove` — remove one of the person's pages.
      */
     {
-      id:    'screen-remove-page',
+      id:    'screen-remove-page', visibility: 'private',
       group: 'device',
       verb:  'remove',
       writes: { scope: 'device' },
@@ -869,7 +869,7 @@ export const basisManifest = {
      * `/page-rename` — rename a page.
      */
     {
-      id:    'screen-rename-page',
+      id:    'screen-rename-page', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -890,7 +890,7 @@ export const basisManifest = {
      * `/page-show` — the page the home opens on.
      */
     {
-      id:    'screen-set-active',
+      id:    'screen-set-active', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -911,7 +911,7 @@ export const basisManifest = {
      * the screens book, so it is a page change like the others: logged, undoable.
      */
     {
-      id:    'screen-set-personas',
+      id:    'screen-set-personas', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -929,7 +929,7 @@ export const basisManifest = {
      * `/page-circles` — which circles a page shows (none named = all).
      */
     {
-      id:    'screen-set-circles',
+      id:    'screen-set-circles', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -952,7 +952,7 @@ export const basisManifest = {
      * its circle with that op's form; it is never invoked from the sheet.
      */
     {
-      id:    'screen-pin',
+      id:    'screen-pin', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -974,7 +974,7 @@ export const basisManifest = {
      * `/unpin` — take a pin off the "+" sheet, by its key (`pinKey`).
      */
     {
-      id:    'screen-unpin',
+      id:    'screen-unpin', visibility: 'private',
       group: 'device',
       resolves: [{ field: 'book', policy: 'content' }],
       verb:  'remove',
@@ -991,7 +991,7 @@ export const basisManifest = {
      * `/page-block-add` — add a block from the block table (only those the person's pages may hold).
      */
     {
-      id:    'screen-add-block',
+      id:    'screen-add-block', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -1013,7 +1013,7 @@ export const basisManifest = {
      * `/page-block-remove` — remove a block from a page.
      */
     {
-      id:    'screen-remove-block',
+      id:    'screen-remove-block', visibility: 'private',
       group: 'device',
       verb:  'remove',
       writes: { scope: 'device' },
@@ -1032,7 +1032,7 @@ export const basisManifest = {
      * `/page-block-move` — move a block to another place on its page.
      */
     {
-      id:    'screen-move-block',
+      id:    'screen-move-block', visibility: 'private',
       group: 'device',
       verb:  'move',
       writes: { scope: 'device' },
@@ -1052,7 +1052,7 @@ export const basisManifest = {
      * `/page-block-set` — change a block's settings (its circles, mine/all, horizon, limit…).
      */
     {
-      id:    'screen-set-block-config',
+      id:    'screen-set-block-config', visibility: 'private',
       group: 'device',
       // one book per device, one writer: the latest edit stands
       resolves: [{ field: 'book', policy: 'content' }],
@@ -1074,7 +1074,7 @@ export const basisManifest = {
      * `/page-undo` — undo the newest change to the person's pages (each change is kept as a version and logged).
      */
     {
-      id:    'screen-undo',
+      id:    'screen-undo', visibility: 'private',
       group: 'device',
       verb:  'undo',
       writes: { scope: 'device' },
@@ -1156,6 +1156,32 @@ export const basisManifest = {
     { id: 'shared-with-me',    labelKey: 'circle.profile.sharedWithMe',     target: { kind: 'nav', to: 'sharedWithMe' } },
     { id: 'blocked',           labelKey: 'circle.profile.blocked',          target: { kind: 'nav', to: 'blocked' } },
     { id: 'log-report',        labelKey: 'circle.profile.logReport',        target: { kind: 'nav', to: 'logReport' } },
+  ],
+
+  /**
+   * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
+   * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
+   * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
+   * My data page. Kinds say how a row behaves, so it looks like what it is:
+   *   door    — opens another screen (text + →)            switch  — on or off (a real switch)
+   *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
+   * `custody: true` marks a section painted behind the custody guard (keys, devices, sign-in) on both shells.
+   * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
+   */
+  settingsGroups: [
+    {
+      id: 'appearance', labelKey: 'circle.settings_home.appearance',
+      sections: [
+        { id: 'theme',         kind: 'control' },
+        { id: 'language',      kind: 'control' },
+        { id: 'start-screen',  kind: 'control' },
+        { id: 'bot-actions',   kind: 'control' },
+        { id: 'week-overview', kind: 'switch'  },
+        { id: 'notifications', kind: 'switch'  },
+        { id: 'assistant',     kind: 'control' },
+      ],
+    },
+    { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
   ],
 
   /**

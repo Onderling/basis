@@ -93,7 +93,7 @@ describe('Pinboard V1 Phase 15 — persistPath wires FilePersist into the factor
       });
       await b2.offeringMatch.start();
 
-      const list = await callSkill(b2.agent, 'listOpen', { kind: 'ask' });
+      const list = await callSkill(b2.agent, 'listOpenRequests', { kind: 'ask' });
       expect(list.items.some(i => i.text === 'paint the fence')).toBe(true);
     } finally { await cleanup(); }
   });

@@ -1640,12 +1640,21 @@ export async function createSecureAgent(opts = {}) {
    * @param {{connect?:boolean}} [o]
    * @returns {Promise<object>} the transport
    */
+  /** name → the `peer-discovered` listener `addSecureTransport` installed (removed with the transport). */
+  const recoveryListeners = new Map();
   async function addSecureTransport(name, tx, { connect = true } = {}) {
     if (!name || !tx) throw new Error('addSecureTransport: name + transport required');
     makeReceiveHandler(tx);                                   // secure receive wiring (NOT agent.addTransport)
     if (connect && typeof tx.connect === 'function') await tx.connect();
     routing.addTransport(name, tx);                           // unified router selects among all transports
     extraTransports.set(name, tx);
+    // A transport that rediscovers a peer (mDNS: the peer is back on the LAN) lifts the penalty a failed send left on
+    // it, so the peer is routed there again at once — not after the degraded window, while the relay carries it.
+    if (typeof tx.on === 'function') {
+      const onFound = (peer) => { try { if (peer) routing.onTransportRecovered?.(peer, name); } catch { /* defensive */ } };
+      tx.on('peer-discovered', onFound);
+      recoveryListeners.set(name, onFound);
+    }
     if (transportMode === 'nkn' || transportMode === 'relay') transportMode = 'both';  // let the router pick
     if (auditAutoLog) audit('transport.add', name);
     return tx;
@@ -1654,6 +1663,8 @@ export async function createSecureAgent(opts = {}) {
   async function removeSecureTransport(name) {
     const tx = extraTransports.get(name);
     if (tx) {
+      const onFound = recoveryListeners.get(name);
+      if (onFound) { try { tx.off?.('peer-discovered', onFound); } catch { /* defensive */ } recoveryListeners.delete(name); }
       try { await tx.disconnect?.(); } catch { /* swallow */ }
       try { routing.removeTransport(name); } catch { /* defensive */ }
       extraTransports.delete(name);

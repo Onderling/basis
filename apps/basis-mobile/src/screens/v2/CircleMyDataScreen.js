@@ -9,7 +9,7 @@
  */
 import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share, Switch } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
@@ -73,7 +73,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   // the doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here
   doors = {},
   // the person's own week overview (a row in their own store, switched here): the clock, or null on a shell without one
-  personClock = null }) {
+  personClock = null,
+  // a settings group's screen: the section ids to paint, in order (`settingsGroupFor`), and its title; absent ⇒ the
+  // old My data page, which paints every section NOT declared under the gear
+  only = null, groupTitle = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -374,6 +377,169 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const relay = [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ');
   const usage = Object.entries(metrics || {});
 
+  // The sections that live under the gear (Instellingen), one painter per declared id. Painted ONLY on a settings
+  // group's screen (`only`, in the manifest's order); the old page paints none of them. Web: circleMyData.js.
+  const painters = {
+    'theme': () => (
+      <>
+        {/* Display theme (systeem / licht / donker) — a mono pill segmented control,
+            mirror of web's Mij toggle + onderling.org's header toggle. Reuses the
+            shared circle.mydata.theme(_system/_light/_dark) keys; switches live. */}
+        <Section title={t('circle.mydata.theme')}>
+          <View style={styles.themeToggle} accessibilityLabel={t('circle.mydata.theme')} testID="mydata-theme-toggle">
+            {['system', 'light', 'dark'].map((opt) => (
+              <Pressable
+                key={opt}
+                accessibilityRole="button"
+                accessibilityState={{ selected: opt === themePref }}
+                style={[styles.themeBtn, opt === themePref && styles.themeBtnActive]}
+                onPress={() => setThemePref(opt)}
+                testID={`mydata-theme-${opt}`}
+              >
+                <Text style={[styles.themeBtnText, opt === themePref && styles.themeBtnTextActive]}>
+                  {t(`circle.mydata.theme_${opt}`)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Section>
+      </>
+    ),
+    'language': () => (
+      <>
+        {/* global app language (NL/EN) — a user preference, applies app-wide (web≡mobile). */}
+        <Section title={t('circle.mydata.language')}>
+          {['nl', 'en'].map((lg) => (
+            <Pressable
+              key={lg}
+              style={[styles.action, lg === lang() && styles.actionActive]}
+              onPress={() => {
+                setLang(lg);   // the pre-boot cache — i18n initialises before the agent exists
+                // …and the register, which is the authority. Without this the choice reverts the moment
+                // something reconciles from the register, the same way the relay setting did.
+                callSkill?.('params', 'set-param', { key: 'app.lang', value: lg })?.catch?.(() => {});
+              }}
+              testID={`mydata-lang-${lg}`}
+            >
+              <Text style={[styles.actionLabel, lg === lang() && styles.actionActiveLabel]}>{lg.toUpperCase()}</Text>
+            </Pressable>
+          ))}
+        </Section>
+      </>
+    ),
+    'start-screen': () => (
+      <>
+        {/* Where the app opens on this device — the start-screen setting (startScreen.js), written through set-param like
+            every setting. Web parity: circleMyData.js. Omitted without an agent. */}
+        {agent && typeof agent.getParamValue === 'function' ? (
+          <Section title={t('circle.mydata.start_title')}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {START_SCREEN_CHOICES.map((c) => {
+                const on = (agent.getParamValue('home.startScreen') ?? 'vandaag') === c.value;
+                return (
+                  <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-start-${c.value}`}
+                    accessibilityState={{ selected: on }}
+                    onPress={async () => {
+                      try { await callSkill('params', 'set-param', { key: 'home.startScreen', value: c.value }); } catch { /* the row re-reads the truth */ }
+                      setHistoryTick((n) => n + 1);
+                    }}>
+                    <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Section>
+        ) : null}
+      </>
+    ),
+    'bot-actions': () => (
+      <>
+        <Section title={t('circle.mydata.surface_pref')}>
+          {['inline', 'screen', 'chat'].map((opt) => (
+            <Pressable
+              key={opt}
+              style={[styles.action, opt === surfacePref && styles.actionActive]}
+              onPress={() => setPref(opt)}
+              testID={`mydata-pref-${opt}`}
+            >
+              <Text style={[styles.actionLabel, opt === surfacePref && styles.actionActiveLabel]}>
+                {t(`circle.mydata.surface_pref_${opt}`)}
+              </Text>
+            </Pressable>
+          ))}
+          {/* S6.D — when "chat" is chosen, show whether AI is enriching it here. */}
+          {surfacePref === 'chat' && chatAi?.reason ? (
+            <Text style={styles.privacyBody}>
+              {chatAi.enriched ? '✨ ' : ''}{t(`circle.mydata.${CHAT_AI_KEY[chatAi.reason] ?? 'chat_ai_no_provider'}`)}
+            </Text>
+          ) : null}
+        </Section>
+      </>
+    ),
+    'week-overview': () => (
+      <>
+        {weekOn !== undefined ? (
+          <Section title={t('circle.profile.week_switch')}>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
+              <Switch testID="profile-week-toggle" value={weekOn === true} disabled={weekOn === null} onValueChange={() => toggleWeek()} />
+            </View>
+          </Section>
+        ) : null}
+
+      </>
+    ),
+    'notifications': () => (
+      <>
+        <Section title={t('circle.mydata.notifications')}>
+          <Text style={styles.privacyBody}>
+            {!push.supported ? t('circle.mydata.notif_unsupported')
+              : push.granted ? t('circle.mydata.notif_on') : t('circle.mydata.notif_off')}
+          </Text>
+          {/* J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in
+              both states: someone reviewing their settings should be able to see what having it on means.
+              Three lines on purpose — the cost, what is still not learned (a bare "affects your privacy"
+              invites imagining worse than the truth), and the escape. Deliberately not framed as a
+              warning: most people should turn notifications on. → docs/decisions.md 2026-07-29 */}
+          {push.supported ? (
+            <>
+              <Text style={styles.privacyBody} testID="mydata-notif-privacy">{t('circle.mydata.notif_privacy')}</Text>
+              <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_not')}</Text>
+              <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_escape')}</Text>
+            </>
+          ) : null}
+          {push.supported ? (
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>
+              <Switch testID="mydata-notif-toggle" value={push.granted === true} onValueChange={() => toggleNativePush()} />
+            </View>
+          ) : null}
+        </Section>
+      </>
+    ),
+    'assistant': () => (
+      <>
+        {typeof onSaveUserLlm === 'function' && (
+          <Section title={t('circle.userLlm.title')}>
+            <UserLlmSettings current={userLlm || {}} onSave={onSaveUserLlm} validate={validateUserLlm} />
+          </Section>
+        )}
+      </>
+    ),
+  };
+
+  if (Array.isArray(only)) {
+    return (
+      <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
+        <View style={styles.header}>
+          {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
+          <Text style={styles.title}>{groupTitle ?? t('circle.mydata.title')}</Text>
+        </View>
+        {only.map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-mydata">
       <View style={styles.header}>
@@ -391,16 +557,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           ))}
         </Section>
       ) : null}
-      {weekOn !== undefined ? (
-        <Section title={t('circle.profile.week_switch')}>
-          <Pressable testID="profile-week-toggle" accessibilityRole="switch"
-            accessibilityState={{ checked: weekOn === true, disabled: weekOn === null }}
-            disabled={weekOn === null} onPress={toggleWeek} style={styles.relaySave}>
-            <Text style={styles.relaySaveText}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
-          </Pressable>
-        </Section>
-      ) : null}
-
       <Section title={t('circle.mydata.storage')}>
         <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
         {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
@@ -856,29 +1012,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         ) : null}
         <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
       </Section>
-
-      {/* Where the app opens on this device — the start-screen setting (startScreen.js), written through set-param like
-          every setting. Web parity: circleMyData.js. Omitted without an agent. */}
-      {agent && typeof agent.getParamValue === 'function' ? (
-        <Section title={t('circle.mydata.start_title')}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {START_SCREEN_CHOICES.map((c) => {
-              const on = (agent.getParamValue('home.startScreen') ?? 'vandaag') === c.value;
-              return (
-                <Pressable key={c.value} style={[styles.action, on && { borderColor: theme.color.ink }]} testID={`mydata-start-${c.value}`}
-                  accessibilityState={{ selected: on }}
-                  onPress={async () => {
-                    try { await callSkill('params', 'set-param', { key: 'home.startScreen', value: c.value }); } catch { /* the row re-reads the truth */ }
-                    setHistoryTick((n) => n + 1);
-                  }}>
-                  <Text style={styles.actionLabel}>{t(c.labelKey)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Section>
-      ) : null}
-
       {/* The personal history mirror — live health from the agent; the toggle flips the
           history.mirror register param through the one kind-gated write (the agent starts/stops
           the sink LIVE). Web parity: circleMyData.js's history section. Omitted without an agent. */}
@@ -913,98 +1046,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           </Section>
         );
       })() : null}
-
-      <Section title={t('circle.mydata.notifications')}>
-        <Text style={styles.privacyBody}>
-          {!push.supported ? t('circle.mydata.notif_unsupported')
-            : push.granted ? t('circle.mydata.notif_on') : t('circle.mydata.notif_off')}
-        </Text>
-        {/* J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in
-            both states: someone reviewing their settings should be able to see what having it on means.
-            Three lines on purpose — the cost, what is still not learned (a bare "affects your privacy"
-            invites imagining worse than the truth), and the escape. Deliberately not framed as a
-            warning: most people should turn notifications on. → docs/decisions.md 2026-07-29 */}
-        {push.supported ? (
-          <>
-            <Text style={styles.privacyBody} testID="mydata-notif-privacy">{t('circle.mydata.notif_privacy')}</Text>
-            <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_not')}</Text>
-            <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_escape')}</Text>
-          </>
-        ) : null}
-        {push.supported ? (
-          <Pressable style={styles.action} onPress={toggleNativePush} testID="mydata-notif-toggle">
-            <Text style={styles.actionLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>
-          </Pressable>
-        ) : null}
-      </Section>
-
-      {/* Display theme (systeem / licht / donker) — a mono pill segmented control,
-          mirror of web's Mij toggle + onderling.org's header toggle. Reuses the
-          shared circle.mydata.theme(_system/_light/_dark) keys; switches live. */}
-      <Section title={t('circle.mydata.theme')}>
-        <View style={styles.themeToggle} accessibilityLabel={t('circle.mydata.theme')} testID="mydata-theme-toggle">
-          {['system', 'light', 'dark'].map((opt) => (
-            <Pressable
-              key={opt}
-              accessibilityRole="button"
-              accessibilityState={{ selected: opt === themePref }}
-              style={[styles.themeBtn, opt === themePref && styles.themeBtnActive]}
-              onPress={() => setThemePref(opt)}
-              testID={`mydata-theme-${opt}`}
-            >
-              <Text style={[styles.themeBtnText, opt === themePref && styles.themeBtnTextActive]}>
-                {t(`circle.mydata.theme_${opt}`)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </Section>
-
-      <Section title={t('circle.mydata.surface_pref')}>
-        {['inline', 'screen', 'chat'].map((opt) => (
-          <Pressable
-            key={opt}
-            style={[styles.action, opt === surfacePref && styles.actionActive]}
-            onPress={() => setPref(opt)}
-            testID={`mydata-pref-${opt}`}
-          >
-            <Text style={[styles.actionLabel, opt === surfacePref && styles.actionActiveLabel]}>
-              {t(`circle.mydata.surface_pref_${opt}`)}
-            </Text>
-          </Pressable>
-        ))}
-        {/* S6.D — when "chat" is chosen, show whether AI is enriching it here. */}
-        {surfacePref === 'chat' && chatAi?.reason ? (
-          <Text style={styles.privacyBody}>
-            {chatAi.enriched ? '✨ ' : ''}{t(`circle.mydata.${CHAT_AI_KEY[chatAi.reason] ?? 'chat_ai_no_provider'}`)}
-          </Text>
-        ) : null}
-      </Section>
-
-      {/* global app language (NL/EN) — a user preference, applies app-wide (web≡mobile). */}
-      <Section title={t('circle.mydata.language')}>
-        {['nl', 'en'].map((lg) => (
-          <Pressable
-            key={lg}
-            style={[styles.action, lg === lang() && styles.actionActive]}
-            onPress={() => {
-              setLang(lg);   // the pre-boot cache — i18n initialises before the agent exists
-              // …and the register, which is the authority. Without this the choice reverts the moment
-              // something reconciles from the register, the same way the relay setting did.
-              callSkill?.('params', 'set-param', { key: 'app.lang', value: lg })?.catch?.(() => {});
-            }}
-            testID={`mydata-lang-${lg}`}
-          >
-            <Text style={[styles.actionLabel, lg === lang() && styles.actionActiveLabel]}>{lg.toUpperCase()}</Text>
-          </Pressable>
-        ))}
-      </Section>
-
-      {typeof onSaveUserLlm === 'function' && (
-        <Section title={t('circle.userLlm.title')}>
-          <UserLlmSettings current={userLlm || {}} onSave={onSaveUserLlm} validate={validateUserLlm} />
-        </Section>
-      )}
 
       {privacy.length > 0 && (
         <Section title={t('circle.mydata.privacy')}>
@@ -1096,6 +1137,8 @@ const makeStyles = (theme) => StyleSheet.create({
   privacy: { gap: 2 },
   privacyTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
   privacyBody: { fontSize: 13, color: theme.color.inkSoft, lineHeight: 18 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
+  switchLabel: { fontSize: 14, color: theme.color.ink, flex: 1, marginRight: 12 },
   // P1 §4 tail — the retention choice row (web parity).
   retentionRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   retentionChoice:      { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },

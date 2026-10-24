@@ -541,6 +541,36 @@ Assert that `makePair` yields a Transport implementation satisfying the port.
 - `[opts.label='transport']` `string`
 - `[opts.timeout=5000]` `number`
 
+### `assertSenderBindingConformance`
+
+**Kind:** function · **Import:** `assertSenderBindingConformance` from `'@onderling/core/conformance'`
+
+```js
+async assertSenderBindingConformance(makePair, { label = 'transport', timeout = 5000 } = {})
+```
+
+SENDER BINDING — the case every transport that PROVES a sender must pass (a transport that cannot prove one,
+like the in-process bus, has nothing to bind and is not run against it).
+
+A connection's sender is proven somehow — a challenged hello (mDNS), a key-proof at registration (the relay), an
+authenticated `src` (NKN). An envelope's `_from` is only a claim, and a signature proves a key, never that the
+key belongs at the address the envelope names. So a transport that proves who is on the other end must bind
+`_from` to that proof: a frame claiming any other address is DROPPED, never delivered. Without it, a peer who can
+reach you at all can speak as anyone a receiver has not yet bound (trust on first use takes the forger's key for
+that address). The rule is the kernel's (`createSenderBinding` / `senderVerdict`); this asserts it holds over the
+adapter's own wire.
+
+The factory returns a connected pair plus `forgedAddr`, an address `a` is NOT proven as. The harness pushes a
+frame from `a` over its own connection claiming `forgedAddr` (`a._put` — below the base class, so nothing stamps
+the real sender), then an honest one, and asserts `b` dispatched the honest frame and never the forged one.
+
+**Parameters**
+
+- `makePair` `() => Promise<{ a: object, b: object, addrA: string, addrB: string, forgedAddr: string, teardown?: () => (void|Promise<void>) }>`
+- `[opts]` `object`
+- `[opts.label='transport']` `string`
+- `[opts.timeout=5000]` `number`
+
 ## `src/crypto/b64.js`
 
 ### `b64encode`
@@ -3040,7 +3070,7 @@ A transport is "degraded" for a peer if markDegraded() was called and the
 `until` timestamp has not elapsed.  Degraded transports are ranked after
 all healthy transports.
 
-**Methods:** `record()` · `getBest()` · `markDegraded()` · `isDegraded()` · `getAll()` · `clear()`
+**Methods:** `record()` · `getBest()` · `markDegraded()` · `clearDegraded()` · `isDegraded()` · `getAll()` · `clear()`
 
 ## `src/routing/ReachabilityOracle.js`
 
@@ -3178,7 +3208,7 @@ priority order to pick the best transport; tierFor() additionally classifies the
 selection into 'direct' | 'mesh' | 'hop' reachability tiers, and routeLadder()
 exposes the full 'direct → mesh → hop → companion' rung ladder.
 
-**Methods:** `attachPeerGraph()` · `selectTransport()` · `onTransportFailure()` · `setPreferredTransport()` · `clearPreferredTransport()` · `getPreferredTransport()` · `addTransport()` · `removeTransport()` · `tierFor()` · `routeLadder()`
+**Methods:** `attachPeerGraph()` · `selectTransport()` · `onTransportFailure()` · `onTransportRecovered()` · `setPreferredTransport()` · `clearPreferredTransport()` · `getPreferredTransport()` · `addTransport()` · `removeTransport()` · `tierFor()` · `routeLadder()`
 
 ## `src/routing/invokeWithHop.js`
 
@@ -3243,7 +3273,7 @@ learned from HI envelopes — established when we hold none for that address, ne
 Also tracks key-rotation grace state so envelopes to/from a recently rotated key
 still validate, and can attach an inline rotation proof to outbound envelopes.
 
-**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
+**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `adoptInProcessPeer()` · `inProcessPeerKeys()` · `getPeerKey()` · `peerBindings()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
 
 ## `src/security/authorChain.js`
 
@@ -3506,6 +3536,31 @@ Short-circuits on the first accept.
 **Parameters**
 
 - `gates` `...((envelope: object) => boolean | Promise<boolean>)`
+
+## `src/security/inProcessAuthorization.js`
+
+### `IN_PROCESS_SENDER`
+
+**Kind:** constant · **Import:** `IN_PROCESS_SENDER` from `'@onderling/core'`
+
+The verdict reasons this authorizer gives.
+
+### `createInProcessSenderAuthorizer`
+
+**Kind:** function · **Import:** `createInProcessSenderAuthorizer` from `'@onderling/core'`
+
+```js
+createInProcessSenderAuthorizer(layer)
+```
+
+The sender authorizer for an in-process layer: admits a key only if the layer adopted it on its bus
+(`adoptInProcessPeer`), read at check time; refuses everything while nothing is adopted.
+
+**Parameters**
+
+- `layer` `{inProcessPeerKeys: () => Set<string>}` — the layer it is installed on
+
+**Returns:** `(context: {senderKey: string}) => {allow: boolean, reason: string}`
 
 ## `src/security/originSignature.js`
 

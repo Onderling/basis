@@ -109,57 +109,7 @@ describe('Tasks V2 — addTask embeds', () => {
   });
 });
 
-describe('Tasks V2 — circleConfig.storage', () => {
-  it('defaults to none when storage is omitted', async () => {
-    const { circle } = await makeCircle();
-    expect(circle.bundle?.circleState ?? circle.circleState ?? {}).toBeTruthy();
-    const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r).toEqual({ policy: 'none', groupPodUri: null });
-  });
 
-  it('honours shared + groupPodUri from the config', async () => {
-    const { circle } = await makeCircle({
-      policy:      'shared',
-      groupPodUri: 'https://circle.pod/',
-    });
-    const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r).toEqual({ policy: 'shared', groupPodUri: 'https://circle.pod/' });
-  });
-
-  it('forward-additive: unknown policies fall back to none silently', async () => {
-    const { circle } = await makeCircle({ policy: 'fancy-future-mode' });
-    const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r.policy).toBe('none');
-  });
-});
-
-describe('Tasks V2 — pod sign-in skills', () => {
-  it('podSignInStatus returns signedIn:false when nothing is wired', async () => {
-    const { circle } = await makeCircle();
-    const r = await callSkill(circle.agent, 'podSignInStatus', {});
-    expect(r).toEqual({ signedIn: false });
-  });
-
-  it('startPodSignIn requires issuer + redirectUrl', async () => {
-    const { circle } = await makeCircle();
-    const r1 = await callSkill(circle.agent, 'startPodSignIn', { redirectUrl: 'https://example/cb' });
-    expect(r1?.error).toMatch(/issuer required/);
-    const r2 = await callSkill(circle.agent, 'startPodSignIn', { issuer: 'https://idp.example' });
-    expect(r2?.error).toMatch(/redirectUrl required/);
-  });
-
-  it('signOutOfPod is a no-op when no session', async () => {
-    const { circle } = await makeCircle();
-    const r = await callSkill(circle.agent, 'signOutOfPod', {});
-    expect(r).toEqual({ ok: true });
-  });
-
-  it('completePodSignIn rejects when no sign-in is in progress', async () => {
-    const { circle } = await makeCircle();
-    const r = await callSkill(circle.agent, 'completePodSignIn', { callbackUrl: 'https://example/cb' });
-    expect(r?.error).toMatch(/no sign-in in progress/);
-  });
-});
 
 describe('Tasks V2 — agent-registry on bundle bring-up', () => {
   it('attaches bundle.agentRegistry with this agent registered', async () => {
@@ -406,47 +356,3 @@ describe('Tasks V2 — provisionMyCircle', () => {
   });
 });
 
-describe('Tasks V2 — setCircleStoragePolicy', () => {
-  it('upgrades none → shared', async () => {
-    const { circle } = await makeCircle();
-    const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
-      circleId:        'oss-tools',
-      storagePolicy: 'shared',
-      groupPodUri:   'https://anne.pod/',
-    });
-    expect(r.storage).toEqual({ policy: 'shared', groupPodUri: 'https://anne.pod/' });
-    const after = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(after.policy).toBe('shared');
-  });
-
-  it('rejects downgrade to none', async () => {
-    const { circle } = await makeCircle({
-      policy:      'shared',
-      groupPodUri: 'https://anne.pod/',
-    });
-    const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
-      circleId:        'oss-tools',
-      storagePolicy: 'none',
-    });
-    expect(r?.error).toBe('storage-policy-downgrade-not-supported');
-  });
-
-  it('rejects non-admin', async () => {
-    const { circle } = await makeCircle();
-    const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
-      circleId:        'oss-tools',
-      storagePolicy: 'shared',
-      groupPodUri:   'https://anne.pod/',
-    }, BOB);
-    expect(r?.error).toBe('admin-only');
-  });
-
-  it('rejects shared without groupPodUri', async () => {
-    const { circle } = await makeCircle();
-    const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
-      circleId:        'oss-tools',
-      storagePolicy: 'shared',
-    });
-    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:shared/);
-  });
-});

@@ -93,7 +93,7 @@ async function buildBot() {
 
   // F-retrieve grounds on the REAL household items (listOpen), semantic if EMBED_BASEURL set.
   const loadItems = async () => {
-    const r = await agent.callSkill('household', 'listOpen', {});
+    const r = await agent.callSkill('household', 'listOpenItems', {});
     return (r?.items ?? []).map((it) => ({ id: it.id, label: it.text ?? it.label, kind: it.type ?? 'item' }));
   };
   let embed;
@@ -136,7 +136,7 @@ async function buildBot() {
     return r;
   };
   const hasItem = async (re) => {
-    const r = await agent.callSkill('household', 'listOpen', {});
+    const r = await agent.callSkill('household', 'listOpenItems', {});
     return (r?.items ?? []).some((i) => re.test(String(i.text ?? i.label ?? '')));
   };
   return { agent, cd, transcript, turn, hasItem };
@@ -152,7 +152,7 @@ describe.runIf(LIVE)(`LIVE household pipeline — ${OLLAMA_MODEL} @ ${OLLAMA_BAS
     expect(added).toMatchObject({ ok: true });                 // ACTION shape {ok,message,itemId}
     expect(typeof added.itemId === 'string' || added.itemId == null).toBe(true);
 
-    const list = await agent.callSkill('household', 'listOpen', {});
+    const list = await agent.callSkill('household', 'listOpenItems', {});
     expect(Array.isArray(list.items)).toBe(true);              // LIST shape {items:[…]}
     expect(list.items.some((i) => /fresh bread/i.test(i.text ?? ''))).toBe(true);
     expect(list.items[0]).toHaveProperty('id');               // structured per-row → inline buttons render

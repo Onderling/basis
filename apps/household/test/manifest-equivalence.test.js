@@ -32,10 +32,9 @@ import * as Skills                 from '../src/skills/index.js';
 // doesn't matter for the toolCatalogue/systemPrompt byte-equality check.
 const noopRegistry = {
   addItem:      Skills.addItem,
-  listOpen:     Skills.listOpen,
+  listOpenItems:     Skills.listOpen,
   markComplete: Skills.markComplete,
   removeItem:   Skills.removeItem,
-  help:         Skills.help,
 };
 const noopCtxAdapter = (toolCtx) => ({ ...toolCtx });
 
@@ -44,7 +43,7 @@ describe('SP-1 equivalence: toolCatalogue === V0_TOOL_CATALOGUE', () => {
   // reassign, registerName). The byte-equivalence still holds
   // we filter to the original five op ids.  The remaining toolCatalogue
   // entries beyond the set are the additions.
-  const SP1_IDS = new Set(['addItem', 'listOpen', 'markComplete', 'removeItem', 'help']);
+  const SP1_IDS = new Set(['addItem', 'listOpenItems', 'markComplete', 'removeItem']);
 
   it('byte-equal JSON (filtered to the SP-1 op ids)', () => {
     const out = renderChat(householdManifest, {
@@ -61,8 +60,8 @@ describe('SP-1 equivalence: toolCatalogue === V0_TOOL_CATALOGUE', () => {
       skillRegistry: noopRegistry,
       toSkillCtx:    noopCtxAdapter,
     });
-    expect(out.toolCatalogue.slice(0, 5).map((t) => t.id))
-      .toEqual(['addItem', 'listOpen', 'markComplete', 'removeItem', 'help']);
+    expect(out.toolCatalogue.slice(0, 4).map((t) => t.id))
+      .toEqual(['addItem', 'listOpenItems', 'markComplete', 'removeItem']);
   });
 });
 
@@ -102,9 +101,9 @@ describe('SP-1 equivalence: renderSlash.parse === regexParse (corpus)', () => {
     'help',
     'hulp',
     // edge cases per grammar.md §"Edge cases"
-    'add',                  // verb only → help
-    'list',                 // verb only → help
-    'done',                 // verb only → help
+    'add',                  // verb only → nothing
+    'list',                 // verb only → nothing
+    'done',                 // verb only → nothing
     'remove',               // verb only → help
     'add bread',            // no alias prefix → default 'shopping'
     'add shopping milk, bread, eggs',

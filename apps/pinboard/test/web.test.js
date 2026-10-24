@@ -168,11 +168,11 @@ describe('Pinboard V1 web UI — Phase 5 (intent tabs + moderation)', () => {
     await callRest('postRequest', { text: 'aanhanger', intent: 'lend',  expectClaims: 0, timeoutMs: 1 });
     await callRest('postRequest', { text: 'tax help',  intent: 'offer', expectClaims: 0, timeoutMs: 1 });
 
-    const lends = await callRest('listOpen', { intent: 'lend' });
+    const lends = await callRest('listOpenRequests', { intent: 'lend' });
     expect(lends.items.every(i => i.type === 'offer' && i.kind === 'lend')).toBe(true);
     expect(lends.items.some(i => i.text === 'aanhanger')).toBe(true);
 
-    const offers = await callRest('listOpen', { intent: 'offer' });
+    const offers = await callRest('listOpenRequests', { intent: 'offer' });
     expect(offers.items.every(i => i.type === 'offer' && i.kind === 'give')).toBe(true);
   });
 
@@ -186,7 +186,7 @@ describe('Pinboard V1 web UI — Phase 5 (intent tabs + moderation)', () => {
     const r = await callRest('reportPost', { itemId: post.requestId, reason: 'irrelevant' });
     expect(r.reportId).toBeTruthy();
 
-    const reports = await callRest('listOpen', { intent: 'report' });
+    const reports = await callRest('listOpenRequests', { intent: 'report' });
     expect(reports.items.some(it => it.id === r.reportId)).toBe(true);
   });
 });

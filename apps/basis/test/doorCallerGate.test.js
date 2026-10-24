@@ -29,9 +29,9 @@ describe('the door caller gate', () => {
     const refused = (r) => r && r.ok === false && typeof r.error === 'string';
 
     // a stranger: not admitted, so public — refused even an ordinary household read
-    expect(refused(await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:999' }))).toBe(true);
+    expect(refused(await agent.callSkill('household', 'listOpenItems', { type: 'shopping' }, { caller: 'telegram:999' }))).toBe(true);
     // a member reaches the household's ops…
-    expect(refused(await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:111' }))).toBe(false);
+    expect(refused(await agent.callSkill('household', 'listOpenItems', { type: 'shopping' }, { caller: 'telegram:111' }))).toBe(false);
     // …and never the owner's own
     const memberPhrase = await agent.callSkill('household', 'revealOwnerPhrase', {}, { caller: 'telegram:111' });
     expect(refused(memberPhrase)).toBe(true);
@@ -87,8 +87,8 @@ describe('the door caller gate', () => {
     expect(await users.list()).toHaveLength(2);
     // and the gate knows them: the member reaches the household, a stranger does not
     const refused = (r) => r && r.ok === false;
-    expect(refused(await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: ann }))).toBe(false);
-    expect(refused(await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:999' }))).toBe(true);
+    expect(refused(await agent.callSkill('household', 'listOpenItems', { type: 'shopping' }, { caller: ann }))).toBe(false);
+    expect(refused(await agent.callSkill('household', 'listOpenItems', { type: 'shopping' }, { caller: 'telegram:999' }))).toBe(true);
   }, 90_000);
 
   it('the door\'s own admin ops: the admin passes `trusted`, a member does not, a stranger nothing', async () => {
@@ -111,7 +111,7 @@ describe('the door caller gate', () => {
     expect(await agent.doorRefusal('tasks.listOpen', 'telegram:111')).toBeNull();
     await agent.clearDoorCaller('telegram:111');
     expect(await agent.doorRefusal('tasks.listOpen', 'telegram:111')).toBeTruthy();
-    const r = await agent.callSkill('household', 'listOpen', { type: 'shopping' }, { caller: 'telegram:111' });
+    const r = await agent.callSkill('household', 'listOpenItems', { type: 'shopping' }, { caller: 'telegram:111' });
     expect(r).toMatchObject({ ok: false });
   }, 90_000);
 

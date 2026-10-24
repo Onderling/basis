@@ -36,7 +36,7 @@ describe('agents P2 — token-backed grant/revoke through the real composition',
     const { a, selfId } = await boot();
 
     const granted = await a.callSkill('agents', 'grantAgent', {
-      agentId: selfId, skill: 'household.listOpen',
+      agentId: selfId, skill: 'household.listOpenItems',
     });
     expect(granted.granted).toBe(true);
     expect(granted.tokenBacked).toBe(true);                    // ← the point of the binding
@@ -62,7 +62,7 @@ describe('agents P2 — token-backed grant/revoke through the real composition',
   it('revokeGrant (single-token adjust) flips isRevoked for THAT token only', async () => {
     const { a, selfId } = await boot();
 
-    const g1 = await a.callSkill('agents', 'grantAgent', { agentId: selfId, skill: 'household.listOpen' });
+    const g1 = await a.callSkill('agents', 'grantAgent', { agentId: selfId, skill: 'household.listOpenItems' });
     const g2 = await a.callSkill('agents', 'grantAgent', { agentId: selfId, skill: 'household.addItem' });
     expect(g1.tokenBacked).toBe(true);
     expect(g2.tokenBacked).toBe(true);

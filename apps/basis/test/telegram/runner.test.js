@@ -102,10 +102,10 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
   it("the open door ('*' or no list) admits any chat; a list pairs exactly those", async () => {
     const { say, calls } = await boot({ allowedChatIds: '*' });
     await say('/mine', '777');
-    expect(calls.at(-1)).toMatchObject({ op: 'listOpen' });
+    expect(calls.at(-1)).toMatchObject({ op: 'listOpenItems' });
     const { say: say2, calls: calls2 } = await boot({ allowedChatIds: [] });
     await say2('/mine', '778');
-    expect(calls2.at(-1)).toMatchObject({ op: 'listOpen' });
+    expect(calls2.at(-1)).toMatchObject({ op: 'listOpenItems' });
   });
 
   it('a door that admits people: every call of the turn carries the person, and the log does not', async () => {
@@ -162,10 +162,10 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
   });
 
   it('free text goes through the SAME turn engine as a typed circle line: the deterministic gate routes a verb', async () => {
-    const gate = { evaluate: async (text) => (/^show my list$/i.test(text) ? { via: 'rule', command: { opId: 'listOpen', args: {}, appOrigin: 'household' } } : { via: 'llm' }) };
+    const gate = { evaluate: async (text) => (/^show my list$/i.test(text) ? { via: 'rule', command: { opId: 'listOpenItems', args: {}, appOrigin: 'household' } } : { via: 'llm' }) };
     const { say, calls } = await boot({ gate });
     const out = await say('show my list');
-    expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'listOpen' });
+    expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'listOpenItems' });
     expect(out.find((m) => m.buttons.length)).toBeTruthy();
     // a skip with no LLM route → the help hint, never silence
     const miss = await say('what is the weather');
@@ -173,24 +173,24 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
   });
 
   it('with an interpreter (an LLM route), free text the gate skips is interpreted to an op', async () => {
-    const interpret = async (text) => (/list/i.test(text) ? { opId: 'listOpen', args: {} } : null);
+    const interpret = async (text) => (/list/i.test(text) ? { opId: 'listOpenItems', args: {} } : null);
     const { say, calls } = await boot({ interpret, gate: { evaluate: async () => ({ via: 'llm' }) } });
     await say('could you list what is open?');
-    expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'listOpen' });
+    expect(calls.at(-1)).toMatchObject({ app: 'household', op: 'listOpenItems' });
   });
 
   it('the walk log gets one record per turn: what came in, the path, the dispatch, the replies, the time', async () => {
     const log = [];
-    const gate = { evaluate: async (text) => (/^show my list$/i.test(text) ? { via: 'rule', command: { opId: 'listOpen', args: {}, appOrigin: 'household' } } : { via: 'llm' }) };
+    const gate = { evaluate: async (text) => (/^show my list$/i.test(text) ? { via: 'rule', command: { opId: 'listOpenItems', args: {}, appOrigin: 'household' } } : { via: 'llm' }) };
     const { say } = await boot({ gate, walkLog: (e) => log.push(e) });
     await say('/mine');
     await say('show my list');
     await say('what is the weather');
     expect(log).toHaveLength(3);
-    expect(log[0]).toMatchObject({ chat: '42', text: '/mine', via: 'slash', route: 'ready', opId: 'listOpen' });
+    expect(log[0]).toMatchObject({ chat: '42', text: '/mine', via: 'slash', route: 'ready', opId: 'listOpenItems' });
     expect(log[0].replies?.length).toBeGreaterThan(0);
     expect(typeof log[0].ms).toBe('number');
-    expect(log[1]).toMatchObject({ via: 'gate', opId: 'listOpen' });
+    expect(log[1]).toMatchObject({ via: 'gate', opId: 'listOpenItems' });
     expect(log[2]).toMatchObject({ via: 'llm-unavailable' });
   });
 
@@ -211,10 +211,10 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
 
   it('an enum arg named the Dutch way is coerced to the declared value', async () => {
     const { say, calls } = await boot();
-    await say('listOpen:');   // a bare tap has no type
+    await say('listOpenItems:');   // a bare tap has no type
     await say('/mine boodschappen');
     const last = calls.at(-1);
-    expect(last.op).toBe('listOpen');
+    expect(last.op).toBe('listOpenItems');
     if (last.args && 'type' in last.args) expect(last.args.type).toBe('shopping');
   });
 

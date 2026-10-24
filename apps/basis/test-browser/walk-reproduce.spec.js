@@ -138,8 +138,8 @@ test('O17 — does something posted on the noticeboard reach the other device?',
     log('addItem', 'OBSERVED', JSON.stringify(add)?.slice(0, 160));
     await B.page.waitForTimeout(12000);
 
-    const aList = await call(A.page, 'household', 'listOpen', { type: 'shopping' });
-    const bList = await call(B.page, 'household', 'listOpen', { type: 'shopping' });
+    const aList = await call(A.page, 'household', 'listOpenItems', { type: 'shopping' });
+    const bList = await call(B.page, 'household', 'listOpenItems', { type: 'shopping' });
     const aTexts = (aList?.items ?? []).map((i) => i.text);
     const bTexts = (bList?.items ?? []).map((i) => i.text);
     log('item crossed?', bTexts.some((t) => /BOORMACHINE/.test(t)) ? 'PASS' : 'FINDING',

@@ -586,7 +586,7 @@ if (relayUrl) {
         } catch { roster = null; }
         let trail = null;
         try {
-          const all = await callSkill('pinboard', 'listOpen', { type: 'membership-redemption' });
+          const all = await callSkill('pinboard', 'listOpenRequests', { type: 'membership-redemption' });
           const items = Array.isArray(all?.items) ? all.items : (Array.isArray(all) ? all : []);
           trail = items.filter((it) => it?.source?.groupId === circleId).map((it) => ({ id: String(it.id).slice(0, 10), by: String(it.source?.redeemedBy ?? it.source?.confirmedBy ?? '').slice(0, 8), addr: it.source?.circleAddress ? String(it.source.circleAddress).slice(0, 8) : null, set: (it.source?.circleAddresses ?? []).map((p) => String(p?.address ?? p).slice(0, 8)), etag: it.etag ?? it._etag ?? null }));
         } catch { trail = null; }

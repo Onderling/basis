@@ -37,7 +37,7 @@ export const V0_TOOL_CATALOGUE = Object.freeze([
     },
   },
   {
-    id: 'listOpen',
+    id: 'listOpenItems',
     description: 'List open items of a type.',
     schema: {
       type: 'object',

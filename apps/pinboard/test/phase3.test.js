@@ -222,7 +222,7 @@ describe('Pinboard V1 — author hydration on listOpen / listMyRequests', () => 
     // hydrates the author block on the local actor's own posts.
     const bundle = await buildAgent();
     await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpen');
+    const r = await callSkill(bundle.agent, 'listOpenRequests');
     expect(r.items[0].addedBy).toBe(ANNE);
     expect(r.items[0].addedByDisplay).toBeTruthy();
     // No handle / displayName set yet → render falls back to the
@@ -239,7 +239,7 @@ describe('Pinboard V1 — author hydration on listOpen / listMyRequests', () => 
     const bundle = await buildAgent({ reveals, members: initialMembers });
 
     await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpen');
+    const r = await callSkill(bundle.agent, 'listOpenRequests');
 
     expect(r.items[0].addedByDisplay.render).toBe('@oosterpoort-bird-23');
     expect(r.items[0].addedByDisplay.isRevealed).toBe(false);
@@ -256,7 +256,7 @@ describe('Pinboard V1 — author hydration on listOpen / listMyRequests', () => 
     const bundle = await buildAgent({ reveals, members: initialMembers });
 
     await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpen');
+    const r = await callSkill(bundle.agent, 'listOpenRequests');
     expect(r.items[0].addedByDisplay.render).toBe('Anne van Dijk');
     expect(r.items[0].addedByDisplay.isRevealed).toBe(true);
   });
@@ -284,7 +284,7 @@ describe('Pinboard V1 — listOpen filters by intent', () => {
     await callSkill(bundle.agent, 'postRequest', { text: 'fiets',     intent: 'ask', expectClaims: 0, timeoutMs: 1 });
     await callSkill(bundle.agent, 'postRequest', { text: 'tuingoed',  intent: 'offer', expectClaims: 0, timeoutMs: 1 });
 
-    const r = await callSkill(bundle.agent, 'listOpen', { intent: 'lend' });
+    const r = await callSkill(bundle.agent, 'listOpenRequests', { intent: 'lend' });
     expect(r.items).toHaveLength(1);
     expect(r.items[0].text).toBe('aanhanger');
   });
@@ -293,7 +293,7 @@ describe('Pinboard V1 — listOpen filters by intent', () => {
     const bundle = await buildAgent();
     await callSkill(bundle.agent, 'postRequest', { text: 'aanhanger', intent: 'lend', expectClaims: 0, timeoutMs: 1 });
     await callSkill(bundle.agent, 'postRequest', { text: 'fiets',     intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpen');
+    const r = await callSkill(bundle.agent, 'listOpenRequests');
     expect(r.items).toHaveLength(2);
   });
 });

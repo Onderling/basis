@@ -99,7 +99,7 @@ describe('the per-thread lane', () => {
       seen.push({ text, history: history ?? [] });
       await sleep(100);
       running -= 1;
-      return { opId: 'listOpen', args: {} };
+      return { opId: 'listOpenItems', args: {} };
     };
     const { runner, send } = await box({ interpret });
     const sent = [send('wat staat er open')];
@@ -149,7 +149,7 @@ describe('the per-thread lane', () => {
 
   it('the box lets the bridge go while a turn runs, so the next line (this chat or another) can be delivered', async () => {
     vi.useFakeTimers();
-    const interpret = async () => { await sleep(500); return { opId: 'listOpen', args: {} }; };
+    const interpret = async () => { await sleep(500); return { opId: 'listOpenItems', args: {} }; };
     const { runner, send } = await box({ interpret });
     let delivered = false;
     const p = send('wat staat er open').then(() => { delivered = true; });

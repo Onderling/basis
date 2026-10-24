@@ -47,7 +47,7 @@ export const mockHouseholdManifest = {
   itemTypes:  ['chore', ...HH_LIST_TYPES],
   operations: [
     {
-      id:    'listOpen',
+      id:    'listOpenItems',
       verb:  'list',
       params: [
         // Optional: a specific household list to show. Omit → open chores (back-compat).
@@ -81,7 +81,7 @@ export const mockHouseholdManifest = {
       params:    [{
         name: 'choreId', kind: 'string', required: true,
         // bare `/done` → list open chores; click row → done.
-        pickerSource: { listOp: 'listOpen' },
+        pickerSource: { listOp: 'listOpenItems' },
       }],
       surfaces:  {
         // Part C gate — "done X" / "klaar met X" → markComplete{choreId} (choreId has pickerSource).
@@ -122,7 +122,7 @@ export const mockHouseholdManifest = {
         chat:  {
           reply: 'text', hint: 'add a member to the household',
           followUps: [
-            { opId: 'listOpen' },   // same-app follow-up
+            { opId: 'listOpenItems' },   // same-app follow-up
           ],
         },
       },
@@ -169,7 +169,7 @@ export const mockHouseholdManifest = {
       params: [
         {
           name: 'choreId', kind: 'string', required: true,
-          pickerSource: { listOp: 'listOpen' },
+          pickerSource: { listOp: 'listOpenItems' },
         },
         { name: 'confirm', kind: 'boolean', required: false },
       ],
@@ -207,7 +207,7 @@ mockHouseholdManifest.operations.find((o) => o.id === 'markComplete')
 // v0.7 — brief-summary decl on household's list op. /brief fans
 // across these to produce the morning brief. Pinboard / folio +
 // augmentations live in `mockManifests.js`.
-mockHouseholdManifest.operations.find((o) => o.id === 'listOpen')
+mockHouseholdManifest.operations.find((o) => o.id === 'listOpenItems')
   .surfaces.chat.brief = {
     summarySkill: 'briefSummary',
     order:        10,
@@ -215,7 +215,7 @@ mockHouseholdManifest.operations.find((o) => o.id === 'listOpen')
   };
 
 // v0.7.5 — search decl on household's list op.
-mockHouseholdManifest.operations.find((o) => o.id === 'listOpen')
+mockHouseholdManifest.operations.find((o) => o.id === 'listOpenItems')
   .surfaces.chat.search = { searchSkill: 'searchChores' };
 
 /**
@@ -233,7 +233,7 @@ export function createMockHouseholdAgent(opts = {}) {
     if (appOrigin !== 'household') {
       throw new Error(`mock agent: unknown appOrigin "${appOrigin}"`);
     }
-    if (opId === 'listOpen') {
+    if (opId === 'listOpenItems') {
       return { items: chores.filter((c) => c.state === 'open') };
     }
     if (opId === 'getProfile') {

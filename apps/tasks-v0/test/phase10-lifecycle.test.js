@@ -4,7 +4,7 @@
  * Covers:
  *   1. localisation wrapper — initLocalisation loads en + nl; t() unwraps `{text, doc}`
  *      leaves; missing keys fall back to the key.
- *   2. PRIVACY_NOTICE shape — same item count + headings in both langs.
+ *   2. (the privacy notice lives in pinboard now)
  *   3. circleControls skills — pause/unpause/archive/unarchive (admin /
  *      coord gating) + getPrivacyNotice.
  *   4. addTask gate — paused circle rejects with `error: 'circle-paused'`;
@@ -24,7 +24,6 @@ import { DataPart } from '@onderling/core';
 import { buildBundle } from '../src/storage/buildBundle.js';
 import { createCircleAgent } from '../src/Circle.js';
 import { initLocalisation, t, setLang, currentLang, __test__ } from '../src/lib/localisation.js';
-import { PRIVACY_NOTICE, privacyNoticeFor } from '../src/lib/privacyNotice.js';
 
 const ANNE  = 'https://id.example/anne';
 const FRITS = 'https://id.example/frits';
@@ -140,34 +139,6 @@ describe('Phase 10 — locale files conform to {text, doc} convention', () => {
   });
 });
 
-describe('Phase 10 — privacy notice', () => {
-  it('has the same number of items in nl + en', () => {
-    expect(PRIVACY_NOTICE.nl.length).toBe(PRIVACY_NOTICE.en.length);
-    expect(PRIVACY_NOTICE.en.length).toBeGreaterThanOrEqual(6);
-  });
-
-  it('every item has heading + body', () => {
-    for (const lang of ['nl', 'en']) {
-      for (const item of PRIVACY_NOTICE[lang]) {
-        expect(typeof item.heading).toBe('string');
-        expect(item.heading.length).toBeGreaterThan(0);
-        expect(typeof item.body).toBe('string');
-        expect(item.body.length).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  it('mentions the calendar-stays-on-device guarantee in both langs', () => {
-    const enJoined = PRIVACY_NOTICE.en.map((i) => i.body).join('\n');
-    const nlJoined = PRIVACY_NOTICE.nl.map((i) => i.body).join('\n');
-    expect(enJoined).toMatch(/calendar/i);
-    expect(nlJoined).toMatch(/agenda/i);
-  });
-
-  it('privacyNoticeFor falls back to en for unknown langs', () => {
-    expect(privacyNoticeFor('xx')).toBe(PRIVACY_NOTICE.en);
-  });
-});
 
 // ── Live skill tests ───────────────────────────────────────────────────────
 
@@ -237,22 +208,6 @@ describe('Phase 10 — circleControls + addTask gate', () => {
     expect((await callSkill(circle.agent, 'archiveCircle', {}, FRITS)).error).toMatch(/admin/i);
   });
 
-  it('getPrivacyNotice returns localised content', async () => {
-    const en = await callSkill(circle.agent, 'getPrivacyNotice', { lang: 'en' }, ANNE);
-    expect(en.lang).toBe('en');
-    expect(en.items.length).toBeGreaterThanOrEqual(6);
-    expect(en.items[0].heading).toBeTruthy();
-    expect(en.items[0].body).toMatch(/encrypted/i);
-
-    const nl = await callSkill(circle.agent, 'getPrivacyNotice', { lang: 'nl' }, ANNE);
-    expect(nl.lang).toBe('nl');
-    expect(nl.items.length).toBe(en.items.length);
-    expect(nl.items[0].body).toMatch(/versleuteld/i);
-
-    // Unknown lang falls back to en.
-    const xx = await callSkill(circle.agent, 'getPrivacyNotice', { lang: 'xx' }, ANNE);
-    expect(xx.items).toEqual(en.items);
-  });
 
   it('getCircleConfig surfaces the paused / archived flags', async () => {
     await callSkill(circle.agent, 'pauseCircle', {}, ANNE);

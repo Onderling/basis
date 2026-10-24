@@ -342,7 +342,7 @@ describe('the roster seed — the device-set gate, unit-level', () => {
     const rows = [{ id: 'r1', type: 'membership-redemption', text: 'joined', source: { groupId: 'c1', redeemedBy: 'w1' } }];
     const sent = [];
     const server = makeRosterSeedServer({
-      callSkill: async (app, op) => (op === 'listOpen' ? { items: rows } : {}),
+      callSkill: async (app, op) => (op === 'listOpenRequests' ? { items: rows } : {}),
       signerPromise: Promise.resolve({ identity: self }),
       verifyDeviceSet: async ({ author }) => author === self.pubKey,   // the floor, stubbed
       selfPubKey: self.pubKey,
@@ -382,7 +382,7 @@ describe('the roster seed — the device-set gate, unit-level', () => {
     await receiver('x', sent[0].payload);
     // The rows land first, then the sibling's own address goes through the ANNOUNCE door — the proof
     // verifies there or it is refused, exactly as if it had arrived on its own.
-    expect(applied.map((a) => a.op).filter((op) => op !== 'listOpen')).toEqual(['recordRosterSeed', 'recordCircleAddressAnnouncement']);
+    expect(applied.map((a) => a.op).filter((op) => op !== 'listOpenRequests')).toEqual(['recordRosterSeed', 'recordCircleAddressAnnouncement']);
     expect(applied[0].args.rows).toHaveLength(1);
     expect(applied[1].args).toMatchObject({ groupId: 'c1', memberWebid: self.pubKey, circleAddress: 'self-in-c1', circleAddressProof: 'proof-1' });
     expect(ROSTER_SEED_VERSION).toBe(sent[0].payload.body.v);

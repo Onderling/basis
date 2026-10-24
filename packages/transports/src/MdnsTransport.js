@@ -23,7 +23,7 @@
  * Do not construct this directly on a phone. `@onderling/react-native` exports a subclass with the Android
  * MdnsModule already injected (and the `isAvailable()` guard the mesh builder uses).
  */
-import { Transport, DISCOVERABILITY, AgentIdentity } from '@onderling/core';
+import { Transport, DISCOVERABILITY, AgentIdentity, createSenderBinding } from '@onderling/core';
 import { b64Encode, b64Decode }       from './utils/base64.js';
 import { parseUntrustedJson } from '@onderling/core';
 
@@ -121,6 +121,9 @@ export class MdnsTransport extends Transport {
   // by routing to detect zombie TCP connections (present in the maps but
   // not actually delivering).  A value of 0 means "never seen activity".
   #lastActivity = new Map();
+  /** The kernel's sender binding: a frame's `_from` must be the key its connection proved (set in the constructor). */
+  #checkSender;
+  #refusedSenders = 0;
 
   #eventSubs    = [];
   #started      = false;
@@ -147,7 +150,22 @@ export class MdnsTransport extends Transport {
     this.#hostname = hostname ?? `dw-${identity.pubKey.slice(0, 8)}`;
     this.#native   = native;
     this.#emitter  = emitter;
+    // THE SENDER IS THE KEY THE CONNECTION PROVED. The challenged hello proves who is on the other end; a frame's
+    // `_from` is only a claim. Without this, a device on the Wi-Fi with its own honestly proven key could push a
+    // frame naming another listed peer, and a receiver not yet bound to that address would take the forger's key
+    // for it at the first hello. The kernel's one rule (`createSenderBinding`), as the relay and NKN ask it.
+    this.#checkSender = createSenderBinding({
+      transportName:       'MdnsTransport',
+      // FAIL CLOSED: a connection whose handshake has not proven a key refuses the frame — never `null`, which the
+      // kernel reads as "this transport has no sender to offer" and lets through with a warning. (The reader below
+      // also routes an unkeyed connection's data here; the invariant does not depend on that order.)
+      authenticatedSender: (connectionId) => this.#connToPubKey.get(connectionId) ?? { refuse: 'connection-not-proven' },
+      onUnauthenticated:   (message) => this.emit('warn', message),
+    });
   }
+
+  /** Frames dropped because their `_from` was not the key their connection proved. */
+  get refusedSenders() { return this.#refusedSenders; }
 
   async connect() {
     if (this.#started) return;
@@ -353,7 +371,14 @@ export class MdnsTransport extends Transport {
       this.#emitter.addListener('MdnsServiceDiscovered', async ({ host, port, pubKey }) => {
         console.log('[MdnsTransport] ServiceDiscovered:', pubKey?.slice(0,12), host, port);
         if (pubKey === this.#pubKey) { console.log('[MdnsTransport] skipping self'); return; }
-        if (this.#pubKeyToConn.has(pubKey)) { console.log('[MdnsTransport] already connected'); return; }
+        // Mapped already: leave a live connection alone — a re-announcement is not a reason for a second socket. But a
+        // mapped connection that has gone SILENT past the freshness window may be a dead socket to a peer that
+        // restarted (its close can take minutes to reach us), and that peer, now the responder, waits for our dial:
+        // dial again, and the proven handshake re-maps the peer to the live socket (as an inbound one already does).
+        if (this.#pubKeyToConn.has(pubKey)) {
+          if (!this.isStale(pubKey)) { console.log('[MdnsTransport] already connected'); return; }
+          console.log('[MdnsTransport] mapped but silent — dialling the rediscovered peer again');
+        }
         // Tiebreaker — but only when BOTH sides can see each other. It exists to stop two peers opening
         // duplicate sockets, and that can only happen if they can each discover the other. In ghost mode
         // nobody can discover us, so deferring to the peer means waiting for a connection that will never
@@ -398,11 +423,26 @@ export class MdnsTransport extends Transport {
           this.#onHandshakeFrame(connectionId, envelope);
           return;
         }
-        // No row, no route, no DATA: a frame from a connection without a key is dropped and the socket refused — it
-        // cannot be replied to, and the hello exists so that nothing arrives from a key nobody proved.
-        if (!this.#connToPubKey.has(connectionId)) { this.#refuse(connectionId); return; }
-
+        // THE SENDER BINDING, for every data frame. No row, no route, no DATA: a frame on a connection whose handshake
+        // has not proven a key is dropped and the socket refused (it cannot be replied to — the hello exists so that
+        // nothing arrives from a key nobody proved). A frame claiming another sender than the key its connection proved
+        // is dropped. Both are counted and reported the way a refused envelope is (`security-error`, so the agent warns
+        // once per sender); nothing is ever re-mapped.
         const mappedPubKey = this.#connToPubKey.get(connectionId);
+        const verdict = this.#checkSender(connectionId, envelope);
+        if (!verdict.ok) {
+          this.#refusedSenders += 1;
+          const unproven = verdict.reason === 'connection-not-proven';
+          const err = Object.assign(
+            new Error(unproven
+              ? 'MdnsTransport: dropped a frame on a connection that has not proven a key'
+              : `MdnsTransport: dropped a frame whose _from is not the key its connection proved (${verdict.reason})`),
+            { code: unproven ? 'CONNECTION_NOT_PROVEN' : 'SENDER_MISMATCH' },
+          );
+          this.emit('security-error', err, envelope);
+          if (unproven) this.#refuse(connectionId);
+          return;
+        }
         if (mappedPubKey) this.#lastActivity.set(mappedPubKey, Date.now());
 
         try { this._receive(envelope); } catch {}

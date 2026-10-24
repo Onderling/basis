@@ -42,7 +42,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
         "args": {
           "type": "shopping",
         },
-        "skillId": "listOpen",
+        "skillId": "listOpenItems",
       },
       "filter": {
         "open": true,
@@ -56,7 +56,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Done",
@@ -70,7 +69,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Remove",
@@ -118,7 +116,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
         "args": {
           "type": "errand",
         },
-        "skillId": "listOpen",
+        "skillId": "listOpenItems",
       },
       "filter": {
         "open": true,
@@ -132,7 +130,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Done",
@@ -146,7 +143,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Remove",
@@ -194,7 +190,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
         "args": {
           "type": "repair",
         },
-        "skillId": "listOpen",
+        "skillId": "listOpenItems",
       },
       "filter": {
         "open": true,
@@ -208,7 +204,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Done",
@@ -222,7 +217,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Remove",
@@ -270,7 +264,7 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
         "args": {
           "type": "schedule",
         },
-        "skillId": "listOpen",
+        "skillId": "listOpenItems",
       },
       "filter": {
         "open": true,
@@ -284,7 +278,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Done",
@@ -298,7 +291,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
               "errand",
               "repair",
               "schedule",
-              "task",
             ],
           },
           "label": "Remove",
@@ -308,83 +300,6 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
       ],
       "itemType": "schedule",
       "title": "Schedule",
-    },
-    {
-      "affordances": [
-        {
-          "label": "add",
-          "opId": "addTask",
-          "paramsSchema": {
-            "properties": {
-              "assignee": {
-                "type": "string",
-              },
-              "dueAt": {
-                "type": "number",
-              },
-              "text": {
-                "minLength": 1,
-                "type": "string",
-              },
-            },
-            "required": [
-              "text",
-            ],
-            "type": "object",
-          },
-          "placement": "section",
-        },
-      ],
-      "dataSource": {
-        "skillId": "listTasks",
-      },
-      "filter": {
-        "open": true,
-      },
-      "id": "tasks",
-      "itemActions": [
-        {
-          "appliesTo": {
-            "type": [
-              "shopping",
-              "errand",
-              "repair",
-              "schedule",
-              "task",
-            ],
-          },
-          "label": "Done",
-          "labelKey": "circle.button.household.markComplete",
-          "opId": "markComplete",
-        },
-        {
-          "appliesTo": {
-            "type": [
-              "shopping",
-              "errand",
-              "repair",
-              "schedule",
-              "task",
-            ],
-          },
-          "label": "Remove",
-          "labelKey": "circle.button.household.removeItem",
-          "opId": "removeItem",
-        },
-        {
-          "appliesTo": {
-            "state": [
-              "open",
-            ],
-            "type": "task",
-          },
-          "label": "I'll do this",
-          "labelKey": "circle.button.household.claim",
-          "opId": "claim",
-        },
-      ],
-      "itemType": "task",
-      "title": "Tasks",
     },
     {
       "affordances": [

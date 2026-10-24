@@ -284,22 +284,6 @@
         const r = await callSkill('declineSubtaskProposal', { proposalId, note: note ?? undefined });
         if (r?.error) alert(`Decline: ${r.error}`);
         await refresh();
-      } else if (id.startsWith('appeal:')) {
-        // Slice #252 (2026-05-27) — appeal button now routes to the
-        // chat-thread page instead of firing the prompt+skill in-line.
-        // The first send on `chat.html?threadId=appeal:<taskId>` calls
-        // `appealTask` automatically (see `shouldUseAppeal` in
-        // /lib/chatThread.js), so the appeal still opens with one user
-        // gesture — but the user sees the thread and can compose a
-        // proper opening message instead of a single prompt() line.
-        // Parity with tasks-mobile's ChatThreadScreen (route param
-        // `appealForTaskId`).
-        const taskId = id.slice('appeal:'.length);
-        const qs = new URLSearchParams({
-          threadId:        `appeal:${taskId}`,
-          appealForTaskId: taskId,
-        });
-        window.location.href = `/chat.html?${qs.toString()}`;
       } else {
         alert(`Unknown button id: ${id}`);
       }

@@ -89,11 +89,11 @@ describe('sectionForScreen — section selector over renderWeb(manifest).section
     expect(found.section.labelField).toBe('label');
   });
 
-  it('resolves `noticeboard` → pinboard / listOpen / kind (from the real manifest)', () => {
+  it('resolves `noticeboard` → pinboard / listOpenRequests / kind (from the real manifest)', () => {
     const found = sectionForScreen(manifestsByOrigin, 'noticeboard');
     expect(found).not.toBeNull();
     expect(found.appOrigin).toBe('pinboard');
-    expect(found.section.dataSource.skillId).toBe('listOpen');
+    expect(found.section.dataSource.skillId).toBe('listOpenRequests');
     expect(found.section.categoryField).toBe('kind');
     // labelField omitted on the noticeboard view → the panel defaults to 'label'.
     expect(found.section.labelField).toBeUndefined();

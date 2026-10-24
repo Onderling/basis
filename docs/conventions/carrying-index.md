@@ -98,6 +98,18 @@ the need named beside them.
 mobile, never on the box; WebRTC rendezvous on web and mobile; mDNS on mobile (browse by default) and on a companion
 started with `--nearby`.
 
+**Sender bound** (a frame's `_from` must be what its connection proved — `assertSenderBindingConformance`): the relay
+yes (server-side: key-proof at register, refused `send` from an unregistered address); NKN yes (its authenticated
+`src`); mDNS yes (the key its challenged hello proved — a mismatching frame is dropped and counted as a
+`security-error`); WebRTC rendezvous yes (the channel's peer is the key that signed the offer, verified by the signalling transport's
+security layer — unsigned signalling is refused; every frame on the channel is bound to that peer); the in-process bus has no sender to prove.
+
+**Switching between them (the LAN/relay hybrid):** the secure send path's one picker routes a peer over mDNS while the
+transport holds a live connection to it, over the relay when it leaves, and back when mDNS rediscovers it; a send that
+fails on the way is resent on the next tier, and the peer's return lifts that penalty at once
+(`packages/secure-agent/test/lanRelayHybrid.test.js`). **No order is kept across a switch:** one-way sends promise
+none, so what rode the relay can land after what rode the LAN later — the app orders by time, never by arrival.
+
 ## Where servers keep things
 
 - **The relay:** the forward queue (SQLite at `QUEUE_DB`, else memory), push tokens (SQLite at `PUSH_TOKENS_DB`, else

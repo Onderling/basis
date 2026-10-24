@@ -223,22 +223,3 @@ export function shortWebid(webid) {
   const tail = i >= 0 ? webid.slice(i + 1) : webid;
   return tail.length > 14 ? `${tail.slice(0, 14)}…` : tail;
 }
-
-/**
- * Build the URL the Appeal CTA navigates to. Mirrors mobile's
- * `nav.navigate(ROUTES.ChatThread, { threadId: \`appeal:${id}\`, … })`
- * but encodes the params as a query string for the web router.
- *
- * @param {string} taskId
- * @returns {string}    `/chat.html?threadId=appeal:<taskId>&appealForTaskId=<taskId>`
- */
-export function buildAppealUrl(taskId) {
-  if (typeof taskId !== 'string' || !taskId) {
-    throw new TypeError('buildAppealUrl: taskId required');
-  }
-  const qs = new URLSearchParams({
-    threadId:        `appeal:${taskId}`,
-    appealForTaskId: taskId,
-  });
-  return `/chat.html?${qs.toString()}`;
-}

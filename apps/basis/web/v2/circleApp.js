@@ -156,6 +156,7 @@ import { renderRecordScreen } from './recordScreen.js';
 // personas#1 — the "Mij → persona's" surface (general persona + persona cards + per-circle sharing)
 // + its shared read-model; the one "About me" on both shells (the single-persona About-me it replaced is retired).
 import { renderMij } from './circleMij.js';
+import { saveDriver, removeDriver } from '../../src/v2/driversSection.js';
 import { loadMijModel } from '../../src/v2/mijLoader.js';
 // feedback-extension P2c — load downloadable extension mappings + the load-time sandbox gate.
 import { loadMappings } from '@onderling/pod-routing/mappings';
@@ -6591,12 +6592,13 @@ async function openAboutMePanel(personaId) {
         try { await rawCallSkill('agents', 'setProfileProperty', { id: model.defaultId ?? 'default', key, value }); } catch { /* */ }
         await draw();
       },
-      // Skills — a skill is a driver-like open item {text, tags[]};
-      // kind 'offering' is a first-class DRIVER_KIND (agent-registry) and its
-      // coarse rung is the taxonomy category (offeringsTaxonomy.js).
-      onAddOffering: async ({ text, tags }) => {
-        const key = (text || tags).trim().toLowerCase().slice(0, 40);   // keyed by the phrase; re-using it edits
-        try { await rawCallSkill('agents', 'setProfileDriver', { id: model.defaultId ?? 'default', key, kind: 'offering', text, tags }); } catch { /* */ }
+      // The drivers (offerings · interests · goals) on the general persona, through the one shared write path.
+      onSaveDriver: async (section, input) => {
+        await saveDriver({ callSkill: rawCallSkill, personaId: model.defaultId ?? 'default', section, input });
+        await draw();
+      },
+      onRemoveDriver: async (key) => {
+        await removeDriver({ callSkill: rawCallSkill, personaId: model.defaultId ?? 'default', key });
         await draw();
       },
       onCreatePersona: async (name, answers) => {

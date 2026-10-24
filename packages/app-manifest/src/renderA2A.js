@@ -62,7 +62,7 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // a release — getPersonaRelease too, since the caller picks the context. A connection may see what acts for them and
   // what exists (listAgents · viewAgent · listCatalogue · listDataVersions), nothing more.
   'agents.createProfile', 'agents.purgeAgent',
-  'agents.setProfileProperty', 'agents.setProfileDriver', 'agents.setProfileCircleMembership',
+  'agents.setProfileProperty', 'agents.setProfileDriver', 'agents.removeProfileDriver', 'agents.setProfileCircleMembership',
   'agents.removeProfileCircleMembership', 'agents.setProfileDisclosure', 'agents.setAgentSkillExposure',
   'agents.grantAgent', 'agents.grantRole', 'agents.revokeGrant', 'agents.revokeAgent', 'agents.installAgent',
   'agents.restoreDataVersion',

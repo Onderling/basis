@@ -7532,11 +7532,11 @@
       "doc": "mij#personas — property without a value on the general persona."
     },
     "offerings_label": {
-      "text": "Offerings & drivers",
-      "doc": "mij#personas — row label for the skills/drivers chips."
+      "text": "Offerings",
+      "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ offering or driver",
+      "text": "+ offering",
       "doc": "mij#personas — dashed add button (potential-action grammar)."
     },
     "offering_text_ph": {
@@ -7706,6 +7706,22 @@
     "goals_label": {
       "text": "Goals",
       "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
+    },
+    "goal_add": {
+      "text": "+ goal",
+      "doc": "Mij → Goals: opens the form to add a goal."
+    },
+    "goal_text_ph": {
+      "text": "what you want to achieve, in a sentence",
+      "doc": "Mij → Goals: the phrase field placeholder."
+    },
+    "interest_add_ph": {
+      "text": "an interest, e.g. gardening",
+      "doc": "Mij → Interests: the field to add one interest (a tag)."
+    },
+    "driver_remove": {
+      "text": "Remove {{what}}",
+      "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
     }
   },
   "attach": {

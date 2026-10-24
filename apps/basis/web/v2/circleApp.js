@@ -3025,6 +3025,8 @@ async function showContacts() {
     onOpen: showContactThread,
     // a person: the scanQr op (web: the paste prompt), routed by what it reads — Me's Scan, the same door
     onAddPerson: () => runMeAction('scan'),
+    // the people this device blocks (once a door on My data): at the foot of Contacten
+    onBlocked: showBlocked,
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
       if (input) addBotFromInput(input);
@@ -3884,7 +3886,7 @@ function showConnectionPoints() {
     // them have a socket right now, and since 2026-09-08 that is several at once.
     relays: _peerAgent?.relays?.list?.() ?? [],
     agentUp: !!_peerAgent,
-    onBack: showMyData,
+    onBack: () => showMyData({ group: 'connection' }),
     onAdopt: (url) => { store.adopt(url); draw(); },
     // Ask before removing: the impact report is the point of this screen.
     onRemove: (url) => { removing = { url, ...store.impactOfRemoving(url) }; draw(); },
@@ -4551,6 +4553,7 @@ async function showMij() {
     onBlockAction: (a) => {
       if (a?.kind === 'edit-me') openAboutMePanel('default');
       else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') showMyData();
+      else if (a?.kind === 'open-shared-with-me') showSharedWithMe();
       // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
       else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
@@ -4583,6 +4586,8 @@ async function showMij() {
     // "wat wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here
     openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
     pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
+    // what was shared with the person: a chip on Mij (once a door on My data)
+    sharedWithMeCount: async () => (await sharedWithMeStore.list()).length,
   } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
   if (_activeTab === 'mij') rerender();
 }
@@ -4619,7 +4624,7 @@ async function showSharedWithMe() {
   const opener = openerForIdentity(circleCoreAgent?.identity);   // network-derived; null → deny-safe no-op
   renderSharedWithMe(rootEl, {
     entries, t,
-    onBack: showMyData,
+    onBack: showMij,
     onOpen: async (entry) => {
       if (typeof opener !== 'function') return;   // deny-safe: no opener → no-op (no leak)
       try { await openSharedCopy(entry, opener); } catch { /* wrong key / not a recipient — deny-safe */ }
@@ -4648,7 +4653,7 @@ async function showBlocked() {
     }
     renderBlockedList(rootEl, {
       rows: buildBlockedList({ peers, members }),
-      t, loading, onBack: showMyData,
+      t, loading, onBack: showContacts,
       onUnblock: async (key) => {
         try { await rawCallSkill('basis', 'unmute', { peer: key }); } catch { /* re-read tells the truth */ }
         await paint(false);
@@ -6667,7 +6672,7 @@ async function showAvailability() {
     availability: working,
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
-    onSave: async () => { await availabilityStore.update(working); showMyData(); },
+    onSave: async () => { await availabilityStore.update(working); showMyData({ group: 'connection' }); },
     onHop: showHop,
   });
   rerender();

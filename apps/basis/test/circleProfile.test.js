@@ -98,13 +98,13 @@ describe('renderProfileBasics — location', () => {
 });
 
 describe('My data — the doors Mij gave up', () => {
-  it('paints the declared doors this shell can open, in order; each fires its own', () => {
-    const availability = vi.fn(); const blocked = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), { t, doors: { blocked, availability } });   // keyed by the view each opens
+  it('paints the declared doors this shell can open (only the log report since the settings regroup); each fires its own', () => {
+    const logReport = vi.fn(); const availability = vi.fn();
+    const el = renderCircleMyData(document.createElement('div'), { t, doors: { logReport, availability } });   // keyed by the view each opens
     const btns = [...el.querySelectorAll('.cc-mydata__doors button')];
-    expect(btns.map((b) => b.textContent)).toEqual(['circle.profile.availability', 'circle.profile.blocked']);
+    expect(btns.map((b) => b.textContent)).toEqual(['circle.profile.logReport']);   // availability is a Verbinding door now
     btns[0].click();
-    expect(availability).toHaveBeenCalled();
+    expect(logReport).toHaveBeenCalled();
     expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-mydata__doors')).toBeNull();
   });
 

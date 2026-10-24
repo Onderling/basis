@@ -25,6 +25,11 @@ const allSettingsProps = () => ({
   weekOverview: { on: true, onToggle: vi.fn() },
   notifications: { supported: true, subscribed: false }, onToggleNotifications: vi.fn(),
   onSaveUserLlm: vi.fn(), userLlm: {}, validateUserLlm: () => null,
+  doors: { availability: vi.fn(), points: vi.fn() },
+  delivery: { sendReceipts: true, allowFallback: false }, onSetDelivery: vi.fn(),
+  shareNknAddress: true, onSetShareAddress: vi.fn(),
+  dataLocation: { relayUrl: 'wss://relay.example' }, onOpenRelayPanel: vi.fn(), relayUrl: 'wss://relay.example',
+  syncSelection: { silos: { chat: true, tasks: true, contacts: true }, fileBytes: 'full', kringenOff: new Set(), kringen: [] }, onSetSync: vi.fn(),
 });
 
 describe('settings behind the gear (web)', () => {

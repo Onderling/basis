@@ -124,6 +124,8 @@ export class TaskGrantManager {
   #grants = new Map();
   /** Optional `{get,set}` persistence port — the same one `RoleGrantManager` takes. */
   #store = null;
+  /** The key this manager's record lives under in the store — one per circle when circles share a vault. */
+  #storeKey = STORE_KEY;
   /** Optional appender port: called after every revoke with the revoked tokens (see constructor). */
   #onRevoked = null;
   /** Resolves once the persisted state has loaded; already-resolved when there is no store. */
@@ -144,6 +146,8 @@ export class TaskGrantManager {
    *   same port since it was written; this class did not, and its header called its bare Set "the
    *   single revocation enforcement point". Omitting the store WARNS rather than degrading quietly.
    *   A PORT, not an adapter — the kernel never imports a concrete vault (invariant 5).
+   * @param {string} [opts.storeKey='task-grants'] — the key the record lives under; circles sharing one store each
+   *   pass their own, or the last circle to write would overwrite the others' revocations.
    * @param {(revoked: {taskId: string, tokens: Array<{id: string, subject: string}>}) => *} [opts.onRevoked]
    *   — APPENDER port for cross-device binding: called (and awaited, best-effort) after every
    *   `revokeTaskGrants` with the revoked tokens. The HOST composes it — basis appends the ids to
@@ -151,7 +155,8 @@ export class TaskGrantManager {
    *   devices' doors too. This class stays a device-local revocation SOURCE either way; the port
    *   is how a revoke becomes a signed statement rather than this kernel importing any lane.
    */
-  constructor({ identity, agentId, parentToken, store = null, onRevoked = null } = {}) {
+  constructor({ identity, agentId, parentToken, store = null, storeKey = STORE_KEY, onRevoked = null } = {}) {
+    this.#storeKey = typeof storeKey === 'string' && storeKey ? storeKey : STORE_KEY;
     if (!identity) throw new Error('TaskGrantManager requires identity');
     this.#identity = identity;
     this.#agentId  = agentId ?? identity.pubKey;
@@ -181,7 +186,7 @@ export class TaskGrantManager {
   /** Hydrate the revocation set + the task index. Best-effort: a corrupt blob starts empty. */
   async #load() {
     try {
-      const raw = await this.#store.get(STORE_KEY);
+      const raw = await this.#store.get(this.#storeKey);
       if (!raw) return;
       const { revoked = [], grants = [] } = JSON.parse(raw);
       for (const id of revoked) this.#revoked.add(id);
@@ -195,7 +200,7 @@ export class TaskGrantManager {
   async #persist() {
     if (!this.#store) return;
     try {
-      await this.#store.set(STORE_KEY, JSON.stringify({
+      await this.#store.set(this.#storeKey, JSON.stringify({
         revoked: [...this.#revoked],
         grants:  [...this.#grants.entries()].map(([taskId, tokens]) => [taskId, tokens.map((t) => t.toJSON())]),
       }));

@@ -38,11 +38,11 @@ describe('circle-post → driver match→notify (#5)', () => {
     expect(events.some((e) => e.payload?.message?.includes('cooking'))).toBe(true);   // normal post notif still fires
   });
 
-  it('no drivers ⇒ no resonance check (and ingestion still works)', async () => {
+  it('no drivers ⇒ no resonance check, and nothing is ingested (the post is already in the circle store)', async () => {
     const { handler, events, callSkill } = harness({ drivers: {} });
     await handler('peer.addr', { groupId: 'b', payload: { requestId: 'r3', text: 'sailing', tags: ['sailing'], from: 'x' } });
     expect(events.find((e) => e.payload?.driverMatch)).toBeUndefined();
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'ingestRemotePost', expect.any(Object));
+    expect(callSkill).not.toHaveBeenCalledWith('pinboard', 'ingestRemotePost', expect.any(Object));
   });
 
   it('honours an explicit driverSignature over the post text/tags', async () => {

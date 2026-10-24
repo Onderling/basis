@@ -64,6 +64,8 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       return store;
     },
     has: (circleId) => stores.has(circleId),
+    /** The circles whose store is open on this device (each opened by a `getStore`), in the order they were opened. */
+    ids: () => [...stores.keys()],
     /**
      * Forget ONE circle on this device: its rows go from the backing it lives on and its cached store with them. The
      * rows are deleted at the DataSource, beneath the store, so no removal hook fires — this is a device letting go

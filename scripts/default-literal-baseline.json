@@ -3,5 +3,5 @@
   "apps/basis/src/core/agent/ownerRootRestore.js": 2,
   "apps/basis/src/core/agent/personaRuntime.js": 5,
   "apps/basis/src/core/agent/personaVault.js": 1,
-  "apps/basis/src/core/agent/realAgent.js": 112
+  "apps/basis/src/core/agent/realAgent.js": 114
 }

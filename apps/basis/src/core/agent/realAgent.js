@@ -138,8 +138,6 @@ import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser
 import { createBrowserPinboardAgent } from '@onderling-app/pinboard/browser';
 import { assertPinboardHostBindings } from './pinboardHostBindings.js';
 import { PINBOARD_OP_ALIAS } from '../../v2/pinboardOpAliases.js';
-import { shouldFanNoticeboardItem, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
-import { toCircleStorePost } from '../../v2/noticeboardCarry.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
 // agents — the read-only "your agents" surface (2026-07-09). buildAgentSkills
 // derives the two defineSkill-shaped handlers (listAgents / viewAgent) from
@@ -4539,6 +4537,20 @@ export async function createRealHouseholdAgent(opts = {}) {
   // holds only pointers (handle/address), and every key re-derives from the recovery phrase. Best-effort
   // per circle and idempotent — a circle whose pod is unreachable degrades locally, never blocking boot
   // or the other circles. (The already-eager 'household' and tasks-primary circles are skipped.)
+  // The circles one self holds on this device (`actorKey` a persona's chat key or the default's; null = every self this
+  // device runs), from the membership registry. Never through pinboard: pinboard answers its own circle list from the
+  // store this feeds, and would be asking itself.
+  async function circleIdsOnDevice(actorKey = null) {
+    const ofSelf = async (pid) => (pid === 'default'
+      ? Object.keys(await readSelfCircleMemberships())
+      : Object.keys(circleMembershipsOf((await agentsRegistryRef?.lookup?.(pid)) ?? {})));
+    const pidOf = (key) => [...personas].find(([pid, rt]) => pid !== 'default' && rt?.chatId?.pubKey && rt.chatId.pubKey === key)?.[0] ?? 'default';
+    const out = new Set();
+    for (const pid of (actorKey ? [pidOf(actorKey)] : [...personas.keys()])) {
+      try { for (const c of await ofSelf(pid)) if (c) out.add(c); } catch { /* that self's list is unreadable now: the others stand */ }
+    }
+    return [...out];
+  }
   async function reopenMemberCircles() {
     const reopened = [];
     let memberCircleIds = [];
@@ -4756,11 +4768,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         delegation: (scope) => deviceKitOf(selfOfOwnLane(scope))?.record ?? null,
         belongs: (scope, item) => ownLaneOf(selfOfOwnItem(item)) === scope,
       },
-      // A landed snapshot that is a noticeboard post goes to the shell's bridge (pinboard's index + notification).
+      // A landed snapshot that is a noticeboard post goes to the shell's bridge (the notification and the driver match);
+      // the post itself is already where pinboard reads it: the circle's store.
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
-      onItemApplied: async (circleId, item) => {
+      onItemApplied: async (circleId, item, landing = {}) => {
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
-        return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item) : undefined;
+        return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
       },
     });
     taskEmit = makeTaskEmitter({
@@ -4992,6 +5005,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The default card and this device's own requests name the CHAT identity — the address people reach. This
     // agent's own key stays in-process: it is on no card and in no request.
     selfCard: () => ({ pubKey: chatId.pubKey, stableId: chatId.stableId }),
+    // A POST lives in its circle's own store — the one the circle syncs — written as the self this device is there.
+    // Pinboard keeps in its own pile only what is not a post (until each of those has a home too).
+    hostCircles: {
+      // a write opens the circle (its sync wired first, as any write's); a read takes it only if it is open already
+      storeFor: async (circleId, { write = false } = {}) => {
+        if (write) { await ensureCircleSync(circleId); return householdService.stores.getStore(circleId); }
+        return householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null;
+      },
+      circlesOf: (actorKey) => circleIdsOnDevice(actorKey),
+      openCircles: () => householdService.stores.ids(),
+      writerIn: (circleId) => circleSelf(circleId).webid ?? chatId.pubKey,
+    },
     membershipEmit,
     membershipRead,
     // The person key this device announces on a join or create (`{ version, pubKey }`, or null).
@@ -5050,11 +5075,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     label:      'PinboardAgent(cc)',
   }) });
   pinboardAgentRef.current = pinboardAgent;   // the raw contact-book reads above may run from here on
-  // Every noticeboard item the pinboard store ACCEPTS fans to its circle — a request, an offer, an
-  // announcement, and the next kind — through the one `circle-post` door (`noticeboardFan.js` decides from
-  // the item; a received item never echoes). Installed on the store event, so no op has to remember.
-  try { pinboardAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
-  catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
   adoptInProcess(pinboardAgent.bundle.agent);
 
   // Contacts made before the persona field existed record NONE. Write `default` onto them once — only where the
@@ -5286,40 +5306,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   }
 
-  /**
-   * A noticeboard item pinboard just accepted goes into the CIRCLE's store — and the store's own mirror carries
-   * it (a signed task-lane snapshot, fanned + catch-up served). This retired the second sync
-   * implementation (a `circle-post` envelope fanned by hand, 2026-08-30 — option B). Which items qualify is
-   * `noticeboardFan.js`'s decision; the canonical shape the store's registry needs is `noticeboardCarry.js`'s.
-   */
-  async function fanNoticeboardItem(item) {
-    if (!shouldFanNoticeboardItem(item)) return;
-    try {
-      const explicit = noticeboardItemCircle(item);
-      // a post that names no circle goes to the circles of the self that WROTE it — never across selves (a persona's
-      // post to the persona's circles, the default's to the default's)
-      const asSelf = [...personas.values()].find((rt) => rt !== persona && rt?.chatId?.pubKey && rt.chatId.pubKey === (item?.addedBy ?? item?.actor ?? null))?.chatId?.pubKey ?? null;
-      const circleIds = explicit ? [explicit] : await _listMyKnownCircles(asSelf);
-      if (circleIds.length === 0) {
-        if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard: the item names no circle and none is known — it stays local');
-        return;
-      }
-      for (const circleId of circleIds) {
-        try {
-          await ensureCircleSync(circleId);   // the publish valve is wired at open; a post may come first
-          const store = householdService.stores.getStore(circleId);
-          const me = circleSelf(circleId).webid ?? chatId.pubKey;   // in a persona's circle, the persona posts
-          await store.put(toCircleStorePost(item, { from: me }), { by: me });
-          if (typeof console !== 'undefined') console.info(`[realAgent] noticeboard ${item.type} ${item.id} → circle store ${circleId} (the lane carries it)`);
-        } catch (err) {
-          if (typeof console !== 'undefined') console.warn(`[realAgent] noticeboard → circle store ${circleId} failed:`, err?.message ?? err);
-        }
-      }
-    } catch (err) {
-      if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard carry failed', err);
-    }
-  }
-  /** The shell's bridge for a post that LANDED in a circle store from another member (see noticeboardCarry.js). */
+  /** The shell's announcement for a post that LANDED in a circle store from another member (see noticeboardCarry.js). */
   let _noticeboardLanded = null;
 
   /** The circles ONE self is in — the default's, or (`asSelf`, a persona's chat key) that persona's. Never the union:
@@ -6411,8 +6398,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         // what the default's names are told to — ask pinboard directly, not through here.)
         if (realOpId === 'listMyCircles' && reply && Array.isArray(reply.circles)) reply = await withPersonaCircles(reply, parts);
         rawReply = reply;
-        // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the pinboard
-        // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
         return adaptPinboardReply(opId, reply, realArgs, tr);
       };
       // The three roster reads share one answer per circle for a short window (every lane asks at boot,

@@ -11,12 +11,10 @@
  */
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
-import { versionLine } from '../../src/v2/versionLine.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { historyStatusLine } from '../../src/v2/historyMirror.js';
-import { myDataActionsFor } from '../../src/v2/meActionProjection.js';
 import { basisManifest } from '../../src/index.js';
 
 export function renderCircleMyData(container, {
@@ -107,18 +105,14 @@ export function renderCircleMyData(container, {
   onOpenRelayPanel,       // Objective D / Surface 4:  => void — open the set-relay op in the docked
                           // side-panel (openPagePanel). When provided, the relay row is an entry button that
                           // routes through the generic panel instead of the bespoke inline form below.
-  // The doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here.
-  // A door without one is omitted.
+  // The doors a group's sections open (availability, connection points, the log report): the view each opens → what
+  // opens it here. A door without one is omitted.
   doors = {},
   // the person's own week overview (a card of the coming week on Saturday morning): `{ on, onToggle }`; on null while
   // it loads or switches; absent = no switch (no clock here)
   weekOverview = undefined,
-  // The build this tab runs (the tag the publish baked in; '' on a dev server). Absent ⇒ no line; given ⇒ the last
-  // line, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's build looked
-  // like a laptop that receives nothing).
-  version,
-  // A settings group's screen: the section ids to paint, in order (from `settingsGroupFor`), and its title. Absent ⇒
-  // the old My data page, which paints every section NOT declared under the gear.
+  // A settings group's screen: the section ids to paint, in order (from `settingsGroupFor`), and its title. Every
+  // section is declared under the gear; nothing is painted outside a group.
   only = null,
   groupTitle = null,
 } = {}) {
@@ -279,735 +273,766 @@ export function renderCircleMyData(container, {
         container.appendChild(holder);
       }
     },
-  };
-  if (Array.isArray(only)) {
-    container.classList.add('cc-settings-group');
-    for (const id of only) {
-      const before = container.children.length;
-      painters[id]?.();
-      for (let k = before; k < container.children.length; k += 1) container.children[k].dataset.section = id;
-    }
-    return container;
-  }
-
-  // ── the doors Mij gave up: availability · connection points · shared with me · blocked ──
-  const doorRow = myDataActionsFor(basisManifest, doors);
-  if (doorRow.length) {
-    const sec = section(tr('circle.profile.mydata_more'));
-    sec.classList.add('cc-mydata__doors');
-    for (const d of doorRow) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-btn cc-btn--quiet cc-profile__${d.id}`;
-      b.textContent = tr(d.labelKey);
-      b.addEventListener('click', () => d.open());
-      sec.appendChild(b);
-    }
-    container.appendChild(sec);
-  }
-
-  // ── where your data lives ─────────────────────────────────────────────────
-  const storage = section(tr('circle.mydata.storage'));
-  const status = podStatus.signedIn
-    ? tr('circle.mydata.pod_signed_in', { webid: podStatus.webid ?? '' })
-    : tr('circle.mydata.pod_local');
-  storage.appendChild(kv(tr('circle.mydata.pod'), status));
-  // With no pod, say what that COSTS — here, where the state is shown, not at the moment someone tries to
-  // leave with their things. A wipe-and-restore walk (2026-08-02) proved the phrase brings back the
-  // identity and no circles; learning that while switching devices is learning it too late to act on.
-  if (!podStatus.signedIn) {
-    const localNote = document.createElement('p');
-    localNote.className = 'cc-mydata__hint';
-    localNote.textContent = tr('circle.mydata.pod_local_consequence');
-    storage.appendChild(localNote);
-  }
-  // Sign in to a real Solid pod (reuses src/web/podAuth.js) — sealed circles then store there.
-  if (!podStatus.signedIn && typeof onSignIn === 'function') {
-    const signIn = document.createElement('button');
-    signIn.type = 'button';
-    signIn.className = 'cc-mydata__signin';
-    signIn.textContent = tr('circle.mydata.pod_sign_in');
-    signIn.addEventListener('click', () => onSignIn());
-    storage.appendChild(signIn);
-  }
-  if (dataLocation.podRoot) storage.appendChild(kv(tr('circle.mydata.pod_root'), dataLocation.podRoot));
-  if (dataLocation.relayOperator || dataLocation.relayUrl) {
-    storage.appendChild(kv(tr('circle.mydata.relay'), [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ')));
-  }
-  // In-app relay setting — point the no-server cross-device relay at a reachable server WITHOUT a rebuild.
-  // Objective D / Surface 4: when the host wires `onOpenRelayPanel`, the edit is routed through the
-  // generic docked side-panel (openPagePanel's simple-form for the `set-relay` op) instead of the bespoke
-  // inline field. The button is the entry point; the panel builds the form from set-relay's params + dispatches.
-  if (typeof onOpenRelayPanel === 'function') {
-    const row = document.createElement('div');
-    row.className = 'cc-mydata__relay-edit';
-    const current = document.createElement('span');
-    current.className = 'cc-mydata__relay-note';
-    current.textContent = tr('circle.mydata.relay_current', { url: relayUrl || relayEnvUrl || tr('circle.mydata.relay_off') });
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'cc-btn cc-btn--quiet cc-mydata__relay-open';
-    open.textContent = tr('circle.mydata.relay_open');
-    open.addEventListener('click', () => onOpenRelayPanel());
-    const hint = document.createElement('p');
-    hint.className = 'cc-mydata__relay-hint';
-    hint.textContent = tr('circle.mydata.relay_hint');
-    row.appendChild(current);
-    row.appendChild(open);
-    storage.appendChild(row);
-    storage.appendChild(hint);
-  } else if (typeof onSaveRelay === 'function') {
-    const row = document.createElement('div');
-    row.className = 'cc-mydata__relay-edit';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'cc-mydata__relay-input';
-    input.value = relayUrl || '';
-    input.placeholder = relayEnvUrl || 'ws://…:8787';
-    input.setAttribute('aria-label', tr('circle.mydata.relay_set'));
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.className = 'cc-btn cc-btn--quiet cc-mydata__relay-save';
-    save.textContent = tr('circle.mydata.relay_save');
-    const note = document.createElement('span');
-    note.className = 'cc-mydata__relay-note';
-    save.addEventListener('click', async () => {
-      save.disabled = true; note.textContent = tr('circle.mydata.relay_saving');
-      try {
-        const r = await onSaveRelay(input.value);
-        note.textContent = r && r.ok
-          ? tr('circle.mydata.relay_saved', { url: r.effective || tr('circle.mydata.relay_off') })
-          : tr('circle.mydata.relay_error', { msg: (r && r.error) || '' });
-      } catch (e) { note.textContent = tr('circle.mydata.relay_error', { msg: e?.message ?? '' }); }
-      save.disabled = false;
-    });
-    const hint = document.createElement('p');
-    hint.className = 'cc-mydata__relay-hint';
-    hint.textContent = tr('circle.mydata.relay_hint');
-    row.appendChild(input); row.appendChild(save); row.appendChild(note);
-    storage.appendChild(row);
-    storage.appendChild(hint);
-  }
-  container.appendChild(storage);
-
-  // ── key management (S5) ─────────────────────────────────────────────────────
-  // Back up / reveal recovery phrase / restore. Each is gated on its callback so
-  // the section only appears where the host wired the (existing) wizard/skill.
-  const acts = [
-    ['cc-mydata__backup',   'circle.mydata.backup',         onBackup],
-    ['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic',  onViewMnemonic],
-    ['cc-mydata__restore',  'circle.mydata.restore',        onRestore],
-    // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
-    // never on a device that already has authority).
-    ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
-    // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
-    ['cc-mydata__receive-personas', 'circle.mydata.receive_personas', onReceivePersonas],
-    // The recovery file: the circle list sealed to the phrase — the pod-less way back.
-    ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
-    ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
-    // The replace ceremony: after a restore, retire every other device in one act.
-    ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
-    // A companion node of your own: claim it with the line it prints in its log.
-    ['cc-mydata__claim-companion', 'circle.companionClaim.button', onClaimCompanion],
-    // The member's choice of which device others deliver to first (their primary contact address).
-    ['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary],
-  ].filter(([, , fn]) => typeof fn === 'function');
-  if (acts.length) {
-    const keys = section(tr('circle.mydata.keys'));
-    for (const [cls, key, fn] of acts) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-mydata__action ${cls}`;
-      b.textContent = tr(key);
-      b.addEventListener('click', () => fn());
-      keys.appendChild(b);
-    }
-    container.appendChild(keys);
-  }
-
-  // ── enrolled devices (add-a-device) ─────────────────────────────────────────
-  // One row per registry delegation; tombstones shown struck. The revoke door (the phrase-proven
-  // ceremony) acts on the live rows — gated on the callback like every identity act above.
-  if (typeof onRevokeDevice === 'function' && Array.isArray(devices) && devices.length) {
-    const sec = section(tr('circle.mydata.devices'));
-    // without the recovery seal this device carries nothing of the person's own scope to the others: say how to fix it
-    if (devicesNeedPhrase) {
-      const note = document.createElement('p');
-      note.dataset.role = 'devices-needs-phrase';
-      note.textContent = tr('circle.mydata.devices_needs_phrase');
-      sec.appendChild(note);
-    }
-    for (const d of devices) {
-      const row = document.createElement('div');
-      row.className = 'cc-mydata__device';
-      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.25rem 0;';
-      const label = document.createElement('span');
-      label.textContent = d.label || d.deviceId;
-      if (d.revoked) label.style.textDecoration = 'line-through';
-      row.appendChild(label);
-      if (!d.revoked) {
+    'availability': () => {
+      if (typeof doors.availability === 'function') {
+        const sec = section(tr('circle.profile.availability'));
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'cc-btn cc-btn--danger cc-mydata__device-revoke';
-        b.textContent = tr('circle.revoke.title');
-        b.addEventListener('click', () => onRevokeDevice(d.deviceId));
-        row.appendChild(b);
+        b.className = 'cc-settings__row cc-settings__door--availability';
+        b.textContent = tr('circle.profile.availability');
+        b.addEventListener('click', () => doors.availability());
+        sec.appendChild(b);
+        container.appendChild(sec);
       }
-      sec.appendChild(row);
-    }
-    container.appendChild(sec);
-  }
+    },
+    'connection-points': () => {
+      if (typeof doors.points === 'function') {
+        const sec = section(tr('circle.nearbyScreen.points_open'));
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-settings__row cc-settings__door--connection-points';
+        b.textContent = tr('circle.nearbyScreen.points_open');
+        b.addEventListener('click', () => doors.points());
+        sec.appendChild(b);
+        container.appendChild(sec);
+      }
+    },
+    'delivery': () => {
+      // ── delivery (2026-07-28) ───────────────────────────────────────────────────
+      // Both lines describe WHAT HAPPENS, not which switch is where. And note what is NOT said: nothing tells
+      // you what other people see about your receipt setting, because nothing in the model reveals it — a
+      // "others cannot tell" reassurance here would be the first place that leaked.
+      if (typeof onSetDelivery === 'function' && delivery) {
+        const sec = section(tr('circle.nearbyScreen.delivery_section'));
 
-  // ── my agents: the nodes I own, and what another agent may do there ────────────────────────────────
-  // One row per node; "give access" asks the node what it can give (its families), then a pick of who (a contact, a
-  // linked bot) and the ticks. The node mints the tokens; nothing here decides what a family is.
-  if (typeof onOpenCompanionGrant === 'function' && typeof onGrantCompanion === 'function' && Array.isArray(companions) && companions.length) {
-    const sec = section(tr('circle.companionGrant.nodes'));
-    if (companionsPending) {
-      const p = document.createElement('p');
-      p.className = 'cc-mydata__companion-pending';
-      p.style.cssText = 'font-size:.9em;opacity:.8;margin:.2rem 0;';
-      p.textContent = companionsPending;
-      sec.appendChild(p);
-    }
-    for (const c of companions) {
-      const row = document.createElement('div');
-      row.className = 'cc-mydata__companion';
-      row.style.cssText = 'padding:.35rem 0;';
-      const head = document.createElement('div');
-      head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;';
-      const name = document.createElement('span');
-      name.className = 'cc-mydata__companion-name';
-      name.textContent = tr('circle.companionGrant.node_row', { short: c.short });
-      const give = document.createElement('button');
-      give.type = 'button';
-      give.className = 'cc-btn cc-btn--quiet cc-mydata__companion-give';
-      give.textContent = tr('circle.companionGrant.give');
-      head.append(name, give);
-      row.appendChild(head);
-      // who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken"
-      const holders = document.createElement('div');
-      holders.className = 'cc-mydata__companion-holders';
-      holders.style.cssText = 'font-size:.9em;';
-      row.appendChild(holders);
-      const paintHolders = async (said = null) => {
-        if (typeof onLoadCompanionGrants !== 'function') return;
-        const r = await onLoadCompanionGrants(c.node);
-        holders.innerHTML = '';
-        if (said) {
-          const p = document.createElement('p');
-          p.style.cssText = 'opacity:.8;margin:.2rem 0;';
-          p.textContent = said;
-          holders.appendChild(p);
-        }
-        if (!r?.ok) {
-          const p = document.createElement('p');
-          p.style.cssText = 'opacity:.75;margin:.2rem 0;';
-          p.textContent = r?.message ?? '';
-          holders.appendChild(p);
-          return;
-        }
-        for (const h of r.rows) {
-          const line = document.createElement('div');
-          line.className = 'cc-mydata__companion-holder';
-          line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.1rem 0;';
-          const what = document.createElement('span');
-          what.textContent = `${h.label} — ${h.may}`;
-          const rev = document.createElement('button');
-          rev.type = 'button';
-          rev.className = 'cc-btn cc-btn--danger cc-mydata__companion-revoke';
-          rev.textContent = tr('circle.companionGrant.revoke');
-          rev.addEventListener('click', async () => {
-            rev.disabled = true;
-            const line2 = typeof onRevokeCompanionGrant === 'function' ? await onRevokeCompanionGrant({ node: c.node, to: h.to }) : null;
-            await paintHolders(line2);
-          });
-          line.append(what, rev);
-          holders.appendChild(line);
-        }
-      };
-      paintHolders();
-      const panel = document.createElement('div');
-      panel.className = 'cc-mydata__companion-panel';
-      panel.hidden = true;
-      row.appendChild(panel);
-      const say = (text) => {
-        const p = document.createElement('p');
-        p.className = 'cc-mydata__companion-note';
-        p.style.cssText = 'font-size:.9em;opacity:.8;';
-        p.textContent = text;
-        panel.appendChild(p);
-      };
-      give.addEventListener('click', async () => {
-        panel.hidden = false;
-        panel.innerHTML = '';
-        say(tr('circle.companionGrant.loading'));
-        const picker = await onOpenCompanionGrant(c.node);
-        panel.innerHTML = '';
-        if (!picker?.ok) { say(picker?.message ?? tr('circle.companionGrant.failed')); return; }
-        if (!picker.targets.length) { say(tr('circle.companionGrant.to_none')); return; }
-        const toLabel = document.createElement('label');
-        toLabel.style.cssText = 'display:block;margin:.3rem 0;';
-        toLabel.textContent = tr('circle.companionGrant.to_label');
-        const to = document.createElement('select');
-        to.className = 'cc-mydata__companion-to';
-        to.style.cssText = 'display:block;width:100%;';
-        for (const tg of picker.targets) {
-          const o = document.createElement('option');
-          o.value = tg.key;
-          o.textContent = tg.label;
-          to.appendChild(o);
-        }
-        toLabel.appendChild(to);
-        panel.appendChild(toLabel);
-        const may = document.createElement('div');
-        may.textContent = tr('circle.companionGrant.may_do');
-        may.style.cssText = 'font-weight:600;margin:.3rem 0 .2rem;';
-        panel.appendChild(may);
-        const boxes = picker.choices.map((ch) => {
-          const line = document.createElement('label');
-          line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
-          const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.value = ch.id;
-          cb.className = 'cc-mydata__companion-family';
-          const txt = document.createElement('span');
-          txt.textContent = ch.label;
-          line.append(cb, txt);
-          panel.appendChild(line);
-          return cb;
+        const receiptsLine = document.createElement('p');
+        receiptsLine.className = 'cc-mydata__delivery-receipts';
+        receiptsLine.textContent = tr(delivery.sendReceipts
+          ? 'circle.nearbyScreen.delivery_receipts_on'
+          : 'circle.nearbyScreen.delivery_receipts_off');
+        sec.appendChild(receiptsLine);
+
+        const receiptsBtn = document.createElement('button');
+        receiptsBtn.type = 'button';
+        receiptsBtn.className = 'cc-mydata__action cc-mydata__delivery-receipts-toggle';
+        receiptsBtn.textContent = tr(delivery.sendReceipts
+          ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
+          : 'circle.nearbyScreen.delivery_receipts_toggle_off');
+        receiptsBtn.addEventListener('click', () => onSetDelivery({ sendReceipts: !delivery.sendReceipts }));
+        sec.appendChild(receiptsBtn);
+
+        const fallbackLine = document.createElement('p');
+        fallbackLine.className = 'cc-mydata__delivery-fallback';
+        fallbackLine.textContent = tr(delivery.allowFallback
+          ? 'circle.nearbyScreen.delivery_fallback_on'
+          : 'circle.nearbyScreen.delivery_fallback_off');
+        sec.appendChild(fallbackLine);
+
+        // The cost rides WITH the option to turn it on — never the fix alone.
+        const fallbackCost = document.createElement('p');
+        fallbackCost.className = 'cc-mydata__delivery-fallback-cost';
+        fallbackCost.textContent = tr('circle.nearbyScreen.delivery_fallback_cost');
+        sec.appendChild(fallbackCost);
+
+        // The toggle is GONE until the stored setting reaches the send path (2026-08-02).
+        //
+        // It wrote a preference nothing read: the send path defaults the fallback ON and never consults it, so
+        // both states behaved identically while the screen described them as different. A control that changes
+        // nothing is a stronger false claim than a sentence — someone presses it and believes they acted. The
+        // preference is still stored, so wiring it later restores the control without a migration.
+        const fallbackNote = document.createElement('p');
+        fallbackNote.className = 'cc-mydata__hint';
+        fallbackNote.textContent = tr('circle.nearbyScreen.delivery_fallback_note');
+        sec.appendChild(fallbackNote);
+
+        container.appendChild(sec);
+      }
+    },
+    'address-sharing': () => {
+      // ── my global address (2026-07-29) ─────────────────────────────────────────
+      // Placed with delivery rather than alone: it is the same family of question — how much does the
+      // network learn in exchange for reaching you. The cost rides WITH the option, as it does there.
+      if (typeof onSetShareAddress === 'function' && shareNknAddress != null) {
+        const sec = section(tr('circle.mydata.address_sharing'));
+
+        const line = document.createElement('p');
+        line.className = 'cc-mydata__address-sharing';
+        line.textContent = tr(shareNknAddress
+          ? 'circle.mydata.address_sharing_on'
+          : 'circle.mydata.address_sharing_off');
+        sec.appendChild(line);
+
+        const cost = document.createElement('p');
+        cost.className = 'cc-mydata__address-sharing-cost';
+        cost.textContent = tr('circle.mydata.address_sharing_cost');
+        sec.appendChild(cost);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cc-mydata__address-sharing-toggle cc-switch';
+        btn.setAttribute('role', 'switch');
+        btn.setAttribute('aria-checked', shareNknAddress ? 'true' : 'false');
+        btn.textContent = tr(shareNknAddress
+          ? 'circle.mydata.address_sharing_toggle_on'
+          : 'circle.mydata.address_sharing_toggle_off');
+        btn.addEventListener('click', () => onSetShareAddress(!shareNknAddress));
+        sec.appendChild(btn);
+
+        container.appendChild(sec);
+      }
+    },
+    'relay': () => {
+      const relaySec = section(tr('circle.mydata.relay'));
+      if (dataLocation.relayOperator || dataLocation.relayUrl) {
+        relaySec.appendChild(kv(tr('circle.mydata.relay'), [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ')));
+      }
+      // In-app relay setting — point the no-server cross-device relay at a reachable server WITHOUT a rebuild.
+      // Objective D / Surface 4: when the host wires `onOpenRelayPanel`, the edit is routed through the
+      // generic docked side-panel (openPagePanel's simple-form for the `set-relay` op) instead of the bespoke
+      // inline field. The button is the entry point; the panel builds the form from set-relay's params + dispatches.
+      if (typeof onOpenRelayPanel === 'function') {
+        const row = document.createElement('div');
+        row.className = 'cc-mydata__relay-edit';
+        const current = document.createElement('span');
+        current.className = 'cc-mydata__relay-note';
+        current.textContent = tr('circle.mydata.relay_current', { url: relayUrl || relayEnvUrl || tr('circle.mydata.relay_off') });
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'cc-btn cc-btn--quiet cc-mydata__relay-open';
+        open.textContent = tr('circle.mydata.relay_open');
+        open.addEventListener('click', () => onOpenRelayPanel());
+        const hint = document.createElement('p');
+        hint.className = 'cc-mydata__relay-hint';
+        hint.textContent = tr('circle.mydata.relay_hint');
+        row.appendChild(current);
+        row.appendChild(open);
+        relaySec.appendChild(row);
+        relaySec.appendChild(hint);
+      } else if (typeof onSaveRelay === 'function') {
+        const row = document.createElement('div');
+        row.className = 'cc-mydata__relay-edit';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'cc-mydata__relay-input';
+        input.value = relayUrl || '';
+        input.placeholder = relayEnvUrl || 'ws://…:8787';
+        input.setAttribute('aria-label', tr('circle.mydata.relay_set'));
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'cc-btn cc-btn--quiet cc-mydata__relay-save';
+        save.textContent = tr('circle.mydata.relay_save');
+        const note = document.createElement('span');
+        note.className = 'cc-mydata__relay-note';
+        save.addEventListener('click', async () => {
+          save.disabled = true; note.textContent = tr('circle.mydata.relay_saving');
+          try {
+            const r = await onSaveRelay(input.value);
+            note.textContent = r && r.ok
+              ? tr('circle.mydata.relay_saved', { url: r.effective || tr('circle.mydata.relay_off') })
+              : tr('circle.mydata.relay_error', { msg: (r && r.error) || '' });
+          } catch (e) { note.textContent = tr('circle.mydata.relay_error', { msg: e?.message ?? '' }); }
+          save.disabled = false;
         });
+        const hint = document.createElement('p');
+        hint.className = 'cc-mydata__relay-hint';
+        hint.textContent = tr('circle.mydata.relay_hint');
+        row.appendChild(input); row.appendChild(save); row.appendChild(note);
+        relaySec.appendChild(row);
+        relaySec.appendChild(hint);
+      }
+      if (relaySec.children.length > 1) container.appendChild(relaySec);
+    },
+    'device-keeps': () => {
+      // ── what this device keeps (sync-policy §11, 2026-09-17) ───────────────────────────────────
+      // A device's own choice about itself, read live by every landing, pull and pairing; never on the wire.
+      if (typeof onSetSync === 'function' && syncSelection && typeof syncSelection === 'object') {
+        const sec = section(tr('circle.mydata.sync'));
+        const intro = document.createElement('p');
+        intro.className = 'cc-mydata__sync-intro';
+        intro.textContent = tr('circle.mydata.sync_intro');
+        sec.appendChild(intro);
+        const check = (cls, label, checked, onChange) => {
+          const row = document.createElement('label');
+          row.className = `cc-mydata__sync-row ${cls}`;
+          row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
+          const box = document.createElement('input');
+          box.type = 'checkbox'; box.checked = !!checked;
+          box.addEventListener('change', () => onChange(box.checked));
+          row.appendChild(box);
+          const txt = document.createElement('span'); txt.textContent = label;
+          row.appendChild(txt);
+          return row;
+        };
+        for (const silo of ['chat', 'tasks', 'contacts']) {
+          sec.appendChild(check(`cc-mydata__sync-silo-${silo}`, tr(`circle.mydata.sync_silo_${silo}`), syncSelection.silos?.[silo] !== false, (on) => onSetSync({ silo, value: on })));
+        }
+        const files = document.createElement('div');
+        files.className = 'cc-mydata__sync-files';
+        files.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
+        const filesLabel = document.createElement('span'); filesLabel.textContent = tr('circle.mydata.sync_files');
+        const filesSel = document.createElement('select');
+        filesSel.className = 'cc-mydata__sync-files-mode';
+        for (const mode of ['full', 'description']) {
+          const o = document.createElement('option'); o.value = mode; o.textContent = tr(`circle.mydata.sync_files_${mode}`);
+          if ((syncSelection.fileBytes ?? 'full') === mode) o.selected = true;
+          filesSel.appendChild(o);
+        }
+        filesSel.addEventListener('change', () => onSetSync({ fileBytes: filesSel.value }));
+        files.appendChild(filesLabel); files.appendChild(filesSel);
+        sec.appendChild(files);
+        const kh = document.createElement('p'); kh.className = 'cc-mydata__sync-kringen-head'; kh.textContent = tr('circle.mydata.sync_kringen');
+        sec.appendChild(kh);
+        const kringen = Array.isArray(syncSelection.kringen) ? syncSelection.kringen : [];
+        if (!kringen.length) {
+          const none = document.createElement('p'); none.textContent = tr('circle.mydata.sync_kringen_none'); sec.appendChild(none);
+        }
+        const off = syncSelection.kringenOff instanceof Set ? syncSelection.kringenOff : new Set(syncSelection.kringenOff ?? []);
+        for (const k of kringen) {
+          const row = check('cc-mydata__sync-kring', k.name ?? k.id, !off.has(k.id), (on) => onSetSync({ kringId: k.id, on }));
+          row.dataset.kringId = k.id;
+          sec.appendChild(row);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'history-mirror': () => {
+      // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
+      if (historyMirror && typeof onToggleHistoryMirror === 'function') {
+        const h = historyMirror;
+        const sec2 = section(tr('circle.mydata.history'));
+        const state = document.createElement('p');
+        state.className = 'cc-mydata__history-status';
+        state.dataset.role = 'history-status';
+        const line = historyStatusLine({ enabled: h.enabled, status: h.status });
+        state.textContent = tr(line.key, line.vars);
+        sec2.appendChild(state);
+        const what = document.createElement('p');
+        what.className = 'cc-mydata__history-what';
+        what.textContent = tr('circle.mydata.history_what');
+        sec2.appendChild(what);
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'cc-mydata__action cc-mydata__history-toggle';
+        toggle.textContent = h.enabled ? tr('circle.mydata.history_disable') : tr('circle.mydata.history_enable');
+        toggle.addEventListener('click', () => onToggleHistoryMirror());
+        sec2.appendChild(toggle);
+        // Export = "mirror to a file" — the same sink, one shot, sealed the same way; needs no pod.
+        if (typeof onExportHistory === 'function') {
+          const exp = document.createElement('button');
+          exp.type = 'button';
+          exp.className = 'cc-mydata__action cc-mydata__history-export';
+          exp.textContent = tr('circle.mydata.history_export');
+          exp.addEventListener('click', () => onExportHistory());
+          sec2.appendChild(exp);
+        }
+        container.appendChild(sec2);
+      }
+    },
+    'message-cleanup': () => {
+      // ── message cleanup (the conversation is the RECORD) ────────────────────────
+      // Messages never expire by policy — deleting them is the user's own explicit act: pick an age, then
+      // confirm the clearly-destructive button (two clicks; the first arms it). The result line reports the
+      // real count, and the note says what is NOT touched (decisions/reports compact, they don't delete).
+      if (typeof onPurgeMessages === 'function') {
+        const sec = section(tr('circle.mydata.cleanup'));
+
+        let chosenDays = RETENTION_CHOICES_DAYS[RETENTION_CHOICES_DAYS.length - 1];
+        const row = document.createElement('div');
+        row.className = 'cc-mydata__retention';
+        const chips = [];
+        for (const days of RETENTION_CHOICES_DAYS) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'cc-mydata__action cc-mydata__retention-choice';
+          if (days === chosenDays) b.classList.add('is-on');
+          b.textContent = tr('circle.mydata.cleanup_older_than', { days });
+          b.addEventListener('click', () => {
+            chosenDays = days;
+            for (const c of chips) c.classList.toggle('is-on', c === b);
+            disarm();
+          });
+          chips.push(b);
+          row.appendChild(b);
+        }
+        sec.appendChild(row);
+
+        const act = document.createElement('button');
+        act.type = 'button';
+        act.className = 'cc-mydata__action cc-mydata__cleanup-run';
+        const result = document.createElement('p');
+        result.className = 'cc-mydata__retention-note';
+        let armed = false;
+        const disarm = () => { armed = false; act.classList.remove('is-armed'); act.textContent = tr('circle.mydata.cleanup_button', { days: chosenDays }); };
+        disarm();
+        act.addEventListener('click', async () => {
+          if (!armed) {
+            armed = true;
+            act.classList.add('is-armed');
+            act.textContent = tr('circle.mydata.cleanup_confirm', { days: chosenDays });
+            return;
+          }
+          let count = 0;
+          try { count = (await onPurgeMessages(chosenDays)) ?? 0; } catch { count = 0; }
+          disarm();
+          result.textContent = tr('circle.mydata.cleanup_done', { count });
+        });
+        sec.appendChild(act);
+        sec.appendChild(result);
+
+        const note = document.createElement('p');
+        note.className = 'cc-mydata__retention-note';
+        note.textContent = tr('circle.mydata.cleanup_note');
+        sec.appendChild(note);
+
+        container.appendChild(sec);
+      }
+    },
+    'privacy': () => {
+      // ── privacy ────────────────────────────────────────────────────────────────
+      if (Array.isArray(privacy) && privacy.length) {
+        const priv = section(tr('circle.mydata.privacy'));
+        for (const s of privacy) {
+          const item = document.createElement('div');
+          item.className = 'cc-mydata__privacy';
+          const h = document.createElement('div');
+          h.className = 'cc-mydata__privacy-title';
+          h.textContent = s.title ?? '';
+          const b = document.createElement('p');
+          b.className = 'cc-mydata__privacy-body';
+          b.textContent = s.body ?? '';
+          item.appendChild(h);
+          item.appendChild(b);
+          priv.appendChild(item);
+        }
+        container.appendChild(priv);
+      }
+    },
+    'usage': () => {
+      // ── usage ──────────────────────────────────────────────────────────────────
+      const entries = Object.entries(metrics || {});
+      if (entries.length) {
+        const usage = section(tr('circle.mydata.usage'));
+        for (const [k, v] of entries) {
+          usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
+        }
+        container.appendChild(usage);
+      }
+    },
+    'frequent': () => {
+      // ── what you use most (this device only) ─────────────────────────────────────
+      {
+        const sec = section(tr('circle.mydata.frequent'));
+        const note = document.createElement('p');
+        note.className = 'cc-mydata__note';
+        note.textContent = tr('circle.mydata.frequent_note');
+        sec.appendChild(note);
+        if (Array.isArray(frequent) && frequent.length) {
+          for (const r of frequent) sec.appendChild(kv(r.name, r.items.map((i) => `${i.label} ${i.count}`).join(' · ')));
+          if (typeof onClearFrequent === 'function') {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'cc-btn cc-btn--quiet cc-mydata__frequent-clear';
+            b.textContent = tr('circle.mydata.frequent_clear');
+            b.addEventListener('click', () => onClearFrequent());
+            sec.appendChild(b);
+          }
+        } else {
+          const none = document.createElement('p');
+          none.className = 'cc-mydata__note';
+          none.textContent = tr('circle.mydata.frequent_none');
+          sec.appendChild(none);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'devices': () => {
+      // ── enrolled devices (add-a-device) ─────────────────────────────────────────
+      // One row per registry delegation; tombstones shown struck. The revoke door (the phrase-proven
+      // ceremony) acts on the live rows — gated on the callback like every identity act above.
+      if (typeof onRevokeDevice === 'function' && Array.isArray(devices) && devices.length) {
+        const sec = section(tr('circle.mydata.devices'));
+        // without the recovery seal this device carries nothing of the person's own scope to the others: say how to fix it
+        if (devicesNeedPhrase) {
+          const note = document.createElement('p');
+          note.dataset.role = 'devices-needs-phrase';
+          note.textContent = tr('circle.mydata.devices_needs_phrase');
+          sec.appendChild(note);
+        }
+        for (const d of devices) {
+          const row = document.createElement('div');
+          row.className = 'cc-mydata__device';
+          row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.25rem 0;';
+          const label = document.createElement('span');
+          label.textContent = d.label || d.deviceId;
+          if (d.revoked) label.style.textDecoration = 'line-through';
+          row.appendChild(label);
+          if (!d.revoked) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'cc-btn cc-btn--danger cc-mydata__device-revoke';
+            b.textContent = tr('circle.revoke.title');
+            b.addEventListener('click', () => onRevokeDevice(d.deviceId));
+            row.appendChild(b);
+          }
+          sec.appendChild(row);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'agents': () => {
+      // ── my agents: the nodes I own, and what another agent may do there ────────────────────────────────
+      // One row per node; "give access" asks the node what it can give (its families), then a pick of who (a contact, a
+      // linked bot) and the ticks. The node mints the tokens; nothing here decides what a family is.
+      if (typeof onOpenCompanionGrant === 'function' && typeof onGrantCompanion === 'function' && Array.isArray(companions) && companions.length) {
+        const sec = section(tr('circle.companionGrant.nodes'));
+        if (companionsPending) {
+          const p = document.createElement('p');
+          p.className = 'cc-mydata__companion-pending';
+          p.style.cssText = 'font-size:.9em;opacity:.8;margin:.2rem 0;';
+          p.textContent = companionsPending;
+          sec.appendChild(p);
+        }
+        for (const c of companions) {
+          const row = document.createElement('div');
+          row.className = 'cc-mydata__companion';
+          row.style.cssText = 'padding:.35rem 0;';
+          const head = document.createElement('div');
+          head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;';
+          const name = document.createElement('span');
+          name.className = 'cc-mydata__companion-name';
+          name.textContent = tr('circle.companionGrant.node_row', { short: c.short });
+          const give = document.createElement('button');
+          give.type = 'button';
+          give.className = 'cc-btn cc-btn--quiet cc-mydata__companion-give';
+          give.textContent = tr('circle.companionGrant.give');
+          head.append(name, give);
+          row.appendChild(head);
+          // who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken"
+          const holders = document.createElement('div');
+          holders.className = 'cc-mydata__companion-holders';
+          holders.style.cssText = 'font-size:.9em;';
+          row.appendChild(holders);
+          const paintHolders = async (said = null) => {
+            if (typeof onLoadCompanionGrants !== 'function') return;
+            const r = await onLoadCompanionGrants(c.node);
+            holders.innerHTML = '';
+            if (said) {
+              const p = document.createElement('p');
+              p.style.cssText = 'opacity:.8;margin:.2rem 0;';
+              p.textContent = said;
+              holders.appendChild(p);
+            }
+            if (!r?.ok) {
+              const p = document.createElement('p');
+              p.style.cssText = 'opacity:.75;margin:.2rem 0;';
+              p.textContent = r?.message ?? '';
+              holders.appendChild(p);
+              return;
+            }
+            for (const h of r.rows) {
+              const line = document.createElement('div');
+              line.className = 'cc-mydata__companion-holder';
+              line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.1rem 0;';
+              const what = document.createElement('span');
+              what.textContent = `${h.label} — ${h.may}`;
+              const rev = document.createElement('button');
+              rev.type = 'button';
+              rev.className = 'cc-btn cc-btn--danger cc-mydata__companion-revoke';
+              rev.textContent = tr('circle.companionGrant.revoke');
+              rev.addEventListener('click', async () => {
+                rev.disabled = true;
+                const line2 = typeof onRevokeCompanionGrant === 'function' ? await onRevokeCompanionGrant({ node: c.node, to: h.to }) : null;
+                await paintHolders(line2);
+              });
+              line.append(what, rev);
+              holders.appendChild(line);
+            }
+          };
+          paintHolders();
+          const panel = document.createElement('div');
+          panel.className = 'cc-mydata__companion-panel';
+          panel.hidden = true;
+          row.appendChild(panel);
+          const say = (text) => {
+            const p = document.createElement('p');
+            p.className = 'cc-mydata__companion-note';
+            p.style.cssText = 'font-size:.9em;opacity:.8;';
+            p.textContent = text;
+            panel.appendChild(p);
+          };
+          give.addEventListener('click', async () => {
+            panel.hidden = false;
+            panel.innerHTML = '';
+            say(tr('circle.companionGrant.loading'));
+            const picker = await onOpenCompanionGrant(c.node);
+            panel.innerHTML = '';
+            if (!picker?.ok) { say(picker?.message ?? tr('circle.companionGrant.failed')); return; }
+            if (!picker.targets.length) { say(tr('circle.companionGrant.to_none')); return; }
+            const toLabel = document.createElement('label');
+            toLabel.style.cssText = 'display:block;margin:.3rem 0;';
+            toLabel.textContent = tr('circle.companionGrant.to_label');
+            const to = document.createElement('select');
+            to.className = 'cc-mydata__companion-to';
+            to.style.cssText = 'display:block;width:100%;';
+            for (const tg of picker.targets) {
+              const o = document.createElement('option');
+              o.value = tg.key;
+              o.textContent = tg.label;
+              to.appendChild(o);
+            }
+            toLabel.appendChild(to);
+            panel.appendChild(toLabel);
+            const may = document.createElement('div');
+            may.textContent = tr('circle.companionGrant.may_do');
+            may.style.cssText = 'font-weight:600;margin:.3rem 0 .2rem;';
+            panel.appendChild(may);
+            const boxes = picker.choices.map((ch) => {
+              const line = document.createElement('label');
+              line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.value = ch.id;
+              cb.className = 'cc-mydata__companion-family';
+              const txt = document.createElement('span');
+              txt.textContent = ch.label;
+              line.append(cb, txt);
+              panel.appendChild(line);
+              return cb;
+            });
+            const confirm = document.createElement('button');
+            confirm.type = 'button';
+            confirm.className = 'cc-btn cc-btn--quiet cc-mydata__companion-confirm';
+            confirm.textContent = tr('circle.companionGrant.confirm');
+            panel.appendChild(confirm);
+            confirm.addEventListener('click', async () => {
+              const families = boxes.filter((b) => b.checked).map((b) => b.value);
+              if (!families.length) { say(tr('circle.companionGrant.nothing_ticked')); return; }
+              confirm.disabled = true;
+              const line = await onGrantCompanion({ node: c.node, to: to.value, families });
+              panel.innerHTML = '';
+              say(line);
+              paintHolders();
+            });
+          });
+          sec.appendChild(row);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'connections': () => {
+      // ── connections: screens that are yours, somewhere else ────────────────────────────────────
+      // Placed beside the devices list because that is the question a person is answering here —
+      // "what else of mine is out there" — and the two are told apart by what they can DO: a device
+      // holds your keys, a connection holds only the ticks you gave it.
+      if (typeof onUnpairConnection === 'function' && Array.isArray(connections) && connections.length) {
+        const sec = section(tr('circle.mydata.connections'));
+        for (const c of connections) {
+          const row = document.createElement('div');
+          row.className = 'cc-mydata__connection';
+          row.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;padding:.35rem 0;';
+
+          const left = document.createElement('div');
+          const name = document.createElement('div');
+          name.className = 'cc-mydata__connection-name';
+          // A key is not a name; the stub keeps two unlabelled connections tellable apart.
+          name.textContent = c.label || c.short;
+          left.appendChild(name);
+
+          // The two columns, as one honest line each.
+          const sees = document.createElement('div');
+          sees.className = 'cc-mydata__connection-sees';
+          sees.style.cssText = 'opacity:.75;font-size:.9em;';
+          sees.textContent = c.sees
+            ? tr('circle.mydata.connection_sees', {
+              what: [...c.sees.circles, ...(c.sees.device ? [tr('circle.mydata.connection_device_section')] : [])].join(', '),
+            })
+            // NOT "0 onderdelen": a connection that cannot read is a real shape, and saying so plainly
+            // is the difference between an honest row and one that looks broken.
+            : tr('circle.mydata.connection_acts_only');
+          left.appendChild(sees);
+
+          const does = document.createElement('div');
+          does.className = 'cc-mydata__connection-does';
+          does.style.cssText = 'opacity:.75;font-size:.9em;';
+          does.textContent = tr('circle.mydata.connection_does', { count: c.opCount });
+          left.appendChild(does);
+          row.appendChild(left);
+
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'cc-btn cc-btn--quiet cc-mydata__connection-unpair';
+          b.textContent = tr('circle.mydata.connection_unpair');
+          b.addEventListener('click', () => onUnpairConnection(c.viewPubKey));
+          row.appendChild(b);
+          sec.appendChild(row);
+        }
+        container.appendChild(sec);
+      }
+    },
+    'connection-add': () => {
+      // ── pair a new connection ──────────────────────────────────────────────────────────────────
+      // Two steps on purpose. A person pastes what the other screen shows, and only THEN sees what
+      // they are about to hand over — deciding before you can see the choices is not consent.
+      if (typeof onPairConnection === 'function' && connectionChoices && typeof parseConnectionOffer === 'function') {
+        const sec = section(tr('circle.mydata.connection_add'));
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'cc-mydata__connection-offer';
+        input.placeholder = tr('circle.mydata.connection_offer_placeholder');
+        input.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:.4rem;';
+        sec.appendChild(input);
+
+        const note = document.createElement('div');
+        note.className = 'cc-mydata__connection-note';
+        note.style.cssText = 'font-size:.9em;opacity:.75;min-height:1.2em;';
+        sec.appendChild(note);
+
+        const picker = document.createElement('div');
+        picker.className = 'cc-mydata__connection-picker';
+        picker.hidden = true;
+        sec.appendChild(picker);
+
+        const tickList = (title, items, idOf, labelOf) => {
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'margin:.4rem 0;';
+          const h = document.createElement('div');
+          h.textContent = title;
+          h.style.cssText = 'font-weight:600;margin-bottom:.2rem;';
+          wrap.appendChild(h);
+          for (const it of items) {
+            const line = document.createElement('label');
+            line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = idOf(it);
+            const txt = document.createElement('span');
+            txt.textContent = labelOf(it);
+            line.append(cb, txt);
+            wrap.appendChild(line);
+          }
+          return wrap;
+        };
+
+        const opsBox = tickList(tr('circle.mydata.connection_may_do'), connectionChoices.ops ?? [],
+          (o) => o.id, (o) => o.label || o.id);
+        const secBox = tickList(tr('circle.mydata.connection_may_see'), connectionChoices.sections ?? [],
+          (x) => x.id, (x) => x.label || tr('circle.mydata.connection_device_section'));
+        picker.append(opsBox, secBox);
+
         const confirm = document.createElement('button');
         confirm.type = 'button';
-        confirm.className = 'cc-btn cc-btn--quiet cc-mydata__companion-confirm';
-        confirm.textContent = tr('circle.companionGrant.confirm');
-        panel.appendChild(confirm);
-        confirm.addEventListener('click', async () => {
-          const families = boxes.filter((b) => b.checked).map((b) => b.value);
-          if (!families.length) { say(tr('circle.companionGrant.nothing_ticked')); return; }
-          confirm.disabled = true;
-          const line = await onGrantCompanion({ node: c.node, to: to.value, families });
-          panel.innerHTML = '';
-          say(line);
-          paintHolders();
+        confirm.className = 'cc-btn cc-btn--quiet cc-mydata__connection-confirm';
+        confirm.textContent = tr('circle.mydata.connection_confirm');
+        picker.appendChild(confirm);
+
+        let offer = null;
+        input.addEventListener('input', () => {
+          const parsed = parseConnectionOffer(input.value.trim());
+          offer = parsed && parsed.ok ? parsed : null;
+          picker.hidden = !offer;
+          // A refusal names ITS OWN reason rather than a generic "invalid": a mistyped code, a code
+          // from a newer version and a code for something else entirely are different problems.
+          note.textContent = input.value.trim() === ''
+            ? ''
+            : (offer
+              ? tr('circle.mydata.connection_recognised', { name: offer.label || offer.viewPubKey.slice(0, 8) })
+              : tr(`circle.mydata.connection_offer_${(parsed && parsed.reason) || 'unreadable'}`));
         });
-      });
-      sec.appendChild(row);
-    }
-    container.appendChild(sec);
-  }
 
-  // ── connections: screens that are yours, somewhere else ────────────────────────────────────
-  // Placed beside the devices list because that is the question a person is answering here —
-  // "what else of mine is out there" — and the two are told apart by what they can DO: a device
-  // holds your keys, a connection holds only the ticks you gave it.
-  if (typeof onUnpairConnection === 'function' && Array.isArray(connections) && connections.length) {
-    const sec = section(tr('circle.mydata.connections'));
-    for (const c of connections) {
-      const row = document.createElement('div');
-      row.className = 'cc-mydata__connection';
-      row.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;padding:.35rem 0;';
-
-      const left = document.createElement('div');
-      const name = document.createElement('div');
-      name.className = 'cc-mydata__connection-name';
-      // A key is not a name; the stub keeps two unlabelled connections tellable apart.
-      name.textContent = c.label || c.short;
-      left.appendChild(name);
-
-      // The two columns, as one honest line each.
-      const sees = document.createElement('div');
-      sees.className = 'cc-mydata__connection-sees';
-      sees.style.cssText = 'opacity:.75;font-size:.9em;';
-      sees.textContent = c.sees
-        ? tr('circle.mydata.connection_sees', {
-          what: [...c.sees.circles, ...(c.sees.device ? [tr('circle.mydata.connection_device_section')] : [])].join(', '),
-        })
-        // NOT "0 onderdelen": a connection that cannot read is a real shape, and saying so plainly
-        // is the difference between an honest row and one that looks broken.
-        : tr('circle.mydata.connection_acts_only');
-      left.appendChild(sees);
-
-      const does = document.createElement('div');
-      does.className = 'cc-mydata__connection-does';
-      does.style.cssText = 'opacity:.75;font-size:.9em;';
-      does.textContent = tr('circle.mydata.connection_does', { count: c.opCount });
-      left.appendChild(does);
-      row.appendChild(left);
-
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'cc-btn cc-btn--quiet cc-mydata__connection-unpair';
-      b.textContent = tr('circle.mydata.connection_unpair');
-      b.addEventListener('click', () => onUnpairConnection(c.viewPubKey));
-      row.appendChild(b);
-      sec.appendChild(row);
-    }
-    container.appendChild(sec);
-  }
-
-  // ── pair a new connection ──────────────────────────────────────────────────────────────────
-  // Two steps on purpose. A person pastes what the other screen shows, and only THEN sees what
-  // they are about to hand over — deciding before you can see the choices is not consent.
-  if (typeof onPairConnection === 'function' && connectionChoices && typeof parseConnectionOffer === 'function') {
-    const sec = section(tr('circle.mydata.connection_add'));
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'cc-mydata__connection-offer';
-    input.placeholder = tr('circle.mydata.connection_offer_placeholder');
-    input.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:.4rem;';
-    sec.appendChild(input);
-
-    const note = document.createElement('div');
-    note.className = 'cc-mydata__connection-note';
-    note.style.cssText = 'font-size:.9em;opacity:.75;min-height:1.2em;';
-    sec.appendChild(note);
-
-    const picker = document.createElement('div');
-    picker.className = 'cc-mydata__connection-picker';
-    picker.hidden = true;
-    sec.appendChild(picker);
-
-    const tickList = (title, items, idOf, labelOf) => {
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'margin:.4rem 0;';
-      const h = document.createElement('div');
-      h.textContent = title;
-      h.style.cssText = 'font-weight:600;margin-bottom:.2rem;';
-      wrap.appendChild(h);
-      for (const it of items) {
-        const line = document.createElement('label');
-        line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.value = idOf(it);
-        const txt = document.createElement('span');
-        txt.textContent = labelOf(it);
-        line.append(cb, txt);
-        wrap.appendChild(line);
+        confirm.addEventListener('click', () => {
+          if (!offer) return;
+          const picked = (box) => [...box.querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.value);
+          onPairConnection({
+            viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label,
+            ops: picked(opsBox), sections: picked(secBox),
+          });
+          input.value = ''; note.textContent = ''; picker.hidden = true; offer = null;
+        });
+        container.appendChild(sec);
       }
-      return wrap;
-    };
-
-    const opsBox = tickList(tr('circle.mydata.connection_may_do'), connectionChoices.ops ?? [],
-      (o) => o.id, (o) => o.label || o.id);
-    const secBox = tickList(tr('circle.mydata.connection_may_see'), connectionChoices.sections ?? [],
-      (x) => x.id, (x) => x.label || tr('circle.mydata.connection_device_section'));
-    picker.append(opsBox, secBox);
-
-    const confirm = document.createElement('button');
-    confirm.type = 'button';
-    confirm.className = 'cc-btn cc-btn--quiet cc-mydata__connection-confirm';
-    confirm.textContent = tr('circle.mydata.connection_confirm');
-    picker.appendChild(confirm);
-
-    let offer = null;
-    input.addEventListener('input', () => {
-      const parsed = parseConnectionOffer(input.value.trim());
-      offer = parsed && parsed.ok ? parsed : null;
-      picker.hidden = !offer;
-      // A refusal names ITS OWN reason rather than a generic "invalid": a mistyped code, a code
-      // from a newer version and a code for something else entirely are different problems.
-      note.textContent = input.value.trim() === ''
-        ? ''
-        : (offer
-          ? tr('circle.mydata.connection_recognised', { name: offer.label || offer.viewPubKey.slice(0, 8) })
-          : tr(`circle.mydata.connection_offer_${(parsed && parsed.reason) || 'unreadable'}`));
-    });
-
-    confirm.addEventListener('click', () => {
-      if (!offer) return;
-      const picked = (box) => [...box.querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.value);
-      onPairConnection({
-        viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label,
-        ops: picked(opsBox), sections: picked(secBox),
-      });
-      input.value = ''; note.textContent = ''; picker.hidden = true; offer = null;
-    });
-    container.appendChild(sec);
-  }
-
-  // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
-  if (historyMirror && typeof onToggleHistoryMirror === 'function') {
-    const h = historyMirror;
-    const sec2 = section(tr('circle.mydata.history'));
-    const state = document.createElement('p');
-    state.className = 'cc-mydata__history-status';
-    state.dataset.role = 'history-status';
-    const line = historyStatusLine({ enabled: h.enabled, status: h.status });
-    state.textContent = tr(line.key, line.vars);
-    sec2.appendChild(state);
-    const what = document.createElement('p');
-    what.className = 'cc-mydata__history-what';
-    what.textContent = tr('circle.mydata.history_what');
-    sec2.appendChild(what);
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'cc-mydata__action cc-mydata__history-toggle';
-    toggle.textContent = h.enabled ? tr('circle.mydata.history_disable') : tr('circle.mydata.history_enable');
-    toggle.addEventListener('click', () => onToggleHistoryMirror());
-    sec2.appendChild(toggle);
-    // Export = "mirror to a file" — the same sink, one shot, sealed the same way; needs no pod.
-    if (typeof onExportHistory === 'function') {
-      const exp = document.createElement('button');
-      exp.type = 'button';
-      exp.className = 'cc-mydata__action cc-mydata__history-export';
-      exp.textContent = tr('circle.mydata.history_export');
-      exp.addEventListener('click', () => onExportHistory());
-      sec2.appendChild(exp);
-    }
-    container.appendChild(sec2);
-  }
-
-  // ── delivery (2026-07-28) ───────────────────────────────────────────────────
-  // Both lines describe WHAT HAPPENS, not which switch is where. And note what is NOT said: nothing tells
-  // you what other people see about your receipt setting, because nothing in the model reveals it — a
-  // "others cannot tell" reassurance here would be the first place that leaked.
-  if (typeof onSetDelivery === 'function' && delivery) {
-    const sec = section(tr('circle.nearbyScreen.delivery_section'));
-
-    const receiptsLine = document.createElement('p');
-    receiptsLine.className = 'cc-mydata__delivery-receipts';
-    receiptsLine.textContent = tr(delivery.sendReceipts
-      ? 'circle.nearbyScreen.delivery_receipts_on'
-      : 'circle.nearbyScreen.delivery_receipts_off');
-    sec.appendChild(receiptsLine);
-
-    const receiptsBtn = document.createElement('button');
-    receiptsBtn.type = 'button';
-    receiptsBtn.className = 'cc-mydata__action cc-mydata__delivery-receipts-toggle';
-    receiptsBtn.textContent = tr(delivery.sendReceipts
-      ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
-      : 'circle.nearbyScreen.delivery_receipts_toggle_off');
-    receiptsBtn.addEventListener('click', () => onSetDelivery({ sendReceipts: !delivery.sendReceipts }));
-    sec.appendChild(receiptsBtn);
-
-    const fallbackLine = document.createElement('p');
-    fallbackLine.className = 'cc-mydata__delivery-fallback';
-    fallbackLine.textContent = tr(delivery.allowFallback
-      ? 'circle.nearbyScreen.delivery_fallback_on'
-      : 'circle.nearbyScreen.delivery_fallback_off');
-    sec.appendChild(fallbackLine);
-
-    // The cost rides WITH the option to turn it on — never the fix alone.
-    const fallbackCost = document.createElement('p');
-    fallbackCost.className = 'cc-mydata__delivery-fallback-cost';
-    fallbackCost.textContent = tr('circle.nearbyScreen.delivery_fallback_cost');
-    sec.appendChild(fallbackCost);
-
-    // The toggle is GONE until the stored setting reaches the send path (2026-08-02).
-    //
-    // It wrote a preference nothing read: the send path defaults the fallback ON and never consults it, so
-    // both states behaved identically while the screen described them as different. A control that changes
-    // nothing is a stronger false claim than a sentence — someone presses it and believes they acted. The
-    // preference is still stored, so wiring it later restores the control without a migration.
-    const fallbackNote = document.createElement('p');
-    fallbackNote.className = 'cc-mydata__hint';
-    fallbackNote.textContent = tr('circle.nearbyScreen.delivery_fallback_note');
-    sec.appendChild(fallbackNote);
-
-    container.appendChild(sec);
-  }
-
-  // ── what this device keeps (sync-policy §11, 2026-09-17) ───────────────────────────────────
-  // A device's own choice about itself, read live by every landing, pull and pairing; never on the wire.
-  if (typeof onSetSync === 'function' && syncSelection && typeof syncSelection === 'object') {
-    const sec = section(tr('circle.mydata.sync'));
-    const intro = document.createElement('p');
-    intro.className = 'cc-mydata__sync-intro';
-    intro.textContent = tr('circle.mydata.sync_intro');
-    sec.appendChild(intro);
-    const check = (cls, label, checked, onChange) => {
-      const row = document.createElement('label');
-      row.className = `cc-mydata__sync-row ${cls}`;
-      row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
-      const box = document.createElement('input');
-      box.type = 'checkbox'; box.checked = !!checked;
-      box.addEventListener('change', () => onChange(box.checked));
-      row.appendChild(box);
-      const txt = document.createElement('span'); txt.textContent = label;
-      row.appendChild(txt);
-      return row;
-    };
-    for (const silo of ['chat', 'tasks', 'contacts']) {
-      sec.appendChild(check(`cc-mydata__sync-silo-${silo}`, tr(`circle.mydata.sync_silo_${silo}`), syncSelection.silos?.[silo] !== false, (on) => onSetSync({ silo, value: on })));
-    }
-    const files = document.createElement('div');
-    files.className = 'cc-mydata__sync-files';
-    files.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
-    const filesLabel = document.createElement('span'); filesLabel.textContent = tr('circle.mydata.sync_files');
-    const filesSel = document.createElement('select');
-    filesSel.className = 'cc-mydata__sync-files-mode';
-    for (const mode of ['full', 'description']) {
-      const o = document.createElement('option'); o.value = mode; o.textContent = tr(`circle.mydata.sync_files_${mode}`);
-      if ((syncSelection.fileBytes ?? 'full') === mode) o.selected = true;
-      filesSel.appendChild(o);
-    }
-    filesSel.addEventListener('change', () => onSetSync({ fileBytes: filesSel.value }));
-    files.appendChild(filesLabel); files.appendChild(filesSel);
-    sec.appendChild(files);
-    const kh = document.createElement('p'); kh.className = 'cc-mydata__sync-kringen-head'; kh.textContent = tr('circle.mydata.sync_kringen');
-    sec.appendChild(kh);
-    const kringen = Array.isArray(syncSelection.kringen) ? syncSelection.kringen : [];
-    if (!kringen.length) {
-      const none = document.createElement('p'); none.textContent = tr('circle.mydata.sync_kringen_none'); sec.appendChild(none);
-    }
-    const off = syncSelection.kringenOff instanceof Set ? syncSelection.kringenOff : new Set(syncSelection.kringenOff ?? []);
-    for (const k of kringen) {
-      const row = check('cc-mydata__sync-kring', k.name ?? k.id, !off.has(k.id), (on) => onSetSync({ kringId: k.id, on }));
-      row.dataset.kringId = k.id;
-      sec.appendChild(row);
-    }
-    container.appendChild(sec);
-  }
-
-  // ── my global address (2026-07-29) ─────────────────────────────────────────
-  // Placed with delivery rather than alone: it is the same family of question — how much does the
-  // network learn in exchange for reaching you. The cost rides WITH the option, as it does there.
-  if (typeof onSetShareAddress === 'function' && shareNknAddress != null) {
-    const sec = section(tr('circle.mydata.address_sharing'));
-
-    const line = document.createElement('p');
-    line.className = 'cc-mydata__address-sharing';
-    line.textContent = tr(shareNknAddress
-      ? 'circle.mydata.address_sharing_on'
-      : 'circle.mydata.address_sharing_off');
-    sec.appendChild(line);
-
-    const cost = document.createElement('p');
-    cost.className = 'cc-mydata__address-sharing-cost';
-    cost.textContent = tr('circle.mydata.address_sharing_cost');
-    sec.appendChild(cost);
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cc-mydata__action cc-mydata__address-sharing-toggle';
-    btn.textContent = tr(shareNknAddress
-      ? 'circle.mydata.address_sharing_toggle_on'
-      : 'circle.mydata.address_sharing_toggle_off');
-    btn.addEventListener('click', () => onSetShareAddress(!shareNknAddress));
-    sec.appendChild(btn);
-
-    container.appendChild(sec);
-  }
-
-  // ── message cleanup (the conversation is the RECORD) ────────────────────────
-  // Messages never expire by policy — deleting them is the user's own explicit act: pick an age, then
-  // confirm the clearly-destructive button (two clicks; the first arms it). The result line reports the
-  // real count, and the note says what is NOT touched (decisions/reports compact, they don't delete).
-  if (typeof onPurgeMessages === 'function') {
-    const sec = section(tr('circle.mydata.cleanup'));
-
-    let chosenDays = RETENTION_CHOICES_DAYS[RETENTION_CHOICES_DAYS.length - 1];
-    const row = document.createElement('div');
-    row.className = 'cc-mydata__retention';
-    const chips = [];
-    for (const days of RETENTION_CHOICES_DAYS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'cc-mydata__action cc-mydata__retention-choice';
-      if (days === chosenDays) b.classList.add('is-on');
-      b.textContent = tr('circle.mydata.cleanup_older_than', { days });
-      b.addEventListener('click', () => {
-        chosenDays = days;
-        for (const c of chips) c.classList.toggle('is-on', c === b);
-        disarm();
-      });
-      chips.push(b);
-      row.appendChild(b);
-    }
-    sec.appendChild(row);
-
-    const act = document.createElement('button');
-    act.type = 'button';
-    act.className = 'cc-mydata__action cc-mydata__cleanup-run';
-    const result = document.createElement('p');
-    result.className = 'cc-mydata__retention-note';
-    let armed = false;
-    const disarm = () => { armed = false; act.classList.remove('is-armed'); act.textContent = tr('circle.mydata.cleanup_button', { days: chosenDays }); };
-    disarm();
-    act.addEventListener('click', async () => {
-      if (!armed) {
-        armed = true;
-        act.classList.add('is-armed');
-        act.textContent = tr('circle.mydata.cleanup_confirm', { days: chosenDays });
-        return;
+    },
+    'keys': () => {
+      // ── key management (S5) ─────────────────────────────────────────────────────
+      // Back up / reveal recovery phrase / restore. Each is gated on its callback so
+      // the section only appears where the host wired the (existing) wizard/skill.
+      const acts = [
+        ['cc-mydata__backup',   'circle.mydata.backup',         onBackup],
+        ['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic',  onViewMnemonic],
+        ['cc-mydata__restore',  'circle.mydata.restore',        onRestore],
+        // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
+        // never on a device that already has authority).
+        ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
+        // After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here.
+        ['cc-mydata__receive-personas', 'circle.mydata.receive_personas', onReceivePersonas],
+        // The recovery file: the circle list sealed to the phrase — the pod-less way back.
+        ['cc-mydata__recovery-export', 'circle.mydata.recovery_export', onExportRecovery],
+        ['cc-mydata__recovery-import', 'circle.mydata.recovery_import', onImportRecovery],
+        // The replace ceremony: after a restore, retire every other device in one act.
+        ['cc-mydata__replace', 'circle.mydata.replace_device', onReplaceDevice],
+        // A companion node of your own: claim it with the line it prints in its log.
+        ['cc-mydata__claim-companion', 'circle.companionClaim.button', onClaimCompanion],
+        // The member's choice of which device others deliver to first (their primary contact address).
+        ['cc-mydata__primary', 'circle.mydata.make_primary', onMakePrimary],
+      ].filter(([, , fn]) => typeof fn === 'function');
+      if (acts.length) {
+        const keys = section(tr('circle.mydata.keys'));
+        for (const [cls, key, fn] of acts) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `cc-mydata__action ${cls}`;
+          b.textContent = tr(key);
+          b.addEventListener('click', () => fn());
+          keys.appendChild(b);
+        }
+        container.appendChild(keys);
       }
-      let count = 0;
-      try { count = (await onPurgeMessages(chosenDays)) ?? 0; } catch { count = 0; }
-      disarm();
-      result.textContent = tr('circle.mydata.cleanup_done', { count });
-    });
-    sec.appendChild(act);
-    sec.appendChild(result);
-
-    const note = document.createElement('p');
-    note.className = 'cc-mydata__retention-note';
-    note.textContent = tr('circle.mydata.cleanup_note');
-    sec.appendChild(note);
-
-    container.appendChild(sec);
-  }
-
-  // ── privacy ────────────────────────────────────────────────────────────────
-  if (Array.isArray(privacy) && privacy.length) {
-    const priv = section(tr('circle.mydata.privacy'));
-    for (const s of privacy) {
-      const item = document.createElement('div');
-      item.className = 'cc-mydata__privacy';
-      const h = document.createElement('div');
-      h.className = 'cc-mydata__privacy-title';
-      h.textContent = s.title ?? '';
-      const b = document.createElement('p');
-      b.className = 'cc-mydata__privacy-body';
-      b.textContent = s.body ?? '';
-      item.appendChild(h);
-      item.appendChild(b);
-      priv.appendChild(item);
-    }
-    container.appendChild(priv);
-  }
-
-  // ── usage ──────────────────────────────────────────────────────────────────
-  const entries = Object.entries(metrics || {});
-  if (entries.length) {
-    const usage = section(tr('circle.mydata.usage'));
-    for (const [k, v] of entries) {
-      usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
-    }
-    container.appendChild(usage);
-  }
-  // ── what you use most (this device only) ─────────────────────────────────────
-  {
-    const sec = section(tr('circle.mydata.frequent'));
-    sec.dataset.section = 'mydata-frequent';
-    const note = document.createElement('p');
-    note.className = 'cc-mydata__note';
-    note.textContent = tr('circle.mydata.frequent_note');
-    sec.appendChild(note);
-    if (Array.isArray(frequent) && frequent.length) {
-      for (const r of frequent) sec.appendChild(kv(r.name, r.items.map((i) => `${i.label} ${i.count}`).join(' · ')));
-      if (typeof onClearFrequent === 'function') {
+    },
+    'storage': () => {
+      // ── where your data lives ─────────────────────────────────────────────────
+      const storage = section(tr('circle.mydata.storage'));
+      const status = podStatus.signedIn
+        ? tr('circle.mydata.pod_signed_in', { webid: podStatus.webid ?? '' })
+        : tr('circle.mydata.pod_local');
+      storage.appendChild(kv(tr('circle.mydata.pod'), status));
+      // With no pod, say what that COSTS — here, where the state is shown, not at the moment someone tries to
+      // leave with their things. A wipe-and-restore walk (2026-08-02) proved the phrase brings back the
+      // identity and no circles; learning that while switching devices is learning it too late to act on.
+      if (!podStatus.signedIn) {
+        const localNote = document.createElement('p');
+        localNote.className = 'cc-mydata__hint';
+        localNote.textContent = tr('circle.mydata.pod_local_consequence');
+        storage.appendChild(localNote);
+      }
+      // Sign in to a real Solid pod (reuses src/web/podAuth.js) — sealed circles then store there.
+      if (!podStatus.signedIn && typeof onSignIn === 'function') {
+        const signIn = document.createElement('button');
+        signIn.type = 'button';
+        signIn.className = 'cc-mydata__signin';
+        signIn.textContent = tr('circle.mydata.pod_sign_in');
+        signIn.addEventListener('click', () => onSignIn());
+        storage.appendChild(signIn);
+      }
+      if (dataLocation.podRoot) storage.appendChild(kv(tr('circle.mydata.pod_root'), dataLocation.podRoot));
+      container.appendChild(storage);
+    },
+    'log-report': () => {
+      if (typeof doors.logReport === 'function') {
+        const sec = section(tr('circle.profile.logReport'));
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'cc-btn cc-btn--quiet cc-mydata__frequent-clear';
-        b.textContent = tr('circle.mydata.frequent_clear');
-        b.addEventListener('click', () => onClearFrequent());
+        b.className = 'cc-settings__row cc-settings__door--log-report';
+        b.textContent = tr('circle.profile.logReport');
+        b.addEventListener('click', () => doors.logReport());
         sec.appendChild(b);
+        container.appendChild(sec);
       }
-    } else {
-      const none = document.createElement('p');
-      none.className = 'cc-mydata__note';
-      none.textContent = tr('circle.mydata.frequent_none');
-      sec.appendChild(none);
-    }
-    container.appendChild(sec);
-  }
-  if (typeof version === 'string') {
-    const v = document.createElement('div');
-    v.className = 'cc-profile__version';
-    v.textContent = versionLine(version, tr);
-    container.appendChild(v);
+    },
+  };
+  container.classList.add('cc-settings-group');
+  for (const id of (Array.isArray(only) ? only : [])) {
+    const before = container.children.length;
+    painters[id]?.();
+    for (let k = before; k < container.children.length; k += 1) container.children[k].dataset.section = id;
   }
   return container;
 

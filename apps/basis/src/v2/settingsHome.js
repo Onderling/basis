@@ -10,20 +10,22 @@ const groupsOf = (manifest) => (Array.isArray(manifest?.settingsGroups) ? manife
 /**
  * @param {object} manifest
  * @returns {{ groups: Array<{id: string, labelKey: string, sections: Array<{id: string, kind: string, custody: boolean, target?: object}>}>,
- *   perCircle: {id: string, labelKey: string, target: object}|null }}
+ *   perCircle: {id: string, labelKey: string, target: object}|null, doors: Array<{id: string, labelKey: string, target: object}> }}
  */
 export function settingsHomeFor(manifest) {
   const groups = [];
   let perCircle = null;
+  const doors = [];   // the other doors at the foot of the home (each an op or a view): feedback
   for (const g of groupsOf(manifest)) {
     if (g?.id === 'per-circle') { perCircle = { id: g.id, labelKey: g.labelKey, target: g.target }; continue; }
+    if (g?.kind === 'door') { doors.push({ id: g.id, labelKey: g.labelKey, target: g.target }); continue; }
     groups.push({
       id: g.id,
       labelKey: g.labelKey,
       sections: (g.sections ?? []).map((s) => ({ id: s.id, kind: s.kind, custody: s.custody === true, ...(s.target ? { target: s.target } : {}) })),
     });
   }
-  return { groups, perCircle };
+  return { groups, perCircle, doors };
 }
 
 /** One group, by id, or null. */
@@ -34,4 +36,14 @@ export function settingsGroupFor(manifest, groupId) {
 /** Every section id declared under the gear: the old My data page paints none of these. */
 export function settingsSectionIds(manifest) {
   return new Set(settingsHomeFor(manifest).groups.flatMap((g) => g.sections.map((s) => s.id)));
+}
+
+/**
+ * The settings group an action from Mij opens: a device row, an agent row and a device offer ("open my data") all land
+ * on Apparaten & sleutels, where devices, agents and the enrol live. Null for an action no group answers.
+ * @param {{kind?: string}|null} action
+ * @returns {string|null}
+ */
+export function settingsGroupForAction(action) {
+  return action?.kind === 'open-my-data' || action?.kind === 'open-mydata' ? 'devices-keys' : null;
 }

@@ -6,6 +6,7 @@
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/persona-switcher.spec.js
  */
 import { test, expect } from '@playwright/test';
+import { createCircleViaWizard } from './helpers.js';
 
 test.setTimeout(120_000);
 
@@ -14,6 +15,8 @@ test('the switcher narrows what the app shows to the ticked selves, and "Alle" b
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  // the default self's own circle (a fresh profile has no tile: the help bot is a contact, not a circle)
+  await createCircleViaWizard(page, 'Switcher Kring');
   const made = await page.evaluate(async () => window.onderlingCall('agents', 'createProfile', { name: 'Werk' }));
   expect(made?.created, JSON.stringify(made)).toBe(true);
   await page.reload();
@@ -21,7 +24,7 @@ test('the switcher narrows what the app shows to the ticked selves, and "Alle" b
 
   await page.locator('[data-tab="circles"]').first().click();
   const tiles = page.locator('.circle-tile');
-  await expect(tiles.first(), 'a fresh profile has its circle').toBeVisible({ timeout: 20_000 });
+  await expect(tiles.first(), 'the default self has its circle').toBeVisible({ timeout: 20_000 });
   const before = await tiles.count();
 
   await page.locator('.cc-header-avatar__button').click();

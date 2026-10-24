@@ -269,6 +269,25 @@ export const basisManifest = {
      * apps/basis-mobile (and a future browser implementation
      * via getUserMedia + jsQR if desired).
      */
+    /**
+     * Feedback about the app: opens the feedback contact's thread (the build's card, seeded into every fresh install)
+     * with "[<screen> · <version>] " prefilled — the person writes and sends it themselves, nothing is collected or
+     * sent on its own. No card in the build: the door says so, honestly, and stays (testers report the gap). Its
+     * doors: `/feedback` in any composer, the "+" sheet, the foot of Instellingen. Its reach is the opener's own thread.
+     */
+    {
+      id:    'feedback', visibility: 'authenticated',
+      verb:  'get',   // it opens a thread and writes nothing
+      params: [
+        { name: 'screen', kind: 'string' },
+      ],
+      surfaces: {
+        slash:  { command: '/feedback' },
+        chat:   { reply: 'text', hint: 'open the thread to Onderling to give feedback about the app; never sends anything itself' },
+        attach: { label: 'circle.feedback.plus', scopes: ['own'] },
+      },
+    },
+
     {
       id:    'scanQr', visibility: 'authenticated',
       group: 'device',
@@ -1146,26 +1165,14 @@ export const basisManifest = {
   ],
 
   /**
-   * Nav-chrome (My data) — the doors at the top of My data: the views Me gave up when it became one declared screen
-   * (2026-10-15). Views no op backs, so `nav` rows (strict validation refuses one that names an op). Both shells paint
-   * them from this declaration (`myDataActionsFor`), each `to` mapped to the view it opens there.
-   */
-  myDataActions: [
-    { id: 'availability',      labelKey: 'circle.profile.availability',     target: { kind: 'nav', to: 'availability' } },
-    { id: 'connection-points', labelKey: 'circle.nearbyScreen.points_open', target: { kind: 'nav', to: 'points' } },
-    { id: 'shared-with-me',    labelKey: 'circle.profile.sharedWithMe',     target: { kind: 'nav', to: 'sharedWithMe' } },
-    { id: 'blocked',           labelKey: 'circle.profile.blocked',          target: { kind: 'nav', to: 'blocked' } },
-    { id: 'log-report',        labelKey: 'circle.profile.logReport',        target: { kind: 'nav', to: 'logReport' } },
-  ],
-
-  /**
    * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
    * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
    * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
    * My data page. Kinds say how a row behaves, so it looks like what it is:
    *   door    — opens another screen (text + →)            switch  — on or off (a real switch)
    *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
-   * `custody: true` marks a section painted behind the custody guard (keys, devices, sign-in) on both shells.
+   * `custody: true` marks a section of the owner's keys, devices or sign-in: its painter reaches only `private` ops, and
+   * only through the waist (the fitness test reads both shells). A step-up before it paints is a later design.
    * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
    */
   settingsGroups: [
@@ -1181,7 +1188,42 @@ export const basisManifest = {
         { id: 'assistant',     kind: 'control' },
       ],
     },
+    {
+      id: 'connection', labelKey: 'circle.settings_home.connection',
+      sections: [
+        { id: 'availability',      kind: 'door', target: { kind: 'nav', to: 'availability' } },
+        { id: 'connection-points', kind: 'door', target: { kind: 'nav', to: 'points' } },
+        { id: 'delivery',          kind: 'control' },
+        { id: 'address-sharing',   kind: 'switch'  },
+        { id: 'relay',             kind: 'control' },
+        { id: 'device-keeps',      kind: 'control' },
+      ],
+    },
+    {
+      id: 'devices-keys', labelKey: 'circle.settings_home.devices_keys',
+      sections: [
+        { id: 'devices',        kind: 'control', custody: true },
+        { id: 'agents',         kind: 'control' },
+        { id: 'connections',    kind: 'control' },
+        { id: 'connection-add', kind: 'control' },
+        { id: 'keys',           kind: 'control', custody: true },
+        { id: 'storage',        kind: 'control', custody: true },
+      ],
+    },
+    {
+      id: 'my-data', labelKey: 'circle.settings_home.my_data',
+      sections: [
+        { id: 'history-mirror',  kind: 'control' },
+        { id: 'message-cleanup', kind: 'control' },
+        { id: 'privacy',         kind: 'fact'    },
+        { id: 'usage',           kind: 'fact'    },
+        { id: 'frequent',        kind: 'control' },
+        { id: 'log-report',      kind: 'door', target: { kind: 'nav', to: 'logReport' } },
+      ],
+    },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
+    // feedback about the app: the feedback op (its thread to Onderling, prefilled), the same act /feedback and the "+" run
+    { id: 'feedback', kind: 'door', labelKey: 'circle.feedback.plus', target: { kind: 'op', opId: 'feedback' } },
   ],
 
   /**

@@ -5,6 +5,8 @@
  * strategy and a p0 circle resolves none (cleartext).
  */
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   initCirclePods, getCircleSealStrategy, setCirclePodSession, getActiveRealPodRouting,
   ensureCirclePod, setCircleKeyEventWiring, recordCircleKeyEvent,
@@ -34,6 +36,19 @@ describe('mobile circlePods', () => {
     expect(strat.open(strat.seal('hoi circle'))).toBe('hoi circle');
   });
 
+  it('an ask before the circle\'s policy is read does not fix its posture: the next ask, with the policy, seals', async () => {
+    // A circle view opens before its policy has loaded (the shell reads it from the store a moment later). That
+    // first ask has no posture; were it kept, the circle would be cleartext for good — no photo in its "+".
+    initCirclePods(mockAsyncStorage());
+    expect(await getCircleSealStrategy('mob-late', null)).toBeNull();
+    const strat = await getCircleSealStrategy('mob-late', { storagePosture: 'p2' });
+    expect(strat, 'the policy\'s posture decides once it is known').toBeTruthy();
+    expect(strat.open(strat.seal('hoi'))).toBe('hoi');
+  });
+  it('the circle view tells "not read yet" (null) from "read, no record" ({}), as web does', () => {
+    const src = readFileSync(fileURLToPath(new URL('../src/screens/v2/CircleLauncherScreen.js', import.meta.url)), 'utf8');
+    expect(src.match(/setSelectedPolicy\(p \?\? \{\}\)/g)?.length).toBe(2);
+  });
   it('p0 circle → null strategy (cleartext, no sealing)', async () => {
     initCirclePods(mockAsyncStorage());
     const strat = await getCircleSealStrategy('mob-p0', { storagePosture: 'p0' });

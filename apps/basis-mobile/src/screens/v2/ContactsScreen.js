@@ -18,11 +18,16 @@ import FaceView from './FaceView.js';
 import { splitShownHidden, loadContactRoster, makeContactNameStore, contactRowMeta } from '../../../../basis/src/v2/contactsSource.js';
 import { addBotToGraph } from '../../../../basis/src/v2/addBot.js';
 import { DEFAULT_PERSONA } from '../../../../basis/src/v2/contactPersona.js';
+import { withHelpContact } from '../../../../basis/src/v2/helpContact.js';
 // L125 — the add sheet: what the new contact sees of you, asked before the card is added (web parity)
 import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.js';
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
+  // the people this device blocks, and the one place a block is undone (web: contactsRoster.js); absent = no door
+  onBlocked = null,
+  // the help circle is on this device: Contacten shows the help bot as one synthetic row (shared `withHelpContact`)
+  helpAvailable = false,
   // the contacts of the selves ticked in the header (shared `contactsInSet`); absent = all
   keep = null }) {
   const theme = useTheme();
@@ -50,9 +55,9 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
   const reload = useCallback(async () => {
     // The one Contacten read (web parity): the graph less aliases and my own addresses, the book, merged, and every
     // contact with a pair roster here named by what they said on it.
-    try { const all = await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill, names: contactNames }); setContacts(typeof keep === 'function' ? keep(all) : all); }
+    try { const all = await loadContactRoster({ peerGraph, agent: bundle?.agent ?? null, callSkill, names: contactNames }); const kept = typeof keep === 'function' ? keep(all) : all; setContacts(withHelpContact(kept, { t, available: helpAvailable })); }
     catch { setContacts([]); }
-  }, [peerGraph, callSkill, contactNames]);
+  }, [peerGraph, callSkill, contactNames, helpAvailable]);
 
   // Load on mount + whenever the graph changes (a bot added/discovered/removed).
   useEffect(() => {
@@ -101,7 +106,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       >
         {/* THE FACE, or this person's own first letter (web parity: contactsRoster's icon slot). A bot keeps
             its glyph — it is not a person and has no face. */}
-        <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} resolvePicture={typeof resolvePictureFor === 'function' ? resolvePictureFor(c) : null} />
+        <FaceView row={c} size={32} fallbackGlyph={c.isBot ? '🤖' : null} resolvePicture={typeof resolvePictureFor === 'function' && !c.synthetic ? resolvePictureFor(c) : null} />
         <View style={styles.body}>
           <Text style={[styles.name, n > 0 && styles.nameUnread]}>
             {c.name}
@@ -117,6 +122,14 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       </Pressable>
     );
   };
+
+  // at the foot of Contacten: the blocked list (someone blocked is not a contact, so an empty roster has it too)
+  const blockedDoor = typeof onBlocked === 'function' ? (
+    <Pressable style={styles.blockedDoor} onPress={onBlocked} accessibilityRole="button" testID="contacts-blocked">
+      <Text style={styles.blockedText}>{t('circle.contacts.blocked')}</Text>
+      <Text style={styles.blockedArrow}>→</Text>
+    </Pressable>
+  ) : null;
 
   return (
     <View style={styles.wrap} testID="contacts-screen">
@@ -157,7 +170,10 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       {error && <Text style={styles.error}>{t(error === 'invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed')}</Text>}
 
       {contacts.length === 0 ? (
-        <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
+        <>
+          <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
+          {blockedDoor}
+        </>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
           {shown.map((c) => rowFor(c))}
@@ -167,6 +183,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
             </Pressable>
           ) : null}
           {foldOpen ? hidden.map((c) => rowFor(c, true)) : null}
+          {blockedDoor}
         </ScrollView>
       )}
     </View>
@@ -174,6 +191,9 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
 }
 
 const makeStyles = (theme, insets) => StyleSheet.create({
+  blockedDoor: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: theme.color.line },
+  blockedText: { fontSize: 15, color: theme.color.ink },
+  blockedArrow: { fontSize: 15, color: theme.color.inkSoft },
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },

@@ -4842,7 +4842,7 @@
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off · /huishouden feedback <link of @naam>|off",
+      "text": "Gebruik: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <aantal> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_announce_none_here": {
@@ -5640,8 +5640,8 @@
       "text": "\"Welke weetjes zijn er\" laat zien wat het huishouden heeft opgeschreven.",
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     },
-    "feedback_handoff": "Feedback over de app gaat naar de makers: {{channel}}. Ik kan mezelf niet veranderen en bewaar het niet — stuur het daarheen.",
-    "feedback_no_channel": "Feedback over de app gaat naar de makers, maar deze bot heeft geen feedbackkanaal. Vraag de beheerder er een in te stellen (/huishouden feedback <link>). Ik kan mezelf niet veranderen en bewaar het niet."
+    "feedback_contact": "Feedback over de app gaat naar Onderling — voeg ze toe als contact en schrijf ze daar: {{link}}. Ik kan mezelf niet veranderen en bewaar of stuur niets door.",
+    "feedback_no_contact": "Feedback over de app gaat naar Onderling, maar deze bot heeft geen contact van ze om te geven. In de app vind je ze onder Instellingen → Feedback. Ik kan mezelf niet veranderen en bewaar niets."
   },
   "op": {
     "admin_only": {
@@ -5977,6 +5977,10 @@
     "add_person": {
       "text": "+ Persoon toevoegen",
       "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
+    },
+    "blocked": {
+      "text": "Geblokkeerd",
+      "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
     }
   },
   "pairedDevices": {
@@ -6262,10 +6266,6 @@
       "text": "Beschikbaarheid →",
       "doc": "S2 — open the availability/quiet-hours screen."
     },
-    "mydata": {
-      "text": "Mijn gegevens →",
-      "doc": "S5 — open the data-location/privacy/usage screen."
-    },
     "sharedWithMe": {
       "text": "Met mij gedeeld →",
       "doc": "Nav label (Mij sub-screen) opening the personal, cross-circle inbox of sealed copies peers shared privately to this device."
@@ -6397,10 +6397,6 @@
     "agent_bot": {
       "text": "bot: {{label}}, aan jou gekoppeld",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
-    },
-    "mydata_more": {
-      "text": "Meer",
-      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
     },
     "edit": {
       "text": "Aanpassen",
@@ -7690,6 +7686,10 @@
     "awaiting_device": {
       "text": "Er wacht een apparaat-aanbod",
       "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_shared": {
+      "text": "Met je gedeeld: {{count}}",
+      "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
     }
   },
   "attach": {
@@ -9934,10 +9934,6 @@
         "text": "Herinneringen",
         "doc": "A setting's label (projected from the parameter register)."
       },
-      "assistant_feedbackChannel": {
-        "text": "Waar feedback heen gaat",
-        "doc": "A setting's label (projected from the parameter register)."
-      },
       "assistant_quietHours": {
         "text": "Stille uren",
         "doc": "A setting's label (projected from the parameter register)."
@@ -10152,6 +10148,15 @@
     "title": "Instellingen",
     "appearance": "Weergave",
     "per_circle": "Per kring",
-    "no_circles": "Je zit nog in geen enkele kring."
+    "no_circles": "Je zit nog in geen enkele kring.",
+    "connection": "Verbinding",
+    "my_data": "Mijn gegevens",
+    "devices_keys": "Apparaten & sleutels"
+  },
+  "feedback": {
+    "plus": {
+      "text": "Feedback geven",
+      "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
+    }
   }
 }

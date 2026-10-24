@@ -23,6 +23,8 @@ export function plusActs({ manifestsByOrigin } = {}) {
   return Object.freeze(attachEntriesFor({ manifestsByOrigin: byOrigin, scope: 'own' }).map((e) => Object.freeze({
     id: `${e.appOrigin}.${e.itemType ?? e.opId}`,
     appOrigin: e.appOrigin, opId: e.opId, noun: e.itemType ?? null,
+    // an act that makes no item names itself (its entry's label): "Feedback geven"
+    ...(e.itemType ? {} : { labelKey: e.label ?? null }),
     fields: Object.freeze((e.fields ?? (e.params ?? []).filter((p) => p.required).map((p) => ({ name: p.name, kind: p.kind === 'date' ? 'datetime' : 'text' })))
       .map((f) => Object.freeze({ ...f }))),
     ...(e.edit ? { edit: e.edit } : {}),
@@ -53,7 +55,13 @@ export function orderedPlusActs(acts = PLUS_ACTS, frequency = null) {
   return [...first, ...acts.filter((a) => !first.includes(a))];
 }
 
-export function plusLabel(t, act) { return t('circle.vandaag.plus_own', { noun: nounWord(t, act.noun) }); }
+export function plusLabel(t, act) {
+  if (!act?.noun && act?.labelKey) return t(act.labelKey);
+  return t('circle.vandaag.plus_own', { noun: nounWord(t, act.noun) });
+}
+
+/** An act that makes no item and asks nothing (feedback: it opens a thread) runs at once — no empty form in between. */
+export const actRunsAtOnce = (act) => Boolean(act) && !act.noun && !(act.fields?.length);
 
 const EMPTY = { error: 'circle.vandaag.plus_empty' };
 
@@ -270,8 +278,10 @@ export function plusLineOutcome(line, { circles = [], acts = PLUS_ACTS, manifest
 export async function plusReadWithModel(line, { ask, acts = PLUS_ACTS } = {}) {
   if (typeof ask !== 'function' || !word(line)) return null;
   let r = null;
-  try { r = await ask(word(line), { scope: OWN_DEVICES_SCOPE, acts: acts.map((a) => ({ actId: a.id, fields: a.fields.map((f) => f.name) })) }); } catch { r = null; }
-  const act = r && acts.find((a) => a.id === r.actId);
+  // only the acts that MAKE something: a line is never read as "open a door" (feedback runs at once, from its button)
+  const makers = acts.filter((a) => !actRunsAtOnce(a));
+  try { r = await ask(word(line), { scope: OWN_DEVICES_SCOPE, acts: makers.map((a) => ({ actId: a.id, fields: a.fields.map((f) => f.name) })) }); } catch { r = null; }
+  const act = r && makers.find((a) => a.id === r.actId);
   if (!act) return null;
   const values = {};
   for (const f of act.fields) if (r.values?.[f.name] != null && word(String(r.values[f.name]))) values[f.name] = word(String(r.values[f.name]));

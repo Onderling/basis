@@ -63,6 +63,6 @@ describe('a noun is named by its manifest', () => {
 
   it('the "+" says what it makes in the declaring manifest\'s word', () => {
     const t = (key, o = {}) => (key === 'circle.vandaag.plus_own' ? `Eigen ${o.noun}` : tFrom(nounWords().nl)(key, o));
-    expect(PLUS_ACTS.map((a) => plusLabel(t, a))).toEqual(['Eigen notitie', 'Eigen afspraak']);
+    expect(PLUS_ACTS.filter((a) => a.noun).map((a) => plusLabel(t, a))).toEqual(['Eigen notitie', 'Eigen afspraak']);
   });
 });

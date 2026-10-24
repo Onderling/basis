@@ -1,7 +1,7 @@
 /**
  * One owner per skill among the in-process agents: no skill id is registered by two of them.
  *
- * The in-process agents (host, tasks, pinboard; household and folio register on the host) register skills by name; when two register the same
+ * The in-process agents (host, pinboard; household, folio and tasks register on the host) register skills by name; when two register the same
  * id, which one a call reaches is decided by registration order, and folding the agents into one would overwrite one
  * silently. Since the one-owner-per-op fold none is, and none may be added. (The manifest-level rule
  * is scripts/lint-op-owners.mjs; this covers the runtime registrations, which include ops no manifest declares.)

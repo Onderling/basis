@@ -125,3 +125,16 @@ describe('unread on Contacten (2026-09-21)', () => {
     expect(el.querySelector('.cc-contacts__row[data-contact-id="cas"] .cc-contacts__unread')).toBeNull();
   });
 });
+
+describe('Contacten — the blocked list is a door at its foot (it was on My data)', () => {
+  it('a "Geblokkeerd" door when the host wires it; none without', async () => {
+    const { renderContactsRoster: render } = await import('../web/v2/contactsRoster.js');
+    const onBlocked = vi.fn();
+    const el = render(document.createElement('div'), { contacts: [], t: (k) => k, onOpen: () => {}, onBlocked });
+    const door = el.querySelector('.cc-contacts__blocked');
+    expect(door.textContent).toBe('circle.contacts.blocked');
+    door.click();
+    expect(onBlocked).toHaveBeenCalled();
+    expect(render(document.createElement('div'), { contacts: [], t: (k) => k, onOpen: () => {} }).querySelector('.cc-contacts__blocked')).toBeNull();
+  });
+});

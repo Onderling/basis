@@ -12,7 +12,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden, contactRowMeta } from '../../src/v2/contactsSource.js';
 import { paintFace } from './faceView.js';
 
-export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null, onBlocked = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -43,12 +43,24 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
 
   // Hidden contacts (L106) fold away at the bottom: the row stays, out of sight, until they write again or
   // the person shows them. A list of only hidden contacts is not empty — the fold says what is there.
+  // the people this device blocks, and the one place a block is undone: a door at the foot of Contacten (an empty
+  // roster has one too — someone blocked is not a contact)
+  const blockedDoor = () => {
+    if (typeof onBlocked !== 'function') return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cc-settings__row cc-contacts__blocked';
+    b.textContent = tr('circle.contacts.blocked');
+    b.addEventListener('click', () => onBlocked());
+    container.appendChild(b);
+  };
   const { shown, hidden } = splitShownHidden(contacts);
   if (!contacts.length) {
     const empty = document.createElement('p');
     empty.className = 'cc-contacts__empty';
     empty.textContent = tr('circle.contacts.empty');
     container.appendChild(empty);
+    blockedDoor();
     return container;
   }
 
@@ -58,11 +70,14 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     li.dataset.contactId = c.contactId;
     if (!c.reachable) li.classList.add('is-offline');
     if (c.hidden) li.classList.add('is-hidden');
+    // the help bot's row (shared `withHelpContact`): no pair roster behind it, so no face to fetch and no thread —
+    // its tap opens the help circle, the host decides that through the shared `contactOpenTarget`
+    if (c.synthetic) li.dataset.synthetic = 'true';
 
     // THE FACE, or this person's own first letter. A bot keeps its glyph: it is not a person and has no face.
     const icon = document.createElement('span');
     icon.className = 'cc-contacts__icon';
-    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null, resolvePicture: typeof resolvePictureFor === 'function' ? resolvePictureFor(c) : null });
+    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null, resolvePicture: typeof resolvePictureFor === 'function' && !c.synthetic ? resolvePictureFor(c) : null });
     li.appendChild(icon);
 
     const body = document.createElement('div');
@@ -137,5 +152,6 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     container.appendChild(fold);
     container.appendChild(folded);
   }
+  blockedDoor();
   return container;
 }

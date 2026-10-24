@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const SRC = readFileSync(fileURLToPath(new URL('../src/screens/v2/CircleMyDataScreen.js', import.meta.url)), 'utf8');
 const titles = (text) => [...text.matchAll(/<Section title=\{t\('([^']+)'\)\}/g)].map((m) => m[1]);
 
-/** Each section id the Weergave group declares, and the one title its painter opens. */
+/** Each section id a group declares (Weergave, Verbinding, Apparaten & sleutels, Mijn gegevens), and the one title its painter opens. */
 const OWN_TITLE = {
   'theme': 'circle.mydata.theme',
   'language': 'circle.mydata.language',
@@ -23,6 +23,24 @@ const OWN_TITLE = {
   'week-overview': 'circle.profile.week_switch',
   'notifications': 'circle.mydata.notifications',
   'assistant': 'circle.userLlm.title',
+  'availability': 'circle.profile.availability',
+  'connection-points': 'circle.nearbyScreen.points_open',
+  'delivery': 'circle.nearbyScreen.delivery_section',
+  'address-sharing': 'circle.mydata.address_sharing',
+  'relay': 'circle.mydata.relay',
+  'device-keeps': 'circle.mydata.sync',
+  'history-mirror': 'circle.mydata.history',
+  'message-cleanup': 'circle.mydata.cleanup',
+  'privacy': 'circle.mydata.privacy',
+  'usage': 'circle.mydata.usage',
+  'frequent': 'circle.mydata.frequent',
+  'log-report': 'circle.profile.logReport',
+  'devices': 'circle.mydata.devices',
+  'agents': 'circle.companionGrant.nodes',
+  'connections': 'circle.mydata.connections',
+  'connection-add': 'circle.mydata.connection_add',
+  'keys': 'circle.mydata.keys',
+  'storage': 'circle.mydata.storage',
 };
 
 const painterBodies = () => {
@@ -38,13 +56,36 @@ describe('mobile settings painters', () => {
     for (const [id, title] of Object.entries(OWN_TITLE)) expect(titles(bodies[id] ?? ''), id).toEqual([title]);
   });
 
-  it('the old My data page keeps every other section, in its order', () => {
-    const page = SRC.slice(SRC.indexOf('  return (\n    <ScrollView style={styles.wrap}'));
-    expect(titles(page)).toEqual([
-      'circle.profile.mydata_more', 'circle.mydata.storage', 'circle.mydata.keys', 'circle.mydata.devices',
-      'circle.companionGrant.nodes', 'circle.mydata.connections', 'circle.mydata.connection_add', 'circle.mydata.sync',
-      'circle.mydata.address_sharing', 'circle.mydata.cleanup', 'circle.mydata.history', 'circle.mydata.privacy',
-      'circle.mydata.frequent', 'circle.mydata.usage',
-    ]);
+  it('the wizards a section opens are mounted on the group screen too (the keys painter opens backup, restore, enrol)', () => {
+    const at = SRC.indexOf('testID="circle-settings-group"');
+    const group = SRC.slice(at, SRC.indexOf('</ScrollView>', at));
+    expect(group).toMatch(/\{overlays\}/);
+    expect(SRC.slice(SRC.indexOf('const overlays = ('), SRC.indexOf('if (Array.isArray(only))'))).toMatch(/EncryptedBackupWizardModal[\s\S]*EnrollDeviceModal[\s\S]*mydata-mnemonic-reveal/);
+  });
+
+  it('there is no old My data page: the screen paints a settings group, and nothing outside one', () => {
+    expect(SRC).not.toMatch(/testID="circle-mydata"/);
+    expect(SRC.match(/testID="circle-settings-group"/g)?.length).toBe(1);
+    expect(SRC).not.toMatch(/myDataActionsMobile/);
+  });
+});
+
+describe('the two moves out of My data, on mobile (web: contactsRoster.js, the awaiting chip)', () => {
+  const read = (name) => readFileSync(fileURLToPath(new URL(`../src/screens/v2/${name}`, import.meta.url)), 'utf8');
+  it('Contacten has the blocked door, also on an empty roster; the launcher opens the blocked list from it', () => {
+    const contacts = read('ContactsScreen.js');
+    expect(contacts).toMatch(/onBlocked = null/);
+    expect(contacts.match(/\{blockedDoor\}/g)?.length).toBe(2);   // the empty roster and the list both
+    expect(read('CircleLauncherScreen.js')).toMatch(/onBlocked=\{\(\) => setView\('blocked'\)\}/);
+  });
+  it('Mij opens Apparaten & sleutels for its device and agent rows, through the shared settingsGroupForAction', () => {
+    expect(read('CircleProfileScreen.js')).toMatch(/else if \(settingsGroupForAction\(a\)\)/);
+    expect(read('CircleLauncherScreen.js')).toMatch(/onSettingsGroup=\{\(id\) => \{ setSettingsGroupId\(id\); setView\('settingsGroup'\); \}\}/);
+  });
+  it('Mij opens shared-with-me from its chip, with the count handed in as a source', () => {
+    const profile = read('CircleProfileScreen.js');
+    expect(profile).toMatch(/a\?\.kind === 'open-shared-with-me'\) onSharedWithMe\?\.\(\)/);
+    expect(profile).toMatch(/sharedWithMeCount: sources\.sharedWithMeCount/);
+    expect(read('CircleLauncherScreen.js')).toMatch(/sharedWithMeCount: async \(\) =>/);
   });
 });

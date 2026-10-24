@@ -119,6 +119,7 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
   exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
+- **Read the decisions before you change a behaviour.** Before changing how a feature reads, writes or decides, grep `docs/decisions.md` for it; a decision there binds until Frits reverses it in the same file. A claim that something is absent or undesigned names what was read (the catalogue page, the manifests, `plans/` incl. `archive/`).
 - **Log your OWN judgement calls as you make them — dated rule, review on 2026-08-13.** Any choice made
   without Frits goes into `plans/DECISIONS-FOR-REVIEW.md` **in the same turn as the change**, colour-coded
   (🟢 · 🟡 · 🔴), stating **the risk you are taking** and **how to undo it**. Not a batch at the end — the
@@ -240,6 +241,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   the PR; the CI gate (~8 min) gates the merge; the browser tail runs AFTER the merge and gates the *release*;
   `npm run release:check` says whether it passed on the bytes about to ship. A shell/transport/box change never
   skips rung 2 — [`verification-ladder.md`](docs/conventions/verification-ladder.md).
+- **Live-LLM tests run only with `LIVE_LLM=1` and never on a machine holding the production key.** A key file
+  on disk is not consent to spend its quota: one eval batch once used up the month and took the live bot down.
 - **Branch per feature; the trunk moves by MERGE.** `development` is the trunk (the repo default since
   2026-09-04) and `live` will be the release branch: never commit straight onto either — `git switch -c
   feat/<what>`, land it green, merge back. Enforced twice: `.githooks/pre-commit` refuses the commit (run

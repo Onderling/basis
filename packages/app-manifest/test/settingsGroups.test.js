@@ -55,4 +55,11 @@ describe('settingsGroups', () => {
     const m = good(); m.settingsGroups[1].target = { kind: 'nav', to: 'somewhereElse' };
     expect(errorsAt(m).some((e) => /circleSettingsChooser/.test(e.message))).toBe(true);
   });
+  it('another door at the foot of the home names an op of this manifest (feedback) — an unknown op is refused', () => {
+    const m = good(); m.settingsGroups.push({ id: 'feedback', kind: 'door', labelKey: 'a.feedback', target: { kind: 'op', opId: 'me' } });
+    expect(errorsAt(m)).toEqual([]);
+    m.settingsGroups[2].target = { kind: 'op', opId: 'nope' };
+    // strict, as for a tab: the op the door dispatches must resolve in the manifest
+    expect((validateManifest(m, { strict: true }).errors ?? []).some((e) => e.path === '/settingsGroups/2/target/opId')).toBe(true);
+  });
 });

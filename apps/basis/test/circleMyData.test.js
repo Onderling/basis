@@ -7,23 +7,26 @@ import { settingsGroupFor } from '../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../manifest.js';
 // the Weergave group's sections live on its own screen (under the gear), not the old My data page
 const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
+const CONNECTION = settingsGroupFor(settingsManifest, 'connection').sections.map((x) => x.id);
+const DEVICES_KEYS = settingsGroupFor(settingsManifest, 'devices-keys').sections.map((x) => x.id);
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
+
 describe('renderCircleMyData', () => {
-  it('shows the pod-local status + relay when not signed in', () => {
-    const el = renderCircleMyData(document.createElement('div'), {
-      t, podStatus: { signedIn: false },
-      dataLocation: { relayOperator: 'Onderling', relayUrl: 'wss://relay.example' },
-    });
-    const kvs = [...el.querySelectorAll('.cc-mydata__kv')].map((r) => r.querySelector('.cc-mydata__v').textContent);
-    expect(kvs).toContain('circle.mydata.pod_local');
-    expect(kvs.some((v) => v.includes('Onderling') && v.includes('wss://relay.example'))).toBe(true);
+  it('shows the pod-local status when not signed in; the relay is on the Verbinding screen, not here', () => {
+    const props = { t, podStatus: { signedIn: false }, dataLocation: { relayOperator: 'Onderling', relayUrl: 'wss://relay.example' } };
+    const kvsOf = (el) => [...el.querySelectorAll('.cc-mydata__kv')].map((r) => r.querySelector('.cc-mydata__v').textContent);
+    const old = kvsOf(renderCircleMyData(document.createElement('div'), { ...props, only: DEVICES_KEYS }));
+    expect(old).toContain('circle.mydata.pod_local');
+    expect(old.some((v) => v.includes('wss://relay.example'))).toBe(false);
+    const connection = kvsOf(renderCircleMyData(document.createElement('div'), { ...props, only: CONNECTION }));
+    expect(connection.some((v) => v.includes('Onderling') && v.includes('wss://relay.example'))).toBe(true);
   });
 
   it('shows a sign-in button when local-only + wires it to onSignIn', () => {
     const onSignIn = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), { t, podStatus: { signedIn: false }, onSignIn });
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t, podStatus: { signedIn: false }, onSignIn });
     const btn = el.querySelector('.cc-mydata__signin');
     expect(btn).toBeTruthy();
     expect(btn.textContent).toBe('circle.mydata.pod_sign_in');
@@ -39,7 +42,7 @@ describe('renderCircleMyData', () => {
   });
 
   it('shows pod root + signed-in status when on a pod', () => {
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, podStatus: { signedIn: true, webid: 'https://me.pod/profile' },
       dataLocation: { podRoot: 'https://me.pod/' },
     });
@@ -50,7 +53,7 @@ describe('renderCircleMyData', () => {
 
   it('lists privacy sections + usage metrics', () => {
     const el = renderCircleMyData(document.createElement('div'), {
-      t,
+      t, only: ['privacy', 'usage'],   // Mijn gegevens, under the gear
       privacy: [{ title: 'Encryption', body: 'Messages are sealed before they leave the device.' }],
       metrics: { posts: 4, claims: 1 },
     });
@@ -62,11 +65,11 @@ describe('renderCircleMyData', () => {
   });
 
   it('renders the key-management actions only when their callbacks are wired', () => {
-    const bare = renderCircleMyData(document.createElement('div'), { t, podStatus: { signedIn: true } });
+    const bare = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t, podStatus: { signedIn: true } });
     expect(bare.querySelector('.cc-mydata__action')).toBeNull();
 
     const onBackup = vi.fn(); const onViewMnemonic = vi.fn(); const onRestore = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, podStatus: { signedIn: true }, onBackup, onViewMnemonic, onRestore,
     });
     el.querySelector('.cc-mydata__backup').click();
@@ -79,7 +82,7 @@ describe('renderCircleMyData', () => {
 
   it('add-a-device: the enroll action renders when wired and fires its callback', () => {
     const onEnroll = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, podStatus: { signedIn: true }, onEnroll,
     });
     el.querySelector('.cc-mydata__enroll').click();
@@ -88,7 +91,7 @@ describe('renderCircleMyData', () => {
 
   it('devices: live rows get a revoke door, tombstones render struck without one', () => {
     const onRevokeDevice = vi.fn();
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, podStatus: { signedIn: true }, onRevokeDevice,
       devices: [
         { deviceId: 'dev-1', label: 'telefoon', revoked: false },
@@ -105,7 +108,7 @@ describe('renderCircleMyData', () => {
 
   it('devices: a device without the recovery seal says how to get it (its own data reaches no other device until then)', () => {
     const base = { t, podStatus: { signedIn: true }, onRevokeDevice: vi.fn(), devices: [{ deviceId: 'dev-1', label: 'telefoon', revoked: false }] };
-    const without = renderCircleMyData(document.createElement('div'), { ...base, devicesNeedPhrase: true });
+    const without = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, ...base, devicesNeedPhrase: true });
     expect(without.querySelector('[data-role="devices-needs-phrase"]')?.textContent).toBe('circle.mydata.devices_needs_phrase');
     const withSeal = renderCircleMyData(document.createElement('div'), base);
     expect(withSeal.querySelector('[data-role="devices-needs-phrase"]')).toBe(null);
@@ -114,7 +117,7 @@ describe('renderCircleMyData', () => {
   it('the history-mirror row: state line reflects off/on/error; the toggle fires the flip', () => {
     const onToggleHistoryMirror = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {
-      t, historyMirror: { enabled: false, status: null }, onToggleHistoryMirror,
+      t, only: ['history-mirror'], historyMirror: { enabled: false, status: null }, onToggleHistoryMirror,
     });
     expect(off.querySelector('[data-role="history-status"]').textContent).toBe('circle.mydata.history_off');
     const btn = off.querySelector('.cc-mydata__history-toggle');
@@ -123,19 +126,19 @@ describe('renderCircleMyData', () => {
     expect(onToggleHistoryMirror).toHaveBeenCalled();
 
     const on = renderCircleMyData(document.createElement('div'), {
-      t, historyMirror: { enabled: true, status: { mirrored: 12, pending: 2, lastError: null } }, onToggleHistoryMirror,
+      t, only: ['history-mirror'], historyMirror: { enabled: true, status: { mirrored: 12, pending: 2, lastError: null } }, onToggleHistoryMirror,
     });
     expect(on.querySelector('[data-role="history-status"]').textContent).toContain('circle.mydata.history_on');
     expect(on.querySelector('[data-role="history-status"]').textContent).toContain('14');   // mirrored + pending
     expect(on.querySelector('.cc-mydata__history-toggle').textContent).toBe('circle.mydata.history_disable');
 
     const err = renderCircleMyData(document.createElement('div'), {
-      t, historyMirror: { enabled: true, status: { mirrored: 3, lastError: 'pod weg' } }, onToggleHistoryMirror,
+      t, only: ['history-mirror'], historyMirror: { enabled: true, status: { mirrored: 3, lastError: 'pod weg' } }, onToggleHistoryMirror,
     });
     expect(err.querySelector('[data-role="history-status"]').textContent).toContain('circle.mydata.history_error');
 
     // absent prop → no section (unchanged surface for hosts that don't pass it)
-    const none = renderCircleMyData(document.createElement('div'), { t });
+    const none = renderCircleMyData(document.createElement('div'), { t, only: ['history-mirror'] });
     expect(none.querySelector('[data-role="history-status"]')).toBe(null);
   });
 
@@ -218,7 +221,7 @@ describe('renderCircleMyData', () => {
 
   it('my agents: a row per owned node; giving access asks the node, picks who, ticks what, and says how it ended', async () => {
     const opened = []; const granted = [];
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }],
       onOpenCompanionGrant: async (node) => { opened.push(node); return { ok: true, targets: [{ key: 'B'.repeat(43), label: 'Huishoudbot' }], choices: [{ id: 'agenda-files', label: 'agenda-bestanden plaatsen' }] }; },
       onGrantCompanion: async (args) => { granted.push(args); return 'gegeven'; },
@@ -240,7 +243,7 @@ describe('renderCircleMyData', () => {
   });
 
   it('my agents: a node that cannot be asked says why; no one to grant to says how to add the bot', async () => {
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, companions: [{ node: 'N'.repeat(43), short: 'a' }, { node: 'M'.repeat(43), short: 'b' }],
       onOpenCompanionGrant: async (node) => (node.startsWith('N') ? { ok: false, message: 'antwoordt niet' } : { ok: true, targets: [], choices: [] }),
       onGrantCompanion: async () => '',
@@ -250,13 +253,13 @@ describe('renderCircleMyData', () => {
     await new Promise((r) => { setTimeout(r, 0); });
     const notes = [...el.querySelectorAll('.cc-mydata__companion-note')].map((n) => n.textContent);
     expect(notes).toEqual(['antwoordt niet', 'circle.companionGrant.to_none']);
-    expect(renderCircleMyData(document.createElement('div'), { t }).querySelector('.cc-mydata__companion')).toBeNull();
+    expect(renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t }).querySelector('.cc-mydata__companion')).toBeNull();
   });
 
   it('my agents: one line per agent the node granted — what it may, and "intrekken", which revokes and reads again', async () => {
     let held = [{ to: 'B'.repeat(43), label: 'Huishoudbot', may: 'mag: agenda-bestanden plaatsen' }];
     const revoked = [];
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, companions: [{ node: 'N'.repeat(43), short: 'NNNNNNNN…' }],
       onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }),
       onGrantCompanion: async () => '',
@@ -275,12 +278,12 @@ describe('renderCircleMyData', () => {
   });
 
   it('my agents: while revokes are on their way, the section says so', () => {
-    const el = renderCircleMyData(document.createElement('div'), {
+    const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, companions: [{ node: 'N'.repeat(43), short: 'a' }], companionsPending: 'onderweg bij 1',
       onOpenCompanionGrant: async () => ({ ok: true, targets: [], choices: [] }), onGrantCompanion: async () => '',
     });
     expect(el.querySelector('.cc-mydata__companion-pending').textContent).toBe('onderweg bij 1');
-    const none = renderCircleMyData(document.createElement('div'), {
+    const none = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
       t, companions: [{ node: 'N'.repeat(43), short: 'a' }], onOpenCompanionGrant: async () => ({}), onGrantCompanion: async () => '',
     });
     expect(none.querySelector('.cc-mydata__companion-pending')).toBeNull();

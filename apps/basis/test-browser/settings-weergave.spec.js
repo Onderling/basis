@@ -1,7 +1,7 @@
 /**
  * THE GEAR ON MIJ (2026-10-23). Mij's header has a gear: Instellingen. Its home lists the declared groups and then
  * "Per kring"; Weergave holds the theme, the language, where the app opens, how the bot shows actions, the week
- * overview (a real switch), notifications and the assistant — and the old My data page no longer shows any of them.
+ * overview (a real switch), notifications and the assistant — and Mij has no door to an old My data page.
  * "Per kring" lists the person's circles, each opening that circle's own settings.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/settings-weergave.spec.js
@@ -39,12 +39,11 @@ test('the gear opens Instellingen; Weergave holds the appearance settings, Per k
   await page.locator('.cc-settings__per-circle').click();
   await expect(page.locator('.cc-settings__circle, .cc-settings__fact').first()).toBeVisible({ timeout: 15_000 });
 
-  // back, back: the home, then Mij — and the old My data page no longer paints the appearance sections
+  // back, back: the home, then Mij — which has no door to an old My data page
   await page.locator('.cc-mydata__back').first().click();
   await expect(page.locator('.cc-settings__per-circle')).toBeVisible({ timeout: 15_000 });
   await page.locator('.cc-mydata__back').first().click();
-  await page.locator('.cc-profile__mydata').first().click();
-  await expect(page.locator('.cc-mydata__title')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.cc-mydata .cc-mydata__theme-toggle'), 'no theme on the old page').toHaveCount(0);
+  await expect(page.locator('.cc-profile__gear')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.cc-profile__mydata'), 'Mij has no My data door: the gear is the one way in').toHaveCount(0);
   expect(errs).toEqual([]);
 });

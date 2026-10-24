@@ -7029,6 +7029,7 @@ snapshots:
       '@onderling/logger': link:../../packages/logger
       '@onderling/manifest-host': link:../../packages/manifest-host
       '@onderling/notifier': link:../../packages/notifier
+      '@onderling/notify-envelope': link:../../packages/notify-envelope
       '@onderling/oidc-session': link:../../packages/oidc-session
       '@onderling/online-cadence': link:../../packages/online-cadence
       '@onderling/pod-client': link:../../packages/pod-client
@@ -7040,6 +7041,7 @@ snapshots:
       '@onderling/redaction': link:../../packages/redaction
       '@onderling/sdk': link:../../packages/sdk
       '@onderling/secure-agent': link:../../packages/secure-agent
+      '@onderling/substrate-stack': link:../../packages/substrate-stack
       '@onderling/sync-engine': link:../../packages/sync-engine
       '@onderling/vault': link:../../packages/vault
       '@onderling/web-adapter': link:../../packages/web-adapter

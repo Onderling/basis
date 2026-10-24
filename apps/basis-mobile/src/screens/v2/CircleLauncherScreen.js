@@ -290,6 +290,7 @@ import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
+import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpContact.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
 import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
@@ -595,6 +596,9 @@ export default function CircleLauncherScreen({
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
+  // the screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name
+  const feedbackScreenRef = useRef(null);
+  feedbackScreenRef.current = () => ({ inCircle: view === 'detail', screen: view, settingsGroup: settingsGroupId });
   // The member's saved assistant endpoint config (settings → My data). Persisted to AsyncStorage;
   // CircleDetail re-reads it on mount, so a save applies the next time a circle opens.
   const [userLlmCfg, setUserLlmCfg] = useState({});
@@ -718,6 +722,16 @@ export default function CircleLauncherScreen({
   }, [bundle, contactSeen]);
   useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
   useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
+  // the feedback door: the contact's row (the one Contacten paints), its thread opened with the draft in the composer
+  const openFeedbackThread = useCallback(async (webid, draft) => {
+    let row = null;
+    try {
+      const rows = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames });
+      row = rows.find((c) => c.contactId === webid) ?? null;
+    } catch { row = null; }
+    setContactThread({ ...(row ?? { contactId: webid }), draft });
+    setView('contacten');
+  }, [bundle, contactNames]);
   const openContactThread = useCallback((contact) => {
     setContactThread(contact);
     // opening the thread is reading it — the seen-mark moves to now, the badge is gone
@@ -859,7 +873,7 @@ export default function CircleLauncherScreen({
     if (!selected?.id) { setSelectedPolicy(null); return; }
     let p = null;
     try { p = await policyStore.get(selected.id); } catch { /* defaults */ }
-    setSelectedPolicy(p);
+    setSelectedPolicy(p ?? {});   // read: {} when the circle has no record (web parity) — null means not read yet
   }, [selected, policyStore]);
   useEffect(() => {
     if (!selected?.id) { setSelectedPolicy(null); return; }
@@ -868,7 +882,7 @@ export default function CircleLauncherScreen({
       let p = null; let o = null;
       try { p = await policyStore.get(selected.id); } catch { /* defaults */ }
       try { o = await overrideStore.get(selected.id); } catch { /* defaults */ }
-      if (alive) { setSelectedPolicy(p); setSelectedOverride(o); }
+      if (alive) { setSelectedPolicy(p ?? {}); setSelectedOverride(o); }   // {} = read, no record; null = not read yet
     })();
     return () => { alive = false; };
   }, [selected, policyStore, overrideStore]);
@@ -1016,6 +1030,11 @@ export default function CircleLauncherScreen({
       // The camera IS this platform's answer for `scanQr`; the modal's own parser decides what a code
       // means. An invite routes into the join wizard, as a scan from anywhere else on this screen does.
       openQrScanner: () => setJoinScanOpen(true),
+      // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
+      openFeedback: ({ webid, draft }) => { openFeedbackThread(webid, draft).catch(() => {}); },
+      feedbackCard: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD ?? null,
+      appVersion: Constants.expoConfig?.extra?.appVersion ?? '',
+      currentScreen: () => feedbackScreenRef.current?.() ?? null,
       // the person's clock shows them a card (their week): this platform's alert, until they close it
       showPersonCard: (card) => Alert.alert(card.title, [...(card.lines?.length ? card.lines : [t('circle.profile.planned_none')]), '', card.note].join('\n'), [{ text: t('circle.profile.week_card_close') }]),
     }));
@@ -1043,6 +1062,8 @@ export default function CircleLauncherScreen({
     // "wat wacht op jou": the votes open in each circle (the same fold the tile badge reads), a device offer here
     openProposals: (cid) => (govPolicyRef.current ? openPolicyProposals(govPolicyRef.current, cid) : Promise.resolve({ proposals: [] })),
     pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
+    // what was shared with the person: a chip on Mij (once a door on My data)
+    sharedWithMeCount: async () => ((await bundle?.sharedWithMeStore?.list?.()) ?? []).length,
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
     // the phone's own name, for "this device" when the person never named it
@@ -1143,7 +1164,7 @@ export default function CircleLauncherScreen({
     await refreshSights();
   }, [bundle, refreshSights]);
   const kringOn = useCallback((id) => makeSyncSelection({ getParamValue: (k) => bundle?.agent?.getParamValue?.(k) }).kringOn(id), [bundle]);
-  const bySight = useMemo(() => splitBySight(circlesShown, { sights, kringOn }), [circlesShown, sights, kringOn]);
+  const bySight = useMemo(() => splitBySight(tileCircles(circlesShown), { sights, kringOn }), [circlesShown, sights, kringOn]);
   const [menuCircle, setMenuCircle] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -1718,12 +1739,15 @@ export default function CircleLauncherScreen({
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
       // Hop screen lives under the Mij tab.
       if (view === 'hop') { setView('availability'); return true; }
-      if (view === 'blocked') { setView('mydata'); return true; }
-      if (view === 'logReport') { setView('mydata'); return true; }
+      if (view === 'blocked') { setView('contacten'); return true; }
+      if (view === 'logReport') { setSettingsGroupId('my-data'); setView('settingsGroup'); return true; }
       if (view === 'shareContact') { setView('profile'); return true; }
-      // Mij's sub-views; availability, blocked and shared-with-me sit behind My data.
-      if (view === 'availability' || view === 'sharedWithMe') { setView('mydata'); return true; }
-      if (view === 'mydata') { setView('profile'); return true; }
+      // shared-with-me opens from Mij's chip; availability from the Verbinding settings (blocked from Contacten, above)
+      if (view === 'sharedWithMe') { setView('profile'); return true; }
+      if (view === 'availability' || view === 'points') { setSettingsGroupId('connection'); setView('settingsGroup'); return true; }
+      // the person's settings behind the gear: a group → the home → Mij; the circle chooser → the home
+      if (view === 'settingsGroup' || view === 'settingsCircles') { setView('settingsHome'); return true; }
+      if (view === 'settingsHome') { setView('profile'); return true; }
       if (view === 'advanced') { setView('profile'); return true; }
       // S3 — admin panel is a sub-view of the circle detail.
       if (selected && view === 'admin') { setView('detail'); return true; }
@@ -2022,6 +2046,12 @@ export default function CircleLauncherScreen({
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
   const plusSheet = (
       <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)}
+        // an act that makes nothing and asks nothing (feedback) runs at once — the sheet closes, the op opens its thread
+        onRunAct={(a) => {
+          setPlusOpen(false);
+          Promise.resolve(bundle?.callSkill?.(a.appOrigin, a.opId, { screen: t('circle.vandaag.plus') }))
+            .then((r) => { if (r?.error) Alert.alert('', String(r.error)); }).catch(() => {});
+        }}
         pinned={pinnedView} pinnedActIds={pinsOf(screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId)}
         onTogglePin={(actId) => { const own = { kind: 'own', actId }; const on = pinsOf(screensBook ?? {}).some((p) => pinKey(p) === pinKey(own)); runScreenOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own); }}
         onUnpin={(key) => runScreenOp('screen-unpin', { key })}
@@ -2167,7 +2197,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2180,7 +2210,7 @@ export default function CircleLauncherScreen({
   if (view === 'blocked') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('mydata')} />
+        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('contacten')} />
       </WithTabBar>
     );
   }
@@ -2188,7 +2218,7 @@ export default function CircleLauncherScreen({
   if (view === 'logReport') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <LogReportScreen onBack={() => setView('mydata')} />
+        <LogReportScreen onBack={() => { setSettingsGroupId('my-data'); setView('settingsGroup'); }} />
       </WithTabBar>
     );
   }
@@ -2221,7 +2251,7 @@ export default function CircleLauncherScreen({
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
-          onBack={() => setView('mydata')}
+          onBack={() => setView('profile')}
         />
       </WithTabBar>
     );
@@ -2233,21 +2263,19 @@ export default function CircleLauncherScreen({
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
           personClock={personClockRef.current} {...extra} />
   );
-  // S5 — "My data": data-location + privacy + usage (read-only); sub-view of Mij.
-  if (view === 'mydata') {
-    return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        {myDataScreen()}
-      </WithTabBar>
-    );
-  }
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <SettingsHomeScreen onBack={() => setView('profile')}
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
-          onOpenPerCircle={() => setView('settingsCircles')} />
+          onOpenPerCircle={() => setView('settingsCircles')}
+          onOpenDoor={(d) => {
+            if (d?.target?.kind !== 'op') return;
+            // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
+            Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))
+              .then((r) => { if (r?.error) Alert.alert('', String(r.error)); }).catch(() => {});
+          }} />
       </WithTabBar>
     );
   }
@@ -2272,7 +2300,7 @@ export default function CircleLauncherScreen({
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleAvailabilityScreen
           store={availabilityStore}
-          onBack={() => setView('mydata')}
+          onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
           onHop={() => setView('hop')}
         />
       </WithTabBar>
@@ -2287,6 +2315,7 @@ export default function CircleLauncherScreen({
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
+            draft={contactThread?.draft ?? ''}
             resolvePicture={circlePictureResolver(contactThread?.pairCircleId)}
             onBack={() => setContactThread(null)}
             onRead={() => contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {})}
@@ -2296,8 +2325,11 @@ export default function CircleLauncherScreen({
     }
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
-          onAddPerson={() => onMeAction('scan')}
+        <ContactsScreen bundle={bundle} unread={contactUnread}
+          helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
+          onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
+          resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
+          onAddPerson={() => onMeAction('scan')} onBlocked={() => setView('blocked')}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>
     );
@@ -2420,7 +2452,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'points') {
     // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
-    return <ConnectionPointsHost bundle={bundle} onBack={() => setView('mydata')} />;
+    return <ConnectionPointsHost bundle={bundle} onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }} />;
   }
   if (view === 'nearby') {
     // Nearby screen. Driven by `createNearbyScreen` (shared with web), fed from the SURFACE — the

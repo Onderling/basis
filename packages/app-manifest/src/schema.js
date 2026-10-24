@@ -1,6 +1,6 @@
 /**
  * Schema for @onderling/app-manifest.  JSDoc typedefs only — no runtime
- * (per repo convention; cf. apps/household/src/types.js).  Importing this
+ * (per repo convention; as the retired household runtime's types did).  Importing this
  * file gives you `__types__` only; the typedefs are doc/IDE artefacts.
  *
  * The schema is the **frozen input contract** the four projectors

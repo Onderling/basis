@@ -15,7 +15,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { bootPeers, teardown, pair, toChat, sendChat, readBubbles, log,
-  gotoCircles, createCircle, openCircleMatching, joinFromInvite } from './peerHarness.js';
+  gotoCircles, createCircle, openCircleMatching, joinFromInvite, THREAD_ROWS } from './peerHarness.js';
 
 test.setTimeout(420_000);
 
@@ -129,7 +129,7 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
     await gotoCircles(A.page);
     const contactsTab = A.page.locator('[data-tab="contacten"]');
     if (await contactsTab.count()) { await contactsTab.first().click(); await A.page.waitForTimeout(2000); }
-    const rows = A.page.locator('.cc-contacts__row');
+    const rows = A.page.locator(THREAD_ROWS);
     const nRows = await rows.count();
     let aThread = '';
     for (let i = 0; i < nRows && !aThread.includes(replyText); i += 1) {

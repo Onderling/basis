@@ -5,7 +5,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
 import { flushPendingSaves, pendingSaveCount } from '@onderling/local-store';
-import { buildHouseholdDataSource } from '../../household/src/storage/persist.js';
+import { buildHouseholdDataSource } from '../src/household/persist.js';
 
 describe('a waiting save, flushed on exit', () => {
   it('is in IndexedDB right after the flush — before its timer would have run', async () => {

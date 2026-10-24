@@ -139,6 +139,9 @@ export function buildMobileLocalBuiltins({
   eventLog, openLogsPanel, openQrScanner,
   openFilePicker,
   showPersonCard,   // the person's clock: how this platform shows them a card (their week)
+  // feedback about the app: open the feedback contact's thread with the prefill; the build's card, its version and
+  // the screen the person is on (web parity: circleApp's createLocalBuiltins)
+  openFeedback, feedbackCard = null, appVersion = '', currentScreen = null,
   // Media mobile twin (2026-07) — the sealed-media seams. All optional:
   // absent gateway ⇒ the shared embed-file builtin keeps its legacy inline
   // file-card path (honest degradation, identical to web — no sealer in
@@ -202,6 +205,7 @@ export function buildMobileLocalBuiltins({
     openQrScanner,
     openFilePicker,
     showPersonCard,
+    openFeedback, feedbackCard, appVersion, currentScreen,
     // the person's pages: the screen ops edit this book (the same AsyncStorage key the launcher reads)
     screenStore: makeUserScreenStoreRN(AsyncStorage),
     // Media mobile twin (2026-07) — the sealed-media deps ride the same

@@ -69,6 +69,14 @@ export const SEAMS = Object.freeze([
   { id: 'contact-self-per-persona', pattern: /selfFor:\s*\(peerAddr\)\s*=>\s*agent\.contactSelf/, why: 'a contact filed under a persona hears from that persona, never the default, from every shell' },
   { id: 'pair-roster-per-persona', pattern: /selfWebidOf:\s*\(personaId\)\s*=>\s*agent\.personaWebid/, why: 'a persona\'s contact gets the persona\'s own pair circle, from every shell' },
   { id: 'circle-address-per-self', pattern: /relaysOf:\s*\(cid\)\s*=>\s*agent\.relaysFor/, why: 'a persona\'s circle traffic crosses the wire on the persona\'s own socket, from every shell' },
+  // The help bot is a contact: its conversation's door is a Contacten row, and the launcher paints no help tile.
+  { id: 'help-bot-door', pattern: /tileCircles\(/, shells: ['web', 'mobile'], why: 'the help conversation opens from Contacten on every person\'s shell, never from a second tile' },
+  // Feedback about the app: the op opens the feedback contact's thread through the shell, prefilled; a shell without the
+  // seam answers "not possible here" to /feedback, the "+" and the Instellingen door alike.
+  { id: 'feedback-door', pattern: /openFeedback:/, shells: ['web', 'mobile'], why: 'feedback about the app opens the thread to Onderling, prefilled, on every person\'s shell' },
+  // Mij's device and agent rows (and the device offer) open the settings group where devices live; the old My data
+  // page is no longer that place, so a shell that kept opening it would show a page without them.
+  { id: 'settings-group-for-action', pattern: /settingsGroupForAction\(/, shells: ['web', 'mobile'], why: 'a tap on a device or agent row on Mij opens Apparaten & sleutels, on every person\'s shell' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).

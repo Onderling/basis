@@ -139,7 +139,7 @@ export default defineConfig({
       'nkn-sdk':         empty,
       // The Telegram bridge is a Node-only server transport (reads process.env at
       // module load → `process is not defined` in the browser, blanking the app).
-      // household/src re-exports it, so it lands in the web import graph; stub it.
+      // A re-export would land it in the web import graph; stub it.
       '@onderling/chat-agent/bridges/telegram': telegramShim,
       'js-yaml':         empty,
       'node-datachannel': empty,

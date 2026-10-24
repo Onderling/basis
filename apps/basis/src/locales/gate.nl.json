@@ -88,6 +88,20 @@
       "wat moet de kat doen"
     ]
   },
+  "lists.listEntries.need": {
+    "doc": "\"Wat hebben we nodig?\" — read the household's shopping list (with or without a shop or place after it).",
+    "patterns": [
+      "wat hebben we (nog)? nodig",
+      "wat hebben we (nog)? nodig {any}"
+    ],
+    "examples": [
+      "wat hebben we nodig?",
+      "Wat hebben we nog nodig bij de Jumbo?"
+    ],
+    "not": [
+      "we hebben geen melk nodig"
+    ]
+  },
   "lists.listEntries.named": {
     "doc": "Read what is on a list the household names (the agenda reads its appointments).",
     "patterns": [

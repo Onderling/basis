@@ -4,13 +4,18 @@
  */
 import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
-import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk } from '../../src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 
 describe('Vandaag — the "+"', () => {
   it('offers the own-scope attach entries the composed manifests declare — each with its fields', () => {
-    expect(PLUS_ACTS.map((a) => a.id)).toEqual(['household.note', 'calendar.calendar-event']);
-    expect(PLUS_ACTS[1].fields.map((f) => f.name)).toEqual(['title', 'when']);
+    expect(PLUS_ACTS.map((a) => a.id)).toEqual(['basis.feedback', 'household.note', 'calendar.calendar-event']);
+    expect(PLUS_ACTS.find((a) => a.id === 'calendar.calendar-event').fields.map((f) => f.name)).toEqual(['title', 'when']);
+    // feedback makes nothing and asks nothing: it names itself and runs at once (no empty form)
+    const fb = PLUS_ACTS.find((a) => a.id === 'basis.feedback');
+    expect(fb).toMatchObject({ noun: null, labelKey: 'circle.feedback.plus' });
+    expect(actRunsAtOnce(fb)).toBe(true);
+    expect(actRunsAtOnce(PLUS_ACTS.find((a) => a.id === 'household.note'))).toBe(false);
   });
 
   it('an entry not declared for the own scope never appears on Vandaag (a circle composer entry stays a circle\'s)', () => {
@@ -125,6 +130,7 @@ describe('Vandaag — the free line at the top of the sheet', () => {
     let asked = null;
     const ok = await plusReadWithModel('iets', { ask: async (line, bounds) => { asked = bounds; return { actId: 'household.note', values: { body: 'x', circleId: 'kring' } }; } });
     expect(asked.scope).toBe(OWN_DEVICES_SCOPE);
+    // the acts that make something — feedback opens a thread from its button, never from a read line
     expect(asked.acts.map((a) => a.actId)).toEqual(['household.note', 'calendar.calendar-event']);
     expect(ok).toEqual({ actId: 'household.note', values: { body: 'x' } });
     expect(await plusReadWithModel('iets', { ask: async () => ({ actId: 'household.addItem', values: { text: 'x' } }) })).toBe(null);

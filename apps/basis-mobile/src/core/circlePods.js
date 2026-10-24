@@ -47,7 +47,7 @@ import { shareItemAcrossCircles, shareItemToPublishedKey as sharedShareItemToPub
 import { createCirclePodCustody } from '../../../basis/src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../../basis/src/v2/circleCacheMedium.js';
 import { circleStoreMode } from '../../../basis/src/v2/circleDataPolicy.js';
-import { buildHouseholdDataSource } from '../../../household/src/index.js';
+import { buildHouseholdDataSource } from '../../../basis/src/household/persist.js';
 // objective L follow-up — the mobile per-circle policy store (AsyncStorage-backed, `cc.circlePolicy.<id>`
 // keys). Mirror of web circleApp.js's module-level `policyStore`: the composition-root's `policyOf` reads the
 // LIVE per-circle `sharePosture` from here instead of the deny-by-default `{}`.
@@ -235,6 +235,9 @@ const strategyFlight = createSingleFlight();
 /** Ensure a per-circle producer exists (idempotent). Best-effort; null when no vault / on failure. */
 export async function ensureCirclePod(circleId, policy) {
   if (!circleId || !circleVault || circlePods.has(circleId)) return circlePods.get(circleId) ?? null;
+  // No policy yet (a circle view opens before its policy is read from the store): the posture is unknown, so build
+  // nothing and keep nothing — a producer made now would be the default p0 one, cached for the circle for good.
+  if (policy == null) return null;
   return podFlight(circleId, () => buildCirclePod(circleId, policy));
 }
 
@@ -287,6 +290,7 @@ export async function seedCircleRosterFor({ circleId, policy, callSkill }) {
 /** Resolve (+ cache) a circle's content seal/open strategy via the device's own sealing identity. */
 export async function getCircleSealStrategy(circleId, policy) {
   if (circleSealStrategies.has(circleId)) return circleSealStrategies.get(circleId);
+  if (policy == null) return null;   // not known yet: no answer to keep (see ensureCirclePod)
   return strategyFlight(circleId, () => buildCircleSealStrategy(circleId, policy));
 }
 

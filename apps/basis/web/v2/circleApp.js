@@ -174,11 +174,12 @@ import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
+import { withHelpContact, contactOpenTarget, tileCircles } from '../../src/v2/helpContact.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
 import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -187,7 +188,7 @@ import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
-import { settingsGroupFor } from '../../src/v2/settingsHome.js';
+import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsHome.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
@@ -432,7 +433,7 @@ import { renderMandatePicker } from './mandatePicker.js';
 // The platform-neutral enforcement assembly (web≡mobile — mobile's circlePods.js calls the SAME builder).
 import { buildCircleShareEnforcement } from '../../src/v2/circleShareEnforcement.js';
 import { renderContainerCard } from './containerCard.js';      // the nested container card (web DOM)
-import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';  // portable persistent DataSource (IDB on web) — submodule import so basis's live path no longer loads the retired household skillRegistry/HouseholdAgent via index.js (L3)
+import { buildHouseholdDataSource } from '../../src/household/persist.js';  // portable persistent DataSource (IDB on web) — submodule import so basis's live path no longer loads the retired household skillRegistry/HouseholdAgent via index.js (L3)
 
 // The WEB confirm presenter: mount the dialog, resolve once on accept(true)/cancel(false), then remove
 // the overlay (catchUpChooserModal pattern). Accept-exactly-once / cancel-never-executes belong to the
@@ -911,6 +912,11 @@ function mountBasisOpsOnAgent(agent) {
     screenStore: userScreenStore,
     podAuth,
     openFilePicker: webFilePicker,
+    // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
+    openFeedback: ({ webid, draft }) => { showContactThread(webid, { draft }).catch(() => {}); },
+    feedbackCard: SEEDED_CONTACT_CARD,
+    appVersion: APP_VERSION,
+    currentScreen: () => feedbackScreenState(),
     // /send-file resizes a photo the way a circle photo is resized (the one encoder, the one cap).
     encodeImage: encodeImageFile,
     briefRunner: (o) => runBrief({ catalogue: circleCatalogue, callSkill: rawCallSkill, cache: _briefCache, bypassCache: o?.bypassCache }),
@@ -2897,6 +2903,10 @@ function buildCircleBot(agent) {
 // Top-level tab bar (Circles / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
 let _activeTab = null;             // which top-level tab is showing — so a landed turn can repaint the bar's badge
+// The screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name.
+function feedbackScreenState() {
+  return { inCircle: !!getActiveCircle(), screen: _activeTab };
+}
 let _contactUnread = {};           // the last computed unread map (contactId → {unread, lastTs}); the bar reads its sum
 function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
@@ -3018,13 +3028,20 @@ async function showContacts() {
   if (_selfSet.held.length > 1) contacts = contactsInSet(contacts, _selfSet.on, profileIdOfCircle);
   const unread = await refreshContactUnread();
   showTabBar('contacten');   // the sum may have changed
+  // the help bot is a contact: its conversation is the help circle's, so the row is there while that circle is
+  contacts = withHelpContact(contacts, { t, available: (circlesCache ?? []).some((c) => c.id === HELP_CIRCLE_ID) });
   renderContactsRoster(rootEl, {
     contacts, unread, t,
     // each row's picture is sealed to ITS pair circle
     resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
-    onOpen: showContactThread,
+    onOpen: (contactId) => {
+      const target = contactOpenTarget(contacts.find((c) => c.contactId === contactId) ?? { contactId });
+      if (target.kind === 'circle') showDetail(target.circleId); else showContactThread(contactId);
+    },
     // a person: the scanQr op (web: the paste prompt), routed by what it reads — Me's Scan, the same door
     onAddPerson: () => runMeAction('scan'),
+    // the people this device blocks (once a door on My data): at the foot of Contacten
+    onBlocked: showBlocked,
     onAdd: () => {
       const input = (globalThis.prompt?.(t('circle.contacts.add_prompt')) || '').trim();
       if (input) addBotFromInput(input);
@@ -3306,8 +3323,9 @@ async function addBotFromInput(input) {
 // a 1:1 DM thread with a contact-bot. The conversational turn goes over
 // the contact-thread channel (sa.peer → mdns/relay/nkn); the async reply lands
 // via `onContactReply` (registered in the peer router) and re-renders here.
-async function showContactThread(contactId) {
+async function showContactThread(contactId, { draft = '' } = {}) {
   hideCircleTabBar(tabBarEl);
+
   let row = null;
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
   catch { /* fall back to any cached thread below */ }
@@ -3319,6 +3337,8 @@ async function showContactThread(contactId) {
   const peerAddr = row?.peerAddr ?? contactThreads.get(contactId)?.peerAddr ?? contactId;
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
+  // a draft to start the composer with (the feedback door's prefill): it stays in the composer until the person sends
+  if (typeof draft === 'string' && draft) thread.draft = draft;
   thread.name = name; thread.peerAddr = peerAddr;
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
@@ -3389,6 +3409,7 @@ async function showContactThread(contactId) {
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
+    inputValue: thread.draft ?? '',
     face,
     resolvePicture: resolveFace,
     messages: (() => {
@@ -3431,6 +3452,7 @@ async function showContactThread(contactId) {
       }
     },
     onSend: async (text) => {
+      thread.draft = '';   // the draft went out with this (or was replaced by what they typed)
       // `/skill args` → dispatch as a skill; otherwise a conversational turn.
       if (text.startsWith('/')) {
         const sp = text.slice(1).indexOf(' ');
@@ -3685,7 +3707,7 @@ function paintLauncher() {
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
-    circles: circlesShown(),   // the circles of the selves ticked in the header
+    circles: tileCircles(circlesShown()),   // the circles of the selves ticked in the header; the help circle's door is in Contacten
     previews,
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,
@@ -3884,7 +3906,7 @@ function showConnectionPoints() {
     // them have a socket right now, and since 2026-09-08 that is several at once.
     relays: _peerAgent?.relays?.list?.() ?? [],
     agentUp: !!_peerAgent,
-    onBack: showMyData,
+    onBack: () => showMyData({ group: 'connection' }),
     onAdopt: (url) => { store.adopt(url); draw(); },
     // Ask before removing: the impact report is the point of this screen.
     onRemove: (url) => { removing = { url, ...store.impactOfRemoving(url) }; draw(); },
@@ -4429,7 +4451,17 @@ function showVandaagPlus({ edit = null } = {}) {
       _pendingPinOpen = r; close(); showDetail(r.circleId);
     },
     onPickSelf: (id) => { asSelf = id; paint(); },
-    onPick: (id) => { actId = id; error = null; paint(); },
+    onPick: (id) => {
+      const picked = PLUS_ACTS.find((a) => a.id === id);
+      // an act that makes nothing and asks nothing (feedback) runs at once: no empty form in between
+      if (actRunsAtOnce(picked)) {
+        close();
+        rawCallSkill(picked.appOrigin, picked.opId, { screen: t('circle.vandaag.plus') })
+          .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
+        return;
+      }
+      actId = id; error = null; paint();
+    },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
@@ -4550,11 +4582,11 @@ async function showMij() {
     t, blocks, profilePage,
     onBlockAction: (a) => {
       if (a?.kind === 'edit-me') openAboutMePanel('default');
-      else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') showMyData();
+      else if (settingsGroupForAction(a)) showMyData({ group: settingsGroupForAction(a) });   // devices, agents, the offer
+      else if (a?.kind === 'open-shared-with-me') showSharedWithMe();
       // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
       else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
-    onMyData: showMyData,
     // the gear: the person's settings (Instellingen)
     onSettings: showSettingsHome,
     // The advanced surface — every surface-less op + the settable params (the default place).
@@ -4583,6 +4615,8 @@ async function showMij() {
     // "wat wacht op jou": the votes open in each circle (the same fold the settings banner reads), a device offer here
     openProposals: (cid) => openPolicyProposals(mijGov ??= shellGovernance(), cid),
     pendingDeviceOffer: () => pendingEnrollOffer(window.localStorage),
+    // what was shared with the person: a chip on Mij (once a door on My data)
+    sharedWithMeCount: async () => (await sharedWithMeStore.list()).length,
   } }).catch((err) => { console.warn('[mij] blocks failed', err?.message ?? err); return []; });
   if (_activeTab === 'mij') rerender();
 }
@@ -4619,7 +4653,7 @@ async function showSharedWithMe() {
   const opener = openerForIdentity(circleCoreAgent?.identity);   // network-derived; null → deny-safe no-op
   renderSharedWithMe(rootEl, {
     entries, t,
-    onBack: showMyData,
+    onBack: showMij,
     onOpen: async (entry) => {
       if (typeof opener !== 'function') return;   // deny-safe: no opener → no-op (no leak)
       try { await openSharedCopy(entry, opener); } catch { /* wrong key / not a recipient — deny-safe */ }
@@ -4648,7 +4682,7 @@ async function showBlocked() {
     }
     renderBlockedList(rootEl, {
       rows: buildBlockedList({ peers, members }),
-      t, loading, onBack: showMyData,
+      t, loading, onBack: showContacts,
       onUnblock: async (key) => {
         try { await rawCallSkill('basis', 'unmute', { peer: key }); } catch { /* re-read tells the truth */ }
         await paint(false);
@@ -4663,11 +4697,11 @@ async function showBlocked() {
 function showLogReport() {
   hideCircleTabBar(tabBarEl);
   const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
-  renderLogReport(rootEl, { text, n, t, onBack: showMyData });
+  renderLogReport(rootEl, { text, n, t, onBack: () => showMyData({ group: 'my-data' }) });   // its door is in Mijn gegevens
 }
 
-// "My data": where your data lives (pod/relay) + privacy + usage + key
-// management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
+// A settings group's screen (from Instellingen, the gear on Mij): the group's declared sections, painted by the one
+// painter map; without a group, the settings home.
 /**
  * The ADVANCED surface (the "default places for any new opId" rule): every op without a
  * bespoke screen, listed and reachable — no-arg ops run through the waist, arg-taking ops
@@ -4809,6 +4843,10 @@ function ensurePagePanel() {
 async function showMyData(opts) {
   // a settings group's screen (from the gear on Mij): the same sections and handlers, only that group's, in its order
   const group = typeof opts?.group === 'string' ? settingsGroupFor(basisManifest, opts.group) : null;
+  // every section lives in a group now: without one there is nothing to show but the groups themselves
+  if (!group) { showSettingsHome(); return; }
+  // a ceremony or wizard that closes comes back to the screen it was opened from
+  const again = () => showMyData(opts);
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
@@ -4825,16 +4863,16 @@ async function showMyData(opts) {
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
   const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
-  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
+  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => again() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
   const onReceivePersonas = () => showReceivePersonas();
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
-  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
+  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => again() });
   // The replace ceremony: retire every other device in one act, after a restore.
-  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
-  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => showMyData() });
+  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); again(); } });
+  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => again() });
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
@@ -4929,12 +4967,12 @@ async function showMyData(opts) {
     names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
     labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
   });
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: group ? showSettingsHome : showMij,
-    only: group ? group.sections.map((sec) => sec.id) : null, groupTitle: group ? t(group.labelKey) : null,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showSettingsHome,
+    only: group.sections.map((sec) => sec.id), groupTitle: t(group.labelKey),
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
-    // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
+    // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
-    weekOverview, version: APP_VERSION,
+    weekOverview,
     onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
@@ -5087,6 +5125,14 @@ function showSettingsHome() {
     t, onBack: showMij,
     onOpenGroup: (id) => showMyData({ group: id }),
     onOpenPerCircle: showSettingsCircleChooser,
+    // another door at the foot (feedback): its op, through the waist, naming this screen's id (never words)
+    onOpenDoor: (d) => {
+      if (d?.target?.kind !== 'op') return;
+      // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
+      rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
+        .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
+    },
+    version: APP_VERSION,
   });
 }
 
@@ -6667,7 +6713,7 @@ async function showAvailability() {
     availability: working,
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
-    onSave: async () => { await availabilityStore.update(working); showMyData(); },
+    onSave: async () => { await availabilityStore.update(working); showMyData({ group: 'connection' }); },
     onHop: showHop,
   });
   rerender();
@@ -6950,6 +6996,14 @@ function showCircle(id, circle, policy) {
   // Resolved asynchronously, so the menu is briefly empty rather than briefly wrong.
   circleAttachMenu = [];
   circleAvailabilityNow = null;
+  // The menu as it stands NOW: rebuilt when the availability lands and again when the sealed-media path resolves —
+  // built once, before media resolved, it left the file entry out of the "+" for good while the composer had the
+  // media pipeline all along (no photo could be attached in a circle).
+  const circleAttachEntriesNow = () => attachEntriesFor({
+    manifestsByOrigin: circleManifestsByOrigin ?? {},
+    availability: circleAvailabilityNow,
+    mediaWired: !!circleMedia,
+  });
   (async () => {
     try {
       const av = await circleOpAvailability(id);
@@ -6961,11 +7015,7 @@ function showCircle(id, circle, policy) {
       // Every composed app's entries, not only basis's — a circle that composes tasks offers "+ → Task"
       // by DECLARATION, and the filter (composition · feature · capability · is the path even wired) is
       // the one shared answer both shells and the journey read.
-      circleAttachMenu = attachEntriesFor({
-        manifestsByOrigin: circleManifestsByOrigin ?? {},
-        availability: av,
-        mediaWired: !!circleMedia,
-      });
+      circleAttachMenu = circleAttachEntriesNow();
       // a BOOKMARK opened from the "+" sheet: this circle, that op's form — the same path a tap on the entry takes here
       if (_pendingPinOpen?.circleId === id) {
         const want = _pendingPinOpen; _pendingPinOpen = null;
@@ -7018,6 +7068,7 @@ function showCircle(id, circle, policy) {
   getCircleMediaComposition(id, policy).then((m) => {
     if (!m) return;   // no seal strategy → affordance stays hidden
     circleMedia = m;
+    if (circleAvailabilityNow) circleAttachMenu = circleAttachEntriesNow();   // the file entry joins the "+"
     if (getActiveCircle() === id) rerender();
   });
 

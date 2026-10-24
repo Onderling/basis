@@ -43,6 +43,10 @@
     "__generic__:household:list:note": {
       "text": "Laat de weetjes van het huishouden zien: wat mensen hebben opgeschreven zodat iedereen het weet. Citeer een weetje; verander er nooit een.",
       "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
+    },
+    "restoreFromMnemonicWizard": {
+      "text": "Herstel je identiteit vanaf een bewaarde herstelzin (VERVANGT wat er nu op dit apparaat staat).",
+      "doc": "What the model reads about this op when the member writes Dutch (the English hint is in the manifest)."
     }
   },
   "lists": {

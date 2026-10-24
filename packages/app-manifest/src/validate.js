@@ -375,10 +375,9 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // Nav-chrome (Me) — `manifest.meActions` declares the ordered actions at the top of the person's own page (Me):
-  // "Share my card" and "Scan" (2026-10-09); `manifest.myDataActions` the doors at the top of My data (the views Me
-  // gave up, 2026-10-15). The SAME NavItem shape and helper as `tabs`, so both shells paint them from the declaration,
-  // never from a screen file's list. Forward-additive: absent → none.
-  for (const key of ['meActions', 'myDataActions']) {
+  // "Share my card" and "Scan" (2026-10-09). The SAME NavItem shape and helper as `tabs`, so both shells paint them
+  // from the declaration, never from a screen file's list. Forward-additive: absent → none.
+  for (const key of ['meActions']) {
     if (manifest[key] === undefined) continue;
     if (!Array.isArray(manifest[key])) {
       errors.push({ path: `/${key}`, message: `${key} must be an array if present` });
@@ -391,7 +390,8 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // The person's settings (behind the gear on Mij) — `manifest.settingsGroups`: groups of sections, each a door,
-  // switch, control or fact (custody-guarded ones marked), then the door to the chooser of the person's circles.
+  // switch, control or fact (custody-guarded ones marked), then the door to the chooser of the person's circles and
+  // any other door at the foot of the home (a nav item: an op of this manifest, or a view).
   // A section id is declared once across every group: a section lives in one place. Forward-additive: absent → none.
   if (manifest.settingsGroups !== undefined) {
     if (!Array.isArray(manifest.settingsGroups)) {
@@ -406,6 +406,11 @@ export function validateManifest(manifest, opts = {}) {
           if (g.kind !== 'door' || g.target?.kind !== 'nav' || g.target?.to !== 'circleSettingsChooser') {
             errors.push({ path: at, message: 'the per-circle row is a door ({kind: "door"}) to the circle chooser (target {kind: "nav", to: "circleSettingsChooser"})' });
           }
+          return;
+        }
+        // another door at the foot of the home (feedback): a nav item like a tab's — an op of this manifest or a view
+        if (g?.kind === 'door' && !Array.isArray(g.sections)) {
+          validateNavItem(g, at, manifest, errors, groupIds, strict);
           return;
         }
         if (!g || typeof g !== 'object' || typeof g.id !== 'string' || g.id === '') {

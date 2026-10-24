@@ -11,7 +11,7 @@ import { useTheme } from './themeContext.js';
 import Btn from './Btn.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { t } from '../../core/localisation.js';
-import { PLUS_ACTS, plusLabel } from '../../../../basis/src/v2/vandaagPlus.js';
+import { PLUS_ACTS, plusLabel, actRunsAtOnce } from '../../../../basis/src/v2/vandaagPlus.js';
 
 export default function VandaagPlusModal({ visible, onSave, onClose, onRead = null, onRemove = null,
   // opened on an own row whose act shares ("Delen met…"): the contacts it can go to, and what a pick does → null, or the line
@@ -24,6 +24,8 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
   onOpenCircle = null,
   // the own acts in the order to offer them (most used first: `orderedPlusActs`); absent, the declared order
   acts = PLUS_ACTS,
+  // an act that makes nothing (feedback): the host runs it at once — the sheet only hands it over
+  onRunAct = null,
   // Vastgezet: the pins to paint (each with `label` and `key`); `onOpenPin(pin)` → `{actId}` (an own act), a line (why
   // nothing opened), or null (it opened a circle); × → `onUnpin(key)`; ☆/★ beside an own act → `onTogglePin(actId)`
   pinned = [], onOpenPin = null, onUnpin = null, pinnedActIds = [], onTogglePin = null }) {
@@ -94,7 +96,7 @@ export default function VandaagPlusModal({ visible, onSave, onClose, onRead = nu
             </View>
           ) : !act ? acts.map((a) => (
             <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Btn style={styles.btnAt} onPress={() => setActId(a.id)} testID={`vandaag-plus-${a.id}`} label={plusLabel(t, a)} />
+              <Btn style={styles.btnAt} onPress={() => (actRunsAtOnce(a) && typeof onRunAct === 'function' ? onRunAct(a) : setActId(a.id))} testID={`vandaag-plus-${a.id}`} label={plusLabel(t, a)} />
               {onTogglePin ? (
                 <Pressable onPress={() => onTogglePin(a.id)} accessibilityRole="button" testID={`vandaag-plus-pin-${a.id}`}
                   accessibilityLabel={t(pinnedActIds.includes(a.id) ? 'circle.vandaag.unpin' : 'circle.vandaag.pin')} style={{ paddingHorizontal: 8 }}>

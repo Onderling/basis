@@ -1,8 +1,8 @@
 /**
  * MIJ = IDENTITY, ON A REAL SCREEN (2026-10-15). Mij is one declared screen: the person's name as the title with the
  * readings under it (the next appointment among them), the Me actions, "My devices and helpers" (this device listed),
- * one door to My data — and no section listed by hand. "Edit" opens the person's own editor with the handle and the
- * location on top; the doors Mij gave up (availability, shared with me, blocked) are behind My data.
+ * the gear to the person's settings — and no section listed by hand. "Edit" opens the person's own editor with the
+ * handle and the location on top; the doors Mij gave up have their own homes.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/mij-identity.spec.js
  */
@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-test('Mij shows the name, its readings and the devices; Edit and My data hold the rest', async ({ page }) => {
+test('Mij shows the name, its readings and the devices; Edit and the gear hold the rest (the moved doors have their own homes)', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
@@ -33,8 +33,13 @@ test('Mij shows the name, its readings and the devices; Edit and My data hold th
   await expect(page.locator('.cc-screen-panel .cc-profile__geo-input')).toBeVisible();
   await page.locator('.cc-screen-panel__close').click();
 
-  await page.locator('.cc-profile__mydata').first().click();
-  for (const door of ['availability', 'shared-with-me', 'blocked']) await expect(page.locator(`.cc-mydata__doors .cc-profile__${door}`), door).toBeVisible({ timeout: 15_000 });
+  // the doors Mij gave up have their own homes since the settings regroup: availability under the gear (Verbinding),
+  // shared-with-me a chip on Mij, blocked at the foot of Contacten, the log report in Mijn gegevens; Mij has no door to an
+  // old My data page — the gear is the one way into the settings
+  await expect(page.locator('.cc-profile__mydata')).toHaveCount(0);
+  await page.locator('.cc-profile__gear').click();
+  await page.locator('.cc-settings__group--my-data').click();
+  await expect(page.locator('.cc-settings__door--log-report')).toBeVisible({ timeout: 15_000 });
   expect(errs).toEqual([]);
 });
 

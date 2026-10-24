@@ -1,10 +1,9 @@
 {
   "counts": {
-    "apps/household/src/storage/InMemoryStore.js": 1,
-    "apps/presence-v0/src/HomeAgent.js": 1,
+    "apps/basis/src/household/InMemoryStore.js": 1,
     "apps/pinboard/src/Agent.js": 1,
     "apps/pinboard/src/Service.js": 1,
-    "apps/tasks-mobile/src/lib/buildCircleState.js": 1,
+    "apps/presence-v0/src/HomeAgent.js": 1,
     "apps/tasks-v0/bin/tasks-ui.js": 1,
     "apps/tasks-v0/src/Agent.js": 1
   }

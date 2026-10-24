@@ -32,7 +32,7 @@
 import gateEn from './gate.en.json' with { type: 'json' };
 import gateNl from './gate.nl.json' with { type: 'json' };
 
-import { SYSTEM_PROMPT_CLASSIFY } from './src/llm/prompts.js';
+import { SYSTEM_PROMPT_CLASSIFY } from './prompts.js';
 
 const STR_NONEMPTY = { schema: { minLength: 1 } };
 
@@ -556,6 +556,18 @@ export const householdManifest = {
         { name: 'mnemonic', kind: 'secret', required: true },
       ],
       surfaces: {},
+    },
+    {
+      // The wizard a person types the phrase into: it runs restoreOwnerPhrase above, the one op that takes a phrase
+      // onto this device. Declared beside it, so the phrase has one owner.
+      id:   'restoreFromMnemonicWizard', visibility: 'private', group: 'device', verb: 'submit',
+      writes: { scope: 'device' },   // restores the identity onto this device
+      params: [],
+      surfaces: {
+        slash: { command: '/restore-from-mnemonic' },
+        chat:  { hint: 'recover from a saved mnemonic phrase (DESTRUCTIVE)' },
+        page:  { kind: 'side-panel', title: 'Restore identity' },
+      },
     },
     {
       id:   'grantSurface', visibility: 'private', group: 'admin',

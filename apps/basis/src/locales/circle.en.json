@@ -5977,6 +5977,10 @@
     "add_person": {
       "text": "+ Add a person",
       "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
+    },
+    "blocked": {
+      "text": "Blocked",
+      "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
     }
   },
   "pairedDevices": {
@@ -7690,6 +7694,10 @@
     "awaiting_device": {
       "text": "A device offer is waiting",
       "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_shared": {
+      "text": "Shared with you: {{count}}",
+      "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
     }
   },
   "attach": {
@@ -10152,6 +10160,7 @@
     "title": "Settings",
     "appearance": "Appearance",
     "per_circle": "Per circle",
-    "no_circles": "You are not in any circle yet."
+    "no_circles": "You are not in any circle yet.",
+    "connection": "Connection"
   }
 }

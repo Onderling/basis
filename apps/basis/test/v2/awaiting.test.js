@@ -50,3 +50,12 @@ describe('the block on Mij, through the one screen materializer', () => {
     expect(a.content.items.map((i) => i.kind)).toEqual(['vote', 'rsvp', 'device']);
   });
 });
+
+describe('Mij: what was shared with me is waiting too (it was a door on My data)', () => {
+  it('a shared chip with the count, opening the inbox; none when nothing was shared', () => {
+    const items = awaitingItems({ sharedWithMe: 2 });
+    expect(items).toEqual([{ kind: 'shared', count: 2, open: { kind: 'open-shared-with-me' }, labelKey: 'circle.mij.awaiting_shared' }]);
+    expect(awaitingItems({ sharedWithMe: 0 })).toEqual([]);
+    expect(awaitingItems({})).toEqual([]);
+  });
+});

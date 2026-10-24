@@ -5977,6 +5977,10 @@
     "add_person": {
       "text": "+ Persoon toevoegen",
       "doc": "Contacts: add a person — opens the scanner (web: paste their link or card), the same door as Me's Scan."
+    },
+    "blocked": {
+      "text": "Geblokkeerd",
+      "doc": "A door at the foot of Contacten: the people this device blocks, and the one place a block is undone."
     }
   },
   "pairedDevices": {
@@ -7690,6 +7694,10 @@
     "awaiting_device": {
       "text": "Er wacht een apparaat-aanbod",
       "doc": "Mij's \"what is waiting for you\" block (each chip opens where the thing lives)."
+    },
+    "awaiting_shared": {
+      "text": "Met je gedeeld: {{count}}",
+      "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
     }
   },
   "attach": {
@@ -10152,6 +10160,7 @@
     "title": "Instellingen",
     "appearance": "Weergave",
     "per_circle": "Per kring",
-    "no_circles": "Je zit nog in geen enkele kring."
+    "no_circles": "Je zit nog in geen enkele kring.",
+    "connection": "Verbinding"
   }
 }

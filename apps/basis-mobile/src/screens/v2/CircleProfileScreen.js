@@ -24,7 +24,7 @@ import CircleScreenView from './CircleScreenView.js';
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
  *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
  */
-export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onSettings = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
+export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onSettings = null, onSharedWithMe = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -48,6 +48,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         deviceName: (() => { try { return sources.deviceName?.() ?? null; } catch { return null; } })(),
         ...(typeof sources.openProposals === 'function' ? { openProposals: sources.openProposals } : {}),
         ...(typeof sources.pendingDeviceOffer === 'function' ? { pendingDeviceOffer: sources.pendingDeviceOffer } : {}),
+        ...(typeof sources.sharedWithMeCount === 'function' ? { sharedWithMeCount: sources.sharedWithMeCount } : {}),
       } }).catch(() => []);
       if (alive) setBlocks(b);
     })();
@@ -60,6 +61,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
     // "wat wacht op jou": a chip opens where the thing lives
     else if (a?.kind === 'open-proposals' && a.circleId) onOpenProposals?.(a.circleId);
     else if (a?.kind === 'open-circle' && a.circleId) onOpenCircle?.(a.circleId);
+    else if (a?.kind === 'open-shared-with-me') onSharedWithMe?.();
   };
   const hasName = Array.isArray(blocks) && blocks.some((b) => b.type === 'identityLine');
 

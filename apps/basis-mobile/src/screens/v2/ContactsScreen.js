@@ -23,6 +23,8 @@ import { useContactLensSheet } from '../../../../basis/src/rn/ContactLensSheet.j
 
 // `unread` — per contact `{unread, lastTs}` from the shared `buildContactUnread` (the launcher computes it, web parity).
 export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePictureFor = null, onAddPerson = null,
+  // the people this device blocks, and the one place a block is undone (web: contactsRoster.js); absent = no door
+  onBlocked = null,
   // the contacts of the selves ticked in the header (shared `contactsInSet`); absent = all
   keep = null }) {
   const theme = useTheme();
@@ -118,6 +120,14 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
     );
   };
 
+  // at the foot of Contacten: the blocked list (someone blocked is not a contact, so an empty roster has it too)
+  const blockedDoor = typeof onBlocked === 'function' ? (
+    <Pressable style={styles.blockedDoor} onPress={onBlocked} accessibilityRole="button" testID="contacts-blocked">
+      <Text style={styles.blockedText}>{t('circle.contacts.blocked')}</Text>
+      <Text style={styles.blockedArrow}>→</Text>
+    </Pressable>
+  ) : null;
+
   return (
     <View style={styles.wrap} testID="contacts-screen">
       {lens.sheet}
@@ -157,7 +167,10 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
       {error && <Text style={styles.error}>{t(error === 'invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed')}</Text>}
 
       {contacts.length === 0 ? (
-        <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
+        <>
+          <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>
+          {blockedDoor}
+        </>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}>
           {shown.map((c) => rowFor(c))}
@@ -167,6 +180,7 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
             </Pressable>
           ) : null}
           {foldOpen ? hidden.map((c) => rowFor(c, true)) : null}
+          {blockedDoor}
         </ScrollView>
       )}
     </View>
@@ -174,6 +188,9 @@ export default function ContactsScreen({ bundle, onOpen, unread = {}, resolvePic
 }
 
 const makeStyles = (theme, insets) => StyleSheet.create({
+  blockedDoor: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: theme.color.line },
+  blockedText: { fontSize: 15, color: theme.color.ink },
+  blockedArrow: { fontSize: 15, color: theme.color.inkSoft },
   wrap: { flex: 1, padding: 16, paddingTop: 16 + (insets?.top ?? 0), backgroundColor: theme.color.paper },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   title: { fontFamily: theme.font.serif, fontSize: 22, fontWeight: '600', color: theme.color.ink },

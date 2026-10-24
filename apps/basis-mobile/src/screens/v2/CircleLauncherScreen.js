@@ -1043,6 +1043,8 @@ export default function CircleLauncherScreen({
     // "wat wacht op jou": the votes open in each circle (the same fold the tile badge reads), a device offer here
     openProposals: (cid) => (govPolicyRef.current ? openPolicyProposals(govPolicyRef.current, cid) : Promise.resolve({ proposals: [] })),
     pendingDeviceOffer: () => pendingEnrollOffer(AsyncStorage),
+    // what was shared with the person: a chip on Mij (once a door on My data)
+    sharedWithMeCount: async () => ((await bundle?.sharedWithMeStore?.list?.()) ?? []).length,
     relays: () => bundle?.agent?.relays?.list?.() ?? [],
     deviceId: () => bundle?.agent?.myDeviceId?.() ?? null,
     // the phone's own name, for "this device" when the person never named it
@@ -1718,12 +1720,16 @@ export default function CircleLauncherScreen({
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
       // Hop screen lives under the Mij tab.
       if (view === 'hop') { setView('availability'); return true; }
-      if (view === 'blocked') { setView('mydata'); return true; }
+      if (view === 'blocked') { setView('contacten'); return true; }
       if (view === 'logReport') { setView('mydata'); return true; }
       if (view === 'shareContact') { setView('profile'); return true; }
-      // Mij's sub-views; availability, blocked and shared-with-me sit behind My data.
-      if (view === 'availability' || view === 'sharedWithMe') { setView('mydata'); return true; }
+      // shared-with-me opens from Mij's chip; availability from the Verbinding settings (blocked from Contacten, above)
+      if (view === 'sharedWithMe') { setView('profile'); return true; }
+      if (view === 'availability' || view === 'points') { setSettingsGroupId('connection'); setView('settingsGroup'); return true; }
       if (view === 'mydata') { setView('profile'); return true; }
+      // the person's settings behind the gear: a group → the home → Mij; the circle chooser → the home
+      if (view === 'settingsGroup' || view === 'settingsCircles') { setView('settingsHome'); return true; }
+      if (view === 'settingsHome') { setView('profile'); return true; }
       if (view === 'advanced') { setView('profile'); return true; }
       // S3 — admin panel is a sub-view of the circle detail.
       if (selected && view === 'admin') { setView('detail'); return true; }
@@ -2167,7 +2173,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2180,7 +2186,7 @@ export default function CircleLauncherScreen({
   if (view === 'blocked') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('mydata')} />
+        <CircleBlockedScreen callSkill={bundle?.callSkill} circles={circles} onBack={() => setView('contacten')} />
       </WithTabBar>
     );
   }
@@ -2221,7 +2227,7 @@ export default function CircleLauncherScreen({
         <SharedWithMeScreen
           received={sharedWithMeList}
           opener={bundle?.sharedWithMeOpener ?? null}
-          onBack={() => setView('mydata')}
+          onBack={() => setView('profile')}
         />
       </WithTabBar>
     );
@@ -2272,7 +2278,7 @@ export default function CircleLauncherScreen({
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <CircleAvailabilityScreen
           store={availabilityStore}
-          onBack={() => setView('mydata')}
+          onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
           onHop={() => setView('hop')}
         />
       </WithTabBar>
@@ -2297,7 +2303,7 @@ export default function CircleLauncherScreen({
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
-          onAddPerson={() => onMeAction('scan')}
+          onAddPerson={() => onMeAction('scan')} onBlocked={() => setView('blocked')}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>
     );
@@ -2420,7 +2426,7 @@ export default function CircleLauncherScreen({
   }
   if (view === 'points') {
     // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
-    return <ConnectionPointsHost bundle={bundle} onBack={() => setView('mydata')} />;
+    return <ConnectionPointsHost bundle={bundle} onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }} />;
   }
   if (view === 'nearby') {
     // Nearby screen. Driven by `createNearbyScreen` (shared with web), fed from the SURFACE — the

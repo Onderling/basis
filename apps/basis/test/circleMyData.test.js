@@ -7,18 +7,19 @@ import { settingsGroupFor } from '../src/v2/settingsHome.js';
 import { basisManifest as settingsManifest } from '../manifest.js';
 // the Weergave group's sections live on its own screen (under the gear), not the old My data page
 const WEERGAVE = settingsGroupFor(settingsManifest, 'appearance').sections.map((x) => x.id);
+const CONNECTION = settingsGroupFor(settingsManifest, 'connection').sections.map((x) => x.id);
 
 const t = (k, v) => (v ? `${k}:${JSON.stringify(v)}` : k);
 
 describe('renderCircleMyData', () => {
-  it('shows the pod-local status + relay when not signed in', () => {
-    const el = renderCircleMyData(document.createElement('div'), {
-      t, podStatus: { signedIn: false },
-      dataLocation: { relayOperator: 'Onderling', relayUrl: 'wss://relay.example' },
-    });
-    const kvs = [...el.querySelectorAll('.cc-mydata__kv')].map((r) => r.querySelector('.cc-mydata__v').textContent);
-    expect(kvs).toContain('circle.mydata.pod_local');
-    expect(kvs.some((v) => v.includes('Onderling') && v.includes('wss://relay.example'))).toBe(true);
+  it('shows the pod-local status when not signed in; the relay is on the Verbinding screen, not here', () => {
+    const props = { t, podStatus: { signedIn: false }, dataLocation: { relayOperator: 'Onderling', relayUrl: 'wss://relay.example' } };
+    const kvsOf = (el) => [...el.querySelectorAll('.cc-mydata__kv')].map((r) => r.querySelector('.cc-mydata__v').textContent);
+    const old = kvsOf(renderCircleMyData(document.createElement('div'), props));
+    expect(old).toContain('circle.mydata.pod_local');
+    expect(old.some((v) => v.includes('wss://relay.example'))).toBe(false);
+    const connection = kvsOf(renderCircleMyData(document.createElement('div'), { ...props, only: CONNECTION }));
+    expect(connection.some((v) => v.includes('Onderling') && v.includes('wss://relay.example'))).toBe(true);
   });
 
   it('shows a sign-in button when local-only + wires it to onSignIn', () => {

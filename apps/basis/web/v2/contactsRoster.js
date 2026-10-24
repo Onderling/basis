@@ -12,7 +12,7 @@ import { translatorOr } from '../../src/locales/translatorOr.js';
 import { splitShownHidden, contactRowMeta } from '../../src/v2/contactsSource.js';
 import { paintFace } from './faceView.js';
 
-export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null } = {}) {
+export function renderContactsRoster(container, { contacts = [], unread = {}, t, onOpen, onAdd, onAddPerson = null, resolvePictureFor = null, onBlocked = null } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'contactsRoster.js');
   container.innerHTML = '';
@@ -43,12 +43,24 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
 
   // Hidden contacts (L106) fold away at the bottom: the row stays, out of sight, until they write again or
   // the person shows them. A list of only hidden contacts is not empty — the fold says what is there.
+  // the people this device blocks, and the one place a block is undone: a door at the foot of Contacten (an empty
+  // roster has one too — someone blocked is not a contact)
+  const blockedDoor = () => {
+    if (typeof onBlocked !== 'function') return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cc-settings__row cc-contacts__blocked';
+    b.textContent = tr('circle.contacts.blocked');
+    b.addEventListener('click', () => onBlocked());
+    container.appendChild(b);
+  };
   const { shown, hidden } = splitShownHidden(contacts);
   if (!contacts.length) {
     const empty = document.createElement('p');
     empty.className = 'cc-contacts__empty';
     empty.textContent = tr('circle.contacts.empty');
     container.appendChild(empty);
+    blockedDoor();
     return container;
   }
 
@@ -137,5 +149,6 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     container.appendChild(fold);
     container.appendChild(folded);
   }
+  blockedDoor();
   return container;
 }

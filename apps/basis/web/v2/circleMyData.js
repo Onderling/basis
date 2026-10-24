@@ -279,6 +279,228 @@ export function renderCircleMyData(container, {
         container.appendChild(holder);
       }
     },
+    'availability': () => {
+      if (typeof doors.availability === 'function') {
+        const sec = section(tr('circle.profile.availability'));
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-settings__row cc-settings__door--availability';
+        b.textContent = tr('circle.profile.availability');
+        b.addEventListener('click', () => doors.availability());
+        sec.appendChild(b);
+        container.appendChild(sec);
+      }
+    },
+    'connection-points': () => {
+      if (typeof doors.points === 'function') {
+        const sec = section(tr('circle.nearbyScreen.points_open'));
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-settings__row cc-settings__door--connection-points';
+        b.textContent = tr('circle.nearbyScreen.points_open');
+        b.addEventListener('click', () => doors.points());
+        sec.appendChild(b);
+        container.appendChild(sec);
+      }
+    },
+    'delivery': () => {
+      // ── delivery (2026-07-28) ───────────────────────────────────────────────────
+      // Both lines describe WHAT HAPPENS, not which switch is where. And note what is NOT said: nothing tells
+      // you what other people see about your receipt setting, because nothing in the model reveals it — a
+      // "others cannot tell" reassurance here would be the first place that leaked.
+      if (typeof onSetDelivery === 'function' && delivery) {
+        const sec = section(tr('circle.nearbyScreen.delivery_section'));
+
+        const receiptsLine = document.createElement('p');
+        receiptsLine.className = 'cc-mydata__delivery-receipts';
+        receiptsLine.textContent = tr(delivery.sendReceipts
+          ? 'circle.nearbyScreen.delivery_receipts_on'
+          : 'circle.nearbyScreen.delivery_receipts_off');
+        sec.appendChild(receiptsLine);
+
+        const receiptsBtn = document.createElement('button');
+        receiptsBtn.type = 'button';
+        receiptsBtn.className = 'cc-mydata__action cc-mydata__delivery-receipts-toggle';
+        receiptsBtn.textContent = tr(delivery.sendReceipts
+          ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
+          : 'circle.nearbyScreen.delivery_receipts_toggle_off');
+        receiptsBtn.addEventListener('click', () => onSetDelivery({ sendReceipts: !delivery.sendReceipts }));
+        sec.appendChild(receiptsBtn);
+
+        const fallbackLine = document.createElement('p');
+        fallbackLine.className = 'cc-mydata__delivery-fallback';
+        fallbackLine.textContent = tr(delivery.allowFallback
+          ? 'circle.nearbyScreen.delivery_fallback_on'
+          : 'circle.nearbyScreen.delivery_fallback_off');
+        sec.appendChild(fallbackLine);
+
+        // The cost rides WITH the option to turn it on — never the fix alone.
+        const fallbackCost = document.createElement('p');
+        fallbackCost.className = 'cc-mydata__delivery-fallback-cost';
+        fallbackCost.textContent = tr('circle.nearbyScreen.delivery_fallback_cost');
+        sec.appendChild(fallbackCost);
+
+        // The toggle is GONE until the stored setting reaches the send path (2026-08-02).
+        //
+        // It wrote a preference nothing read: the send path defaults the fallback ON and never consults it, so
+        // both states behaved identically while the screen described them as different. A control that changes
+        // nothing is a stronger false claim than a sentence — someone presses it and believes they acted. The
+        // preference is still stored, so wiring it later restores the control without a migration.
+        const fallbackNote = document.createElement('p');
+        fallbackNote.className = 'cc-mydata__hint';
+        fallbackNote.textContent = tr('circle.nearbyScreen.delivery_fallback_note');
+        sec.appendChild(fallbackNote);
+
+        container.appendChild(sec);
+      }
+    },
+    'address-sharing': () => {
+      // ── my global address (2026-07-29) ─────────────────────────────────────────
+      // Placed with delivery rather than alone: it is the same family of question — how much does the
+      // network learn in exchange for reaching you. The cost rides WITH the option, as it does there.
+      if (typeof onSetShareAddress === 'function' && shareNknAddress != null) {
+        const sec = section(tr('circle.mydata.address_sharing'));
+
+        const line = document.createElement('p');
+        line.className = 'cc-mydata__address-sharing';
+        line.textContent = tr(shareNknAddress
+          ? 'circle.mydata.address_sharing_on'
+          : 'circle.mydata.address_sharing_off');
+        sec.appendChild(line);
+
+        const cost = document.createElement('p');
+        cost.className = 'cc-mydata__address-sharing-cost';
+        cost.textContent = tr('circle.mydata.address_sharing_cost');
+        sec.appendChild(cost);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cc-mydata__address-sharing-toggle cc-switch';
+        btn.setAttribute('role', 'switch');
+        btn.setAttribute('aria-checked', shareNknAddress ? 'true' : 'false');
+        btn.textContent = tr(shareNknAddress
+          ? 'circle.mydata.address_sharing_toggle_on'
+          : 'circle.mydata.address_sharing_toggle_off');
+        btn.addEventListener('click', () => onSetShareAddress(!shareNknAddress));
+        sec.appendChild(btn);
+
+        container.appendChild(sec);
+      }
+    },
+    'relay': () => {
+      const relaySec = section(tr('circle.mydata.relay'));
+      if (dataLocation.relayOperator || dataLocation.relayUrl) {
+        relaySec.appendChild(kv(tr('circle.mydata.relay'), [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ')));
+      }
+      // In-app relay setting — point the no-server cross-device relay at a reachable server WITHOUT a rebuild.
+      // Objective D / Surface 4: when the host wires `onOpenRelayPanel`, the edit is routed through the
+      // generic docked side-panel (openPagePanel's simple-form for the `set-relay` op) instead of the bespoke
+      // inline field. The button is the entry point; the panel builds the form from set-relay's params + dispatches.
+      if (typeof onOpenRelayPanel === 'function') {
+        const row = document.createElement('div');
+        row.className = 'cc-mydata__relay-edit';
+        const current = document.createElement('span');
+        current.className = 'cc-mydata__relay-note';
+        current.textContent = tr('circle.mydata.relay_current', { url: relayUrl || relayEnvUrl || tr('circle.mydata.relay_off') });
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'cc-btn cc-btn--quiet cc-mydata__relay-open';
+        open.textContent = tr('circle.mydata.relay_open');
+        open.addEventListener('click', () => onOpenRelayPanel());
+        const hint = document.createElement('p');
+        hint.className = 'cc-mydata__relay-hint';
+        hint.textContent = tr('circle.mydata.relay_hint');
+        row.appendChild(current);
+        row.appendChild(open);
+        relaySec.appendChild(row);
+        relaySec.appendChild(hint);
+      } else if (typeof onSaveRelay === 'function') {
+        const row = document.createElement('div');
+        row.className = 'cc-mydata__relay-edit';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'cc-mydata__relay-input';
+        input.value = relayUrl || '';
+        input.placeholder = relayEnvUrl || 'ws://…:8787';
+        input.setAttribute('aria-label', tr('circle.mydata.relay_set'));
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'cc-btn cc-btn--quiet cc-mydata__relay-save';
+        save.textContent = tr('circle.mydata.relay_save');
+        const note = document.createElement('span');
+        note.className = 'cc-mydata__relay-note';
+        save.addEventListener('click', async () => {
+          save.disabled = true; note.textContent = tr('circle.mydata.relay_saving');
+          try {
+            const r = await onSaveRelay(input.value);
+            note.textContent = r && r.ok
+              ? tr('circle.mydata.relay_saved', { url: r.effective || tr('circle.mydata.relay_off') })
+              : tr('circle.mydata.relay_error', { msg: (r && r.error) || '' });
+          } catch (e) { note.textContent = tr('circle.mydata.relay_error', { msg: e?.message ?? '' }); }
+          save.disabled = false;
+        });
+        const hint = document.createElement('p');
+        hint.className = 'cc-mydata__relay-hint';
+        hint.textContent = tr('circle.mydata.relay_hint');
+        row.appendChild(input); row.appendChild(save); row.appendChild(note);
+        relaySec.appendChild(row);
+        relaySec.appendChild(hint);
+      }
+      if (relaySec.children.length > 1) container.appendChild(relaySec);
+    },
+    'device-keeps': () => {
+      // ── what this device keeps (sync-policy §11, 2026-09-17) ───────────────────────────────────
+      // A device's own choice about itself, read live by every landing, pull and pairing; never on the wire.
+      if (typeof onSetSync === 'function' && syncSelection && typeof syncSelection === 'object') {
+        const sec = section(tr('circle.mydata.sync'));
+        const intro = document.createElement('p');
+        intro.className = 'cc-mydata__sync-intro';
+        intro.textContent = tr('circle.mydata.sync_intro');
+        sec.appendChild(intro);
+        const check = (cls, label, checked, onChange) => {
+          const row = document.createElement('label');
+          row.className = `cc-mydata__sync-row ${cls}`;
+          row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
+          const box = document.createElement('input');
+          box.type = 'checkbox'; box.checked = !!checked;
+          box.addEventListener('change', () => onChange(box.checked));
+          row.appendChild(box);
+          const txt = document.createElement('span'); txt.textContent = label;
+          row.appendChild(txt);
+          return row;
+        };
+        for (const silo of ['chat', 'tasks', 'contacts']) {
+          sec.appendChild(check(`cc-mydata__sync-silo-${silo}`, tr(`circle.mydata.sync_silo_${silo}`), syncSelection.silos?.[silo] !== false, (on) => onSetSync({ silo, value: on })));
+        }
+        const files = document.createElement('div');
+        files.className = 'cc-mydata__sync-files';
+        files.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
+        const filesLabel = document.createElement('span'); filesLabel.textContent = tr('circle.mydata.sync_files');
+        const filesSel = document.createElement('select');
+        filesSel.className = 'cc-mydata__sync-files-mode';
+        for (const mode of ['full', 'description']) {
+          const o = document.createElement('option'); o.value = mode; o.textContent = tr(`circle.mydata.sync_files_${mode}`);
+          if ((syncSelection.fileBytes ?? 'full') === mode) o.selected = true;
+          filesSel.appendChild(o);
+        }
+        filesSel.addEventListener('change', () => onSetSync({ fileBytes: filesSel.value }));
+        files.appendChild(filesLabel); files.appendChild(filesSel);
+        sec.appendChild(files);
+        const kh = document.createElement('p'); kh.className = 'cc-mydata__sync-kringen-head'; kh.textContent = tr('circle.mydata.sync_kringen');
+        sec.appendChild(kh);
+        const kringen = Array.isArray(syncSelection.kringen) ? syncSelection.kringen : [];
+        if (!kringen.length) {
+          const none = document.createElement('p'); none.textContent = tr('circle.mydata.sync_kringen_none'); sec.appendChild(none);
+        }
+        const off = syncSelection.kringenOff instanceof Set ? syncSelection.kringenOff : new Set(syncSelection.kringenOff ?? []);
+        for (const k of kringen) {
+          const row = check('cc-mydata__sync-kring', k.name ?? k.id, !off.has(k.id), (on) => onSetSync({ kringId: k.id, on }));
+          row.dataset.kringId = k.id;
+          sec.appendChild(row);
+        }
+        container.appendChild(sec);
+      }
+    },
   };
   if (Array.isArray(only)) {
     container.classList.add('cc-settings-group');
@@ -331,63 +553,6 @@ export function renderCircleMyData(container, {
     storage.appendChild(signIn);
   }
   if (dataLocation.podRoot) storage.appendChild(kv(tr('circle.mydata.pod_root'), dataLocation.podRoot));
-  if (dataLocation.relayOperator || dataLocation.relayUrl) {
-    storage.appendChild(kv(tr('circle.mydata.relay'), [dataLocation.relayOperator, dataLocation.relayUrl].filter(Boolean).join(' · ')));
-  }
-  // In-app relay setting — point the no-server cross-device relay at a reachable server WITHOUT a rebuild.
-  // Objective D / Surface 4: when the host wires `onOpenRelayPanel`, the edit is routed through the
-  // generic docked side-panel (openPagePanel's simple-form for the `set-relay` op) instead of the bespoke
-  // inline field. The button is the entry point; the panel builds the form from set-relay's params + dispatches.
-  if (typeof onOpenRelayPanel === 'function') {
-    const row = document.createElement('div');
-    row.className = 'cc-mydata__relay-edit';
-    const current = document.createElement('span');
-    current.className = 'cc-mydata__relay-note';
-    current.textContent = tr('circle.mydata.relay_current', { url: relayUrl || relayEnvUrl || tr('circle.mydata.relay_off') });
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'cc-btn cc-btn--quiet cc-mydata__relay-open';
-    open.textContent = tr('circle.mydata.relay_open');
-    open.addEventListener('click', () => onOpenRelayPanel());
-    const hint = document.createElement('p');
-    hint.className = 'cc-mydata__relay-hint';
-    hint.textContent = tr('circle.mydata.relay_hint');
-    row.appendChild(current);
-    row.appendChild(open);
-    storage.appendChild(row);
-    storage.appendChild(hint);
-  } else if (typeof onSaveRelay === 'function') {
-    const row = document.createElement('div');
-    row.className = 'cc-mydata__relay-edit';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'cc-mydata__relay-input';
-    input.value = relayUrl || '';
-    input.placeholder = relayEnvUrl || 'ws://…:8787';
-    input.setAttribute('aria-label', tr('circle.mydata.relay_set'));
-    const save = document.createElement('button');
-    save.type = 'button';
-    save.className = 'cc-btn cc-btn--quiet cc-mydata__relay-save';
-    save.textContent = tr('circle.mydata.relay_save');
-    const note = document.createElement('span');
-    note.className = 'cc-mydata__relay-note';
-    save.addEventListener('click', async () => {
-      save.disabled = true; note.textContent = tr('circle.mydata.relay_saving');
-      try {
-        const r = await onSaveRelay(input.value);
-        note.textContent = r && r.ok
-          ? tr('circle.mydata.relay_saved', { url: r.effective || tr('circle.mydata.relay_off') })
-          : tr('circle.mydata.relay_error', { msg: (r && r.error) || '' });
-      } catch (e) { note.textContent = tr('circle.mydata.relay_error', { msg: e?.message ?? '' }); }
-      save.disabled = false;
-    });
-    const hint = document.createElement('p');
-    hint.className = 'cc-mydata__relay-hint';
-    hint.textContent = tr('circle.mydata.relay_hint');
-    row.appendChild(input); row.appendChild(save); row.appendChild(note);
-    storage.appendChild(row);
-    storage.appendChild(hint);
-  }
   container.appendChild(storage);
 
   // ── key management (S5) ─────────────────────────────────────────────────────
@@ -757,138 +922,6 @@ export function renderCircleMyData(container, {
       sec2.appendChild(exp);
     }
     container.appendChild(sec2);
-  }
-
-  // ── delivery (2026-07-28) ───────────────────────────────────────────────────
-  // Both lines describe WHAT HAPPENS, not which switch is where. And note what is NOT said: nothing tells
-  // you what other people see about your receipt setting, because nothing in the model reveals it — a
-  // "others cannot tell" reassurance here would be the first place that leaked.
-  if (typeof onSetDelivery === 'function' && delivery) {
-    const sec = section(tr('circle.nearbyScreen.delivery_section'));
-
-    const receiptsLine = document.createElement('p');
-    receiptsLine.className = 'cc-mydata__delivery-receipts';
-    receiptsLine.textContent = tr(delivery.sendReceipts
-      ? 'circle.nearbyScreen.delivery_receipts_on'
-      : 'circle.nearbyScreen.delivery_receipts_off');
-    sec.appendChild(receiptsLine);
-
-    const receiptsBtn = document.createElement('button');
-    receiptsBtn.type = 'button';
-    receiptsBtn.className = 'cc-mydata__action cc-mydata__delivery-receipts-toggle';
-    receiptsBtn.textContent = tr(delivery.sendReceipts
-      ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
-      : 'circle.nearbyScreen.delivery_receipts_toggle_off');
-    receiptsBtn.addEventListener('click', () => onSetDelivery({ sendReceipts: !delivery.sendReceipts }));
-    sec.appendChild(receiptsBtn);
-
-    const fallbackLine = document.createElement('p');
-    fallbackLine.className = 'cc-mydata__delivery-fallback';
-    fallbackLine.textContent = tr(delivery.allowFallback
-      ? 'circle.nearbyScreen.delivery_fallback_on'
-      : 'circle.nearbyScreen.delivery_fallback_off');
-    sec.appendChild(fallbackLine);
-
-    // The cost rides WITH the option to turn it on — never the fix alone.
-    const fallbackCost = document.createElement('p');
-    fallbackCost.className = 'cc-mydata__delivery-fallback-cost';
-    fallbackCost.textContent = tr('circle.nearbyScreen.delivery_fallback_cost');
-    sec.appendChild(fallbackCost);
-
-    // The toggle is GONE until the stored setting reaches the send path (2026-08-02).
-    //
-    // It wrote a preference nothing read: the send path defaults the fallback ON and never consults it, so
-    // both states behaved identically while the screen described them as different. A control that changes
-    // nothing is a stronger false claim than a sentence — someone presses it and believes they acted. The
-    // preference is still stored, so wiring it later restores the control without a migration.
-    const fallbackNote = document.createElement('p');
-    fallbackNote.className = 'cc-mydata__hint';
-    fallbackNote.textContent = tr('circle.nearbyScreen.delivery_fallback_note');
-    sec.appendChild(fallbackNote);
-
-    container.appendChild(sec);
-  }
-
-  // ── what this device keeps (sync-policy §11, 2026-09-17) ───────────────────────────────────
-  // A device's own choice about itself, read live by every landing, pull and pairing; never on the wire.
-  if (typeof onSetSync === 'function' && syncSelection && typeof syncSelection === 'object') {
-    const sec = section(tr('circle.mydata.sync'));
-    const intro = document.createElement('p');
-    intro.className = 'cc-mydata__sync-intro';
-    intro.textContent = tr('circle.mydata.sync_intro');
-    sec.appendChild(intro);
-    const check = (cls, label, checked, onChange) => {
-      const row = document.createElement('label');
-      row.className = `cc-mydata__sync-row ${cls}`;
-      row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
-      const box = document.createElement('input');
-      box.type = 'checkbox'; box.checked = !!checked;
-      box.addEventListener('change', () => onChange(box.checked));
-      row.appendChild(box);
-      const txt = document.createElement('span'); txt.textContent = label;
-      row.appendChild(txt);
-      return row;
-    };
-    for (const silo of ['chat', 'tasks', 'contacts']) {
-      sec.appendChild(check(`cc-mydata__sync-silo-${silo}`, tr(`circle.mydata.sync_silo_${silo}`), syncSelection.silos?.[silo] !== false, (on) => onSetSync({ silo, value: on })));
-    }
-    const files = document.createElement('div');
-    files.className = 'cc-mydata__sync-files';
-    files.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
-    const filesLabel = document.createElement('span'); filesLabel.textContent = tr('circle.mydata.sync_files');
-    const filesSel = document.createElement('select');
-    filesSel.className = 'cc-mydata__sync-files-mode';
-    for (const mode of ['full', 'description']) {
-      const o = document.createElement('option'); o.value = mode; o.textContent = tr(`circle.mydata.sync_files_${mode}`);
-      if ((syncSelection.fileBytes ?? 'full') === mode) o.selected = true;
-      filesSel.appendChild(o);
-    }
-    filesSel.addEventListener('change', () => onSetSync({ fileBytes: filesSel.value }));
-    files.appendChild(filesLabel); files.appendChild(filesSel);
-    sec.appendChild(files);
-    const kh = document.createElement('p'); kh.className = 'cc-mydata__sync-kringen-head'; kh.textContent = tr('circle.mydata.sync_kringen');
-    sec.appendChild(kh);
-    const kringen = Array.isArray(syncSelection.kringen) ? syncSelection.kringen : [];
-    if (!kringen.length) {
-      const none = document.createElement('p'); none.textContent = tr('circle.mydata.sync_kringen_none'); sec.appendChild(none);
-    }
-    const off = syncSelection.kringenOff instanceof Set ? syncSelection.kringenOff : new Set(syncSelection.kringenOff ?? []);
-    for (const k of kringen) {
-      const row = check('cc-mydata__sync-kring', k.name ?? k.id, !off.has(k.id), (on) => onSetSync({ kringId: k.id, on }));
-      row.dataset.kringId = k.id;
-      sec.appendChild(row);
-    }
-    container.appendChild(sec);
-  }
-
-  // ── my global address (2026-07-29) ─────────────────────────────────────────
-  // Placed with delivery rather than alone: it is the same family of question — how much does the
-  // network learn in exchange for reaching you. The cost rides WITH the option, as it does there.
-  if (typeof onSetShareAddress === 'function' && shareNknAddress != null) {
-    const sec = section(tr('circle.mydata.address_sharing'));
-
-    const line = document.createElement('p');
-    line.className = 'cc-mydata__address-sharing';
-    line.textContent = tr(shareNknAddress
-      ? 'circle.mydata.address_sharing_on'
-      : 'circle.mydata.address_sharing_off');
-    sec.appendChild(line);
-
-    const cost = document.createElement('p');
-    cost.className = 'cc-mydata__address-sharing-cost';
-    cost.textContent = tr('circle.mydata.address_sharing_cost');
-    sec.appendChild(cost);
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cc-mydata__action cc-mydata__address-sharing-toggle';
-    btn.textContent = tr(shareNknAddress
-      ? 'circle.mydata.address_sharing_toggle_on'
-      : 'circle.mydata.address_sharing_toggle_off');
-    btn.addEventListener('click', () => onSetShareAddress(!shareNknAddress));
-    sec.appendChild(btn);
-
-    container.appendChild(sec);
   }
 
   // ── message cleanup (the conversation is the RECORD) ────────────────────────

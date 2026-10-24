@@ -526,6 +526,145 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         )}
       </>
     ),
+    'availability': () => (
+      <>
+        {typeof doors.availability === 'function' ? (
+          <Section title={t('circle.profile.availability')}>
+            <Pressable style={styles.doorRow} onPress={doors.availability} accessibilityRole="button" testID="settings-door-availability">
+              <Text style={styles.doorText}>{t('circle.profile.availability')}</Text>
+              <Text style={styles.doorArrow}>→</Text>
+            </Pressable>
+          </Section>
+        ) : null}
+      </>
+    ),
+    'connection-points': () => (
+      <>
+        {typeof doors.points === 'function' ? (
+          <Section title={t('circle.nearbyScreen.points_open')}>
+            <Pressable style={styles.doorRow} onPress={doors.points} accessibilityRole="button" testID="settings-door-points">
+              <Text style={styles.doorText}>{t('circle.nearbyScreen.points_open')}</Text>
+              <Text style={styles.doorArrow}>→</Text>
+            </Pressable>
+          </Section>
+        ) : null}
+      </>
+    ),
+    'delivery': () => (
+      <>
+        <Section title={t('circle.nearbyScreen.delivery_section')}>
+          {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
+              tells you what others see about your receipt setting, because nothing in the model reveals it.
+              A "they cannot tell" reassurance here would be the first place that leaked. */}
+          <Text style={styles.relayHint} testID="delivery-receipts-state">
+            {t(delivery.sendReceipts
+              ? 'circle.nearbyScreen.delivery_receipts_on'
+              : 'circle.nearbyScreen.delivery_receipts_off')}
+          </Text>
+          <Pressable
+            style={styles.relaySave}
+            onPress={() => toggleDelivery({ sendReceipts: !delivery.sendReceipts })}
+            testID="delivery-receipts-toggle"
+          >
+            <Text style={styles.relaySaveText}>
+              {t(delivery.sendReceipts
+                ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
+                : 'circle.nearbyScreen.delivery_receipts_toggle_off')}
+            </Text>
+          </Pressable>
+
+          <Text style={styles.relayHint} testID="delivery-fallback-state">
+            {t(delivery.allowFallback
+              ? 'circle.nearbyScreen.delivery_fallback_on'
+              : 'circle.nearbyScreen.delivery_fallback_off')}
+          </Text>
+          {/* The cost rides WITH the option to enable it — never the fix alone. */}
+          <Text style={styles.relayHint}>{t('circle.nearbyScreen.delivery_fallback_cost')}</Text>
+          {/* The toggle is GONE until the stored setting reaches the send path (2026-08-02) — it wrote a
+              preference nothing read, so both states behaved identically. A control that changes nothing is a
+              stronger false claim than the sentence above it. web ≡ mobile: circleMyData.js does the same. */}
+          <Text style={styles.relayHint} testID="delivery-fallback-note">
+            {t('circle.nearbyScreen.delivery_fallback_note')}
+          </Text>
+        </Section>
+      </>
+    ),
+    'address-sharing': () => (
+      <>
+        {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
+        {shareNknAddress != null ? (
+          <Section title={t('circle.mydata.address_sharing')}>
+            <Text style={styles.privacyBody}>
+              {t(shareNknAddress ? 'circle.mydata.address_sharing_on' : 'circle.mydata.address_sharing_off')}
+            </Text>
+            <Text style={styles.privacyBody}>{t('circle.mydata.address_sharing_cost')}</Text>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>
+                {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
+              </Text>
+              <Switch testID="address-sharing-toggle" value={shareNknAddress === true} onValueChange={() => toggleShareAddress()} />
+            </View>
+          </Section>
+        ) : null}
+      </>
+    ),
+    'relay': () => (
+      <>
+        <Section title={t('circle.mydata.relay')}>
+          {relay ? <KV k={t('circle.mydata.relay')} v={relay} /> : null}
+
+          {/* In-app relay setting — no-server cross-device sync, configurable without a rebuild. */}
+          <View style={styles.relayEdit}>
+            <TextInput
+              style={styles.relayInput}
+              value={relayInput}
+              onChangeText={setRelayInput}
+              placeholder={process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL || 'ws://…:8787'}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              testID="relay-input"
+            />
+            <Pressable style={styles.relaySave} onPress={saveRelay} testID="relay-save">
+              <Text style={styles.relaySaveText}>{t('circle.mydata.relay_save')}</Text>
+            </Pressable>
+          </View>
+          {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
+          <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
+        </Section>
+      </>
+    ),
+    'device-keeps': () => (
+      <>
+        {/* What this device keeps (sync-policy §11, web parity): a device's own choice about itself; never on the wire. */}
+        {syncSel ? (
+          <Section title={t('circle.mydata.sync')}>
+            <Text style={styles.privacyBody}>{t('circle.mydata.sync_intro')}</Text>
+            {SYNC_SILOS.map((silo) => {
+              const on = syncSel.siloOn(silo);
+              return (
+                <Pressable key={silo} onPress={() => setSync({ silo, value: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-silo-${silo}`}>
+                  <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${t(`circle.mydata.sync_silo_${silo}`)}`}</Text>
+                </Pressable>
+              );
+            })}
+            <Pressable onPress={() => setSync({ fileBytes: syncSel.fileBytes() === 'full' ? 'description' : 'full' })} accessibilityRole="button" style={styles.action} testID="sync-files-mode">
+              <Text style={styles.actionLabel}>{`${t('circle.mydata.sync_files')}: ${t(`circle.mydata.sync_files_${syncSel.fileBytes()}`)}`}</Text>
+            </Pressable>
+            <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen')}</Text>
+            {circlesForConnections.length === 0 ? <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen_none')}</Text> : null}
+            {circlesForConnections.map((k) => {
+              const on = syncSel.kringOn(k.id);
+              return (
+                <Pressable key={k.id} onPress={() => setSync({ kringId: k.id, on: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-kring-${k.id}`}>
+                  <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${k.name}`}</Text>
+                </Pressable>
+              );
+            })}
+          </Section>
+        ) : null}
+      </>
+    ),
   };
 
   if (Array.isArray(only)) {
@@ -566,62 +705,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           </Text>
         )}
         {dataLocation.podRoot ? <KV k={t('circle.mydata.pod_root')} v={dataLocation.podRoot} /> : null}
-        {relay ? <KV k={t('circle.mydata.relay')} v={relay} /> : null}
-
-        {/* In-app relay setting — no-server cross-device sync, configurable without a rebuild. */}
-        <View style={styles.relayEdit}>
-          <TextInput
-            style={styles.relayInput}
-            value={relayInput}
-            onChangeText={setRelayInput}
-            placeholder={process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL || 'ws://…:8787'}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            testID="relay-input"
-          />
-          <Pressable style={styles.relaySave} onPress={saveRelay} testID="relay-save">
-            <Text style={styles.relaySaveText}>{t('circle.mydata.relay_save')}</Text>
-          </Pressable>
-        </View>
-        {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
-        <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
-
-        {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
-            tells you what others see about your receipt setting, because nothing in the model reveals it.
-            A "they cannot tell" reassurance here would be the first place that leaked. */}
-        <Text style={styles.sectionTitle}>{t('circle.nearbyScreen.delivery_section')}</Text>
-        <Text style={styles.relayHint} testID="delivery-receipts-state">
-          {t(delivery.sendReceipts
-            ? 'circle.nearbyScreen.delivery_receipts_on'
-            : 'circle.nearbyScreen.delivery_receipts_off')}
-        </Text>
-        <Pressable
-          style={styles.relaySave}
-          onPress={() => toggleDelivery({ sendReceipts: !delivery.sendReceipts })}
-          testID="delivery-receipts-toggle"
-        >
-          <Text style={styles.relaySaveText}>
-            {t(delivery.sendReceipts
-              ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
-              : 'circle.nearbyScreen.delivery_receipts_toggle_off')}
-          </Text>
-        </Pressable>
-
-        <Text style={styles.relayHint} testID="delivery-fallback-state">
-          {t(delivery.allowFallback
-            ? 'circle.nearbyScreen.delivery_fallback_on'
-            : 'circle.nearbyScreen.delivery_fallback_off')}
-        </Text>
-        {/* The cost rides WITH the option to enable it — never the fix alone. */}
-        <Text style={styles.relayHint}>{t('circle.nearbyScreen.delivery_fallback_cost')}</Text>
-        {/* The toggle is GONE until the stored setting reaches the send path (2026-08-02) — it wrote a
-            preference nothing read, so both states behaved identically. A control that changes nothing is a
-            stronger false claim than the sentence above it. web ≡ mobile: circleMyData.js does the same. */}
-        <Text style={styles.relayHint} testID="delivery-fallback-note">
-          {t('circle.nearbyScreen.delivery_fallback_note')}
-        </Text>
-
         {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
         {podCapable && !podSignedIn && (
           <View style={styles.signin}>
@@ -941,48 +1024,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         })()}
       </Section>
 
-      {/* What this device keeps (sync-policy §11, web parity): a device's own choice about itself; never on the wire. */}
-      {syncSel ? (
-        <Section title={t('circle.mydata.sync')}>
-          <Text style={styles.privacyBody}>{t('circle.mydata.sync_intro')}</Text>
-          {SYNC_SILOS.map((silo) => {
-            const on = syncSel.siloOn(silo);
-            return (
-              <Pressable key={silo} onPress={() => setSync({ silo, value: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-silo-${silo}`}>
-                <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${t(`circle.mydata.sync_silo_${silo}`)}`}</Text>
-              </Pressable>
-            );
-          })}
-          <Pressable onPress={() => setSync({ fileBytes: syncSel.fileBytes() === 'full' ? 'description' : 'full' })} accessibilityRole="button" style={styles.action} testID="sync-files-mode">
-            <Text style={styles.actionLabel}>{`${t('circle.mydata.sync_files')}: ${t(`circle.mydata.sync_files_${syncSel.fileBytes()}`)}`}</Text>
-          </Pressable>
-          <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen')}</Text>
-          {circlesForConnections.length === 0 ? <Text style={styles.privacyBody}>{t('circle.mydata.sync_kringen_none')}</Text> : null}
-          {circlesForConnections.map((k) => {
-            const on = syncSel.kringOn(k.id);
-            return (
-              <Pressable key={k.id} onPress={() => setSync({ kringId: k.id, on: !on })} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={styles.action} testID={`sync-kring-${k.id}`}>
-                <Text style={styles.actionLabel}>{`${on ? '☑' : '☐'} ${k.name}`}</Text>
-              </Pressable>
-            );
-          })}
-        </Section>
-      ) : null}
 
-      {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
-      {shareNknAddress != null ? (
-        <Section title={t('circle.mydata.address_sharing')}>
-          <Text style={styles.privacyBody}>
-            {t(shareNknAddress ? 'circle.mydata.address_sharing_on' : 'circle.mydata.address_sharing_off')}
-          </Text>
-          <Text style={styles.privacyBody}>{t('circle.mydata.address_sharing_cost')}</Text>
-          <Pressable onPress={toggleShareAddress} accessibilityRole="button" style={styles.action} testID="address-sharing-toggle">
-            <Text style={styles.actionLabel}>
-              {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
-            </Text>
-          </Pressable>
-        </Section>
-      ) : null}
 
       {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
           confirmed deletion. The note says what is NOT touched: decisions/reports compact into a
@@ -1139,6 +1181,9 @@ const makeStyles = (theme) => StyleSheet.create({
   privacyBody: { fontSize: 13, color: theme.color.inkSoft, lineHeight: 18 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
   switchLabel: { fontSize: 14, color: theme.color.ink, flex: 1, marginRight: 12 },
+  doorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+  doorText: { fontSize: 15, color: theme.color.ink },
+  doorArrow: { fontSize: 15, color: theme.color.inkSoft, marginLeft: 12 },
   // P1 §4 tail — the retention choice row (web parity).
   retentionRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   retentionChoice:      { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },

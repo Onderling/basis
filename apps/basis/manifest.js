@@ -1188,6 +1188,16 @@ export const basisManifest = {
         { id: 'device-keeps',      kind: 'control' },
       ],
     },
+    {
+      id: 'my-data', labelKey: 'circle.settings_home.my_data',
+      sections: [
+        { id: 'history-mirror',  kind: 'control' },
+        { id: 'message-cleanup', kind: 'control' },
+        { id: 'privacy',         kind: 'fact'    },
+        { id: 'usage',           kind: 'fact'    },
+        { id: 'frequent',        kind: 'control' },
+      ],
+    },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
   ],
 

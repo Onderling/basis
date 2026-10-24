@@ -51,7 +51,7 @@ describe('renderCircleMyData', () => {
 
   it('lists privacy sections + usage metrics', () => {
     const el = renderCircleMyData(document.createElement('div'), {
-      t,
+      t, only: ['privacy', 'usage'],   // Mijn gegevens, under the gear
       privacy: [{ title: 'Encryption', body: 'Messages are sealed before they leave the device.' }],
       metrics: { posts: 4, claims: 1 },
     });
@@ -115,7 +115,7 @@ describe('renderCircleMyData', () => {
   it('the history-mirror row: state line reflects off/on/error; the toggle fires the flip', () => {
     const onToggleHistoryMirror = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {
-      t, historyMirror: { enabled: false, status: null }, onToggleHistoryMirror,
+      t, only: ['history-mirror'], historyMirror: { enabled: false, status: null }, onToggleHistoryMirror,
     });
     expect(off.querySelector('[data-role="history-status"]').textContent).toBe('circle.mydata.history_off');
     const btn = off.querySelector('.cc-mydata__history-toggle');
@@ -124,19 +124,19 @@ describe('renderCircleMyData', () => {
     expect(onToggleHistoryMirror).toHaveBeenCalled();
 
     const on = renderCircleMyData(document.createElement('div'), {
-      t, historyMirror: { enabled: true, status: { mirrored: 12, pending: 2, lastError: null } }, onToggleHistoryMirror,
+      t, only: ['history-mirror'], historyMirror: { enabled: true, status: { mirrored: 12, pending: 2, lastError: null } }, onToggleHistoryMirror,
     });
     expect(on.querySelector('[data-role="history-status"]').textContent).toContain('circle.mydata.history_on');
     expect(on.querySelector('[data-role="history-status"]').textContent).toContain('14');   // mirrored + pending
     expect(on.querySelector('.cc-mydata__history-toggle').textContent).toBe('circle.mydata.history_disable');
 
     const err = renderCircleMyData(document.createElement('div'), {
-      t, historyMirror: { enabled: true, status: { mirrored: 3, lastError: 'pod weg' } }, onToggleHistoryMirror,
+      t, only: ['history-mirror'], historyMirror: { enabled: true, status: { mirrored: 3, lastError: 'pod weg' } }, onToggleHistoryMirror,
     });
     expect(err.querySelector('[data-role="history-status"]').textContent).toContain('circle.mydata.history_error');
 
     // absent prop → no section (unchanged surface for hosts that don't pass it)
-    const none = renderCircleMyData(document.createElement('div'), { t });
+    const none = renderCircleMyData(document.createElement('div'), { t, only: ['history-mirror'] });
     expect(none.querySelector('[data-role="history-status"]')).toBe(null);
   });
 

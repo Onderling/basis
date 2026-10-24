@@ -30,6 +30,11 @@ const allSettingsProps = () => ({
   shareNknAddress: true, onSetShareAddress: vi.fn(),
   dataLocation: { relayUrl: 'wss://relay.example' }, onOpenRelayPanel: vi.fn(), relayUrl: 'wss://relay.example',
   syncSelection: { silos: { chat: true, tasks: true, contacts: true }, fileBytes: 'full', kringenOff: new Set(), kringen: [] }, onSetSync: vi.fn(),
+  historyMirror: { enabled: false, status: null }, onToggleHistoryMirror: vi.fn(), onExportHistory: vi.fn(),
+  onPurgeMessages: vi.fn(async () => 0),
+  privacy: [{ title: 'P', body: 'b' }],
+  metrics: { opens: 3 },
+  frequent: [], onClearFrequent: vi.fn(),
 });
 
 describe('settings behind the gear (web)', () => {

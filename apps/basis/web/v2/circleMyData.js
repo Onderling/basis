@@ -501,6 +501,156 @@ export function renderCircleMyData(container, {
         container.appendChild(sec);
       }
     },
+    'history-mirror': () => {
+      // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
+      if (historyMirror && typeof onToggleHistoryMirror === 'function') {
+        const h = historyMirror;
+        const sec2 = section(tr('circle.mydata.history'));
+        const state = document.createElement('p');
+        state.className = 'cc-mydata__history-status';
+        state.dataset.role = 'history-status';
+        const line = historyStatusLine({ enabled: h.enabled, status: h.status });
+        state.textContent = tr(line.key, line.vars);
+        sec2.appendChild(state);
+        const what = document.createElement('p');
+        what.className = 'cc-mydata__history-what';
+        what.textContent = tr('circle.mydata.history_what');
+        sec2.appendChild(what);
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'cc-mydata__action cc-mydata__history-toggle';
+        toggle.textContent = h.enabled ? tr('circle.mydata.history_disable') : tr('circle.mydata.history_enable');
+        toggle.addEventListener('click', () => onToggleHistoryMirror());
+        sec2.appendChild(toggle);
+        // Export = "mirror to a file" — the same sink, one shot, sealed the same way; needs no pod.
+        if (typeof onExportHistory === 'function') {
+          const exp = document.createElement('button');
+          exp.type = 'button';
+          exp.className = 'cc-mydata__action cc-mydata__history-export';
+          exp.textContent = tr('circle.mydata.history_export');
+          exp.addEventListener('click', () => onExportHistory());
+          sec2.appendChild(exp);
+        }
+        container.appendChild(sec2);
+      }
+    },
+    'message-cleanup': () => {
+      // ── message cleanup (the conversation is the RECORD) ────────────────────────
+      // Messages never expire by policy — deleting them is the user's own explicit act: pick an age, then
+      // confirm the clearly-destructive button (two clicks; the first arms it). The result line reports the
+      // real count, and the note says what is NOT touched (decisions/reports compact, they don't delete).
+      if (typeof onPurgeMessages === 'function') {
+        const sec = section(tr('circle.mydata.cleanup'));
+
+        let chosenDays = RETENTION_CHOICES_DAYS[RETENTION_CHOICES_DAYS.length - 1];
+        const row = document.createElement('div');
+        row.className = 'cc-mydata__retention';
+        const chips = [];
+        for (const days of RETENTION_CHOICES_DAYS) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'cc-mydata__action cc-mydata__retention-choice';
+          if (days === chosenDays) b.classList.add('is-on');
+          b.textContent = tr('circle.mydata.cleanup_older_than', { days });
+          b.addEventListener('click', () => {
+            chosenDays = days;
+            for (const c of chips) c.classList.toggle('is-on', c === b);
+            disarm();
+          });
+          chips.push(b);
+          row.appendChild(b);
+        }
+        sec.appendChild(row);
+
+        const act = document.createElement('button');
+        act.type = 'button';
+        act.className = 'cc-mydata__action cc-mydata__cleanup-run';
+        const result = document.createElement('p');
+        result.className = 'cc-mydata__retention-note';
+        let armed = false;
+        const disarm = () => { armed = false; act.classList.remove('is-armed'); act.textContent = tr('circle.mydata.cleanup_button', { days: chosenDays }); };
+        disarm();
+        act.addEventListener('click', async () => {
+          if (!armed) {
+            armed = true;
+            act.classList.add('is-armed');
+            act.textContent = tr('circle.mydata.cleanup_confirm', { days: chosenDays });
+            return;
+          }
+          let count = 0;
+          try { count = (await onPurgeMessages(chosenDays)) ?? 0; } catch { count = 0; }
+          disarm();
+          result.textContent = tr('circle.mydata.cleanup_done', { count });
+        });
+        sec.appendChild(act);
+        sec.appendChild(result);
+
+        const note = document.createElement('p');
+        note.className = 'cc-mydata__retention-note';
+        note.textContent = tr('circle.mydata.cleanup_note');
+        sec.appendChild(note);
+
+        container.appendChild(sec);
+      }
+    },
+    'privacy': () => {
+      // ── privacy ────────────────────────────────────────────────────────────────
+      if (Array.isArray(privacy) && privacy.length) {
+        const priv = section(tr('circle.mydata.privacy'));
+        for (const s of privacy) {
+          const item = document.createElement('div');
+          item.className = 'cc-mydata__privacy';
+          const h = document.createElement('div');
+          h.className = 'cc-mydata__privacy-title';
+          h.textContent = s.title ?? '';
+          const b = document.createElement('p');
+          b.className = 'cc-mydata__privacy-body';
+          b.textContent = s.body ?? '';
+          item.appendChild(h);
+          item.appendChild(b);
+          priv.appendChild(item);
+        }
+        container.appendChild(priv);
+      }
+    },
+    'usage': () => {
+      // ── usage ──────────────────────────────────────────────────────────────────
+      const entries = Object.entries(metrics || {});
+      if (entries.length) {
+        const usage = section(tr('circle.mydata.usage'));
+        for (const [k, v] of entries) {
+          usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
+        }
+        container.appendChild(usage);
+      }
+    },
+    'frequent': () => {
+      // ── what you use most (this device only) ─────────────────────────────────────
+      {
+        const sec = section(tr('circle.mydata.frequent'));
+        const note = document.createElement('p');
+        note.className = 'cc-mydata__note';
+        note.textContent = tr('circle.mydata.frequent_note');
+        sec.appendChild(note);
+        if (Array.isArray(frequent) && frequent.length) {
+          for (const r of frequent) sec.appendChild(kv(r.name, r.items.map((i) => `${i.label} ${i.count}`).join(' · ')));
+          if (typeof onClearFrequent === 'function') {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'cc-btn cc-btn--quiet cc-mydata__frequent-clear';
+            b.textContent = tr('circle.mydata.frequent_clear');
+            b.addEventListener('click', () => onClearFrequent());
+            sec.appendChild(b);
+          }
+        } else {
+          const none = document.createElement('p');
+          none.className = 'cc-mydata__note';
+          none.textContent = tr('circle.mydata.frequent_none');
+          sec.appendChild(none);
+        }
+        container.appendChild(sec);
+      }
+    },
   };
   if (Array.isArray(only)) {
     container.classList.add('cc-settings-group');
@@ -892,150 +1042,6 @@ export function renderCircleMyData(container, {
     container.appendChild(sec);
   }
 
-  // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
-  if (historyMirror && typeof onToggleHistoryMirror === 'function') {
-    const h = historyMirror;
-    const sec2 = section(tr('circle.mydata.history'));
-    const state = document.createElement('p');
-    state.className = 'cc-mydata__history-status';
-    state.dataset.role = 'history-status';
-    const line = historyStatusLine({ enabled: h.enabled, status: h.status });
-    state.textContent = tr(line.key, line.vars);
-    sec2.appendChild(state);
-    const what = document.createElement('p');
-    what.className = 'cc-mydata__history-what';
-    what.textContent = tr('circle.mydata.history_what');
-    sec2.appendChild(what);
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'cc-mydata__action cc-mydata__history-toggle';
-    toggle.textContent = h.enabled ? tr('circle.mydata.history_disable') : tr('circle.mydata.history_enable');
-    toggle.addEventListener('click', () => onToggleHistoryMirror());
-    sec2.appendChild(toggle);
-    // Export = "mirror to a file" — the same sink, one shot, sealed the same way; needs no pod.
-    if (typeof onExportHistory === 'function') {
-      const exp = document.createElement('button');
-      exp.type = 'button';
-      exp.className = 'cc-mydata__action cc-mydata__history-export';
-      exp.textContent = tr('circle.mydata.history_export');
-      exp.addEventListener('click', () => onExportHistory());
-      sec2.appendChild(exp);
-    }
-    container.appendChild(sec2);
-  }
-
-  // ── message cleanup (the conversation is the RECORD) ────────────────────────
-  // Messages never expire by policy — deleting them is the user's own explicit act: pick an age, then
-  // confirm the clearly-destructive button (two clicks; the first arms it). The result line reports the
-  // real count, and the note says what is NOT touched (decisions/reports compact, they don't delete).
-  if (typeof onPurgeMessages === 'function') {
-    const sec = section(tr('circle.mydata.cleanup'));
-
-    let chosenDays = RETENTION_CHOICES_DAYS[RETENTION_CHOICES_DAYS.length - 1];
-    const row = document.createElement('div');
-    row.className = 'cc-mydata__retention';
-    const chips = [];
-    for (const days of RETENTION_CHOICES_DAYS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'cc-mydata__action cc-mydata__retention-choice';
-      if (days === chosenDays) b.classList.add('is-on');
-      b.textContent = tr('circle.mydata.cleanup_older_than', { days });
-      b.addEventListener('click', () => {
-        chosenDays = days;
-        for (const c of chips) c.classList.toggle('is-on', c === b);
-        disarm();
-      });
-      chips.push(b);
-      row.appendChild(b);
-    }
-    sec.appendChild(row);
-
-    const act = document.createElement('button');
-    act.type = 'button';
-    act.className = 'cc-mydata__action cc-mydata__cleanup-run';
-    const result = document.createElement('p');
-    result.className = 'cc-mydata__retention-note';
-    let armed = false;
-    const disarm = () => { armed = false; act.classList.remove('is-armed'); act.textContent = tr('circle.mydata.cleanup_button', { days: chosenDays }); };
-    disarm();
-    act.addEventListener('click', async () => {
-      if (!armed) {
-        armed = true;
-        act.classList.add('is-armed');
-        act.textContent = tr('circle.mydata.cleanup_confirm', { days: chosenDays });
-        return;
-      }
-      let count = 0;
-      try { count = (await onPurgeMessages(chosenDays)) ?? 0; } catch { count = 0; }
-      disarm();
-      result.textContent = tr('circle.mydata.cleanup_done', { count });
-    });
-    sec.appendChild(act);
-    sec.appendChild(result);
-
-    const note = document.createElement('p');
-    note.className = 'cc-mydata__retention-note';
-    note.textContent = tr('circle.mydata.cleanup_note');
-    sec.appendChild(note);
-
-    container.appendChild(sec);
-  }
-
-  // ── privacy ────────────────────────────────────────────────────────────────
-  if (Array.isArray(privacy) && privacy.length) {
-    const priv = section(tr('circle.mydata.privacy'));
-    for (const s of privacy) {
-      const item = document.createElement('div');
-      item.className = 'cc-mydata__privacy';
-      const h = document.createElement('div');
-      h.className = 'cc-mydata__privacy-title';
-      h.textContent = s.title ?? '';
-      const b = document.createElement('p');
-      b.className = 'cc-mydata__privacy-body';
-      b.textContent = s.body ?? '';
-      item.appendChild(h);
-      item.appendChild(b);
-      priv.appendChild(item);
-    }
-    container.appendChild(priv);
-  }
-
-  // ── usage ──────────────────────────────────────────────────────────────────
-  const entries = Object.entries(metrics || {});
-  if (entries.length) {
-    const usage = section(tr('circle.mydata.usage'));
-    for (const [k, v] of entries) {
-      usage.appendChild(kv(k, typeof v === 'object' ? JSON.stringify(v) : String(v)));
-    }
-    container.appendChild(usage);
-  }
-  // ── what you use most (this device only) ─────────────────────────────────────
-  {
-    const sec = section(tr('circle.mydata.frequent'));
-    sec.dataset.section = 'mydata-frequent';
-    const note = document.createElement('p');
-    note.className = 'cc-mydata__note';
-    note.textContent = tr('circle.mydata.frequent_note');
-    sec.appendChild(note);
-    if (Array.isArray(frequent) && frequent.length) {
-      for (const r of frequent) sec.appendChild(kv(r.name, r.items.map((i) => `${i.label} ${i.count}`).join(' · ')));
-      if (typeof onClearFrequent === 'function') {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'cc-btn cc-btn--quiet cc-mydata__frequent-clear';
-        b.textContent = tr('circle.mydata.frequent_clear');
-        b.addEventListener('click', () => onClearFrequent());
-        sec.appendChild(b);
-      }
-    } else {
-      const none = document.createElement('p');
-      none.className = 'cc-mydata__note';
-      none.textContent = tr('circle.mydata.frequent_none');
-      sec.appendChild(none);
-    }
-    container.appendChild(sec);
-  }
   if (typeof version === 'string') {
     const v = document.createElement('div');
     v.className = 'cc-profile__version';

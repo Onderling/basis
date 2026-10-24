@@ -151,8 +151,10 @@ export class BotAgentRegistry {
     const tasks = this.#tasksAgent;
     // The bot's key is `public` on the engine that judges it: its token's `bot.*` scope is all it reaches there. Left
     // unknown it would default to `authenticated` and reach every op of that tier token-less — on a host that is
-    // every authenticated op of every app it carries.
-    await tasks.policyEngine.trustRegistry?.setTier?.(identity.pubKey, 'public');
+    // every authenticated op of every app it carries. So no registry to say it in means no adoption, never a skip.
+    const registry = tasks.policyEngine?.trustRegistry;
+    if (typeof registry?.setTier !== 'function') throw new Error('BotAgentRegistry: the engine has no trust registry to hold the bot at public; not adopted');
+    await registry.setTier(identity.pubKey, 'public');
     const theirs = tasks.security.adoptInProcessPeer(tasks.transport, agent.transport, identity);
     const ours = agent.security.adoptInProcessPeer(agent.transport, tasks.transport, tasks.identity);
     if (theirs === 'refused' || ours === 'refused') throw new Error('BotAgentRegistry: the bot could not be adopted on the tasks bus');

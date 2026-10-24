@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const SRC = readFileSync(fileURLToPath(new URL('../src/screens/v2/CircleMyDataScreen.js', import.meta.url)), 'utf8');
 const titles = (text) => [...text.matchAll(/<Section title=\{t\('([^']+)'\)\}/g)].map((m) => m[1]);
 
-/** Each section id the Weergave group declares, and the one title its painter opens. */
+/** Each section id a group declares (Weergave, Verbinding), and the one title its painter opens. */
 const OWN_TITLE = {
   'theme': 'circle.mydata.theme',
   'language': 'circle.mydata.language',
@@ -23,6 +23,12 @@ const OWN_TITLE = {
   'week-overview': 'circle.profile.week_switch',
   'notifications': 'circle.mydata.notifications',
   'assistant': 'circle.userLlm.title',
+  'availability': 'circle.profile.availability',
+  'connection-points': 'circle.nearbyScreen.points_open',
+  'delivery': 'circle.nearbyScreen.delivery_section',
+  'address-sharing': 'circle.mydata.address_sharing',
+  'relay': 'circle.mydata.relay',
+  'device-keeps': 'circle.mydata.sync',
 };
 
 const painterBodies = () => {
@@ -42,9 +48,25 @@ describe('mobile settings painters', () => {
     const page = SRC.slice(SRC.indexOf('  return (\n    <ScrollView style={styles.wrap}'));
     expect(titles(page)).toEqual([
       'circle.profile.mydata_more', 'circle.mydata.storage', 'circle.mydata.keys', 'circle.mydata.devices',
-      'circle.companionGrant.nodes', 'circle.mydata.connections', 'circle.mydata.connection_add', 'circle.mydata.sync',
-      'circle.mydata.address_sharing', 'circle.mydata.cleanup', 'circle.mydata.history', 'circle.mydata.privacy',
+      'circle.companionGrant.nodes', 'circle.mydata.connections', 'circle.mydata.connection_add',
+      'circle.mydata.cleanup', 'circle.mydata.history', 'circle.mydata.privacy',
       'circle.mydata.frequent', 'circle.mydata.usage',
     ]);
+  });
+});
+
+describe('the two moves out of My data, on mobile (web: contactsRoster.js, the awaiting chip)', () => {
+  const read = (name) => readFileSync(fileURLToPath(new URL(`../src/screens/v2/${name}`, import.meta.url)), 'utf8');
+  it('Contacten has the blocked door, also on an empty roster; the launcher opens the blocked list from it', () => {
+    const contacts = read('ContactsScreen.js');
+    expect(contacts).toMatch(/onBlocked = null/);
+    expect(contacts.match(/\{blockedDoor\}/g)?.length).toBe(2);   // the empty roster and the list both
+    expect(read('CircleLauncherScreen.js')).toMatch(/onBlocked=\{\(\) => setView\('blocked'\)\}/);
+  });
+  it('Mij opens shared-with-me from its chip, with the count handed in as a source', () => {
+    const profile = read('CircleProfileScreen.js');
+    expect(profile).toMatch(/a\?\.kind === 'open-shared-with-me'\) onSharedWithMe\?\.\(\)/);
+    expect(profile).toMatch(/sharedWithMeCount: sources\.sharedWithMeCount/);
+    expect(read('CircleLauncherScreen.js')).toMatch(/sharedWithMeCount: async \(\) =>/);
   });
 });

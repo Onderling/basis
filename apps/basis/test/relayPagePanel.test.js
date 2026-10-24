@@ -34,7 +34,7 @@ describe('my-data relay control — routes through the side-panel', () => {
     const onOpenRelayPanel = vi.fn();
     const container = document.createElement('div');
     renderCircleMyData(container, {
-      t: (k) => k, onOpenRelayPanel, relayUrl: '', relayEnvUrl: 'ws://env:8787',
+      t: (k) => k, onOpenRelayPanel, relayUrl: '', relayEnvUrl: 'ws://env:8787', only: ['relay'],   // the relay is a Verbinding section
     });
     const btn = container.querySelector('.cc-mydata__relay-open');
     expect(btn).not.toBeNull();

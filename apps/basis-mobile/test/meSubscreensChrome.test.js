@@ -31,7 +31,8 @@ describe('the screens under Me', () => {
     expect(read('CircleAdvancedScreen.js')).toMatch(/onBack/);
     const launcher = read('CircleLauncherScreen.js');
     expect(launcher).toMatch(/<CircleAdvancedScreen[^>]*onBack=\{\(\) => setView\('profile'\)\}/);
-    expect(launcher).toMatch(/<CircleAvailabilityScreen\s+store=\{availabilityStore\}\s+onBack=\{\(\) => setView\('mydata'\)\}/);
+    // availability is a door in the Verbinding settings now: its back is that group's screen
+    expect(launcher).toMatch(/<CircleAvailabilityScreen\s+store=\{availabilityStore\}\s+onBack=\{\(\) => \{ setSettingsGroupId\('connection'\); setView\('settingsGroup'\); \}\}/);
   });
 
   it('Availability paints its field text in ink, and its placeholders in the soft ink', () => {

@@ -45,7 +45,9 @@ import { INBOX_KIND, isInboxItem } from '@onderling/item-types';
  */
 const BOT_SKILL_OPTS = {
   description: undefined,        // overridden per skill
-  visibility:  'authenticated',
+  // public + requires-token: a bot's key sits at `public` on the host's registry, so its token's `bot.*` scope is the
+  // ONLY thing it reaches there — every other op of the host asks a tier a bot key does not have.
+  visibility:  'public',
   policy:      'requires-token',
 };
 

@@ -31,7 +31,7 @@ describe('renderAttachments(basisManifest) — the ATTACHMENT projector', () => 
     // `embed` is NOT here, and its absence is the decision: it takes an item id, so as a "+" entry it
     // could only open a form asking a person to type one. It is a ROW ACTION on the item instead —
     // the item is on the screen and knows its own id. The "+" is for things that do not exist yet.
-    expect(attachMenu.map((e) => e.opId)).toEqual(['embed-file', 'embed-time']);
+    expect(attachMenu.map((e) => e.opId)).toEqual(['embed-file', 'embed-time', 'feedback']);
   });
 
   it('projects the file entry (embed-file → "Bestand") with its itemType', () => {
@@ -56,7 +56,8 @@ describe('renderAttachments(basisManifest) — the ATTACHMENT projector', () => 
 });
 
 describe('noticeboard composer — the projected "+" attach menu', () => {
-  const attachMenu = renderAttachments(basisManifest).attachMenu;
+  // a circle's composer offers the CIRCLE-scope entries (an own-scope one — feedback — is the "+" sheet's)
+  const attachMenu = renderAttachments(basisManifest).attachMenu.filter((e) => (e.scopes ?? ['circle']).includes('circle'));
 
   it('renders a "+" trigger + a menu item per entry (not the hardcoded 📎)', () => {
     const el = renderCircleNoticeboard(document.createElement('div'), {
@@ -110,7 +111,8 @@ describe('noticeboard composer — the projected "+" attach menu', () => {
 });
 
 describe('circle composer — the same projected "+" menu', () => {
-  const attachMenu = renderAttachments(basisManifest).attachMenu;
+  // a circle's composer offers the CIRCLE-scope entries (an own-scope one — feedback — is the "+" sheet's)
+  const attachMenu = renderAttachments(basisManifest).attachMenu.filter((e) => (e.scopes ?? ['circle']).includes('circle'));
   const CIRCLE = { id: 'c1', name: 'Buren' };
 
   it('renders the menu + routes the file entry through onAttachMedia', () => {

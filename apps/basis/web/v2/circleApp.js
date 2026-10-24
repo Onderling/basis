@@ -179,7 +179,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
 import { renderVandaagPlus } from './vandaagPlus.js';
-import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel } from '../../src/v2/vandaagPlus.js';
+import { plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusLineOutcome, plusReadWithModel, plusModelAsk, orderedPlusActs, PLUS_ACTS, OWN_USAGE_SCOPE, plusLabel, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
 import { handleOp, keySnoozeUntil } from '../../src/v2/onboardingStrip.js';
 import { renderHeaderAvatar } from './headerAvatar.js';
 import { loadPersonaAvatar, pictureRefOf } from '../../src/v2/personaAvatar.js';
@@ -912,6 +912,11 @@ function mountBasisOpsOnAgent(agent) {
     screenStore: userScreenStore,
     podAuth,
     openFilePicker: webFilePicker,
+    // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
+    openFeedback: ({ webid, draft }) => { showContactThread(webid, { draft }).catch(() => {}); },
+    feedbackCard: SEEDED_CONTACT_CARD,
+    appVersion: APP_VERSION,
+    currentScreen: () => feedbackScreenState(),
     // /send-file resizes a photo the way a circle photo is resized (the one encoder, the one cap).
     encodeImage: encodeImageFile,
     briefRunner: (o) => runBrief({ catalogue: circleCatalogue, callSkill: rawCallSkill, cache: _briefCache, bypassCache: o?.bypassCache }),
@@ -2898,6 +2903,10 @@ function buildCircleBot(agent) {
 // Top-level tab bar (Circles / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
 let _activeTab = null;             // which top-level tab is showing — so a landed turn can repaint the bar's badge
+// The screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name.
+function feedbackScreenState() {
+  return { inCircle: !!getActiveCircle(), screen: _activeTab };
+}
 let _contactUnread = {};           // the last computed unread map (contactId → {unread, lastTs}); the bar reads its sum
 function showTabBar(active) {
   // Every top-level screen passes here; a DM thread is no longer on screen once one does, so a turn arriving for
@@ -3314,8 +3323,9 @@ async function addBotFromInput(input) {
 // a 1:1 DM thread with a contact-bot. The conversational turn goes over
 // the contact-thread channel (sa.peer → mdns/relay/nkn); the async reply lands
 // via `onContactReply` (registered in the peer router) and re-renders here.
-async function showContactThread(contactId) {
+async function showContactThread(contactId, { draft = '' } = {}) {
   hideCircleTabBar(tabBarEl);
+
   let row = null;
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
   catch { /* fall back to any cached thread below */ }
@@ -3327,6 +3337,8 @@ async function showContactThread(contactId) {
   const peerAddr = row?.peerAddr ?? contactThreads.get(contactId)?.peerAddr ?? contactId;
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
+  // a draft to start the composer with (the feedback door's prefill): it stays in the composer until the person sends
+  if (typeof draft === 'string' && draft) thread.draft = draft;
   thread.name = name; thread.peerAddr = peerAddr;
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
@@ -3397,6 +3409,7 @@ async function showContactThread(contactId) {
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
+    inputValue: thread.draft ?? '',
     face,
     resolvePicture: resolveFace,
     messages: (() => {
@@ -3439,6 +3452,7 @@ async function showContactThread(contactId) {
       }
     },
     onSend: async (text) => {
+      thread.draft = '';   // the draft went out with this (or was replaced by what they typed)
       // `/skill args` → dispatch as a skill; otherwise a conversational turn.
       if (text.startsWith('/')) {
         const sp = text.slice(1).indexOf(' ');
@@ -4437,7 +4451,17 @@ function showVandaagPlus({ edit = null } = {}) {
       _pendingPinOpen = r; close(); showDetail(r.circleId);
     },
     onPickSelf: (id) => { asSelf = id; paint(); },
-    onPick: (id) => { actId = id; error = null; paint(); },
+    onPick: (id) => {
+      const picked = PLUS_ACTS.find((a) => a.id === id);
+      // an act that makes nothing and asks nothing (feedback) runs at once: no empty form in between
+      if (actRunsAtOnce(picked)) {
+        close();
+        rawCallSkill(picked.appOrigin, picked.opId, { screen: t('circle.vandaag.plus') })
+          .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
+        return;
+      }
+      actId = id; error = null; paint();
+    },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
     // …and when the plain reading misses, the person's own model reads it (only theirs; none set = no model)
     onRead: async (text) => {
@@ -5098,6 +5122,13 @@ function showSettingsHome() {
     t, onBack: showMij,
     onOpenGroup: (id) => showMyData({ group: id }),
     onOpenPerCircle: showSettingsCircleChooser,
+    // another door at the foot (feedback): its op, through the waist, naming this screen's id (never words)
+    onOpenDoor: (d) => {
+      if (d?.target?.kind !== 'op') return;
+      // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
+      rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
+        .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
+    },
   });
 }
 

@@ -10,20 +10,22 @@ const groupsOf = (manifest) => (Array.isArray(manifest?.settingsGroups) ? manife
 /**
  * @param {object} manifest
  * @returns {{ groups: Array<{id: string, labelKey: string, sections: Array<{id: string, kind: string, custody: boolean, target?: object}>}>,
- *   perCircle: {id: string, labelKey: string, target: object}|null }}
+ *   perCircle: {id: string, labelKey: string, target: object}|null, doors: Array<{id: string, labelKey: string, target: object}> }}
  */
 export function settingsHomeFor(manifest) {
   const groups = [];
   let perCircle = null;
+  const doors = [];   // the other doors at the foot of the home (each an op or a view): feedback
   for (const g of groupsOf(manifest)) {
     if (g?.id === 'per-circle') { perCircle = { id: g.id, labelKey: g.labelKey, target: g.target }; continue; }
+    if (g?.kind === 'door') { doors.push({ id: g.id, labelKey: g.labelKey, target: g.target }); continue; }
     groups.push({
       id: g.id,
       labelKey: g.labelKey,
       sections: (g.sections ?? []).map((s) => ({ id: s.id, kind: s.kind, custody: s.custody === true, ...(s.target ? { target: s.target } : {}) })),
     });
   }
-  return { groups, perCircle };
+  return { groups, perCircle, doors };
 }
 
 /** One group, by id, or null. */

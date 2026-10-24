@@ -60,8 +60,10 @@ describe('privatemodeProvider', () => {
   });
 });
 
-describe('privatemodeProvider — LIVE (skipped without a key)', () => {
-  const key = readPrivatemodeKey();
+// A key file on the machine is not consent to spend its quota: the live call runs only with LIVE_LLM=1 (as
+// apps/basis/test/live/ does). One run of this suite on a key-holding laptop once reached the enclave unasked.
+describe('privatemodeProvider — LIVE (LIVE_LLM=1 and a key)', () => {
+  const key = process.env.LIVE_LLM === '1' ? readPrivatemodeKey() : null;
   const maybe = key ? it : it.skip;
   maybe('attests, encrypts and answers a Dutch tool pick through the real enclave', async () => {
     const p = await privatemodeProvider({ apiKey: key, timeoutMs: 60_000 });

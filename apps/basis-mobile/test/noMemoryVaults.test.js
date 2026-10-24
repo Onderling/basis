@@ -25,8 +25,8 @@ function fakeAsyncStorage(store = new Map()) {
 describe('the phone keeps every vault', () => {
   it('no realAgent vault falls back to memory, and the in-process agents keep their keys across a relaunch', { timeout: 120_000 }, async () => {
     const asyncStorage = fakeAsyncStorage();
-    // what an install from before the fold still holds: the retired household and folio agents' keys
-    for (const prefix of ['cc-household-agent-id:', 'cc-folio-id:']) asyncStorage.store.set(`${prefix}agent-privkey`, 'an old private key');
+    // what an install from before the fold still holds: the retired household, folio and tasks agents' keys
+    for (const prefix of ['cc-household-agent-id:', 'cc-folio-id:', 'cc-tasks-id:']) asyncStorage.store.set(`${prefix}agent-privkey`, 'an old private key');
     const before = memoryVaultFallbacks().length;
     const first = await bootAgentBundle({ asyncStorage });
     expect(memoryVaultFallbacks().slice(before)).toEqual([]);
@@ -36,9 +36,9 @@ describe('the phone keeps every vault', () => {
     const second = await bootAgentBundle({ asyncStorage });
     const keysSecond = agentSlots();
     const prefixes = new Set(Object.keys(keysFirst).map((k) => k.split(':')[0]));
-    expect([...prefixes].sort()).toEqual(['cc-host-id', 'cc-pinboard-id', 'cc-tasks-id']);
+    expect([...prefixes].sort()).toEqual(['cc-host-id', 'cc-pinboard-id']);
     // the retired agents' keys are forgotten at boot: nothing owns them any more
-    expect([...asyncStorage.store.keys()].filter((k) => /^cc-(household-agent|folio)-id:/.test(k))).toEqual([]);
+    expect([...asyncStorage.store.keys()].filter((k) => /^cc-(household-agent|folio|tasks)-id:/.test(k))).toEqual([]);
     expect(keysSecond).toEqual(keysFirst);   // the same stored keys: restored, not minted again
     try { await second.agent?.stop?.(); } catch { /* */ }
   });

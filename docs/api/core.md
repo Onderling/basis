@@ -2435,7 +2435,7 @@ All known role ids (standard + registered custom), sorted by rank descending.
 
 ```js
 class TaskGrantManager
-new TaskGrantManager({ identity, agentId, parentToken, store = null, onRevoked = null } = {})
+new TaskGrantManager({ identity, agentId, parentToken, store = null, storeKey = STORE_KEY, onRevoked = null } = {})
 ```
 
 Materialize task-scoped capability tokens for a member, attenuated from the
@@ -2461,7 +2461,7 @@ Vault-backed store for CapabilityTokens received from peers ("held" tokens). `ge
 returns the latest-expiring valid token matching an agent+skill; `revoke()` marks a
 token locally revoked; `cleanup()` deletes expired tokens from the vault.
 
-**Methods:** `store()` · `get()` · `revoke()` · `isRevoked()` · `cleanup()`
+**Methods:** `store()` · `get()` · `holds()` · `revoke()` · `isRevoked()` · `cleanup()`
 
 ## `src/permissions/TrustRegistry.js`
 

@@ -136,6 +136,7 @@ import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
 import { createBrowserPinboardAgent } from '@onderling-app/pinboard/browser';
+import { assertPinboardHostBindings } from './pinboardHostBindings.js';
 import { PINBOARD_OP_ALIAS } from '../../v2/pinboardOpAliases.js';
 import { shouldFanNoticeboardItem, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
 import { toCircleStorePost } from '../../v2/noticeboardCarry.js';
@@ -4974,7 +4975,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       return (await matchProfileDrivers({ properties: offerings, item: post })).length > 0;
     } catch { return false; }
   };
-  const pinboardAgent = await createBrowserPinboardAgent({
+  const pinboardAgent = await createBrowserPinboardAgent({ ...assertPinboardHostBindings({
     matchesMine,
     bus,
     identityVault: pinboardIdentityVault,
@@ -5047,7 +5048,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // passes nothing.
     allowAddressFallback: opts.allowAddressFallback,
     label:      'PinboardAgent(cc)',
-  });
+  }) });
   pinboardAgentRef.current = pinboardAgent;   // the raw contact-book reads above may run from here on
   // Every noticeboard item the pinboard store ACCEPTS fans to its circle — a request, an offer, an
   // announcement, and the next kind — through the one `circle-post` door (`noticeboardFan.js` decides from
@@ -7811,6 +7812,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       const stat = (a) => { const l = layerOf(a); return l ? { installed: l.hasSenderAuthorizer, byAbsence: l.senderAuthorizationsByAbsence, refused: l.refusedUnauthorizedSenders } : null; };
       return { host: stat(hostAgent), tasks: stat(tasksCircle?.agent), pinboard: stat(pinboardAgent?.bundle?.agent) };
     },
+    // Each in-process agent's own key, read-only — for the check that none of them is ever on the wire or on a card.
+    inProcessAddresses: () => ({
+      host: hostAgent?.address ?? null, tasks: tasksCircle?.agent?.address ?? null,
+      pinboard: pinboardAgent?.bundle?.agent?.identity?.pubKey ?? pinboardAgent?.address ?? null,
+    }),
     // The skill ids each in-process agent registers, read-only — for the check that one op has one owner.
     inProcessSkillIds: () => {
       const idsOf = (a) => (a?.skills?.all?.() ?? []).map((d) => d.id).sort();

@@ -7698,6 +7698,14 @@
     "awaiting_shared": {
       "text": "Shared with you: {{count}}",
       "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
+    },
+    "interests_label": {
+      "text": "Interests",
+      "doc": "Mij → the person's interests: one driver whose tags say what they like (matched on the device, released per circle)."
+    },
+    "goals_label": {
+      "text": "Goals",
+      "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
     }
   },
   "attach": {

@@ -5,7 +5,7 @@
 // invalid-driver are all exercised.
 import { describe, it, expect } from 'vitest';
 import { createDriver, driversFromProperties } from '@onderling/agent-registry';
-import { setProfileDriver, getProfileDrivers } from '../src/cores.js';
+import { setProfileDriver, getProfileDrivers, removeProfileDriver } from '../src/cores.js';
 
 // A minimal profiles collaborator mirroring realAgent's setDriver/getDrivers over an in-memory map.
 function fakeStore() {
@@ -15,6 +15,7 @@ function fakeStore() {
     profiles: {
       setDriver: async ({ key, kind, text, tags }) => { properties[key] = createDriver({ kind, text, tags }); return { ok: true }; },
       getDrivers: async () => driversFromProperties(properties),
+      removeDriver: async ({ key }) => { if (!properties[key]?.kind) return { ok: false, reason: 'not-a-driver' }; delete properties[key]; return { ok: true }; },
     },
     _properties: properties,
   };
@@ -70,5 +71,16 @@ describe('setProfileDriver / getProfileDrivers (#3)', () => {
     const unwired = { registry: { list: async () => [] }, profiles: {} };
     expect((await setProfileDriver(unwired, { id: 'd', key: 'k', text: 'y' })).reason).toBe('profiles-unavailable');
     expect((await getProfileDrivers(unwired, { id: 'd' })).reason).toBe('profiles-unavailable');
+  });
+});
+
+describe('removeProfileDriver — a driver can be taken off again', () => {
+  it('removes a driver; refuses a non-driver key and a missing id/key', async () => {
+    const store = fakeStore();
+    await setProfileDriver(store, { id: 'default', key: 'goals', kind: 'goal', text: 'zeilen leren', tags: ['zeilen'] });
+    expect(await removeProfileDriver(store, { id: 'default', key: 'goals' })).toEqual({ ok: true, id: 'default', key: 'goals' });
+    expect(Object.keys((await getProfileDrivers(store, { id: 'default' })).drivers)).toEqual([]);
+    expect(await removeProfileDriver(store, { id: 'default', key: 'place' })).toMatchObject({ ok: false, reason: 'not-a-driver' });
+    expect(await removeProfileDriver(store, { id: '', key: 'goals' })).toMatchObject({ ok: false, reason: 'id-required' });
   });
 });

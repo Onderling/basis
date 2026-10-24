@@ -25,27 +25,26 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(60_000);
   });
 
-  // Availability is a door in My data, under Mij (Mij V1, 2026-10-15): Mij → "My data" → "Availability"; its Save and
-  // its back return to My data.
+  // Availability is a door under the gear (Instellingen → Verbinding, 2026-10-24): Mij → the gear → Verbinding →
+  // "Availability"; its Save and its back return to Verbinding.
   async function openAvailability() {
     await element(by.id('circle-tab-mij')).tap();
-    await waitFor(element(by.id('circle-profile'))).toBeVisible().withTimeout(10_000);
-    await waitFor(element(by.id('profile-mydata'))).toBeVisible()
-      .whileElement(by.id('circle-profile')).scroll(400, 'down');
-    await element(by.id('profile-mydata')).tap();
-    await waitFor(element(by.id('circle-mydata'))).toExist().withTimeout(10_000);
-    await waitFor(element(by.id('mydata-door-availability'))).toBeVisible()
-      .whileElement(by.id('circle-mydata')).scroll(400, 'down');
-    await element(by.id('mydata-door-availability')).tap();
+    await waitFor(element(by.id('profile-settings'))).toBeVisible().withTimeout(10_000);
+    await element(by.id('profile-settings')).tap();
+    await waitFor(element(by.id('settings-group-connection'))).toBeVisible().withTimeout(10_000);
+    await element(by.id('settings-group-connection')).tap();
+    await waitFor(element(by.id('settings-door-availability'))).toBeVisible()
+      .whileElement(by.id('circle-settings-group')).scroll(400, 'down');
+    await element(by.id('settings-door-availability')).tap();
     // The loading state carries the same `circle-availability` id — wait for the loaded form (its holiday switch).
     await waitFor(element(by.id('holiday-active'))).toBeVisible().withTimeout(15_000);
   }
 
-  it('opens Availability from My data, toggles holiday, Saves back to My data', async () => {
+  it('opens Availability from Verbinding, toggles holiday, Saves back to Verbinding', async () => {
     await openAvailability();
     await element(by.id('holiday-active')).tap();
     await element(by.id('circle-availability-save')).tap();
-    await waitFor(element(by.id('circle-mydata'))).toBeVisible().withTimeout(10_000);
+    await waitFor(element(by.id('circle-settings-group'))).toBeVisible().withTimeout(10_000);
   });
 
   it('the Circles tab returns from Availability to the launcher', async () => {

@@ -84,7 +84,7 @@ export { deriveSignature, itemSignature, sharedTags, jaccard, scoreDriver, match
 export { matchableSignature, matchProfilesMatchable } from './src/driverMatch.js';
 // anonymous-talk reveal ladder (#5b) — self-controlled, unilateral, ephemeral-default identity reveal.
 export { REVEAL_LEVELS, isRevealLevel, revealRank, nextRevealLevel, ephemeralHandle, createParticipant, revealSelf, revealNext, presentSelf, presetForRevealLevel, revealLevelForPreset } from './src/revealLadder.js';
-export { createDisclosurePolicy, setDisclosure, getDisclosure, releasedValues, releasedForMatching, isDisclosed, isMatchable, isRequestable } from './src/disclosure.js';
+export { createDisclosurePolicy, setDisclosure, forgetDisclosureKey, getDisclosure, releasedValues, releasedForMatching, isDisclosed, isMatchable, isRequestable } from './src/disclosure.js';
 // reveal PRESETS (C7) — named amount-bundles (`handle → profile → full`) over disclosure's
 // `enabled` axis; the single reveal-state home. Per-attribute booleans stay the truth.
 export { REVEAL_PRESETS, isRevealPreset, revealPresetRank, nextRevealPreset, applyRevealPreset, revealPresetOf } from './src/disclosure.js';

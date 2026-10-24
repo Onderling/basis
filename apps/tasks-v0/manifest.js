@@ -1119,11 +1119,13 @@ export const tasksManifest = {
      * has a visible data source).
      */
     {
-      id:         'open',
+      // the open tasks — the 'tasks' screen that /mytasks opens (listMine's `ui.screen`) is this view
+      id:         'tasks',
       title:      'Open',
       type:       'task',
       filter:     { open: true },
-      dataSource: { skillId: 'listOpen', args: { type: 'task' } },
+      // the panel names its circle (`$circleId`, host-materialized): the tasks resolver reads one store per circle
+      dataSource: { skillId: 'listOpen', args: { type: 'task' }, argsFromContext: { circleId: '$circleId' } },
     },
     {
       id:         'mine',

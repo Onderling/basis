@@ -7532,11 +7532,11 @@
       "doc": "mij#personas — eigenschap zonder waarde op de algemene persona."
     },
     "offerings_label": {
-      "text": "Aanbod & drijfveren",
-      "doc": "mij#personas — rij-label voor de chips met vaardigheden/drijfveren."
+      "text": "Aanbod",
+      "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ aanbod of drijfveer",
+      "text": "+ aanbod",
       "doc": "mij#personas — gestippelde toevoeg-knop (potentiële-actie-grammatica)."
     },
     "offering_text_ph": {
@@ -7706,6 +7706,22 @@
     "goals_label": {
       "text": "Doelen",
       "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
+    },
+    "goal_add": {
+      "text": "+ doel",
+      "doc": "Mij → Goals: opens the form to add a goal."
+    },
+    "goal_text_ph": {
+      "text": "wat wil je bereiken, in een zin",
+      "doc": "Mij → Goals: the phrase field placeholder."
+    },
+    "interest_add_ph": {
+      "text": "een interesse, bv. tuinieren",
+      "doc": "Mij → Interests: the field to add one interest (a tag)."
+    },
+    "driver_remove": {
+      "text": "Haal {{what}} weg",
+      "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
     }
   },
   "attach": {

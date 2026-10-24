@@ -13,14 +13,14 @@ const drivers = [
 ];
 
 describe('driverSections', () => {
-  it('three sections in order; each driver in its kind\'s section; other kinds stay out', () => {
+  it('three sections in order; each driver in its kind\'s section; other personal kinds show under Goals', () => {
     const s = driverSections(drivers);
     expect(s.map((x) => x.id)).toEqual(DRIVER_SECTION_IDS);
     expect(DRIVER_SECTION_IDS).toEqual(['offerings', 'interests', 'goals']);
     expect(s[0].rows.map((r) => r.key)).toEqual(['fietsen maken']);
     expect(s[1].tags).toEqual(['tuinieren', 'koken']);
     expect(s[1].key).toBe('interests');
-    expect(s[2].rows.map((r) => r.key)).toEqual(['goal:leren zeilen']);
+    expect(s[2].rows.map((r) => r.key)).toEqual(['goal:leren zeilen', 'oud']);
     expect(s.every((x) => typeof x.labelKey === 'string')).toBe(true);
   });
 
@@ -49,5 +49,32 @@ describe('interestTagsAfter', () => {
     expect(interestTagsAfter(['koken'], { add: ' Tuinieren ' })).toEqual(['koken', 'tuinieren']);
     expect(interestTagsAfter(['koken', 'tuinieren'], { add: 'koken' })).toEqual(['koken', 'tuinieren']);
     expect(interestTagsAfter(['koken', 'tuinieren'], { remove: 'koken' })).toEqual(['tuinieren']);
+  });
+});
+
+describe('saveDriver / removeDriver — the one write path both shells call', async () => {
+  const { saveDriver, removeDriver } = await import('../../src/v2/driversSection.js');
+  const calls = [];
+  const callSkill = async (app, op, args) => { calls.push([app, op, args]); return { ok: true }; };
+
+  it('a goal → setProfileDriver with the projection\'s key and kind, on the persona', async () => {
+    calls.length = 0;
+    expect(await saveDriver({ callSkill, personaId: 'default', section: 'goals', input: { text: 'Leren zeilen', tags: 'water' } })).toEqual({ ok: true });
+    expect(calls).toEqual([['agents', 'setProfileDriver', { id: 'default', key: 'goal:leren zeilen', kind: 'goal', text: 'Leren zeilen', tags: 'water' }]]);
+  });
+  it('interests with no tags left → the interests driver is removed, not written empty', async () => {
+    calls.length = 0;
+    await saveDriver({ callSkill, personaId: 'default', section: 'interests', input: { tags: [] } });
+    expect(calls).toEqual([['agents', 'removeProfileDriver', { id: 'default', key: 'interests' }]]);
+  });
+  it('nothing to write → no call', async () => {
+    calls.length = 0;
+    expect(await saveDriver({ callSkill, personaId: 'default', section: 'goals', input: { text: ' ' } })).toEqual({ ok: false, reason: 'empty' });
+    expect(calls).toEqual([]);
+  });
+  it('remove → removeProfileDriver by key', async () => {
+    calls.length = 0;
+    await removeDriver({ callSkill, personaId: 'p-1', key: 'goal:leren zeilen' });
+    expect(calls).toEqual([['agents', 'removeProfileDriver', { id: 'p-1', key: 'goal:leren zeilen' }]]);
   });
 });

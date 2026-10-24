@@ -164,6 +164,8 @@ const GATE_RULES = [
     if (!list || items.length !== 1) return null;
     return { opId: 'addToList', args: { list, text: items[0] }, ...(items.length > 1 ? { more: items.slice(1).map((x) => ({ opId: 'addToList', args: { list, text: x } })) } : {}) };
   } },
+  // "wat hebben we nodig?" — the shopping list (the template's shopping role, never a name)
+  { id: 'lists.listEntries.need', name: 'lists:listEntries(what-we-need)', build: (_m, _t, { shopping }) => (shopping ? { opId: 'listEntries', args: { list: shopping } } : null) },
   { id: 'lists.listEntries.named', name: 'lists:listEntries(named-list-read)', build: (m, _t, { listFor, holdsEvents }) => {
     const list = listFor(m.list);
     if (!list) return null;

@@ -8,7 +8,6 @@ import { makeHandleCirclePost } from '../src/core/handlers/circlePost.js';
 function harness({ drivers }) {
   const events = [];
   const callSkill = vi.fn(async (app, op) => {
-    if (op === 'ingestRemotePost') return { itemId: 'item-1' };
     if (op === 'getProfileDrivers') return { ok: true, drivers };
     return {};
   });

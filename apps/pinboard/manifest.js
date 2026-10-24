@@ -1649,20 +1649,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'ingestRemotePost', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      params: [
-        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'payload',      kind: 'object', required: true },
-      ],
-      resolves: [{ field: 'text', policy: 'content' }],
-      surfaces: {
-        chat: { hint: 'Ingest a bulletin post from an authenticated peer.' },
-        ui:   { control: 'page' },
-      },
-    },
   ],
 
   // first pinboard web page via renderWeb.

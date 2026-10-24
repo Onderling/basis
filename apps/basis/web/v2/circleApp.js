@@ -9365,8 +9365,7 @@ async function boot() {
       // handler + connect the NKN transport (best-effort; no-op when
       // nkn-sdk failed to load).  The ingest hook mirrors the envelope
       // into pinboard's itemStore so circle chat history is durable,
-      // searchable, and mute/eviction-filtered (parity with /post
-      // delivery via `ingestRemotePost`).  EventLog append still drives
+      // searchable, and mute/eviction-filtered.  EventLog append still drives
       // the live bubble render.
       const ingestCircleMessage = async (payload, fromPeerAddr) => {
         try {

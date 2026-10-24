@@ -692,6 +692,12 @@ export async function sendDirectMessage(page, text, { to: wanted = null } = {}) 
   return { sent: kept, to, sealedTo, why: kept ? '' : 'the sender did not keep the turn — it never left this device' };
 }
 
+/**
+ * The Contacten rows that are a conversation with someone. The help bot's row is synthetic: it opens the help circle,
+ * not a thread, and going back from there leaves Contacten, so a loop over every row stops at it.
+ */
+export const THREAD_ROWS = '.cc-contacts__row:not([data-synthetic="true"])';
+
 /** Poll the other side's contact threads until the text shows up in one. */
 export async function waitForContactMessage(page, text, opts = {}) {
   return (await waitForContactMessageDetailed(page, text, opts)).found;
@@ -706,7 +712,7 @@ export async function waitForContactMessageDetailed(page, text, { tries = 10, ev
     await gotoCircles(page);
     const tab = page.locator('[data-tab="contacten"]');
     if (await tab.count()) { await tab.first().click(); await page.waitForTimeout(1500); }
-    const rows = page.locator('.cc-contacts__row');
+    const rows = page.locator(THREAD_ROWS);
     for (let r = 0; r < await rows.count(); r++) {
       await rows.nth(r).click();
       await page.waitForTimeout(1500);

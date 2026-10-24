@@ -28,17 +28,19 @@ import { matchProfileDrivers } from '@onderling/agent-registry';
  * @param {Array<object>} a.posts
  * @param {() => Promise<Record<string,object>>} a.getDrivers
  * @param {Function} [a.judge]
+ * @param {boolean} [a.modelConsent=false]  the persona's word on a model judging its drivers (`modelConsentFor`);
+ *                                          without a yes the judge is never called
  * @param {number} [a.minShared=1]
  * @returns {Promise<Array<object>>}  posts, each optionally carrying `resonance`
  */
-export async function annotateResonantPosts({ posts, getDrivers, judge, minShared = 1 } = {}) {
+export async function annotateResonantPosts({ posts, getDrivers, judge, modelConsent = false, minShared = 1 } = {}) {
   const list = Array.isArray(posts) ? posts : [];
   let drivers = {};
   try { drivers = (await getDrivers?.()) ?? {}; } catch { drivers = {}; }
   if (!drivers || Object.keys(drivers).length === 0) return list;
   return Promise.all(list.map(async (p) => {
     let matches = [];
-    try { matches = await matchProfileDrivers({ properties: drivers, item: p, judge, minShared }); }
+    try { matches = await matchProfileDrivers({ properties: drivers, item: p, judge, modelConsent, minShared }); }
     catch { matches = []; }
     return matches.length ? { ...p, resonance: { reason: matchReasonText(matches[0]), matches } } : p;
   }));
@@ -59,15 +61,16 @@ export function matchReasonText(match) {
  * @param {object} a.item                         the incoming item (driverSignature | text/tags)
  * @param {() => Promise<Record<string,object>>} a.getDrivers   loads the active persona's drivers
  * @param {Function} [a.judge]                    optional injected LLM judge
+ * @param {boolean} [a.modelConsent=false]        the persona's yes; the judge runs only under it
  * @param {number} [a.minShared=1]
  * @returns {Promise<Array<object>>}
  */
-export async function evaluateItemForDrivers({ item, getDrivers, judge, minShared = 1 } = {}) {
+export async function evaluateItemForDrivers({ item, getDrivers, judge, modelConsent = false, minShared = 1 } = {}) {
   if (!item || typeof getDrivers !== 'function') return [];
   let drivers = {};
   try { drivers = (await getDrivers()) ?? {}; } catch { return []; }
   if (!drivers || Object.keys(drivers).length === 0) return [];
-  try { return await matchProfileDrivers({ properties: drivers, item, judge, minShared }); }
+  try { return await matchProfileDrivers({ properties: drivers, item, judge, modelConsent, minShared }); }
   catch { return []; }
 }
 
@@ -87,8 +90,8 @@ export async function evaluateItemForDrivers({ item, getDrivers, judge, minShare
  * @param {number} [a.minShared=1]
  * @returns {Promise<{notified:boolean, matches:Array<object>}>}
  */
-export async function notifyIfResonant({ item, getDrivers, notify, judge, minShared = 1 } = {}) {
-  const matches = await evaluateItemForDrivers({ item, getDrivers, judge, minShared });
+export async function notifyIfResonant({ item, getDrivers, notify, judge, modelConsent = false, minShared = 1 } = {}) {
+  const matches = await evaluateItemForDrivers({ item, getDrivers, judge, modelConsent, minShared });
   if (!matches.length || typeof notify !== 'function') return { notified: false, matches };
   const top = matches[0];
   const itemTitle = item?.title ?? item?.text ?? '';

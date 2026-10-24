@@ -847,7 +847,7 @@ Derive a driver signature FROM an item. An item that carries an explicit `driver
 **Kind:** function · **Import:** `matchProfileDrivers` from `'@onderling/agent-registry'`
 
 ```js
-matchProfileDrivers({ properties, item, judge, minShared = 1 } = {})
+matchProfileDrivers({ properties, item, judge, modelConsent = false, minShared = 1 } = {})
 ```
 
 Convenience bridge: match an item against the DRIVER properties held on a profile's property map
@@ -897,7 +897,7 @@ matcher's device; they are not surfaced anywhere (the de-identification model).
 **Kind:** function · **Import:** `matchProfilesMatchable` from `'@onderling/agent-registry'`
 
 ```js
-matchProfilesMatchable({ properties, candidateMatchable, judge, minShared = 1 } = {})
+matchProfilesMatchable({ properties, candidateMatchable, judge, modelConsent = false, minShared = 1 } = {})
 ```
 
 PROFILE↔PROFILE matchable-aware match: score MY private drivers against a CANDIDATE's MATCHABLE
@@ -985,13 +985,16 @@ map (as stored on the profile) OR an array of driver values.
 **Kind:** function · **Import:** `matchDriversSemantic` from `'@onderling/agent-registry'`
 
 ```js
-async matchDriversSemantic({ drivers, signature, judge, minShared = 1 } = {})
+async matchDriversSemantic({ drivers, signature, judge: offered, modelConsent = false, minShared = 1 } = {})
 ```
 
 SEMANTIC on-device match: the deterministic matches PLUS, when an LLM `judge` is wired, the drivers
 that DON'T share tags but the judge rules resonant (catching the synonyms tag-overlap misses). The
 judge runs locally/privatemode/companion — the drivers still never leave a trusted environment.
 Every judge match carries the judge's own reason, so the explainability invariant holds.
+
+The judge runs only under the persona's yes (`modelConsent: true`, from `modelConsentFor`): a judge handed in
+without it is ignored, so no caller reaches a model on someone's drivers they did not agree to.
 
 `judge({ driver, signature })` resolves `{ match:boolean, reason?:string }`. A judge that throws (or
 a missing judge) simply yields no semantic additions — the deterministic layer always stands.
@@ -1575,6 +1578,43 @@ profilePictureDescriptor()
 
 The descriptor for the canonical `profilePicture` property (media-typed).
 
+## `src/modelConsent.js`
+
+### `MODEL_CONSENT_KEY`
+
+**Kind:** constant · **Import:** `MODEL_CONSENT_KEY` from `'@onderling/agent-registry'`
+
+The profile property that holds a persona's word (true · false) on a model judging its drivers.
+
+### `modelConsentFor`
+
+**Kind:** function · **Import:** `modelConsentFor` from `'@onderling/agent-registry'`
+
+```js
+modelConsentFor(getProfile, personaId, { defaultProfileId = null, modelConfigured = false } = {})
+```
+
+Whether a model may judge this persona's drivers: its own word, else the default persona's, else — nothing said
+anywhere — whether the person configured a model on this device.
+
+**Parameters**
+
+- `getProfile` `(id: string) => object|null`
+- `personaId` `string`
+- `[opts]` `{ defaultProfileId?: string|null, modelConfigured?: boolean }`
+
+**Returns:** `boolean`
+
+### `consentedJudge`
+
+**Kind:** function · **Import:** `consentedJudge` from `'@onderling/agent-registry'`
+
+```js
+consentedJudge(judge, consent)
+```
+
+The one gate on the judge seam: the judge is handed on only under a yes (`true`, nothing else).
+
 ## `src/offeringsTaxonomy.js`
 
 ### `OFFERINGS_TAXONOMY`
@@ -2067,7 +2107,7 @@ The registry's marker namespace (`_inherit.offering`, …): every key under it i
 
 **Kind:** constant · **Import:** `PERSON_SETTABLE_KEYS` from `'@onderling/agent-registry'`
 
-The keys a person may set through the property ops although this package defines them (their own media ref).
+The keys a person may set through the property ops although this package defines them (their picture, their word on a model).
 
 ### `isReservedPropertyKey`
 

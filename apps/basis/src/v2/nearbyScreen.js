@@ -104,6 +104,8 @@ export function nearbyVisibilityKey(visibility) {
  * @param {() => boolean} [deps.levelChosen]  whether the room self chose a Nearby level; until it did, the device is
  *   never announced (default-strict: absent ⇒ not chosen)
  * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
+ * @param {() => boolean} [deps.modelConsent]  the room self's word on a model judging its drivers; without a yes the
+ *                                        judge is never called
  * @param {() => number} [deps.now]
  * @param {string} [deps.restingState]   passed through to the session adapter
  * @param {function} [deps.t]
@@ -134,6 +136,7 @@ export function createNearbyScreen({
   roomLevel = null,
   levelChosen = () => false,
   judge,
+  modelConsent = () => false,
   now = () => Date.now(),
   restingState,
   // The persisted radio switch, a {get, set} port over 'on'|'off' (a shell's device-local store).
@@ -241,7 +244,7 @@ export function createNearbyScreen({
     asksInFlight.add(ask.id);
     let evaluated = { resonant: false, reason: null };
     if (typeof getDrivers === 'function') {
-      try { evaluated = await evaluateIncomingAsk({ ask, getDrivers, judge, now }); }
+      try { evaluated = await evaluateIncomingAsk({ ask, getDrivers, judge, modelConsent: modelConsent?.() === true, now }); }
       catch (err) { try { onError?.(err, 'evaluateAsk'); } catch { /* diagnostics only */ } }
     }
     asksInFlight.delete(ask.id);

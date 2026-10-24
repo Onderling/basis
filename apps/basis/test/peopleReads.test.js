@@ -15,6 +15,8 @@ import { withAssistantOps } from '../src/v2/assistantOps.js';
 import { EventLog } from '../src/eventLog.js';
 import { createBotThreads, memoryThreadStore } from '../src/v2/botThreads.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
+// N CALENDAR days from now at this clock time — never `now + N × 24h`, which on a DST night lands on the wrong day
+const daysFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
 
 const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.template.chores': 'Klusjes', 'circle.lists.template.repairs': 'Reparaties', 'circle.lists.template.schedule': 'Agenda' };
 const t = (k, p) => NAMES[k] ?? (p ? `${k} ${JSON.stringify(p)}` : k);
@@ -23,7 +25,7 @@ const ANN = 'telegram:1'; const BERT = 'telegram:2'; const FRITS = 'telegram:9';
 
 describe('the people reads', () => {
   let agent; let door;
-  const X = local(new Date(Date.now() + 3 * 86_400_000));          // the day asked about
+  const X = local(daysFromNow(3));          // the day asked about
   const as = (caller) => (a, o, x) => agent.callSkill(a, o, x, { caller });
   const names = (value) => agent.callSkill('params', 'set-param', { key: 'assistant.names', value });
 
@@ -114,7 +116,7 @@ describe('the people reads', () => {
       expect(r.message).toContain('tandarts');
       expect(JSON.stringify(r)).not.toContain('telegram:');
       // a day in words is read on the household's clock
-      expect((await day(BERT, 'morgen')).day).toBe(local(new Date(Date.now() + 86_400_000)));
+      expect((await day(BERT, 'morgen')).day).toBe(local(daysFromNow(1)));
       // the week, without a day, is as it was
       expect((await door('assistant', 'weekOverview', {}, { caller: BERT, threadId: BERT })).message).toContain('circle.bot.overview_head');
     });

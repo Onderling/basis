@@ -188,7 +188,7 @@ import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
-import { settingsGroupFor } from '../../src/v2/settingsHome.js';
+import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsHome.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
@@ -4582,7 +4582,7 @@ async function showMij() {
     t, blocks, profilePage,
     onBlockAction: (a) => {
       if (a?.kind === 'edit-me') openAboutMePanel('default');
-      else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') showMyData();
+      else if (settingsGroupForAction(a)) showMyData({ group: settingsGroupForAction(a) });   // devices, agents, the offer
       else if (a?.kind === 'open-shared-with-me') showSharedWithMe();
       // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
       else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
@@ -4844,6 +4844,8 @@ function ensurePagePanel() {
 async function showMyData(opts) {
   // a settings group's screen (from the gear on Mij): the same sections and handlers, only that group's, in its order
   const group = typeof opts?.group === 'string' ? settingsGroupFor(basisManifest, opts.group) : null;
+  // a ceremony or wizard that closes comes back to the screen it was opened from
+  const again = () => showMyData(opts);
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
@@ -4860,16 +4862,16 @@ async function showMyData(opts) {
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
   const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
-  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
+  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => again() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
   const onReceivePersonas = () => showReceivePersonas();
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
-  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
+  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => again() });
   // The replace ceremony: retire every other device in one act, after a restore.
-  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
-  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => showMyData() });
+  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); again(); } });
+  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => again() });
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {

@@ -590,6 +590,18 @@ matchable be TRUE while disclosed is FALSE.
 - `key` `string`
 - `[choice]` `{ enabled?: boolean, rung?: string|null, matchable?: boolean, requestable?: boolean }`
 
+### `forgetDisclosureKey`
+
+**Kind:** function · **Import:** `forgetDisclosureKey` from `'@onderling/agent-registry'`
+
+```js
+forgetDisclosureKey(policy, key)
+```
+
+Forget one property's disclosure in EVERY context: what a removed property leaves behind would otherwise be a
+release with nothing under it, which comes back the day a property of the same key does. Returns a NEW policy; a
+context left empty goes too.
+
 ### `getDisclosure`
 
 **Kind:** function · **Import:** `getDisclosure` from `'@onderling/agent-registry'`

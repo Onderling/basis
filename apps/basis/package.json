@@ -55,6 +55,7 @@
   },
   "dependencies": {
     "@onderling/notifier": "workspace:*",
+    "@onderling/notify-envelope": "workspace:*",
     "@inrupt/solid-client": "^3.0.0",
     "@inrupt/solid-client-authn-browser": "^2.4.0",
     "@onderling-app/agents": "workspace:*",
@@ -88,6 +89,7 @@
     "@onderling/redaction": "workspace:*",
     "@onderling/sdk": "workspace:*",
     "@onderling/secure-agent": "workspace:*",
+    "@onderling/substrate-stack": "workspace:*",
     "@onderling/sync-engine": "workspace:*",
     "@onderling/vault": "workspace:*",
     "@onderling/web-adapter": "workspace:*",

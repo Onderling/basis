@@ -206,7 +206,7 @@ const _cfg = withOnderlingPreset({
       // 6. SHIM the Node-only Telegram bridge. It does `import { Telegraf } from 'telegraf'`
       //    + `class … extends Telegraf`; on Hermes telegraf doesn't load → the base is
       //    undefined → "Super expression must be null or a function" at module-eval → the
-      //    whole agent boot fails. household/src re-exports it, so it lands in the RN bundle
+      //    whole agent boot fails. a re-export would land it in the RN bundle
       //    even though mobile never runs a Telegram bot. Resolve it to a no-op stub. (Mirror
       //    of the web vite alias.) Must be a subpath resolver, not extraShims — the preset's
       //    generic `@onderling/<pkg>/<subpath>` handler would otherwise resolve the real file first.
@@ -222,8 +222,8 @@ const _cfg = withOnderlingPreset({
 // Wrap the preset's resolveRequest to intercept BEFORE its generic `@onderling/<pkg>/<subpath>`
 // handler. The Telegram bridge is Node-only (`import { Telegraf } from 'telegraf'` →
 // `class … extends Telegraf`); on Hermes telegraf doesn't load → the base is undefined →
-// "Super expression must be null or a function" → agent boot fails. household/src re-exports
-// it, so it lands in the RN bundle. extraSubpathResolvers run AFTER the generic @onderling
+// "Super expression must be null or a function" → agent boot fails. A re-export
+// would land it in the RN bundle. extraSubpathResolvers run AFTER the generic @onderling
 // handler (which resolves the REAL file first), so the shim must intercept here. Mirror of
 // the web vite alias.
 const _presetResolve = _cfg.resolver.resolveRequest;

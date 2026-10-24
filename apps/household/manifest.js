@@ -32,7 +32,7 @@
 import gateEn from './gate.en.json' with { type: 'json' };
 import gateNl from './gate.nl.json' with { type: 'json' };
 
-import { SYSTEM_PROMPT_CLASSIFY } from './src/llm/prompts.js';
+import { SYSTEM_PROMPT_CLASSIFY } from './prompts.js';
 
 const STR_NONEMPTY = { schema: { minLength: 1 } };
 

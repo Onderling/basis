@@ -47,7 +47,7 @@ import { shareItemAcrossCircles, shareItemToPublishedKey as sharedShareItemToPub
 import { createCirclePodCustody } from '../../../basis/src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../../basis/src/v2/circleCacheMedium.js';
 import { circleStoreMode } from '../../../basis/src/v2/circleDataPolicy.js';
-import { buildHouseholdDataSource } from '../../../household/src/index.js';
+import { buildHouseholdDataSource } from '../../../basis/src/household/persist.js';
 // objective L follow-up — the mobile per-circle policy store (AsyncStorage-backed, `cc.circlePolicy.<id>`
 // keys). Mirror of web circleApp.js's module-level `policyStore`: the composition-root's `policyOf` reads the
 // LIVE per-circle `sharePosture` from here instead of the deny-by-default `{}`.

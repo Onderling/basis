@@ -14,7 +14,7 @@
  */
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { buildHouseholdDataSource } from '@onderling-app/household';
+import { buildHouseholdDataSource } from '../household/persist.js';
 import { backendSnapshotIo, fileKeyValueStorage } from './eventLogPersistence.js';
 import { sealedLocalBackend, sealedKeyValue, shellContentSeal } from './localStoreSeal.js';
 

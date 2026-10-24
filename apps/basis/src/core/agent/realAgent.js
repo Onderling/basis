@@ -282,10 +282,10 @@ import { parseDateInput as parseCalendarDate } from '@onderling-app/calendar';
 // re-exports the retired `HOUSEHOLD_SKILL_REGISTRY` / `HouseholdAgent`. The `InMemoryStore`
 // (`HouseholdStore`) survives here solely as the no-pod sync mirror's substrate backing;
 // the live item data lives in the per-circle `CircleItemStore` (householdService).
-import { InMemoryStore as HouseholdStore } from '../../../../household/src/storage/InMemoryStore.js';
-import { buildHouseholdSubstrateStack }    from '../../../../household/src/lib/substrateStack.js';
-import { wireHouseholdSubstrateMirror }    from '../../../../household/src/substrateMirror.js';
-import { buildHouseholdDataSource }        from '../../../../household/src/storage/persist.js';
+import { InMemoryStore as HouseholdStore } from '../../household/InMemoryStore.js';
+import { buildHouseholdSubstrateStack }    from '../../household/substrateStack.js';
+import { wireHouseholdSubstrateMirror }    from '../../household/substrateMirror.js';
+import { buildHouseholdDataSource }        from '../../household/persist.js';
 import { householdManifest }               from '../../../../household/manifest.js';
 import { basisManifest }                   from '../../../manifest.js';                  // basis's own op contract — the gate on the waist branch below
 import { createLocalBuiltins }             from '../localBuiltins.js';                   // basis's own handlers: the table every shell has been dispatching around

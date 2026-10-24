@@ -85,6 +85,20 @@
       "what does it have to do"
     ]
   },
+  "lists.listEntries.need": {
+    "doc": "\"What do we need?\" — read the household's shopping list (with or without a shop or place after it).",
+    "patterns": [
+      "what do we (still)? need",
+      "what do we (still)? need {any}"
+    ],
+    "examples": [
+      "what do we need?",
+      "What do we still need at the market?"
+    ],
+    "not": [
+      "we don't need milk"
+    ]
+  },
   "lists.listEntries.named": {
     "doc": "Read what is on a list the household names (the agenda reads its appointments).",
     "patterns": [

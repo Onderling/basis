@@ -1,7 +1,7 @@
 /**
  * dispatch — parse a chat-bot text message into a Tasks skill call.
  *
- * Mirrors the shape of `apps/household/src/parsers/regexCommands.js`
+ * Mirrors the shape of the retired household bot's regex command parser
  * (locked V0 grammar there) but for Tasks V1's surface. Pure module
  * — no I/O. Returns:
  *

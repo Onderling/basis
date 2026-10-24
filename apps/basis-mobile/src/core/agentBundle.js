@@ -44,7 +44,7 @@ import { announceOwnCircleAddress } from '../../../basis/src/v2/circleAddressAnn
 import { makeSyncSelection } from '../../../basis/src/v2/syncSelection.js';
 import { createContactDmStore } from '../../../basis/src/v2/contactDmStore.js';
 import { createAttachmentBlobStoreRN } from './attachmentBlobStoreRN.js';
-import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
+import { buildHouseholdDataSource } from '../../../basis/src/household/persist.js';
 // Calendar cross-peer fan-out — wrap the bundle callSkill so a successful calendar
 // op fans its invite/RSVP envelopes out over the peer transport (web parity).
 import { withCalendarOutbound } from '../../../basis/src/core/handlers/calendarOutbound.js';

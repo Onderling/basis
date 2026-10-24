@@ -88,6 +88,9 @@ importers:
       '@onderling/notifier':
         specifier: workspace:*
         version: link:../../packages/notifier
+      '@onderling/notify-envelope':
+        specifier: workspace:*
+        version: link:../../packages/notify-envelope
       '@onderling/oidc-session':
         specifier: workspace:*
         version: link:../../packages/oidc-session
@@ -121,6 +124,9 @@ importers:
       '@onderling/secure-agent':
         specifier: workspace:*
         version: link:../../packages/secure-agent
+      '@onderling/substrate-stack':
+        specifier: workspace:*
+        version: link:../../packages/substrate-stack
       '@onderling/sync-engine':
         specifier: workspace:*
         version: link:../../packages/sync-engine

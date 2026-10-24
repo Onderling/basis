@@ -3,7 +3,7 @@
  * of crypto randomness).  ~26 chars, lexicographically sortable by
  * creation time, collision-resistant.
  *
- * Lifted from apps/household/src/storage/InMemoryStore.js (see
+ * Lifted from apps/basis/src/household/InMemoryStore.js (see
  * pattern-source notes in Project Files/Substrates/L1b-item-store.md).
  *
  * Requires `globalThis.crypto.getRandomValues` — Node ≥19, browsers,

@@ -433,7 +433,7 @@ import { renderMandatePicker } from './mandatePicker.js';
 // The platform-neutral enforcement assembly (web≡mobile — mobile's circlePods.js calls the SAME builder).
 import { buildCircleShareEnforcement } from '../../src/v2/circleShareEnforcement.js';
 import { renderContainerCard } from './containerCard.js';      // the nested container card (web DOM)
-import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';  // portable persistent DataSource (IDB on web) — submodule import so basis's live path no longer loads the retired household skillRegistry/HouseholdAgent via index.js (L3)
+import { buildHouseholdDataSource } from '../../src/household/persist.js';  // portable persistent DataSource (IDB on web) — submodule import so basis's live path no longer loads the retired household skillRegistry/HouseholdAgent via index.js (L3)
 
 // The WEB confirm presenter: mount the dialog, resolve once on accept(true)/cancel(false), then remove
 // the overlay (catchUpChooserModal pattern). Accept-exactly-once / cancel-never-executes belong to the

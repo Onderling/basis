@@ -371,12 +371,20 @@ export class BotAgentRegistry {
           for (const k of (await vault.list()).filter((k) => k.startsWith('token:'))) {
             await vault.delete(k);
           }
-          // never longer than the token it replaces, never longer than a fresh one
+          // never longer than the token it replaces, never longer than a fresh one — with a second's margin, as `issue`
+          // counts from its own now; a binding with no time left is expired, not stretched
           const until = Math.min(parsed.expiresAt ?? Infinity, Date.now() + DEFAULT_TTL_DAYS * MS_PER_DAY);
+          const expiresIn = until - Date.now() - 1_000;
+          if (expiresIn <= 0) {
+            try { await agent.stop(); } catch { /* noop */ }
+            try { await this.#dataSource.delete(uri); } catch { /* noop */ }
+            out.expired++;
+            continue;
+          }
           const fresh = await this.#tasksAgent.issueCapabilityToken({
             subject:    identity.pubKey,
             skill:      'bot.*',
-            expiresIn:  Math.max(60_000, until - Date.now()),
+            expiresIn,
             constraints: { actingAs: binding.webid, scope: 'bot' },
           });
           await tokenRegistry.store(fresh);

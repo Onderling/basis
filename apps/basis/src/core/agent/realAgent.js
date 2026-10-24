@@ -4424,10 +4424,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    * can be checked and re-signed by the host (`BotAgentRegistry.restoreAll`); then its prefix is emptied. An emptied
    * prefix holds no key, so later boots re-sign nothing — the forgetting is the one-shot marker.
    */
-  const retiredTasksVault = pickVault('cc-tasks-id:');
+  const retiredTasksVault = opts.tasksIdentityVault ?? pickVault('cc-tasks-id:');
   let retiredBotIssuer = null;
   try {
-    const sealed = await sealedVault(opts.tasksIdentityVault ?? retiredTasksVault);
+    const sealed = await sealedVault(retiredTasksVault);
     if (await sealed.has('agent-privkey')) retiredBotIssuer = (await AgentIdentity.restore(sealed)).pubKey;
   } catch (e) { console.warn('[realAgent] the retired tasks key could not be read — its bot bindings will be dropped, not re-signed:', e?.message ?? e); }
   // the task grants' durable store: the host's, one record per circle inside it

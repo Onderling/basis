@@ -916,7 +916,7 @@ function mountBasisOpsOnAgent(agent) {
     openFeedback: ({ webid, draft }) => { showContactThread(webid, { draft }).catch(() => {}); },
     feedbackCard: SEEDED_CONTACT_CARD,
     appVersion: APP_VERSION,
-    currentScreen: () => feedbackScreenName(),
+    currentScreen: () => feedbackScreenState(),
     // /send-file resizes a photo the way a circle photo is resized (the one encoder, the one cap).
     encodeImage: encodeImageFile,
     briefRunner: (o) => runBrief({ catalogue: circleCatalogue, callSkill: rawCallSkill, cache: _briefCache, bypassCache: o?.bypassCache }),
@@ -2903,11 +2903,9 @@ function buildCircleBot(agent) {
 // Top-level tab bar (Circles / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
 let _activeTab = null;             // which top-level tab is showing — so a landed turn can repaint the bar's badge
-// The screen the person is on, in their words — for the feedback prefill (a circle by its name, else the tab).
-function feedbackScreenName() {
-  const id = getActiveCircle();
-  if (id) return (circlesCache ?? []).find((c) => c.id === id)?.name ?? t('circle.tab.circles');
-  return _activeTab ? t(`circle.tab.${_activeTab}`) : '';
+// The screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name.
+function feedbackScreenState() {
+  return { inCircle: !!getActiveCircle(), screen: _activeTab };
 }
 let _contactUnread = {};           // the last computed unread map (contactId → {unread, lastTs}); the bar reads its sum
 function showTabBar(active) {
@@ -5124,11 +5122,11 @@ function showSettingsHome() {
     t, onBack: showMij,
     onOpenGroup: (id) => showMyData({ group: id }),
     onOpenPerCircle: showSettingsCircleChooser,
-    // another door at the foot (feedback): its op, through the waist, naming this screen
+    // another door at the foot (feedback): its op, through the waist, naming this screen's id (never words)
     onOpenDoor: (d) => {
       if (d?.target?.kind !== 'op') return;
       // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
-      rawCallSkill('basis', d.target.opId, { screen: t('circle.settings_home.title') })
+      rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
         .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
     },
   });

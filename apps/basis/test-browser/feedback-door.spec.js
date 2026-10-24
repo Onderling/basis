@@ -21,23 +21,25 @@ test('Instellingen → Feedback geven opens the thread, prefilled', async ({ pag
   await page.locator('[data-tab="mij"]').first().click();
   await page.locator('.cc-profile__gear').click();
   await page.locator('.cc-settings__door-row--feedback').click();
-  await expect(composer(page)).toHaveValue(/^\[(Instellingen|Settings) · .+\] $/, { timeout: 20_000 });
+  await expect(composer(page)).toHaveValue(/^\[instellingen · .+\] $/, { timeout: 20_000 });
   // the thread is the seeded contact's (named by its address until it says its name, as any card-added contact is)
   await expect(composer(page)).toHaveAttribute('placeholder', /onderling-feedback|Onderling/);
 });
 
-test('/feedback in a circle opens the thread and posts nothing to the circle', async ({ page }) => {
+test('/feedback in a circle opens the thread, names no circle, and posts nothing to the circle', async ({ page }) => {
   test.skip(!WITH_CARD, 'a build with a feedback card (VITE_SEEDED_CONTACT_CARD)');
-  await bootCircle(page, 'Feedback Kring');
+  await bootCircle(page, 'Huize Zwartkruid-7731');
   const before = await page.locator('.circle-view__bubble').count();
   await page.locator('.circle-view__composer-input').fill('/feedback');
   await page.locator('.circle-view__composer-send').click();
-  await expect(composer(page)).toHaveValue(/^\[Feedback Kring · .+\] $/, { timeout: 20_000 });
+  // the KIND of screen only: the draft goes to the maker's contact, and the circle's name is the person's own
+  await expect(composer(page)).toHaveValue(/^\[circle · .+\] $/, { timeout: 20_000 });
+  expect(await composer(page).inputValue()).not.toContain('Zwartkruid');
   // back in the circle: no line was posted there
   await page.goBack().catch(() => {});
   await page.goto('/');
   await page.locator('[data-tab="circles"]').first().click();
-  await page.locator('.circle-tile', { hasText: 'Feedback Kring' }).first().click();
+  await page.locator('.circle-tile', { hasText: 'Huize Zwartkruid-7731' }).first().click();
   await expect(page.locator('.circle-view__bubble', { hasText: '/feedback' })).toHaveCount(0);
   expect(await page.locator('.circle-view__bubble').count()).toBeLessThanOrEqual(before);
 });

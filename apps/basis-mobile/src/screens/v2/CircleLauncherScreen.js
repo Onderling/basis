@@ -595,14 +595,10 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
-  // the screen the person is on, in their words — for the feedback prefill (a circle by its name, else the tab; web parity)
-  const feedbackScreenRef = useRef(null);
-  feedbackScreenRef.current = () => {
-    if (view === 'detail' && selected) return selected.name ?? t('circle.tab.circles');
-    const tab = { screens: 'vandaag', list: 'circles', contacten: 'contacten', profile: 'mij', nearby: 'nearby' }[view];
-    return tab ? t(`circle.tab.${tab}`) : t('circle.settings_home.title');
-  };
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
+  // the screen state for the feedback prefill; the builtin names its kind (feedbackScreenId), never a circle's name
+  const feedbackScreenRef = useRef(null);
+  feedbackScreenRef.current = () => ({ inCircle: view === 'detail', screen: view, settingsGroup: settingsGroupId });
   // The member's saved assistant endpoint config (settings → My data). Persisted to AsyncStorage;
   // CircleDetail re-reads it on mount, so a save applies the next time a circle opens.
   const [userLlmCfg, setUserLlmCfg] = useState({});
@@ -1038,7 +1034,7 @@ export default function CircleLauncherScreen({
       openFeedback: ({ webid, draft }) => { openFeedbackThread(webid, draft).catch(() => {}); },
       feedbackCard: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD ?? null,
       appVersion: Constants.expoConfig?.extra?.appVersion ?? '',
-      currentScreen: () => feedbackScreenRef.current?.() ?? '',
+      currentScreen: () => feedbackScreenRef.current?.() ?? null,
       // the person's clock shows them a card (their week): this platform's alert, until they close it
       showPersonCard: (card) => Alert.alert(card.title, [...(card.lines?.length ? card.lines : [t('circle.profile.planned_none')]), '', card.note].join('\n'), [{ text: t('circle.profile.week_card_close') }]),
     }));
@@ -2286,7 +2282,7 @@ export default function CircleLauncherScreen({
           onOpenDoor={(d) => {
             if (d?.target?.kind !== 'op') return;
             // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
-            Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: t('circle.settings_home.title') }))
+            Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: 'settingsHome' }))
               .then((r) => { if (r?.error) Alert.alert('', String(r.error)); }).catch(() => {});
           }} />
       </WithTabBar>

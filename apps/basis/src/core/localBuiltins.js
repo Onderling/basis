@@ -17,7 +17,7 @@
  * `apps/basis/manifest.js`.
  */
 
-import { feedbackTarget, feedbackDraft } from '../v2/feedbackContact.js';
+import { feedbackTarget, feedbackDraft, feedbackScreenId } from '../v2/feedbackContact.js';
 import { PERSON_WEEK_OP, personWeekCard } from '../v2/personWeekOverview.js';
 import { buildFileShareEnvelope } from './handlers/fileShare.js';
 import { describeFilter }    from '../filter.js';
@@ -74,7 +74,7 @@ export function createLocalBuiltins({
   openFeedback,              // () => {webid, draft} → void — opens the feedback contact's thread with the draft in its composer
   feedbackCard = null,       // the build's feedback contact card (`onderling-contact://…`), or none
   appVersion = '',           // the build's version tag ('' on a dev build)
-  currentScreen = null,      // () => string — the screen the person is on (its words), for the prefill
+  currentScreen = null,      // () => {inCircle, screen, settingsGroup} — the shell's screen state; the prefill names its kind
   podAuth,                   // v0.7. — real Solid OIDC wrapper
   onSignOut,                 // v0.7. — cleanup hook for the pod writer
   agent,                     // v0.7.P3a — agent {identity:{host,chat}}
@@ -147,7 +147,9 @@ async function runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion
   const webid = feedbackTarget(feedbackCard);
   if (!webid) return { ok: false, error: t('feedback.no_contact') };
   if (typeof openFeedback !== 'function') return { ok: false, error: t('feedback.not_available') };
-  const screen = String(args?.screen ?? '').trim() || (typeof currentScreen === 'function' ? currentScreen() : '');
+  // the KIND of screen, never what is on it (feedbackScreenId): a circle's name is the person's, not the maker's
+  const state = typeof currentScreen === 'function' ? currentScreen() : null;
+  const screen = feedbackScreenId({ screen: args?.screen }) || feedbackScreenId(state && typeof state === 'object' ? state : {});
   openFeedback({ webid, draft: feedbackDraft({ screen, version: appVersion }) });
   return { ok: true };
 }

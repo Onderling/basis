@@ -10,6 +10,29 @@
 import { seededContactWebid } from './seededContact.js';
 import { contactCardLink } from './contactCardLink.js';
 
+// A shell's screen state → the one id both shells say. Ids, not words: the prefill goes to the maker's contact.
+const SCREEN_IDS = {
+  screens: 'vandaag', circles: 'kringen', list: 'kringen', profile: 'mij', mij: 'mij',
+  contacten: 'contacten', nearby: 'nearby', settingsHome: 'instellingen', settingsGroup: 'instellingen',
+};
+const CODE_ID = /^[a-z][A-Za-z0-9-]{0,40}$/;
+
+/**
+ * The KIND of screen the person is on, for the prefill: never what is on it. Inside a circle it is "circle" and never
+ * the circle's name (the person's own); a settings group adds its group id; anything that is not a plain code id is
+ * dropped rather than echoed.
+ *
+ * @param {{inCircle?: boolean, screen?: string|null, settingsGroup?: string|null}} [state]
+ * @returns {string}
+ */
+export function feedbackScreenId({ inCircle = false, screen = null, settingsGroup = null } = {}) {
+  if (inCircle) return 'circle';
+  const s = typeof screen === 'string' ? screen : '';
+  const id = SCREEN_IDS[s] ?? (CODE_ID.test(s) ? s : '');
+  if (s === 'settingsGroup' && typeof settingsGroup === 'string' && CODE_ID.test(settingsGroup)) return `${id}/${settingsGroup}`;
+  return id;
+}
+
 /** The prefill: "[<screen> · <version>] " and nothing else. */
 export function feedbackDraft({ screen = '', version = '' } = {}) {
   const where = String(screen ?? '').trim() || '?';

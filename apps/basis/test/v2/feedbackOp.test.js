@@ -22,10 +22,21 @@ describe('the feedback op', () => {
 
   it('opens the contact\'s thread with the prefill; sends nothing', async () => {
     const openFeedback = vi.fn();
-    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha', currentScreen: () => 'Instellingen' });
+    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha',
+      currentScreen: () => ({ screen: 'settingsGroup', settingsGroup: 'display' }) });
     const r = await ops.feedback({});
     expect(r.ok).toBe(true);
-    expect(openFeedback).toHaveBeenCalledWith({ webid: 'https://id.example/onderling', draft: '[Instellingen · v0.1.74-alpha] ' });
+    expect(openFeedback).toHaveBeenCalledWith({ webid: 'https://id.example/onderling', draft: '[instellingen/display · v0.1.74-alpha] ' });
+  });
+
+  it('inside a circle the prefill says "circle", never the circle\'s name — not even when an arg carries it', async () => {
+    const openFeedback = vi.fn();
+    const ops = createLocalBuiltins({ t, openFeedback, feedbackCard: CARD, appVersion: 'v0.1.74-alpha',
+      currentScreen: () => ({ inCircle: true, screen: 'Huize Zwartkruid-7731' }) });
+    await ops.feedback({ screen: 'Huize Zwartkruid-7731' });
+    const { draft } = openFeedback.mock.calls[0][0];
+    expect(draft).toBe('[circle · v0.1.74-alpha] ');
+    expect(draft).not.toContain('Zwartkruid');
   });
 
   it('no card in the build → says so (the door stays), opens nothing', async () => {

@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const SRC = readFileSync(fileURLToPath(new URL('../src/screens/v2/CircleMyDataScreen.js', import.meta.url)), 'utf8');
 const titles = (text) => [...text.matchAll(/<Section title=\{t\('([^']+)'\)\}/g)].map((m) => m[1]);
 
-/** Each section id a group declares (Weergave, Verbinding), and the one title its painter opens. */
+/** Each section id a group declares (Weergave, Verbinding, Mijn gegevens), and the one title its painter opens. */
 const OWN_TITLE = {
   'theme': 'circle.mydata.theme',
   'language': 'circle.mydata.language',
@@ -29,6 +29,11 @@ const OWN_TITLE = {
   'address-sharing': 'circle.mydata.address_sharing',
   'relay': 'circle.mydata.relay',
   'device-keeps': 'circle.mydata.sync',
+  'history-mirror': 'circle.mydata.history',
+  'message-cleanup': 'circle.mydata.cleanup',
+  'privacy': 'circle.mydata.privacy',
+  'usage': 'circle.mydata.usage',
+  'frequent': 'circle.mydata.frequent',
 };
 
 const painterBodies = () => {
@@ -49,8 +54,6 @@ describe('mobile settings painters', () => {
     expect(titles(page)).toEqual([
       'circle.profile.mydata_more', 'circle.mydata.storage', 'circle.mydata.keys', 'circle.mydata.devices',
       'circle.companionGrant.nodes', 'circle.mydata.connections', 'circle.mydata.connection_add',
-      'circle.mydata.cleanup', 'circle.mydata.history', 'circle.mydata.privacy',
-      'circle.mydata.frequent', 'circle.mydata.usage',
     ]);
   });
 });

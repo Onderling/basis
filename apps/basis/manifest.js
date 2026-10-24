@@ -1208,6 +1208,17 @@ export const basisManifest = {
       ],
     },
     {
+      id: 'devices-keys', labelKey: 'circle.settings_home.devices_keys',
+      sections: [
+        { id: 'devices',        kind: 'control' },
+        { id: 'agents',         kind: 'control' },
+        { id: 'connections',    kind: 'control' },
+        { id: 'connection-add', kind: 'control' },
+        { id: 'keys',           kind: 'control' },
+        { id: 'storage',        kind: 'control' },
+      ],
+    },
+    {
       id: 'my-data', labelKey: 'circle.settings_home.my_data',
       sections: [
         { id: 'history-mirror',  kind: 'control' },

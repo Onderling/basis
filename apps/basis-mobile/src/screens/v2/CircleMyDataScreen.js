@@ -58,11 +58,8 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
-import { myDataActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
-import { versionLine } from '../../../../basis/src/v2/versionLine.js';
-import Constants from 'expo-constants';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
@@ -1115,6 +1112,18 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         </Section>
       </>
     ),
+    'log-report': () => (
+      <>
+        {typeof doors.logReport === 'function' ? (
+          <Section title={t('circle.profile.logReport')}>
+            <Pressable style={styles.doorRow} onPress={doors.logReport} accessibilityRole="button" testID="settings-door-log-report">
+              <Text style={styles.doorText}>{t('circle.profile.logReport')}</Text>
+              <Text style={styles.doorArrow}>→</Text>
+            </Pressable>
+          </Section>
+        ) : null}
+      </>
+    ),
   };
 
   // the wizards and sheets a section opens (backup, restore, recovery file, enrol, replace, revoke, the phrase):
@@ -1169,39 +1178,15 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     </>
   );
 
-  if (Array.isArray(only)) {
-    return (
-      <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
-        <View style={styles.header}>
-          {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
-          <Text style={styles.title}>{groupTitle ?? t('circle.mydata.title')}</Text>
-        </View>
-        {only.map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}
-        {overlays}
-      </ScrollView>
-    );
-  }
-
+  // every section lives in a settings group: this screen paints the group's declared sections, nothing else
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-mydata">
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
       <View style={styles.header}>
         {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
-        <Text style={styles.title}>{t('circle.mydata.title')}</Text>
+        <Text style={styles.title}>{groupTitle ?? t('circle.settings_home.title')}</Text>
       </View>
-
-      {/* the doors that sat on Mij: availability · connection points · shared with me · blocked (web: circleMyData.js) */}
-      {myDataActionsMobile(basisManifest, doors).length ? (
-        <Section title={t('circle.profile.mydata_more')}>
-          {myDataActionsMobile(basisManifest, doors).map((d) => (
-            <Pressable key={d.id} style={styles.relaySave} onPress={d.open} testID={`mydata-door-${d.id}`}>
-              <Text style={styles.relaySaveText}>{t(d.labelKey)}</Text>
-            </Pressable>
-          ))}
-        </Section>
-      ) : null}
+      {(Array.isArray(only) ? only : []).map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}
       {overlays}
-      {/* the version this build was made from (its tree's exact clean tag, through the build; none → dev) — web's line */}
-      <Text style={styles.privacyBody} testID="mydata-version">{versionLine(Constants.expoConfig?.extra?.appVersion ?? null, t)}</Text>
     </ScrollView>
   );
 }

@@ -117,7 +117,9 @@ test('step 0: link, claim the companion, give the bot the agenda files, the link
     await page.goto(appUrl);
     await expect.poll(() => page.evaluate(() => typeof window.onderlingCall === 'function'), { timeout: 120_000 }).toBe(true);
     await page.locator('[data-tab="mij"]').first().click();
-    await page.locator('.cc-profile__mydata').first().click();
+    // Instellingen → Apparaten & sleutels: where devices, agents and the claim live
+    await page.locator('.cc-profile__gear').click();
+    await page.locator('.cc-settings__group--devices-keys').click();
     await page.locator('.cc-mydata__claim-companion').first().click();
     // the claim sheet: its field (placeholder 'ABCD-EFGH@…') and its 'Claimen' button
     await page.getByPlaceholder('ABCD-EFGH@…').fill(claim);

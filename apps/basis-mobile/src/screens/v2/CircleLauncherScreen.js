@@ -290,6 +290,7 @@ import { isPairCircleId } from '../../../../basis/src/v2/pairCircleId.js';
 import { handleOp, keySnoozeUntil } from '../../../../basis/src/v2/onboardingStrip.js';
 import MnemonicCreateScreen from '../MnemonicCreateScreen.js';
 import ContactsScreen from './ContactsScreen.js';
+import { contactOpenTarget, tileCircles } from '../../../../basis/src/v2/helpContact.js';
 import ContactThreadScreen from './ContactThreadScreen.js';
 // objective L · Phase 2 — the Contacten roster feeds CircleShareScreen's out-of-circle recipient picker.
 import { loadContactRoster, makeContactNameStore } from '../../../../basis/src/v2/contactsSource.js';
@@ -1145,7 +1146,7 @@ export default function CircleLauncherScreen({
     await refreshSights();
   }, [bundle, refreshSights]);
   const kringOn = useCallback((id) => makeSyncSelection({ getParamValue: (k) => bundle?.agent?.getParamValue?.(k) }).kringOn(id), [bundle]);
-  const bySight = useMemo(() => splitBySight(circlesShown, { sights, kringOn }), [circlesShown, sights, kringOn]);
+  const bySight = useMemo(() => splitBySight(tileCircles(circlesShown), { sights, kringOn }), [circlesShown, sights, kringOn]);
   const [menuCircle, setMenuCircle] = useState(null);
   useEffect(() => {
     let alive = true;
@@ -2302,7 +2303,10 @@ export default function CircleLauncherScreen({
     }
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="contacten" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <ContactsScreen bundle={bundle} unread={contactUnread} onOpen={openContactThread} resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
+        <ContactsScreen bundle={bundle} unread={contactUnread}
+          helpAvailable={circles.some((c) => c.id === HELP_CIRCLE_ID)}
+          onOpen={(c) => { const target = contactOpenTarget(c); if (target.kind === 'circle') { const hc = circles.find((x) => x.id === target.circleId); if (hc) openCircle(hc); } else openContactThread(c); }}
+          resolvePictureFor={(c) => circlePictureResolver(c?.pairCircleId)}
           onAddPerson={() => onMeAction('scan')} onBlocked={() => setView('blocked')}
           keep={heldSelves.length > 1 ? (list) => contactsInSet(list, selvesOn, profileIdOfCircle) : null} />
       </WithTabBar>

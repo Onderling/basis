@@ -70,11 +70,14 @@ export function renderContactsRoster(container, { contacts = [], unread = {}, t,
     li.dataset.contactId = c.contactId;
     if (!c.reachable) li.classList.add('is-offline');
     if (c.hidden) li.classList.add('is-hidden');
+    // the help bot's row (shared `withHelpContact`): no pair roster behind it, so no face to fetch and no thread —
+    // its tap opens the help circle, the host decides that through the shared `contactOpenTarget`
+    if (c.synthetic) li.dataset.synthetic = 'true';
 
     // THE FACE, or this person's own first letter. A bot keeps its glyph: it is not a person and has no face.
     const icon = document.createElement('span');
     icon.className = 'cc-contacts__icon';
-    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null, resolvePicture: typeof resolvePictureFor === 'function' ? resolvePictureFor(c) : null });
+    paintFace(icon, c, { fallbackGlyph: c.isBot ? '🤖' : null, resolvePicture: typeof resolvePictureFor === 'function' && !c.synthetic ? resolvePictureFor(c) : null });
     li.appendChild(icon);
 
     const body = document.createElement('div');

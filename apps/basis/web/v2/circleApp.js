@@ -174,6 +174,7 @@ import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
+import { withHelpContact, contactOpenTarget, tileCircles } from '../../src/v2/helpContact.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderProfileBasics } from './profileBasics.js';
 import { newPersonaArgs } from '../../src/v2/newPersona.js';
@@ -3018,11 +3019,16 @@ async function showContacts() {
   if (_selfSet.held.length > 1) contacts = contactsInSet(contacts, _selfSet.on, profileIdOfCircle);
   const unread = await refreshContactUnread();
   showTabBar('contacten');   // the sum may have changed
+  // the help bot is a contact: its conversation is the help circle's, so the row is there while that circle is
+  contacts = withHelpContact(contacts, { t, available: (circlesCache ?? []).some((c) => c.id === HELP_CIRCLE_ID) });
   renderContactsRoster(rootEl, {
     contacts, unread, t,
     // each row's picture is sealed to ITS pair circle
     resolvePictureFor: (c) => circlePictureResolver(c?.pairCircleId),
-    onOpen: showContactThread,
+    onOpen: (contactId) => {
+      const target = contactOpenTarget(contacts.find((c) => c.contactId === contactId) ?? { contactId });
+      if (target.kind === 'circle') showDetail(target.circleId); else showContactThread(contactId);
+    },
     // a person: the scanQr op (web: the paste prompt), routed by what it reads — Me's Scan, the same door
     onAddPerson: () => runMeAction('scan'),
     // the people this device blocks (once a door on My data): at the foot of Contacten
@@ -3687,7 +3693,7 @@ function paintLauncher() {
   });
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
-    circles: circlesShown(),   // the circles of the selves ticked in the header
+    circles: tileCircles(circlesShown()),   // the circles of the selves ticked in the header; the help circle's door is in Contacten
     previews,
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,

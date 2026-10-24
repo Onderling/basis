@@ -32,6 +32,17 @@ load_conf() {
   . "$BOX_DIR/box.conf"
   : "${REPOS:?box.conf: REPOS is required (name=url#branch …)}"
   : "${ROLES:?box.conf: ROLES is required (role@repo …)}"
+  check_companion_nearby
+}
+
+# Refused here, at the top level, not inside compose_cmd: a `die` in a `$(…)` only leaves the subshell.
+check_companion_nearby() {
+  case "${COMPANION_NEARBY:-off}" in off|false|0|'') return 0 ;; esac
+  role_names | grep -qx companion || return 0
+  if role_names | grep -qxE 'relay|caddy'; then
+    die "COMPANION_NEARBY needs the companion on the host network, and this box runs the relay or Caddy, which reach it by its compose name; turn it on for a personal box only"
+  fi
+  [ -f "$(role_file companion nearby.yml)" ] || die "COMPANION_NEARBY is set but $(role_file companion nearby.yml) is missing"
 }
 
 # REPOS="basis=git@github.com:Onderling/basis.git#live feedback=…#live"
@@ -57,6 +68,20 @@ compose_cmd() {
     [ -f "$f" ] || die "role $role: $f missing (does $(role_repo "$role") honour the role contract?)"
     cmd+=(-f "$f")
   done
+  # COMPANION_NEARBY (box.conf: browse · publish · publish:<duration> · off) turns on the companion's local-network
+  # radio. mDNS is multicast, which docker's bridge network does not carry, so the companion then runs on the HOST's
+  # network (roles/companion.nearby.yml). That takes it off the compose network: `relay:8787` and Caddy's
+  # `companion:8790` stop resolving, so a box that runs the relay or Caddy (the platform box) refuses it.
+  # A personal box (the household's tablet) dials the shared relay and has neither.
+  case "${COMPANION_NEARBY:-off}" in
+    off|false|0|'') ;;
+    *)
+      # load_conf has refused a box with the relay or Caddy, or a missing overlay; this only composes
+      if role_names | grep -qx companion; then
+        cmd=(env "COMPANION_NEARBY=$COMPANION_NEARBY" "${cmd[@]}" -f "$(role_file companion nearby.yml)")
+      fi
+      ;;
+  esac
   printf '%q ' "${cmd[@]}"
 }
 

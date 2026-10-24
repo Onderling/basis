@@ -25,7 +25,7 @@ const allSettingsProps = () => ({
   weekOverview: { on: true, onToggle: vi.fn() },
   notifications: { supported: true, subscribed: false }, onToggleNotifications: vi.fn(),
   onSaveUserLlm: vi.fn(), userLlm: {}, validateUserLlm: () => null,
-  doors: { availability: vi.fn(), points: vi.fn() },
+  doors: { availability: vi.fn(), points: vi.fn(), logReport: vi.fn() },
   delivery: { sendReceipts: true, allowFallback: false }, onSetDelivery: vi.fn(),
   shareNknAddress: true, onSetShareAddress: vi.fn(),
   dataLocation: { relayUrl: 'wss://relay.example' }, onOpenRelayPanel: vi.fn(), relayUrl: 'wss://relay.example',

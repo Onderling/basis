@@ -6266,10 +6266,6 @@
       "text": "Beschikbaarheid →",
       "doc": "S2 — open the availability/quiet-hours screen."
     },
-    "mydata": {
-      "text": "Mijn gegevens →",
-      "doc": "S5 — open the data-location/privacy/usage screen."
-    },
     "sharedWithMe": {
       "text": "Met mij gedeeld →",
       "doc": "Nav label (Mij sub-screen) opening the personal, cross-circle inbox of sealed copies peers shared privately to this device."
@@ -6401,10 +6397,6 @@
     "agent_bot": {
       "text": "bot: {{label}}, aan jou gekoppeld",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
-    },
-    "mydata_more": {
-      "text": "Meer",
-      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
     },
     "edit": {
       "text": "Aanpassen",

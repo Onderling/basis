@@ -23,7 +23,6 @@ export function renderCircleProfile(container, {
   blocks = null,
   // what a block's tap means here: `{ kind: 'edit-me' }` (the identity line's door) · `{ kind: 'open-my-data' }`
   onBlockAction,
-  onMyData,
   // The gear in Me's header: the person's settings (Instellingen). Absent ⇒ no gear.
   onSettings,
   // The advanced surface — surface-less ops + settable params; given only when the developer switch is on.
@@ -83,7 +82,6 @@ export function renderCircleProfile(container, {
   }
 
   // ── one door to My data; Advanced only behind the developer switch ──
-  if (typeof onMyData === 'function') container.appendChild(button(tr('circle.profile.mydata'), 'cc-profile__mydata', onMyData));
   if (typeof onAdvanced === 'function') container.appendChild(button(tr('circle.advanced.title'), 'cc-profile__advanced', onAdvanced));
   return container;
 

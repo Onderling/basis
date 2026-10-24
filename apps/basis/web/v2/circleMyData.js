@@ -11,12 +11,10 @@
  */
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
-import { versionLine } from '../../src/v2/versionLine.js';
 import { renderThemeToggle } from './themeToggle.js';
 import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { historyStatusLine } from '../../src/v2/historyMirror.js';
-import { myDataActionsFor } from '../../src/v2/meActionProjection.js';
 import { basisManifest } from '../../src/index.js';
 
 export function renderCircleMyData(container, {
@@ -107,18 +105,14 @@ export function renderCircleMyData(container, {
   onOpenRelayPanel,       // Objective D / Surface 4:  => void — open the set-relay op in the docked
                           // side-panel (openPagePanel). When provided, the relay row is an entry button that
                           // routes through the generic panel instead of the bespoke inline form below.
-  // The doors that sat on Mij, DECLARED in the manifest (`myDataActions`): the view each opens → what opens it here.
-  // A door without one is omitted.
+  // The doors a group's sections open (availability, connection points, the log report): the view each opens → what
+  // opens it here. A door without one is omitted.
   doors = {},
   // the person's own week overview (a card of the coming week on Saturday morning): `{ on, onToggle }`; on null while
   // it loads or switches; absent = no switch (no clock here)
   weekOverview = undefined,
-  // The build this tab runs (the tag the publish baked in; '' on a dev server). Absent ⇒ no line; given ⇒ the last
-  // line, so "which version are you on" has an answer on screen (2026-09-19: a laptop on last week's build looked
-  // like a laptop that receives nothing).
-  version,
-  // A settings group's screen: the section ids to paint, in order (from `settingsGroupFor`), and its title. Absent ⇒
-  // the old My data page, which paints every section NOT declared under the gear.
+  // A settings group's screen: the section ids to paint, in order (from `settingsGroupFor`), and its title. Every
+  // section is declared under the gear; nothing is painted outside a group.
   only = null,
   groupTitle = null,
 } = {}) {
@@ -1021,38 +1015,24 @@ export function renderCircleMyData(container, {
       if (dataLocation.podRoot) storage.appendChild(kv(tr('circle.mydata.pod_root'), dataLocation.podRoot));
       container.appendChild(storage);
     },
+    'log-report': () => {
+      if (typeof doors.logReport === 'function') {
+        const sec = section(tr('circle.profile.logReport'));
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-settings__row cc-settings__door--log-report';
+        b.textContent = tr('circle.profile.logReport');
+        b.addEventListener('click', () => doors.logReport());
+        sec.appendChild(b);
+        container.appendChild(sec);
+      }
+    },
   };
-  if (Array.isArray(only)) {
-    container.classList.add('cc-settings-group');
-    for (const id of only) {
-      const before = container.children.length;
-      painters[id]?.();
-      for (let k = before; k < container.children.length; k += 1) container.children[k].dataset.section = id;
-    }
-    return container;
-  }
-
-  // ── the doors Mij gave up: availability · connection points · shared with me · blocked ──
-  const doorRow = myDataActionsFor(basisManifest, doors);
-  if (doorRow.length) {
-    const sec = section(tr('circle.profile.mydata_more'));
-    sec.classList.add('cc-mydata__doors');
-    for (const d of doorRow) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-btn cc-btn--quiet cc-profile__${d.id}`;
-      b.textContent = tr(d.labelKey);
-      b.addEventListener('click', () => d.open());
-      sec.appendChild(b);
-    }
-    container.appendChild(sec);
-  }
-
-  if (typeof version === 'string') {
-    const v = document.createElement('div');
-    v.className = 'cc-profile__version';
-    v.textContent = versionLine(version, tr);
-    container.appendChild(v);
+  container.classList.add('cc-settings-group');
+  for (const id of (Array.isArray(only) ? only : [])) {
+    const before = container.children.length;
+    painters[id]?.();
+    for (let k = before; k < container.children.length; k += 1) container.children[k].dataset.section = id;
   }
   return container;
 

@@ -1,7 +1,7 @@
 /**
  * MIJN GEGEVENS UNDER THE GEAR (2026-10-24). Instellingen → Mijn gegevens holds message cleanup and what you use most
- * (always there), and the history mirror, privacy and usage where the host has them; the old My data page paints
- * none of them.
+ * (always there), the history mirror, privacy and usage where the host has them, and the log report's door; there is
+ * no other My data page, and Mij has no door to one.
  *
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/settings-mydata.spec.js
  */
@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test';
 
 test.setTimeout(120_000);
 
-test('Mijn gegevens holds cleanup and most-used; the old page has neither', async ({ page }) => {
+test('Mijn gegevens holds cleanup, most-used and the log report; there is no old page', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
@@ -27,11 +27,12 @@ test('Mijn gegevens holds cleanup and most-used; the old page has neither', asyn
   await run.click();
   await expect(run).toHaveClass(/is-armed/);
 
-  // the old My data page no longer paints them (a group screen hides the tab bar: come back in from the top)
+  // the log report is a door here, and comes back here
+  await page.locator('.cc-settings__door--log-report').click();
+  await expect(page.locator('.cc-settings__door--log-report'), 'the log report replaced Mijn gegevens').toHaveCount(0, { timeout: 15_000 });
+  // there is no old My data page (a group screen hides the tab bar: come back in from the top)
   await page.goto('/');
   await page.locator('[data-tab="mij"]').first().click();
-  await page.locator('.cc-profile__mydata').first().click();
-  await expect(page.locator('.cc-mydata__title')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.cc-mydata .cc-mydata__cleanup-run, .cc-mydata .cc-mydata__history-toggle, .cc-mydata .cc-mydata__frequent-clear'), 'none on the old page').toHaveCount(0);
+  await expect(page.locator('.cc-profile__mydata'), 'Mij has no My data door: the gear is the one way in').toHaveCount(0);
   expect(errs).toEqual([]);
 });

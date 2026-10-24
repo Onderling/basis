@@ -13,9 +13,9 @@ describe('versionLine', () => {
     expect(versionLine(null, t)).toBe('circle.profile.version|{"tag":"circle.profile.version_dev"}');
     expect(versionLine('', t)).toBe('circle.profile.version|{"tag":"circle.profile.version_dev"}');
   });
-  it('both shells paint it in My data, the phone from its build\'s extra.appVersion', () => {
-    expect(read('../../web/v2/circleMyData.js')).toMatch(/versionLine\(version, tr\)/);
-    const mob = read('../../../basis-mobile/src/screens/v2/CircleMyDataScreen.js');
+  it('both shells paint it at the foot of Instellingen, the phone from its build\'s extra.appVersion', () => {
+    expect(read('../../web/v2/circleSettingsHome.js')).toMatch(/versionLine\(version, tr\)/);
+    const mob = read('../../../basis-mobile/src/screens/v2/SettingsHomeScreen.js');
     expect(mob).toMatch(/versionLine\(/);
     expect(mob).toMatch(/expoConfig\?\.extra\?\.appVersion/);
   });

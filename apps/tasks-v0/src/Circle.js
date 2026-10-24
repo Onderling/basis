@@ -297,6 +297,8 @@ export async function createCircleAgent({
   // BotAgentRegistry: the host turns each revoke into a grants-lane statement.
   onTaskGrantsRevoked,
   onBotTokenRevoked,
+  // The key that issued this circle's bot tokens before its agent took over (see BotAgentRegistry.restoreAll).
+  retiredBotIssuer = null,
   // The HOST of this engine — the one invoking key allowed to name an `actor` (skills/actor.js).
   // Absent ⇒ the agent's own key.
   hostKey,
@@ -479,6 +481,7 @@ export async function createCircleAgent({
           dataSource: localStoreBundle.cache,
           circleId:     liveCircle.circleId,
           onRevoked:  onBotTokenRevoked,
+          retiredIssuer: retiredBotIssuer,
         })
       : null;
     // Parking the registry on the CircleState IS the wiring: the agent's PolicyEngine was built with
@@ -490,9 +493,9 @@ export async function createCircleAgent({
     if (botAgentRegistry?.persisting) {
       try {
         const r = await botAgentRegistry.restoreAll();
-        if (r.restored > 0 || r.expired > 0 || r.failed > 0) {
+        if (r.restored > 0 || r.expired > 0 || r.failed > 0 || r.dropped > 0) {
           // eslint-disable-next-line no-console
-          console.log(`[BotAgentRegistry] restored=${r.restored} expired=${r.expired} failed=${r.failed}`);
+          console.log(`[BotAgentRegistry] restored=${r.restored} reissued=${r.reissued} expired=${r.expired} failed=${r.failed} dropped=${r.dropped}`);
         }
       } catch { /* noop */ }
     }

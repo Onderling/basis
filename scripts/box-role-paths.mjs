@@ -156,7 +156,9 @@ function main() {
 const update = process.argv.includes('--update');
 const pkgs = workspacePackages();
 let stale = 0;
-for (const f of readdirSync(ROLES).filter((n) => n.endsWith('.yml')).sort()) {
+// a role is `<role>.yml`; `<role>.<variant>.yml` is an overlay the updater composes over its role (companion.nearby.yml)
+// and builds nothing of its own, so it carries no paths file
+for (const f of readdirSync(ROLES).filter((n) => /^[^.]+\.yml$/.test(n)).sort()) {
   const role = f.replace(/\.yml$/, '');
   const yml = readFileSync(path.join(ROLES, f), 'utf8');
   const want = render(role, pathsForRole(role, yml, pkgs));

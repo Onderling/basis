@@ -545,3 +545,29 @@ test('the assistant is down: the update goes ahead only on an export younger tha
   assert.notEqual(b.headOfBox(), before, 'updated');
   assert.match(readFileSync(join(b.box, 'box.log'), 'utf8'), /assistant not running — its shelf holds an export younger than a day/);
 });
+
+test('COMPANION_NEARBY in box.conf: the companion gets the host-network overlay and the value; a box with a relay refuses it', () => {
+  const b = makeBox({ roles: ['companion'] });
+  // the overlay ships beside the role, like the real one (deploy/roles/companion.nearby.yml)
+  writeFileSync(join(b.box, 'repos/mono/deploy/roles/companion.nearby.yml'), 'services:\n  companion:\n    network_mode: host\n');
+  const conf = readFileSync(join(b.box, 'box.conf'), 'utf8');
+  const r0 = b.run({ FORCE: '1' });
+  assert.equal(r0.status, 0, r0.stderr);
+  assert.ok(!b.calls().some((c) => /companion\.nearby\.yml/.test(c)), 'off unless box.conf asks');
+  b.clearCalls();
+
+  writeFileSync(join(b.box, 'box.conf'), `${conf}COMPANION_NEARBY=publish\n`);
+  const r1 = b.run({ FORCE: '1' });
+  assert.equal(r1.status, 0, r1.stderr);
+  const up = b.calls().find((c) => /up -d/.test(c));
+  assert.match(up, /-f \S*companion\.nearby\.yml/, 'the overlay is composed in');
+  b.clearCalls();
+
+  // host networking leaves the compose network: a box that runs the relay or Caddy (the platform box) refuses
+  writeFileSync(join(b.box, 'box.conf'), `${conf.replace('ROLES="', 'ROLES="relay@mono ')}COMPANION_NEARBY=publish\n`);
+  writeFileSync(join(b.box, 'repos/mono/deploy/roles/relay.yml'), 'services:\n  relay:\n    image: x\n');
+  const r2 = b.run({ FORCE: '1' });
+  assert.notEqual(r2.status, 0, 'refused');
+  assert.match(r2.stderr, /COMPANION_NEARBY/);
+  assert.ok(!b.calls().some((c) => /up -d/.test(c)), 'nothing started');
+});

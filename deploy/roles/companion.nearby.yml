@@ -1,0 +1,11 @@
+# deploy/roles/companion.nearby.yml — composed over roles/companion.yml only when box.conf sets COMPANION_NEARBY
+# (deploy/box/lib.sh compose_cmd). The local-network radio is mDNS, and multicast does not cross docker's bridge,
+# so the companion runs on the host's network: the phones in the room see it and it sees them. It then has no
+# compose network, so the box refuses this when it also runs the relay or Caddy; on a personal box the companion
+# dials the shared relay (COMPANION_RELAY_URL in .env) as it does without the radio.
+services:
+  companion:
+    network_mode: host
+    environment:
+      # browse = see the room and announce nothing; publish[:<duration>] = also be found (the walk needs publish)
+      COMPANION_NEARBY: "${COMPANION_NEARBY:-off}"

@@ -172,6 +172,8 @@ export class PolicyEngine {
 
   /** Phase 50.9.1 — read-only access to the injected resolver (or null). */
   get actorResolver() { return this.#actorResolver; }
+  /** The tier registry this engine judges by — read so a host can place a key it adopts (a bot it spun up). */
+  get trustRegistry() { return this.#trustRegistry; }
 
   /**
    * The tier-vs-visibility check alone, for one caller identity — the half of `checkInbound` a door's in-process call

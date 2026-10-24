@@ -241,6 +241,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   the PR; the CI gate (~8 min) gates the merge; the browser tail runs AFTER the merge and gates the *release*;
   `npm run release:check` says whether it passed on the bytes about to ship. A shell/transport/box change never
   skips rung 2 — [`verification-ladder.md`](docs/conventions/verification-ladder.md).
+- **Live-LLM tests run only with `LIVE_LLM=1` and never on a machine holding the production key.** A key file
+  on disk is not consent to spend its quota: one eval batch once used up the month and took the live bot down.
 - **Branch per feature; the trunk moves by MERGE.** `development` is the trunk (the repo default since
   2026-09-04) and `live` will be the release branch: never commit straight onto either — `git switch -c
   feat/<what>`, land it green, merge back. Enforced twice: `.githooks/pre-commit` refuses the commit (run

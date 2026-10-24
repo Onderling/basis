@@ -859,7 +859,7 @@ export default function CircleLauncherScreen({
     if (!selected?.id) { setSelectedPolicy(null); return; }
     let p = null;
     try { p = await policyStore.get(selected.id); } catch { /* defaults */ }
-    setSelectedPolicy(p);
+    setSelectedPolicy(p ?? {});   // read: {} when the circle has no record (web parity) — null means not read yet
   }, [selected, policyStore]);
   useEffect(() => {
     if (!selected?.id) { setSelectedPolicy(null); return; }
@@ -868,7 +868,7 @@ export default function CircleLauncherScreen({
       let p = null; let o = null;
       try { p = await policyStore.get(selected.id); } catch { /* defaults */ }
       try { o = await overrideStore.get(selected.id); } catch { /* defaults */ }
-      if (alive) { setSelectedPolicy(p); setSelectedOverride(o); }
+      if (alive) { setSelectedPolicy(p ?? {}); setSelectedOverride(o); }   // {} = read, no record; null = not read yet
     })();
     return () => { alive = false; };
   }, [selected, policyStore, overrideStore]);

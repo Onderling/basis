@@ -6955,6 +6955,14 @@ function showCircle(id, circle, policy) {
   // Resolved asynchronously, so the menu is briefly empty rather than briefly wrong.
   circleAttachMenu = [];
   circleAvailabilityNow = null;
+  // The menu as it stands NOW: rebuilt when the availability lands and again when the sealed-media path resolves —
+  // built once, before media resolved, it left the file entry out of the "+" for good while the composer had the
+  // media pipeline all along (no photo could be attached in a circle).
+  const circleAttachEntriesNow = () => attachEntriesFor({
+    manifestsByOrigin: circleManifestsByOrigin ?? {},
+    availability: circleAvailabilityNow,
+    mediaWired: !!circleMedia,
+  });
   (async () => {
     try {
       const av = await circleOpAvailability(id);
@@ -6966,11 +6974,7 @@ function showCircle(id, circle, policy) {
       // Every composed app's entries, not only basis's — a circle that composes tasks offers "+ → Task"
       // by DECLARATION, and the filter (composition · feature · capability · is the path even wired) is
       // the one shared answer both shells and the journey read.
-      circleAttachMenu = attachEntriesFor({
-        manifestsByOrigin: circleManifestsByOrigin ?? {},
-        availability: av,
-        mediaWired: !!circleMedia,
-      });
+      circleAttachMenu = circleAttachEntriesNow();
       // a BOOKMARK opened from the "+" sheet: this circle, that op's form — the same path a tap on the entry takes here
       if (_pendingPinOpen?.circleId === id) {
         const want = _pendingPinOpen; _pendingPinOpen = null;
@@ -7023,6 +7027,7 @@ function showCircle(id, circle, policy) {
   getCircleMediaComposition(id, policy).then((m) => {
     if (!m) return;   // no seal strategy → affordance stays hidden
     circleMedia = m;
+    if (circleAvailabilityNow) circleAttachMenu = circleAttachEntriesNow();   // the file entry joins the "+"
     if (getActiveCircle() === id) rerender();
   });
 

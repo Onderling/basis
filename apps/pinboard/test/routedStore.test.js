@@ -65,3 +65,15 @@ describe('createRoutedStore — no circle yet', () => {
   });
 });
 
+
+describe('createRoutedStore — the poster\'s own knowledge stays on the device', () => {
+  it('who answered my post is never written to the circle store, yet my reads see it', async () => {
+    const { stores, routed } = setup();
+    const [post] = await routed.addItems([ask('kring-a')], { actor: ANN });
+    await routed.update(post.id, { source: { ...post.source, responders: ['https://id.example/bob'] } }, { actor: ANN });
+    const inCircle = await stores.getStore('kring-a').get(post.id);
+    expect(inCircle.source?.responders, 'the circle store (what syncs) holds no responders').toBeUndefined();
+    expect((await routed.getById(post.id))?.source?.responders).toEqual(['https://id.example/bob']);
+    expect((await routed.listOpen({})).find((i) => i.id === post.id)?.source?.responders).toEqual(['https://id.example/bob']);
+  });
+});

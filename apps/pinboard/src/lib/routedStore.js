@@ -102,6 +102,38 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     }
     return out;
   };
+  // THE POSTER'S OWN KNOWLEDGE — who answered my post (`source.responders`, recorded from 1:1 answers) — is never put on
+  // the circle's store, which syncs to every member and would tell them all who answered. It is kept on this device, a
+  // `post-answers` row per post in the pile, and folded back into the post on every read of it.
+  const PRIVATE_SOURCE = ['responders'];
+  const ANSWERS = 'post-answers';
+  const answersRowOf = async (itemId) => ((await pile.listOpen({ type: ANSWERS })) ?? []).find((r) => r?.source?.itemId === itemId) ?? null;
+  const keepPrivate = async (itemId, priv, ctx) => {
+    const row = await answersRowOf(itemId);
+    if (row) return pile.update(row.id, { source: { ...row.source, ...priv } }, ctx);
+    return pile.addItems([{ type: ANSWERS, text: 'post-answers', source: { itemId, ...priv } }], ctx);
+  };
+  const withPrivate = async (rows) => {
+    const posts = rows.filter((r) => isPost(r));
+    if (posts.length === 0) return rows;
+    const byItem = new Map(((await pile.listOpen({ type: ANSWERS })) ?? []).map((r) => [r?.source?.itemId, r.source]));
+    return rows.map((r) => {
+      const priv = isPost(r) ? byItem.get(r.id) : null;
+      if (!priv) return r;
+      const extra = Object.fromEntries(PRIVATE_SOURCE.filter((k) => priv[k] !== undefined).map((k) => [k, priv[k]]));
+      return { ...r, source: { ...(r.source ?? {}), ...extra } };
+    });
+  };
+  /** Split a patch for a circle post: what may sync, and what stays with the poster. */
+  const splitPatch = (patch) => {
+    const src = patch?.source;
+    if (!src || typeof src !== 'object') return { shared: patch, priv: null };
+    const priv = Object.fromEntries(PRIVATE_SOURCE.filter((k) => src[k] !== undefined).map((k) => [k, src[k]]));
+    if (Object.keys(priv).length === 0) return { shared: patch, priv: null };
+    const rest = Object.fromEntries(Object.entries(src).filter(([k]) => !PRIVATE_SOURCE.includes(k)));
+    return { shared: { ...patch, source: rest }, priv };
+  };
+
   const read = (verb) => async (filter) => {
     // the pile's rows as they are: what is not a post, and a post no circle could hold (a device with no circle yet)
     const lists = [(await pile[verb](filter)) ?? []];
@@ -110,7 +142,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       const ts = await taskStoreOf(c);
       if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isPost(it)));
     }
-    return unionById(lists);
+    // the answers row is this device's own bookkeeping, not an item a reader lists
+    return withPrivate(unionById(lists).filter((r) => r?.type !== ANSWERS));
   };
   const notFound = (err) => err?.name === 'ItemNotFoundError' || err?.code === 'ITEM_NOT_FOUND' || /not found/i.test(String(err?.message ?? ''));
   /**
@@ -123,9 +156,16 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       if (!notFound(err)) throw err;
       const hs = await circleHolders(id);
       if (hs.length === 0) throw err;
+      let args = rest;
+      if (verb === 'update') {
+        const [patch, ctx] = rest;
+        const { shared, priv } = splitPatch(patch);
+        if (priv) await keepPrivate(id, priv, ctx);
+        args = [shared, ctx];
+      }
       let first;
-      for (const st of hs) { const r = await st[verb](id, ...rest); if (first === undefined) first = r; }
-      return first;
+      for (const st of hs) { const r = await st[verb](id, ...args); if (first === undefined) first = r; }
+      return verb === 'update' ? (await withPrivate([first]))[0] : first;
     }
   };
   /** markComplete / removeItems take refs: each ref to the pile when it holds the id, else to the circles that do. */
@@ -152,9 +192,9 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       for (const c of await circlesFor(null)) {
         const ts = await taskStoreOf(c);
         const row = ts ? await ts.getById(id).catch(() => null) : null;
-        if (row) return row;
+        if (row) return (await withPrivate([row]))[0];
       }
-      return hit ?? null;
+      return null;
     },
     addItems: async (partials, ctx = {}) => {
       const created = [];

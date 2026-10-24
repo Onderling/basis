@@ -66,7 +66,7 @@ describe('driver matcher (#4)', () => {
         ? { match: true, reason: 'boating is sailing by another name' }
         : { match: false });
 
-    const matches = await matchDriversSemantic({ drivers: DRIVERS, signature: item, judge });
+    const matches = await matchDriversSemantic({ drivers: DRIVERS, signature: item, judge, modelConsent: true });
     expect(matches).toHaveLength(1);
     expect(matches[0].key).toBe('goals');
     expect(matches[0].reason).toEqual({ kind: 'llm', text: 'boating is sailing by another name' });
@@ -77,7 +77,7 @@ describe('driver matcher (#4)', () => {
   it('matchDriversSemantic: tag matches are NOT re-judged (cheaper + stronger) and rank first', async () => {
     const item = { text: 'learn to sail', tags: ['sailing'] };   // tag-overlaps `goals`
     const judge = vi.fn(async () => ({ match: true, reason: 'x' }));
-    const matches = await matchDriversSemantic({ drivers: DRIVERS, signature: item, judge });
+    const matches = await matchDriversSemantic({ drivers: DRIVERS, signature: item, judge, modelConsent: true });
     // goals matched on tags (not judged); hobby had no overlap → judged, judge said match.
     expect(matches[0].key).toBe('goals');
     expect(matches[0].reason.kind).toBe('tags');
@@ -88,7 +88,7 @@ describe('driver matcher (#4)', () => {
   it('matchDriversSemantic: a judge that throws never removes the deterministic layer', async () => {
     const item = { tags: ['sailing', 'boating'] };
     const judge = vi.fn(async () => { throw new Error('model offline'); });
-    const matches = await matchDriversSemantic({ drivers: DRIVERS, signature: item, judge });
+    const matches = await matchDriversSemantic({ drivers: DRIVERS, signature: item, judge, modelConsent: true });
     expect(matches.map((m) => m.key)).toEqual(['goals']);   // tag layer stands
     expect(matches[0].reason.kind).toBe('tags');
   });

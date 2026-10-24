@@ -99,15 +99,16 @@ export function isAskLive(ask, now = () => Date.now()) {
  * @param {object} a.ask
  * @param {() => Promise<Record<string,object>>} a.getDrivers   MY drivers — they never leave the device
  * @param {Function} [a.judge]
+ * @param {boolean} [a.modelConsent=false]  the persona's yes; the judge runs only under it
  * @param {number} [a.minShared=1]
  * @param {() => number} [a.now]
  * @returns {Promise<{resonant: boolean, reason: string|null, matches: object[], expired: boolean}>}
  */
-export async function evaluateIncomingAsk({ ask, getDrivers, judge, minShared = 1, now = () => Date.now() } = {}) {
+export async function evaluateIncomingAsk({ ask, getDrivers, judge, modelConsent = false, minShared = 1, now = () => Date.now() } = {}) {
   if (!ask) return { resonant: false, reason: null, matches: [], expired: false };
   if (!isAskLive(ask, now)) return { resonant: false, reason: null, matches: [], expired: true };
 
-  const matches = await evaluateItemForDrivers({ item: ask, getDrivers, judge, minShared });
+  const matches = await evaluateItemForDrivers({ item: ask, getDrivers, judge, modelConsent, minShared });
   if (!matches.length) return { resonant: false, reason: null, matches: [], expired: false };
 
   return { resonant: true, reason: matchReasonText(matches[0]), matches, expired: false };

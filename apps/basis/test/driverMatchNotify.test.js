@@ -55,11 +55,11 @@ describe('driver match→notify seam (#5)', () => {
     await expect(notifyIfResonant({ item, getDrivers, notify })).resolves.toMatchObject({ notified: true });
   });
 
-  it('notifyIfResonant threads an injected judge for synonym matches', async () => {
+  it('notifyIfResonant threads an injected judge for synonym matches, under the persona\'s yes', async () => {
     const notify = vi.fn();
     const judge = vi.fn(async () => ({ match: true, reason: 'boating is sailing' }));
     const item = { id: 'q2', title: 'weekend boating', driverSignature: { tags: ['boating'] } };   // no tag overlap
-    const res = await notifyIfResonant({ item, getDrivers, notify, judge });
+    const res = await notifyIfResonant({ item, getDrivers, notify, judge, modelConsent: true });
     expect(res.notified).toBe(true);
     expect(notify.mock.calls[0][0].topReason).toBe('boating is sailing');
   });

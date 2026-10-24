@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 
 test.setTimeout(90_000);
 
-test('Mij shows the name, its readings and the devices; Edit and My data hold the rest', async ({ page }) => {
+test('Mij shows the name, its readings and the devices; Edit and My data hold the rest (the moved doors have their own homes)', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message.split('\n')[0]));
   await page.goto('/');
@@ -33,8 +33,11 @@ test('Mij shows the name, its readings and the devices; Edit and My data hold th
   await expect(page.locator('.cc-screen-panel .cc-profile__geo-input')).toBeVisible();
   await page.locator('.cc-screen-panel__close').click();
 
+  // the doors Mij gave up have their own homes since the settings regroup: availability under the gear (Verbinding),
+  // shared-with-me a chip on Mij, blocked at the foot of Contacten; My data keeps the log report
   await page.locator('.cc-profile__mydata').first().click();
-  for (const door of ['availability', 'shared-with-me', 'blocked']) await expect(page.locator(`.cc-mydata__doors .cc-profile__${door}`), door).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.cc-mydata__doors .cc-profile__log-report')).toBeVisible({ timeout: 15_000 });
+  for (const door of ['availability', 'shared-with-me', 'blocked']) await expect(page.locator(`.cc-mydata__doors .cc-profile__${door}`), door).toHaveCount(0);
   expect(errs).toEqual([]);
 });
 

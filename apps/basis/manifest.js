@@ -1151,10 +1151,6 @@ export const basisManifest = {
    * them from this declaration (`myDataActionsFor`), each `to` mapped to the view it opens there.
    */
   myDataActions: [
-    { id: 'availability',      labelKey: 'circle.profile.availability',     target: { kind: 'nav', to: 'availability' } },
-    { id: 'connection-points', labelKey: 'circle.nearbyScreen.points_open', target: { kind: 'nav', to: 'points' } },
-    { id: 'shared-with-me',    labelKey: 'circle.profile.sharedWithMe',     target: { kind: 'nav', to: 'sharedWithMe' } },
-    { id: 'blocked',           labelKey: 'circle.profile.blocked',          target: { kind: 'nav', to: 'blocked' } },
     { id: 'log-report',        labelKey: 'circle.profile.logReport',        target: { kind: 'nav', to: 'logReport' } },
   ],
 
@@ -1179,6 +1175,17 @@ export const basisManifest = {
         { id: 'week-overview', kind: 'switch'  },
         { id: 'notifications', kind: 'switch'  },
         { id: 'assistant',     kind: 'control' },
+      ],
+    },
+    {
+      id: 'connection', labelKey: 'circle.settings_home.connection',
+      sections: [
+        { id: 'availability',      kind: 'door', target: { kind: 'nav', to: 'availability' } },
+        { id: 'connection-points', kind: 'door', target: { kind: 'nav', to: 'points' } },
+        { id: 'delivery',          kind: 'control' },
+        { id: 'address-sharing',   kind: 'switch'  },
+        { id: 'relay',             kind: 'control' },
+        { id: 'device-keeps',      kind: 'control' },
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },

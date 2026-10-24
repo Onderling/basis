@@ -389,9 +389,10 @@ async function materializeItems(block, activeCircleIds, { callSkill, selfIn = ()
 /**
  * Mij's "wat wacht op jou" (`awaiting.js`): from the reads the tabs already make — each circle's open proposals
  * (`hostOps.openProposals`, the tile badge's read), its appointments ahead (`listEvents`, answers projected), and a
- * device offer stashed here (`hostOps.pendingDeviceOffer`). A source a shell does not hand in counts as nothing waiting.
+ * device offer stashed here (`hostOps.pendingDeviceOffer`), and what was shared with the person (`sharedWithMeCount`, the
+ * shell's shared-with-me store). A source a shell does not hand in counts as nothing waiting.
  */
-async function materializeAwaiting(block, { callSkill, circles = [], selfIn = () => null, openProposals = null, pendingDeviceOffer = null } = {}) {
+async function materializeAwaiting(block, { callSkill, circles = [], selfIn = () => null, openProposals = null, pendingDeviceOffer = null, sharedWithMeCount = null } = {}) {
   const mine = (Array.isArray(circles) ? circles : []).filter((c) => c?.id && !isPairCircleId(c.id));
   const proposalsByCircle = {};
   const eventsByCircle = {};
@@ -405,7 +406,9 @@ async function materializeAwaiting(block, { callSkill, circles = [], selfIn = ()
   }));
   let deviceOffer = false;
   if (typeof pendingDeviceOffer === 'function') { try { deviceOffer = !!(await pendingDeviceOffer()); } catch { deviceOffer = false; } }
-  const items = awaitingItems({ circles: mine, selfIn, proposalsByCircle, eventsByCircle, deviceOffer });
+  let sharedWithMe = 0;
+  if (typeof sharedWithMeCount === 'function') { try { sharedWithMe = Number(await sharedWithMeCount()) || 0; } catch { sharedWithMe = 0; } }
+  const items = awaitingItems({ circles: mine, selfIn, proposalsByCircle, eventsByCircle, deviceOffer, sharedWithMe });
   return { blockId: block.id, type: 'awaiting', status: items.length ? 'ok' : 'empty', content: { items } };
 }
 

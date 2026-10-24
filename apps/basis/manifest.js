@@ -1146,15 +1146,6 @@ export const basisManifest = {
   ],
 
   /**
-   * Nav-chrome (My data) — the doors at the top of My data: the views Me gave up when it became one declared screen
-   * (2026-10-15). Views no op backs, so `nav` rows (strict validation refuses one that names an op). Both shells paint
-   * them from this declaration (`myDataActionsFor`), each `to` mapped to the view it opens there.
-   */
-  myDataActions: [
-    { id: 'log-report',        labelKey: 'circle.profile.logReport',        target: { kind: 'nav', to: 'logReport' } },
-  ],
-
-  /**
    * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
    * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
    * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
@@ -1208,6 +1199,7 @@ export const basisManifest = {
         { id: 'privacy',         kind: 'fact'    },
         { id: 'usage',           kind: 'fact'    },
         { id: 'frequent',        kind: 'control' },
+        { id: 'log-report',      kind: 'door', target: { kind: 'nav', to: 'logReport' } },
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },

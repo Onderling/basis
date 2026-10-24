@@ -3,11 +3,12 @@
  * last, the door to the circles' own settings; the chooser lists the person's circles, each opening that circle's
  * settings screen. What is listed and in which order is the manifest's (`settingsHomeFor`); this only paints.
  */
+import { versionLine } from '../../src/v2/versionLine.js';
 import { settingsHomeFor } from '../../src/v2/settingsHome.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPerCircle } = {}) {
+export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPerCircle, version } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleSettingsHome.js');
   page(container, tr, tr('circle.settings_home.title'), onBack);
@@ -17,6 +18,14 @@ export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPe
   for (const g of groups) list.appendChild(door(tr(g.labelKey), `cc-settings__group cc-settings__group--${g.id}`, () => onOpenGroup?.(g.id), g.id));
   if (perCircle && typeof onOpenPerCircle === 'function') list.appendChild(door(tr(perCircle.labelKey), 'cc-settings__per-circle', () => onOpenPerCircle(), perCircle.id));
   container.appendChild(list);
+  // the build this tab runs (the tag the publish baked in; '' on a dev server): "which version are you on" has an answer
+  // at the foot of the settings (2026-09-19: a laptop on last week's build looked like a laptop that receives nothing)
+  if (typeof version === 'string') {
+    const v = document.createElement('p');
+    v.className = 'cc-settings__fact cc-settings__version';
+    v.textContent = versionLine(version, tr);
+    container.appendChild(v);
+  }
   return container;
 }
 

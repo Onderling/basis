@@ -4563,7 +4563,6 @@ async function showMij() {
       // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
       else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
-    onMyData: showMyData,
     // the gear: the person's settings (Instellingen)
     onSettings: showSettingsHome,
     // The advanced surface — every surface-less op + the settable params (the default place).
@@ -4674,11 +4673,11 @@ async function showBlocked() {
 function showLogReport() {
   hideCircleTabBar(tabBarEl);
   const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
-  renderLogReport(rootEl, { text, n, t, onBack: showMyData });
+  renderLogReport(rootEl, { text, n, t, onBack: () => showMyData({ group: 'my-data' }) });   // its door is in Mijn gegevens
 }
 
-// "My data": where your data lives (pod/relay) + privacy + usage + key
-// management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
+// A settings group's screen (from Instellingen, the gear on Mij): the group's declared sections, painted by the one
+// painter map; without a group, the settings home.
 /**
  * The ADVANCED surface (the "default places for any new opId" rule): every op without a
  * bespoke screen, listed and reachable — no-arg ops run through the waist, arg-taking ops
@@ -4820,6 +4819,8 @@ function ensurePagePanel() {
 async function showMyData(opts) {
   // a settings group's screen (from the gear on Mij): the same sections and handlers, only that group's, in its order
   const group = typeof opts?.group === 'string' ? settingsGroupFor(basisManifest, opts.group) : null;
+  // every section lives in a group now: without one there is nothing to show but the groups themselves
+  if (!group) { showSettingsHome(); return; }
   // a ceremony or wizard that closes comes back to the screen it was opened from
   const again = () => showMyData(opts);
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
@@ -4942,12 +4943,12 @@ async function showMyData(opts) {
     names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
     labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
   });
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: group ? showSettingsHome : showMij,
-    only: group ? group.sections.map((sec) => sec.id) : null, groupTitle: group ? t(group.labelKey) : null,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showSettingsHome,
+    only: group.sections.map((sec) => sec.id), groupTitle: t(group.labelKey),
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
-    // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
+    // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
-    weekOverview, version: APP_VERSION,
+    weekOverview,
     onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
@@ -5100,6 +5101,7 @@ function showSettingsHome() {
     t, onBack: showMij,
     onOpenGroup: (id) => showMyData({ group: id }),
     onOpenPerCircle: showSettingsCircleChooser,
+    version: APP_VERSION,
   });
 }
 

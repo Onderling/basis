@@ -375,10 +375,9 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // Nav-chrome (Me) — `manifest.meActions` declares the ordered actions at the top of the person's own page (Me):
-  // "Share my card" and "Scan" (2026-10-09); `manifest.myDataActions` the doors at the top of My data (the views Me
-  // gave up, 2026-10-15). The SAME NavItem shape and helper as `tabs`, so both shells paint them from the declaration,
-  // never from a screen file's list. Forward-additive: absent → none.
-  for (const key of ['meActions', 'myDataActions']) {
+  // "Share my card" and "Scan" (2026-10-09). The SAME NavItem shape and helper as `tabs`, so both shells paint them
+  // from the declaration, never from a screen file's list. Forward-additive: absent → none.
+  for (const key of ['meActions']) {
     if (manifest[key] === undefined) continue;
     if (!Array.isArray(manifest[key])) {
       errors.push({ path: `/${key}`, message: `${key} must be an array if present` });

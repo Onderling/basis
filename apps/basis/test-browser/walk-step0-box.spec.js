@@ -109,7 +109,7 @@ test('step 0: link, claim the companion, give the bot the agenda files, the link
       .find((c) => c.webid === boxAddress && c.linkedRow) ?? null, { timeout: 60_000, step: 500 });
     expect(contact, 'the bot is a contact in the app').toMatchObject({ webid: boxAddress, linkedRow: `telegram:${ADMIN}` });
 
-    // ── 2 · Claim the companion: the claim line from the log, pasted under My data → "Companion claimen" ──
+    // ── 2 · Claim the companion: the claim line from the log, pasted under Instellingen → Apparaten & sleutels → "Companion claimen" ──
     const claimLine = /Claim:\s+(\S+@\S+)/g;
     let claim = null;
     for (const m of logsOf('companion', env).matchAll(claimLine)) claim = m[1];   // `| tail -1`

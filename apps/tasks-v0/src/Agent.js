@@ -85,6 +85,8 @@ export async function createTasksAgent({
   // appends those ids to its grants lane so the revoke binds at the owner's other devices too.
   // Absent ⇒ device-local durability only, exactly as before.
   onTaskGrantsRevoked,
+  // The key this circle's task grants are kept under in the shared vault (one per circle; see TaskGrantManager).
+  grantStoreKey,
   // Multi-circle runtime (2026-05-14, Tasks V2 sixth slice) —
   // a pre-built `core.Agent` to reuse across circle bundles; when
   // truthy, `registerSkills` defaults to false so the CLI owns the
@@ -181,7 +183,7 @@ export async function createTasksAgent({
   // revocation set in memory only, so a restart re-admits holders it had already cut off while their
   // tokens are still signed and unexpired — and it says so loudly on construction rather than
   // degrading in silence.
-  const taskGrantManager = new TaskGrantManager({ identity: id, store: grantVault, onRevoked: onTaskGrantsRevoked });
+  const taskGrantManager = new TaskGrantManager({ identity: id, store: grantVault, storeKey: grantStoreKey, onRevoked: onTaskGrantsRevoked });
 
   // OfferingMatch (Phase 4.2 — composes core.Agent + pubSub directly).
   let offeringMatch = null;

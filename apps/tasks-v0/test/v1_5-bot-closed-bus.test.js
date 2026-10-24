@@ -54,4 +54,18 @@ describe('a cap-token bot behind the closed bus roster', () => {
     expect(circle.agent.security.inProcessPeerKeys().has(issued.botPubKey)).toBe(false);
     expect(circle.agent.security.getPeerKey(issued.botPubKey)).toBe(null);
   });
+
+  it('an engine with no trust registry adopts no bot: it would judge the bot\'s key at the default tier', async () => {
+    // fail closed: without a registry the bot's key cannot be held to `public`, so it would reach every
+    // authenticated op token-less — the adoption refuses instead of skipping the tier
+    Object.defineProperty(circle.agent.policyEngine, 'trustRegistry', { value: undefined, configurable: true });
+    await call(circle, 'setBotChatBinding', { chatId: ANNE_CHAT, webid: ANNE }, ANNE);
+    let issued;
+    try { issued = await call(circle, 'issueBotToken', { chatId: ANNE_CHAT, ttlDays: 1 }, ANNE); }
+    catch (err) { issued = { ok: false, error: String(err?.message ?? err) }; }
+    expect(issued?.ok).not.toBe(true);
+    expect(String(issued?.error ?? '')).toMatch(/trust registry/);
+    expect([...circle.agent.security.inProcessPeerKeys()].length).toBe(0);
+  });
 });
+

@@ -4340,6 +4340,9 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // The host gate's trust registry — the door sets the tier of the people it admits here (setDoorCaller).
   let hostTrustRegistry = null;
+  // The tasks bundle the host carries (composed below): its revocations and its record of what it issued are part of
+  // this engine's answer. Until it is composed it answers nothing, so a token naming it is refused, never waved on.
+  let tasksOnHost = null;
   /* Identity step 2.4a/2.4b — attach a PolicyEngine to hostAgent so scoped access is ENFORCED
    * (the gate was structurally absent: hostAgent.policyEngine was null, so taskExchange/A2ATransport
    * skipped it for host traffic). The owner-only CONTROL + secret-material skills (the phrase, the root,
@@ -4358,8 +4361,21 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the owner's chat agent IS self here (two keys, one person): the only identity besides the host's own that
       // may reach a 'private' skill. Fixed at construction — nothing can be added to self later.
       selfIds:       [chatId.pubKey],
-      isRevoked:     async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
+      // Deny wins across every source of the host's revocation truth: the agents app's issued tokens, every loaded
+      // circle's task grants and bot bindings, and the grants lane (a revoke made on a sibling device).
+      isRevoked:     anyRevoked([
+        async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
+        async (tokenId) => Boolean(await tasksOnHost?.isRevoked(tokenId)),
+        async (tokenId) => Boolean(await surfaceGrants.isRevoked(tokenId)),
+      ]),
+      // …and a token presented here must be ON RECORD: one the agents app issued and holds, or one a loaded circle's
+      // task grants or bot bindings list. A token signed by this key but on no record — minted off the record, or
+      // naming a circle that is not loaded — is refused (`INVALID_TOKEN: not active`).
+      isAllowed:     async (token) => Boolean(await agentsTokenRegistry?.holds?.(token?.id)) || Boolean(tasksOnHost?.isOnRecord(token)),
     });
+    // The host's own key signs every token this engine verifies: it is `private` (self), or every token it issues would
+    // die at its own door as signed by an issuer that is "not trusted".
+    await hostTrustRegistry.setTier(hostId.pubKey, 'private');
     // The in-process chat caller is the owner's device — it is self, so it clears the 'private' host ops.
     await hostTrustRegistry.setTier(chatId.pubKey, 'private');
   } catch (e) { console.warn('[realAgent] hostAgent PolicyEngine attach skipped:', e?.message ?? e); }
@@ -4400,21 +4416,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   }
 
-  /* ─── tasks-v0 real circle agent (— integration plan
-   *     2026-05-23) ─────────────────────────────────────────────
+  /* ─── the tasks engine, carried by the host ───────────────────────────────────────────────────
    *
-   * Replaces the previous mock-task handlers (~210 lines) with
-   * the actual tasks-v0 Circle agent composed in-process.  Boots
-   * 110 real skills (addTask, claimTask, completeTask, submitTask,
-   * approveTask, rejectTask, listMyInbox, listOpen, listMine,
-   * getTaskSnapshot, provisionMyCircle, …).
-   *
-   * Separate identity vault prefix so circle identity is isolated
-   * from chat identity (per integration-plan decision #2).
+   * The tasks-v0 skills (addTask, claimTask, completeTask, listOpen, listMine, …) register on the HOST agent: one
+   * agent per person, so the host key signs every task grant and bot token and the host engine judges every call.
+   * The tasks key this device held before is retired: read ONCE, before it is forgotten, so a bot binding it signed
+   * can be checked and re-signed by the host (`BotAgentRegistry.restoreAll`); then its prefix is emptied. An emptied
+   * prefix holds no key, so later boots re-sign nothing — the forgetting is the one-shot marker.
    */
-  const tasksIdentityVault = await sealedVault(opts.tasksIdentityVault
-    ?? pickVault('cc-tasks-id:'));
-  await giveFreshSeedIfShared(tasksIdentityVault, notInProcessKeys, inProcessHealed);
+  const retiredTasksVault = opts.tasksIdentityVault ?? pickVault('cc-tasks-id:');
+  let retiredBotIssuer = null;
+  try {
+    const sealed = await sealedVault(retiredTasksVault);
+    if (await sealed.has('agent-privkey')) retiredBotIssuer = (await AgentIdentity.restore(sealed)).pubKey;
+  } catch (e) { console.warn('[realAgent] the retired tasks key could not be read — its bot bindings will be dropped, not re-signed:', e?.message ?? e); }
+  // the task grants' durable store: the host's, one record per circle inside it
+  const hostGrantsVault = await sealedVault(opts.hostGrantsVault ?? pickVault('cc-host-grants:'));
   // Register the chatAgent's pubKey as the local member ("admin")
   // AND keep the legacy webid:* members for demo cross-actor tests.
   // Real tasks-v0 skills use `from` (caller) to look up the actor's
@@ -4427,9 +4444,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   const tasksDefaultCircleId = botHouseholdId ?? ((typeof opts.tasksCircleId === 'string' && opts.tasksCircleId) ? opts.tasksCircleId : 'cc-default');
   const tasksCircle = await createBrowserMultiCircleTasksAgent({
     bus,
+    agent: hostAgent,
+    retiredBotIssuer,
     // the host that may vouch for a door's person (`actor`): its caller here is the owner's chat agent
     hostKey: chatId.pubKey,
-    identityVault: tasksIdentityVault,
+    identityVault: hostGrantsVault,
     // THE ONE MEMBERSHIP ANSWER for the tasks app's authority gates: this circle's folded roster,
     // read through the waist. The tasks bundle composes its own member list locally (with this
     // device as admin of its primary circle), so a gate reading that list let any member grant
@@ -4496,7 +4515,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!ok) console.warn(`[realAgent] bot ${chatId}: token revoke did not reach the grants lane — it binds on this device; siblings learn it at catch-up/TTL`);
     },
   });
-  adoptInProcess(tasksCircle.agent);
+  tasksOnHost = tasksCircle;
+  // the retired tasks key is forgotten now that every binding it signed was checked and re-signed or dropped
+  try { for (const key of await retiredTasksVault.list()) await retiredTasksVault.delete(key); }
+  catch (e) { console.warn('[realAgent] could not forget the retired tasks key:', e?.message ?? e); }
 
   // The primary tasks circle's single store needs its store<->mirror sync wired
   // so unscoped task ops (which don't carry a circleId, so the per-op wiring at
@@ -7792,8 +7814,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The skill ids each in-process agent registers, read-only — for the check that one op has one owner.
     inProcessSkillIds: () => {
       const idsOf = (a) => (a?.skills?.all?.() ?? []).map((d) => d.id).sort();
+      // tasks registers on the host (one agent per person): the host's ids are tasks' too
       return {
-        host: idsOf(hostAgent), tasks: idsOf(tasksCircle?.agent), pinboard: idsOf(pinboardAgent?.bundle?.agent),
+        host: idsOf(hostAgent), pinboard: idsOf(pinboardAgent?.bundle?.agent),
       };
     },
     // Part G — the REAL household app manifest (item/task vocab) is now the

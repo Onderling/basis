@@ -50,6 +50,11 @@ export class TokenRegistry {
     return best;
   }
 
+  /** Whether this registry holds the token with this id (issued here and stored, whatever its state). */
+  async holds(tokenId) {
+    return typeof tokenId === 'string' && tokenId !== '' && this.#vault.has(`token:${tokenId}`);
+  }
+
   /** Mark a token as locally revoked. */
   async revoke(tokenId) {
     await this.#vault.set(`revoked:${tokenId}`, '1');

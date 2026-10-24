@@ -65,8 +65,8 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (pure types)', () => 
     expect(r.status).toBe('error');
   });
 
-  it('noticeboard block pulls pinboard listOpen (#16 — screen shows the noticeboard)', async () => {
-    const callSkill = async (app, op) => (app === 'pinboard' && op === 'listOpen'
+  it('noticeboard block pulls pinboard listOpenRequests (#16 — screen shows the noticeboard)', async () => {
+    const callSkill = async (app, op) => (app === 'pinboard' && op === 'listOpenRequests'
       ? { items: [{ id: 'p1', text: 'wie heeft een boormachine?', addedBy: 'https://alice.example/me' }] }
       : null);
     const r = await materializeBlock({ block: { id: 'b', type: 'noticeboard' }, circleId: 'c1', hostOps: { callSkill } });

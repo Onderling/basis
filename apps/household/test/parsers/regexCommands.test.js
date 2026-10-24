@@ -97,48 +97,48 @@ const cases = [
   // ──────────────────────────────────────────────────────────────
   ['list + shopping',
     'list shopping',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
   ['list + errand',
     'list errand',
-    { skillId: 'listOpen', args: { type: 'errand' } }],
+    { skillId: 'listOpenItems', args: { type: 'errand' } }],
   ['list + repair',
     'list repair',
-    { skillId: 'listOpen', args: { type: 'repair' } }],
+    { skillId: 'listOpenItems', args: { type: 'repair' } }],
   ['list + schedule',
     'list schedule',
-    { skillId: 'listOpen', args: { type: 'schedule' } }],
+    { skillId: 'listOpenItems', args: { type: 'schedule' } }],
   ['show + groceries',
     'show groceries',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
 
   // ──────────────────────────────────────────────────────────────
   // Dutch `list`
   // ──────────────────────────────────────────────────────────────
   ['lijst + boodschappen',
     'lijst boodschappen',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
   ['toon + agenda',
     'toon agenda',
-    { skillId: 'listOpen', args: { type: 'schedule' } }],
+    { skillId: 'listOpenItems', args: { type: 'schedule' } }],
 
   // ──────────────────────────────────────────────────────────────
   // "what do we need" / "wat hebben we nodig"
   // ──────────────────────────────────────────────────────────────
   ['what do we need? → shopping',
     'what do we need?',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
   ['what do we need at the supermarket?',
     'what do we need at the supermarket?',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
   ['what do we need in the kitchen',
     'what do we need in the kitchen',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
   ['wat hebben we nodig?',
     'wat hebben we nodig?',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
   ['wat hebben we nodig in de supermarkt?',
     'wat hebben we nodig in de supermarkt?',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
 
   // ──────────────────────────────────────────────────────────────
   // English `done`
@@ -201,12 +201,12 @@ const cases = [
   // ──────────────────────────────────────────────────────────────
   // Help
   // ──────────────────────────────────────────────────────────────
-  ['help',
+  ['help → nothing (the help is basis\'s)',
     'help',
-    { skillId: 'help', args: {} }],
+    null],
   ['hulp',
     'hulp',
-    { skillId: 'help', args: {} }],
+    null],
 
   // ──────────────────────────────────────────────────────────────
   // Addressed-mode prefix stripping
@@ -223,9 +223,9 @@ const cases = [
   ['!add prefix',
     '!add bread',
     { skillId: 'addItem', args: { type: 'shopping', text: 'bread' } }],
-  ['/help slash command',
+  ['/help slash command → nothing (basis owns /help)',
     '/help',
-    { skillId: 'help', args: {} }],
+    null],
   ['@Household + Dutch verb',
     '@Household voeg toe melk',
     { skillId: 'addItem', args: { type: 'shopping', text: 'melk' } }],
@@ -295,7 +295,7 @@ const cases = [
     { skillId: 'markComplete', args: { match: 'bread' } }],
   ['list shopping. → strip .',
     'list shopping.',
-    { skillId: 'listOpen', args: { type: 'shopping' } }],
+    { skillId: 'listOpenItems', args: { type: 'shopping' } }],
 
   // ──────────────────────────────────────────────────────────────
   // Whitespace tolerance / case
@@ -313,18 +313,18 @@ const cases = [
   // ──────────────────────────────────────────────────────────────
   // Edge cases — just-the-verb / null
   // ──────────────────────────────────────────────────────────────
-  ['just "add" → help',
+  ['just \"add\" → nothing (no help skill: basis answers an empty command)',
     'add',
-    { skillId: 'help', args: {} }],
-  ['just "list" → help',
+    null],
+  ['just \"list\" → nothing (no help skill: basis answers an empty command)',
     'list',
-    { skillId: 'help', args: {} }],
-  ['just "done" → help',
+    null],
+  ['just \"done\" → nothing (no help skill: basis answers an empty command)',
     'done',
-    { skillId: 'help', args: {} }],
-  ['just "remove" → help',
+    null],
+  ['just \"remove\" → nothing (no help skill: basis answers an empty command)',
     'remove',
-    { skillId: 'help', args: {} }],
+    null],
   ['empty string → null',
     '',
     null],

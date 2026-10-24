@@ -124,7 +124,7 @@ describe('renderCircleView — the paint half', () => {
 
 describe('materializeNoticeboard — the screen shares the stamp', () => {
   it('stamps senderLabel from the roster; the full addedBy webid is the match key', async () => {
-    const callSkill = async (app, op) => (op === 'listOpen'
+    const callSkill = async (app, op) => (op === 'listOpenRequests'
       ? { items: [{ id: 'p1', type: 'request', intent: 'ask', text: 'wie helpt?', addedBy: 'webid:ella' }] }
       : {});
     const block = await materializeBlock({

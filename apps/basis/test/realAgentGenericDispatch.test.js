@@ -41,7 +41,7 @@ describe('createRealHouseholdAgent — §1b 1d generic op-id dispatch at callSki
   it('regression: a non-generic (bespoke) household op still routes normally via callSkill', async () => {
     const a = await createRealHouseholdAgent();
     await a.callSkill('household', 'addItem', { circleId: 'c1', type: 'shopping', text: 'milk' });
-    const open = await a.callSkill('household', 'listOpen', { circleId: 'c1', type: 'shopping' });
+    const open = await a.callSkill('household', 'listOpenItems', { circleId: 'c1', type: 'shopping' });
     expect(open.items.map((i) => i.label)).toContain('milk');
   });
 

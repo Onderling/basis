@@ -53,12 +53,6 @@ import { validateCanonical } from '@onderling/item-types';
 import { saveCircleConfig, loadCircleConfig, KIND_DEFAULTS } from '../Circle.js';
 import { tasksManifest } from '../../manifest.js';
 import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
-import {
-  startPodSignIn      as _startPodSignIn,
-  completePodSignIn   as _completePodSignIn,
-  signOutOfPod        as _signOutOfPod,
-  podSignInStatus     as _podSignInStatus,
-} from '../lib/podSignIn.js';
 
 /**
  * Cross-pod ref soft cap on `addTask({embeds: [...]})`. Eight keeps
@@ -908,135 +902,11 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
       visibility:  'authenticated',
     }),
 
-    /**
-     * getCircleStoragePolicy({circleId})
-     *   — Tasks V2 standardisation adoption (2026-05-14). Returns the
-     *   circle's storage policy `{policy, groupPodUri?}` from its
-     *   `circleConfig.storage`. Defaults to `'none'`.
-     *
-     * NOT wired: no `operations[]` declaration (pod-plumbing skill,
-     * referenced only via a `pod-settings` dataSource.skillId).
-     */
-    defineSkill('getCircleStoragePolicy', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      const storage = circle.liveCircle?.storage ?? { policy: 'none' };
-      return {
-        policy:      storage.policy ?? 'none',
-        groupPodUri: storage.groupPodUri ?? null,
-      };
-    }, {
-      description: "Tasks V2: read the circle's storage policy (§II.2: no-pod / centralised / decentralised / hybrid).",
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * setCircleStoragePolicy({circleId, storagePolicy, groupPodUri?})
-     *   — Tasks V2 standardisation adoption (2026-05-14). Admin /
-     *   coordinator only. **One-way**: rejects downgrade to
-     *   `'none'` once a pod-having policy is active (substrate-
-     *   side data migration is the user's job, per
-     *   `Substrates/storage-migration-design-2026-05-14.md`).
-     *
-     * NOT wired: no `operations[]` declaration (pod-plumbing skill,
-     * referenced only via `pod-settings` field.patch.opId).
-     */
-    defineSkill('setCircleStoragePolicy', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      const a = argsFromParts(parts);
-      // Admin / coordinator gate via the circle's role map.
-      const role = await roleOf(circle, from);
-      if (role !== 'admin' && role !== 'coordinator') {
-        return { error: 'admin-only' };
-      }
-      const err = _validateStoragePolicy(a.storagePolicy, a.groupPodUri);
-      if (err) return { error: err };
-      const next = _buildStoragePolicy(a.storagePolicy, a.groupPodUri);
-      const current = circle.liveCircle?.storage ?? { policy: 'none' };
-      if (current.policy && current.policy !== 'none' && next.policy === 'none') {
-        return { error: 'storage-policy-downgrade-not-supported' };
-      }
-      // Apply via the frozen-copy mutator (circleState.circleMutator).
-      if (typeof circle.circleMutator === 'function') {
-        circle.circleMutator({ storage: next });
-      }
-      return { circleId: circle.liveCircle?.circleId ?? a.circleId ?? null, storage: next };
-    }, {
-      description: 'Tasks V2: admin-only upgrade of the circle storage policy. One-way.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * startPodSignIn({issuer, redirectUrl, circleId?})
-     *   — Tasks V2 substrate-adoption (2026-05-14, Phase 52.15.3
-     *   mirror). Kicks off the OIDC redirect dance. Returns the IdP
-     *   authorize URL; the browser navigates there. The session is
-     *   stored on `circle.oidcSession` until the callback lands.
-     *
-     * NOT wired: OIDC redirect orchestration, no `operations[]` op
-     * (modelling it would need a redirect-flow primitive the substrate
-     * doesn't yet have — manifest note at the `pod-settings` block).
-     */
-    defineSkill('startPodSignIn', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      const a = argsFromParts(parts);
-      return _startPodSignIn({ circle, issuer: a.issuer, redirectUrl: a.redirectUrl });
-    }, {
-      description: 'Phase 1 of pod sign-in: returns the IdP authorize URL.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * completePodSignIn({callbackUrl, circleId?})
-     *   — Tasks V2 substrate-adoption. Phase 2: handles the OIDC
-     *   callback + attaches a SolidPodSource to the circle's
-     *   CachingDataSource.
-     *
-     * NOT wired: OIDC orchestration, no `operations[]` op.
-     */
-    defineSkill('completePodSignIn', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      const a = argsFromParts(parts);
-      return _completePodSignIn({ circle, callbackUrl: a.callbackUrl });
-    }, {
-      description: 'Phase 2 of pod sign-in: completes the OIDC dance + attaches the pod-backed DataSource.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * signOutOfPod({circleId?})
-     *   — Tasks V2 substrate-adoption. Detaches the inner DataSource
-     *   + clears the OIDC session. Local cache preserved.
-     *
-     * NOT wired: OIDC orchestration, no `operations[]` op.
-     */
-    defineSkill('signOutOfPod', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      return _signOutOfPod({ circle });
-    }, {
-      description: 'Sign out of the active pod; preserves local cache.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * podSignInStatus({circleId?})
-     *   — Tasks V2 substrate-adoption. Read-only `{signedIn, webid,
-     *   podAttached}`.
-     *
-     * NOT wired: OIDC orchestration, no `operations[]` op.
-     */
-    defineSkill('podSignInStatus', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      return _podSignInStatus({ circle });
-    }, {
-      description: 'Read the current pod-sign-in state for this circle.',
-      visibility:  'authenticated',
-    }),
 
     /**
      * spawnMyCircle({circleId})

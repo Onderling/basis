@@ -149,41 +149,5 @@ export function buildWorkspaceSkills({ bundleResolver, roleOf = makeRoleOf(null)
       description: 'List tasks I master whose claim is awaiting my confirmation.',
     }),
 
-    /**
-     * getItemTree({itemId, circleId?}) — M4 Phase 3.3c decentralised
-     * cross-pod read path.
-     *
-     * Walks the task's `embeds`/`dependencies` graph via item-store's
-     * `treeOf`, resolving the 3 canonical cross-pod ref shapes
-     * (`urn:dec:item:` → local, `pseudo-pod://` → pseudo-pod ring,
-     * `http(s)://` → another member's pod) through
-     * `createCrossPodRefResolver`. Permission failures surface as
-     * `{source:'placeholder', reason:'PERMISSION_DENIED'}` nodes (the
-     * cross-pod-refs.md three-tier render fallback), never throwing.
-     *
-     * Agent-side by design: Tasks web + mobile are both thin A2A
-     * clients, so the walk lives here and serves BOTH equally — one
-     * device-independent path (the platform-parity principle). Mirror
-     * of Pinboard's `getItemTree` skill (commit `a2685c6`).
-     *
-     * Tasks stores `embeds` at the top level on the task item (unlike
-     * Pinboard's `source.embeds` shape). Both are bridged here for
-     * forward-compatibility.
-     */
-    defineSkill('getItemTree', async ({ parts, from, envelope }) => {
-      const circle = bundleResolver(parts, { envelope, from });
-      if (!circle) return { error: 'circleId required' };
-      const a = argsFromParts(parts);
-      // One implementation, in the package that owns `treeOf` — pinboard has the same op and this body
-      // was copied from it.
-      return itemTreeFor({
-        itemId:        a.itemId,
-        getById:       (id) => circle.itemStore.getById(id),
-        pseudoPodRead: typeof circle.pseudoPod?.read === 'function' ? (ref) => circle.pseudoPod.read(ref) : undefined,
-      });
-    }, {
-      description: 'Walk a task\'s embeds/deps tree, materialising cross-pod refs (the decentralised read path).',
-      visibility:  'authenticated',
-    }),
   ];
 }

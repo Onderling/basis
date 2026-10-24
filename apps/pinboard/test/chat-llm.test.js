@@ -140,7 +140,7 @@ describe('Pinboard Slice D.2 — LLM tool-calling on chat via renderChat', () =>
     await callSkill(bundle.agent, 'postRequest', { intent: 'offer', text: 'spare jam jars' });
 
     const provider = mockProvider({
-      responses: [{ toolCall: { id: 'listOpen', args: {} }, replyText: null }],
+      responses: [{ toolCall: { id: 'listOpenRequests', args: {} }, replyText: null }],
     });
     const llm = new LlmClient({ provider });
     const { onFreeText } = createLlmChat({ bundle, llm, localActor: ANNE });

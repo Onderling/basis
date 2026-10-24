@@ -194,7 +194,7 @@ describe('H5 — cancel + list', () => {
       { type: 'request', text: 'paint',    requiredSkills: ['paint']  },
       { type: 'request', text: 'plumbing', requiredSkills: ['plumb']  },
     ], { actor: ALICE });
-    const r = await callSkill(bundle.agent, 'listOpen', { skill: 'paint' }, ALICE);
+    const r = await callSkill(bundle.agent, 'listOpenRequests', { skill: 'paint' }, ALICE);
     expect(r.items).toHaveLength(1);
   });
 });

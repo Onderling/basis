@@ -11,7 +11,7 @@ describe('household and folio fold onto the host', () => {
     const agent = await createRealHouseholdAgent({ seedHousehold: false });
     const ids = agent.inProcessSkillIds();
     expect(Object.keys(ids).sort()).toEqual(['host', 'pinboard', 'tasks']);
-    for (const op of ['addItem', 'addTask', 'markComplete', 'claim', 'reassign', 'removeItem', 'listOpen', 'listTasks',
+    for (const op of ['addItem', 'markComplete', 'removeItem', 'listOpenItems',
       'listFiles', 'readNote', 'shareFolder', 'searchFiles', 'folio_briefSummary']) {
       expect(ids.host, `${op} is not a host skill`).toContain(op);
     }
@@ -20,7 +20,7 @@ describe('household and folio fold onto the host', () => {
     expect(shared.share.issuer).toBe(agent.inProcessPubKeys().host);
     // ...and a household write still lands and reads back through the host
     await agent.callSkill('household', 'addItem', { type: 'shopping', text: 'melk' });
-    const open = await agent.callSkill('household', 'listOpen', { type: 'shopping' });
+    const open = await agent.callSkill('household', 'listOpenItems', { type: 'shopping' });
     expect(JSON.stringify(open)).toContain('melk');
   });
 });

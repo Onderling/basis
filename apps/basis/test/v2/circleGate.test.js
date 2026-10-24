@@ -62,10 +62,10 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
     expect((await route('add milk to the list')).command).toEqual({ opId: 'addItem', args: { text: 'milk' } });
   });
 
-  it('READ: "show/what\'s on the <type> list" → listOpen({type}) — NOT markComplete (the read misfire)', async () => {
-    expect((await route('show the shopping list')).command).toEqual({ opId: 'listOpen', args: { type: 'shopping' } });
-    expect((await route('show me the shopping list')).command).toEqual({ opId: 'listOpen', args: { type: 'shopping' } });
-    expect((await route("what's on the errand list")).command).toEqual({ opId: 'listOpen', args: { type: 'errand' } });
+  it('READ: "show/what\'s on the <type> list" → listOpenItems({type}) — NOT markComplete (the read misfire)', async () => {
+    expect((await route('show the shopping list')).command).toEqual({ opId: 'listOpenItems', args: { type: 'shopping' } });
+    expect((await route('show me the shopping list')).command).toEqual({ opId: 'listOpenItems', args: { type: 'shopping' } });
+    expect((await route("what's on the errand list")).command).toEqual({ opId: 'listOpenItems', args: { type: 'errand' } });
   });
 
   it('READ: "what tasks do we have" / "show the chores" → listTasks', async () => {

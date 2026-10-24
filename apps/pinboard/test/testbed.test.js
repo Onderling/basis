@@ -176,7 +176,7 @@ describe('H5 testbed — multi-user onboarding flow', () => {
     expect(result.displayName).toBe('Charlie');
 
     // The spawned agent is reachable at the returned URL.
-    const charlieListOpen = await callSkill(result.spawnedUrl, 'listOpen', {});
+    const charlieListOpen = await callSkill(result.spawnedUrl, 'listOpenRequests', {});
     expect(Array.isArray(charlieListOpen.items)).toBe(true);
 
     // Posts on Charlie's UI are stamped with Charlie's webid (per the
@@ -311,7 +311,7 @@ describe('H5 testbed — multi-user onboarding flow', () => {
     expect(eve.error).toBeUndefined();
 
     // Eve's noticeboard includes admin's pre-existing post.
-    const eveOpen = await callSkill(eve.spawnedUrl, 'listOpen', {});
+    const eveOpen = await callSkill(eve.spawnedUrl, 'listOpenRequests', {});
     expect(eveOpen.items.some((i) =>
       i?.text === 'Admin posted before Eve joined'
       && i?.source?.broadcast === true

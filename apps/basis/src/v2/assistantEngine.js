@@ -303,5 +303,5 @@ export function loadAssistantItems({ callSkill }) {
   };
   // the open list items, and the household's notes (weetjes: what its people wrote down for everyone to know) — the
   // model reads a note it is given here; it has no tool to write or change one
-  return async () => [...await read('listOpen', 'item'), ...await read(encodeGenericOpId('household', 'list', 'note'), 'note')];
+  return async () => [...await read('listOpenItems', 'item'), ...await read(encodeGenericOpId('household', 'list', 'note'), 'note')];
 }

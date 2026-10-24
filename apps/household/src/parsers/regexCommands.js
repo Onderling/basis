@@ -71,7 +71,6 @@ const REMOVE_VERBS = [
   'verwijder', 'weg',
 ];
 
-const HELP_VERBS = ['help', 'hulp'];
 
 // "what do we need [in/at <where>]?" / "wat hebben we nodig [in/op <waar>]?"
 // Both forms always map to listOpen({ type: 'shopping' }).
@@ -103,7 +102,7 @@ export function regexParse(text) {
   // The "what do we need" form is special — match anywhere on the
   // line and ignore the suffix.
   if (WHAT_DO_WE_NEED_RE.test(s)) {
-    return { skillId: 'listOpen', args: { type: 'shopping' } };
+    return { skillId: 'listOpenItems', args: { type: 'shopping' } };
   }
 
   // Try multi-word add verbs first ("voeg toe").
@@ -142,11 +141,6 @@ export function regexParse(text) {
   }
 
   // Help verbs.
-  for (const v of HELP_VERBS) {
-    const re = new RegExp(`^${escapeRe(v)}\\b\\s*(.*)$`, 'i');
-    const m = s.match(re);
-    if (m) return { skillId: 'help', args: {} };
-  }
 
   // Unknown leading word — fall through to the LLM.
   return null;
@@ -159,17 +153,17 @@ export function regexParse(text) {
  * @param {string} body  the text after the verb
  * @returns {{ skillId: 'addItem', args: { type: string, text: string } }
  *          | Array<{ skillId: 'addItem', args: { type: string, text: string } }>
- *          | { skillId: 'help', args: {} }}
+ *          | null}
  */
 function parseAdd(body) {
   const trimmed = body.trim();
-  if (!trimmed) return { skillId: 'help', args: {} };
+  if (!trimmed) return null;
 
   const { type, rest } = peelType(trimmed);
-  if (!rest) return { skillId: 'help', args: {} };
+  if (!rest) return null;
 
   const items = splitItems(rest);
-  if (items.length === 0) return { skillId: 'help', args: {} };
+  if (items.length === 0) return null;
 
   if (items.length === 1) {
     return { skillId: 'addItem', args: { type, text: items[0] } };
@@ -181,28 +175,28 @@ function parseAdd(body) {
 }
 
 /**
- * `list <type>` body parser.  Empty body → help (per the grammar's
+ * `list <type>` body parser.  Empty body → null, nothing to do (per the grammar's
  * "edge cases — just the verb").
  *
  * @param {string} body
  */
 function parseList(body) {
   const trimmed = body.trim().replace(TRAILING_PUNCT_RE, '').trim();
-  if (!trimmed) return { skillId: 'help', args: {} };
+  if (!trimmed) return null;
   const { type } = peelType(trimmed);
-  return { skillId: 'listOpen', args: { type } };
+  return { skillId: 'listOpenItems', args: { type } };
 }
 
 /**
  * Body parser for verbs that take a single `match` argument
- * (`done`, `remove`).  Empty body → help.
+ * (`done`, `remove`).  Empty body → null.
  *
  * @param {'markComplete'|'removeItem'} skillId
  * @param {string} body
  */
 function parseMatchVerb(skillId, body) {
   const trimmed = body.trim().replace(TRAILING_PUNCT_RE, '').trim();
-  if (!trimmed) return { skillId: 'help', args: {} };
+  if (!trimmed) return null;
 
   // Multi-item form (`bought eggs and bread`) — return an array of
   // skill calls so the agent can fan them out.

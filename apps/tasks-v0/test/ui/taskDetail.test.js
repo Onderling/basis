@@ -13,7 +13,6 @@ import {
   deriveTaskActions,
   formatReviewEntry,
   shortWebid,
-  buildAppealUrl,
 } from '../../src/ui/taskDetail.js';
 
 const ANNE  = 'https://id.example/anne';   // assignee
@@ -242,14 +241,3 @@ describe('taskDetail.shortWebid', () => {
   });
 });
 
-describe('taskDetail.buildAppealUrl', () => {
-  it('encodes both the threadId and appealForTaskId params', () => {
-    expect(buildAppealUrl('t-42')).toBe(
-      '/chat.html?threadId=appeal%3At-42&appealForTaskId=t-42',
-    );
-  });
-  it('throws on bad taskId', () => {
-    expect(() => buildAppealUrl('')).toThrow(/taskId/);
-    expect(() => buildAppealUrl(null)).toThrow(/taskId/);
-  });
-});

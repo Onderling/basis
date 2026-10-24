@@ -21,7 +21,7 @@ const snapshot = async (node) => {
   const call = (op, args = {}) => node.agent.callSkill('pinboard', op, args);
   const circles = ((await call('listMyCircles'))?.circles ?? []).map((c) => (typeof c === 'string' ? c : c?.groupId ?? c?.id));
   const roster = (await readRoster(node, G)).map((m) => m.handle ?? m.address ?? m.webid).filter(Boolean).sort();
-  const posts = ((await call('listOpen', { groupId: G }))?.items ?? []).map((i) => i.text ?? i.body).filter(Boolean).sort();
+  const posts = ((await call('listOpenRequests', { groupId: G }))?.items ?? []).map((i) => i.text ?? i.body).filter(Boolean).sort();
   return { circles, roster, posts };
 };
 

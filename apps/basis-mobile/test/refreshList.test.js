@@ -27,7 +27,7 @@ beforeAll(async () => {
   setDevLog(false);                  // tests shouldn't spam stdout
 });
 
-/** Mock-bundle factory: minimal household-like store with listOpen + markComplete.
+/** Mock-bundle factory: minimal household-like store with listOpenItems + markComplete.
  *  Part G (2026-06-17) — items use a REAL household list type ('shopping') so the
  *  REAL manifest's markComplete `appliesTo: {type: [...LIST_TYPES, 'task']}` gate
  *  lights the per-row [Done] button; markComplete resolves by `match` (id). */
@@ -44,7 +44,7 @@ function makeMockBundle() {
     if (appOrigin !== 'household') {
       throw new Error(`mock callSkill only knows household; got ${appOrigin}`);
     }
-    if (opId === 'listOpen') {
+    if (opId === 'listOpenItems') {
       const items = [...chores.values()].filter((c) => c.state === 'open');
       return { items };
     }
@@ -83,7 +83,7 @@ describe('#253 step 3 — refreshList state morphing', () => {
 
     // Snapshot the source dispatch (the listOpen the bubble came from).
     const sourceDispatch = snapshotSourceDispatch({
-      opId:       'listOpen',
+      opId:       'listOpenItems',
       args:       {},
       appOrigin:  'household',
       replyShape: 'list',
@@ -139,7 +139,7 @@ describe('#253 step 3 — refreshList state morphing', () => {
   it('refreshList swallows callSkill errors and returns null (UI keeps bubble as-is)', async () => {
     const bundle = makeMockBundle();
     const sourceDispatch = snapshotSourceDispatch({
-      opId: 'listOpen', args: {}, appOrigin: 'household', replyShape: 'list',
+      opId: 'listOpenItems', args: {}, appOrigin: 'household', replyShape: 'list',
     });
     const broken = { ...bundle, callSkill: async () => { throw new Error('boom'); } };
     const r = await refreshList({ ...broken, sourceDispatch, t });

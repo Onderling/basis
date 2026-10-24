@@ -579,12 +579,12 @@ describe('renderWeb D-mig-1a — pinboard manifest projection', () => {
     expect(c.searchFields).toEqual(['label', 'handle']);
   });
 
-  it('pinboard noticeboard section carries listOpen + kind + post', async () => {
+  it('pinboard noticeboard section carries listOpenRequests + kind + post', async () => {
     const { pinboardManifest } = await import('../../../apps/pinboard/manifest.js');
     const p = renderWeb(pinboardManifest).sections.find((s) => s.id === 'noticeboard');
     expect(p).toBeDefined();
     expect(p.itemType).toBe('post');
-    expect(p.dataSource).toEqual({ skillId: 'listOpen' });
+    expect(p.dataSource).toEqual({ skillId: 'listOpenRequests' });
     expect(p.categoryField).toBe('kind');
     // D-mig-2 — noticeboard's label IS the post body; searchFields formalises the
     // label-only default explicitly (no distinct secondary field exists).

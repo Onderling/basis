@@ -38,13 +38,13 @@ test('corpus 1.3 / 1.4 / 1.7 — grants: revoke then re-grant, grant while offli
     const cKey = (await call(C.page, 'pinboard', 'whoAmI', {}))?.pubKey ?? null;
 
     // 1.3 — grant, revoke, grant again
-    const g1 = await call(A.page, 'household', 'grantSurface', { viewPubKey: bKey, ops: ['listOpen'], reads: ['household'] });
+    const g1 = await call(A.page, 'household', 'grantSurface', { viewPubKey: bKey, ops: ['listOpenItems'], reads: ['household'] });
     log('corpus 1.3 · grant a surface to Bram', ok(g1) ? 'PASS' : 'BLOCKED', JSON.stringify(g1)?.slice(0, 140));
     const listed = await call(A.page, 'household', 'listSurfaceGrants', {});
     log('corpus 1.3 · are grants listable?', ok(listed) ? 'PASS' : 'BLOCKED', JSON.stringify(listed)?.slice(0, 160));
     const r1 = await call(A.page, 'household', 'revokeSurface', { viewPubKey: bKey });
     log('corpus 1.3 · revoke it', ok(r1) ? 'PASS' : 'BLOCKED', JSON.stringify(r1)?.slice(0, 120));
-    const g2 = await call(A.page, 'household', 'grantSurface', { viewPubKey: cKey, ops: ['listOpen'], reads: ['household'] });
+    const g2 = await call(A.page, 'household', 'grantSurface', { viewPubKey: cKey, ops: ['listOpenItems'], reads: ['household'] });
     log('corpus 1.3 · then grant to Cato', ok(g2) ? 'PASS' : 'BLOCKED', JSON.stringify(g2)?.slice(0, 120));
     const after = await call(A.page, 'household', 'listSurfaceGrants', {});
     const holders = JSON.stringify(after ?? {});
@@ -55,7 +55,7 @@ test('corpus 1.3 / 1.4 / 1.7 — grants: revoke then re-grant, grant while offli
     // 1.4 — grant while the granter is offline, then reconnect
     await A.context.setOffline(true);
     await A.page.waitForTimeout(1500);
-    const gOffline = await call(A.page, 'household', 'grantSurface', { viewPubKey: bKey, ops: ['listOpen'], reads: ['household'] });
+    const gOffline = await call(A.page, 'household', 'grantSurface', { viewPubKey: bKey, ops: ['listOpenItems'], reads: ['household'] });
     log('corpus 1.4 · granting while offline', ok(gOffline) ? 'OBSERVED — accepted locally' : 'OBSERVED — refused',
       JSON.stringify(gOffline)?.slice(0, 140));
     await A.context.setOffline(false);

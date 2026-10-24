@@ -27,9 +27,9 @@ describe('household manifest → NavModel (Slice A.2)', () => {
     expect(navModel.app).toBe('household');
   });
 
-  it('six sections — 4 list-types + tasks + members — in declaration order', () => {
+  it('five sections — 4 list-types + members — in declaration order (tasks are the tasks app\'s)', () => {
     expect(navModel.sections.map((s) => s.id)).toEqual([
-      'shopping', 'errand', 'repair', 'schedule', 'tasks', 'members',
+      'shopping', 'errand', 'repair', 'schedule', 'members',
     ]);
   });
 
@@ -39,7 +39,6 @@ describe('household manifest → NavModel (Slice A.2)', () => {
     expect(byId.errand).toMatchObject  ({ title: 'Errands',  itemType: 'errand'   });
     expect(byId.repair).toMatchObject  ({ title: 'Repairs',  itemType: 'repair'   });
     expect(byId.schedule).toMatchObject({ title: 'Schedule', itemType: 'schedule' });
-    expect(byId.tasks).toMatchObject   ({ title: 'Tasks',    itemType: 'task'     });
     expect(byId.members).toMatchObject ({ title: 'Members',  itemType: 'contact'  });
   });
 
@@ -61,29 +60,6 @@ describe('household manifest → NavModel (Slice A.2)', () => {
     }
   });
 
-  describe('tasks section (SP-2 appliesTo + multi-type lifecycle)', () => {
-    const tasks = navModel.sections.find((s) => s.id === 'tasks');
-
-    it('addTask surfaces as section affordance (no prefilledParams; explicit appliesTo)', () => {
-      const addTask = tasks.affordances.find((a) => a.opId === 'addTask');
-      expect(addTask).toBeTruthy();
-      expect(addTask).not.toHaveProperty('prefilledParams');
-    });
-
-    it('claim surfaces as itemAction with state="open"', () => {
-      const claim = tasks.itemActions.find((a) => a.opId === 'claim');
-      expect(claim).toBeTruthy();
-      // (2026-05-26) canonicalised appliesTo.state to array form
-      // across all apps (tasks-v0 / calendar / pinboard / household).
-      expect(claim.appliesTo.state).toEqual(['open']);
-    });
-
-    it('markComplete + removeItem surface as itemActions on tasks too (multi-type appliesTo)', () => {
-      const ids = tasks.itemActions.map((a) => a.opId);
-      expect(ids).toContain('markComplete');
-      expect(ids).toContain('removeItem');
-    });
-  });
 
   describe('members section', () => {
     const members = navModel.sections.find((s) => s.id === 'members');
@@ -106,7 +82,7 @@ describe('household manifest → NavModel (Slice A.2)', () => {
         ...s.itemActions.map((a) => a.opId),
       ]);
       // listOpen + listTasks: skipped by verb=list rule.
-      expect(allOpIds).not.toContain('listOpen');
+      expect(allOpIds).not.toContain('listOpenItems');
       expect(allOpIds).not.toContain('listTasks');
       // classifyAndExtract: not in manifest, sanity-check.
       expect(allOpIds).not.toContain('classifyAndExtract');

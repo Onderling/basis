@@ -60,9 +60,9 @@ describe('scopePinboardCallSkill', () => {
       { id: '3' },                         // no hint → kept (already scoped upstream)
     ] });
     const scoped = scopePinboardCallSkill(cs, 'circle-a');
-    const res = await scoped('pinboard', 'listOpen', {});
+    const res = await scoped('pinboard', 'listOpenRequests', {});
     expect(res.items.map((i) => i.id)).toEqual(['1', '3']);
-    expect(SCOPED_LIST_OPS.has('listOpen')).toBe(true);
+    expect(SCOPED_LIST_OPS.has('listOpenRequests')).toBe(true);
   });
 
   it('does not inject/filter for a non-pinboard app, and passes mutePeer through unscoped', async () => {
@@ -102,7 +102,7 @@ describe('scopePinboardCallSkill', () => {
       { id: '3', text: 'SEALED(weg)', groupId: 'circle-b' },   // other circle → filtered out
     ] });
     const scoped = scopePinboardCallSkill(cs, 'circle-a', async () => fakeStrategy);
-    const res = await scoped('pinboard', 'listOpen', {});
+    const res = await scoped('pinboard', 'listOpenRequests', {});
     expect(res.items.map((i) => [i.id, i.text])).toEqual([['1', 'geheim'], ['2', 'plain']]);
     expect(res.items[0].label).toBe('geheim');
   });
@@ -177,7 +177,7 @@ describe('scopePinboardCallSkill — sealed image attachments', () => {
       { id: '1', text: 'SEALED(hoi)', groupId: 'circle-a', source: { groupId: 'circle-a', attachments: [sealedAtt] } },
     ] });
     const scopedList = scopePinboardCallSkill(csList, 'circle-a', async () => fakeStrategy, async () => media);
-    const res = await scopedList('pinboard', 'listOpen', {});
+    const res = await scopedList('pinboard', 'listOpenRequests', {});
     const openedAtt = res.items[0].source.attachments[0];
     expect(openedAtt.thumbnail).toMatch(/^data:image\/jpeg;base64,/);   // opened for render
     expect(openedAtt.source.type).toBe('blob');                          // sealed pointer preserved

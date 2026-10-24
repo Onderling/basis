@@ -58,9 +58,6 @@ import {
   listOpen,
   markComplete,
   removeItem,
-  addTask,
-  listTasks,
-  claim,
   registerName,
 } from '../src/skills/index.js';
 
@@ -166,17 +163,10 @@ export async function startHouseholdWeb(opts = {}) {
   // drive the UI — every button on the page traces to an op the
   // server knows how to dispatch.
 
-  agent.register('listOpen', adaptHouseholdSkill(
+  agent.register('listOpenItems', adaptHouseholdSkill(
     listOpen, store, getAgent,
     async (_reply, args) => ({
       items: await store.listOpen({ type: args?.type }),
-    }),
-  ));
-
-  agent.register('listTasks', adaptHouseholdSkill(
-    listTasks, store, getAgent,
-    async () => ({
-      items: await store.listOpen({ type: 'task' }),
     }),
   ));
 
@@ -190,17 +180,8 @@ export async function startHouseholdWeb(opts = {}) {
     },
   ));
 
-  agent.register('addTask', adaptHouseholdSkill(
-    addTask, store, getAgent,
-    async () => {
-      const items = await store.listOpen({ type: 'task' });
-      return { items, added: items[items.length - 1] ?? null };
-    },
-  ));
-
   agent.register('markComplete', adaptHouseholdSkill(markComplete, store, getAgent));
   agent.register('removeItem',   adaptHouseholdSkill(removeItem,   store, getAgent));
-  agent.register('claim',        adaptHouseholdSkill(claim,        store, getAgent));
   agent.register('registerName', adaptHouseholdSkill(registerName, store, getAgent));
 
   // ──: `chat` skill — free-text passthrough ──────────────
@@ -246,7 +227,7 @@ export async function startHouseholdWeb(opts = {}) {
     });
   });
 
-  // (no need to register `listOpen` for type=contact specifically — the
+  // (no need to register `listOpenItems` for type=contact specifically — the
   // members section's adapter calls listOpen({type: 'contact'}) and
   // the household skill's KNOWN_TYPES guard rejects it.  V0 surfaces
   // the members tab as empty until a follow-on adds a contact-list

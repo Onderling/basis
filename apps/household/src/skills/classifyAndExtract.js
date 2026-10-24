@@ -42,7 +42,7 @@ export const V0_TOOL_CATALOGUE = Object.freeze([
     },
   },
   {
-    id: 'listOpen',
+    id: 'listOpenItems',
     description: 'List open items of a type.',
     schema: {
       type: 'object',
@@ -69,11 +69,6 @@ export const V0_TOOL_CATALOGUE = Object.freeze([
       properties: { match: { type: 'string', minLength: 1 } },
       required: ['match'],
     },
-  },
-  {
-    id: 'help',
-    description: 'Print the command list.',
-    schema: { type: 'object', properties: {} },
   },
 ]);
 

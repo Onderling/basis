@@ -9591,10 +9591,6 @@
       "text": "More than one match for '{{match}}'. Reply with the start of the id:\n{{options}}",
       "doc": "/done, /remove, /grab or a reassign whose words fit several open items; {{options}} lists them, one per line."
     },
-    "not_found_task": {
-      "text": "Couldn't find an open task matching '{{match}}'.",
-      "doc": "/grab or a reassign whose words fit no open task."
-    },
     "not_found_item": {
       "text": "Couldn't find an open item matching '{{match}}'.",
       "doc": "/done or /remove whose words fit no open item."
@@ -9606,18 +9602,6 @@
     "removed": {
       "text": "✓ Removed: {{text}}",
       "doc": "Confirmation of /remove."
-    },
-    "claimed": {
-      "text": "✓ Claimed: {{text}}",
-      "doc": "Confirmation of /grab."
-    },
-    "reassigned": {
-      "text": "✓ Reassigned: {{text}} → {{who}}",
-      "doc": "Confirmation of a reassign; {{who}} is who has it now."
-    },
-    "added_task": {
-      "text": "✓ Added task: {{text}}",
-      "doc": "Confirmation of /task."
     },
     "added_to": {
       "text": "✓ Added to {{list}}: {{text}}",

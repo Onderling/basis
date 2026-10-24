@@ -12,8 +12,8 @@ describe('per-circle household store', () => {
     const a = await createRealHouseholdAgent();
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'ZucchiniA', circleId: 'circle-A' });
 
-    const inB = await a.callSkill('household', 'listOpen', { type: 'shopping', circleId: 'circle-B' });
-    const inA = await a.callSkill('household', 'listOpen', { type: 'shopping', circleId: 'circle-A' });
+    const inB = await a.callSkill('household', 'listOpenItems', { type: 'shopping', circleId: 'circle-B' });
+    const inA = await a.callSkill('household', 'listOpenItems', { type: 'shopping', circleId: 'circle-A' });
 
     expect(texts(inB)).not.toContain('ZucchiniA');   // circle B is its own (empty) list
     expect(texts(inA)).toContain('ZucchiniA');        // circle A has it
@@ -24,7 +24,7 @@ describe('per-circle household store', () => {
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'AppleA', circleId: 'c1' });
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'BananaB', circleId: 'c2' });
 
-    expect(texts(await a.callSkill('household', 'listOpen', { type: 'shopping', circleId: 'c1' }))).toEqual(['AppleA']);
-    expect(texts(await a.callSkill('household', 'listOpen', { type: 'shopping', circleId: 'c2' }))).toEqual(['BananaB']);
+    expect(texts(await a.callSkill('household', 'listOpenItems', { type: 'shopping', circleId: 'c1' }))).toEqual(['AppleA']);
+    expect(texts(await a.callSkill('household', 'listOpenItems', { type: 'shopping', circleId: 'c2' }))).toEqual(['BananaB']);
   });
 });

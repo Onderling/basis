@@ -58,7 +58,7 @@ export const SYSTEM_PROMPT_LEGACY = `You are the household assistant.  A small g
 
 Available tools:
 - addItem({ type, text }) — add a NEW open item.  type ∈ {shopping, errand, repair, schedule}.
-- listOpen({ type }) — list currently open items of a type.
+- listOpenItems({ type }) — list currently open items of a type.
 - markComplete({ match }) — mark an EXISTING open item complete (the user is reporting it's done).
 - removeItem({ match }) — hard-delete an item the user wants gone.
 - help({}) — return the command list.  Use ONLY when the user explicitly asks for help.

@@ -7112,7 +7112,7 @@ function showCircle(id, circle, policy) {
   async function loadNoticeboard() {
     try {
       await ensureMyWebid();
-      const res = await pinboardCall('pinboard', 'listOpen', {});
+      const res = await pinboardCall('pinboard', 'listOpenRequests', {});
       // listOpen (no intent) also returns system items (rules / membership) — keep only
       // real asks/offers so the noticeboard isn't full of bookkeeping (and other circles').
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);

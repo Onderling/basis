@@ -35,7 +35,7 @@ describe('createPinboardService — legacy callSkill (DataPart wrapper over buil
     const svc = createPinboardService({ groupId: 'g1' });
     const posted = await svc.callSkill('postRequest', { text: 'ladder', intent: 'ask' }, ctx());
     expect(typeof posted.requestId).toBe('string');                       // real handler ran + stored
-    const open = await svc.callSkill('listOpen', {}, ctx());
+    const open = await svc.callSkill('listOpenRequests', {}, ctx());
     expect(open.items.map((i) => i.text)).toContain('ladder');
     await expect(svc.callSkill('noSuchOp', {}, ctx())).rejects.toThrow(/unknown op/);
   });
@@ -48,10 +48,10 @@ describe('createPinboardService — callCapability atom-dispatch over the real s
 
     // post — remove·post → cancelRequest (bespoke-first, really removes the item)
     const posted = await svc.callSkill('postRequest', { text: 'need a drill', intent: 'ask' }, c);
-    expect((await svc.callSkill('listOpen', {}, c)).items.map((i) => i.text)).toContain('need a drill');
+    expect((await svc.callSkill('listOpenRequests', {}, c)).items.map((i) => i.text)).toContain('need a drill');
     const removed = await svc.callCapability('remove', 'post', { requestId: posted.requestId }, c);
     expect(removed).toMatchObject({ ok: true, via: 'op', opId: 'cancelRequest' });
-    expect((await svc.callSkill('listOpen', {}, c)).items.map((i) => i.text)).not.toContain('need a drill');
+    expect((await svc.callSkill('listOpenRequests', {}, c)).items.map((i) => i.text)).not.toContain('need a drill');
 
     // post — claim·post → respondToItem (reaches the real handler; chat isn't wired here so it reports so)
     const post2 = await svc.callSkill('postRequest', { text: 'borrow a tent', intent: 'ask' }, c);

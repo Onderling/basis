@@ -57,9 +57,9 @@ const FIXTURES = [
   { text: 'de wasmachine moet gerepareerd worden',      expect: { tool: 'addItem', type: 'repair' } },
 
   // ── listOpen
-  { text: 'what do we need at the supermarket?',        expect: { tool: 'listOpen', type: 'shopping' } },
-  { text: 'wat hebben we nodig?',                       expect: { tool: 'listOpen', type: 'shopping' } },
-  { text: 'show me the open errands',                   expect: { tool: 'listOpen', type: 'errand' } },
+  { text: 'what do we need at the supermarket?',        expect: { tool: 'listOpenItems', type: 'shopping' } },
+  { text: 'wat hebben we nodig?',                       expect: { tool: 'listOpenItems', type: 'shopping' } },
+  { text: 'show me the open errands',                   expect: { tool: 'listOpenItems', type: 'errand' } },
 
   // ── markComplete
   { text: 'I bought bread',                             expect: { tool: 'markComplete' } },

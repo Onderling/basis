@@ -65,7 +65,7 @@ function formatReply(opId, reply) {
     case 'markReturned': {
       return `marked as returned`;
     }
-    case 'listOpen':
+    case 'listOpenRequests':
     case 'listMyRequests': {
       const items = Array.isArray(reply.items) ? reply.items : [];
       if (items.length === 0) return '(no open items)';
@@ -127,7 +127,7 @@ function adaptSdkSkill(skillDef, agent) {
  * pinboard LLM chat binds them to the right skill.
  */
 const PINBOARD_OP_ALIAS = {
-  listFeed:        'listOpen',
+  listFeed:        'listOpenRequests',
   getPinboardProfile: 'getMyProfile',
 };
 

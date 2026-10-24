@@ -47,24 +47,6 @@
       <dl id="settings-list" style="display:grid;grid-template-columns:max-content 1fr;gap:0.4rem 1rem;font-size:0.9rem"></dl>
     </section>
 
-    <section id="stats">
-      <h3>Stats</h3>
-      <p style="font-size:0.85rem;color:var(--muted)">
-        Local-only metrics from this device. Counts since the agent
-        started; latency reservoirs hold the last 200 samples per
-        name.
-      </p>
-      <table id="counters-table" style="width:100%;font-size:0.9rem;border-collapse:collapse">
-        <thead><tr><th style="text-align:left">Counter</th><th style="text-align:right">Count</th><th style="text-align:right">Last</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <h4 style="margin-top:1rem;font-size:0.9rem;color:var(--muted)">Latencies (ms)</h4>
-      <table id="latencies-table" style="width:100%;font-size:0.9rem;border-collapse:collapse">
-        <thead><tr><th style="text-align:left">Metric</th><th style="text-align:right">N</th><th style="text-align:right">p50</th><th style="text-align:right">p90</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
     <section id="customroles" hidden>
       <h3>Custom roles (admin only)</h3>
       <p style="font-size:0.85rem;color:var(--muted)">
@@ -310,36 +292,6 @@
       row('default approval', circle.dodPolicy?.defaultApproval ?? 'self-mark');
       row('subtasksAdminApprovalDepth', String(circle.subtasksAdminApprovalDepth ?? 3));
       row('member count', String((circle.members ?? []).length));
-
-      // Stats — counters + latencies.
-      const stats = await callSkill('getMetrics').catch(() => ({ snapshot: {} }));
-      const counters = stats.snapshot?.counters ?? {};
-      const latencies = stats.snapshot?.latencies ?? {};
-      const cb = document.querySelector('#counters-table tbody');
-      cb.innerHTML = '';
-      const counterNames = Object.keys(counters).sort();
-      if (counterNames.length === 0) {
-        cb.innerHTML = '<tr><td colspan="3" class="empty" style="color:var(--muted);font-style:italic">No events recorded yet.</td></tr>';
-      }
-      for (const name of counterNames) {
-        const tr = document.createElement('tr');
-        const c = counters[name];
-        const last = c.lastAt ? new Date(c.lastAt).toLocaleTimeString() : '—';
-        tr.innerHTML = `<td>${escapeHtml(name)}</td><td style="text-align:right">${c.count}</td><td style="text-align:right;color:var(--muted)">${escapeHtml(last)}</td>`;
-        cb.appendChild(tr);
-      }
-      const lb = document.querySelector('#latencies-table tbody');
-      lb.innerHTML = '';
-      const latencyNames = Object.keys(latencies).sort();
-      if (latencyNames.length === 0) {
-        lb.innerHTML = '<tr><td colspan="4" class="empty" style="color:var(--muted);font-style:italic">No latency samples yet.</td></tr>';
-      }
-      for (const name of latencyNames) {
-        const l = latencies[name];
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(name)}</td><td style="text-align:right">${l.count}</td><td style="text-align:right">${l.p50}</td><td style="text-align:right">${l.p90}</td>`;
-        lb.appendChild(tr);
-      }
 
       // V1.5 — custom roles (admin only).
       if (role === 'admin') {

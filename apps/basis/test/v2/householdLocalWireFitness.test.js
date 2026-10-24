@@ -78,18 +78,14 @@ const typeOptional = (op) => ({
 /**
  * The one wiring table — `[opId, adaptedCore, opDeclaration]` — driving BOTH
  * routes, mirroring realAgent.js's `wire('addItem', …)` block op-for-op so the
- * test exercises production's exact adapters.  Full 8-op set (not just the
+ * test exercises production's exact adapters.  Full 4-op set (tasks are the tasks app's; not just the
  * representative cases) so the parity check covers every wired core.
  */
 const WIRED = [
   ['addItem',      withBy(householdApp.addItem),      hhOp('addItem')],
-  ['addTask',      withBy(householdApp.addTask),      hhOp('addTask')],
   ['markComplete', withBy(householdApp.markComplete), hhOp('markComplete')],
-  ['claim',        withBy(householdApp.claim),        hhOp('claim')],
-  ['reassign',     withBy(householdApp.reassign),     hhOp('reassign')],
   ['removeItem',   withBy(householdApp.removeItem),   hhOp('removeItem')],       // gated + attributed like the other writes
-  ['listOpen',     listWrap(householdApp.listOpen),   typeOptional(hhOp('listOpen'))],
-  ['listTasks',    listWrap(householdApp.listTasks),  hhOp('listTasks')],
+  ['listOpenItems',     listWrap(householdApp.listOpen),   typeOptional(hhOp('listOpenItems'))],
 ];
 
 /**
@@ -142,11 +138,6 @@ describeLocalWireFitness(
         volatile: HH_VOLATILE,
       },
       {
-        name:     'addTask (create task)',
-        run:      (invoke) => invoke('addTask', { text: 'vacuum living room' }),
-        volatile: HH_VOLATILE,
-      },
-      {
         name: 'markComplete (mutate, match chained from addItem)',
         run:  async (invoke) => {
           await invoke('addItem', { type: 'errand', text: 'post a parcel' });
@@ -155,27 +146,11 @@ describeLocalWireFitness(
         volatile: HH_VOLATILE,
       },
       {
-        name: 'claim (lifecycle, match chained from addTask)',
-        run:  async (invoke) => {
-          await invoke('addTask', { text: 'water the plants' });
-          return invoke('claim', { match: 'water the plants' });
-        },
-        volatile: HH_VOLATILE,
-      },
-      {
-        name: 'listOpen (read, all open after two shopping adds)',
+        name: 'listOpenItems (read, all open after two shopping adds)',
         run:  async (invoke) => {
           await invoke('addItem', { type: 'shopping', text: 'apples' });
           await invoke('addItem', { type: 'shopping', text: 'bread' });
-          return invoke('listOpen', { type: 'shopping' });
-        },
-        volatile: HH_VOLATILE,
-      },
-      {
-        name: 'listTasks (read, after an addTask)',
-        run:  async (invoke) => {
-          await invoke('addTask', { text: 'sweep the floor' });
-          return invoke('listTasks', {});
+          return invoke('listOpenItems', { type: 'shopping' });
         },
         volatile: HH_VOLATILE,
       },

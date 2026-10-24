@@ -37,7 +37,7 @@ function door() {
   const agent = {
     callSkill: async (app, op, args) => {
       if (app === 'household' && op === 'addItem') { rows.push({ id: `row-${rows.length + 1}`, type: args.type, label: args.text }); return { ok: true, message: `+ ${args.text}` }; }
-      if (app === 'household' && op === 'listOpen' && args?.type && args.type !== 'chore') return { items: rows.filter((r) => r.type === args.type) };
+      if (app === 'household' && op === 'listOpenItems' && args?.type && args.type !== 'chore') return { items: rows.filter((r) => r.type === args.type) };
       return mock.callSkill(app, op, args);
     },
   };
@@ -64,7 +64,7 @@ describe('a turn with the bot is chat-class content, not the record', () => {
     await d.say('111', '/add-item');
     await d.say('111', 'shopping');
     await d.say('111', 'bread');
-    const shopping = async () => (await d.agent.callSkill('household', 'listOpen', { type: 'shopping' }))?.items ?? [];
+    const shopping = async () => (await d.agent.callSkill('household', 'listOpenItems', { type: 'shopping' }))?.items ?? [];
     expect((await shopping()).some((i) => /bread/i.test(i.label ?? i.text ?? '')), 'the turn made a list line').toBe(true);
     expect(threadEntries(d.eventLog, 'telegram:111').length, 'the turns were kept').toBeGreaterThan(0);
 

@@ -19,19 +19,12 @@
  * Optional:
  *   - `circlesProvider` — `() => Iterable<CircleState>` for the dashboard
  *     skill. Defaults to a single-circle iterator if omitted.
- *   - `members` — when supplied, identity-resolver registers in the
- *     classic single-circle shape with this MemberMap. For multi-circle,
- *     pass `getBundle` instead (returns `{members}` per resolved circle).
- *   - `getBundle` — `(args, ctx) => {members} | null` for multi-circle
- *     identity skills.
  */
 
-import { buildIdentitySkills } from '@onderling/identity-resolver';
 
 import { buildSkills } from './skills/index.js';
 import { buildProfileSkills } from './skills/profile.js';
 import { buildAppealSkill } from './skills/appeal.js';
-import { buildChatSkills } from './skills/chat.js';
 import { buildPushTokenSkills } from './skills/pushTokens.js';
 import { buildSubtaskSkills } from './skills/subtasks.js';
 import { buildInboxSkills } from './skills/inbox.js';
@@ -61,8 +54,6 @@ import { argsFromParts } from './bundleResolver.js';
  *   Optional. When omitted, a no-op default is supplied so the
  *   observability skills register but report empty state when called.
  * @param {() => Iterable<object>} [args.circlesProvider]
- * @param {object} [args.members]
- * @param {(args: object, ctx?: object) => object | null} [args.getBundle]
  * @returns {{registered: string[]}}
  */
 export function wireSkills({
@@ -70,8 +61,6 @@ export function wireSkills({
   bundleResolver,
   userSettings,
   circlesProvider,
-  members,
-  getBundle,
   // The caller's role in a circle, from the HOST's membership head. Threaded through to the
   // authority gates that need it; absent, those gates refuse rather than guess.
   circleRoleOf = null,
@@ -98,22 +87,13 @@ export function wireSkills({
         return circle ? [circle] : [];
       };
 
-  const idsArgs = members
-    ? { members }
-    : (typeof getBundle === 'function' ? { getBundle } : null);
-  if (!idsArgs) {
-    throw new TypeError('wireSkills: pass either `members` (single-circle) or `getBundle` (multi-circle) for identity skills');
-  }
-
   // ONE reader for every authority gate below: the host's membership head when injected, else the declared map.
   const roleOf = makeRoleOf(circleRoleOf);
 
   const allBuilders = [
-    buildIdentitySkills(idsArgs),
     buildSkills({ bundleResolver, circlesProvider: cp, roleOf }),
     buildProfileSkills({ bundleResolver, roleOf }),
     buildAppealSkill({ bundleResolver, roleOf }),
-    buildChatSkills({ bundleResolver, roleOf }),
     buildPushTokenSkills({ bundleResolver, roleOf }),
     buildSubtaskSkills({ bundleResolver, roleOf }),
     buildInboxSkills({ bundleResolver, roleOf }),

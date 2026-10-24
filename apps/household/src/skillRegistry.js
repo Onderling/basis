@@ -26,15 +26,10 @@ import { classifyAndExtract } from './skills/classifyAndExtract.js';
 export const HOUSEHOLD_SKILL_REGISTRY = Object.freeze({
   // 
   addItem:             Skills.addItem,
-  listOpen:            Skills.listOpen,
+  listOpenItems:            Skills.listOpen,
   markComplete:        Skills.markComplete,
   removeItem:          Skills.removeItem,
-  help:                Skills.help,
   // 
-  addTask:             Skills.addTask,
-  listTasks:           Skills.listTasks,
-  claim:               Skills.claim,
-  reassign:            Skills.reassign,
   registerName:        Skills.registerName,
   // basis /brief contributor; declared by listOpen's
   // surfaces.chat.brief.summarySkill in manifest.js.

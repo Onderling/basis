@@ -775,16 +775,6 @@ export const pinboardManifest = {
 
     // ── Cluster C wizards — customRenderer ──
     {
-      id:   'restoreFromMnemonicWizard', visibility: 'private', verb: 'submit',
-      writes: { scope: 'device' },   // restores the identity onto this device
-      params: [],
-      surfaces: {
-        slash: { command: '/restore-from-mnemonic' },
-        chat:  { hint: 'recover from a saved mnemonic phrase (DESTRUCTIVE)' },
-        page:  { kind: 'side-panel', title: 'Restore identity' },
-      },
-    },
-    {
       id:   'conflictDisputeWizard', visibility: 'authenticated',
       circleScoped: false, verb: 'add',
       writes: { scope: 'circle' },

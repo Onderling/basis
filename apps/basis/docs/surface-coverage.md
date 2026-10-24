@@ -127,6 +127,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `buildEnrollOffer` | get | · | · | · | · | · | · |  |
 |  | `revealOwnerPhrase` | reveal-owner-phrase | · | · | · | · | · | · |  |
 |  | `restoreOwnerPhrase` | restore-owner-phrase | · | · | · | · | · | · |  |
+|  | `restoreFromMnemonicWizard` | submit | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `grantSurface` | grant-surface | · | · | · | · | · | · |  |
 |  | `revokeSurface` | revoke-surface | · | · | · | · | · | · |  |
 |  | `listSurfaceGrants` | list-surface-grants | · | · | · | · | · | · |  |
@@ -154,7 +155,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `setContactPersona` | submit | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `setContactPersonKey` | submit | ✅ | · | · | · | ✅ | · |  |
 |  | `getContactShareQr` | list | ✅ | ✅ | · | · | · | · |  |
-|  | `restoreFromMnemonicWizard` | submit | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `conflictDisputeWizard` | add | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `postAudienceWizard` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `encryptedBackupWizard` | list | ✅ | ✅ | · | · | ✅ | · |  |

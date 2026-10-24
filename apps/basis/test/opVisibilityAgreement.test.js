@@ -58,7 +58,7 @@ describe('an op is registered at the visibility its manifest declares', () => {
   // owner's alone: `private` (self only, whatever tier anyone else holds). Declared, so the host gate judges them by
   // their own record once every app op lives on the host.
   const OWNER_ONLY = {
-    household: ['revealOwnerPhrase', 'restoreOwnerPhrase', 'exportRecoveryFile', 'importRecoveryFile', 'revokeDevice',
+    household: ['revealOwnerPhrase', 'restoreOwnerPhrase', 'restoreFromMnemonicWizard', 'exportRecoveryFile', 'importRecoveryFile', 'revokeDevice',
       'replaceDevice', 'enrollDevice', 'buildEnrollOffer', 'grantCompanion', 'revokeCompanionGrant', 'grantSurface',
       'revokeSurface'],
     // `settings` writes the relay endpoint among the device's controls; then the owner's session, the transport wiring,
@@ -70,7 +70,7 @@ describe('an op is registered at the visibility its manifest declares', () => {
       'screen-add-page', 'screen-remove-page', 'screen-rename-page', 'screen-set-active', 'screen-set-personas',
       'screen-set-circles', 'screen-pin', 'screen-unpin', 'screen-add-block', 'screen-remove-block', 'screen-move-block',
       'screen-set-block-config', 'screen-undo'],
-    pinboard: ['restoreFromMnemonicWizard', 'encryptedBackupWizard'],
+    pinboard: ['encryptedBackupWizard'],
   };
   for (const [app, ids] of Object.entries(OWNER_ONLY)) {
     it(`${app}: the owner's custody and wiring ops are declared private`, () => {

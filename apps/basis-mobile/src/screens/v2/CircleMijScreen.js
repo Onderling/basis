@@ -25,9 +25,11 @@ import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, Image } from 
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import ProfileBasics from './ProfileBasics.js';
+import Btn from './Btn.js';
+import { driverSections, interestTagsAfter, saveDriver, removeDriver } from '../../../../basis/src/v2/driversSection.js';
 import { shareOutcome, SHARING_NOW, mediaRefusedHere } from '../../../../basis/src/v2/shareOutcome.js';
 import {
-  loadMijModel, setGeneralProperty, addGeneralOffering, createPersona,
+  loadMijModel, setGeneralProperty, createPersona,
   toggleDisclosure, shareDisclosureToCircle,
   setProfilePicture, loadCurrentPicture, resolveSealedThumbUri,
 } from '../../core/mijHost.js';
@@ -69,7 +71,8 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
   const [picUri, setPicUri] = useState(null);             // current profile picture as a data: URI (or null)
   const [openEditor, setOpenEditor] = useState(null);     // property key whose inline editor is open
   const [propDrafts, setPropDrafts] = useState({});       // free-text property edits before save
-  const [offeringForm, setOfferingForm] = useState(null);       // {text, tags} | null — the dashed add-offering form
+  const [driverForm, setDriverForm] = useState(null);           // {section, text, tags} | null — a section's add form
+  const [interestDraft, setInterestDraft] = useState('');        // the interest being typed (one tag)
   const [personaForm, setPersonaForm] = useState(null);   // {name} | null — the dashed new-persona form
   const [addShareFor, setAddShareFor] = useState(null);   // circleId whose share-affordance is open
   const [shareState, setShareState] = useState({});       // `${circleId}:${personaId}` → 'sharing' | the share's result
@@ -110,14 +113,17 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
     await load();
   }, [callSkill, model?.defaultId, load]);
 
-  const onAddOffering = useCallback(async () => {
-    const text = (offeringForm?.text ?? '').trim();
-    const tags = (offeringForm?.tags ?? '').trim();
-    if (!text && !tags) return;                            // nothing to match on
-    await addGeneralOffering({ callSkill, defaultId: model?.defaultId, text, tags });
-    setOfferingForm(null);
+  // the drivers (offerings · interests · goals) on the general persona, through the one shared write path (web parity)
+  const onSaveDriver = useCallback(async (section, input) => {
+    await saveDriver({ callSkill, personaId: model?.defaultId ?? 'default', section, input });
+    setDriverForm(null);
+    setInterestDraft('');
     await load();
-  }, [callSkill, model?.defaultId, offeringForm, load]);
+  }, [callSkill, model?.defaultId, load]);
+  const onRemoveDriver = useCallback(async (key) => {
+    await removeDriver({ callSkill, personaId: model?.defaultId ?? 'default', key });
+    await load();
+  }, [callSkill, model?.defaultId, load]);
 
   const onCreatePersona = useCallback(async () => {
     const name = (personaForm?.name ?? '').trim();
@@ -264,62 +270,73 @@ export default function CircleMijScreen({ callSkill, emitMemberProps, lastShared
             );
           })}
 
-          {/* offerings & drivers — chips: bold text · mono tags · "≈ categorie" badge */}
-          <View style={styles.propRow}>
-            <View style={styles.propLine}>
-              <Text style={styles.key}>{t('circle.mij.offerings_label')}</Text>
-              <Text style={styles.ladder}>{ladderHint(['all', 'none'])}</Text>
-            </View>
-            <View style={styles.chips}>
-              {(model.general?.drivers || []).map((d) => {
-                // The coarse rung this item coarsens to under disclosure: for
-                // offerings the taxonomy category (picked or derived), other
-                // driver kinds show their kind label.
-                const coarse = d.categoryId
-                  ? ((d.categoryLabel && (d.categoryLabel[lang()] || d.categoryLabel.nl)) || d.categoryId)
-                  : trOr(`circle.aboutme.driverkind.${d.kind}`, d.kind);
-                return (
-                  <View key={d.key} style={styles.chip} testID={`mij-chip-${d.key}`}>
-                    <Text style={styles.chipText}>{d.text || d.tags.join(', ')}</Text>
-                    {d.tags.map((tg) => <Text key={tg} style={styles.chipTag}>{tg}</Text>)}
-                    <Text style={styles.chipBadge}>{t('circle.mij.approx', { category: coarse })}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* dashed add-affordance → the inline offering form (text + tags) */}
-          {offeringForm ? (
-            <View style={styles.form}>
-              <TextInput
-                style={styles.input}
-                value={offeringForm.text}
-                placeholder={t('circle.mij.offering_text_ph')}
-                placeholderTextColor={theme.color.inkSoft}
-                onChangeText={(v) => setOfferingForm((s) => ({ ...s, text: v }))}
-              />
-              <TextInput
-                style={styles.input}
-                value={offeringForm.tags}
-                placeholder={t('circle.mij.offering_tags_ph')}
-                placeholderTextColor={theme.color.inkSoft}
-                onChangeText={(v) => setOfferingForm((s) => ({ ...s, tags: v }))}
-              />
-              <View style={styles.formActions}>
-                <Pressable style={styles.btnPrimary} accessibilityRole="button" onPress={onAddOffering}>
-                  <Text style={styles.btnPrimaryText}>{t('circle.mij.offering_save')}</Text>
-                </Pressable>
-                <Pressable style={styles.btnGhost} accessibilityRole="button" onPress={() => setOfferingForm(null)}>
-                  <Text style={styles.btnGhostText}>{t('circle.mij.offering_cancel')}</Text>
-                </Pressable>
+          {/* the drivers in three sections (shared `driverSections`): offerings · interests · goals — each chip can be
+              taken off; release per circle is the Circles section, by key (web parity: circleMij.js) */}
+          {driverSections(model.general?.drivers || []).map((ds) => (
+            <View key={ds.id} style={styles.propRow} testID={`mij-drivers-${ds.id}`}>
+              <View style={styles.propLine}>
+                <Text style={styles.key}>{t(ds.labelKey)}</Text>
+                <Text style={styles.ladder}>{ladderHint(['all', 'none'])}</Text>
               </View>
+              <View style={styles.chips}>
+                {ds.id === 'interests'
+                  ? ds.tags.map((tg) => (
+                    <View key={tg} style={styles.chip} testID={`mij-interest-${tg}`}>
+                      <Text style={styles.chipText}>{tg}</Text>
+                      <Pressable accessibilityRole="button" accessibilityLabel={t('circle.mij.driver_remove', { what: tg })}
+                        onPress={() => onSaveDriver('interests', { tags: interestTagsAfter(ds.tags, { remove: tg }) })} testID={`mij-interest-remove-${tg}`}>
+                        <Text style={styles.chipTag}>×</Text>
+                      </Pressable>
+                    </View>
+                  ))
+                  : ds.rows.map((d) => {
+                    // the coarse rung an offering coarsens to under disclosure: its taxonomy category
+                    const coarse = d.categoryId ? ((d.categoryLabel && (d.categoryLabel[lang()] || d.categoryLabel.nl)) || d.categoryId) : null;
+                    return (
+                      <View key={d.key} style={styles.chip} testID={`mij-chip-${d.key}`}>
+                        <Text style={styles.chipText}>{d.text || d.tags.join(', ')}</Text>
+                        {d.tags.map((tg) => <Text key={tg} style={styles.chipTag}>{tg}</Text>)}
+                        {coarse ? <Text style={styles.chipBadge}>{t('circle.mij.approx', { category: coarse })}</Text> : null}
+                        <Pressable accessibilityRole="button" accessibilityLabel={t('circle.mij.driver_remove', { what: d.text || d.key })}
+                          onPress={() => onRemoveDriver(d.key)} testID={`mij-chip-remove-${d.key}`}>
+                          <Text style={styles.chipTag}>×</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+              </View>
+              {ds.id === 'interests' ? (
+                <View style={styles.form}>
+                  <TextInput style={styles.input} value={interestDraft} placeholder={t('circle.mij.interest_add_ph')}
+                    placeholderTextColor={theme.color.inkSoft} onChangeText={setInterestDraft} testID="mij-interest-input" />
+                  <Btn variant="primary" label={t('circle.mij.offering_save')} testID="mij-interest-add"
+                    onPress={() => { if (interestDraft.trim()) onSaveDriver('interests', { tags: interestTagsAfter(ds.tags, { add: interestDraft }) }); }} />
+                </View>
+              ) : driverForm?.section === ds.id ? (
+                <View style={styles.form}>
+                  <TextInput style={styles.input} value={driverForm.text}
+                    placeholder={t(ds.id === 'goals' ? 'circle.mij.goal_text_ph' : 'circle.mij.offering_text_ph')}
+                    placeholderTextColor={theme.color.inkSoft} onChangeText={(v) => setDriverForm((f) => ({ ...f, text: v }))} />
+                  <TextInput style={styles.input} value={driverForm.tags} placeholder={t('circle.mij.offering_tags_ph')}
+                    placeholderTextColor={theme.color.inkSoft} onChangeText={(v) => setDriverForm((f) => ({ ...f, tags: v }))} />
+                  <View style={styles.formActions}>
+                    <Pressable style={styles.btnPrimary} accessibilityRole="button"
+                      onPress={() => { if (driverForm.text.trim() || driverForm.tags.trim()) onSaveDriver(ds.id, { text: driverForm.text.trim(), tags: driverForm.tags.trim() }); }}>
+                      <Text style={styles.btnPrimaryText}>{t('circle.mij.offering_save')}</Text>
+                    </Pressable>
+                    <Pressable style={styles.btnGhost} accessibilityRole="button" onPress={() => setDriverForm(null)}>
+                      <Text style={styles.btnGhostText}>{t('circle.mij.offering_cancel')}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Pressable style={styles.addDashed} accessibilityRole="button" testID={`mij-add-${ds.id}`}
+                  onPress={() => setDriverForm({ section: ds.id, text: '', tags: '' })}>
+                  <Text style={styles.addDashedText}>{t(ds.id === 'goals' ? 'circle.mij.goal_add' : 'circle.mij.offering_add')}</Text>
+                </Pressable>
+              )}
             </View>
-          ) : (
-            <Pressable style={styles.addDashed} accessibilityRole="button" onPress={() => setOfferingForm({ text: '', tags: '' })}>
-              <Text style={styles.addDashedText}>{t('circle.mij.offering_add')}</Text>
-            </Pressable>
-          )}
+          ))}
         </View>
       </Section>
 

@@ -36,7 +36,7 @@ describe('Slice B.1: renderWeb(tasksManifest) NavModel', () => {
     // added, append here AND to manifest.js (preserves: declaration
     // order = render order).
     expect(navModel.sections.map((s) => s.id)).toEqual([
-      'open',
+      'tasks',
       'mine',
       'mastered',     // .1 (2026-05-20) — middle section of mine.html
       'pending-claims', // (2026-08-07) — claims awaiting my confirmation (claim-confirmation UX)

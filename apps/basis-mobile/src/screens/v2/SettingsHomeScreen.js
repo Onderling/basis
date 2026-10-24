@@ -12,13 +12,17 @@ import { basisManifest } from '../../../../basis/src/index.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
 
-export default function SettingsHomeScreen({ onBack, onOpenGroup, onOpenPerCircle }) {
-  const { groups, perCircle } = settingsHomeFor(basisManifest);
+export default function SettingsHomeScreen({ onBack, onOpenGroup, onOpenPerCircle, onOpenDoor }) {
+  const { groups, perCircle, doors } = settingsHomeFor(basisManifest);
   return (
     <Page title={t('circle.settings_home.title')} onBack={onBack} testID="settings-home">
       {groups.map((g) => <Door key={g.id} label={t(g.labelKey)} onPress={() => onOpenGroup?.(g.id)} testID={`settings-group-${g.id}`} />)}
       {perCircle && typeof onOpenPerCircle === 'function'
         ? <Door label={t(perCircle.labelKey)} onPress={onOpenPerCircle} testID="settings-per-circle" />
+        : null}
+      {/* the other doors at the foot (feedback): each its op, opened by the host (web parity) */}
+      {typeof onOpenDoor === 'function'
+        ? doors.map((d) => <Door key={d.id} label={t(d.labelKey)} onPress={() => onOpenDoor(d)} testID={`settings-door-${d.id}`} />)
         : null}
     </Page>
   );

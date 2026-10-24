@@ -595,6 +595,13 @@ export default function CircleLauncherScreen({
   // Boot lands on CIRCLES ('list') for now (Frits, 2026-08-31) — the social front door, not the
   // screen manager. The landing choice is to become a SETTING later, "last used" among its options.
   const [view, setView] = useState('list');
+  // the screen the person is on, in their words — for the feedback prefill (a circle by its name, else the tab; web parity)
+  const feedbackScreenRef = useRef(null);
+  feedbackScreenRef.current = () => {
+    if (view === 'detail' && selected) return selected.name ?? t('circle.tab.circles');
+    const tab = { screens: 'vandaag', list: 'circles', contacten: 'contacten', profile: 'mij', nearby: 'nearby' }[view];
+    return tab ? t(`circle.tab.${tab}`) : t('circle.settings_home.title');
+  };
   const [settingsGroupId, setSettingsGroupId] = useState(null);   // which settings group's screen is open (the gear on Mij)
   // The member's saved assistant endpoint config (settings → My data). Persisted to AsyncStorage;
   // CircleDetail re-reads it on mount, so a save applies the next time a circle opens.
@@ -719,6 +726,16 @@ export default function CircleLauncherScreen({
   }, [bundle, contactSeen]);
   useEffect(() => { refreshContactUnread(); }, [refreshContactUnread]);
   useEffect(() => subscribeContactReplies(() => { refreshContactUnread(); }), [refreshContactUnread]);
+  // the feedback door: the contact's row (the one Contacten paints), its thread opened with the draft in the composer
+  const openFeedbackThread = useCallback(async (webid, draft) => {
+    let row = null;
+    try {
+      const rows = await loadContactRoster({ peerGraph: bundle?.peerGraph ?? null, agent: bundle?.agent ?? null, callSkill: bundle?.callSkill ?? null, names: contactNames });
+      row = rows.find((c) => c.contactId === webid) ?? null;
+    } catch { row = null; }
+    setContactThread({ ...(row ?? { contactId: webid }), draft });
+    setView('contacten');
+  }, [bundle, contactNames]);
   const openContactThread = useCallback((contact) => {
     setContactThread(contact);
     // opening the thread is reading it — the seen-mark moves to now, the badge is gone
@@ -1017,6 +1034,11 @@ export default function CircleLauncherScreen({
       // The camera IS this platform's answer for `scanQr`; the modal's own parser decides what a code
       // means. An invite routes into the join wizard, as a scan from anywhere else on this screen does.
       openQrScanner: () => setJoinScanOpen(true),
+      // feedback about the app: the build's feedback contact (the seeded card), its thread opened with the prefill
+      openFeedback: ({ webid, draft }) => { openFeedbackThread(webid, draft).catch(() => {}); },
+      feedbackCard: process.env.EXPO_PUBLIC_SEEDED_CONTACT_CARD ?? null,
+      appVersion: Constants.expoConfig?.extra?.appVersion ?? '',
+      currentScreen: () => feedbackScreenRef.current?.() ?? '',
       // the person's clock shows them a card (their week): this platform's alert, until they close it
       showPersonCard: (card) => Alert.alert(card.title, [...(card.lines?.length ? card.lines : [t('circle.profile.planned_none')]), '', card.note].join('\n'), [{ text: t('circle.profile.week_card_close') }]),
     }));
@@ -2029,6 +2051,8 @@ export default function CircleLauncherScreen({
   // frame paints wherever it is (`WithTabBar` plusSheet), opened by the floating "+" there or by an own row on Vandaag
   const plusSheet = (
       <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)}
+        // an act that makes nothing and asks nothing (feedback) runs at once — the sheet closes, the op opens its thread
+        onRunAct={(a) => { setPlusOpen(false); bundle?.callSkill?.(a.appOrigin, a.opId, { screen: t('circle.vandaag.plus') })?.catch?.(() => {}); }}
         pinned={pinnedView} pinnedActIds={pinsOf(screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId)}
         onTogglePin={(actId) => { const own = { kind: 'own', actId }; const on = pinsOf(screensBook ?? {}).some((p) => pinKey(p) === pinKey(own)); runScreenOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own); }}
         onUnpin={(key) => runScreenOp('screen-unpin', { key })}
@@ -2254,7 +2278,8 @@ export default function CircleLauncherScreen({
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
         <SettingsHomeScreen onBack={() => setView('profile')}
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
-          onOpenPerCircle={() => setView('settingsCircles')} />
+          onOpenPerCircle={() => setView('settingsCircles')}
+          onOpenDoor={(d) => { if (d?.target?.kind === 'op') bundle?.callSkill?.('basis', d.target.opId, { screen: t('circle.settings_home.title') }).catch?.(() => {}); }} />
       </WithTabBar>
     );
   }
@@ -2294,6 +2319,7 @@ export default function CircleLauncherScreen({
           <ContactThreadScreen
             bundle={bundle}
             contact={contactThread}
+            draft={contactThread?.draft ?? ''}
             resolvePicture={circlePictureResolver(contactThread?.pairCircleId)}
             onBack={() => setContactThread(null)}
             onRead={() => contactSeen.mark(contactThread?.contactId, Date.now()).then(refreshContactUnread).catch(() => {})}

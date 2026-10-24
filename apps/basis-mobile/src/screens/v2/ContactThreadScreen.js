@@ -26,7 +26,7 @@ import { deleteContact, returnedMarkerKey } from '../../../../basis/src/v2/conta
 import { unregisterCircleAddressesOnRelays } from '../../../../basis/src/v2/circleAddressRegistration.js';
 
 // `onRead` — the host's seen-mark: called for every inbound turn painted while this thread is open (web parity).
-export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null }) {
+export default function ContactThreadScreen({ bundle, contact, onBack, onRead, resolvePicture = null, draft = '' }) {
   const onReadRef = useRef(onRead); onReadRef.current = onRead;
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar, as the launcher does
@@ -98,7 +98,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack, onRead, r
       setMessages((prev) => [...prev, { id: mkId(), origin: 'user', text: t('circle.nearbyScreen.reach_shared_you') }]);
     }
   };
-  const [input, setInput] = useState('');
+  // a draft to start with (the feedback door's prefill) — the person reads it, writes on, and sends it themselves
+  const [input, setInput] = useState(typeof draft === 'string' ? draft : '');
   // …and what to offer while the command word is being typed (closes as soon as a space is typed).
   const suggestions = useMemo(
     () => (input.startsWith('/') ? commands.suggest(input) : []), [commands, input]);

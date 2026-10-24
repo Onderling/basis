@@ -80,7 +80,7 @@ export function layoutButtons(buttons) {
 
 /**
  * Telegraf-backed `MessagingBridge`.  Moved from
- * `apps/household/src/bridges/TelegramBridge.js` into the substrate
+ * the retired household bot's Telegram bridge into the substrate
  * 2026-05-02 (Plan B sub-task B.5) — closes Task #12.  Reusable by
  * any chat-agent consumer (H2 V2, H5, etc.).
  *

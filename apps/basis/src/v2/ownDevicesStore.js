@@ -14,7 +14,7 @@
 import { createCircleStores, memoryDataSource } from '@onderling/item-store';
 import { validate } from '@onderling/item-types';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
-import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';
+import { buildHouseholdDataSource } from '../household/persist.js';
 import { shellContentSeal } from './localStoreSeal.js';
 
 /**

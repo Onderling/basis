@@ -10,8 +10,8 @@
  * channel; webid → identifier resolution is the consuming app's job
  * (typically L1h identity-resolver).
  *
- * Pattern source: apps/household/src/scheduler/{Scheduler.js,
- * NudgeTimer.js, DailyDigest.js}.  Substrate generalises into:
+ * Pattern source: the retired household bot's scheduler, nudge
+ * timer and daily digest.  Substrate generalises into:
  *
  *   - schedule({id, cadence, recipients, channel, builder}) — recurring
  *   - scheduleOnce({triggerAt, recipient, channel, builder, cancelKey}) — one-shot

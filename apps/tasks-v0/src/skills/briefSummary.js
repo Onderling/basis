@@ -9,7 +9,7 @@
  *
  * Reply shape mirrors:
  *   - `apps/folio/src/browser.js:280` (folio_briefSummary)
- *   - `apps/household/src/skills/briefSummary.js`
+ *   - the retired household bot's brief summary
  *   - `apps/pinboard/src/skills/index.js` (pinboard_briefSummary)
  *
  * When the open-tasks list is empty we return `{ok: true}` — brief.js

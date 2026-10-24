@@ -1,7 +1,7 @@
 /**
  * LlmClient — provider-agnostic OpenAI-style tool-calling client.
  *
- * Ported from apps/household/src/llm/LlmClient.js into the substrate
+ * Ported from the retired household bot's LLM client into the substrate
  * package (per L1j sketch: split out from L1c so multiple consumers
  * can share the LLM access — H2 chat, future H4/H7 NL search).
  *

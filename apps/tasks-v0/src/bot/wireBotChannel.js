@@ -1,7 +1,7 @@
 /**
  * wireBotChannel — Tasks chat-bot wiring.
  *
- * Mirrors `apps/household/src/HouseholdAgent.js#start()` shape, but
+ * Mirrors the retired household agent's start() shape, but
  * for Tasks's surface. Generic over `MessagingBridge` instances —
  * works with `chat-agent.TelegramBridge` (production), `chat-agent.InMemoryBridge`
  * (tests), or any other MessagingBridge a future app introduces.

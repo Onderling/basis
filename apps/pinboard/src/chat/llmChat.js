@@ -15,7 +15,7 @@
  *     dispatch; the LLM picks one of the 13 tools and invokes the
  *     underlying SDK skill via this adapter.
  *
- * Mirrors `apps/household/src/HouseholdAgent.js`'s renderChat wiring
+ * Mirrors the retired household agent's renderChat wiring
  * (lines 100–145) and `apps/tasks-v0/src/mountable.js`'s SDK-skill-to-
  * renderChat adapter (`adaptSdkSkill` / `stringifyReply`).  Pinboard's
  * skills are SDK-native (`({parts, from, agent}) → reply-object`), so

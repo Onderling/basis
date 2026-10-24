@@ -1,7 +1,7 @@
 /**
  * IANA-timezone-aware "next fire at HH:MM" math.
  *
- * Ported from apps/household/src/scheduler/DailyDigest.js (the
+ * Ported from the retired household bot's daily digest (the
  * battle-tested H2 V0 implementation).  Uses only Intl.DateTimeFormat
  * — no `date-fns-tz` or other deps.
  *

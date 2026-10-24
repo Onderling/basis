@@ -3,14 +3,7 @@
  */
 
 export { LlmClient } from './LlmClient.js';
-export {
-  ollamaProvider,
-  parseOpenAIChatResponse,
-  parseLooseToolCall,
-  parseLooseToolCalls,
-  stripJsonBlobs,
-  OLLAMA_DEFAULT_MODEL,
-} from './providers/ollama.js';
+export { ollamaProvider, stripJsonBlobs } from './providers/ollama.js';
 export { mockProvider } from './providers/mock.js';
 
 // Configurable endpoint block — pick an endpoint (baseUrl + model + auth/headers)

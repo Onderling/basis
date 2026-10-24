@@ -2,8 +2,8 @@
  * Browser-safe shim for `@onderling/chat-agent/bridges/telegram`.
  *
  * The Telegram bridge is a SERVER-side chat transport (long-polls the Telegram
- * Bot API, reads `process.env`, etc.). household/src re-exports it for Node
- * consumers, so the bare specifier ends up in the web bundle's import graph even
+ * Bot API, reads `process.env`, etc.). A re-export for Node
+ * consumers would put the bare specifier in the web bundle's import graph even
  * though the browser never runs a Telegram bot — and the module's top-level
  * `process` access throws `ReferenceError: process is not defined`, blanking the app.
  *

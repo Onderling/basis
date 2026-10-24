@@ -38,6 +38,23 @@ describe('settings sections: declared once, painted on both shells', () => {
     });
   }
 
+  // A painter paints ITS section and nothing else: a cut that swallows its neighbours moves them off the old page and onto
+  // a group's screen (mobile's week-overview painter held ten sections, custody among them, 2026-10-24).
+  const painterBodies = (src) => {
+    const start = src.indexOf('const painters = {');
+    const end = src.indexOf('\n  };\n', start);
+    const block = src.slice(start, end);
+    const heads = [...block.matchAll(/^ {4}'([a-z0-9-]+)': \(\) =>/gm)];
+    return heads.map((m, i) => [m[1], block.slice(m.index, i + 1 < heads.length ? heads[i + 1].index : block.length)]);
+  };
+  for (const [shell, src] of Object.entries(SHELLS)) {
+    it(`${shell}: each painter paints exactly one section`, () => {
+      const sectionOpen = shell === 'web' ? /\bsection\(tr\(/g : /<Section title=/g;
+      const counts = painterBodies(src).map(([id, body]) => `${id}:${(body.match(sectionOpen) ?? []).length + (shell === 'web' && /renderUserLlmSettings\(holder/.test(body) ? 1 : 0)}`);
+      expect(counts.filter((c) => !c.endsWith(':1'))).toEqual([]);
+    });
+  }
+
   it('no custody section is declared until both shells\' guard is checked here', () => {
     const custody = settingsHomeFor(basisManifest).groups.flatMap((g) => g.sections.filter((s) => s.custody).map((s) => s.id));
     expect(custody).toEqual([]);

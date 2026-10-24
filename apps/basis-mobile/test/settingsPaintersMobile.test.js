@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const SRC = readFileSync(fileURLToPath(new URL('../src/screens/v2/CircleMyDataScreen.js', import.meta.url)), 'utf8');
 const titles = (text) => [...text.matchAll(/<Section title=\{t\('([^']+)'\)\}/g)].map((m) => m[1]);
 
-/** Each section id a group declares (Weergave, Verbinding, Mijn gegevens), and the one title its painter opens. */
+/** Each section id a group declares (Weergave, Verbinding, Apparaten & sleutels, Mijn gegevens), and the one title its painter opens. */
 const OWN_TITLE = {
   'theme': 'circle.mydata.theme',
   'language': 'circle.mydata.language',
@@ -34,6 +34,12 @@ const OWN_TITLE = {
   'privacy': 'circle.mydata.privacy',
   'usage': 'circle.mydata.usage',
   'frequent': 'circle.mydata.frequent',
+  'devices': 'circle.mydata.devices',
+  'agents': 'circle.companionGrant.nodes',
+  'connections': 'circle.mydata.connections',
+  'connection-add': 'circle.mydata.connection_add',
+  'keys': 'circle.mydata.keys',
+  'storage': 'circle.mydata.storage',
 };
 
 const painterBodies = () => {
@@ -49,11 +55,16 @@ describe('mobile settings painters', () => {
     for (const [id, title] of Object.entries(OWN_TITLE)) expect(titles(bodies[id] ?? ''), id).toEqual([title]);
   });
 
-  it('the old My data page keeps every other section, in its order', () => {
+  it('the wizards a section opens are mounted on the group screen too (the keys painter opens backup, restore, enrol)', () => {
+    const group = SRC.slice(SRC.indexOf('testID="circle-settings-group"'), SRC.indexOf('testID="circle-mydata"'));
+    expect(group).toMatch(/\{overlays\}/);
+    expect(SRC.slice(SRC.indexOf('const overlays = ('), SRC.indexOf('if (Array.isArray(only))'))).toMatch(/EncryptedBackupWizardModal[\s\S]*EnrollDeviceModal[\s\S]*mydata-mnemonic-reveal/);
+  });
+
+  it('the old My data page keeps only the log-report door', () => {
     const page = SRC.slice(SRC.indexOf('  return (\n    <ScrollView style={styles.wrap}'));
     expect(titles(page)).toEqual([
-      'circle.profile.mydata_more', 'circle.mydata.storage', 'circle.mydata.keys', 'circle.mydata.devices',
-      'circle.companionGrant.nodes', 'circle.mydata.connections', 'circle.mydata.connection_add',
+      'circle.profile.mydata_more',
     ]);
   });
 });
@@ -65,6 +76,10 @@ describe('the two moves out of My data, on mobile (web: contactsRoster.js, the a
     expect(contacts).toMatch(/onBlocked = null/);
     expect(contacts.match(/\{blockedDoor\}/g)?.length).toBe(2);   // the empty roster and the list both
     expect(read('CircleLauncherScreen.js')).toMatch(/onBlocked=\{\(\) => setView\('blocked'\)\}/);
+  });
+  it('Mij opens Apparaten & sleutels for its device and agent rows, through the shared settingsGroupForAction', () => {
+    expect(read('CircleProfileScreen.js')).toMatch(/else if \(settingsGroupForAction\(a\)\)/);
+    expect(read('CircleLauncherScreen.js')).toMatch(/onSettingsGroup=\{\(id\) => \{ setSettingsGroupId\(id\); setView\('settingsGroup'\); \}\}/);
   });
   it('Mij opens shared-with-me from its chip, with the count handed in as a source', () => {
     const profile = read('CircleProfileScreen.js');

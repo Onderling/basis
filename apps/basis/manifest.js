@@ -1180,7 +1180,8 @@ export const basisManifest = {
    * My data page. Kinds say how a row behaves, so it looks like what it is:
    *   door    — opens another screen (text + →)            switch  — on or off (a real switch)
    *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
-   * `custody: true` marks a section painted behind the custody guard (keys, devices, sign-in) on both shells.
+   * `custody: true` marks a section of the owner's keys, devices or sign-in: its painter reaches only `private` ops, and
+   * only through the waist (the fitness test reads both shells). A step-up before it paints is a later design.
    * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
    */
   settingsGroups: [
@@ -1210,12 +1211,12 @@ export const basisManifest = {
     {
       id: 'devices-keys', labelKey: 'circle.settings_home.devices_keys',
       sections: [
-        { id: 'devices',        kind: 'control' },
+        { id: 'devices',        kind: 'control', custody: true },
         { id: 'agents',         kind: 'control' },
         { id: 'connections',    kind: 'control' },
         { id: 'connection-add', kind: 'control' },
-        { id: 'keys',           kind: 'control' },
-        { id: 'storage',        kind: 'control' },
+        { id: 'keys',           kind: 'control', custody: true },
+        { id: 'storage',        kind: 'control', custody: true },
       ],
     },
     {

@@ -4,6 +4,13 @@ exports[`household manifest → NavModel (Slice A.2) > determinism + structural 
 {
   "app": "household",
   "globals": [],
+  "pages": [
+    {
+      "kind": "side-panel",
+      "opId": "restoreFromMnemonicWizard",
+      "title": "Restore identity",
+    },
+  ],
   "sections": [
     {
       "affordances": [

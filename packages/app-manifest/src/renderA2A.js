@@ -30,6 +30,7 @@ export const NEVER_DELEGABLE = Object.freeze(new Set([
   // Secret material: the phrase IS the account. Handing it to a paired screen would hand over the account.
   'household.revealOwnerPhrase',
   'household.restoreOwnerPhrase',
+  'household.restoreFromMnemonicWizard',
   // Device ceremonies: adding or cutting off a device is the custody boundary itself.
   'household.enrollDevice',
   'household.revokeDevice',

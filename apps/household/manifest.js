@@ -558,6 +558,18 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      // The wizard a person types the phrase into: it runs restoreOwnerPhrase above, the one op that takes a phrase
+      // onto this device. Declared beside it, so the phrase has one owner.
+      id:   'restoreFromMnemonicWizard', visibility: 'private', group: 'device', verb: 'submit',
+      writes: { scope: 'device' },   // restores the identity onto this device
+      params: [],
+      surfaces: {
+        slash: { command: '/restore-from-mnemonic' },
+        chat:  { hint: 'recover from a saved mnemonic phrase (DESTRUCTIVE)' },
+        page:  { kind: 'side-panel', title: 'Restore identity' },
+      },
+    },
+    {
       id:   'grantSurface', visibility: 'private', group: 'admin',
       verb: 'grant-surface',
       writes: { scope: 'person' },   // a connection is the person's: the grants lane travels between their own devices

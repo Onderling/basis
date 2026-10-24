@@ -269,6 +269,25 @@ export const basisManifest = {
      * apps/basis-mobile (and a future browser implementation
      * via getUserMedia + jsQR if desired).
      */
+    /**
+     * Feedback about the app: opens the feedback contact's thread (the build's card, seeded into every fresh install)
+     * with "[<screen> · <version>] " prefilled — the person writes and sends it themselves, nothing is collected or
+     * sent on its own. No card in the build: the door says so, honestly, and stays (testers report the gap). Its
+     * doors: `/feedback` in any composer, the "+" sheet, the foot of Instellingen. Its reach is the opener's own thread.
+     */
+    {
+      id:    'feedback', visibility: 'authenticated',
+      verb:  'get',   // it opens a thread and writes nothing
+      params: [
+        { name: 'screen', kind: 'string' },
+      ],
+      surfaces: {
+        slash:  { command: '/feedback' },
+        chat:   { reply: 'text', hint: 'open the thread to Onderling to give feedback about the app; never sends anything itself' },
+        attach: { label: 'circle.feedback.plus', scopes: ['own'] },
+      },
+    },
+
     {
       id:    'scanQr', visibility: 'authenticated',
       group: 'device',
@@ -1199,6 +1218,8 @@ export const basisManifest = {
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },
+    // feedback about the app: the feedback op (its thread to Onderling, prefilled), the same act /feedback and the "+" run
+    { id: 'feedback', kind: 'door', labelKey: 'circle.feedback.plus', target: { kind: 'op', opId: 'feedback' } },
   ],
 
   /**

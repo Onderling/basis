@@ -29,6 +29,8 @@
  *   PRIVATEMODE_API_KEY      optional — the confidential LLM route for free text
  *   BASIS_APP_URL            the web app: a household bot's screen and identity links go into it (the role defaults it to
  *                            the public app); without it a screen cannot be connected and an offer prints without a link
+ *   ONDERLING_FEEDBACK_CONTACT_CARD optional — the build's feedback contact card (`onderling-contact://…`, the one the apps
+ *                            seed); a person who gives the bot feedback about the app gets its link to add (BASIS_APP_URL)
  *   ONDERLING_PRIMARY_DEVICE  optional — `1`: this device is the person's PRIMARY contact address (sync-policy
  *                            §12): it registers the profile and person addresses as primary on every relay, and
  *                            its per-circle addresses take the primary slot on the roster, so a direct message
@@ -1240,6 +1242,8 @@ if (tgToken || inboxDoor.bridge) {
   }
   const doorCall = withAssistantOps({
     callSkill, threads, t, refusal: agent.doorRefusal,
+    // feedback about the app: the link to add the feedback contact (the same card the apps seed), nothing forwarded
+    feedback: { card: (process.env.ONDERLING_FEEDBACK_CONTACT_CARD ?? '').trim() || null, appUrl },
     // the planned overview: written by `/overzicht`, sent to the person's own door, never in their quiet hours
     announcer,
     intentions: {

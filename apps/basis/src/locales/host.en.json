@@ -832,5 +832,15 @@
         "doc": "Success step intro"
       }
     }
+  },
+  "feedback": {
+    "no_contact": {
+      "text": "This version of the app has no feedback contact. Tell whoever gave you the app — that is exactly the kind of thing we want to know.",
+      "doc": "The feedback door when the build carries no feedback contact card: says so, honestly (testers report the gap)."
+    },
+    "not_available": {
+      "text": "Giving feedback is not possible here.",
+      "doc": "Defensive: the feedback op without a shell to open the thread."
+    }
   }
 }

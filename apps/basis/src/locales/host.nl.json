@@ -832,5 +832,15 @@
         "doc": "Success-stap intro"
       }
     }
+  },
+  "feedback": {
+    "no_contact": {
+      "text": "Deze versie van de app heeft geen feedbackcontact. Meld het aan wie je de app gaf — dat is precies het soort ding dat we willen weten.",
+      "doc": "The feedback door when the build carries no feedback contact card: says so, honestly (testers report the gap)."
+    },
+    "not_available": {
+      "text": "Feedback geven kan hier niet.",
+      "doc": "Defensive: the feedback op without a shell to open the thread."
+    }
   }
 }

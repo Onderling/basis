@@ -7,15 +7,16 @@ import { settingsHomeFor } from '../../src/v2/settingsHome.js';
 import { basisManifest } from '../../src/index.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPerCircle } = {}) {
+export function renderSettingsHome(container, { t, onBack, onOpenGroup, onOpenPerCircle, onOpenDoor } = {}) {
   if (!container) return container;
   const tr = translatorOr(t, 'circleSettingsHome.js');
   page(container, tr, tr('circle.settings_home.title'), onBack);
   const list = document.createElement('div');
   list.className = 'cc-settings__list';
-  const { groups, perCircle } = settingsHomeFor(basisManifest);
+  const { groups, perCircle, doors } = settingsHomeFor(basisManifest);
   for (const g of groups) list.appendChild(door(tr(g.labelKey), `cc-settings__group cc-settings__group--${g.id}`, () => onOpenGroup?.(g.id), g.id));
   if (perCircle && typeof onOpenPerCircle === 'function') list.appendChild(door(tr(perCircle.labelKey), 'cc-settings__per-circle', () => onOpenPerCircle(), perCircle.id));
+  if (typeof onOpenDoor === 'function') for (const d of doors) list.appendChild(door(tr(d.labelKey), `cc-settings__door-row cc-settings__door-row--${d.id}`, () => onOpenDoor(d), d.id));
   container.appendChild(list);
   return container;
 }

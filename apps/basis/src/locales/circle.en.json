@@ -4842,7 +4842,7 @@
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_usage": {
-      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off · /huishouden feedback <link or @handle>|off",
+      "text": "Use: /huishouden assign roles|anyone|self · /huishouden names members|assigners|admin|none · /huishouden passed keep|hide|delete · /huishouden days <number> · /huishouden cancel own|admin · /huishouden reminders on|off · /huishouden quiet 21:00-08:00 · /huishouden lead 0|5|15|30|60 · /huishouden usage admin|members · /huishouden roles standard|flat · /huishouden app off|on · /huishouden announce appointments|chores on|off",
       "doc": "The household bot admin's /huishouden: the bot's settings as they stand, and how to change them."
     },
     "settings_announce_none_here": {
@@ -5640,8 +5640,8 @@
       "text": "\"What notes are there\" shows what the household wrote down.",
       "doc": "A line of the welcome (botWelcome.js): what the bot does for this person, said once."
     },
-    "feedback_handoff": "Feedback about the app goes to its makers: {{channel}}. I can't change myself and I don't keep it — please send it there.",
-    "feedback_no_channel": "Feedback about the app goes to its makers, but this bot has no feedback channel set. Ask the admin to set one (/huishouden feedback <link>). I can't change myself and I don't keep it."
+    "feedback_contact": "Feedback about the app goes to Onderling — add them as a contact and write to them there: {{link}}. I can't change myself and I don't keep or forward anything.",
+    "feedback_no_contact": "Feedback about the app goes to Onderling, but this bot has no contact of theirs to give. In the app they are under Settings → Feedback. I can't change myself and I don't keep anything."
   },
   "op": {
     "admin_only": {
@@ -9942,10 +9942,6 @@
         "text": "Reminders",
         "doc": "A setting's label (projected from the parameter register)."
       },
-      "assistant_feedbackChannel": {
-        "text": "Where feedback goes",
-        "doc": "A setting's label (projected from the parameter register)."
-      },
       "assistant_quietHours": {
         "text": "Quiet hours",
         "doc": "A setting's label (projected from the parameter register)."
@@ -10163,5 +10159,11 @@
     "no_circles": "You are not in any circle yet.",
     "connection": "Connection",
     "my_data": "My data"
+  },
+  "feedback": {
+    "plus": {
+      "text": "Give feedback",
+      "doc": "The \"+\" sheet act and the Instellingen door that open the feedback contact's thread."
+    }
   }
 }

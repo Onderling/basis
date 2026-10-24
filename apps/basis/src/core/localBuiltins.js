@@ -17,6 +17,7 @@
  * `apps/basis/manifest.js`.
  */
 
+import { feedbackTarget, feedbackDraft } from '../v2/feedbackContact.js';
 import { PERSON_WEEK_OP, personWeekCard } from '../v2/personWeekOverview.js';
 import { buildFileShareEnvelope } from './handlers/fileShare.js';
 import { describeFilter }    from '../filter.js';
@@ -70,6 +71,10 @@ export function createLocalBuiltins({
   findRunner,                // v0.7.5 — ({query}) => Promise<FindReply>
   openFilePicker,            // v0.7.13 — () => Promise<File|null>
   openQrScanner,             // 2026-05-27 — () => void (mobile: opens scanner modal)
+  openFeedback,              // () => {webid, draft} → void — opens the feedback contact's thread with the draft in its composer
+  feedbackCard = null,       // the build's feedback contact card (`onderling-contact://…`), or none
+  appVersion = '',           // the build's version tag ('' on a dev build)
+  currentScreen = null,      // () => string — the screen the person is on (its words), for the prefill
   podAuth,                   // v0.7. — real Solid OIDC wrapper
   onSignOut,                 // v0.7. — cleanup hook for the pod writer
   agent,                     // v0.7.P3a — agent {identity:{host,chat}}
@@ -130,7 +135,21 @@ export function createLocalBuiltins({
     logs:      async (args) => runLogsBuiltin(args, { eventLog, t, openLogsPanel }),
     find:      async (args) => runFindBuiltin(args, { findRunner, t }),
     scanQr:    async ()     => runScanQrBuiltin({ openQrScanner, t }),
+    feedback:  async (args) => runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion, currentScreen, t }),
   };
+}
+
+/**
+ * `/feedback` (and the "+" sheet, and the foot of Instellingen): open the feedback contact's thread with the prefill.
+ * Nothing is sent: the person writes and sends it. No card in this build → said, and nothing opens.
+ */
+async function runFeedbackBuiltin(args, { openFeedback, feedbackCard, appVersion, currentScreen, t }) {
+  const webid = feedbackTarget(feedbackCard);
+  if (!webid) return { ok: false, error: t('feedback.no_contact') };
+  if (typeof openFeedback !== 'function') return { ok: false, error: t('feedback.not_available') };
+  const screen = String(args?.screen ?? '').trim() || (typeof currentScreen === 'function' ? currentScreen() : '');
+  openFeedback({ webid, draft: feedbackDraft({ screen, version: appVersion }) });
+  return { ok: true };
 }
 
 /**

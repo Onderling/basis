@@ -95,17 +95,6 @@ export const REMINDERS_KEY = 'assistant.reminders';
 export const REMINDERS_MODES = Object.freeze(['on', 'off']);
 export const REMINDERS_DEFAULT = param({ key: REMINDERS_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 'on' });
 export const remindersModeFrom = (v) => (REMINDERS_MODES.includes(v) ? v : REMINDERS_DEFAULT);
-/**
- * Where FEEDBACK ABOUT THE APP goes (`/huishouden feedback <link or @handle>`, the admin's): the household bot stores no
- * feedback and forwards none — it tells the person this channel, and nothing else (everything feedback is the feedback
- * repo's). Empty: this bot has no feedback channel.
- */
-export const FEEDBACK_CHANNEL_KEY = 'assistant.feedbackChannel';
-export const FEEDBACK_CHANNEL_DEFAULT = param({ key: FEEDBACK_CHANNEL_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' });
-const FEEDBACK_CHANNEL_SHAPE = /^(https:\/\/\S{3,200}|@[A-Za-z0-9_]{3,64})$/;
-/** A link (https) or a handle (@name) — nothing else is a channel. */
-export const isFeedbackChannel = (v) => FEEDBACK_CHANNEL_SHAPE.test(String(v ?? ''));
-export const feedbackChannelFrom = (v) => (isFeedbackChannel(v) ? v : null);
 export const QUIET_KEY = 'assistant.quietHours';
 export const QUIET_DEFAULT = param({ key: QUIET_KEY, scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '21:00-08:00' });
 const QUIET_SHAPE = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/;

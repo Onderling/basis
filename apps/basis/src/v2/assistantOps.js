@@ -2,13 +2,14 @@
  * assistantOps — the door's own ops (`assistantManifest`), answered by the door: a person's thread settings, and the
  * bot admin's app list, status and users. Composed around the door's callSkill (`withAssistantOps`).
  */
+import { feedbackLink } from './feedbackContact.js';
 import { parsePairingOffer } from './connectionPairing.js';
 import { screenLabel } from './botScreens.js';
 import { personNamed, linkedKeyOf } from './botUsers.js';
 import { MIN_PASSPHRASE } from './exportKeyFile.js';
 import { checkExport, countExport } from './householdExport.js';
 import { isSealedExport, openExport } from './householdExportSeal.js';
-import { FEEDBACK_CHANNEL_KEY, isFeedbackChannel, feedbackChannelFrom, REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, CALENDAR_FEED_KEY, CALENDAR_FEED_MODES, calendarFeedFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
+import { REMINDER_LEAD_CHOICES, ASSIGN_POLICIES, ASSIGN_POLICY_KEY, BOT_ROLES, NAMES_POLICIES, NAMES_KEY, PASSED_POLICIES, PASSED_KEY, PASSED_DAYS_KEY, CANCEL_POLICIES, CANCEL_KEY, REMINDERS_KEY, REMINDERS_MODES, QUIET_KEY, ROLES_KEY, ROLES_PRESETS, rolesPresetFrom, HOUSEHOLD_IN_APP_KEY, IN_APP_MODES, inAppModeFrom, CALENDAR_FEED_KEY, CALENDAR_FEED_MODES, calendarFeedFrom, USAGE_VISIBLE_KEY, USAGE_VISIBILITY, usageVisibleFrom, MONTHLY_TOKEN_LIMIT_KEY, monthlyTokenLimitFrom, isQuietHours, assignPolicyFrom, namesPolicyFrom, passedPolicyFrom, passedDaysFrom, cancelPolicyFrom, remindersModeFrom, quietHoursFrom } from './botSettings.js';
 import { REMINDER_RULES_KEY, reminderRulesFrom, reminderRulesValue, reminderLayerFromWords, leadOf, withLead, describeRules } from './reminderWords.js';
 import { layeredRules, reminderOccurrences } from './reminderOccurrences.js';
 import { upcoming } from './intentions.js';
@@ -109,7 +110,7 @@ const switchOf = (word) => SWITCH_WORDS[String(word ?? '').trim().toLowerCase()]
  * tells them, at once, after the op (`announcements.js`). A read never does.
  */
 
-export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {}, announcer = null }) {
+export function withAssistantOps({ callSkill, threads, t, refusal = null, admin = {}, now = Date.now, intentions = {}, announcer = null, feedback = {} }) {
   // The planned work of the people this door serves (the week overview's row): the host's own-devices store; a
   // composition that hands none keeps it in memory.
   const book = intentions.book ?? createIntentionBook({ store: createOwnDevicesStore(), actor: 'door', now });
@@ -580,15 +581,14 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
   }
 
   /**
-   * Feedback about the APP, told to the household bot: the line says where such feedback goes (the channel the admin set)
-   * or that this bot has none. It carries the channel and nothing else — never the person's words, never an id; it
-   * stores nothing and sends nothing (everything feedback is the feedback repo's).
+   * Feedback about the APP, told to the household bot: the line gives the link to add Onderling's feedback contact (the
+   * build's card, the one every fresh app carries — `feedbackContact.js`), or says this bot has none. It carries the
+   * link and nothing else — never the person's words, never an id; it stores nothing and sends nothing.
    */
   async function feedbackOp(person) {
-    const r = await callSkill('params', 'list-user-params', {}).catch(() => null);
-    const channel = feedbackChannelFrom((r?.params ?? []).find((p) => p.key === FEEDBACK_CHANNEL_KEY)?.value);
+    const link = feedbackLink(feedback ?? {});
     const tp = person ? personT(person) : t;
-    return { ok: true, message: channel ? tp('circle.bot.feedback_handoff', { channel }) : tp('circle.bot.feedback_no_channel') };
+    return { ok: true, message: link ? tp('circle.bot.feedback_contact', { link }) : tp('circle.bot.feedback_no_contact') };
   }
 
   async function settingsOp(change, person, caller, ctx) {
@@ -639,12 +639,6 @@ export function withAssistantOps({ callSkill, threads, t, refusal = null, admin 
       if (!row) return { ok: false, error: { code: 'not-here', message: t('circle.bot.settings_announce_none_here') } };
       try { await (mode === 'off' ? book.cancel(row.id) : book.reopen(row.id)); } catch { return { ok: false, error: { code: 'not-saved', message: t('circle.bot.settings_failed') } }; }
       return { ok: true, message: `${personT(person)('circle.bot.settings_saved')}\n\n${await current()}` };
-    }
-    // where app feedback goes: a link or an @handle, or `off`
-    if (what === 'feedback') {
-      if (value === 'off') return set(FEEDBACK_CHANNEL_KEY, '');
-      if (!isFeedbackChannel(value) || more.length) return usage;
-      return set(FEEDBACK_CHANNEL_KEY, value);
     }
     if (what === 'quiet') {
       if (!isQuietHours(value)) return usage;

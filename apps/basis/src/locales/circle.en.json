@@ -10158,7 +10158,8 @@
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",
     "connection": "Connection",
-    "my_data": "My data"
+    "my_data": "My data",
+    "devices_keys": "Devices & keys"
   },
   "feedback": {
     "plus": {

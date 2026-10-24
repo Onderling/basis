@@ -17,7 +17,7 @@ export { withCAS } from './src/concurrency.js';
 export { projectAgentCard } from './src/agentCard.js';
 // identity step 2 — profile own/inherit property graph + root-derived profile creation
 export {
-  own, inherit, normaliseProperties, resolveProperty, effectiveProperties, setOwn, setInherit,
+  own, inherit, normaliseProperties, resolveProperty, effectiveProperties, setOwn, setInherit, removeOwn,
 } from './src/profileProperties.js';
 export { createProfile, profilePubKey, profileCircleAddress } from './src/createProfile.js';
 

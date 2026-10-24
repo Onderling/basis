@@ -2052,7 +2052,11 @@ export default function CircleLauncherScreen({
   const plusSheet = (
       <VandaagPlusModal acts={orderedPlusActs(PLUS_ACTS, actionFrequency)}
         // an act that makes nothing and asks nothing (feedback) runs at once — the sheet closes, the op opens its thread
-        onRunAct={(a) => { setPlusOpen(false); bundle?.callSkill?.(a.appOrigin, a.opId, { screen: t('circle.vandaag.plus') })?.catch?.(() => {}); }}
+        onRunAct={(a) => {
+          setPlusOpen(false);
+          Promise.resolve(bundle?.callSkill?.(a.appOrigin, a.opId, { screen: t('circle.vandaag.plus') }))
+            .then((r) => { if (r?.error) Alert.alert('', String(r.error)); }).catch(() => {});
+        }}
         pinned={pinnedView} pinnedActIds={pinsOf(screensBook ?? {}).filter((p) => p.kind === 'own').map((p) => p.actId)}
         onTogglePin={(actId) => { const own = { kind: 'own', actId }; const on = pinsOf(screensBook ?? {}).some((p) => pinKey(p) === pinKey(own)); runScreenOp(on ? 'screen-unpin' : 'screen-pin', on ? { key: pinKey(own) } : own); }}
         onUnpin={(key) => runScreenOp('screen-unpin', { key })}
@@ -2279,7 +2283,12 @@ export default function CircleLauncherScreen({
         <SettingsHomeScreen onBack={() => setView('profile')}
           onOpenGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }}
           onOpenPerCircle={() => setView('settingsCircles')}
-          onOpenDoor={(d) => { if (d?.target?.kind === 'op') bundle?.callSkill?.('basis', d.target.opId, { screen: t('circle.settings_home.title') }).catch?.(() => {}); }} />
+          onOpenDoor={(d) => {
+            if (d?.target?.kind !== 'op') return;
+            // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed (web parity)
+            Promise.resolve(bundle?.callSkill?.('basis', d.target.opId, { screen: t('circle.settings_home.title') }))
+              .then((r) => { if (r?.error) Alert.alert('', String(r.error)); }).catch(() => {});
+          }} />
       </WithTabBar>
     );
   }

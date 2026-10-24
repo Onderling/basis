@@ -3327,8 +3327,7 @@ async function addBotFromInput(input) {
 // via `onContactReply` (registered in the peer router) and re-renders here.
 async function showContactThread(contactId, { draft = '' } = {}) {
   hideCircleTabBar(tabBarEl);
-  // a draft to start the composer with (the feedback door's prefill) — the first paint only; the person sends it
-  let draftOnce = typeof draft === 'string' ? draft : '';
+
   let row = null;
   try { row = (await loadAllContacts()).find((c) => c.contactId === contactId) ?? null; }
   catch { /* fall back to any cached thread below */ }
@@ -3340,6 +3339,8 @@ async function showContactThread(contactId, { draft = '' } = {}) {
   const peerAddr = row?.peerAddr ?? contactThreads.get(contactId)?.peerAddr ?? contactId;
   if (!contactThreads.has(contactId)) contactThreads.set(contactId, { name, peerAddr, messages: [] });
   const thread = contactThreads.get(contactId);
+  // a draft to start the composer with (the feedback door's prefill): it stays in the composer until the person sends
+  if (typeof draft === 'string' && draft) thread.draft = draft;
   thread.name = name; thread.peerAddr = peerAddr;
   // The pre-send floor this contact declared (its card → the roster row): applied by the channel on
   // every turn, and said in the header so the participant knows before typing.
@@ -3410,7 +3411,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
     // Rung 4: the ask-back bar and the share action ride the message list as button rows — the thread
     // renderer already knows buttons; the host decides what they do (onButtonTap below).
     name,
-    inputValue: (() => { const d = draftOnce; draftOnce = ''; return d; })(),
+    inputValue: thread.draft ?? '',
     face,
     resolvePicture: resolveFace,
     messages: (() => {
@@ -3453,6 +3454,7 @@ async function showContactThread(contactId, { draft = '' } = {}) {
       }
     },
     onSend: async (text) => {
+      thread.draft = '';   // the draft went out with this (or was replaced by what they typed)
       // `/skill args` → dispatch as a skill; otherwise a conversational turn.
       if (text.startsWith('/')) {
         const sp = text.slice(1).indexOf(' ');
@@ -4454,7 +4456,12 @@ function showVandaagPlus({ edit = null } = {}) {
     onPick: (id) => {
       const picked = PLUS_ACTS.find((a) => a.id === id);
       // an act that makes nothing and asks nothing (feedback) runs at once: no empty form in between
-      if (actRunsAtOnce(picked)) { close(); rawCallSkill(picked.appOrigin, picked.opId, { screen: t('circle.vandaag.plus') }).catch(() => {}); return; }
+      if (actRunsAtOnce(picked)) {
+        close();
+        rawCallSkill(picked.appOrigin, picked.opId, { screen: t('circle.vandaag.plus') })
+          .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
+        return;
+      }
       actId = id; error = null; paint();
     },
     // the free line: what it understood selects the act and fills the fields (editable), never a circle
@@ -5118,7 +5125,12 @@ function showSettingsHome() {
     onOpenGroup: (id) => showMyData({ group: id }),
     onOpenPerCircle: showSettingsCircleChooser,
     // another door at the foot (feedback): its op, through the waist, naming this screen
-    onOpenDoor: (d) => { if (d?.target?.kind === 'op') rawCallSkill('basis', d.target.opId, { screen: t('circle.settings_home.title') }).catch(() => {}); },
+    onOpenDoor: (d) => {
+      if (d?.target?.kind !== 'op') return;
+      // the op's own answer when it cannot open (no feedback contact in this build): said, never swallowed
+      rawCallSkill('basis', d.target.opId, { screen: t('circle.settings_home.title') })
+        .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
+    },
   });
 }
 

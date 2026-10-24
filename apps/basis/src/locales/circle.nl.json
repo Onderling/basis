@@ -7189,32 +7189,6 @@
       "text": "Waar je mee bezig bent of naar streeft. Blijft privé op dit apparaat; alleen gebruikt om items op te merken die aansluiten.",
       "doc": "drivers#5 — eerlijke framing: drijfveren blijven on-device, sturen matching."
     },
-    "driverkind": {
-      "hobby": {
-        "text": "Hobby",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "goal": {
-        "text": "Doel",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "desire": {
-        "text": "Wens",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "motivation": {
-        "text": "Motivatie",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "driver": {
-        "text": "Drijfveer",
-        "doc": "drivers#5 — algemene soort drijfveer."
-      },
-      "interest": {
-        "text": "Interesse",
-        "doc": "interesses→drijfveren fold-in (audit §4/Q6) — soort drijfveer: waar je mee bezig bent (geleerd uit wat je opmerkte)."
-      }
-    },
     "driver_label_ph": {
       "text": "label (bijv. zeilen)",
       "doc": "drivers#5 — placeholder: het label van de drijfveer."

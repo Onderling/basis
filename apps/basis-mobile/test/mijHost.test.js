@@ -13,8 +13,9 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
+import { saveDriver } from '../../basis/src/v2/driversSection.js';
 import {
-  loadMijModel, setGeneralProperty, addGeneralOffering, offeringKeyFor,
+  loadMijModel, setGeneralProperty, offeringKeyFor,
   createPersona, toggleDisclosure,
 } from '../src/core/mijHost.js';
 
@@ -131,16 +132,15 @@ describe('the edit ops — same calls the web host fires (verify the dispatch sh
     expect(callSkill).toHaveBeenCalledWith('agents', 'setProfileProperty', { id: 'default', key: 'place', value: 'Utrecht' });
   });
 
-  it('addGeneralOffering sends setProfileDriver kind=offering on the default profile, keyed by the phrase (web parity)', async () => {
+  it('an offering goes through the shared saveDriver: setProfileDriver kind=offering on the default profile, keyed by the phrase (web parity)', async () => {
     const callSkill = vi.fn(async () => ({ ok: true }));
-    await addGeneralOffering({ callSkill, defaultId: 'default', text: 'Fietsen repareren', tags: 'fiets, gereedschap' });
+    await saveDriver({ callSkill, personaId: 'default', section: 'offerings', input: { text: 'Fietsen repareren', tags: 'fiets, gereedschap' } });
     expect(callSkill).toHaveBeenCalledWith('agents', 'setProfileDriver', {
       id: 'default', key: 'fietsen repareren', kind: 'offering', text: 'Fietsen repareren', tags: 'fiets, gereedschap',
     });
     // the exact web derivation: (text || tags) → trim → lowercase → first 40 chars
     expect(offeringKeyFor({ text: '', tags: 'X'.repeat(50) })).toBe('x'.repeat(40));
   });
-
   it('createPersona / toggleDisclosure mirror createProfile / setProfileDisclosure', async () => {
     const callSkill = vi.fn(async () => ({ ok: true }));
     await createPersona({ callSkill, name: 'werk' });

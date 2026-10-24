@@ -7189,32 +7189,6 @@
       "text": "What you're into or trying to do. Kept private on this device; used only to notice items that resonate.",
       "doc": "drivers#5 — honest framing: drivers stay on-device, drive matching."
     },
-    "driverkind": {
-      "hobby": {
-        "text": "Hobby",
-        "doc": "drivers#5 — driver kind."
-      },
-      "goal": {
-        "text": "Goal",
-        "doc": "drivers#5 — driver kind."
-      },
-      "desire": {
-        "text": "Desire",
-        "doc": "drivers#5 — driver kind."
-      },
-      "motivation": {
-        "text": "Motivation",
-        "doc": "drivers#5 — driver kind."
-      },
-      "driver": {
-        "text": "Driver",
-        "doc": "drivers#5 — generic driver kind."
-      },
-      "interest": {
-        "text": "Interest",
-        "doc": "interests→drivers fold-in (audit §4/Q6) — driver kind: what you engage with (learned from what you noticed)."
-      }
-    },
     "driver_label_ph": {
       "text": "label (e.g. sailing)",
       "doc": "drivers#5 — placeholder: the driver's key/label."

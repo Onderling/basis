@@ -665,6 +665,110 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         ) : null}
       </>
     ),
+    'history-mirror': () => (
+      <>
+        {/* The personal history mirror — live health from the agent; the toggle flips the
+            history.mirror register param through the one kind-gated write (the agent starts/stops
+            the sink LIVE). Web parity: circleMyData.js's history section. Omitted without an agent. */}
+        {agent && typeof agent.historyMirrorStatus === 'function' ? (() => {
+          const on = agent.getParamValue?.('history.mirror') === true;
+          const hs = agent.historyMirrorStatus();
+          const line = historyStatusLine({ enabled: on, status: hs });
+          const stateLine = t(line.key, line.vars);
+          return (
+            <Section title={t('circle.mydata.history')}>
+              <Text style={styles.privacyBody} testID="mydata-history-status">{stateLine}</Text>
+              <Text style={styles.privacyBody}>{t('circle.mydata.history_what')}</Text>
+              <Pressable style={styles.action} testID="mydata-history-toggle"
+                onPress={async () => {
+                  try { await callSkill('params', 'set-param', { key: 'history.mirror', value: !on }); } catch { /* the row re-reads the truth */ }
+                  setTimeout(() => setHistoryTick((n) => n + 1), 400);
+                  setHistoryTick((n) => n + 1);
+                }}>
+                <Text style={styles.actionLabel}>{on ? t('circle.mydata.history_disable') : t('circle.mydata.history_enable')}</Text>
+              </Pressable>
+              {typeof agent.exportHistoryArchive === 'function' ? (
+                <Pressable style={styles.action} testID="mydata-history-export"
+                  onPress={async () => {
+                    try {
+                      const json = await agent.exportHistoryArchive();
+                      await Share.share({ message: json, title: 'onderling-geschiedenis.json' });
+                    } catch { /* dismissed or no share target — nothing to report */ }
+                  }}>
+                  <Text style={styles.actionLabel}>{t('circle.mydata.history_export')}</Text>
+                </Pressable>
+              ) : null}
+            </Section>
+          );
+        })() : null}
+      </>
+    ),
+    'message-cleanup': () => (
+      <>
+        {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
+            confirmed deletion. The note says what is NOT touched: decisions/reports compact into a
+            counted summary rather than disappearing. */}
+        <Section title={t('circle.mydata.cleanup')}>
+          <View style={styles.retentionRow}>
+            {RETENTION_CHOICES_DAYS.map((days) => (
+              <Pressable
+                key={days}
+                onPress={() => { setCleanupDays(days); setCleanupResult(null); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: days === cleanupDays }}
+                style={[styles.retentionChoice, days === cleanupDays && styles.retentionChoiceOn]}
+                testID={`cleanup-${days}`}
+              >
+                <Text style={[styles.retentionChoiceText, days === cleanupDays && styles.retentionChoiceTextOn]}>
+                  {t('circle.mydata.cleanup_older_than', { days })}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={runCleanup} accessibilityRole="button" style={styles.action} testID="cleanup-run">
+            <Text style={styles.actionLabel}>{t('circle.mydata.cleanup_button', { days: cleanupDays })}</Text>
+          </Pressable>
+          {cleanupResult != null ? (
+            <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_done', { count: cleanupResult })}</Text>
+          ) : null}
+          <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
+        </Section>
+      </>
+    ),
+    'privacy': () => (
+      <>
+        {privacy.length > 0 && (
+          <Section title={t('circle.mydata.privacy')}>
+            {privacy.map((s, i) => (
+              <View key={s.key ?? i} style={styles.privacy}>
+                <Text style={styles.privacyTitle}>{s.title}</Text>
+                <Text style={styles.privacyBody}>{s.body}</Text>
+              </View>
+            ))}
+          </Section>
+        )}
+      </>
+    ),
+    'usage': () => (
+      <>
+        {usage.length > 0 && (
+          <Section title={t('circle.mydata.usage')}>
+            {usage.map(([k, v]) => <KV key={k} k={k} v={typeof v === 'object' ? JSON.stringify(v) : String(v)} />)}
+          </Section>
+        )}
+      </>
+    ),
+    'frequent': () => (
+      <>
+        {/* what you use most — counted on this device only (web twin: data-section frequent) */}
+        <Section title={t('circle.mydata.frequent')}>
+          <Text style={styles.privacyBody} testID="mydata-frequent">{t('circle.mydata.frequent_note')}</Text>
+          {frequent.length ? frequent.map((r) => <KV key={r.circleId} k={r.name} v={r.items.map((i) => `${i.label} ${i.count}`).join(' · ')} />)
+            : <Text style={styles.privacyBody}>{t('circle.mydata.frequent_none')}</Text>}
+          {frequent.length && onClearFrequent ? <Btn label={t('circle.mydata.frequent_clear')} onPress={onClearFrequent} testID="mydata-frequent-clear" /> : null}
+        </Section>
+      </>
+    ),
   };
 
   if (Array.isArray(only)) {
@@ -1025,94 +1129,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
       </Section>
 
 
-
-      {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
-          confirmed deletion. The note says what is NOT touched: decisions/reports compact into a
-          counted summary rather than disappearing. */}
-      <Section title={t('circle.mydata.cleanup')}>
-        <View style={styles.retentionRow}>
-          {RETENTION_CHOICES_DAYS.map((days) => (
-            <Pressable
-              key={days}
-              onPress={() => { setCleanupDays(days); setCleanupResult(null); }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: days === cleanupDays }}
-              style={[styles.retentionChoice, days === cleanupDays && styles.retentionChoiceOn]}
-              testID={`cleanup-${days}`}
-            >
-              <Text style={[styles.retentionChoiceText, days === cleanupDays && styles.retentionChoiceTextOn]}>
-                {t('circle.mydata.cleanup_older_than', { days })}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable onPress={runCleanup} accessibilityRole="button" style={styles.action} testID="cleanup-run">
-          <Text style={styles.actionLabel}>{t('circle.mydata.cleanup_button', { days: cleanupDays })}</Text>
-        </Pressable>
-        {cleanupResult != null ? (
-          <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_done', { count: cleanupResult })}</Text>
-        ) : null}
-        <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
-      </Section>
-      {/* The personal history mirror — live health from the agent; the toggle flips the
-          history.mirror register param through the one kind-gated write (the agent starts/stops
-          the sink LIVE). Web parity: circleMyData.js's history section. Omitted without an agent. */}
-      {agent && typeof agent.historyMirrorStatus === 'function' ? (() => {
-        const on = agent.getParamValue?.('history.mirror') === true;
-        const hs = agent.historyMirrorStatus();
-        const line = historyStatusLine({ enabled: on, status: hs });
-        const stateLine = t(line.key, line.vars);
-        return (
-          <Section title={t('circle.mydata.history')}>
-            <Text style={styles.privacyBody} testID="mydata-history-status">{stateLine}</Text>
-            <Text style={styles.privacyBody}>{t('circle.mydata.history_what')}</Text>
-            <Pressable style={styles.action} testID="mydata-history-toggle"
-              onPress={async () => {
-                try { await callSkill('params', 'set-param', { key: 'history.mirror', value: !on }); } catch { /* the row re-reads the truth */ }
-                setTimeout(() => setHistoryTick((n) => n + 1), 400);
-                setHistoryTick((n) => n + 1);
-              }}>
-              <Text style={styles.actionLabel}>{on ? t('circle.mydata.history_disable') : t('circle.mydata.history_enable')}</Text>
-            </Pressable>
-            {typeof agent.exportHistoryArchive === 'function' ? (
-              <Pressable style={styles.action} testID="mydata-history-export"
-                onPress={async () => {
-                  try {
-                    const json = await agent.exportHistoryArchive();
-                    await Share.share({ message: json, title: 'onderling-geschiedenis.json' });
-                  } catch { /* dismissed or no share target — nothing to report */ }
-                }}>
-                <Text style={styles.actionLabel}>{t('circle.mydata.history_export')}</Text>
-              </Pressable>
-            ) : null}
-          </Section>
-        );
-      })() : null}
-
-      {privacy.length > 0 && (
-        <Section title={t('circle.mydata.privacy')}>
-          {privacy.map((s, i) => (
-            <View key={s.key ?? i} style={styles.privacy}>
-              <Text style={styles.privacyTitle}>{s.title}</Text>
-              <Text style={styles.privacyBody}>{s.body}</Text>
-            </View>
-          ))}
-        </Section>
-      )}
-
-      {/* what you use most — counted on this device only (web twin: data-section mydata-frequent) */}
-      <Section title={t('circle.mydata.frequent')}>
-        <Text style={styles.privacyBody} testID="mydata-frequent">{t('circle.mydata.frequent_note')}</Text>
-        {frequent.length ? frequent.map((r) => <KV key={r.circleId} k={r.name} v={r.items.map((i) => `${i.label} ${i.count}`).join(' · ')} />)
-          : <Text style={styles.privacyBody}>{t('circle.mydata.frequent_none')}</Text>}
-        {frequent.length && onClearFrequent ? <Btn label={t('circle.mydata.frequent_clear')} onPress={onClearFrequent} testID="mydata-frequent-clear" /> : null}
-      </Section>
-
-      {usage.length > 0 && (
-        <Section title={t('circle.mydata.usage')}>
-          {usage.map(([k, v]) => <KV key={k} k={k} v={typeof v === 'object' ? JSON.stringify(v) : String(v)} />)}
-        </Section>
-      )}
 
       <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
       <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />

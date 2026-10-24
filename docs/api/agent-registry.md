@@ -1864,6 +1864,16 @@ setOwn(properties, key, value)
 
 Flip a property to OWN (re-scope, no migration). Returns a NEW frozen properties map.
 
+### `removeOwn`
+
+**Kind:** function · **Import:** `removeOwn` from `'@onderling/agent-registry'`
+
+```js
+removeOwn(properties, key)
+```
+
+Take a property off the profile (a removed driver): a NEW frozen map without `key`; an absent key changes nothing.
+
 ### `setInherit`
 
 **Kind:** function · **Import:** `setInherit` from `'@onderling/agent-registry'`

@@ -77,3 +77,14 @@ describe('profile own/inherit property graph', () => {
     expect(p.d).toEqual({ mode: 'inherit', from: 'x' });
   });
 });
+
+describe('removeOwn — a property leaves the profile (a removed driver)', () => {
+  it('returns a new map without the key; others untouched; an absent key is a no-op', async () => {
+    const { removeOwn, setOwn } = await import('../src/profileProperties.js');
+    const before = setOwn(setOwn({}, 'goals', { kind: 'goal', text: 'zeilen', tags: ['zeilen'] }), 'place', 'Groningen');
+    const after = removeOwn(before, 'goals');
+    expect(Object.keys(after)).toEqual(['place']);
+    expect(Object.keys(before)).toContain('goals');   // the input is not mutated
+    expect(removeOwn(after, 'nope')).toEqual(after);
+  });
+});

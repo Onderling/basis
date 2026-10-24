@@ -252,10 +252,11 @@ describe('renderMij', () => {
     const placeRow = el.querySelector('.cc-mij__row[data-key="place"]');
     expect(placeRow.querySelector('.cc-mij__value-btn').textContent).toBe('Amsterdam');
     expect(placeRow.querySelector('.cc-mij__ladder').textContent).toContain('circle.mij.rung.municipality');
-    const chip = el.querySelector('.cc-mij__chip');
+    // the drivers in three sections; the fixture's hobby shows under Goals (never hidden while it still matches)
+    expect([...el.querySelectorAll('.cc-mij__row--drivers')].map((r) => r.dataset.section)).toEqual(['offerings', 'interests', 'goals']);
+    const chip = el.querySelector('.cc-mij__row--goals .cc-mij__chip');
     expect(chip.querySelector('.cc-mij__chip-text').textContent).toBe('leren zeilen');
     expect([...chip.querySelectorAll('.cc-mij__chip-tag')].map((x) => x.textContent)).toEqual(['zeilen', 'water']);
-    expect(chip.querySelector('.cc-mij__chip-badge').textContent).toContain('circle.mij.approx');
     // section 2: the root card is marked; the werk card shows OWN + follows-general
     const root = el.querySelector('.cc-mij__card--root');
     expect(root.dataset.personaId).toBe('default');
@@ -271,16 +272,24 @@ describe('renderMij', () => {
     expect(row.querySelector('.cc-mij__cell-charter').textContent).toContain('circle.mij.rung.municipality');
   });
 
-  it('adds a skill through the dashed inline form (text + tags)', () => {
-    const onAddOffering = vi.fn();
-    const el = renderMij(document.createElement('div'), { model: build(), t, onAddOffering });
-    el.querySelector('.cc-mij__add').click();
-    const form = el.querySelector('.cc-mij__form');
-    const [text, tags] = form.querySelectorAll('.cc-mij__input');
-    text.value = 'banden plakken';
-    tags.value = 'fiets, repareren';
-    form.querySelector('.cc-btn--primary').click();
-    expect(onAddOffering).toHaveBeenCalledWith({ text: 'banden plakken', tags: 'fiets, repareren' });
+  it('adds an offering and a goal through their forms, an interest as a tag; a chip\'s × removes it', () => {
+    const onSaveDriver = vi.fn(); const onRemoveDriver = vi.fn();
+    const el = renderMij(document.createElement('div'), { model: build(), t, onSaveDriver, onRemoveDriver });
+    for (const [section, phrase] of [['offerings', 'banden plakken'], ['goals', 'leren zeilen']]) {
+      el.querySelector(`.cc-mij__add--${section}`).click();
+      const form = el.querySelector(`.cc-mij__form--${section}`);
+      const [text, tags] = form.querySelectorAll('.cc-mij__input');
+      text.value = phrase;
+      tags.value = 'fiets, repareren';
+      form.querySelector('.cc-btn--primary').click();
+      expect(onSaveDriver).toHaveBeenLastCalledWith(section, { text: phrase, tags: 'fiets, repareren' });
+    }
+    const interest = el.querySelector('.cc-mij__form--interests');
+    interest.querySelector('.cc-mij__input').value = 'Tuinieren';
+    interest.querySelector('.cc-btn--primary').click();
+    expect(onSaveDriver).toHaveBeenLastCalledWith('interests', { tags: ['tuinieren'] });
+    el.querySelector('.cc-mij__row--goals .cc-mij__chip-remove').click();
+    expect(onRemoveDriver).toHaveBeenCalledWith('zeilen');
   });
 
   it('edits a general property and toggles disclosure from the circle table', () => {

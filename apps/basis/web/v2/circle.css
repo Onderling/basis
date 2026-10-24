@@ -1174,7 +1174,6 @@
 .cc-mydata__theme-btn { cursor: pointer; font-family: var(--font-mono); font-size: 11.5px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); }
 .cc-mydata__theme-btn:hover { background: var(--ink); color: var(--card); }
 .cc-mydata__theme-btn.is-active { background: var(--ink); color: var(--card); font-weight: 700; }
-.cc-profile__mydata { align-self: flex-start; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: var(--radius); background: transparent; border: 1px solid var(--accent); color: var(--accent-ink); }
 .cc-mydata__signin, .cc-mydata__action { align-self: flex-start; cursor: pointer; font: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius); background: transparent; border: 1px solid var(--accent); color: var(--accent-ink); }
 .cc-mydata__action.cc-mydata__restore { border-color: var(--line); color: var(--ink-soft); }
 /* S5 — modal overlay hosting the backup/restore wizards + the recovery-phrase reveal. */

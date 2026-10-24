@@ -598,11 +598,12 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
               {t(shareNknAddress ? 'circle.mydata.address_sharing_on' : 'circle.mydata.address_sharing_off')}
             </Text>
             <Text style={styles.privacyBody}>{t('circle.mydata.address_sharing_cost')}</Text>
-            <Pressable onPress={toggleShareAddress} accessibilityRole="button" style={styles.action} testID="address-sharing-toggle">
-              <Text style={styles.actionLabel}>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>
                 {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
               </Text>
-            </Pressable>
+              <Switch testID="address-sharing-toggle" value={shareNknAddress === true} onValueChange={() => toggleShareAddress()} />
+            </View>
           </Section>
         ) : null}
       </>

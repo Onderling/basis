@@ -375,7 +375,9 @@ export function renderCircleMyData(container, {
 
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'cc-mydata__action cc-mydata__address-sharing-toggle';
+        btn.className = 'cc-mydata__address-sharing-toggle cc-switch';
+        btn.setAttribute('role', 'switch');
+        btn.setAttribute('aria-checked', shareNknAddress ? 'true' : 'false');
         btn.textContent = tr(shareNknAddress
           ? 'circle.mydata.address_sharing_toggle_on'
           : 'circle.mydata.address_sharing_toggle_off');

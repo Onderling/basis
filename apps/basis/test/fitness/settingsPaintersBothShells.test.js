@@ -55,6 +55,17 @@ describe('settings sections: declared once, painted on both shells', () => {
     });
   }
 
+  // A section declared a switch is painted as one ("a row looks like what it is"): not a button with on/off words.
+  for (const [shell, src] of Object.entries(SHELLS)) {
+    it(`${shell}: every painter of a declared switch paints a real switch`, () => {
+      const bodies = Object.fromEntries(painterBodies(src));
+      const switches = settingsHomeFor(basisManifest).groups.flatMap((g) => g.sections.filter((x) => x.kind === 'switch').map((x) => x.id));
+      expect(switches.length).toBeGreaterThan(0);
+      const real = shell === 'web' ? /setAttribute\('role', 'switch'\)/ : /<Switch\b/;
+      expect(switches.filter((id) => !real.test(bodies[id] ?? ''))).toEqual([]);
+    });
+  }
+
   it('no custody section is declared until both shells\' guard is checked here', () => {
     const custody = settingsHomeFor(basisManifest).groups.flatMap((g) => g.sections.filter((s) => s.custody).map((s) => s.id));
     expect(custody).toEqual([]);

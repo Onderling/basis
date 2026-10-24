@@ -2198,7 +2198,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}

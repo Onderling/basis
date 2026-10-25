@@ -49,11 +49,13 @@ function asCirclePost(item, from) {
  * The posts of one circle store, through its type index: a read never scans the circle's tasks, lists or chat — only
  * the post types. Writes and single reads go to the store itself.
  */
-function postsView(cs) {
+export function postsView(cs) {
   return {
     list:   async () => (await Promise.all(NOTICEBOARD_POST_TYPES.map((t) => cs.listByType(t)))).flat(),
     get:    (id, ...r) => cs.get(id, ...r),
     put:    (item, ...r) => cs.put(item, ...r),
+    // the lifecycle verbs' compare-and-set (claim, approve): a claim on a post is a race between members
+    putIfMatch: (item, ...r) => cs.putIfMatch(item, ...r),
     delete: (id, ...r) => cs.delete(id, ...r),
   };
 }

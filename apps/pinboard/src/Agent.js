@@ -19,7 +19,7 @@
 import { Agent, AgentIdentity, InternalBus, InternalTransport, MemorySource } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { CircleItemStore, createTaskStore } from '@onderling/item-store';
-import { MemberMap, Reveals, buildIdentitySkills }    from '@onderling/identity-resolver';
+import { MemberMap, buildIdentitySkills }    from '@onderling/identity-resolver';
 import { OfferingMatch }                                 from '@onderling/offering-match';
 
 import { buildSkills } from './skills/index.js';
@@ -33,10 +33,7 @@ import { pickPersist }       from './lib/persistPicker.js';
 import { sealedPersist }    from '@onderling/local-store';   // content is sealed on the way to disk, plaintext in the cache
 import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
-import { createProfile }     from './lib/InterestProfile.js';
 import { MemberMapCache }    from './lib/MemberMapCache.js';
-import { RevealsCache }      from './lib/RevealsCache.js';
-import { InterestProfileCache } from './lib/InterestProfileCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
 import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
 import { createContactBook } from './lib/ContactBook.js';
@@ -75,12 +72,6 @@ import { createRoutedStore } from './lib/routedStore.js';
  *   reminder via `notifier.scheduleBefore` and `markReturned` cancels
  *   it.  Without a notifier, lend posts still work — they just don't
  *   produce a reminder.  See Pinboard V1 Phase 3.
- * @param {import('@onderling/identity-resolver').Reveals} [args.reveals]
- *   Optional reveal store (per-group + per-peer "show real name"
- *   flags).  When supplied, list-shaped skills hydrate each item's
- *   author into a `{handle, displayName?, isRevealed, render}` block
- *   via `identity-resolver.resolve()`.  Without it, lists return raw
- *   items (legacy shape preserved for back-compat).
  * @param {object} [args.identity]                        pre-built AgentIdentity (tests / shared-cluster setups)
  * @param {object} [args.transport]                       transport for `core.Agent` (default: InternalTransport over a fresh InternalBus)
  * @param {string} [args.label='NeighbourhoodAgent']
@@ -90,7 +81,6 @@ import { createRoutedStore } from './lib/routedStore.js';
  *   members:    MemberMap,
  *   offeringMatch: OfferingMatch,
  *   notifier:   object | null,
- *   reveals:    Reveals | null,
  *   muted:      Set<string>,   // the shell's block set when one was given
  * }>}
  */
@@ -125,8 +115,12 @@ export async function createNeighbourhoodAgent({
   /** This device's content-seal strategy — what makes the persisted copy unreadable without the key.
    *  Omit for the previous, plaintext behaviour. */
   contentSeal =  null,
+  /**
+   * The push registry's own medium (`{read, write}`): device-local, sealed by the shell, never synced and never in a
+   * backup that leaves the device — a subscription lets its holder wake the device. Absent → in memory only.
+   */
+  pushStore =    null,
   notifier:      providedNotifier,
-  reveals:       providedReveals,
   mutedSet:      providedMutedSet,
   /**
    * Pinboard V1 Phase 18 (2026-05-06): in-process usage counter.  When
@@ -437,32 +431,15 @@ export async function createNeighbourhoodAgent({
   // reads it (ingest filtering).  The empty default is for running headless,
   // where there is no shell and so nobody is blocked.
   const muted = providedMutedSet ?? new Set();
-  // Phase 14 fix (2026-05-06): when the caller doesn't supply a
-  // Reveals store, mint a default in-memory one so `requestReveal`
-  // (the bilateral "Connectie accepteren" button) works out of the
-  // box.  Without this every chat would error
-  // `chat-or-reveals-not-wired` on the first reveal attempt.
-  // Phase 29.1 (V2, 2026-05-07): when a CachingDataSource is wired,
-  // load any persisted Reveals snapshot from the cache + attach
-  // write-through.  Pod-sync rides the same path as MemberMap.
-  let reveals;
-  let revealsDetach = null;
-  if (providedReveals) {
-    reveals = providedReveals;
-  } else if (cache) {
-    reveals = await RevealsCache.load({ dataSource: cache });
-    revealsDetach = RevealsCache.attach({ reveals, dataSource: cache });
-  } else {
-    reveals = new Reveals();
-  }
   const metrics = providedMetrics ?? new UsageMetrics();
 
-  // Phase 29.3 (V2, 2026-05-07): PushRegistry hydrates from cache + write-through.
+  // The push registry hydrates from its own device-local store + writes through to it; never the cache (which can
+  // reach a pod).
   let pushRegistry;
   let pushRegistryDetach = null;
-  if (cache) {
-    pushRegistry = await PushRegistryCache.load({ dataSource: cache });
-    pushRegistryDetach = PushRegistryCache.attach({ registry: pushRegistry, dataSource: cache });
+  if (pushStore?.read && pushStore?.write) {
+    pushRegistry = await PushRegistryCache.load({ dataSource: pushStore });
+    pushRegistryDetach = PushRegistryCache.attach({ registry: pushRegistry, dataSource: pushStore });
   } else {
     pushRegistry = new PushRegistry();
   }
@@ -521,7 +498,6 @@ export async function createNeighbourhoodAgent({
     members,
     offeringMatch,
     notifier: providedNotifier ?? null,
-    reveals,
     muted,
     cache,
     _podCtx: cache ? podCtx : null,   // Phase 2.4 — filled by attachPod
@@ -537,12 +513,7 @@ export async function createNeighbourhoodAgent({
     pushSender,                     // Phase 21 — relay.PushSender (WebPushSender by default when webPush keys supplied)
     expoPushSender,                 // S6.6 — relay.PushSender for Expo tokens (mobile-native), when expoPush supplied
     webPushPublicKey: webPush?.publicKey ?? null,
-    interestProfile:       cache    // Phase 22 + 29.2 — TF-IDF profile (loaded + write-through when cache present)
-      ? await InterestProfileCache.load({ dataSource: cache })
-      : createProfile(),
-    interestProfileDetach: null,    // populated below when cache wires
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
-    revealsDetach,                     // Phase 29.1 — call on shutdown to stop persisting reveals
     settings: cache                    // Phase 23.5 + 33 — split across shared + device blobs
       ? await loadSettings({ dataSource: cache, deviceId: id?.deviceId ?? null })
       : { ...DEFAULT_SETTINGS },
@@ -550,16 +521,6 @@ export async function createNeighbourhoodAgent({
       ? createContactBook({ members, dataSource: cache })
       : null,
   };
-
-  // Phase 29.2 — wire the InterestProfile write-through after the
-  // bundle (and therefore `bundle.interestProfile`) exists.
-  if (cache) {
-    const ipDetach = InterestProfileCache.attach({
-      profile: bundle.interestProfile, dataSource: cache,
-    });
-    bundle.interestProfileDetach = ipDetach.detach;
-    bundle.interestProfileFlushNow = ipDetach.flushNow;
-  }
 
   // track bulk-sync state on the bundle so the UI
   // can poll it via the `getBulkSyncStatus` skill.  Phase: 'idle'
@@ -608,7 +569,6 @@ export async function createNeighbourhoodAgent({
       store:    itemStore,
       offeringMatch,
       notifier: providedNotifier,
-      reveals,
       members,
       controlAgent,   // household sealed-pod membership hooks (no-op when absent)
       muted,

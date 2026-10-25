@@ -16,7 +16,6 @@ import { buildMijViewModel } from './personaView.js';
 import { migrateRosterOfferings } from '../core/offeringsMigration.js';
 import { migrateAvailability } from '../core/availabilityMigration.js';
 import { migrateLocation } from '../core/locationMigration.js';
-import { migrateInterests } from '../core/interestsMigration.js';
 
 export { offeringKeyFor } from '../core/offeringsMigration.js';
 
@@ -39,9 +38,6 @@ export async function loadMijModel({ callSkill, personaId, circles = [], activeC
     // location fold-in (audit §4) — one-time, marker-guarded seed of the person-level
     // `location` property from the bespoke pinboard `profile.location` coarse geo field.
     try { await migrateLocation({ callSkill }); } catch { /* non-fatal */ }
-    // interests fold-in (audit 4) — one-time, marker-guarded seed of an `interest`-kind
-    // driver from the bespoke learned Layer-2 interest signal (pinboard getInterestProfile terms).
-    try { await migrateInterests({ callSkill }); } catch { /* non-fatal */ }
   }
 
   // Every profile-role registry entry is a persona; the opened row + the

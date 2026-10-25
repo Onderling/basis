@@ -8,6 +8,18 @@
 - Who answered my post (`post-answers`, now a dictionary type) lives on the same own store, written as the self I am
   in the post's circle, and is folded back into the post on my own reads. It is no longer in the pile.
 
+## [Unreleased] — push subscriptions on the device, the interest profile gone (2026-10-25)
+
+- Push subscriptions live on the device's own sealed push store (`pushStore`), never in pinboard's cache and never on
+  a pod. **Release note:** a person who had notifications on must switch them off and on once; the old subscription
+  is not carried over.
+- The Layer-2 interest profile is deleted (`getInterestProfile`, `resetInterestProfile`, the profile cache, and
+  basis's one-time interests migration). It learned from every answered post and nothing read it.
+  `scorePostRelevance` answers from the person's own offerings only.
+- The viewer-side Reveals are deleted: the `setPeerReveal` op and its `/reveal` slash, `setGroupReveal`,
+  `requestReveal`, `getMyReveals`, RevealsCache, item hydration (`addedByDisplay` and siblings) and the roster's
+  `viewerNameOptIn`. Nothing read them. A name is disclosed by the persona/disclosure release only.
+
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 
 Media Phase 1 anti-drift tail: pinboard's inline-bytes attachments now

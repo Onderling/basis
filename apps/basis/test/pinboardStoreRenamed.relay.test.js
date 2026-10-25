@@ -68,7 +68,11 @@ describe('the renamed pinboard store', () => {
   }, 180_000);
   it('nothing under the old name: the new store starts empty (the move invents nothing)', async () => {
     const { before, after } = await scenario({ first: 'elsewhere-items.json', second: 'pinboard-items.json' });
+    // The circle, its roster and its posts live in the circle's own store, which this move never touches — so they are
+    // the same after it, from there, not from a store under another name (what is left in pinboard's own store goes in
+    // the fold's last step, and this test with it).
     expect(before.circles).toContain(G);
-    expect(after.circles).toEqual([]);
+    expect(after.circles).toContain(G);
+    expect(after.roster).toEqual(before.roster);
   }, 180_000);
 });

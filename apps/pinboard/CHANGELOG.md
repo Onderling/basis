@@ -14,6 +14,12 @@
 - The Layer-2 interest profile is deleted (`getInterestProfile`, `resetInterestProfile`, the profile cache, and
   basis's one-time interests migration). It learned from every answered post and nothing read it.
   `scorePostRelevance` answers from the person's own offerings only.
+- The viewer-side Reveals are deleted: the `setPeerReveal` op and its `/reveal` slash, `setGroupReveal`,
+  `requestReveal`, `getMyReveals`, RevealsCache, item hydration (`addedByDisplay` and siblings) and the roster's
+  `viewerNameOptIn`. Nothing read them. A name is disclosed by the persona/disclosure release only.
+- A contact re-filed under another self no longer leaves a record in the book (`listRefiledContacts` and
+  `refiled.json` are gone). The host writes one `contact-refile` row to the own-devices store, as the self the
+  contact left; that self's devices drop it from their book where the row lands.
 
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 

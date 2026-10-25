@@ -2,14 +2,13 @@
  * Pinboard V1 — Phase 14 tests.
  *
  * Peer chat round-trip across two agents on the same InternalBus +
- * respondToItem flow + bilateral reveal handshake.  Composes shipped
+ * respondToItem flow + whoAmI.  Composes shipped
  * SDK primitives only; no `chat-agent` substrate involvement.
  */
 
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { Reveals } from '@onderling/identity-resolver';
 
 import { createNeighbourhoodAgent, attachSubstrateMirror } from '../src/index.js';
 
@@ -45,7 +44,6 @@ async function buildPair({ anneBlocks } = {}) {
       { webid: ANNE, handle: 'anne', stableId: anneId.stableId, pubKey: anneId.pubKey },
       { webid: BOB,  handle: 'bob',  stableId: bobId.stableId,  pubKey: bobId.pubKey  },
     ],
-    reveals: new Reveals(),
     mutedSet: anneBlocks,
   });
   const bob = await createNeighbourhoodAgent({
@@ -57,7 +55,6 @@ async function buildPair({ anneBlocks } = {}) {
       { webid: ANNE, handle: 'anne', stableId: anneId.stableId, pubKey: anneId.pubKey },
       { webid: BOB,  handle: 'bob',  stableId: bobId.stableId,  pubKey: bobId.pubKey  },
     ],
-    reveals: new Reveals(),
   });
 
   // Cross-register peer pubkeys at the SecurityLayer (must happen
@@ -129,71 +126,12 @@ describe('Pinboard V1 Phase 14 — respondToItem flow', () => {
   });
 });
 
-// ── Bilateral reveal handshake ───────────────────────────────────────────
-
-describe('Pinboard V1 Phase 14 — bilateral reveal handshake', () => {
-  it('requestReveal flips local Reveals + emits a reveal-request to the peer', async () => {
-    const { anne, bob, anneId, bobId } = await buildPair();
-
-    const r = await callSkill(anne.agent, 'requestReveal', {
-      peerStableId: bobId.stableId, threadId: 'reveal-thread',
-    }, ANNE);
-    expect(r.ok).toBe(true);
-
-    // Anne's local Reveals now has Bob = true.
-    expect(anne.reveals.decide({ peerWebid: bobId.stableId }).showDisplayName).toBe(true);
-  });
-
-  it('bilateral reveal: both sides can requestReveal via peerWebid (regression: recipient-pubkey-unknown)', async () => {
-    // The user-reported bug: admin clicked "Connectie accepteren"
-    // (reveal-request via peerWebid → admin's MemberMap looks up
-    // member's pubKey → fine).  Then member clicked the same button
-    // and got `recipient-pubkey-unknown`.  Root cause: the chat UI
-    // detected the wrong "other party" because getActor() returned
-    // the agent URL instead of the WebID; `peerWebid` ended up as
-    // the member's OWN webid, which was missing pubKey in their
-    // MemberMap.  Fix: factory pre-seeds the local actor's MemberMap
-    // entry, AND `whoAmI` returns the canonical webid.
-    const { anne, bob, anneId, bobId } = await buildPair();
-
-    // Anne accepts (peerWebid path, mirroring chat.html).
-    const a = await callSkill(anne.agent, 'requestReveal',
-      { peerWebid: BOB, threadId: 't' }, ANNE);
-    expect(a.ok).toBe(true);
-
-    // Bob accepts (peerWebid path, mirroring chat.html).  Pre-fix
-    // this errored when Bob's "other party" detection picked his
-    // own webid; the new whoAmI/MemberMap seeding makes it work.
-    const b = await callSkill(bob.agent, 'requestReveal',
-      { peerWebid: ANNE, threadId: 't' }, BOB);
-    expect(b.ok).toBe(true);
-
-    // Both sides have flipped their local Reveals.
-    expect(anne.reveals.decide({ peerWebid: BOB }).showDisplayName).toBe(true);
-    expect(bob.reveals.decide({ peerWebid: ANNE }).showDisplayName).toBe(true);
-  });
-
+describe('Pinboard V1 Phase 14 — whoAmI', () => {
   it('whoAmI returns {webid, stableId, pubKey}', async () => {
     const { anne, anneId } = await buildPair();
     const me = await callSkill(anne.agent, 'whoAmI', undefined, ANNE);
     expect(me.webid).toBe(ANNE);
     expect(me.stableId).toBe(anneId.stableId);
     expect(me.pubKey).toBe(anneId.pubKey);
-  });
-
-  it('reveals is auto-wired so requestReveal works without explicit opt-in', async () => {
-    // Earlier the bundle returned `chat-or-reveals-not-wired` when no
-    // Reveals was provided.  The factory now auto-wires a default
-    // Reveals so the "Connectie accepteren" button works out of the
-    // box.  This test pins the new default.
-    const id = await AgentIdentity.generate(new VaultMemory());
-    const tx = new InternalTransport(new InternalBus(), id.pubKey);
-    const bundle = await createNeighbourhoodAgent({
-      identity: id, transport: tx,
-      offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
-      members:    [{ webid: ANNE }],
-    });
-    await bundle.offeringMatch.start();
-    expect(bundle.reveals).toBeTruthy();
   });
 });

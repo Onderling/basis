@@ -28,10 +28,6 @@
  *     the item.
  *   - blocking a person lives in the shell's own set (one set for the
  *     whole device); this app only READS it, through `scope.muted`.
- *   - `listOpenRequests` / `listMyRequests` outputs hydrate each item's
- *     author into a `display: {handle, displayName?, isRevealed, render}`
- *     block when a `Reveals` store is wired.  Legacy callers without
- *     a reveals store get the raw item shape unchanged.
  *
  * B★ B3 (2026-07-05) — the op-having skills that fit the pure-core shape are
  * now expressed as module-level `coreFn(scope, args, ctx)` functions wrapped by
@@ -64,7 +60,6 @@ import {
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
 import { sealingPublicKeyFromNetworkKey as deriveSealingKeyFromAddress } from '@onderling/pod-client';   // one sealing key family: the join grant wraps to the proven address's image
-import { resolve as resolveMember } from '@onderling/identity-resolver';
 import { validateCanonical, isNoticeboardPost, isNoticeboardPostType } from '@onderling/item-types';
 
 // Rows no listing hands out, whatever it is asked for: the admin's invite code (the code itself is in it) and the poster's
@@ -94,6 +89,7 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
+import { resolve as resolveMember } from '@onderling/identity-resolver';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
 
@@ -449,62 +445,11 @@ async function _findLatestActiveCode(store, groupId) {
 }
 
 /**
- * Hydrate a single item's `addedBy` (and any present `completedBy`,
- * `assignee`) into a `display` block via `identity-resolver.resolve()`.
- * No-op if `members` or `reveals` is missing — returns the raw item.
- *
- * **Substrate candidate (rule of two — first consumer):** when a
- * second app renders item-store items with handle/displayName-on-reveal
- * UX, promote `hydrateItem` / `hydrateItems` into
- * `@onderling/identity-resolver` itself (additive — likely a new
- * `hydrate(items, { memberMap, reveals, groupId })` helper).
- * Tracked in `Project Files/Substrates/substrate-candidates.md`.
- */
-async function hydrateItem(item, { members, reveals, viewerWebid, groupId }) {
-  if (!members || !reveals) return item;
-  const out = { ...item };
-  if (item.addedBy) {
-    const d = await resolveMember({
-      memberMap:   members,
-      reveals,
-      targetWebid: item.addedBy,
-      groupId,
-    });
-    if (d) out.addedByDisplay = d;
-  }
-  if (item.completedBy) {
-    const d = await resolveMember({
-      memberMap:   members,
-      reveals,
-      targetWebid: item.completedBy,
-      groupId,
-    });
-    if (d) out.completedByDisplay = d;
-  }
-  if (item.assignee) {
-    const d = await resolveMember({
-      memberMap:   members,
-      reveals,
-      targetWebid: item.assignee,
-      groupId,
-    });
-    if (d) out.assigneeDisplay = d;
-  }
-  return out;
-}
-
-async function hydrateItems(items, ctx) {
-  if (!ctx.members || !ctx.reveals) return items;
-  return Promise.all(items.map((it) => hydrateItem(it, ctx)));
-}
-
-/**
  * @param {object} args
  * @param {import('@onderling/item-store').ItemStore} args.store
  * @param {import('@onderling/offering-match').OfferingMatch} args.offeringMatch
  * @param {object} [args.notifier]                            optional Notifier (lend reminders)
- * @param {object} [args.reveals]                             optional Reveals (author hydration)
- * @param {object} [args.members]                             optional MemberMap (author hydration)
+ * @param {object} [args.members]                             optional MemberMap
  * @param {Set<string>} [args.muted]                          per-viewer mute set (local only)
  * @param {string} [args.localActor]                          this member's webid (used as recipient for lend reminders)
  * @returns {Array<object>} array of `defineSkill` definitions
@@ -697,7 +642,7 @@ async function _fanOutViaReliableSend({
 // ── B★ B3 pure cores: (scope, a, ctx) → result ───────────────────────────────
 //
 // `scope`  the resolved per-bundle dep bag (what `buildSkills` closes over):
-//          `{ store, members, reveals, notifier, muted, metrics, groupId,
+//          `{ store, members, notifier, muted, metrics, groupId,
 //             chat, bundle, controlAgent, offeringMatch, localActor, … }`.
 // `a`      the decoded args object (wireSkill's decodeArgs; identical to the old
 //          `dataArgs(parts)` for the single-DataPart wire convention).
@@ -710,11 +655,10 @@ async function _fanOutViaReliableSend({
 // no test pins for these skills.
 
 async function listMyRequestsCore(scope, a, ctx) {
-  const { store, members, reveals, groupId } = scope;
+  const { store } = scope;
   const open = await store.listOpen();
   const mine = open.filter((i) => i.addedBy === ctx.from);
-  const items = await hydrateItems(mine, { members, reveals, viewerWebid: ctx.from, groupId });
-  return { items: decorateWithLastSync(items), _sync: simulateSync() };
+  return { items: decorateWithLastSync(mine), _sync: simulateSync() };
 }
 
 async function cancelRequestCore(scope, a, ctx) {
@@ -786,10 +730,10 @@ async function getGroupRulesCore(scope, a, ctx) {
 async function listGroupMembersCore(scope, a, ctx) {
   // Thin wrapper: the full roster-read logic — the foreign-caller ALLOWLIST gate AND the
   // local-viewer release read — lives in `@onderling/circles` (`listCircleMembers`). Pinboard
-  // injects the store, the MemberMap, the viewer's reveal store, the per-circle membership
+  // injects the store, the MemberMap, the per-circle membership
   // projection, the shared exit helpers, and the foreign-caller + allowlist gate helpers,
   // and passes the parsed args + carrier context.
-  const { store, members, reveals, groupId, localActor, circleSignerFor, membershipRead } = scope;
+  const { store, members, groupId, localActor, circleSignerFor, membershipRead } = scope;
   // Thread the circle-scoped signer resolver into the projection so it can verify THIS device's own
   // circle-key↔ref binding when folding spine statements (see projectCircleRoster). `spineless`
   // (the rails' binding verifiers) folds TRAIL + display only — verifying a statement must never
@@ -801,7 +745,7 @@ async function listGroupMembersCore(scope, a, ctx) {
     : projectCircleRoster;
   return listCircleMembers(
     {
-      store, members, reveals, projectCircleRoster: project, readCircleExits, isExited,
+      store, members, projectCircleRoster: project, readCircleExits, isExited,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
     { a, from: ctx?.from ?? null, localActor: scope.localActorIn ? scope.localActorIn(a?.groupId ?? groupId) : localActor, groupId },
@@ -1257,7 +1201,7 @@ export const PINBOARD_CORES = Object.freeze({
  */
 export function buildPinboardScope(deps = {}) {
   const {
-    store, offeringMatch, notifier, reveals, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfWebidFor = null,
   } = deps;
@@ -1277,7 +1221,7 @@ export function buildPinboardScope(deps = {}) {
   };
   return {
     selfSigner, localActorIn,
-    store, offeringMatch, notifier, reveals, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
 }
@@ -1296,7 +1240,6 @@ export function buildSkills({
   store,
   offeringMatch,
   notifier,
-  reveals,
   members,
   // Household sealed-pod control-agent (optional). When present, membership events drive pod
   // ACL + group-key grant/revoke: redeem → addMember (seal the group key to the joiner's sealing
@@ -1370,7 +1313,7 @@ export function buildSkills({
   }
 
   // OfferingMatch's #group is private; Agent.js passes the configured
-  // groupId through here so list-shaped skills can scope reveal lookups.
+  // groupId through here as the bundle's default circle.
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
 
   // B★ B3 — the per-bundle dep bag every skill closes over, packaged as the
@@ -1385,7 +1328,7 @@ export function buildSkills({
   const selfSigner = (typeof circleSignerFor !== 'function' && bundle?.agent?.identity?.pubKey && localActor)
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null;
   const scope = buildPinboardScope({
-    store, offeringMatch, notifier, reveals, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
     selfSigner, selfWebidFor,
   });
@@ -2016,8 +1959,7 @@ export function buildSkills({
       const matched = kindPostFilter
         ? open.filter((it) => it.kind === kindPostFilter)
         : open;
-      const items = await hydrateItems(matched, { members, reveals, viewerWebid: from, groupId });
-      return { items: decorateWithLastSync(items), _sync: simulateSync() };
+      return { items: decorateWithLastSync(matched), _sync: simulateSync() };
     }, {
       description: 'List open posts; optional `skill` + `intent` filters, or one `type`.',
       visibility:  'authenticated',
@@ -2300,8 +2242,8 @@ export function buildSkills({
     /**
      * setMyDisplayName({displayName})  — opt-in real / chosen name.
      *
-     * Visible only to peers / groups where the viewer has flipped a
-     * Reveals flag; defaults to invisible.
+     * What a peer sees of it is the persona / disclosure release (the
+     * contact's revealPreset, the circle's personaProperties).
      */
     defineSkill('setMyDisplayName', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -2311,69 +2253,12 @@ export function buildSkills({
       const updated = await members.addMember({ webid: from, displayName: name });
       return { displayName: name, member: updated, _sync: simulateSync() };
     }, {
-      description: 'Set the calling actor\'s display name (revealed to peers who opted in).',
+      description: 'Set the calling actor\'s display name (shown as each release allows).',
       visibility:  'authenticated',
     }),
 
-    /**
-     * setPeerReveal({peerWebid, showDisplayName?: bool=true})
-     *   — local-only viewer choice; flips Reveals so this viewer
-     *   sees `displayName` for the named peer.
-     *
-     * No mutual-consent enforcement: each side controls its own view
-     * (per the Phase 6 design — symmetric, no auto-reveal).  Apps
-     * that want a "shall we both reveal?" handshake compose this
-     * skill on top of `chat-agent`'s MessagingBridge.
-     */
-    // B★ B3 NOT wired (conflict c): the op declares params `peer`/`action`
-    // (the chat-shell vocab the realAgent adapter translates), but the skill's
-    // real args are `peerWebid`/`showDisplayName` — wireSkill would validate the
-    // wrong param names (and throw on required `peer`). Kept hand-written.
-    defineSkill('setPeerReveal', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.peerWebid !== 'string' || !a.peerWebid) {
-        return { error: 'peerWebid required' };
-      }
-      if (!reveals) return { error: 'no-reveals' };
-      const show = a.showDisplayName ?? true;
-      reveals.setPeerReveal(a.peerWebid, !!show);
-      return { peerWebid: a.peerWebid, showDisplayName: !!show, _sync: simulateSync() };
-    }, {
-      description: 'Locally flip "show real name" for a single peer.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * getMyReveals()  — enumerate "what have I revealed so far?"
-     *   Pairs with `setPeerReveal` / `setGroupReveal` for management UI.
-     */
-    defineSkill('getMyReveals', async () => {
-      if (!reveals) return { error: 'no-reveals' };
-      return reveals.list();
-    }, {
-      description: 'List the calling viewer\'s current per-group + per-peer reveal flags.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * setGroupReveal({groupId, showDisplayName?: bool=true})
-     *   — local-only viewer choice; flips Reveals so this viewer
-     *   sees `displayName` for every member of the group (peer-level
-     *   overrides still win when set).
-     */
-    defineSkill('setGroupReveal', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) {
-        return { error: 'groupId required' };
-      }
-      if (!reveals) return { error: 'no-reveals' };
-      const show = a.showDisplayName ?? true;
-      reveals.setGroupReveal(a.groupId, !!show);
-      return { groupId: a.groupId, showDisplayName: !!show, _sync: simulateSync() };
-    }, {
-      description: 'Locally flip "show real name" for an entire group.',
-      visibility:  'authenticated',
-    }),
 
     // ── Pinboard V1 Phase 7 (2026-05-06) — onboarding ───────────────────────
 
@@ -3359,11 +3244,8 @@ export function buildSkills({
       if (!members) return { error: 'no-member-map' };
       const entry = await members.resolveByWebid(from);
       if (!entry) return { entry: null };
-      // Project how *I* would appear to a viewer-in-this-group who has
-      // not flipped any reveal flag.  This composes resolve() with a
-      // synthesised viewer = anyone-but-me.  (resolve() is viewer-
-      // agnostic for the default case, so this works without a real
-      // separate Reveals.)
+      // Project how *I* would appear to a viewer in this group by default
+      // (resolve() is viewer-agnostic for the default case).
       let renderForCurrentGroup = null;
       if (groupId) {
         renderForCurrentGroup = await resolveMember({
@@ -3378,7 +3260,7 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    // ── Pinboard V1 Phase 14 (2026-05-06) — peer chat + reply + reveal ──────
+    // ── Pinboard V1 Phase 14 (2026-05-06) — peer chat + reply ───────────────
 
     /**
      * respondToItem({itemId, body})
@@ -3392,38 +3274,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * requestReveal({peerStableId? | peerWebid?, threadId})
-     *   — bilateral reveal handshake.  Flips the local Reveals
-     *   record for the peer + sends a `reveal-request` chat envelope
-     *   to the peer so their UI can offer to reciprocate.
-     */
-    defineSkill('requestReveal', async ({ parts, from }) => {
-      if (!chat || !reveals) return { error: 'chat-or-reveals-not-wired' };
-      const a = dataArgs(parts);
-      if (typeof a.threadId !== 'string' || !a.threadId) return { error: 'threadId required' };
-
-      const peerStableId = a.peerStableId ?? null;
-      const peerWebid    = a.peerWebid    ?? null;
-
-      // Flip locally.
-      if (peerStableId) reveals.setPeerReveal(peerStableId, true);
-      else if (peerWebid) reveals.setPeerReveal(peerWebid, true);
-      else return { error: 'peerStableId or peerWebid required' };
-
-      // Send hint to the peer.
-      const r = await chat.send({
-        toStableId: peerStableId,
-        toWebid:    peerWebid,
-        threadId:   a.threadId,
-        body:       null,
-        subtype:    'reveal-request',
-      });
-      return r.ok ? { ok: true } : { error: r.reason };
-    }, {
-      description: 'Bilateral reveal: flip local Reveals + send a hint to the peer to reciprocate.',
-      visibility:  'authenticated',
-    }),
 
     // ── Pinboard V1 Phase 16 (2026-05-06) — group ops admin polish ──────────
 
@@ -4409,9 +4259,9 @@ export function buildSkills({
     }),
 
     /**
-     * forgetContact({webid}) / listRefiledContacts() — the HOST's own, never a peer's: a contact re-filed under a self
-     * this device does not hold leaves this self's book (its contact facets; the member row stays), and the book's
-     * record of where its contacts were filed before a move is what the own-devices lane tells the old self's devices.
+     * forgetContact({webid}) — the HOST's own, never a peer's: a contact re-filed under a self this device does not
+     * hold leaves this self's book (its contact facets; the member row stays). The host calls it where the own-devices
+     * lane lands the old self's `contact-refile` row.
      */
     defineSkill('forgetContact', async ({ parts, from }) => {
       if (!from || from !== localActor) return { error: 'not-yours' };
@@ -4421,14 +4271,6 @@ export function buildSkills({
       catch (err) { return { error: err?.message ?? String(err) }; }
     }, {
       description: "The host's own: drop a contact re-filed under a self this device does not hold (the member row stays).",
-      visibility:  'authenticated',
-    }),
-    defineSkill('listRefiledContacts', async ({ from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts?.listRefiled) return { refiled: [] };
-      return { refiled: await bundle.contacts.listRefiled() };
-    }, {
-      description: "The host's own: the contacts re-filed under another persona here (webid, where they were filed, when).",
       visibility:  'authenticated',
     }),
 
@@ -4813,7 +4655,6 @@ const _SENTINEL_BUNDLE = Object.freeze({
   store:      null,
   offeringMatch: null,
   notifier:   null,
-  reveals:    null,
   members:    null,
   muted:      new Set(),
   localActor: null,

@@ -158,8 +158,8 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
   // offerings are the person's drivers, matched on their own device (the host's `matchesMine`) → 93.
   // 2026-10-23: -1, `restoreFromMnemonic` retired — the recovery phrase is the owner root's, restored by the host
   // (`restoreOwnerPhrase`); this agent's key is never in the phrase → 92.
-  it('ships the full chat+slash surface (one pinboard manifest, 86 ops)', () => {
-    expect(pinboardManifest.operations.length).toBe(86);
+  it('ships the full chat+slash surface (one pinboard manifest, 85 ops)', () => {
+    expect(pinboardManifest.operations.length).toBe(85);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

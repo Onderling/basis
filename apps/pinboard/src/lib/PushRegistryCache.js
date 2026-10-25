@@ -1,9 +1,10 @@
 /**
  * PushRegistryCache — Pinboard V2 Phase 29.3 (2026-05-07).
  *
- * Persist a `PushRegistry`'s snapshot to a `core.DataSource` so a
- * fresh device that signs into the same pod sees the existing
- * subscriptions and can resume push delivery.
+ * Persist a `PushRegistry`'s snapshot to the device-local push store a
+ * shell hands in (`{read, write}`), so a restart keeps the subscriptions.
+ * That store is never synced: not to a pod, not to a sibling, not into a
+ * backup that leaves the device.
  *
  *   - `load({dataSource})`          — read the blob; build a fresh
  *                                     `PushRegistry` from it.
@@ -14,12 +15,9 @@
  * Storage path: `mem://pinboard/push-subscriptions.json`.
  *
  * Persistence semantics:
- * - The whole `byWebid` snapshot is mirrored.  In V2 a bundle
- *   typically only carries subscriptions for the local actor; the
- *   wider Hub-side push deployment (V3) keeps server-side state.
+ * - The whole `byWebid` snapshot is mirrored.
  * - Subscriptions ARE secrets (the endpoint + encrypted-key pair
- *   lets the holder send pushes), but the same is true of the rest
- *   of the cache → pod blob.  Pod ACLs are the gatekeeper.
+ *   lets the holder wake the device), which is why they stay on it.
  */
 
 import { PushRegistry } from './PushRegistry.js';

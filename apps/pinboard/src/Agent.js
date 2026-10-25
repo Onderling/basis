@@ -123,6 +123,11 @@ export async function createNeighbourhoodAgent({
   /** This device's content-seal strategy — what makes the persisted copy unreadable without the key.
    *  Omit for the previous, plaintext behaviour. */
   contentSeal =  null,
+  /**
+   * The push registry's own medium (`{read, write}`): device-local, sealed by the shell, never synced and never in a
+   * backup that leaves the device — a subscription lets its holder wake the device. Absent → in memory only.
+   */
+  pushStore =    null,
   notifier:      providedNotifier,
   reveals:       providedReveals,
   mutedSet:      providedMutedSet,
@@ -455,12 +460,13 @@ export async function createNeighbourhoodAgent({
   }
   const metrics = providedMetrics ?? new UsageMetrics();
 
-  // Phase 29.3 (V2, 2026-05-07): PushRegistry hydrates from cache + write-through.
+  // The push registry hydrates from its own device-local store + writes through to it; never the cache (which can
+  // reach a pod).
   let pushRegistry;
   let pushRegistryDetach = null;
-  if (cache) {
-    pushRegistry = await PushRegistryCache.load({ dataSource: cache });
-    pushRegistryDetach = PushRegistryCache.attach({ registry: pushRegistry, dataSource: cache });
+  if (pushStore?.read && pushStore?.write) {
+    pushRegistry = await PushRegistryCache.load({ dataSource: pushStore });
+    pushRegistryDetach = PushRegistryCache.attach({ registry: pushRegistry, dataSource: pushStore });
   } else {
     pushRegistry = new PushRegistry();
   }

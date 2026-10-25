@@ -102,6 +102,8 @@ export async function createBrowserPinboardAgent({
   // person shows) and the posts persist under it. Absent → the persisted copy is written in the clear,
   // which is what happened until 2026-09-18 — the host handed it in and this factory dropped it here.
   contentSeal = null,
+  // The push registry's own device-local medium (`{read, write}`) — never the persisted store above.
+  pushStore = null,
 }) {
   if (!bus)           throw new TypeError('createBrowserPinboardAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserPinboardAgent: identityVault required');
@@ -143,6 +145,7 @@ export async function createBrowserPinboardAgent({
     hostCircles,
     matchesMine,
     contentSeal,           // the persisted store is sealed under this device's content key
+    pushStore,             // push subscriptions: device-local, never synced
   });
 
   return {

@@ -5050,6 +5050,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       ] : []),
     ],
     persistDb:  opts.pinboardPersistDb,   // browser IDB; opt-in via caller
+    // Push subscriptions on their own medium: sealed, device-local, never in the pinboard store (which can reach a
+    // pod) and never carried to a sibling — a subscription lets its holder wake this device.
+    pushStore:  opts.pinboardPushPersistDb ? await buildHouseholdDataSource(opts.pinboardPushPersistDb, { strategy: contentSeal }).catch(() => null) : null,
     contentSeal,                       // its posts are content too — sealed on the way to disk
     // S4 — per-circle control-agent router: redeem→addMember / leave→removeMember route
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent

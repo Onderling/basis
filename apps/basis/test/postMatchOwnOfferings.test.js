@@ -15,9 +15,9 @@ describe('a post matched against my own offerings', () => {
   it('the default\'s offering matches a post outside any persona\'s circle', async () => {
     const a = await boot();
     expect((await a.callSkill('agents', 'setProfileDriver', { id: 'default', key: 'tuin', kind: 'offering', text: 'Tuinieren', tags: 'tuin,snoeien', categoryId: 'tuin' })).ok).toBe(true);
-    expect((await score(a, { categoryId: 'tuin' }))?.layer1?.matched).toBe(true);
-    expect((await score(a, { tags: ['snoeien'] }))?.layer1?.matched).toBe(true);
-    expect((await score(a, { categoryId: 'vervoer' }))?.layer1?.matched).toBe(false);
+    expect((await score(a, { categoryId: 'tuin' }))?.matched).toBe(true);
+    expect((await score(a, { tags: ['snoeien'] }))?.matched).toBe(true);
+    expect((await score(a, { categoryId: 'vervoer' }))?.matched).toBe(false);
   }, 60_000);
 
   it('the matcher never sees a driver the circle\'s self does not hold (a new persona holds its own offerings only; the default never holds a persona\'s)', async () => {
@@ -26,11 +26,11 @@ describe('a post matched against my own offerings', () => {
     await a.callSkill('agents', 'setProfileCircleMembership', { id, circleId: 'kantoor', handle: 'w', address: a.persona(id).circleAddressFor('kantoor') });
     await a.callSkill('agents', 'setProfileDriver', { id: 'default', key: 'tuin', kind: 'offering', text: 'Tuinieren', tags: 'tuin', categoryId: 'tuin' });
     await a.callSkill('agents', 'setProfileDriver', { id, key: 'fiets', kind: 'offering', text: 'Fietsen maken', tags: 'fiets', categoryId: 'vervoer' });
-    expect((await score(a, { circleId: 'kantoor', categoryId: 'vervoer' }))?.layer1?.matched, 'Werk\'s own offering, in Werk\'s circle').toBe(true);
+    expect((await score(a, { circleId: 'kantoor', categoryId: 'vervoer' }))?.matched, 'Werk\'s own offering, in Werk\'s circle').toBe(true);
     // a NEW persona does not take the general offerings unless it was asked and said yes (the new-persona wizard, default
     // no) — so the general 'tuin' is not Werk's; and what never happens either way is the reverse
-    expect((await score(a, { circleId: 'kantoor', categoryId: 'tuin' }))?.layer1?.matched, 'a new persona does not inherit the general offering').toBe(false);
-    expect((await score(a, { categoryId: 'vervoer' }))?.layer1?.matched, 'Werk\'s offering is not the default\'s').toBe(false);
+    expect((await score(a, { circleId: 'kantoor', categoryId: 'tuin' }))?.matched, 'a new persona does not inherit the general offering').toBe(false);
+    expect((await score(a, { categoryId: 'vervoer' }))?.matched, 'Werk\'s offering is not the default\'s').toBe(false);
   }, 60_000);
 
   it('a persona created with "yes, my offerings too" holds the general offering as its own inherited one', async () => {
@@ -38,7 +38,7 @@ describe('a post matched against my own offerings', () => {
     const { id } = await a.callSkill('agents', 'createProfile', { name: 'Buurt', properties: JSON.stringify({ '_inherit.offering': { mode: 'own', value: true } }) });
     await a.callSkill('agents', 'setProfileCircleMembership', { id, circleId: 'straat', handle: 'b', address: a.persona(id).circleAddressFor('straat') });
     await a.callSkill('agents', 'setProfileDriver', { id: 'default', key: 'tuin', kind: 'offering', text: 'Tuinieren', tags: 'tuin', categoryId: 'tuin' });
-    expect((await score(a, { circleId: 'straat', categoryId: 'tuin' }))?.layer1?.matched).toBe(true);
+    expect((await score(a, { circleId: 'straat', categoryId: 'tuin' }))?.matched).toBe(true);
     const drivers = (await a.callSkill('agents', 'getProfileDrivers', { id }))?.drivers ?? {};
     expect(Object.keys(drivers)).toContain('tuin');
   }, 60_000);
@@ -47,9 +47,9 @@ describe('a post matched against my own offerings', () => {
     let record = { holiday: { active: true, until: null } };
     const a = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), availability: async () => record });
     await a.callSkill('agents', 'setProfileDriver', { id: 'default', key: 'tuin', kind: 'offering', text: 'Tuinieren', tags: 'tuin', categoryId: 'tuin' });
-    expect((await score(a, { categoryId: 'tuin' }))?.layer1?.matched, 'away').toBe(false);
+    expect((await score(a, { categoryId: 'tuin' }))?.matched, 'away').toBe(false);
     record = { holiday: { active: false } };
-    expect((await score(a, { categoryId: 'tuin' }))?.layer1?.matched, 'back').toBe(true);
+    expect((await score(a, { categoryId: 'tuin' }))?.matched, 'back').toBe(true);
   }, 60_000);
 
   it('the SOURCE (the drivers it reads) is returned by no op — the verdict is, by one op, local-only (scorePostRelevance refuses a peer)', () => {

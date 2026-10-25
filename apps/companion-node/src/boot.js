@@ -20,6 +20,7 @@
  *                                  name (`ws://relay:8787`); otherwise the card maps it from COMPANION_RELAY_URL
  *   ── the local radio (opt-in) ──
  *   COMPANION_NEARBY               same values as `--nearby` below; the flag wins when both are given
+ *   COMPANION_NEARBY_PORT          the radio's fixed TCP data port (`--nearby-port`); absent, an ephemeral one
  *
  * Usage:
  *   node src/boot.js

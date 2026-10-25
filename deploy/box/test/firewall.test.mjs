@@ -47,3 +47,38 @@ test('the installer calls the function instead of naming the rules inline', () =
   assert.ok(!/ufw allow OpenSSH/.test(src), 'the OpenSSH profile name is gone');
   assert.match(src, /firewall_rules "\$ROLES"/);
 });
+
+// The companion's local-network radio on a personal box (the household tablet, 2026-10-25): discovery is mDNS on
+// 5353/udp and the hello is plain TCP on the radio's data port. With ufw on and no rule for either, a phone that
+// found the box could never connect. The rules come from lib.sh, from the same box.conf that turns the radio on.
+const LIB = join(resolve(import.meta.dirname, '..'), 'lib.sh');
+function nearbyRules(env) {
+  const src = readFileSync(LIB, 'utf8');
+  const fns = ['role_names', 'nearby_port', 'lan_iface', 'nearby_firewall_rules']
+    .map((n) => new RegExp(`^${n}\\(\\) \\{[\\s\\S]*?^\\}|^${n}\\(\\) \\{.*\\}$`, 'm').exec(src));
+  fns.forEach((f, i) => assert.ok(f, `lib.sh defines ${['role_names', 'nearby_port', 'lan_iface', 'nearby_firewall_rules'][i]}()`));
+  const r = spawnSync('bash', ['-c', `${fns.map((f) => f[0]).join('\n')}\nnearby_firewall_rules`], { encoding: 'utf8', env: { PATH: process.env.PATH, ...env } });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trim().split('\n').filter(Boolean);
+}
+
+test('a box with the radio on opens mDNS and the radio\'s fixed data port ON THE LAN INTERFACE only — and nothing when it is off', () => {
+  // bound to the interface the default route leaves by (the home LAN), never a bare `allow <port>`: the router's NAT
+  // keeps the internet out regardless, and this keeps every other interface shut too
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis assistant@basis', COMPANION_NEARBY: 'publish:2h', LAN_IFACE: 'wlp1s0' }),
+    ['allow in on wlp1s0 to any port 5353 proto udp', 'allow in on wlp1s0 to any port 45210 proto tcp']);
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'browse', COMPANION_NEARBY_PORT: '45333', LAN_IFACE: 'eth0' }),
+    ['allow in on eth0 to any port 5353 proto udp', 'allow in on eth0 to any port 45333 proto tcp']);
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'off', LAN_IFACE: 'eth0' }), []);
+  assert.deepEqual(nearbyRules({ ROLES: 'assistant@basis', COMPANION_NEARBY: 'publish', LAN_IFACE: 'eth0' }), [], 'no companion, no radio');
+  // never Tailscale's interface, and never a rule without an interface
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'publish', LAN_IFACE: 'tailscale0' }), []);
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'publish', LAN_IFACE: '' }), []);
+});
+
+test('the installer applies the radio\'s rules for a new box (root, at install) — the updater never touches ufw', () => {
+  const src = readFileSync(INSTALL, 'utf8');
+  assert.match(src, /nearby_firewall_rules/, 'install.sh applies nearby_firewall_rules');
+  const update = readFileSync(join(resolve(import.meta.dirname, '..'), 'update.sh'), 'utf8');
+  assert.ok(!/\bufw\b/.test(update.replace(/^\s*#.*$/gm, '')), 'update.sh runs as the box user and must not touch the firewall');
+});

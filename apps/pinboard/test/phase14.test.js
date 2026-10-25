@@ -79,92 +79,13 @@ async function buildPair({ anneBlocks } = {}) {
 
 // ── 1-on-1 chat round-trip ───────────────────────────────────────────────
 
-describe('Pinboard V1 Phase 14 — peer chat round-trip', () => {
-  it('Anne sends a chat message to Bob; both sides see it in the thread', async () => {
-    const { anne, bob, bobId } = await buildPair();
-
-    const send = await callSkill(anne.agent, 'sendChatMessage', {
-      toStableId: bobId.stableId, threadId: 'thread-1', body: 'Hoi Bob, hoe gaat het?',
-    }, ANNE);
-    expect(send.ok).toBe(true);
-
-    // Allow the OW envelope to land + be dispatched to Bob.
-    await new Promise(r => setTimeout(r, 30));
-
-    // Anne's own thread shows the outgoing copy.
-    const anneThread = await callSkill(anne.agent, 'getChatThread', { threadId: 'thread-1' }, ANNE);
-    expect(anneThread.messages).toHaveLength(1);
-    expect(anneThread.messages[0].text).toBe('Hoi Bob, hoe gaat het?');
-    expect(anneThread.messages[0].source.fromWebid).toBe(ANNE);
-
-    // Bob's thread shows the incoming.
-    const bobThread = await callSkill(bob.agent, 'getChatThread', { threadId: 'thread-1' }, BOB);
-    expect(bobThread.messages).toHaveLength(1);
-    expect(bobThread.messages[0].text).toBe('Hoi Bob, hoe gaat het?');
-    expect(bobThread.messages[0].source.fromWebid).toBe(ANNE);
-    expect(bobThread.messages[0].source.fromStableId).toBeTruthy();
-  });
-
-  it('Bob can reply on the same thread; Anne sees both messages', async () => {
-    const { anne, bob, anneId, bobId } = await buildPair();
-
-    await callSkill(anne.agent, 'sendChatMessage',
-      { toStableId: bobId.stableId, threadId: 't', body: 'A1' }, ANNE);
-    await new Promise(r => setTimeout(r, 30));
-    await callSkill(bob.agent, 'sendChatMessage',
-      { toStableId: anneId.stableId, threadId: 't', body: 'B1' }, BOB);
-    await new Promise(r => setTimeout(r, 30));
-
-    const anneThread = await callSkill(anne.agent, 'getChatThread', { threadId: 't' }, ANNE);
-    expect(anneThread.messages.map(m => m.text)).toEqual(['A1', 'B1']);
-  });
-
-  it('listChatThreads returns the threads I am in, sorted by recency', async () => {
-    const { anne, bobId } = await buildPair();
-    await callSkill(anne.agent, 'sendChatMessage',
-      { toStableId: bobId.stableId, threadId: 't1', body: 'first' }, ANNE);
-    await new Promise(r => setTimeout(r, 5));
-    await callSkill(anne.agent, 'sendChatMessage',
-      { toStableId: bobId.stableId, threadId: 't2', body: 'second' }, ANNE);
-
-    const list = await callSkill(anne.agent, 'listChatThreads', undefined, ANNE);
-    expect(list.threads.map(t => t.threadId)).toEqual(['t2', 't1']);
-    expect(list.threads[0].lastBody).toBe('second');
-  });
-
-  it('rejects missing args', async () => {
-    const { anne } = await buildPair();
-    // Phase 39 — sendChatMessage now accepts body OR attachment;
-    // the "neither" case yields a clearer error.
-    expect(await callSkill(anne.agent, 'sendChatMessage', { threadId: 'x' }, ANNE))
-      .toEqual({ error: 'body-or-attachment-required' });
-    expect(await callSkill(anne.agent, 'sendChatMessage', { body: 'x' }, ANNE))
-      .toEqual({ error: 'threadId required' });
-    expect(await callSkill(anne.agent, 'getChatThread', {}, ANNE))
-      .toEqual({ error: 'threadId required' });
-  });
-
-  it('a blocked peer\'s chat-messages do not arrive', async () => {
-    // The block set is the SHELL's, handed in at construction — this app never
-    // writes it, it only refuses ingest from whoever is in it.
-    const anneBlocks = new Set();
-    const { anne, bob, anneId, bobId } = await buildPair({ anneBlocks });
-    anneBlocks.add(bobId.stableId);
-
-    await callSkill(bob.agent, 'sendChatMessage',
-      { toStableId: anneId.stableId, threadId: 't', body: 'should not arrive' }, BOB);
-    await new Promise(r => setTimeout(r, 30));
-
-    const t = await callSkill(anne.agent, 'getChatThread', { threadId: 't' }, ANNE);
-    expect(t.messages).toHaveLength(0);
-  });
-});
-
 // ── respondToItem ────────────────────────────────────────────────────────
 
 describe('Pinboard V1 Phase 14 — respondToItem flow', () => {
   it('finds a mirrored post by source.requestId + sends chat to its author', async () => {
     const { anne, bob, anneId } = await buildPair();
+    const reachedAnne = [];
+    anne.agent.on('message', (m) => { for (const p of m?.parts ?? []) if (p?.data?.subtype === 'chat-message') reachedAnne.push(p.data); });
 
     // Bypass the (timing-fragile) broadcast path for this unit test:
     // synthesise the mirrored item directly on Bob's side, the way
@@ -195,9 +116,9 @@ describe('Pinboard V1 Phase 14 — respondToItem flow', () => {
     // Allow the OW envelope to dispatch on Anne's side.
     await new Promise(r => setTimeout(r, 30));
 
-    // Anne's chat thread has Bob's message.
-    const t = await callSkill(anne.agent, 'getChatThread', { threadId: broadcastId }, ANNE);
-    expect(t.messages.some(m => m.text === 'Hoi, ik woon vlakbij' && m.source.fromWebid === BOB)).toBe(true);
+    // Bob's answer reached Anne's agent, threaded under her post (pinboard keeps no copy of a 1:1 turn — a shell's
+    // contact thread is its record).
+    expect(reachedAnne.some((d) => d.threadId === broadcastId && d.body === 'Hoi, ik woon vlakbij' && d.fromWebid === BOB)).toBe(true);
   });
 
   it('rejects when the item is not found', async () => {

@@ -77,12 +77,12 @@ describe('chat-p2p — envelope type config', () => {
       acceptedEnvelopeTypes: ['p2p-chat', 'pinboard-chat'],
       emitEnvelopeType:      'p2p-chat',
     });
-    // Inject a legacy 'pinboard-chat' envelope.
+    // Inject a legacy 'pinboard-chat' envelope (a reveal request: a kind this receiver keeps a row of).
     const legacyEnv = {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
         type:     'pinboard-chat',
-        subtype:  'chat-message',
+        subtype:  'reveal-request',
         threadId: 't1',
         body:     'legacy hello',
         fromWebid: 'urn:peer',
@@ -91,14 +91,14 @@ describe('chat-p2p — envelope type config', () => {
     };
     await h.messageHandlers[0](legacyEnv);
     expect(h.itemStore.addItems).toHaveBeenCalledOnce();
-    expect(h.items[0].text).toBe('legacy hello');
+    expect(h.items[0].type).toBe('reveal-event');
 
     // Then a new 'p2p-chat' envelope.
     const newEnv = {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
         type:     'p2p-chat',
-        subtype:  'chat-message',
+        subtype:  'reveal-request',
         threadId: 't1',
         body:     'new hello',
         fromWebid: 'urn:peer',
@@ -118,7 +118,7 @@ describe('chat-p2p — envelope type config', () => {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
         type: 'tasks-chat',     // NOT in acceptedEnvelopeTypes
-        subtype: 'chat-message',
+        subtype: 'reveal-request',
         threadId: 't1',
         body: 'spoofed',
         fromWebid: 'urn:peer',
@@ -148,8 +148,6 @@ describe('chat-p2p — envelope type config', () => {
       subtype: 'chat-message',
     });
     expect(h.oneWayCalls[0].env.parts[0].data.type).toBe('p2p-chat');
-    // Sender stores its own copy → 1 item so far.
-    expect(h.items.length).toBe(1);
 
     // Legacy reader path still works.
     await h.messageHandlers[0]({
@@ -159,6 +157,6 @@ describe('chat-p2p — envelope type config', () => {
         body: 'legacy', fromWebid: 'urn:p', nonce: 'nz',
       }}],
     });
-    expect(h.items.length).toBe(2);     // own + the inbound legacy
+    expect(h.items.length).toBe(0);     // accepted, and nothing stored (a chat turn's record is the contact thread)
   });
 });

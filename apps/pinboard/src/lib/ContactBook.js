@@ -27,10 +27,7 @@
  *   There is no removal (retired 2026-09-22): the row is also the MemberMap entry every kring roster reads for
  *   the person, so dropping it degrades their row in every shared circle; hiding (`setHidden`) is the act.
  * - **Asymmetric.**  `addContact(bob, vertrouwd)` only changes
- *   *my* MemberMap entry for Bob.  Notifying Bob's agent so HE can
- *   choose to reciprocate is Phase 24.6's
- *   `contact-add-request`-envelope flow.  The lib here does the
- *   local mutation; the envelope-send happens in the skill layer.
+ *   *my* MemberMap entry for Bob; Bob is not told.
  * - **Tags are local-only.**  My label `'koor'` for Bob is not
  *   visible to Bob.  Stored on Bob's MemberMap entry in MY map.
  */

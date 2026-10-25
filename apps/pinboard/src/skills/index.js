@@ -3410,100 +3410,6 @@ export function buildSkills({
     // ── Pinboard V1 Phase 14 (2026-05-06) — peer chat + reply + reveal ──────
 
     /**
-     * sendChatMessage({toStableId? | toWebid? | toPubKey?, threadId, body})
-     *   — peer-to-peer chat over `agent.transport.sendOneWay`.  At
-     *   least one recipient identifier is required; stableId
-     *   preferred, webid back-compat, pubKey for test fixtures.
-     */
-    defineSkill('sendChatMessage', async ({ parts }) => {
-      if (!chat) return { error: 'chat-not-wired' };
-      const a = dataArgs(parts);
-      if (typeof a.threadId !== 'string' || !a.threadId) return { error: 'threadId required' };
-      // Phase 39 — body OR attachment is required (or both).
-      const hasBody       = typeof a.body === 'string' && a.body.length > 0;
-      const hasAttachment = a.attachment && typeof a.attachment === 'object';
-      if (!hasBody && !hasAttachment) return { error: 'body-or-attachment-required' };
-
-      // Validate attachment shape if provided — SEALED-only (the inline
-      // plaintext `dataB64` path is refused; the caller seals via the circle
-      // media gateway and passes an opaque `media` pointer).
-      if (hasAttachment) {
-        const err = validateInboundAttachment(a.attachment);
-        if (err) return { error: err };
-      }
-
-      const r = await chat.send({
-        toStableId: a.toStableId,
-        toWebid:    a.toWebid,
-        toPubKey:   a.toPubKey,
-        threadId:   a.threadId,
-        body:       a.body ?? '',
-        subtype:    'chat-message',
-        extras:     hasAttachment ? { attachment: a.attachment } : undefined,
-      });
-      return r.ok ? { ok: true, itemId: r.itemId, _sync: simulateSync() } : { error: r.reason };
-    }, {
-      description: 'Send a 1-on-1 chat message (with optional inline image attachment) to a peer.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getChatThread({threadId})
-     *   — return all chat-message items for `threadId`, oldest-first.
-     */
-    defineSkill('getChatThread', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.threadId !== 'string' || !a.threadId) return { error: 'threadId required' };
-      const all = await store.listOpen({ type: 'chat-message' });
-      const messages = all
-        .filter(i => i.source?.threadId === a.threadId)
-        .sort((p, q) => (p.source?.sentAt ?? p.addedAt ?? 0) - (q.source?.sentAt ?? q.addedAt ?? 0));
-      const decorated = messages.map((m) => ({
-        ...m,
-        _lastSync: m.source?.sentAt ?? m.addedAt ?? Date.now(),
-      }));
-      return { messages: decorated, _sync: simulateSync() };
-    }, {
-      description: 'Return all chat-messages for a thread, oldest-first.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listChatThreads()
-     *   — distinct threadIds I'm a participant in, with the most
-     *   recent message + the counterparty's stableId / webid.
-     */
-    defineSkill('listChatThreads', async ({ from }) => {
-      const all = await store.listOpen({ type: 'chat-message' });
-      /** @type {Map<string, object>} */
-      const byThread = new Map();
-      for (const m of all) {
-        const t = m.source?.threadId;
-        if (!t) continue;
-        const cur = byThread.get(t);
-        const ts  = m.source?.sentAt ?? m.addedAt ?? 0;
-        if (!cur || ts > cur.lastSentAt) {
-          byThread.set(t, {
-            threadId:    t,
-            lastBody:    m.text,
-            lastSentAt:  ts,
-            lastFrom:    m.source?.fromWebid ?? m.addedBy,
-            counterparty: m.source?.fromWebid === from
-              ? (m.source?.toWebid ?? null)
-              : (m.source?.fromWebid ?? null),
-          });
-        }
-      }
-      const threads = [...byThread.values()]
-        .sort((a, b) => b.lastSentAt - a.lastSentAt)
-        .map((t) => ({ ...t, _lastSync: t.lastSentAt ?? Date.now() }));
-      return { threads, _sync: simulateSync() };
-    }, {
-      description: 'List my chat threads, most-recently-active first.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * respondToItem({itemId, body})
      *   — open a chat thread with the post author.  threadId =
      *   originating post's id; first message body becomes the
@@ -4266,8 +4172,7 @@ export function buildSkills({
      *   Parse a `onderling-contact://` payload and add the contact
      *   to the local ContactBook.  Honours the `trustOffer` from
      *   the QR (defaults to 'bekend' if missing).  Asymmetric —
-     *   adding a contact here does *not* notify them; that's
-     *   Phase 24.6's contact-add-request envelope.
+     *   adding a contact here does *not* notify them.
      */
     defineSkill('addContactFromQr', async ({ parts }) => {
       const a = dataArgs(parts);
@@ -4315,96 +4220,6 @@ export function buildSkills({
       return { contact: m, ...(pk ? { personKey: pk } : {}) };
     }, {
       description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * requestContactAdd({toWebid | toStableId | toPubKey, trustOffer?})
-     *   — Phase 24.6.  Send a `contact-add-request` envelope to the
-     *   peer.  Payload includes the calling actor's WebID / pubKey /
-     *   handle / avatar so the receiver's UI can render an
-     *   "Anna wants to add you as a contact" prompt without a
-     *   pre-existing MemberMap entry.  Asymmetric — adding the
-     *   contact locally is the caller's separate decision.
-     */
-    defineSkill('requestContactAdd', async ({ parts, from, agent }) => {
-      if (!chat) return { error: 'chat-not-wired' };
-      const a = dataArgs(parts);
-      const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
-        ? a.trustOffer : 'bekend';
-      const me = members ? await members.resolveByWebid(from) : null;
-      const r = await chat.send({
-        toWebid:    a.toWebid,
-        toStableId: a.toStableId,
-        toPubKey:   a.toPubKey,
-        subtype:    'contact-add-request',
-        extras: {
-          handle:      me?.handle      ?? null,
-          displayName: me?.displayName ?? null,
-          avatarUrl:   me?.avatarUrl   ?? null,
-          trustOffer,
-        },
-      });
-      if (r.ok) metrics?.record?.('contact-request-sent');
-      return r.ok ? { ok: true } : { error: r.reason };
-    }, {
-      description: 'Send a contact-add-request envelope; receiver decides asymmetrically.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * acceptContactRequest({requestId})
-     *   — Phase 24.6.  Mark the contact-request item complete and
-     *   add the requester to the local ContactBook at the offered
-     *   trust level.
-     */
-    defineSkill('acceptContactRequest', async ({ parts, from }) => {
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      const a = dataArgs(parts);
-      if (typeof a.requestId !== 'string' || !a.requestId) return { error: 'requestId required' };
-      const item = await store.getById(a.requestId);
-      if (!item || item.type !== 'contact-request') return { error: 'not-found' };
-      const card = item.source ?? {};
-      const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
-        ? card.trustOffer : 'bekend';
-      const m = await bundle.contacts.addContact({
-        webid:       card.fromWebid,
-        pubKey:      card.fromPubKey ?? null,
-        stableId:    card.fromStableId ?? null,
-        handle:      card.handle      ?? null,
-        displayName: card.displayName ?? null,
-        avatarUrl:   card.avatarUrl   ?? null,
-        trustLevel,
-      });
-      // Close the request item so the UI prompt clears.
-      try { await store.markComplete([{ id: a.requestId }], { actor: from }); } catch {}
-      metrics?.record?.('contact-request-accepted');
-      return { ok: true, contact: m };
-    }, {
-      description: 'Accept an incoming contact-add request; adds the requester at their offered trust level.',
-      visibility:  'authenticated',
-    }),
-
-    /** declineContactRequest({requestId}) — closes the prompt; does NOT add. */
-    defineSkill('declineContactRequest', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.requestId !== 'string' || !a.requestId) return { error: 'requestId required' };
-      const item = await store.getById(a.requestId);
-      if (!item || item.type !== 'contact-request') return { error: 'not-found' };
-      try { await store.markComplete([{ id: a.requestId }], { actor: from }); } catch {}
-      metrics?.record?.('contact-request-declined');
-      return { ok: true };
-    }, {
-      description: 'Decline an incoming contact-add request (closes the prompt).',
-      visibility:  'authenticated',
-    }),
-
-    /** listContactRequests() — open `kind: 'contact-request'` items. */
-    defineSkill('listContactRequests', async () => {
-      const open = await store.listOpen({ type: 'contact-request' });
-      return { requests: open };
-    }, {
-      description: 'List open contact-add requests addressed to me.',
       visibility:  'authenticated',
     }),
 
@@ -4672,8 +4487,7 @@ export function buildSkills({
      * addContact({webid, pubKey?, handle?, displayName?, trustLevel?, tags?, ...})
      *   — upsert a contact in the calling actor's ContactBook.
      *   Sets `relation: 'contact'` on the MemberMap entry.
-     *   Asymmetric: doesn't notify the contact themselves
-     *   (Phase 24.6 wires the contact-add-request envelope).
+     *   Asymmetric: doesn't notify the contact themselves.
      */
     wire('addContact', {
       description: 'Add or update a 1:1 contact.',

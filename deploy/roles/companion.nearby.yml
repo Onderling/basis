@@ -9,3 +9,5 @@ services:
     environment:
       # browse = see the room and announce nothing; publish[:<duration>] = also be found (the walk needs publish)
       COMPANION_NEARBY: "${COMPANION_NEARBY:-off}"
+      # the radio's fixed data port, the one the box opens in its firewall (box.conf; lib.sh nearby_firewall_rules)
+      COMPANION_NEARBY_PORT: "${COMPANION_NEARBY_PORT:-45210}"

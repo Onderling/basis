@@ -92,11 +92,21 @@ has no compose network, so `relay:8787` and Caddy's `companion:8790` stop resolv
 Caddy (the platform box) refuses it and starts nothing. A personal box dials the shared relay and has neither. The
 banner line `Nearby:` in `docker compose -p onderling logs companion` says what the radio is actually doing.
 
+A phone that finds the companion then connects to it over plain TCP on the radio's data port, which is fixed so a
+firewall can open it: `COMPANION_NEARBY_PORT` (default `45210`). The companion accepts on that port only while it
+announces (a box that is only browsing opens no door) and holds at most a few inbound sockets at once. With ufw on, the
+box needs two rules for the radio, both bound to the home LAN's interface (the one the default route leaves by; never
+Tailscale's, never a bare port): mDNS on 5353/udp and the data port on tcp. `lib.sh nearby_firewall_rules` prints exactly
+those for this box. The router's NAT keeps the internet out regardless, so the exposure is the home LAN only.
+The installer applies them, as root, for a box installed with the radio on. The updater runs as the box user and never
+touches the firewall, so a box that turns the radio on later gets its two rules by hand, once (`sudo ufw` + each printed
+line).
+
 ## The box directory (`/opt/onderling`)
 
 | file | what |
 |---|---|
-| `box.conf` | the profile: `REPOS="name=url#branch …"` and `ROLES="role@repo …"`; optional `COMPANION_NEARBY` (above) |
+| `box.conf` | the profile: `REPOS="name=url#branch …"` and `ROLES="role@repo …"`; optional `COMPANION_NEARBY` and `COMPANION_NEARBY_PORT` (above) |
 | `.env` | secrets + hostnames for compose (`RELAY_DOMAIN`, `POD_DOMAIN`, `ACTIVATE_HOST`, `PORTAL_HOST`, `ACME_EMAIL`, `PRIVATEMODE_API_KEY`, optional `R2_*`/push, the alert chat). **`update.sh` never writes it.** |
 | `state.json` | what is RUNNING: per repo the sha + tag + when, `rolledBack`, `failedRole`, `lastGood` (the last version that passed the health gate) and `previousGood` (the one before it) — the answer to "what are testers on?" |
 | `HOLD` | present ⇒ the updater does nothing. `touch HOLD` before a walk, `rm HOLD` after. |

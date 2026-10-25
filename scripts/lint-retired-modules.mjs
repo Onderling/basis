@@ -37,6 +37,11 @@
  *   (`getAttachmentDataUrl`, `requestAttachment`) — a post's attachment is sealed behind the circle's media gateway;
  *   pinboard's contact lists (six skills, no caller); the `reveal-event` row nothing read.
  *
+ * Retired 2026-10-25 (an export with no import): pinboard's encrypted backup — the `encryptedBackup` and
+ *   `encryptedBackupWizard` ops, the skill and its lib, the web and phone wizards and their state. It sealed the
+ *   person's own posts and member row (no keys, despite its label) into a file nothing could restore. The person's
+ *   backup is the recovery phrase and the circle's recovery file.
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -74,6 +79,7 @@ const RETIRED = [
   { name: 'listContactRequests', re: /['"]listContactRequests['"]/ },
   { name: 'reportPost', re: /['"]reportPost['"]/ },
   { name: 'listReports', re: /['"]listReports['"]/ },
+  { name: 'encryptedBackup', re: /['"]encryptedBackup(?:Wizard)?['"]|from\s+['"][^'"]*encryptedBackup(?:State|Wizard|WizardModal)?(?:\.js)?['"]/ },
   { name: 'getAttachmentDataUrl', re: /['"]getAttachmentDataUrl['"]/ },
   { name: 'requestAttachment', re: /['"]requestAttachment['"]/ },
   { name: 'createContactList', re: /['"]createContactList['"]/ },

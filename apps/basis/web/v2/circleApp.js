@@ -202,7 +202,7 @@ import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 import {
   applyChatFilter, chatFilterChips, normalizeChatFilter, localStorageChatFilterIo,
 } from '../../src/v2/chatFilter.js';
-// key management: reuse the existing encrypted-backup + restore wizards
+// key management: reuse the existing restore wizard
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
 import { renderRecoveryExportWizard, renderRecoveryImportWizard } from '../../src/web/wizards/recoveryFileWizard.js';
@@ -5140,7 +5140,7 @@ function showSettingsCircleChooser() {
   });
 }
 
-// mount one of the existing wizard renderers (encrypted-backup / restore)
+// mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
 function mountMyDataWizard(renderWizard, extra = {}) {

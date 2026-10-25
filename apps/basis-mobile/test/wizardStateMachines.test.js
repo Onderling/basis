@@ -13,7 +13,6 @@ import * as createGroupState         from '../../basis/src/core/wizards/createGr
 import * as joinGroupState           from '../../basis/src/core/wizards/joinGroupState.js';
 import * as restoreFromMnemonicState from '../../basis/src/core/wizards/restoreFromMnemonicState.js';
 import * as postAudienceState        from '../../basis/src/core/wizards/postAudienceState.js';
-import * as encryptedBackupState     from '../../basis/src/core/wizards/encryptedBackupState.js';
 import * as settingsState            from '../../basis/src/core/wizards/settingsState.js';
 
 describe('Bundle F P2 — createGroup state machine', () => {
@@ -127,27 +126,6 @@ describe('Bundle F P2 — postAudience state machine', () => {
     expect(calls[0].op).toBe('postRequest');
     expect(calls[0].args.text).toBe('Hi');
     expect(calls[0].args.kind).toBe('announce');
-  });
-});
-
-describe('Bundle F P2 — encryptedBackup state machine', () => {
-  it('canCreateBackup requires matching passphrase + confirm', () => {
-    const s = encryptedBackupState.initialState();
-    s.passphrase = 'secret';
-    s.confirm    = 'secret';
-    expect(encryptedBackupState.canCreateBackup(s)).toBe(true);
-    s.confirm    = 'mismatch';
-    expect(encryptedBackupState.canCreateBackup(s)).toBe(false);
-  });
-
-  it('submitCreateBackup advances to step 2 on success', async () => {
-    const callSkill = async () => ({ ok: true, blob: 'fake-encrypted-bytes' });
-    const s = encryptedBackupState.initialState();
-    s.passphrase = 'pw';
-    s.confirm    = 'pw';
-    const after = await encryptedBackupState.submitCreateBackup({ state: { ...s }, callSkill });
-    expect(after.step).toBe(2);
-    expect(after.blob).toBe('fake-encrypted-bytes');
   });
 });
 

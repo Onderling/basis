@@ -1,5 +1,11 @@
 # Changelog — @onderling-app/pinboard
 
+## [Unreleased] — the export-only encrypted backup is gone (2026-10-25)
+
+- `encryptedBackup` / `encryptedBackupWizard` and the "Back up my keys" button (web and phone) are deleted. It sealed
+  the person's own posts and member row, not their keys, into a file nothing could restore. **Release note:** the way
+  to keep and restore what is yours is the recovery phrase and the recovery file (Mijn gegevens).
+
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 
 Media Phase 1 anti-drift tail: pinboard's inline-bytes attachments now

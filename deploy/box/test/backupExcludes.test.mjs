@@ -29,4 +29,6 @@ test('the box backup excludes the device runner\'s push store', () => {
   const pushFile = runner.match(/push:\s*path\.join\(dataDir, '([^']+)'\)/)?.[1];
   assert.ok(pushFile, 'the device runner names its push store');
   assert.match(backupCall, new RegExp(`--exclude[ =]${pushFile.replace('.', '\\.')}`), backupCall);
+  // …and the vault passphrase file a box made before kept in the volume (belt and braces: install.sh moves it to .env)
+  assert.match(backupCall, /--exclude[ =]vault\.passphrase/, backupCall);
 });

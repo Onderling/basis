@@ -19,7 +19,7 @@
  *
  * Env:
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)
- *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
+ *   BASIS_VAULT_PASSPHRASE   the vault key, REQUIRED (on a box: BOX_VAULT_PASSPHRASE in its .env); never a file in the data dir
  *   TG_BOT_TOKEN             optional — also answer on Telegram (from the environment only; empty = no Telegram)
  *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
  *   ONDERLING_PROFILE_KIND   `function` on a household bot's own node: its profile is the bot's, its inbox a door
@@ -122,6 +122,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { boxStores } from '../src/v2/boxStorage.js';
+import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
@@ -182,12 +183,16 @@ const linkedTurn = { verify: null };
 
 /** The vault key: the environment if set, else one generated once beside the vault — the machine that
  *  runs unattended holds it, which is the same trust as the disk the vault itself is on. */
-function vaultPassphrase() {
-  if (process.env.BASIS_VAULT_PASSPHRASE) return process.env.BASIS_VAULT_PASSPHRASE;
-  const f = path.join(dataDir, 'vault.passphrase');
-  if (!existsSync(f)) writeFileSync(f, randomBytes(32).toString('base64url'), { mode: 0o600 });
-  return readFileSync(f, 'utf8').trim();
+// The vault passphrase comes from the environment, never a file in the backed-up data directory (boxVaultPassphrase.js).
+// Resolved once, before any vault opens: a misconfigured box stops here, before it writes anything.
+let vaultPass = null;
+try {
+  vaultPass = resolveVaultPassphrase({ env: process.env, dataDir, log: (l) => console.warn(l) });
+} catch (err) {
+  console.error(`[device-runner] ${err?.message ?? err}`);
+  process.exit(1);
 }
+function vaultPassphrase() { return vaultPass; }
 
 /** The prompt-cache secret, made once beside the vault: the model provider derives each person's own cache salt from it,
  *  so the household's calls reuse their prompt's head without anyone sharing a cache with anyone else. */

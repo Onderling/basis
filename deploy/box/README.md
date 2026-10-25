@@ -194,6 +194,17 @@ A restic sidecar snapshots every box volume (relay, pod, companion, assistant, f
 prunes and verifies. No target files ⇒ the run says so and backs up nothing. Restore:
 `docker compose --project-name onderling exec backup sh /backup/backup.sh restore <target> latest /tmp/r`.
 
+**What a restore needs: two secrets, both kept OFF the box.** The restic password (in the target's `.env`) opens the
+snapshot; the vault passphrase (`BOX_VAULT_PASSPHRASE` in `/opt/onderling/.env`) opens the sealed stores inside it. The
+`.env` is not in any snapshot — the backup mounts the named volumes and `state.json` only — so a leaked snapshot alone
+opens nothing. Keep a copy of both somewhere other than the box. What never enters a snapshot at all (`backup.sh`,
+`DEVICE_ONLY`): the device runner's push store and any `vault.passphrase` a box made before still holds.
+
+**The vault passphrase.** `install.sh` writes it into `.env` (a new box gets a fresh one; a box made before kept it as
+`vault.passphrase` in the assistant's volume, and re-running `install.sh` moves it into `.env` once and deletes the
+file — idempotent, the value never printed). The assistant refuses to boot without it, or when `.env` and a left-over
+file disagree. `update.sh` never writes `.env`, so an existing box takes the move only by a re-run of `install.sh`.
+
 ## Tests
 
 `node --test deploy/box/test/` proves the updater against a real git remote and a fake `docker`: no

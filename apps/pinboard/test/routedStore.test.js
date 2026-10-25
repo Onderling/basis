@@ -147,4 +147,18 @@ describe('createRoutedStore — the roster trail lives in its circle\'s store', 
     await routed.update(row.id, { source: { ...row.source, circleAddress: 'addr-9' } }, { actor: ANN });
     expect((await stores.localStore('kring-pod').get(row.id)).source.circleAddress).toBe('addr-9');
   });
+
+  it('a trail row ingested this run is in the next unscoped read, though its circle never opened and the held list came first', async () => {
+    const local = memoryDataSource();
+    const stores = createCircleStores({ dataSource: local, registry: { validate } });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const routed = createRoutedStore({ pile, hostCircles: {
+      storeFor: (c, { write = false } = {}) => (write || stores.has(c) ? stores.getStore(c) : null), circlesOf: () => [],
+      openCircles: () => stores.ids(), heldCircles: () => stores.heldIds(), peekFor: (c) => stores.peek(c),
+      trailStoreFor: (c) => stores.localStore(c),
+    } });
+    expect(await routed.listOpen({ type: 'membership-redemption' })).toEqual([]);   // the held list is taken (empty)
+    await routed.ingestItems([{ id: 'seed-9', ...trail('kring-new') }], { actor: ANN });
+    expect((await routed.listOpen({ type: 'membership-redemption' })).map((r) => r.id)).toEqual(['seed-9']);
+  });
 });

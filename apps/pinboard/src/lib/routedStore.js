@@ -135,8 +135,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     if (!held) held = Promise.resolve(heldCircles()).then((ids) => ids ?? []).catch(() => { held = null; return []; });
     return held;
   };
-  // the circles a post was put in by this store (this run), read beside the memberships: a post may name a circle no
-  // membership lists yet (the home group, a circle being joined)
+  // the circles a row was put in by this store (this run), read beside the memberships: a post may name a circle no
+  // membership lists yet (the home group, a circle being joined), and a trail row lands without opening its circle
   const written = new Set(homeCircle ? [homeCircle] : []);
   const circlesFor = async (filter, actor = null) => {
     const one = typeof filter?.groupId === 'string' && filter.groupId ? filter.groupId : null;
@@ -301,6 +301,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
           : await (async () => { const cs = await Promise.resolve(circleStoreFor(circleOf(it), { write: true })).catch(() => null); return cs ? createTaskStore(circleRowsView(cs, SHARED_TYPES)) : null; })();
         if (!ts) { const r = (await pile.ingestItems([it], ctx)) ?? {}; out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? [])); continue; }
         const r = (await ts.ingestItems([it], ctx)) ?? {};
+        written.add(circleOf(it));   // read beside the open circles from now on (a seed's circle may never open here)
         out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? []));
         if ((r.ingested ?? []).length) { try { pile.emit?.('item-added', (await ts.getById(it.id)) ?? it); } catch { /* a listener never breaks an ingest */ } }
       }

@@ -2637,7 +2637,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
     if (!by) throw new Error(`no self ${pid} on this device`);
     const st = await getOwnStore();
-    return st.put({ type: 'contact-refile', id: `contact-refile:${pid ?? 'default'}:${webid}`, webid, left: true, at }, { by });
+    return st.put({ type: 'contact-refile', id: `contact-refile:${by}:${webid}`, webid, left: true, at }, { by });
   }
   // …and where one LANDS from a device of the person: the contact leaves this self's book here, only while this device
   // still files it under that self and its own filing is older than the move (so arrival order does not matter). Its
@@ -2645,7 +2645,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   async function applyContactLeft(scope, row) {
     const self = selfOfOwnLane(scope);
     if (self === null || typeof row?.webid !== 'string' || !Number.isFinite(row?.at)) return;
-    const pid = self === 'default' || self === primaryId ? null : self;
+    const pid = scope === OWN_DEVICES_SCOPE || self === primaryId ? null : self;
     const mine = (await rawContacts()).find((c) => c?.webid === row.webid);
     if (!mine || (selfOfContactRow(mine) ?? null) !== pid) return;
     const myAt = Number.isFinite(mine.personaAt) ? mine.personaAt : -Infinity;

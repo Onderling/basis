@@ -132,6 +132,7 @@ import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
+import { makeCircleGovernancePeerHandler } from '../src/v2/circleLogReceiver.js';
 import { shareDisclosureToCircle } from '../src/core/handlers/personaPropsUpdate.js';
 import { makeCircleAddressAnnouncePeerHandler, announceOwnCircleAddress, propagateCircleAddressesAfterJoin } from '../src/v2/circleAddressAnnounce.js';
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
@@ -538,6 +539,15 @@ if (relayUrl) {
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     adminsOf: adminsOfViaSkill(callSkill),
   });
+  // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
+  // same reaction for a catch-up batch and a live statement.
+  const govChanged = (cid) => {
+    if (!govRail) return;
+    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
+    circlePolicyLane.apply(cid, govRail)
+      .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
+      .catch(() => {});
+  };
   const lanes = buildCircleLanes({
     agent,
     govRail,
@@ -548,13 +558,7 @@ if (relayUrl) {
       ...await circlePolicyLane.preserved(cid),
     ],
     on: {
-      govChange: (cid) => {
-        if (!govRail) return;
-        applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
-        circlePolicyLane.apply(cid, govRail)
-          .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
-          .catch(() => {});
-      },
+      govChange: (cid) => govChanged(cid),
       // Nothing here asks a person whether to accept a big catch-up: there is no person at this
       // machine, and what it is catching up on is its owner's own circles. Allowing is therefore the
       // honest default rather than a silent refusal that would leave this device permanently behind —
@@ -682,6 +686,11 @@ if (relayUrl) {
   const router = makePeerRouter({
     handlers: {
       ...lanes.handlers,
+      // A live governance statement — a vote, a proposal, a rules or policy update — verified at this device's rail, as
+      // web and mobile register theirs (the catch-up alone would leave an online box behind until its next reconnect)
+      ...(govRail ? { 'circle-governance-broadcast': makeCircleGovernancePeerHandler({
+        eventLog: deviceLog, rail: govRail, onLanded: lanes.landedCarrier?.governance, onChange: govChanged,
+      }) } : {}),
       [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
       [contactChannel.subtypes.out]: contactChannel.messageHandler(landMessage),
       // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin

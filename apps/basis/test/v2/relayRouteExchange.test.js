@@ -15,7 +15,6 @@ import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { signSpine } from '@onderling/core';
-import { reportEntryId } from '../../src/v2/reportModel.js';
 
 const GROUP = 'circle-relay-route';
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -81,10 +80,16 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
 
   it('report: a §8 report event replicates admin -> joiner over the relay', async () => {
     const rid = `r-${rnd()}`;
-    const event = { kind: 'report', event: 'report', reportId: rid, targetType: 'member', targetRef: 'x', reason: 'spam', by: admin.pubKey };
-    await admin.agent.callSkill('pinboard', 'broadcastCircleReport', { groupId: GROUP, event, msgId: reportEntryId(event) });
+    // a report is a SIGNED report-file statement on the governance rail (the transport carries it like a vote)
+    const cid = await admin.agent.circleIdentityFor(GROUP);
+    const event = signSpine(cid, {
+      kind: 'report-file', circleId: GROUP, subject: rid,
+      payload: { targetType: 'member', targetRef: 'x', reason: 'spam', by: admin.pubKey, authorRef: admin.pubKey, at: 1 },
+      parent: null,
+    });
+    await admin.agent.callSkill('pinboard', 'broadcastCircleReport', { groupId: GROUP, event, msgId: `gov:${event.body.hash}` });
     const got = await until(
-      () => joiner.chatEvents.some((e) => e?.type === 'report' && e?.payload?.reportId === rid),
+      () => joiner.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.kind === 'report-file' && e?.payload?.body?.subject === rid),
       { timeout: 10000 },
     );
     expect(got, 'joiner ingested the report event over the relay').toBeTruthy();

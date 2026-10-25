@@ -339,7 +339,7 @@ the hello handshake and the peer maps are all genuinely exercised.
 **Kind:** function · **Import:** `createMdnsNodeBackend` from `'@onderling/transports/mdns-node'`
 
 ```js
-createMdnsNodeBackend({ discovery, host = undefined } = {})
+createMdnsNodeBackend({ discovery, host = undefined, port = 0 } = {})
 ```
 
 Build the Node backend.
@@ -349,6 +349,7 @@ Build the Node backend.
 - `deps` `object`
 - `deps.discovery` `{advertise:Function, browse:Function}` — the DNS-SD seam (see the header)
 - `[deps.host]` `string` — interface to bind (default: all)
+- `[deps.port]` `number` — the TCP port to listen on (default 0: an ephemeral one). A host behind a firewall passes a fixed one, so the rule it opens is known.
 
 **Returns:** `{native: object, emitter: object}` — pass straight into `new MdnsTransport({...})`
 

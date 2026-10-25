@@ -117,9 +117,11 @@ export function createLoopbackDiscovery() {
  * @param {object} deps
  * @param {{advertise:Function, browse:Function}} deps.discovery  the DNS-SD seam (see the header)
  * @param {string} [deps.host]  interface to bind (default: all)
+ * @param {number} [deps.port]  the TCP port to listen on (default 0: an ephemeral one). A host behind a firewall passes
+ *   a fixed one, so the rule it opens is known.
  * @returns {{native: object, emitter: object}}  pass straight into `new MdnsTransport({...})`
  */
-export function createMdnsNodeBackend({ discovery, host = undefined } = {}) {
+export function createMdnsNodeBackend({ discovery, host = undefined, port = 0 } = {}) {
   if (!discovery || typeof discovery.advertise !== 'function' || typeof discovery.browse !== 'function') {
     throw new Error('createMdnsNodeBackend: a discovery seam with advertise() + browse() is required');
   }
@@ -161,7 +163,8 @@ export function createMdnsNodeBackend({ discovery, host = undefined } = {}) {
     server.on('error', fail);
     await new Promise((resolve, reject) => {
       server.once('error', reject);
-      server.listen(0, host, () => { server.off('error', reject); resolve(); });
+      // a fixed port when the host gives one (a firewall has to know what to open); an ephemeral one otherwise
+      server.listen(port, host, () => { server.off('error', reject); resolve(); });
     });
     listenPort = server.address().port;
     return listenPort;

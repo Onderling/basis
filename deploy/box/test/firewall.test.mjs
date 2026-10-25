@@ -47,3 +47,26 @@ test('the installer calls the function instead of naming the rules inline', () =
   assert.ok(!/ufw allow OpenSSH/.test(src), 'the OpenSSH profile name is gone');
   assert.match(src, /firewall_rules "\$ROLES"/);
 });
+
+// The companion's local-network radio on a personal box (the household tablet, 2026-10-25): discovery is mDNS on
+// 5353/udp and the hello is plain TCP on the radio's data port. With ufw on and no rule for either, a phone that
+// found the box could never connect. The rules come from lib.sh, from the same box.conf that turns the radio on.
+const LIB = join(resolve(import.meta.dirname, '..'), 'lib.sh');
+function nearbyRules(env) {
+  const src = readFileSync(LIB, 'utf8');
+  const fns = ['role_names', 'nearby_port', 'nearby_firewall_rules']
+    .map((n) => new RegExp(`^${n}\\(\\) \\{[\\s\\S]*?^\\}|^${n}\\(\\) \\{.*\\}$`, 'm').exec(src));
+  fns.forEach((f, i) => assert.ok(f, `lib.sh defines ${['role_names', 'nearby_port', 'nearby_firewall_rules'][i]}()`));
+  const r = spawnSync('bash', ['-c', `${fns.map((f) => f[0]).join('\n')}\nnearby_firewall_rules`], { encoding: 'utf8', env: { PATH: process.env.PATH, ...env } });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trim().split('\n').filter(Boolean);
+}
+
+test('a box with the radio on opens mDNS and the radio\'s fixed data port — and nothing when it is off', () => {
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis assistant@basis', COMPANION_NEARBY: 'publish:2h' }),
+    ['allow 5353/udp', 'allow 45210/tcp']);
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'browse', COMPANION_NEARBY_PORT: '45333' }),
+    ['allow 5353/udp', 'allow 45333/tcp']);
+  assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'off' }), []);
+  assert.deepEqual(nearbyRules({ ROLES: 'assistant@basis', COMPANION_NEARBY: 'publish' }), [], 'no companion, no radio');
+});

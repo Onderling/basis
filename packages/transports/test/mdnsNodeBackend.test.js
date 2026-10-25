@@ -65,6 +65,18 @@ describe('framing — 4-byte big-endian length prefix', () => {
   });
 });
 
+describe('the data port', () => {
+  // A box behind a firewall needs to know the port to open: an ephemeral one (listen(0)) is refused from the LAN,
+  // so a peer that found the node could still never say hello (the household tablet, 2026-10-25).
+  it('listens on the port it is given, and announces that one', async () => {
+    const discovery = createLoopbackDiscovery();
+    const { native } = createMdnsNodeBackend({ discovery, host: '127.0.0.1', port: 45987 });
+    const port = await native.startAdvertising('_onderling', 'dw-fixed', 'KEY-FIXED');
+    expect(port).toBe(45987);
+    await native.stop?.();
+  });
+});
+
 describe('two Node transports over real sockets', () => {
   const open = [];
   afterEach(async () => { for (const t of open.splice(0)) await t.disconnect().catch(() => {}); });

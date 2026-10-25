@@ -1,5 +1,11 @@
 # Changelog — @onderling-app/pinboard
 
+## [Unreleased] — the noticeboard listing lists posts only (2026-10-25)
+
+- `listOpenRequests` with no `type` or `intent` returns the canonical post types only. Before, it returned every open
+  row of the circle: the rules head, the trail and the admin's membership-code row with its code. Asked for one `type`
+  it answers that type; a secret type (`membership-code`, `post-answers`) is never listed, whatever is asked.
+
 ## [Unreleased] — push subscriptions on the device, the interest profile gone (2026-10-25)
 
 - Push subscriptions live on the device's own sealed push store (`pushStore`), never in pinboard's cache and never on

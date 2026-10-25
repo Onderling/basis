@@ -56,29 +56,6 @@ export async function createGroupWithRules({ store, simulateSync, emitSpine = nu
 }
 
 /**
- * redeemInviteWithGate({store}, {a, from})
- *   — Phase 17 join gate: verify privacy + rules acceptance, then persist a `rules-accept` record BEFORE the
- *   downstream redeem runs. `a` is `{invite, privacyAccepted, rulesAccepted}`; `from` is the accepting caller.
- *   Zero-key (the acceptance record is a plain typed item).
- *
- * @returns {Promise<{ok:true, groupId, acceptanceId}|{error:string}>}
- */
-export async function redeemInviteWithGate({ store }, { a, from } = {}) {
-  if (!a?.invite) return { error: 'invite required' };
-  if (a.privacyAccepted !== true) return { error: 'privacy-not-accepted' };
-  if (a.rulesAccepted   !== true) return { error: 'rules-not-accepted' };
-  const groupId = a.invite?.groupId;
-  if (!groupId) return { error: 'invite missing groupId' };
-  const [item] = await store.addItems([{
-    type:       'rules-accept',
-    text:       `Accepted rules of ${groupId}`,
-    source:     { groupId, acceptedBy: from, acceptedAt: Date.now(), gateVersion: 'phase-17' },
-    visibility: 'household',
-  }], { actor: from });
-  return { ok: true, groupId, acceptanceId: item.id };
-}
-
-/**
  * createGroupV2(deps, {a, from})
  *   — Phase 25.3 self-create: the caller becomes admin; persists the rules (with rotation + storage config
  *   embedded) + mints an initial membership code (returned ONCE). Zero-key — the group content key bootstraps

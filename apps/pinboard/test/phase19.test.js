@@ -46,14 +46,6 @@ describe('Pinboard V1 Phase 19 — closed-beta smoke', () => {
     });
     await bundle.offeringMatch.start();
 
-    // 1. Gated redeem accepts both flags.
-    const gate = await callSkill(bundle.agent, 'redeemInviteWithGate', {
-      invite: { groupId: 'oosterpoort' },
-      privacyAccepted: true,
-      rulesAccepted:   true,
-    });
-    expect(gate.ok).toBe(true);
-
     // 3. Encrypted backup → round-trip with the same passphrase decodes.
     const back = await callSkill(bundle.agent, 'encryptedBackup', { passphrase: 'correct horse battery staple' });
     expect(back.blob).toBeTruthy();

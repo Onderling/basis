@@ -49,7 +49,7 @@ export {
 
 // Circle-creation writers (§8c slice-a, ZERO-KEY) — pure DI lift out of pinboard; the group key bootstraps
 // lazily on the first addMember, so creation moves without the key-custody plumbing.
-export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './circleCreate.js';
+export { createGroupWithRules, createGroupV2 } from './circleCreate.js';
 
 // Key-coupled membership writers (§8c slice-b) — the membership-STATE bodies of the four writers lifted as
 // pure store functions; the single trailing group-key grant/revoke is left as an INJECTED `grantKey`/

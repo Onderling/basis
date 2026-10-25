@@ -292,6 +292,8 @@ export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {
   return {
     publishItem(item) {
       noDowngrade();
+      // a roster-trail row travels by its own proof-keeping carriers, never as a lane snapshot (rosterTrail.js)
+      if (isRosterTrailItem(item)) return undefined;
       if (emitter && item) return emitter.snapshot(circleId, item);
       return undefined;   // no lane → no fan (the write stays local)
     },

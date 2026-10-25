@@ -81,7 +81,7 @@ import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriReq
 import {
   createCircleFanOut, recordCircleAddress, fanCircleAddresses,
   listCircleRoster, listCircleMembers,
-  createGroupWithRules, createGroupV2, redeemInviteWithGate,
+  createGroupWithRules, createGroupV2,
   redeemMembershipCode as redeemMembershipCodeCore,
   verifyMembershipCodeForPeer as verifyMembershipCodeForPeerCore,
   leaveGroup as leaveGroupCore,
@@ -3285,56 +3285,19 @@ export function buildSkills({
 
     /**
      * acceptGroupRules({groupId})
-     *   — the calling actor read + accepted the circle's CURRENT rules. TWO records of the one act:
-     *   the V1 audit item (kind: 'rules-accept', what getOnboardingState reads) as always, PLUS —
-     *   when the circle currently has HUMAN rules and the membership rail is wired — the member's own
-     *   signed `rules-accept` statement on the membership spine, which supersedes the version on their
-     *   signed join on EVERY device (the re-accept half of the rules-acceptance decision, 2026-08-20).
-     *   The spine half is best-effort by the legacy contract: no rules doc / no rail still returns the
-     *   audit id; `rulesAccepted` rides the result only when the statement was emitted.
+     *   — the calling actor read + accepted the circle's CURRENT rules: the member's own signed `rules-accept`
+     *   statement on the membership spine, which supersedes the version on their signed join on EVERY device (the
+     *   re-accept half of the rules-acceptance decision, 2026-08-20). The statement is the one record of the act;
+     *   `rulesAccepted` rides the result when it was emitted, and the core's refusal (no human rules, no rail) is said.
      */
     defineSkill('acceptGroupRules', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      const [item] = await store.addItems(
-        [{
-          type:       'rules-accept',
-          text:       `Accepted rules of ${a.groupId}`,
-          source:     { groupId: a.groupId, acceptedBy: from, acceptedAt: Date.now() },
-          visibility: 'household',
-        }],
-        { actor: from },
-      );
       const spine = await acceptGroupRulesCore({ store, emitSpine }, { a, from });
-      return {
-        acceptanceId: item.id,
-        ...(spine?.ok ? { rulesAccepted: spine.rulesAccepted } : {}),
-        _sync: simulateSync(),
-      };
+      if (!spine?.ok) return { error: spine?.error ?? 'not-accepted', _sync: simulateSync() };
+      return { ok: true, rulesAccepted: spine.rulesAccepted, _sync: simulateSync() };
     }, {
-      description: 'Accept the circle\'s current rules: the V1 audit item + (when rules-gated) the member\'s signed rules-accept on the membership spine.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getOnboardingState()
-     *   — light status report the first-run UI uses to decide which
-     *   step to show next.
-     */
-    defineSkill('getOnboardingState', async ({ from }) => {
-      const me = members ? await members.resolveByWebid(from) : null;
-      const acceptances = await store.listOpen({ type: 'rules-accept' });
-      const accepted = acceptances
-        .filter(i => i.source?.acceptedBy === from)
-        .map(i => i.source?.groupId);
-      return {
-        handleSet:        !!me?.handle,
-        displayNameSet:   !!me?.displayName,
-        groupsAccepted:   accepted,
-        currentGroupId:   groupId,
-      };
-    }, {
-      description: 'Light status report driving the first-run wizard.',
+      description: 'Accept the circle\'s current rules: the member\'s signed rules-accept on the membership spine.',
       visibility:  'authenticated',
     }),
 
@@ -4624,23 +4587,6 @@ export function buildSkills({
       return { requests: open };
     }, {
       description: 'List open contact-add requests addressed to me.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * redeemInviteWithGate({invite, privacyAccepted, rulesAccepted})
-     *   — Phase-17 onboarding-gated invite redeem.  BOTH flags MUST
-     *   be `true` (user explicitly tapped Akkoord on privacy notice +
-     *   group rules); rejects otherwise.  Records the acceptance as
-     *   a `kind: 'rules-accept'` audit item; the actual GroupManager
-     *   redemption is `redeemInvite` (existing) called by the UI
-     *   after this gate clears.
-     */
-    defineSkill('redeemInviteWithGate', async ({ parts, from }) => {
-      // Thin wrapper: the join rules-gate lives in `@onderling/circles` (`redeemInviteWithGate`, §8c slice-a).
-      return redeemInviteWithGate({ store }, { a: dataArgs(parts), from });
-    }, {
-      description: 'Phase 17 gated redeem — verify privacy + rules acceptance before downstream redeem.',
       visibility:  'authenticated',
     }),
 

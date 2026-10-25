@@ -182,7 +182,6 @@ describe('pinboard manifest — Slice D.1 structural invariants', () => {
       'lend',
       'report',
       'group-rules',
-      'rules-accept',
       'group-leave',
       'request',
       'post',

@@ -32,6 +32,6 @@ describe('a door reaches declared ops only', () => {
     expect(declared?.refusal, JSON.stringify(declared)).toBeUndefined();
     const own = await a.callSkill('pinboard', 'scorePostRelevance', { text: 'x', categoryId: 'tuin' });
     expect(own?.refusal).toBeUndefined();
-    expect(own).toHaveProperty('layer1');
+    expect(own).toHaveProperty('matched');
   }, 60_000);
 });

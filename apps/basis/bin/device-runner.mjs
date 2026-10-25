@@ -217,6 +217,7 @@ const contentPaths = {
   tasks:     path.join(dataDir, 'tasks-items.json'),
   settings:  path.join(dataDir, 'settings.json'),
   outbox:    path.join(dataDir, 'outbox.json'),
+  push:      path.join(dataDir, 'push-device.json'),   // push subscriptions: this device's own, never synced
 };
 // The stores that are not item stores — the device log, the contact DM state, the circle policy — sealed at rest
 // like the item stores, composed once in `boxStores` (the at-rest test uses the same function).
@@ -254,6 +255,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-own-devices': stores.paths.ownDevices,
     'cc-outbox-state': contentPaths.outbox,
     'cc-outbox-cache': contentPaths.outbox,
+    'cc-push-device': contentPaths.push,
     'cc-settings-state': contentPaths.settings,
     'cc-settings-cache': contentPaths.settings,
     'cc-pinboard-state': contentPaths.pinboard,
@@ -323,6 +325,7 @@ const agent = await createRealHouseholdAgent({
   tasksPersistDb:     { path: contentPaths.tasks },
   settingsPersistDb:  { path: contentPaths.settings },
   outboxPersistDb:    { path: contentPaths.outbox },
+  pinboardPushPersistDb: { path: contentPaths.push },
   deviceLog,
   deviceLogIo: stores.deviceLogIo,
   // The lists' default table (and basis's) speak through this translator: a reply to Telegram is a sentence,

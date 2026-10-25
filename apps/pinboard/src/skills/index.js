@@ -131,7 +131,6 @@ import {
   toBroadcastShape,
   MAX_ATTACHMENTS_PER_POST,
 } from '../lib/Attachments.js';
-import { update as updateInterest, score as scoreInterest, combinedRelevance } from '../lib/InterestProfile.js';
 import { encodeContactCard, decodeContactCard } from '../lib/contactCard.js';
 
 /**
@@ -1191,12 +1190,6 @@ async function respondToItemCore(scope, a, ctx) {
     subtype:  'chat-message',
   });
   if (!r.ok) return { error: r.reason };
-
-  // Phase 22: feed the post body into my Layer-2 interest profile —
-  // responding is the canonical "I care about this" signal.
-  if (bundle?.interestProfile && typeof post.text === 'string') {
-    try { updateInterest(bundle.interestProfile, post.text); } catch {}
-  }
 
   // `toPubKey` names the poster so the shell can open (and persist into) the contact thread the
   // reply starts — the answer to a post is a 1:1 conversation with its author.
@@ -4756,13 +4749,12 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /* ── Phase 22: Layer-2 personal interest matching ──────────── */
+    /* ── Post relevance ──────────────────────────────────────────── */
 
     /**
      * scorePostRelevance({ text, categoryId?, tags?, circleId? })
-     *   — Combines Layer 1 (does it meet what I offer: the host's `matchesMine` over the drivers of the self I am in
-     *   that circle) with Layer 2 (TF-IDF over the user's response history).  Returns `{matched, ...}` with
-     *   `via: 'offering'|'interest'` when matched, plus the raw `layer2Score` for inspection.
+     *   — Does the post meet what I offer: the host's `matchesMine` over the drivers of the self I am in that circle.
+     *   Returns `{matched, via: 'offering'}` on a match, `{matched: false, reason}` otherwise.
      */
     defineSkill('scorePostRelevance', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -4775,49 +4767,9 @@ export function buildSkills({
       const mine = typeof bundle?.matchesMine === 'function'
         ? await bundle.matchesMine(a.circleId ?? null, { text: a.text, categoryId: a.categoryId ?? null, skillTags: Array.isArray(a.tags) ? a.tags : [] }).catch(() => false)
         : false;
-      const layer1 = mine ? { matched: true, via: 'offering' } : { matched: false, reason: 'no-offering-match' };
-      const layer2 = bundle?.interestProfile
-        ? scoreInterest(bundle.interestProfile, a.text)
-        : 0;
-      const combined = combinedRelevance(layer1, layer2, a.threshold ?? 0.15);
-      return { ...combined, layer1, layer2 };
+      return mine ? { matched: true, via: 'offering' } : { matched: false, reason: 'no-offering-match' };
     }, {
-      description: 'Layer-1 + Layer-2 relevance score for a post body.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getInterestProfile()
-     *   — Read-only snapshot of the bundle's Layer-2 profile.  Used
-     *   by /interests.html for inspection + a "reset" button.
-     */
-    defineSkill('getInterestProfile', async () => {
-      const p = bundle?.interestProfile ?? { docFrequency: {}, totalDocs: 0, centroidTerm: {} };
-      const top = Object.entries(p.centroidTerm ?? {})
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 30)
-        .map(([term, weight]) => ({ term, weight }));
-      return { totalDocs: p.totalDocs, topTerms: top };
-    }, {
-      description: 'Read-only snapshot of the Layer-2 interest profile.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * resetInterestProfile()
-     *   — Wipe the profile.  Useful for users who want to start over.
-     */
-    defineSkill('resetInterestProfile', async () => {
-      if (bundle?.interestProfile) {
-        bundle.interestProfile.docFrequency = {};
-        bundle.interestProfile.centroidTerm = {};
-        bundle.interestProfile.totalDocs    = 0;
-        bundle.interestProfile.centroidNorm = null;
-      }
-      metrics?.record?.('interest-profile-reset');
-      return { ok: true };
-    }, {
-      description: 'Reset the Layer-2 interest profile.',
+      description: 'Does a post body meet what I offer (my drivers in that circle).',
       visibility:  'authenticated',
     }),
 

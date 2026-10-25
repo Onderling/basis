@@ -56,14 +56,13 @@ describe('podPathMap.classify/unclassify', () => {
       storageFn: 'private/state', tail: 'pinboard/reveals.json',
     });
     expect(unclassify('private/state', 'pinboard/reveals.json')).toBe('mem://pinboard/reveals.json');
-    roundtrip('mem://pinboard/push-subscriptions.json');
-    roundtrip('mem://pinboard/interest-profile.json');
     roundtrip('mem://pinboard/avatars/alice.png');
   });
 
   it('returns null for out-of-scope / unroutable keys', () => {
     expect(classify('mem://pinboard/settings/shared.json')).toBeNull();      // cross-app-settings.md owns these
     expect(classify('mem://pinboard/settings/devices/d.json')).toBeNull();
+    expect(classify('mem://pinboard/push-subscriptions.json')).toBeNull();  // a device's own: it never reaches a pod
     expect(classify('mem://neighbourhood/weird/x')).toBeNull();
     expect(classify('not-a-mem-key')).toBeNull();
     // circle-scoped key but no active circle → skip (don't half-route)

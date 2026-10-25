@@ -131,6 +131,10 @@ describe("a persona's contact book, per self", () => {
     for (const n of [box]) await n.agent.knownPeersSync.requestFromSiblings();
     const back = await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? true : null), { timeout: 30_000, step: 300 });
     expect(back, 'filed back under the general self, the friend is on the box again').toBe(true);
+    // the phone's clear is an own-store DELETE that rides the general self's own lane: the box drops its copy of the left
+    // mark too (else it would refuse the next plain re-add of this contact for ever)
+    const markGone = await until(async () => ((((await (await box.agent.ownStore()).list?.()) ?? []).some((r) => r?.type === 'contact-refile' && r.webid === friend)) ? null : true), { timeout: 30_000, step: 300 });
+    expect(markGone, "the general self's left mark is gone on the box too").toBe(true);
   }, 120_000);
 
   it("a W contact's turn reaches the laptop and never the box; a general contact's reaches both", async () => {

@@ -316,9 +316,7 @@ import { splitBySight, SIGHT } from '../../../../basis/src/v2/circleSight.js';
 import { makeSyncSelection } from '../../../../basis/src/v2/syncSelection.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
-import { bindCircleGovernance, openPolicyProposals } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
-import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
-import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
+import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
 import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
@@ -984,13 +982,7 @@ export default function CircleLauncherScreen({
   const fileCircleReportMobile = useCallback(async (targetType, targetRef, targetLabel = null, reason = '') => {
     const circleId = selected?.id; if (!circleId || !targetRef) return;
     try {
-      const broadcast = (channel, cid, event, opts) => {
-        const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-        const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
-        // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
-        const to = Array.isArray(opts?.to) ? opts.to : undefined;
-        bundle?.callSkill?.('pinboard', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
-      };
+      const broadcast = makeGovernanceBroadcast((...a) => bundle?.callSkill?.(...a));   // the one shared fan
       const gov = bindCircleGovernance({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
         myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
@@ -1118,12 +1110,7 @@ export default function CircleLauncherScreen({
   // wired setPolicy enactor) apply-on-approval; proposals cross devices because the events fan.
   const govPolicy = useMemo(() => {
     if (!bundle?.callSkill || !eventLog) return null;
-    const broadcast = (channel, cid, event, opts) => {
-      const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-      const msgId = event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event);
-      const to = Array.isArray(opts?.to) ? opts.to : undefined;
-      bundle.callSkill('pinboard', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
-    };
+    const broadcast = makeGovernanceBroadcast((...a) => bundle.callSkill(...a));   // the one shared fan
     return bindCircleGovernance({
       eventLog, callSkill: bundle.callSkill, getPolicy: (cid) => policyStore.get(cid),
       myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,

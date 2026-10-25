@@ -18,9 +18,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { sectionsOf } from '../../../../basis/src/v2/screenSections.js';
 import { useTheme } from './themeContext.js';
-import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';
-import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
-import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
+import { bindCircleGovernance, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';
 import { buildSubjectLabeler, deadlineLine } from '../../../../basis/src/v2/governanceView.js';
 import { dateLocaleOf } from '../../../../basis/src/v2/whenWords.js';
 import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
@@ -37,13 +35,7 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
   const load = useCallback(async () => {
     let myWebid = '';
     try { const r = await callSkill('pinboard', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-    const broadcast = (channel, circleId, event, opts) => {
-      const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-      const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
-      // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
-      const to = Array.isArray(opts?.to) ? opts.to : undefined;
-      callSkill('pinboard', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
-    };
+    const broadcast = makeGovernanceBroadcast(callSkill);   // the one shared fan (web parity by construction)
     const gov = bindCircleGovernance({
       // the self this device is in each circle (a persona's circle is the persona's) — the launcher hands `selfIn`
       eventLog, callSkill, getPolicy, myRef: (cid) => (typeof selfIn === 'function' ? selfIn(cid) : null) ?? myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,

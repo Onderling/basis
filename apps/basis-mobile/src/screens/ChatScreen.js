@@ -64,7 +64,7 @@ import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { useTheme }          from './v2/themeContext.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
-import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
@@ -870,7 +870,6 @@ export default function ChatScreen({
           }),
         };
       })(),
-      'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({
       ensureDmThread:    handleDmThreadOpen,

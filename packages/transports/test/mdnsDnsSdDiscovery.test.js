@@ -12,7 +12,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { SERVICE_TYPE } from '../src/MdnsTransport.js';
-import { createDnsSdDiscovery, dnsSdType } from '../src/mdnsDnsSdDiscovery.js';
+import { createDnsSdDiscovery, dnsSdType, srvHost } from '../src/mdnsDnsSdDiscovery.js';
 
 /** A stand-in for the library: records what was published, and lets a test push discoveries. */
 function fakeBonjour() {
@@ -60,6 +60,21 @@ describe('advertise', () => {
     expect(bonjour.published[0]).toMatchObject({
       name: 'dw-laptop', type: 'onderling', protocol: 'tcp', port: 51234, txt: { pubKey: 'KEY-A' },
     });
+  });
+
+  // Found on the household tablet (2026-10-25): published without a host, the library put the bare `surface-go.` in the
+  // SRV record, so every resolver — the phone's Android NSD included — went to unicast DNS for it and found nothing.
+  it("publishes the SRV target as this host's .local name, so a resolver answers it over mDNS", async () => {
+    const bonjour = fakeBonjour();
+    const d = createDnsSdDiscovery({ bonjour, hostname: () => 'surface-go' });
+    await d.advertise({ serviceType: SERVICE_TYPE, serviceName: 'dw-x', port: 45113, txt: { pubKey: 'K' } });
+    expect(bonjour.published[0].host).toBe('surface-go.local');
+  });
+
+  it('does not double a host name that already ends in .local (the laptop case)', () => {
+    expect(srvHost('Fritss-MacBook.local')).toBe('Fritss-MacBook.local');
+    expect(srvHost('surface-go')).toBe('surface-go.local');
+    expect(srvHost('surface-go.')).toBe('surface-go.local');
   });
 
   it('returns a stop that unpublishes', async () => {

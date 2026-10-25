@@ -111,7 +111,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     taskStores.set(circleId, createTaskStore(circleRowsView(cs)));
     return taskStores.get(circleId);
   };
-  // the circles that hold rows here, listed once a run (a listing of the backing): what opens later is in `openCircles`
+  // the circles that hold rows here, listed once a run (a listing of the backing): what opens later is in `openCircles`.
+  // Only circles on the SHARED local backing are listed: a circle on its own backing (a pod-backed circle) is read once open.
   let held = null;
   const heldHere = async () => {
     if (typeof heldCircles !== 'function') return [];

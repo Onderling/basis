@@ -148,7 +148,6 @@ export async function redeemMembershipCode({
     text:       `${from} redeemed membership code for ${a.groupId}`,
     source:     {
       groupId:   a.groupId,
-      code:      a.code,
       codeId:    valid.id,
       redeemedBy: from,
       // WHO ADMITTED THEM — the admin who issued the code. The peer path has always recorded this;
@@ -349,7 +348,6 @@ export async function verifyMembershipCodeForPeer({
       text:       `${a.requesterWebid} redeemed (via peer) membership code for ${a.groupId}`,
       source:     {
         groupId:        a.groupId,
-        code:           a.code,
         codeId:         valid.id,
         redeemedBy:     a.requesterWebid,
         redeemedAt:     now,

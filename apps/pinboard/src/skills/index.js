@@ -411,7 +411,7 @@ async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebi
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const redeemers = redeemersOfCode({
-    redemptions, groupId, codeId: codeItem?.id ?? null, code: codeItem?.source?.code ?? null,
+    redemptions, groupId, codeId: codeItem?.id ?? null,
   });
   const already = requesterWebid ? redeemers.get(requesterWebid) ?? null : null;
   if (already) {
@@ -2804,7 +2804,7 @@ export function buildSkills({
         text:       `${from} (peer-confirmed) for ${a.groupId}`,
         source:     {
           groupId:     a.groupId,
-          code:        a.code,
+          // the code is an admin's secret and this row lives in the circle's store: it names the code by id only
           codeId:      a.codeId ?? null,
           redeemedBy:  from,
           redeemedAt:  Date.now(),

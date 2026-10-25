@@ -184,7 +184,6 @@ export default function ChatScreen({
   // The receiver path here routes through it; rehydrator + future catch-up paths
   // share the same instance so dedup state is unified.  Pre-ε.1 prop name
   // `circleChatDedup` no longer exists — App.js owns the inbox now.
-  circleChatInbox = null,
   chatStoredReceipt = null,   // the App-owned receipt sender — shared with the inbox (one policy, two paths)
   // Delivery honesty — the shared per-message map (App.js owns it); inbound receipts advance it here.
   deliveryStateMap = null,

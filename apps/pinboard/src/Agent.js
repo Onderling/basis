@@ -33,10 +33,8 @@ import { pickPersist }       from './lib/persistPicker.js';
 import { sealedPersist }    from '@onderling/local-store';   // content is sealed on the way to disk, plaintext in the cache
 import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
-import { createProfile }     from './lib/InterestProfile.js';
 import { MemberMapCache }    from './lib/MemberMapCache.js';
 import { RevealsCache }      from './lib/RevealsCache.js';
-import { InterestProfileCache } from './lib/InterestProfileCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
 import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
 import { createContactBook } from './lib/ContactBook.js';
@@ -537,10 +535,6 @@ export async function createNeighbourhoodAgent({
     pushSender,                     // Phase 21 — relay.PushSender (WebPushSender by default when webPush keys supplied)
     expoPushSender,                 // S6.6 — relay.PushSender for Expo tokens (mobile-native), when expoPush supplied
     webPushPublicKey: webPush?.publicKey ?? null,
-    interestProfile:       cache    // Phase 22 + 29.2 — TF-IDF profile (loaded + write-through when cache present)
-      ? await InterestProfileCache.load({ dataSource: cache })
-      : createProfile(),
-    interestProfileDetach: null,    // populated below when cache wires
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
     revealsDetach,                     // Phase 29.1 — call on shutdown to stop persisting reveals
     settings: cache                    // Phase 23.5 + 33 — split across shared + device blobs
@@ -550,16 +544,6 @@ export async function createNeighbourhoodAgent({
       ? createContactBook({ members, dataSource: cache })
       : null,
   };
-
-  // Phase 29.2 — wire the InterestProfile write-through after the
-  // bundle (and therefore `bundle.interestProfile`) exists.
-  if (cache) {
-    const ipDetach = InterestProfileCache.attach({
-      profile: bundle.interestProfile, dataSource: cache,
-    });
-    bundle.interestProfileDetach = ipDetach.detach;
-    bundle.interestProfileFlushNow = ipDetach.flushNow;
-  }
 
   // track bulk-sync state on the bundle so the UI
   // can poll it via the `getBulkSyncStatus` skill.  Phase: 'idle'

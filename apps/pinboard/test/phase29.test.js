@@ -2,7 +2,6 @@
  * Pinboard V2 — Phase 29 tests.
  *
  *   29.1  RevealsCache: round-trip; cold-boot hydration
- *   29.2  InterestProfileCache: debounced write; cold-boot hydration
  *   29.3  PushRegistryCache: round-trip; cold-boot hydration
  *   29.4  All three flush to a stubbed pod source on attachInner
  *         (the existing Phase 23.6 pattern, now covering more entities)
@@ -16,9 +15,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
-import { update as updateInterest } from '../src/lib/InterestProfile.js';
 import { RevealsCache, REVEALS_STORAGE_PATH } from '../src/lib/RevealsCache.js';
-import { InterestProfileCache, INTEREST_PROFILE_STORAGE_PATH } from '../src/lib/InterestProfileCache.js';
 import { PushRegistryCache, PUSH_REGISTRY_STORAGE_PATH } from '../src/lib/PushRegistryCache.js';
 
 const ANNE = 'https://id.example/anne';
@@ -99,59 +96,6 @@ describe('Pinboard V2 Phase 29.1 — RevealsCache', () => {
       const decision = b2.reveals.decide({ peerWebid: BOB });
       expect(decision.showDisplayName).toBe(true);
     } finally { await cleanup(); }
-  });
-});
-
-/* ── 29.2 InterestProfileCache ─────────────────────────────── */
-
-describe('Pinboard V2 Phase 29.2 — InterestProfileCache', () => {
-  it('writes through after debounce window via flushNow', async () => {
-    const bundle = await buildBundle();
-    updateInterest(bundle.interestProfile, 'fiets band lekker plak');
-    expect(bundle.interestProfileFlushNow).toBeTypeOf('function');
-    bundle.interestProfileFlushNow();
-    // The write goes via dataSource.write — synchronous-with-pending-promise.
-    await new Promise(r => setTimeout(r, 10));
-    const raw = await bundle.cache.read(INTEREST_PROFILE_STORAGE_PATH);
-    expect(raw).toBeTruthy();
-    const parsed = JSON.parse(raw);
-    expect(parsed.totalDocs).toBe(1);
-    expect(parsed.centroidTerm.fiets).toBeGreaterThan(0);
-  });
-
-  it('cold-boot bundle hydrates InterestProfile from disk', async () => {
-    const { dir, cleanup } = await makeTmpDir();
-    try {
-      const b1 = await buildBundle({ persistPath: dir });
-      updateInterest(b1.interestProfile, 'kun je mijn fiets repareren?');
-      updateInterest(b1.interestProfile, 'fiets band');
-      b1.interestProfileFlushNow();
-      await onDisk(dir, 'fiets');
-      const b2 = await buildBundle({ persistPath: dir });
-      expect(b2.interestProfile.totalDocs).toBe(2);
-      expect(b2.interestProfile.centroidTerm.fiets).toBeGreaterThanOrEqual(2);
-    } finally { await cleanup(); }
-  });
-
-  it('debounces — multiple updates within window produce one save', async () => {
-    let writes = 0;
-    const tinyDataSource = {
-      async read()  { return null; },
-      async write() { writes += 1; },
-      async delete() {},
-      async list() { return []; },
-    };
-    const profile = await InterestProfileCache.load({ dataSource: tinyDataSource });
-    const { detach, flushNow } = InterestProfileCache.attach({
-      profile, dataSource: tinyDataSource, debounceMs: 50,
-    });
-    updateInterest(profile, 'a b c');
-    updateInterest(profile, 'd e f');
-    updateInterest(profile, 'g h i');
-    expect(writes).toBe(0);                  // still pending
-    flushNow();
-    expect(writes).toBe(1);                  // 3 updates → 1 write
-    detach();
   });
 });
 

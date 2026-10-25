@@ -34,6 +34,10 @@
  *   `listContactRequests`). Pinboard's report rows (`reportPost`, `listReports`): a report is a signed statement on the
  *   governance rail, for the circle's admins and its reporter only.
  *
+ * Retired 2026-10-25 (a learned profile nothing read): pinboard's Layer-2 interest profile (InterestProfile,
+ *   InterestProfileCache, `getInterestProfile`, `resetInterestProfile`) and basis's one-time interests migration. It
+ *   learned from every answered post; `scorePostRelevance` answers from the person's own offerings only.
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -71,6 +75,10 @@ const RETIRED = [
   { name: 'listContactRequests', re: /['"]listContactRequests['"]/ },
   { name: 'reportPost', re: /['"]reportPost['"]/ },
   { name: 'listReports', re: /['"]listReports['"]/ },
+  { name: 'InterestProfile', re: /from\s+['"][^'"]*InterestProfile(?:Cache)?(?:\.js)?['"]/ },
+  { name: 'getInterestProfile', re: /['"]getInterestProfile['"]/ },
+  { name: 'resetInterestProfile', re: /['"]resetInterestProfile['"]/ },
+  { name: 'interestsMigration', re: /from\s+['"][^'"]*interestsMigration(?:\.js)?['"]|migrateInterests\s*\(/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

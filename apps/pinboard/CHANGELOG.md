@@ -6,6 +6,12 @@
   the person's own posts and member row, not their keys, into a file nothing could restore. **Release note:** the way
   to keep and restore what is yours is the recovery phrase and the recovery file (Mijn gegevens).
 
+## [Unreleased] — the noticeboard listing lists posts only (2026-10-25)
+
+- `listOpenRequests` with no `type` or `intent` returns the canonical post types only. Before, it returned every open
+  row of the circle: the rules head, the trail and the admin's membership-code row with its code. Asked for one `type`
+  it answers that type; a secret type (`membership-code`, `post-answers`) is never listed, whatever is asked.
+
 ## [Unreleased] — push subscriptions on the device, the interest profile gone (2026-10-25)
 
 - Push subscriptions live on the device's own sealed push store (`pushStore`), never in pinboard's cache and never on
@@ -17,6 +23,9 @@
 - The viewer-side Reveals are deleted: the `setPeerReveal` op and its `/reveal` slash, `setGroupReveal`,
   `requestReveal`, `getMyReveals`, RevealsCache, item hydration (`addedByDisplay` and siblings) and the roster's
   `viewerNameOptIn`. Nothing read them. A name is disclosed by the persona/disclosure release only.
+- A contact re-filed under another self no longer leaves a record in the book (`listRefiledContacts` and
+  `refiled.json` are gone). The host writes one `contact-refile` row to the own-devices store, as the self the
+  contact left; that self's devices drop it from their book where the row lands.
 
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 

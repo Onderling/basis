@@ -60,7 +60,11 @@ import {
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
 import { sealingPublicKeyFromNetworkKey as deriveSealingKeyFromAddress } from '@onderling/pod-client';   // one sealing key family: the join grant wraps to the proven address's image
-import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
+import { validateCanonical, isNoticeboardPost, isNoticeboardPostType } from '@onderling/item-types';
+
+// Rows no listing hands out, whatever it is asked for: the admin's invite code (the code itself is in it) and the poster's
+// record of who answered. Each is read where it is used (the invite and redeem paths; the poster's own reads).
+const SECRET_ROW_TYPES = Object.freeze(['membership-code', 'post-answers']);
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
@@ -1930,8 +1934,12 @@ export function buildSkills({
     // (ask/offer/lend), so wireSkill would throw. Kept hand-written.
     defineSkill('listOpenRequests', async ({ parts, from }) => {
       const a = dataArgs(parts);
+      // A secret row is never listed, whatever is asked: the admin's invite code, who answered my post.
+      if (typeof a.type === 'string' && SECRET_ROW_TYPES.includes(a.type)) return { items: [], _sync: simulateSync() };
       const filter = {};
       if (a.skill) filter.requiredSkill = a.skill;
+      // asked for one type (the roster seed reads the trail this way), that type
+      if (typeof a.type === 'string' && a.type && !a.intent) filter.type = a.type;
       let kindPostFilter = null;
       if (a.intent) {
         const canon = intentToCanonicalDraft(a.intent);
@@ -1944,13 +1952,15 @@ export function buildSkills({
           kindPostFilter = canon.kind;
         }
       }
-      const open = await store.listOpen(filter);
+      const open = (await store.listOpen(filter)).filter((it) => !SECRET_ROW_TYPES.includes(it?.type))
+        // no type asked: the noticeboard's posts only — never a circle's rules head, trail or other bookkeeping
+        .filter((it) => filter.type || isNoticeboardPostType(it));
       const matched = kindPostFilter
         ? open.filter((it) => it.kind === kindPostFilter)
         : open;
       return { items: decorateWithLastSync(matched), _sync: simulateSync() };
     }, {
-      description: 'List open requests; optional `skill` + `intent` filters.',
+      description: 'List open posts; optional `skill` + `intent` filters, or one `type`.',
       visibility:  'authenticated',
     }),
 
@@ -4226,9 +4236,9 @@ export function buildSkills({
     }),
 
     /**
-     * forgetContact({webid}) / listRefiledContacts() — the HOST's own, never a peer's: a contact re-filed under a self
-     * this device does not hold leaves this self's book (its contact facets; the member row stays), and the book's
-     * record of where its contacts were filed before a move is what the own-devices lane tells the old self's devices.
+     * forgetContact({webid}) — the HOST's own, never a peer's: a contact re-filed under a self this device does not
+     * hold leaves this self's book (its contact facets; the member row stays). The host calls it where the own-devices
+     * lane lands the old self's `contact-refile` row.
      */
     defineSkill('forgetContact', async ({ parts, from }) => {
       if (!from || from !== localActor) return { error: 'not-yours' };
@@ -4238,14 +4248,6 @@ export function buildSkills({
       catch (err) { return { error: err?.message ?? String(err) }; }
     }, {
       description: "The host's own: drop a contact re-filed under a self this device does not hold (the member row stays).",
-      visibility:  'authenticated',
-    }),
-    defineSkill('listRefiledContacts', async ({ from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts?.listRefiled) return { refiled: [] };
-      return { refiled: await bundle.contacts.listRefiled() };
-    }, {
-      description: "The host's own: the contacts re-filed under another persona here (webid, where they were filed, when).",
       visibility:  'authenticated',
     }),
 

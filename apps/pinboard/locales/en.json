@@ -445,12 +445,6 @@
     "recovery_heading":       { "text": "Recovery & backup", "doc": "H2 above the recovery section." },
     "recovery_intro_html":    { "text": "Your <strong>recovery phrase</strong> is the only way to get your account back on a new device. We show it <em>once</em> — write it down and keep it somewhere safe (don't screenshot).", "doc": "Lead paragraph for the recovery section. Contains <strong> + <em> tags." },
 
-    "backup_heading":         { "text": "Encrypted backup", "doc": "H3 above the encrypted-backup form." },
-    "backup_intro":           { "text": "Create a backup file that only you can open with your password. The password never leaves this device.", "doc": "Lead paragraph for the encrypted-backup form." },
-    "backup_password_label":  { "text": "Password (min. 8 chars)", "doc": "Label of the backup-password input." },
-    "backup_download":        { "text": "Download backup", "doc": "Submit button for the encrypted-backup form." },
-    "backup_encrypting":      { "text": "Encrypting…", "doc": "Inline status while the encryptedBackup skill is running." },
-    "backup_downloaded":      { "text": "Backup downloaded. Keep the file and your password separately.", "doc": "Inline confirmation after a successful backup download." },
 
     "my_pods_heading":            { "text": "My Solid pods", "doc": "A6 — heading of the My-Solid-pods section on /profile.html." },
     "my_pods_loading":            { "text": "Loading…", "doc": "Initial placeholder under the My-Solid-pods heading." },

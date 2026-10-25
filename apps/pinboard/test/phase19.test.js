@@ -7,7 +7,6 @@
  *
  *   1. Member redeems via the gated path (privacy + rules).
  *   2. One-shot recovery-phrase reveal works once, then locks.
- *   3. Encrypted backup produces a non-empty blob.
  *   4. Posting an `ask` is captured by metrics.
  *   5. `getMetrics` skill exposes the snapshot.
  *
@@ -20,7 +19,6 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
-import { decryptBackup }            from '../src/lib/encryptedBackup.js';
 
 const ANNE = 'https://id.example/anne';
 
@@ -36,7 +34,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
 }
 
 describe('Pinboard V1 Phase 19 — closed-beta smoke', () => {
-  it('runbook flow: gate → backup → post → metrics', async () => {
+  it('runbook flow: gate → post → metrics', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
     const tx = new InternalTransport(new InternalBus(), id.pubKey);
     const bundle = await createNeighbourhoodAgent({
@@ -45,12 +43,6 @@ describe('Pinboard V1 Phase 19 — closed-beta smoke', () => {
       members:    [{ webid: ANNE }],
     });
     await bundle.offeringMatch.start();
-
-    // 3. Encrypted backup → round-trip with the same passphrase decodes.
-    const back = await callSkill(bundle.agent, 'encryptedBackup', { passphrase: 'correct horse battery staple' });
-    expect(back.blob).toBeTruthy();
-    const decoded = await decryptBackup({ blob: back.blob, passphrase: 'correct horse battery staple' });
-    expect(decoded.webid).toBe(ANNE);
 
     // 4. Post an ask.
     const post = await callSkill(bundle.agent, 'postRequest', {
@@ -63,7 +55,6 @@ describe('Pinboard V1 Phase 19 — closed-beta smoke', () => {
     // metric tag 'post-borrow'.
     const m = await callSkill(bundle.agent, 'getMetrics');
     expect(m.snapshot['post-borrow']?.count).toBe(1);
-    expect(m.snapshot['backup-created']?.count).toBe(1);
     expect(typeof m.capturedAt).toBe('number');
   });
 });

@@ -70,7 +70,6 @@ describe('an op is registered at the visibility its manifest declares', () => {
       'screen-add-page', 'screen-remove-page', 'screen-rename-page', 'screen-set-active', 'screen-set-personas',
       'screen-set-circles', 'screen-pin', 'screen-unpin', 'screen-add-block', 'screen-remove-block', 'screen-move-block',
       'screen-set-block-config', 'screen-undo'],
-    pinboard: ['encryptedBackupWizard'],
   };
   for (const [app, ids] of Object.entries(OWNER_ONLY)) {
     it(`${app}: the owner's custody and wiring ops are declared private`, () => {

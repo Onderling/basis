@@ -204,7 +204,6 @@ import {
 } from '../../src/v2/chatFilter.js';
 // key management: reuse the existing encrypted-backup + restore wizards
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
-import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
 import { renderRecoveryExportWizard, renderRecoveryImportWizard } from '../../src/web/wizards/recoveryFileWizard.js';
 // OBJ-2 membership — reuse the classic join wizard renderer in v2 via the same overlay adapter.
@@ -4853,9 +4852,8 @@ async function showMyData(opts) {
   // same capability, and the manifest stops describing what the buttons do.
   const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
-  // launch the existing backup/restore wizards in a modal overlay; reveal
+  // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
-  const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
   const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
@@ -4969,7 +4967,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,

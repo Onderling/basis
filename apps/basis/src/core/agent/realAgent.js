@@ -181,7 +181,7 @@ import {
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
 // that mints a `request` task instead of executing an offering. Wired below onto the
 // live host agent as the `requestOffering` peer-facing dispatcher op.
-import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers, retentionWindowFor, RETAIN } from '@onderling/item-store';
+import { createTaskStore, requestableSkillHandler, memoryDataSource, createGenericAtomHandlers } from '@onderling/item-store';
 import { matchProfileDrivers } from '@onderling/agent-registry';
 import { isAwayNow } from '../../v2/memberAvailability.js';
 
@@ -2630,6 +2630,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // WHOSE CONTACT A ROW IS: the self it is filed under (`persona` on the row; none or the general persona's id = the
   // general persona). A self's book — its rows and the key bindings of their addresses — rides only that self's lane.
   const selfOfContactRow = (c) => (typeof c?.persona === 'string' && c.persona && c.persona !== primaryId && c.persona !== 'default' ? c.persona : null);
+  // A contact that LEFT a self here (re-filed under another): one own-store row, written AS the self it left, so that
+  // self's own-devices lane carries it to that self's devices only and catches them up. It says the webid and when,
+  // never the self it went to: the self that gained it learns that from the contact, on its own lane.
+  async function noteContactLeft(pid, webid, at) {
+    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
+    if (!by) throw new Error(`no self ${pid} on this device`);
+    const st = await getOwnStore();
+    return st.put({ type: 'contact-refile', id: `contact-refile:${by}:${webid}`, webid, left: true, at }, { by });
+  }
+  // …and where one LANDS from a device of the person: the contact leaves this self's book here, only while this device
+  // still files it under that self and its own filing is older than the move (so arrival order does not matter). Its
+  // member row stays (a circle may still need the name).
+  async function applyContactLeft(scope, row) {
+    const self = selfOfOwnLane(scope);
+    if (self === null || typeof row?.webid !== 'string' || !Number.isFinite(row?.at)) return;
+    const pid = scope === OWN_DEVICES_SCOPE || self === primaryId ? null : self;
+    const mine = (await rawContacts()).find((c) => c?.webid === row.webid);
+    if (!mine || (selfOfContactRow(mine) ?? null) !== pid) return;
+    const myAt = Number.isFinite(mine.personaAt) ? mine.personaAt : -Infinity;
+    if (row.at > myAt) await rawPinboard('forgetContact', { webid: row.webid });
+  }
   const knownPeersSyncs = new Map();   // personaId → that persona's sync
   const makeKnownPeersSync = (pid) => {
     const rt = pid ? personas.get(pid) : null;
@@ -2650,14 +2671,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // contact owns (greetings of strangers, siblings) — never a persona's contacts' keys
         const ownAddrs = new Set(ownBook.map((c) => c?.webid).filter(Boolean));
         const peers = pid ? bindings.filter((b) => ownAddrs.has(b?.address)) : bindings.filter((b) => !others.has(b?.address));
-        // …and the contacts re-filed AWAY from this self here, within the keep-aside window: an old-self device that
-        // slept through the live mark still learns the contact left (webid + when; never the self it went to)
-        const since = Date.now() - retentionWindowFor(RETAIN.KEEP_ASIDE);
-        let moved = [];
-        try { moved = (await rawPinboard('listRefiledContacts', {}))?.refiled ?? []; } catch { moved = []; }
-        const refiled = moved.filter((e) => Number.isFinite(e?.at) && e.at >= since && (selfOfContactRow({ persona: e.from }) ?? null) === (pid ?? null))
-          .map((e) => ({ webid: e.webid, refiledAt: e.at }));
-        return { peers, contacts: ownBook, refiled };
+        return { peers, contacts: ownBook };
       },
       learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
       contacts: {
@@ -2675,8 +2689,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         }),
         // …and a newer identity link to a household bot (or its undoing), by the same rule
         setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
-        // …and a contact re-filed under another self on a device of the person leaves THIS self's book here
-        forget: (webid) => rawPinboard('forgetContact', { webid }),
       },
       onLanded: () => savePeerBindings(),
     });
@@ -4773,6 +4785,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item, landing = {}) => {
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
+        if (isOwnLane(circleId) && item?.type === 'contact-refile') {
+          try { await applyContactLeft(circleId, item); } catch (err) { console.warn(`[contacts] a contact that left this self could not leave the book here: ${err?.message ?? err}`); }
+          return undefined;
+        }
         return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
       },
     });
@@ -5244,12 +5260,6 @@ export async function createRealHouseholdAgent(opts = {}) {
    * Pinboard opId aliases — chat-shell vocabulary → real skill name.
    *   /feed       → listOpen     (no `listFeed` in real pinboard)
    *   /pinboard-profile → getMyProfile
-   *
-   * Part G dissolve (2026-06-17) — the `revealPeer → setPeerReveal`
-   * alias was DROPPED: the `revealPeer` op no longer exists (the
-   * `/reveal` collision was resolved by keeping ONE op, `setPeerReveal`,
-   * in the merged manifest).  `setPeerReveal` dispatches directly; the
-   * `peer→peerWebid` + `action→reveal` value transforms below STAY.
    *
    * F1 circle content (5.3d) — `loadCircleItems` reads a circle's
    * pinboard posts via the source ops `getBulletin` / `getFeed`.  Pinboard
@@ -6208,16 +6218,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       const realOpId = PINBOARD_OP_ALIAS[opId] ?? opId;
       // Arg normalisation between chat-shell vocabulary + real pinboard.
       let realArgs = args ?? {};
-      if (realOpId === 'setPeerReveal') {
-        // Chat-shell sends {peer, action: 'on'/'off'}; real takes
-        // {peerWebid, reveal: boolean}.
-        if (realArgs.peer && !realArgs.peerWebid) {
-          realArgs = { ...realArgs, peerWebid: realArgs.peer };
-        }
-        if (typeof realArgs.action === 'string' && realArgs.reveal === undefined) {
-          realArgs = { ...realArgs, reveal: realArgs.action.toLowerCase() === 'on' };
-        }
-      }
       // Part G dissolve (2026-06-17) — the markReturned itemId→requestId
       // bridge was REMOVED: the merged manifest declares the real param
       // `requestId` directly (the `/lend-return` gate binds `arg:
@@ -6430,10 +6430,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
       // A contact RE-FILED under another self: the row rides the new self's lane (above); the OLD self's devices hear it
-      // left — webid and when only, so they never learn which self it went to.
+      // left from a row on the own store, written as the old self — webid and when only, never which self it went to.
       if (realOpId === 'setContactPersona' && rawReply?.contact && contactBefore
           && (selfOfContactRow(contactBefore) ?? null) !== (selfOfContactRow(rawReply.contact) ?? null)) {
-        knownPeersSync.fanRefiled(contactBefore, { webid: rawReply.contact.webid, refiledAt: rawReply.contact.personaAt ?? Date.now() }).catch(() => {});
+        noteContactLeft(selfOfContactRow(contactBefore) ?? null, rawReply.contact.webid, rawReply.contact.personaAt ?? Date.now())
+          .catch((err) => console.warn(`[contacts] the old self's devices will not hear the contact left: ${err?.message ?? err}`));
       }
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
       // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how
@@ -7352,7 +7353,6 @@ export async function createRealHouseholdAgent(opts = {}) {
    *   postRequest     → {ok, message, itemId, _sync}
    *   listFeed/Open   → {items: [{id, label, state, ...}], _sync}
    *   getMyProfile    → {title, handle, displayName, circle, ...}
-   *   setPeerReveal   → {ok, message, peer, action}
    */
   function adaptPinboardReply(opId, data, args, tr = agentT) {
     if (data == null) return null;
@@ -7419,22 +7419,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         handle:      e.handle ?? null,
         displayName: e.displayName ?? null,
         circle:       opts.pinboardGroup ?? 'cc-default-circle',
-      };
-    }
-    // setPeerReveal: real returns {} on success → adapt to chat shape.
-    // Part G dissolve (2026-06-17) — keyed on `setPeerReveal` (was
-    // `revealPeer`, the dropped alias op).  args still carry the
-    // chat-shell `peer`/`action` vocab; the peer→peerWebid +
-    // action→reveal transforms happen before invoke.
-    if (opId === 'setPeerReveal') {
-      const peer   = args?.peer ?? args?.peerWebid ?? tr('circle.reveal.someone');
-      const action = args?.action ?? (args?.reveal ? 'on' : 'off');
-      return {
-        ok: true,
-        message: action === 'on'
-          ? tr('circle.reveal.on', { peer })
-          : tr('circle.reveal.off', { peer }),
-        peer, action,
       };
     }
     // setHolidayMode: real returns {holidayMode: bool} → friendly text.

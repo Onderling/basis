@@ -3865,18 +3865,6 @@
         "text": "Full",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
-    },
-    "on": {
-      "text": "🔓 Reveal turned on for {{peer}}. It works both ways: they must turn it on too.",
-      "doc": "Confirmation of /reveal on."
-    },
-    "off": {
-      "text": "🔒 Reveal turned off for {{peer}}.",
-      "doc": "Confirmation of /reveal off."
-    },
-    "someone": {
-      "text": "(someone)",
-      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {

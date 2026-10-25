@@ -46,6 +46,14 @@
  *   InterestProfileCache, `getInterestProfile`, `resetInterestProfile`) and basis's one-time interests migration. It
  *   learned from every answered post; `scorePostRelevance` answers from the person's own offerings only.
  *
+ * Retired 2026-10-25 (a viewer-side flag nothing read): pinboard's Reveals — the `setPeerReveal` op and its /reveal
+ *   slash, `setGroupReveal`, `requestReveal`, `getMyReveals`, RevealsCache, item hydration and the roster's
+ *   `viewerNameOptIn`. A name is disclosed by the persona/disclosure release (revealPreset, personaProperties) only.
+ *
+ * Retired 2026-10-25 (a contact that left a self is one own-store row, written as that self): book-sync's re-file
+ *   carry (`fanRefiled`, the snapshot's `refiled` list and its receive loop) and pinboard's re-file record
+ *   (`listRefiledContacts`, the book's `refiled.json`).
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -99,6 +107,14 @@ const RETIRED = [
   { name: 'InterestProfile', re: /from\s+['"][^'"]*InterestProfile(?:Cache)?(?:\.js)?['"]/ },
   { name: 'getInterestProfile', re: /['"]getInterestProfile['"]/ },
   { name: 'resetInterestProfile', re: /['"]resetInterestProfile['"]/ },
+  { name: 'setPeerReveal', re: /['"]setPeerReveal['"]/ },
+  { name: 'setGroupReveal', re: /['"]setGroupReveal['"]/ },
+  { name: 'requestReveal', re: /['"]requestReveal['"]/ },
+  { name: 'getMyReveals', re: /['"]getMyReveals['"]/ },
+  { name: 'RevealsCache', re: /from\s+['"][^'"]*RevealsCache(?:\.js)?['"]/ },
+  { name: 'viewerNameOptIn', re: /viewerNameOptIn\s*:/ },
+  { name: 'fanRefiled', re: /fanRefiled\s*\(/ },
+  { name: 'listRefiledContacts', re: /['"]listRefiledContacts['"]/ },
   { name: 'interestsMigration', re: /from\s+['"][^'"]*interestsMigration(?:\.js)?['"]|migrateInterests\s*\(/ },
 ];
 

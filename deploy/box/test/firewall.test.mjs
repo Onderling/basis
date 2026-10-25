@@ -75,3 +75,10 @@ test('a box with the radio on opens mDNS and the radio\'s fixed data port ON THE
   assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'publish', LAN_IFACE: 'tailscale0' }), []);
   assert.deepEqual(nearbyRules({ ROLES: 'companion@basis', COMPANION_NEARBY: 'publish', LAN_IFACE: '' }), []);
 });
+
+test('the installer applies the radio\'s rules for a new box (root, at install) — the updater never touches ufw', () => {
+  const src = readFileSync(INSTALL, 'utf8');
+  assert.match(src, /nearby_firewall_rules/, 'install.sh applies nearby_firewall_rules');
+  const update = readFileSync(join(resolve(import.meta.dirname, '..'), 'update.sh'), 'utf8');
+  assert.ok(!/\bufw\b/.test(update.replace(/^\s*#.*$/gm, '')), 'update.sh runs as the box user and must not touch the firewall');
+});

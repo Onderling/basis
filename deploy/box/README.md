@@ -98,6 +98,9 @@ announces (a box that is only browsing opens no door) and holds at most a few in
 box needs two rules for the radio, both bound to the home LAN's interface (the one the default route leaves by; never
 Tailscale's, never a bare port): mDNS on 5353/udp and the data port on tcp. `lib.sh nearby_firewall_rules` prints exactly
 those for this box. The router's NAT keeps the internet out regardless, so the exposure is the home LAN only.
+The installer applies them, as root, for a box installed with the radio on. The updater runs as the box user and never
+touches the firewall, so a box that turns the radio on later gets its two rules by hand, once (`sudo ufw` + each printed
+line).
 
 ## The box directory (`/opt/onderling`)
 

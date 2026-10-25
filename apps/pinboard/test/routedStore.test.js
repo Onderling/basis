@@ -127,4 +127,24 @@ describe('createRoutedStore — the roster trail lives in its circle\'s store', 
     expect((await routed.getById(row.id))?.id).toBe(row.id);
     expect(after.has('kring-a')).toBe(false);
   });
+
+  it("a pod-backed circle's trail row stays on this device's local backing — never on the pod every member writes", async () => {
+    const local = memoryDataSource();
+    const pod = memoryDataSource();
+    const stores = createCircleStores({ dataSource: local, registry: { validate }, dataSourceFor: (c) => (c === 'kring-pod' ? pod : null) });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const routed = createRoutedStore({ pile, hostCircles: {
+      storeFor: (c) => stores.getStore(c), circlesOf: () => ['kring-pod'], openCircles: () => stores.ids(),
+      trailStoreFor: (c) => stores.localStore(c),
+    } });
+    const [row] = await routed.addItems([trail('kring-pod')], { actor: ANN });
+    const [post] = await routed.addItems([ask('kring-pod')], { actor: ANN });
+    const onPod = [...pod._map.keys()];
+    expect(onPod.some((k) => k.includes(row.id)), JSON.stringify(onPod)).toBe(false);
+    expect([...local._map.keys()].some((k) => k.includes(row.id))).toBe(true);
+    expect(onPod.some((k) => k.includes(post.id))).toBe(true);   // the post IS the circle's: on its pod
+    expect((await routed.listOpen({ type: 'membership-redemption', groupId: 'kring-pod' })).map((r) => r.id)).toEqual([row.id]);
+    await routed.update(row.id, { source: { ...row.source, circleAddress: 'addr-9' } }, { actor: ANN });
+    expect((await stores.localStore('kring-pod').get(row.id)).source.circleAddress).toBe('addr-9');
+  });
 });

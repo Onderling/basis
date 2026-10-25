@@ -5019,6 +5019,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // read without opening them
       heldCircles: () => householdService.stores.heldIds(),
       peekFor: (circleId) => householdService.stores.peek(circleId),
+      // THE TRAIL IS A DEVICE'S VIEW — it records its siblings' proven addresses and never its own — so a medium every
+      // member writes can never hold it: "the circle's own store" for the trail means the circle's root on THIS device's
+      // backing, even when the circle itself runs on a pod
+      trailStoreFor: (circleId) => householdService.stores.localStore(circleId),
       writerIn: (circleId) => circleSelf(circleId).webid ?? chatId.pubKey,
     },
     membershipEmit,

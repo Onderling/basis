@@ -62,9 +62,9 @@ function asCircleRow(item, from) {
  * Pinboard's rows in one circle store, through its type index: a read never scans the circle's tasks, lists or chat —
  * only the post and trail types. Writes and single reads go to the store itself.
  */
-export function circleRowsView(cs) {
+export function circleRowsView(cs, types = CIRCLE_TYPES) {
   return {
-    list:   async () => (await Promise.all(CIRCLE_TYPES.map((t) => cs.listByType(t)))).flat(),
+    list:   async () => (await Promise.all(types.map((t) => cs.listByType(t)))).flat(),
     get:    (id, ...r) => cs.get(id, ...r),
     put:    (item, ...r) => cs.put(item, ...r),
     // the lifecycle verbs' compare-and-set (claim, approve): a claim on a post is a race between members
@@ -78,11 +78,27 @@ const mayBeInCircles = (filter) => !filter?.type || CIRCLE_TYPES.includes(filter
 export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost = isNoticeboardPostType }) {
   // a trail row names its circle always; one that does not stays where it was written
   const isCircleRow = (it) => isPost(it) || (isRosterTrailItem(it) && !!circleOf(it));
-  const { storeFor: circleStoreFor, circlesOf: knownCircles, openCircles = null, heldCircles = null, peekFor = null, writerIn = (_c, actor) => actor } = hostCircles ?? {};
+  const { storeFor: circleStoreFor, circlesOf: knownCircles, openCircles = null, heldCircles = null, peekFor = null, trailStoreFor = null, writerIn = (_c, actor) => actor } = hostCircles ?? {};
   if (!pile || typeof circleStoreFor !== 'function' || typeof knownCircles !== 'function') {
     throw new Error('createRoutedStore: pile and hostCircles { storeFor, circlesOf } are required');
   }
   const taskStores = new Map();
+  // THE TRAIL IS THIS DEVICE'S OWN VIEW (rosterTrail.js: every device holds its own row for each member, patched by
+  // announce), so when the host keeps it apart (`trailStoreFor`: the circle's rows on the device's local backing) it
+  // never sits on a medium other devices write too — a pod-backed circle's pod is every member's. The circle's own
+  // store then holds its posts only.
+  const keepTrailApart = typeof trailStoreFor === 'function';
+  const SHARED_TYPES = keepTrailApart ? NOTICEBOARD_POST_TYPES : CIRCLE_TYPES;
+  const trailStores = new Map();
+  const trailStoreOf = async (circleId) => {
+    if (!keepTrailApart) return null;
+    if (!trailStores.has(circleId)) {
+      const cs = await Promise.resolve(trailStoreFor(circleId)).catch(() => null);
+      if (!cs) return null;
+      trailStores.set(circleId, createTaskStore(circleRowsView(cs, [TRAIL_TYPE])));
+    }
+    return trailStores.get(circleId);
+  };
   // the host may open a circle on first ask (its sync wired before anything is written), so this awaits
   // a READ takes the circle's store only if the host has it open; it never opens one (opening wires the circle's sync,
   // which a join does in its own order). A write opens it (`{ write: true }`).
@@ -90,7 +106,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     if (!taskStores.has(circleId)) {
       const cs = await Promise.resolve(circleStoreFor(circleId, { write: false })).catch(() => null);
       if (!cs) return null;   // not open yet: asked again next time
-      taskStores.set(circleId, createTaskStore(circleRowsView(cs)));
+      taskStores.set(circleId, createTaskStore(circleRowsView(cs, SHARED_TYPES)));
     }
     return taskStores.get(circleId);
   };
@@ -101,14 +117,14 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     const open = await taskStoreOf(circleId);
     if (open || typeof peekFor !== 'function') return open;
     const cs = await Promise.resolve(peekFor(circleId)).catch(() => null);
-    return cs ? createTaskStore({ ...circleRowsView(cs), put: refuse, putIfMatch: refuse, delete: refuse }) : null;
+    return cs ? createTaskStore({ ...circleRowsView(cs, SHARED_TYPES), put: refuse, putIfMatch: refuse, delete: refuse }) : null;
   };
   const writeStoreOf = async (circleId) => {
     const open = await taskStoreOf(circleId);
     if (open) return open;
     const cs = await Promise.resolve(circleStoreFor(circleId, { write: true })).catch(() => null);
     if (!cs) return null;
-    taskStores.set(circleId, createTaskStore(circleRowsView(cs)));
+    taskStores.set(circleId, createTaskStore(circleRowsView(cs, SHARED_TYPES)));
     return taskStores.get(circleId);
   };
   // the circles that hold rows here, listed once a run (a listing of the backing): what opens later is in `openCircles`.
@@ -139,6 +155,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
   const circleHolders = async (id) => {
     const out = [];
     for (const c of await circlesFor(null)) {
+      const tr = await trailStoreOf(c);
+      if (tr && await tr.getById(id).catch(() => null)) { out.push(tr); continue; }
       const ts = await readStoreOf(c);
       if (!ts || !(await ts.getById(id).catch(() => null))) continue;
       const w = await writeStoreOf(c);
@@ -183,8 +201,9 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     const lists = [(await pile[verb](filter)) ?? []];
     if (!mayBeInCircles(filter)) return lists[0];
     for (const c of await circlesFor(filter)) {
-      const ts = await readStoreOf(c);
-      if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isCircleRow(it)));
+      for (const ts of [await readStoreOf(c), await trailStoreOf(c)]) {
+        if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isCircleRow(it)));
+      }
     }
     // the answers row is this device's own bookkeeping, not an item a reader lists
     return withPrivate(unionById(lists).filter((r) => r?.type !== ANSWERS));
@@ -234,9 +253,10 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       const hit = await pile.getById(id).catch(() => null);
       if (hit) return hit;
       for (const c of await circlesFor(null)) {
-        const ts = await readStoreOf(c);
-        const row = ts ? await ts.getById(id).catch(() => null) : null;
-        if (row) return (await withPrivate([row]))[0];
+        for (const ts of [await trailStoreOf(c), await readStoreOf(c)]) {
+          const row = ts ? await ts.getById(id).catch(() => null) : null;
+          if (row) return (await withPrivate([row]))[0];
+        }
       }
       return null;
     },
@@ -251,7 +271,9 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
         const id = (typeof p.id === 'string' && p.id) ? p.id : ulid();
         let first = null;
         for (const c of circles) {
-          const cs = await Promise.resolve(circleStoreFor(c, { write: true })).catch(() => null);
+          const cs = (keepTrailApart && isRosterTrailItem(p))
+            ? await Promise.resolve(trailStoreFor(c)).catch(() => null)
+            : await Promise.resolve(circleStoreFor(c, { write: true })).catch(() => null);
           if (!cs) continue;
           const by = writerIn(c, actor) ?? actor;
           const shaped = isPost(p) ? asCirclePost(p, by) : asCircleRow(p, by);
@@ -275,7 +297,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       const out = { ingested: [], skipped: [] };
       if (toPile.length) { const r = (await pile.ingestItems(toPile, ctx)) ?? {}; out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? [])); }
       for (const it of list.filter((x) => isCircleRow(x))) {
-        const ts = await (async () => { const cs = await Promise.resolve(circleStoreFor(circleOf(it), { write: true })).catch(() => null); return cs ? createTaskStore(circleRowsView(cs)) : null; })();
+        const ts = keepTrailApart ? await trailStoreOf(circleOf(it))
+          : await (async () => { const cs = await Promise.resolve(circleStoreFor(circleOf(it), { write: true })).catch(() => null); return cs ? createTaskStore(circleRowsView(cs, SHARED_TYPES)) : null; })();
         if (!ts) { const r = (await pile.ingestItems([it], ctx)) ?? {}; out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? [])); continue; }
         const r = (await ts.ingestItems([it], ctx)) ?? {};
         out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? []));

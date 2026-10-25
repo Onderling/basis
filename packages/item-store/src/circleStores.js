@@ -42,6 +42,7 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
     throw new Error('createCircleStores: a shared core.DataSource (read/write/delete/list) is required');
   }
   const stores = new Map();   // circleId → CircleItemStore (created lazily, cached)
+  const locals = new Map();   // circleId → its store on the shared local backing, for a circle on its own medium
   const rootFor = (circleId) => `${rootPrefix}${circleId}/`;
 
   return {
@@ -78,6 +79,23 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
         if (id) held.add(id);
       }
       return [...held];
+    },
+    /**
+     * ONE circle's store on the SHARED LOCAL backing, whatever medium the circle itself runs on — for rows that are
+     * this device's own view and must never sit on a medium other devices write too (a pod-backed circle's pod is
+     * shared by every member's device). Cached; no hook (nothing written here is carried by the store's sync).
+     */
+    localStore(circleId) {
+      if (typeof circleId !== 'string' || !circleId) throw new Error('createCircleStores.localStore: a non-empty circleId is required');
+      const open = stores.get(circleId);
+      const ownBacking = typeof dataSourceFor === 'function' && dataSourceFor(circleId);
+      if (open && !ownBacking) return open;   // a shared-backing circle: its store IS on the local backing
+      let local = locals.get(circleId);
+      if (!local) {
+        local = new CircleItemStore({ dataSource, rootContainer: rootFor(circleId), registry, resolution, originOf });
+        locals.set(circleId, local);
+      }
+      return local;
     },
     /**
      * A reader for ONE circle's rows that opens nothing: the open store when there is one, else a store over its rows

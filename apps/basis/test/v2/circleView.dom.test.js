@@ -15,7 +15,9 @@ function mount() {
 
 const circle = { id: 'g1', name: 'Selwerd', memberCount: 87 };
 
-const yest = Date.now() - 24 * 60 * 60 * 1000;
+// 'yesterday' is a CALENDAR day: noon of the day before, never now − 24 h (on a clock-change day that lands on the same date)
+const yestDay = new Date(); yestDay.setDate(yestDay.getDate() - 1); yestDay.setHours(12, 0, 0, 0);
+const yest = yestDay.getTime();
 const now  = Date.now();
 
 // `senderLabel` is what `chatRows` stamps through the reveal ladder; the renderer paints it and

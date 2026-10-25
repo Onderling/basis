@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
+import net from 'node:net';
 import { AgentIdentity, DISCOVERABILITY } from '@onderling/core';
 import { createLoopbackDiscovery } from '@onderling/transports/mdns-node';
 import { startNearbyMdns, normaliseNearbyOption } from '../src/nearbyMdns.js';
@@ -66,6 +67,25 @@ describe('the disclosure default', () => {
     await n.stop();
   });
 
+  // A device that announces nothing keeps no door open: the radio's TCP listener closes when the publish window ends
+  // (the household tablet's firewall opens this port to the home LAN, so the port must be shut while unlisted).
+  it('the data port is closed once a time-boxed announcement expires — and open while it lasts', async () => {
+    const discovery = createLoopbackDiscovery();
+    const n = await startNearbyMdns({ identity: await identity(), opts: { publish: true, publishFor: 60, port: 45991 }, discovery });
+    expect(await reachable(45991), 'open while announcing').toBe(true);
+    await wait(180);
+    expect(n.transport.isAdvertising).toBe(false);
+    expect(await reachable(45991), 'closed once the window ended').toBe(false);
+    await n.stop();
+  });
+
+  it('a browse-only node opens no data port at all', async () => {
+    const discovery = createLoopbackDiscovery();
+    const n = await startNearbyMdns({ identity: await identity(), opts: { port: 45992 }, discovery });
+    expect(await reachable(45992)).toBe(false);
+    await n.stop();
+  });
+
   it('reports what the transport ACHIEVED, not what was asked', async () => {
     const discovery = createLoopbackDiscovery();
     const n = await startNearbyMdns({ identity: await identity(), discovery });
@@ -73,6 +93,14 @@ describe('the disclosure default', () => {
     await n.stop();
   });
 });
+
+/** Can a TCP client connect to this port on loopback (the door the firewall would open)? */
+function reachable(port) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: '127.0.0.1', port }, () => { s.destroy(); resolve(true); });
+    s.once('error', () => resolve(false));
+  });
+}
 
 describe('the peer source the nearby surface subscribes to', () => {
   it('surfaces another node on the same discovery as a nearby peer', async () => {

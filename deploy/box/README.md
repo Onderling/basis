@@ -93,8 +93,11 @@ Caddy (the platform box) refuses it and starts nothing. A personal box dials the
 banner line `Nearby:` in `docker compose -p onderling logs companion` says what the radio is actually doing.
 
 A phone that finds the companion then connects to it over plain TCP on the radio's data port, which is fixed so a
-firewall can open it: `COMPANION_NEARBY_PORT` (default `45210`). With ufw on, the box needs two rules for the radio,
-`allow 5353/udp` (mDNS) and `allow <port>/tcp`; `lib.sh nearby_firewall_rules` prints exactly those for this box.
+firewall can open it: `COMPANION_NEARBY_PORT` (default `45210`). The companion accepts on that port only while it
+announces (a box that is only browsing opens no door) and holds at most a few inbound sockets at once. With ufw on, the
+box needs two rules for the radio, both bound to the home LAN's interface (the one the default route leaves by; never
+Tailscale's, never a bare port): mDNS on 5353/udp and the data port on tcp. `lib.sh nearby_firewall_rules` prints exactly
+those for this box. The router's NAT keeps the internet out regardless, so the exposure is the home LAN only.
 
 ## The box directory (`/opt/onderling`)
 

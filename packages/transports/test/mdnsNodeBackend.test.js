@@ -5,6 +5,7 @@
  * desynchronises, and the symptom appears much later as "the phone and the laptop never see each other".
  * So the adversarial chunkings are asserted directly rather than inferred from a happy-path round trip.
  */
+import net from 'node:net';
 import { describe, it, expect, afterEach } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { AgentIdentity } from '@onderling/core';
@@ -73,6 +74,41 @@ describe('the data port', () => {
     const { native } = createMdnsNodeBackend({ discovery, host: '127.0.0.1', port: 45987 });
     const port = await native.startAdvertising('_onderling', 'dw-fixed', 'KEY-FIXED');
     expect(port).toBe(45987);
+    await native.stop?.();
+  });
+
+  // A hostile device on the LAN must not be able to exhaust the radio by opening sockets it never says hello on.
+  it('refuses inbound connections beyond its small cap', async () => {
+    const discovery = createLoopbackDiscovery();
+    const { native } = createMdnsNodeBackend({ discovery, host: '127.0.0.1', port: 45988, maxInbound: 2 });
+    await native.startAdvertising('_onderling', 'dw-cap', 'KEY-CAP');
+    const open = [];
+    const dial = () => new Promise((resolve) => {
+      const s = net.connect({ host: '127.0.0.1', port: 45988 });
+      open.push(s);
+      s.once('close', () => resolve('closed'));
+      setTimeout(() => resolve('open'), 150);
+    });
+    const results = [await dial(), await dial(), await dial()];
+    expect(results).toEqual(['open', 'open', 'closed']);
+    for (const s of open) s.destroy();
+    await native.stop?.();
+  });
+
+  it('stops accepting when it stops announcing, and keeps the connections it has', async () => {
+    const discovery = createLoopbackDiscovery();
+    const { native } = createMdnsNodeBackend({ discovery, host: '127.0.0.1', port: 45989 });
+    await native.startAdvertising('_onderling', 'dw-door', 'KEY-DOOR');
+    const kept = net.connect({ host: '127.0.0.1', port: 45989 });
+    await new Promise((r) => kept.once('connect', r));
+    await native.stopAdvertising();
+    const refused = await new Promise((resolve) => {
+      const s = net.connect({ host: '127.0.0.1', port: 45989 }, () => { s.destroy(); resolve(false); });
+      s.once('error', () => resolve(true));
+    });
+    expect(refused, 'a new connection is refused once unlisted').toBe(true);
+    expect(kept.destroyed, 'an open connection stays').toBe(false);
+    kept.destroy();
     await native.stop?.();
   });
 });

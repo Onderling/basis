@@ -48,13 +48,24 @@ check_companion_nearby() {
 # The companion's radio data port: fixed, so the firewall knows what to open (box.conf COMPANION_NEARBY_PORT).
 nearby_port() { echo "${COMPANION_NEARBY_PORT:-45210}"; }
 
+# The home LAN's interface: the one the default route leaves by (LAN_IFACE overrides; set but empty means "none").
+lan_iface() {
+  if [ "${LAN_IFACE+set}" = set ]; then echo "$LAN_IFACE"; return 0; fi
+  ip route show default 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }'
+  return 0
+}
+
 # The firewall rules the radio needs (one per line, ufw syntax): mDNS discovery on 5353/udp and the hello on the
-# fixed TCP data port. Nothing when the radio is off or the box runs no companion.
+# fixed TCP data port, both bound to the LAN interface — never a bare `allow <port>`, never Tailscale's interface. The
+# router's NAT keeps the internet out regardless; this keeps every other interface shut too. Nothing when the radio is
+# off, the box runs no companion, or no LAN interface is known.
 nearby_firewall_rules() {
   case "${COMPANION_NEARBY:-off}" in off|false|0|'') return 0 ;; esac
   role_names | grep -qx companion || return 0
-  echo "allow 5353/udp"
-  echo "allow $(nearby_port)/tcp"
+  local iface; iface="$(lan_iface)"
+  case "$iface" in ''|tailscale*|lo) return 0 ;; esac
+  echo "allow in on $iface to any port 5353 proto udp"
+  echo "allow in on $iface to any port $(nearby_port) proto tcp"
 }
 
 # REPOS="basis=git@github.com:Onderling/basis.git#live feedback=…#live"

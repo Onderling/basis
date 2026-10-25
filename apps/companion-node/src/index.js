@@ -58,6 +58,7 @@ import { Agent, AgentIdentity, Parts, PodCapabilityToken, RoutingStrategy,
 import { RelayTransport }              from '@onderling/transports';
 import { startRelay }                  from '@onderling/relay';
 import { VaultNodeFs }                 from '@onderling/vault';
+import { openSealedIdentityVault }     from './identityVault.js';
 import { createPodTokenVerifier, PodClient, CapabilityAuth } from '@onderling/pod-client';
 
 import { homedir }                     from 'node:os';
@@ -249,14 +250,25 @@ export async function startCompanionNode(opts = {}) {
     // where this node's links are served, as its card says: the public https address of the relay it dials (mapped
     // from `relayUrl`), or this explicit override (a node that dials its relay by an inside name, e.g. `ws://relay:8787`)
     publicUrl,
+    // the box's vault passphrase (BASIS_VAULT_PASSPHRASE): the identity vault is sealed under it; required
+    vaultPassphrase,
+    // the dev harness only (boot.js --dev-plaintext-vault): the identity in the clear, as before
+    devPlaintextVault  = false,
   } = opts;
   const bootAt = Date.now();
   // the agenda files are put by an agent the owner granted, its token checked by the gate: no gate, no feeds
   if (feeds && !gate) throw new Error('companion-node: feeds need the gate (a put is allowed by a token the gate verifies)');
 
   // ── 1. Host identity — persisted so the pubKey is stable across restarts ──
+  // sealed under the box's vault passphrase; no passphrase is a misconfigured node (the plaintext mode is the dev
+  // harness's, behind its own flag — never a default a role can reach)
+  if (!identityVault && !vaultPassphrase && !devPlaintextVault) {
+    throw new Error('companion-node: no vault passphrase (BASIS_VAULT_PASSPHRASE) — refusing to keep the identity keys in the clear');
+  }
   const vault = identityVault
-    ?? new VaultNodeFs(join(resolveConfigDir(configDir), IDENTITY_FILE));
+    ?? (devPlaintextVault && !vaultPassphrase
+      ? new VaultNodeFs(join(resolveConfigDir(configDir), IDENTITY_FILE))
+      : await openSealedIdentityVault(join(resolveConfigDir(configDir), IDENTITY_FILE), vaultPassphrase, { log: (l) => console.info(l) }));
   const identity = (await vault.has('agent-privkey'))
     ? await AgentIdentity.restore(vault)
     : await AgentIdentity.generate(vault);

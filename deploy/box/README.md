@@ -202,8 +202,16 @@ opens nothing. Keep a copy of both somewhere other than the box. What never ente
 
 **The vault passphrase.** `install.sh` writes it into `.env` (a new box gets a fresh one; a box made before kept it as
 `vault.passphrase` in the assistant's volume, and re-running `install.sh` moves it into `.env` once and deletes the
-file — idempotent, the value never printed). The assistant refuses to boot without it, or when `.env` and a left-over
-file disagree. `update.sh` never writes `.env`, so an existing box takes the move only by a re-run of `install.sh`.
+file — idempotent, the value never printed). The assistant and the companion refuse to boot without it (the assistant
+also when `.env` and a left-over file disagree). The companion's identity vault is sealed under it; one left in the clear
+by an older node is sealed in place on the first boot with the passphrase (the plaintext bytes overwritten).
+`update.sh` never writes `.env`, so an existing box takes the move only by a re-run of `install.sh`.
+
+**Before any copy of the restic repository leaves the box's operator** (a cloud target added later, a copy handed on):
+every snapshot taken before this box ran the release that carries this change (the first after v0.1.75-alpha; check the
+box's `state.json` for when it took it) holds the companion's identity keys in the clear, and the assistant's vault
+passphrase beside its vaults, under the restic password alone. `restic forget` those snapshots and `prune` the
+repository first — or rotate the companion identity instead.
 
 ## Tests
 

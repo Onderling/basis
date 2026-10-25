@@ -7,12 +7,14 @@ import { routeTaskMirror } from '../../src/v2/taskRail.js';
 
 const trail = { id: 'r1', type: 'membership-redemption', source: { groupId: 'g', redeemedBy: 'pk-bram' } };
 const post = { id: 'p1', type: 'request', text: 'een ladder', source: { groupId: 'g' } };
+const rules = { id: 'gr1', type: 'group-rules', text: 'kring', source: { groupId: 'g', rules: {}, version: 2 } };
 
 describe('the task lane and the roster trail', () => {
   it('a trail row written to a circle store is not published on the lane; any other row is', () => {
     const emitter = { snapshot: vi.fn(() => ({ ok: true })), remove: vi.fn() };
     const valve = routeTaskMirror({ circleId: 'g', emitter });
     valve.publishItem(trail);
+    valve.publishItem(rules);   // the rules head, too: its own lane carries it
     expect(emitter.snapshot).not.toHaveBeenCalled();
     valve.publishItem(post);
     expect(emitter.snapshot).toHaveBeenCalledTimes(1);

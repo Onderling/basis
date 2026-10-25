@@ -5021,8 +5021,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       peekFor: (circleId) => householdService.stores.peek(circleId),
       // THE TRAIL IS A DEVICE'S VIEW — it records its siblings' proven addresses and never its own — so a medium every
       // member writes can never hold it: "the circle's own store" for the trail means the circle's root on THIS device's
-      // backing, even when the circle itself runs on a pod
-      trailStoreFor: (circleId) => householdService.stores.localStore(circleId),
+      // backing, even when the circle itself runs on a pod. The rules head likewise (the version this device applied).
+      localStoreFor: (circleId) => householdService.stores.localStore(circleId),
       writerIn: (circleId) => circleSelf(circleId).webid ?? chatId.pubKey,
     },
     membershipEmit,
@@ -6338,7 +6338,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // chat-shell knows which circle this agent is in (single-circle
       // mode), so auto-inject when missing.
       const REQUIRES_GROUP_ID = new Set([
-        'getGroupRules', 'leaveGroup', 'getMyMembershipStatus',
+        'getGroupRules', 'leaveGroup',
         'editGroupRules', 'removeMember',
       ]);
       if (REQUIRES_GROUP_ID.has(realOpId) && !realArgs.groupId) {

@@ -75,7 +75,6 @@ import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
@@ -193,17 +192,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const pendingMap = new Map();
   const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
-  // The REAL circle-chat receiver — the exact wiring circleApp.js uses (inbox + peer handler).
-  // The harness previously had NO 'circle-chat-message' handler, so chat fell to the defaultHandler
-  // stub: the blind spot that let a broken chat-receive pass node tests. Wire it for real.
+  // The circle chat's device log — what the chat rail below lands each verified statement on (the shells' wiring).
   const chatEventLog = new EventLog({ initial: [], muted: [] });
-  const chatInbox = createChatMessageInbox({
-    eventLog: chatEventLog,
-    // The MIGRATION gate only (the store copy's one-time carry-over): live receive is the signed
-    // statement path below.
-    ingest: (payload, fromPeerAddr) => callSkill('pinboard', 'ingestCircleMessage', { payload, fromPeerAddr }),
-    logger: QUIET,
-  });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
   // key↔ref binding) and lands as the ONE render entry. The harness's LEGACY pairing records no
   // circleAddress roster rows, so the DEFAULT binding here resolves through the live in-process node
@@ -488,7 +478,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).

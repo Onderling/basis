@@ -9,13 +9,13 @@
  *   • ORDER — several messages queue while Cato is away; a flush that re-holds a failure, or a Map that
  *     stops being insertion-ordered, silently reorders a conversation. Nothing checked order on the
  *     circle-chat channel (only the DM one, story 4.1).
- *   • DUPLICATES — the sender dedups by `msgId` while holding, the receiver dedups in `chatMessageInbox`,
+ *   • DUPLICATES — the sender dedups by `msgId` while holding, the chat rail dedups on the statement,
  *     and the EventLog dedups by entry id. Three layers, none of them tested together on a re-flush.
  *   • The ONLINE member must be unaffected — a held message for Cato must not delay or duplicate Bram's.
  *
  * Real agents over a shared InternalBus (`pairRealAgents.js`), so this drives the production send path
  * (`broadcastCircleMessage` → reliableSend → hold-forward) and the production receive path
- * (`circleChatReceiver` → `chatMessageInbox` → EventLog). No stand-ins.
+ * (the signed statement at the chat rail → EventLog). No stand-ins.
  *
  * Cast: Anna (A, admin/poster) · Bram (B, online throughout) · Cato (C, offline for the burst).
  */
@@ -85,7 +85,7 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
   }, 60_000);
 
   it('a RE-SEND of an already-delivered message does not duplicate it on any device', async () => {
-    // The replay a retry or a second flush produces. `chatMessageInbox` dedups on msgId and the EventLog
+    // The replay a retry or a second flush produces. the chat rail dedups the statement and the EventLog
     // dedups on entry id — this asserts the pair actually holds end to end, which neither unit test does.
     const msgId = `replay-${Date.now().toString(36)}`;
     const text = 'zelfde bericht';

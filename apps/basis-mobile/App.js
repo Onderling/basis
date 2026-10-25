@@ -56,22 +56,19 @@ import {
 import { restoreFromMnemonic } from './src/core/restoreFromMnemonic.js';
 import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
-import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/circleChatRehydrate.js';
 import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { createHistoryPodMedium } from '../basis/src/v2/historyMirror.js';
 import { createRegistryPodMedium } from '../basis/src/v2/registryCarrier.js';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { sealedLocalBackend, sealedKeyValue } from '../basis/src/v2/localStoreSeal.js';   // every local store seals at rest — one shared call, web ≡ mobile
 import { backendSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
-import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
-import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
 import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
 // γ-next.recipe — per-circle pending-recipe cache (AsyncStorage-backed).
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeCircleRecipePendingStoreRN } from './src/core/circleRecipePendingStorageRN.js';
-import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, circleResolveRef, getCirclePodFetch, getActiveRealPodRouting } from './src/core/circlePods.js';
+import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, getCirclePodFetch, getActiveRealPodRouting } from './src/core/circlePods.js';
 import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
@@ -223,9 +220,8 @@ export default function App() {
     }
   }, []);
 
-  const circleChatInboxRef = useRef(null);
-  // Delivery honesty — ONE receipt sender, shared by the legacy-envelope inbox and the signed-statement
-  // receive path in ChatScreen (web's `onCircleStored` parity: one set of side effects, not two).
+  // Delivery honesty — ONE receipt sender, for the signed-statement receive path in ChatScreen (web's
+  // `onCircleStored` parity).
   const chatReceiptSenderRef = useRef(null);
   if (!chatReceiptSenderRef.current) {
     chatReceiptSenderRef.current = makeReceiptSender({
@@ -236,42 +232,6 @@ export default function App() {
       sendTo: (to, payload, opts = {}) => (typeof bundleRef.current?.agent?.sendPeerMessage === 'function'
         ? bundleRef.current.agent.sendPeerMessage(to, payload, opts)
         : Promise.reject(new Error('no peer send yet'))),
-    });
-  }
-  if (!circleChatInboxRef.current) {
-    circleChatInboxRef.current = createChatMessageInbox({
-      eventLog: eventLogRef.current,
-      ingest: async (payload, fromPeerAddr) => {
-        const callSkill = bundleRef.current?.callSkill;
-        if (typeof callSkill !== 'function') return { ok: false };
-        try {
-          return await callSkill('pinboard', 'ingestCircleMessage', { payload, fromPeerAddr });
-        } catch (err) {
-          console.warn('[circle-chat] ingestCircleMessage failed:', err?.message ?? err);
-          return { error: String(err?.message ?? err) };
-        }
-      },
-      logger: console,
-      // Delivery honesty — a LIVE insert answers the sender with a receipt, through the ONE shared
-      // sender above (policy entirely inside `makeReceiptSender`: only source 'receiver' · setting read
-      // per message · fail-closed on a broken read; reads `bundleRef` lazily — the bundle boots later).
-      onStored: (info) => chatReceiptSenderRef.current(info),
-      // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer, no
-      // body) into the full chat message by reading + unsealing the circle's shared pod. Absent a pod /
-      // group key → the inbox skips the ref (deferred), never crashes the receive loop. Web parity
-      // (circleApp inbox `resolveRef: circleResolveRef`); the lazy wrapper settles custody at call time.
-      resolveRef: circleResolveRef,
-      // "Did I write this?" — so a message of mine read back out of storage (the boot rehydrate two
-      // blocks down, catch-up, pod replay) comes back as MINE ('me', what the bubbles compare against)
-      // instead of as a stranger's. Web parity, same shared check; per-circle by construction, and never
-      // consulted on the live receive path (chatSelfAuthor.js). Reads `bundleRef` lazily like `ingest`.
-      isSelfAuthored: createSelfAuthorCheck({
-        whoAmI: () => (typeof bundleRef.current?.callSkill === 'function'
-          ? bundleRef.current.callSkill('pinboard', 'whoAmI', {})
-          : Promise.resolve(null)),
-        circleAddressFor: (cid) => bundleRef.current?.agent?.circleAddressFor?.(cid) ?? null,
-      }),
-      localActor: 'me',
     });
   }
   // γ-next.recipe — shared circle-recipe-broadcast pending store.
@@ -657,20 +617,6 @@ export default function App() {
         if (!alreadySeeded) {
           AsyncStorage.setItem(SEED_FLAG, '1').catch(() => { /* non-fatal */ });
         }
-        // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log, web parity): the log is
-        // the record now, so the store-era history lands on it ONCE through the shared inbox and the
-        // AsyncStorage latch skips every later boot. The per-boot rehydrate is retired — this was its
-        // final job; a failed pass leaves the latch unset and retries next boot.
-        if (typeof b?.callSkill === 'function' && eventLogRef.current) {
-          migrateCircleChatHistory({
-            callSkill: b.callSkill,
-            inbox:     circleChatInboxRef.current,
-            marker: {
-              get: () => AsyncStorage.getItem(CHAT_MIGRATION_MARKER_KEY),
-              set: (v) => AsyncStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v),
-            },
-          }).catch(() => { /* logged inside */ });
-        }
       } catch (err) {
         dlog.warn('boot failed (App)', err?.message ?? err);
         if (!cancelled) setBootError(err?.message ?? String(err));
@@ -719,7 +665,6 @@ export default function App() {
             bundle={bundle}
             bootError={bootError}
             eventLog={eventLogRef.current}
-            circleChatInbox={circleChatInboxRef.current}
             chatStoredReceipt={(info) => chatReceiptSenderRef.current(info)}
             deliveryStateMap={deliveryStateMapRef.current}
             circleRecipePendingStore={circleRecipePendingStoreRef.current}

@@ -18,7 +18,6 @@ import { buildSubstrateStack } from './lib/substrateStack.js';
  * @param {object} opts
  * @param {string} opts.group
  * @param {Array<{pubKey: string}>} [opts.peers]
- * @param {object} [opts.evictionRoster]
  * @param {object|false} [opts.agentRegistry]
  *   Phase 52.10 / A7 — when an object (or omitted), the bundle
  *   registers this agent under `pseudo-pod://<deviceId>/private/agent-registry`
@@ -27,7 +26,7 @@ import { buildSubstrateStack } from './lib/substrateStack.js';
  *   Object shape: `{capabilities?: string[], name?: string, role?: string, anchorPodUri?: string}`.
  * @returns {Promise<object>} the mirror handle
  */
-export async function attachSubstrateMirror(bundle, { group, peers = [], evictionRoster, agentRegistry } = {}) {
+export async function attachSubstrateMirror(bundle, { group, peers = [], agentRegistry } = {}) {
   if (!bundle?.agent) throw new Error('attachSubstrateMirror: bundle.agent required');
   if (typeof group !== 'string' || !group) {
     throw new Error('attachSubstrateMirror: group required');
@@ -44,7 +43,6 @@ export async function attachSubstrateMirror(bundle, { group, peers = [], evictio
     pseudoPod:      substrate.pseudoPod,
     group,
     peers,
-    evictionRoster: evictionRoster ?? bundle.evictionRoster ?? null,
     selfPubKey:     bundle.agent?.address ?? null,
   });
   bundle.mirror = mirror;
@@ -135,7 +133,6 @@ export async function registerAgentInRegistry({ pseudoPod, podDeviceId, agent, o
  * **What stays the same:**
  * - Surface is identical: `{addPeer, stop, listPeers, backfillFrom,
  *   getPeers}`. Drop-in replacement at bundle bring-up.
- * `evictionRoster` still filters posts from evicted members.
  * - Dedupe on `source.requestId` preserves idempotency under retry.
  *
  * Per-group recipient lists live HERE (the substrate's `pseudoPod`
@@ -148,7 +145,6 @@ export async function registerAgentInRegistry({ pseudoPod, podDeviceId, agent, o
  * @param {object} args.pseudoPod        — shared per-bundle instance.
  * @param {string} args.group            — group identifier (URI namespace).
  * @param {Array<{pubKey: string}>} [args.peers]
- * @param {import('./lib/EvictionRoster.js').EvictionRoster} [args.evictionRoster]
  * @param {string} [args.selfPubKey]     — local agent address; filtered out
  *                                          of the recipient roster (self).
  * @returns {Promise<{
@@ -165,7 +161,6 @@ export async function wireSubstrateMirror({
   pseudoPod,
   group,
   peers = [],
-  evictionRoster = null,
   selfPubKey = null,
 }) {
   /** Per-group recipient roster. Read by `postRequest` at publish
@@ -188,10 +183,6 @@ export async function wireSubstrateMirror({
     if (!payload) return;
     const requestId = payload.requestId;
     if (!requestId) return;
-    if (evictionRoster) {
-      const fromWebid = payload.from ?? null;
-      if (fromWebid && evictionRoster.isEvicted(fromWebid)) return;
-    }
     // Dedupe — same O(N) check as legacy. Pinboard's open-request volume
     // is small (tens at most).
     const open = await itemStore.listOpen();

@@ -21,7 +21,6 @@
  *   - 39.5: sendChatMessage requires body-or-attachment, and REFUSES an inline
  *           plaintext attachment (accepts a sealed pointer).
  *   - Privacy invariant: no plaintext bytes / `data:image` thumbnail crosses the wire.
- *   - Phase 35 interaction: an evicted author's attachment-bearing post is dropped.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -38,7 +37,6 @@ import {
   MAX_ATTACHMENTS_PER_POST,
 } from '../src/lib/Attachments.js';
 import { attachSubstrateMirror } from '../src/substrateMirror.js';
-import { EVICTION_GRACE_MS } from '../src/lib/EvictionRoster.js';
 import { makeSealCircle, makeSealedImageAttachment, TINY_PNG_B64 } from './helpers/sealedAttachment.js';
 
 const ANNE = 'https://id.example/anne';
@@ -169,7 +167,6 @@ describe('Phase 39.3 — substrate mirror copies the sealed pointer', () => {
     const mirror = await attachSubstrateMirror(bundle, {
       group:          'oosterpoort',
       peers:          [],
-      evictionRoster: bundle.evictionRoster,
     });
 
     await mirror.backfillFrom('pubkey-bob-stub', [{
@@ -222,36 +219,5 @@ describe('Phase 39.5 — sendChatMessage with a sealed attachment', () => {
       threadId: 't1', toWebid: BOB, attachment: makePlaintextAttachment(),
     });
     expect(r.error).toBe('attachment-plaintext-refused');
-  });
-});
-
-describe('Phase 35 + 39 interaction — evicted authors still drop attachments', () => {
-  it('evicted member with attachment: nothing lands locally', async () => {
-    const { att } = await makeSealedImageAttachment(makeSealCircle(), { createdBy: BOB });
-    const bundle = await buildBundle();
-    const past = Date.now() - EVICTION_GRACE_MS - 60_000;
-    bundle.evictionRoster.applyRedemption({
-      type: 'membership-redemption',
-      source: { redeemedBy: BOB, expiresAt: past },
-    });
-
-    const mirror = await attachSubstrateMirror(bundle, {
-      group:          'oosterpoort',
-      peers:          [],
-      evictionRoster: bundle.evictionRoster,
-    });
-
-    await mirror.backfillFrom('pubkey-bob-stub', [{
-      id:           'evicted-with-pic',
-      addedBy:      BOB,
-      type:         'request',
-      text:         'evicted post',
-      requiredSkills: [],
-      source: { attachments: [att] },
-    }]);
-
-    const open = await bundle.itemStore.listOpen();
-    expect(open.some(i => i?.source?.requestId === 'evicted-with-pic')).toBe(false);
-    await mirror.stop();
   });
 });

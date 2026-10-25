@@ -35,11 +35,17 @@ const CIRCLE_ID = 'per-type-matrix';
  */
 const NOT_CROSSING_YET = new Set([]);
 /**
- * Types that are carried ELSEWHERE, on purpose: by the membership lane's statements (and the announces, and the roster
- * seed between a person's own devices), never by the generic store door. For these, NOT arriving here is the asserted
- * behaviour — a roster row riding the task lane would overwrite a peer's proven addresses with this device's view.
+ * Types that are carried ELSEWHERE, on purpose, never by the generic store door — for these, NOT arriving here is the
+ * asserted behaviour:
+ *   - `membership-redemption`, by the membership lane's statements (and the announces, and the roster seed between a
+ *     person's own devices): a roster row riding the task lane would overwrite a peer's proven addresses with this
+ *     device's view;
+ *   - `group-rules`, by the rules lane's signed `rules-update` statements (and the creation, and the join): a rules
+ *     head riding the task lane would skip the rules lane's receiver-side admin check.
+ * (And one type that IS carried by the store door but admitted only from an admin: `announcement` — the task lane's
+ * apply refuses one whose author the folded roster does not name an admin.)
  */
-const CARRIED_ELSEWHERE = new Set(['membership-redemption']);
+const CARRIED_ELSEWHERE = new Set(['membership-redemption', 'group-rules']);
 
 /** A minimal item that satisfies a canonical schema's `required` list. */
 function minimalItem(typeName, schema, i) {

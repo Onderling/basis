@@ -392,39 +392,6 @@ True iff two items carry the SAME claim cluster (used to keep an origin merge id
 
 The circle chat message subtype/kind.
 
-### `chatEnvelopeFromStoreItem`
-
-**Kind:** function · **Import:** `chatEnvelopeFromStoreItem` from `'@onderling/item-store'`
-
-```js
-chatEnvelopeFromStoreItem(item, { groupId = null, lenient = false } = {})
-```
-
-`fromItem` — project a durable itemStore `circle-chat-message` item onto the
-WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
-consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, card? }`.
-
-This replaces the two hand-maintained reshapers that read a stored item's
-`source` and re-emit the envelope — `pinboard getMessagesSince`'s `.map(...)`
-and `basis circleChatRehydrate.itemToEnvelope`. They differ only in their
-leniency toward malformed items, expressed here as one explicit flag rather
-than as two silently-drifting copies:
-
-  - `lenient: true`  (getMessagesSince) — the caller has already filtered by
-    `source.circleId === groupId` and finite `ts`, so missing `msgId`/`text`
-    fall back (`msgId → item.id`, `text → ''`, `circleId → groupId`) and the
-    projector never returns null.
-  - `lenient: false` (rehydrator, default) — a strict projector: an item
-    missing `msgId` / `circleId` / `text` yields `null` so the caller counts
-    it as skipped.
-
-**Parameters**
-
-- `item` `{id?:string, text?:string, source?:object}`
-- `[opts]` `{groupId?:string|null, lenient?:boolean}`
-
-**Returns:** `{subtype:string, circleId:string, msgId:string, ts:number, text:string, fromActor:(string|null), card?:object} | null`
-
 ### `toEventLogItem`
 
 **Kind:** function · **Import:** `toEventLogItem` from `'@onderling/item-store'`
@@ -440,10 +407,8 @@ hand-copies:
   - the optimistic local append (`kring-host circleChatMessageEvent`) — passes
     the LOCAL-ONLY presentation fields (buttons/scope/embeds/review/
     provenance/consent) and NO `senderDisplay`;
-  - the received append (`basis chatMessageInbox`) — passes `senderDisplay`
-    + an already-guarded `card`;
-  - the rehydrate legacy append (`basis circleChatRehydrate`) — passes only
-    `senderDisplay`.
+  - the received append (the chat rail) — passes `senderDisplay`
+    + an already-guarded `card`.
 
 The optional keys are appended in the SAME order and under the SAME
 presence conditions the originals used, so every caller's event is

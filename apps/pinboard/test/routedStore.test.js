@@ -21,7 +21,7 @@ describe('createRoutedStore', () => {
   it('a post goes to its circle\'s store, not the pile; a non-post stays in the pile', async () => {
     const { stores, pile, routed } = setup();
     const [post] = await routed.addItems([ask('kring-a')], { actor: ANN });
-    const [rules] = await routed.addItems([{ type: 'group-rules', text: 'wees aardig', source: { groupId: 'kring-a' } }], { actor: ANN });
+    const [rules] = await routed.addItems([{ type: 'membership-code', text: 'code', source: { groupId: 'kring-a', code: 'GEHEIM' } }], { actor: ANN });
     expect(await stores.getStore('kring-a').get(post.id)).toBeTruthy();
     expect(await pile.getById(post.id).catch(() => null)).toBeFalsy();
     expect(await pile.getById(rules.id)).toBeTruthy();
@@ -135,7 +135,7 @@ describe('createRoutedStore — the roster trail lives in its circle\'s store', 
     const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
     const routed = createRoutedStore({ pile, hostCircles: {
       storeFor: (c) => stores.getStore(c), circlesOf: () => ['kring-pod'], openCircles: () => stores.ids(),
-      trailStoreFor: (c) => stores.localStore(c),
+      localStoreFor: (c) => stores.localStore(c),
     } });
     const [row] = await routed.addItems([trail('kring-pod')], { actor: ANN });
     const [post] = await routed.addItems([ask('kring-pod')], { actor: ANN });
@@ -155,10 +155,26 @@ describe('createRoutedStore — the roster trail lives in its circle\'s store', 
     const routed = createRoutedStore({ pile, hostCircles: {
       storeFor: (c, { write = false } = {}) => (write || stores.has(c) ? stores.getStore(c) : null), circlesOf: () => [],
       openCircles: () => stores.ids(), heldCircles: () => stores.heldIds(), peekFor: (c) => stores.peek(c),
-      trailStoreFor: (c) => stores.localStore(c),
+      localStoreFor: (c) => stores.localStore(c),
     } });
     expect(await routed.listOpen({ type: 'membership-redemption' })).toEqual([]);   // the held list is taken (empty)
     await routed.ingestItems([{ id: 'seed-9', ...trail('kring-new') }], { actor: ANN });
     expect((await routed.listOpen({ type: 'membership-redemption' })).map((r) => r.id)).toEqual(['seed-9']);
+  });
+
+  it("a circle's RULES HEAD lives with the trail — on this device's backing, not the pile and not the pod", async () => {
+    const local = memoryDataSource();
+    const pod = memoryDataSource();
+    const stores = createCircleStores({ dataSource: local, registry: { validate }, dataSourceFor: (c) => (c === 'kring-pod' ? pod : null) });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const routed = createRoutedStore({ pile, hostCircles: {
+      storeFor: (c) => stores.getStore(c), circlesOf: () => ['kring-pod'], openCircles: () => stores.ids(),
+      localStoreFor: (c) => stores.localStore(c),
+    } });
+    const [rules] = await routed.addItems([{ type: 'group-rules', text: 'kring', source: { groupId: 'kring-pod', rules: { purpose: 'circle' }, version: 1 } }], { actor: ANN });
+    expect(await pile.getById(rules.id).catch(() => null)).toBeFalsy();
+    expect([...pod._map.keys()].some((k) => k.includes(rules.id))).toBe(false);
+    expect((await stores.localStore('kring-pod').get(rules.id))?.source?.version).toBe(1);
+    expect((await routed.listOpen({ type: 'group-rules' })).map((r) => r.id)).toEqual([rules.id]);
   });
 });

@@ -390,9 +390,6 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
 import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
-import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/circleChatRehydrate.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
@@ -9361,31 +9358,8 @@ async function boot() {
       sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name });
       // Phase 5 — build the circle composer's bot now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
-      // register a peer-router with the circle-chat-message
-      // handler + connect the NKN transport (best-effort; no-op when
-      // nkn-sdk failed to load).  The ingest hook mirrors the envelope
-      // into pinboard's itemStore so circle chat history is durable,
-      // searchable, and mute/eviction-filtered.  EventLog append still drives
-      // the live bubble render.
-      const ingestCircleMessage = async (payload, fromPeerAddr) => {
-        try {
-          return await agent.callSkill('pinboard', 'ingestCircleMessage', {
-            payload, fromPeerAddr,
-          });
-        } catch (err) {
-          console.warn('[circleApp] ingestCircleMessage failed:', err?.message ?? err);
-          return { error: String(err?.message ?? err) };
-        }
-      };
-      // ε.1 — single normalization gate.  Every circle-chat insert
-      // path (receiver / rehydrator / future catch-up / pod) routes
-      // through this inbox so envelope validation + msgId dedup +
-      // ingest mirror + eventLog append happen in ONE place with
-      // shared state.  Sibling of `eventLog` so the rehydrator's
-      // backfill + the live NKN handler dedupe through the same LRU.
-      // Delivery honesty + repaint — SHARED by the legacy-envelope inbox and the signed-statement
-      // receive path (one set of side effects, not two): a LIVE inbound insert answers the sender with
-      // a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
+      // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender
+      // with a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
       const onCircleStored = ((sendReceipt) => (info) => {
           try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
           // …and REPAINT, because a message that arrived while the circle is open has to APPEAR.
@@ -9416,29 +9390,9 @@ async function boot() {
         }));
       // The Nearby room confirms what lands with the SAME receipt (nearbyRoomBinding.js).
       try { ensureNearbyRoom(agent)?.setLandedHook(onCircleStored); } catch { /* the room works without receipts */ }
-      const circleChatInbox = createChatMessageInbox({
-        eventLog,
-        ingest: ingestCircleMessage,
-        onStored: onCircleStored,
-        // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
-        // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
-        // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
-        resolveRef: circleResolveRef,
-        // "Did I write this?" — so a message of mine read back out of storage (boot rehydrate,
-        // catch-up, pod replay) comes back as MINE (`LOCAL_ACTOR`) instead of as a stranger's.
-        // Per-circle by construction; never consulted on the live receive path (chatSelfAuthor.js).
-        isSelfAuthored: createSelfAuthorCheck({
-          whoAmI: () => agent.callSkill('pinboard', 'whoAmI', {}),
-          circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-        }),
-        localActor: LOCAL_ACTOR,
-        logger: console,
-      });
-      // (the legacy plain-envelope receive is gone — every live chat message arrives as a SIGNED statement)
       // The SIGNED chat receive path (the content re-root): a fanned statement verifies at the agent's
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
-      // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
-      // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
+      // entry (bubble + proof) — the device log is the record — with the delivery receipt and the repaint.
       // THE LANE TABLE, built once for every shell (`buildCircleLanes`): the five signed lanes with
       // their catch-ups, plus the personal ones — grants, the roster seed, and the turns this person's
       // own devices hand each other. This shell passes only its own reactions: what to repaint, where
@@ -9480,18 +9434,6 @@ async function boot() {
       taskCatchUpShell    = circleLanes.catchUps.task;
       chatCatchUpShell    = circleLanes.catchUps.chat;
       podChatCatchUpShell = circleLanes.catchUps.podChat;
-      // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log): the log is the record now
-      // (durable since the persistence slice), so the store-era history lands on it ONCE through the
-      // shared inbox and a device-local latch skips every later boot. The per-boot rehydrate is retired
-      // — this was its final job.
-      migrateCircleChatHistory({
-        callSkill: agent.callSkill,
-        inbox:     circleChatInbox,
-        marker: {
-          get: () => { try { return localStorage.getItem(CHAT_MIGRATION_MARKER_KEY); } catch { return null; } },
-          set: (v) => { try { localStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v); } catch { /* retried next boot */ } },
-        },
-      }).catch(() => { /* logged inside */ });
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
       // recipes per-circle; the editor pulls on mount + passes via
       // γ.3's `incomingRecipe` opt.

@@ -10,7 +10,6 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { Reveals } from '@onderling/identity-resolver';
 import { Notifier, InMemoryScheduleStore } from '@onderling/notifier';
 import { InMemoryBridge } from '@onderling/chat-agent';
 
@@ -30,8 +29,8 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
   });
 }
 
-/** Build a single-agent bundle with optional notifier + reveals + members. */
-async function buildAgent({ notifier, reveals, members } = {}) {
+/** Build a single-agent bundle with optional notifier + members. */
+async function buildAgent({ notifier, members } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
   const bundle = await createNeighbourhoodAgent({
@@ -40,7 +39,6 @@ async function buildAgent({ notifier, reveals, members } = {}) {
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members,
     notifier,
-    reveals,
   });
   // OfferingMatch.broadcast requires start() even with zero peers.
   await bundle.offeringMatch.start();
@@ -183,71 +181,6 @@ describe('Pinboard V1 — lend lifecycle (postRequest + markReturned + notifier)
     expect(res.requestId).toBeTruthy();
   });
 });
-
-// ── Author hydration via Reveals + MemberMap ──────────────────────────────
-
-describe('Pinboard V1 — author hydration on listOpen / listMyRequests', () => {
-  it('without explicit members, the local actor is still hydrated (Phase 14 fix: factory seeds self)', async () => {
-    // The factory seeds the local actor's own MemberMap entry on
-    // construction so chat.send / whoAmI / resolveByWebid work
-    // without requiring setMyHandle.  As a side effect, listOpen
-    // hydrates the author block on the local actor's own posts.
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpenRequests');
-    expect(r.items[0].addedBy).toBe(ANNE);
-    expect(r.items[0].addedByDisplay).toBeTruthy();
-    // No handle / displayName set yet → render falls back to the
-    // WebID's tail label.
-    expect(r.items[0].addedByDisplay.handle).toBeNull();
-    expect(r.items[0].addedByDisplay.isRevealed).toBe(false);
-  });
-
-  it('with reveals + members, listOpen hydrates @handle by default', async () => {
-    const reveals = new Reveals();
-    const initialMembers = [
-      { webid: ANNE, handle: 'oosterpoort-bird-23', displayName: 'Anne van Dijk' },
-    ];
-    const bundle = await buildAgent({ reveals, members: initialMembers });
-
-    await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpenRequests');
-
-    expect(r.items[0].addedByDisplay.render).toBe('@oosterpoort-bird-23');
-    expect(r.items[0].addedByDisplay.isRevealed).toBe(false);
-    expect(r.items[0].addedByDisplay.handle).toBe('oosterpoort-bird-23');
-    expect(r.items[0].addedByDisplay.displayName).toBe('Anne van Dijk');
-  });
-
-  it('per-group reveal flips the rendered name to displayName', async () => {
-    const reveals = new Reveals();
-    reveals.setGroupReveal('oosterpoort', true);
-    const initialMembers = [
-      { webid: ANNE, handle: 'oosterpoort-bird-23', displayName: 'Anne van Dijk' },
-    ];
-    const bundle = await buildAgent({ reveals, members: initialMembers });
-
-    await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listOpenRequests');
-    expect(r.items[0].addedByDisplay.render).toBe('Anne van Dijk');
-    expect(r.items[0].addedByDisplay.isRevealed).toBe(true);
-  });
-
-  it('listMyRequests hydrates the same way', async () => {
-    const reveals = new Reveals();
-    const initialMembers = [
-      { webid: ANNE, handle: 'oosterpoort-bird-23', displayName: 'Anne van Dijk' },
-    ];
-    const bundle = await buildAgent({ reveals, members: initialMembers });
-
-    await callSkill(bundle.agent, 'postRequest', { text: 'paint', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const r = await callSkill(bundle.agent, 'listMyRequests');
-    expect(r.items).toHaveLength(1);
-    expect(r.items[0].addedByDisplay.render).toBe('@oosterpoort-bird-23');
-  });
-});
-
-// ── intent filter on listOpen ─────────────────────────────────────────────
 
 describe('Pinboard V1 — listOpen filters by intent', () => {
   it('listOpen({intent: "lend"}) returns only lends', async () => {

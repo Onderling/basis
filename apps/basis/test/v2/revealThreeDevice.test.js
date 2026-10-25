@@ -68,24 +68,15 @@ describe('names and reveals across three devices', () => {
     }
   });
 
-  it('the "show me names" preference is viewer-side: flipping it changes only the flipping device', async () => {
-    // Anna opts in to seeing names. This is HER display preference, recorded on HER device — it is
-    // NOT a reveal: it cannot stand in for a member's own release, and its marker carries an honest
-    // name (`viewerNameOptIn`) so no gate can mistake it for the discloser's consent again.
-    const r = await A.agent.callSkill('pinboard', 'setGroupReveal', { groupId: GROUP, showDisplayName: true });
-    expect(r?.error).toBeUndefined();
-
-    const onA = rowFor(await rosterOn(A), B.pubKey);
-    expect(onA.viewerNameOptIn, "the marker is the viewing device's own opt-in").toBe(true);
-    expect(onA.reveals ?? null, 'the old revealer-shaped field must not come back').toBeNull();
-
-    // On Cato's device: nothing. A preference is not an event, not a fan, not a shared fact.
-    const onC = rowFor(await rosterOn(C), B.pubKey);
-    expect(onC.viewerNameOptIn ?? false, "one viewer's opt-in must never appear on another device").toBe(false);
-
-    // And the preference never conjured name bytes that were not there: Anna may now be WILLING to
-    // see Bram's name, but her device still does not HAVE it (fact 1 above).
-    expect(onA.displayName ?? null).toBeNull();
+  it('no roster row carries a viewer-side name flag: a name is shown only as its member released it', async () => {
+    // The viewer-side "show me names" toggle (Reveals) is gone: the persona/disclosure release is the one
+    // place a name is disclosed, so no row may carry a second, viewer-made marker beside it.
+    for (const [who, dev] of [['Anna', A], ['Cato', C]]) {
+      const row = rowFor(await rosterOn(dev), B.pubKey);
+      expect(row.viewerNameOptIn, `${who}'s roster row holds no viewer flag`).toBeUndefined();
+      expect(row.reveals ?? null, 'the old revealer-shaped field must not come back').toBeNull();
+      expect(row.displayName ?? null).toBeNull();
+    }
   });
 
   it("join-time persona release lands on the admin's device only — and never as a name", async () => {

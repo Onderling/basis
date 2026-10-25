@@ -14,8 +14,8 @@
  *   - the update does NOT appear in the NOT-revealed context (its release stays empty — the update never
  *     becomes a "silent payload" that bypasses the gate).
  *
- * Discloser-side, like story 5.1 (`revealPerCircleDisclosure.test.js`) — never the viewer-side
- * `Reveals`/`viewerNameOptIn`. Scope: this is the READ-path half (the release the sender computes). The
+ * Discloser-side, like story 5.1 (`revealPerCircleDisclosure.test.js`); the viewer-side toggle that
+ * once sat beside it is deleted. Scope: this is the READ-path half (the release the sender computes). The
  * three-device DELIVERY half — the release said on the circle's membership lane, folded by every member —
  * is proven over the bus and over a real relay (`v2/releasePropagationBus.test.js`, `v2/releasePropagation.relay.test.js`).
  */

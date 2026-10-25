@@ -88,7 +88,6 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc.sharedWithMe',
     'cc.userScreens',
     'cc.actionFrequency',       // which ops the former self used
-    'cc.chatHistoryMigrated.v1',
     'cc.firstBootSeeded.v1',
     'basis.nearbyAllows',       // who this device was told to allow — the former self's consent…
     'basis.nearbyMineSeen',

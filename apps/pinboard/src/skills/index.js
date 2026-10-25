@@ -71,7 +71,7 @@ import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
-import { itemTreeFor, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
+import { itemTreeFor, toWireRefEnvelope } from '@onderling/item-store';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 // The circle storage postures — one vocabulary, in the package that owns the persisted shape.
 import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
@@ -344,15 +344,6 @@ async function collectCircleHandles({ store, members, groupId } = {}) {
 }
 
 /**
- * How long an already-redeemed MEMBERSHIP stays "active" past its code's expiry.
- *
- * Generous on purpose: this answers *is this person still one of us*, and letting someone's standing
- * lapse over a clock difference would evict a real member. Nobody gets IN through this.
- */
-// Parameter register (#36) — membership-standing grace past expiry (scope:device, kind:internal).
-const MEMBERSHIP_GRACE_MS = param({ key: 'pinboard.membershipGraceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
-
-/**
  * How much clock difference a REDEEM tolerates past a code's expiry.
  *
  * A different question from the one above, and it took an attack to see that they had been sharing a
@@ -611,7 +602,6 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * (`held:true`), which counts as a successful send — NOT a failure.
  *
  * The envelope is the conforming `circle-chat-message` wire shape the existing receiver
- * (basis peerRouter → `makeCircleChatPeerHandler` → chatMessageInbox → `ingestCircleMessage`)
  * validates and renders — carrying a top-level `text` (the chat.send path emitted `body`,
  * which that receiver rejects), `circleId`, `msgId`, `ts`, `fromActor`. Dedup stays on
  * `msgId` at the receiver; ordering + persistence + catch-up are unchanged.
@@ -702,28 +692,6 @@ async function _fanOutViaReliableSend({
     if (last) outcomes.push(last);
   }));
   return { sent, attempted: targets.size + unresolved.length, errors, outcomes };
-}
-
-/**
- * Shared inbound-peer filter for BOTH ingest paths (circle chat + circle post),
- * so eviction + mute can't drift between them (E1 drift-guard). Returns a
- * rejection verdict (`{evicted:true}` | `{muted:true}`) or `null` (let through).
- *
- * @param {object} a
- * @param {{isEvicted:(webid:string)=>boolean}|null} [a.evictionRoster]
- * @param {Set<string>|null} [a.muted]              per-viewer local mute set
- * @param {string|null} [a.evictWebid]              author webid tested against eviction
- * @param {Array<string|null|undefined>} [a.muteKeys]  candidate mute keys (stableId/actor/webid)
- * @returns {{evicted:true}|{muted:true}|null}
- */
-function _peerIngestVerdict({ evictionRoster, muted, evictWebid, muteKeys } = {}) {
-  if (evictionRoster && evictWebid && evictionRoster.isEvicted(evictWebid)) return { evicted: true };
-  if (muted) {
-    for (const k of muteKeys ?? []) {
-      if (k && muted.has(k)) return { muted: true };
-    }
-  }
-  return null;
 }
 
 // ── B★ B3 pure cores: (scope, a, ctx) → result ───────────────────────────────
@@ -845,9 +813,8 @@ async function listGroupMembersCore(scope, a, ctx) {
  * (`listGroupMembers`) and the circle FAN-OUT (`broadcastToCircle`).
  *
  * B1 fix (C2) — proof-derived membership: a circle's members are a PROJECTION of the
- * durable, signed `membership-redemption` trail (the same source EvictionRoster
- * reduces), NOT `MemberMap.list()`. The MemberMap is a lossy, GLOBAL display cache:
- * it holds every member of every circle this device ever admitted (with no circle
+ * durable, signed `membership-redemption` trail, NOT `MemberMap.list()`. The MemberMap is a
+ * lossy, GLOBAL display cache: it holds every member of every circle this device ever admitted (with no circle
  * key on the row), and it holds nothing for a circle whose members this device
  * learned from the trail alone — which is exactly a JOINER's view of the admin
  * (`recordRemoteRedemption` records only the joiner's own row; the admin is known
@@ -2573,9 +2540,9 @@ export function buildSkills({
      *   It used to say it marked the previous one stale, and it did not: it only added a newer row, and
      *   the redeem gate accepted any row inside its own expiry plus a day. So rotating a code did not
      *   remove anybody — the old code kept admitting strangers for up to 24 hours (walked 2026-07-29,
-     *   S6/J-A8). Rotation is an act of REMOVAL, and it now behaves like one; an already-redeemed
-     *   membership keeps its own generous grace (`MEMBERSHIP_GRACE_MS`), so nobody already inside is
-     *   evicted by this.
+     *   S6/J-A8). Rotation is an act of REMOVAL, and it now behaves like one; it removes no MEMBER: a
+     *   membership has no expiry (a trail row's `expiresAt` is the invite's lifetime), so nobody already inside
+     *   is evicted by this.
      */
     defineSkill('rotateMyGroupCode', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -2763,9 +2730,7 @@ export function buildSkills({
      *   After the peer-bridge receives a successful
      *   verifyMembershipCodeForPeer reply from the admin, the joiner
      *   calls this skill locally to write its OWN
-     *   `membership-redemption` audit record.  Without this mirror,
-     *   `getMyMembershipStatus()` on the joiner side would return
-     *   `redeemed: false` since it reads local items.
+     *   `membership-redemption` row: the joiner's own roster reads its local trail.
      *
      *   `codeId` is the admin-side item-id (the joiner has no matching
      *   `membership-code` item locally — that's the whole point of
@@ -3079,48 +3044,6 @@ export function buildSkills({
       return { peers, _sync: simulateSync() };
     }, {
       description: 'List circle members who consented to mesh address-sharing.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getMyMembershipStatus({groupId})
-     *   — Phase 25.7.  Reports the calling actor's most recent
-     *   `membership-redemption` for the group, plus whether it's
-     *   still valid.  Members who never redeemed return
-     *   `{redeemed: false}`.  Members whose latest redemption has
-     *   expired (past the rotation window + 24h grace) return
-     *   `{redeemed: true, validUntil, isActive: false}` — the
-     *   "auto-evicted" state.  Active members return `isActive: true`.
-     *
-     *   Eviction is enforced where it actually matters:
-     *   `redeemMembershipCode` rejects expired codes; the relay-side
-     *   proof check (V1 Phase 2) rejects messages signed by stale
-     *   proofs.  This skill is purely informational so the UI can
-     *   surface "Je code is verlopen — vraag de admin / leden om
-     *   de nieuwe."
-     */
-    defineSkill('getMyMembershipStatus', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      const all = await store.listOpen({ type: 'membership-redemption' });
-      const mine = all.filter(i =>
-        i.source?.groupId === a.groupId && i.source?.redeemedBy === from,
-      );
-      if (mine.length === 0) return { redeemed: false };
-      mine.sort((p, q) => (q.source.redeemedAt ?? 0) - (p.source.redeemedAt ?? 0));
-      const latest = mine[0];
-      const now = Date.now();
-      const validUntil = latest.source.expiresAt ?? 0;
-      // Standing, not admission — the generous grace belongs here and only here.
-      const isActive = now <= validUntil + MEMBERSHIP_GRACE_MS;
-      return {
-        redeemed:  true,
-        isActive,
-        validUntil,
-        redemptionId: latest.id,
-      };
-    }, {
-      description: 'Report whether the calling actor\'s membership-code redemption is still valid.',
       visibility:  'authenticated',
     }),
 
@@ -3929,111 +3852,6 @@ export function buildSkills({
     }),
 
     /**
-     * listCircleChats({groupId?, sinceTs?, limit?})
-     *   — list stored circle chat-message items, ordered
-     *   oldest → newest (chat reading order).  Defaults: all circles,
-     *   no time bound, capped at 200 most recent.  Hosts (basis
-     *   web + mobile) call this at boot to rehydrate eventLog so the
-     *   CONVERSATION tab shows historical chats after a reload.
-     */
-    defineSkill('listCircleChats', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const limit = Math.max(1, Math.min(1000,
-        typeof a.limit === 'number' && Number.isFinite(a.limit) ? a.limit : 200,
-      ));
-      const open = await store.listOpen({ type: 'circle-chat-message' });
-      let filtered = open;
-      if (typeof a.groupId === 'string' && a.groupId) {
-        filtered = filtered.filter((i) => i?.source?.circleId === a.groupId);
-      }
-      if (typeof a.sinceTs === 'number' && Number.isFinite(a.sinceTs)) {
-        const cutoff = a.sinceTs;
-        filtered = filtered.filter((i) => (i?.source?.ts ?? 0) > cutoff);
-      }
-      // Chat order: oldest at top, newest at bottom.  Slice tail when
-      // over the limit so callers always get the freshest N entries.
-      const sorted = filtered.slice().sort(
-        (a, b) => (a?.source?.ts ?? 0) - (b?.source?.ts ?? 0),
-      );
-      const trimmed = sorted.length > limit ? sorted.slice(sorted.length - limit) : sorted;
-      return { items: trimmed };
-    }, {
-      description: 'List stored circle chat-message items for boot-time eventLog rehydration.  Filters: groupId, sinceTs (exclusive), limit (default 200, max 1000).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * ingestCircleMessage({payload, fromPubKey, fromPeerAddr})
-     *   — receive-side mirror for an inbound circle chat
-     *   envelope.  Sibling of the retired post ingest for the circle-post
-     *   path: dedupe + eviction + mute filtering + addItems.  Hosts
-     *   (basis web + mobile) call this from their circle-chat
-     *   peer-router handler instead of writing to eventLog directly.
-     *
-     *   Returns: { ok: true, itemId } | { deduped: true } |
-     *            { evicted: true } | { muted: true } | { error }.
-     */
-    defineSkill('ingestCircleMessage', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const payload = a.payload;
-      const fromPubKey = typeof a.fromPubKey === 'string' ? a.fromPubKey : null;
-      const fromPeerAddr = typeof a.fromPeerAddr === 'string' ? a.fromPeerAddr : null;
-      if (!payload || typeof payload !== 'object') return { error: 'payload required' };
-
-      const circleId = payload.circleId;
-      const msgId    = payload.msgId;
-      const text     = payload.text;
-      const ts       = typeof payload.ts === 'number' && Number.isFinite(payload.ts) ? payload.ts : Date.now();
-      if (typeof circleId !== 'string' || !circleId) return { error: 'circleId required' };
-      if (typeof msgId    !== 'string' || !msgId)    return { error: 'msgId required' };
-      if (typeof text     !== 'string' || !text)     return { error: 'text required' };
-
-      // Eviction + mute filter — the ingest's own (posts land on the circle store, verified by its lane) so the
-      // paths can't drift (E1 drift-guard via _peerIngestVerdict).
-      const verdict = _peerIngestVerdict({
-        evictionRoster: bundle?.evictionRoster ?? null,
-        muted,
-        evictWebid: payload.fromActor ?? payload.fromWebid ?? null,
-        muteKeys: [payload.fromStableId, payload.fromActor, payload.fromWebid],
-      });
-      if (verdict) return verdict;
-
-      // Dedupe by msgId — O(N) over open circle-chat items.
-      const open = await store.listOpen({ type: 'circle-chat-message' });
-      if (open.some((i) => i?.source?.msgId === msgId)) return { deduped: true };
-
-      // The embed CARD riding the envelope — a photo, an appointment, a shared item, a file.
-      // Shape-guarded only (pinboard stays incurious about which variants exist; the SENDER's
-      // per-variant whitelist is the boundary that decides what may travel). Persisted so this
-      // peer's rehydrate + catch-up serves keep the card.
-      const card = (payload.card && typeof payload.card === 'object' && !Array.isArray(payload.card))
-        ? payload.card : null;
-
-      const [item] = await store.addItems([{
-        type:       'circle-chat-message',
-        text,
-        visibility: 'household',
-        source: {
-          circleId,
-          msgId,
-          ts,
-          fromActor: payload.fromActor ?? null,
-          fromWebid: payload.fromWebid ?? null,
-          fromPubKey,
-          ...(fromPeerAddr ? { fromPeerAddr } : {}),
-          ...(card ? { card } : {}),
-        },
-      }], {
-        actor: payload.fromActor ?? payload.fromWebid ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'remote'),
-      });
-      metrics?.record?.('circle-chat-ingest');
-      return { ok: true, itemId: item.id };
-    }, {
-      description: 'Ingest an inbound circle chat-message envelope into the local itemStore (mute + eviction filtered, dedupes on msgId).',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * postAnnouncement({text, groupId?})
      *   — admin-only.  Persists a `kind: 'announcement'` item that
      *   the board pins at the top.  Visibility / pinning is a
@@ -4665,21 +4483,6 @@ export function buildSkills({
      */
     defineSkill('podSignInStatus', async () => podSignInStatus({ bundle }), {
       description: 'Read-only Solid pod sign-in status.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listEvictedMembers()
-     *   — Phase 35 (2026-05-06). Returns the webids whose
-     *   most-recent membership-redemption has expired (past
-     *   `expiresAt + GRACE_MS`).  Posts from these members are
-     *   silently dropped on the receive side; the UI uses this
-     *   skill to render a banner on /group.html.
-     */
-    defineSkill('listEvictedMembers', async () => ({
-      evicted: bundle?.evictionRoster?.listEvicted() ?? [],
-    }), {
-      description: 'List webids whose membership has expired past the grace window.',
       visibility:  'authenticated',
     }),
 

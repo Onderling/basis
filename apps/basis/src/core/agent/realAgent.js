@@ -6338,7 +6338,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // chat-shell knows which circle this agent is in (single-circle
       // mode), so auto-inject when missing.
       const REQUIRES_GROUP_ID = new Set([
-        'getGroupRules', 'leaveGroup', 'getMyMembershipStatus',
+        'getGroupRules', 'leaveGroup',
         'editGroupRules', 'removeMember',
       ]);
       if (REQUIRES_GROUP_ID.has(realOpId) && !realArgs.groupId) {

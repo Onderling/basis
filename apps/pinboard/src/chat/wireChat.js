@@ -25,7 +25,7 @@
  *     return;` guards short-circuit) — no plaintext bytes are ever served.
  *
  *   - All other Pinboard-specific knobs (`itemStore`, `members`,
- *     `muted`, `evictionRoster`, `dataSource`) pass through verbatim.
+ *     `muted`, `dataSource`) pass through verbatim.
  */
 
 import { wireChat as substrateWireChat } from '@onderling/chat-p2p';

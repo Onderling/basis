@@ -93,7 +93,6 @@ function freshNonce() {
  */
 export function wireChat({
   agent, itemStore, members, muted, metrics, localActor, localStableId,
-  evictionRoster = null,
   dataSource     = null,
   // Connectivity Phase 2 / Wave B — host-injected hold-forward sender (basis's
   // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`). When wired, a 1:1 DM to a
@@ -342,8 +341,6 @@ export function wireChat({
         (data.fromWebid    && muted.has(data.fromWebid))
       )) return;
 
-      // silently drop posts from evicted members.
-      if (evictionRoster && data.fromWebid && evictionRoster.isEvicted(data.fromWebid)) return;
 
       // Distance filter: receiver checks against own location.
       if (typeof data.maxDistanceKm === 'number' && members) {

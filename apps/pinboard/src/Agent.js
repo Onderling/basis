@@ -41,7 +41,6 @@ import { PushRegistryCache } from './lib/PushRegistryCache.js';
 import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
 import { createContactBook } from './lib/ContactBook.js';
 import { wireChat }          from './chat/wireChat.js';
-import { EvictionRoster }    from './lib/EvictionRoster.js';
 import { createRoutedStore } from './lib/routedStore.js';
 
 /**
@@ -484,15 +483,6 @@ export async function createNeighbourhoodAgent({
     expoPushSender = new ExpoPushSender(expoPush === true ? {} : expoPush);
   }
 
-  // Pinboard Phase 35 (2026-05-06): build the eviction roster
-  // BEFORE wiring chat (chat consumes it) and BEFORE skills register
-  // (so the bundle exposes it).  Hydrate from any existing
-  // `membership-redemption` items, then attach so future redemptions
-  // mutate the roster live.
-  const evictionRoster = new EvictionRoster();
-  await evictionRoster.hydrateFrom(itemStore);
-  const evictionRosterDetach = evictionRoster.attach({ itemStore });
-
   // Pinboard V1 Phase 14 (2026-05-06): wire peer-chat handler BEFORE
   // skills register, so `chat` is in scope for buildSkills.  Listens
   // for `agent.on('message', ...)` envelopes whose first DataPart
@@ -506,7 +496,6 @@ export async function createNeighbourhoodAgent({
     metrics,
     localActor:    offeringMatchOpts.localActor,
     localStableId: id?.stableId ?? null,
-    evictionRoster,                  // Phase 35 — drop broadcast-posts from evicted members
     dataSource:    cache,            // Phase 39 — read/write attachment bytes from the cache
     // Wave B — route 1:1 peer DMs (reveal-request / contact-add / peer chat) through the SAME
     // host-injected hold-forward sender the circle chat fan-out uses, so a DM to a briefly-offline
@@ -528,8 +517,6 @@ export async function createNeighbourhoodAgent({
     flushLocal: async () => { if (persist && lastLocalMap && typeof persist.flush === 'function') await persist.flush(lastLocalMap); },
     agent,
     deviceId: id?.deviceId ?? null,    // Phase 33.1 — per-install id for device-scoped settings
-    evictionRoster,                    // Phase 35 — auto-evict filter for stale memberships
-    evictionRosterDetach,              // call on shutdown to detach the item-added listener
     itemStore,
     members,
     offeringMatch,

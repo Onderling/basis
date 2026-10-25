@@ -1112,18 +1112,6 @@ export const pinboardManifest = {
       },
     },
     {
-      id:   'listCircleChats', visibility: 'authenticated', verb: 'list',
-      params: [
-        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'sinceTs', kind: 'number' },
-        { name: 'limit',   kind: 'number' },
-      ],
-      surfaces: {
-        chat: { hint: 'Chat messages in one circle, newest first, optionally since a timestamp.' },
-        ui:   { control: 'page' },
-      },
-    },
-    {
       id:   'getLatestPostAddedAt', visibility: 'authenticated', verb: 'list',
       // The cheap "is there anything new" probe — a timestamp, so a poll costs one number rather than a feed.
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
@@ -1631,20 +1619,6 @@ export const pinboardManifest = {
       resolves: [{ field: 'circleAddress', policy: 'spine' }],
       surfaces: {
         chat: { hint: "Record a member's PROVEN per-circle address. An unproven one is dropped." },
-        ui:   { control: 'page' },
-      },
-    },
-    {
-      id:   'ingestCircleMessage', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      params: [
-        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'payload',      kind: 'object', required: true },
-      ],
-      resolves: [{ field: 'text', policy: 'content' }],
-      surfaces: {
-        chat: { hint: 'Ingest a circle message from an authenticated peer.' },
         ui:   { control: 'page' },
       },
     },

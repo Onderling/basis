@@ -8,7 +8,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   CIRCLE_CHAT_KIND,
-  chatEnvelopeFromStoreItem,
   toEventLogItem,
   fromEventLogItem,
   toWireEnvelope,
@@ -118,55 +117,6 @@ describe('toEventLogItem ↔ fromEventLogItem round-trip', () => {
   });
 });
 
-describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox envelope', () => {
-  const storeItem = (source, extra = {}) => ({ id: source.msgId ?? 'auto', text: 'hoi', source, ...extra });
-
-  it('lenient (getMessagesSince): full envelope with card', () => {
-    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', card: CARD });
-    expect(chatEnvelopeFromStoreItem(it, { groupId: 'g1', lenient: true })).toEqual({
-      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', card: CARD,
-    });
-  });
-
-  it('lenient: fromActor falls back to fromWebid; card absent stays absent', () => {
-    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromWebid: 'https://id/bob' });
-    const env = chatEnvelopeFromStoreItem(it, { groupId: 'g1', lenient: true });
-    expect(env.fromActor).toBe('https://id/bob');
-    expect(env).not.toHaveProperty('card');
-  });
-
-  it('lenient: msgId falls back to item.id, circleId falls back to groupId, text to empty', () => {
-    const env = chatEnvelopeFromStoreItem({ id: 'itemid', text: undefined, source: { ts: 5 } }, { groupId: 'gX', lenient: true });
-    expect(env).toEqual({ subtype: CIRCLE_CHAT_KIND, circleId: 'gX', msgId: 'itemid', ts: 5, text: '', fromActor: null });
-  });
-
-  it('strict (rehydrate): valid item → envelope', () => {
-    const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', card: CARD });
-    expect(chatEnvelopeFromStoreItem(it)).toEqual({
-      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', card: CARD,
-    });
-  });
-
-  it('strict: missing msgId / circleId / text → null (skipped)', () => {
-    expect(chatEnvelopeFromStoreItem({ text: 'hoi', source: { circleId: 'g', ts: 1 } })).toBeNull();          // no msgId
-    expect(chatEnvelopeFromStoreItem({ text: 'hoi', source: { msgId: 'a', ts: 1 } })).toBeNull();             // no circleId
-    expect(chatEnvelopeFromStoreItem({ text: '', source: { msgId: 'a', circleId: 'g', ts: 1 } })).toBeNull(); // empty text
-    expect(chatEnvelopeFromStoreItem(null)).toBeNull();
-    expect(chatEnvelopeFromStoreItem({})).toBeNull();
-  });
-
-  it('strict: missing/invalid ts → Date.now() (never NaN)', () => {
-    const env = chatEnvelopeFromStoreItem({ text: 'hoi', source: { msgId: 'a', circleId: 'g' } });
-    expect(typeof env.ts).toBe('number');
-    expect(Number.isFinite(env.ts)).toBe(true);
-  });
-
-  it('card guard: an array in source.card is rejected (uniform !Array guard)', () => {
-    const env = chatEnvelopeFromStoreItem({ text: 'hoi', source: { msgId: 'a', circleId: 'g', ts: 1, card: [1, 2] } });
-    expect(env).not.toHaveProperty('card');
-  });
-});
-
 describe('toWireEnvelope (toWire) — canonical → fan-out wire', () => {
   it('byte-identical to the former broadcastCircleMessage literal (with card)', () => {
     const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'https://id/me', card: CARD };
@@ -190,15 +140,6 @@ describe('toWireEnvelope (toWire) — canonical → fan-out wire', () => {
     expect(json).not.toContain('provenance');
     expect(json).not.toContain('consent');
     expect(json).not.toContain('buttons');
-  });
-});
-
-describe('store item → wire round-trip (fromItem then toWire)', () => {
-  it('a persisted item projects back to a wire envelope carrying the same core fields + card', () => {
-    const item = { id: 'a', text: 'hoi', source: { circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', card: CARD } };
-    const env = chatEnvelopeFromStoreItem(item, { groupId: 'g1', lenient: true });
-    const wire = toWireEnvelope({ circleId: env.circleId, msgId: env.msgId, ts: env.ts, text: env.text, fromActor: env.fromActor, fromWebid: env.fromActor, card: env.card });
-    expect(wire).toMatchObject({ type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', card: CARD });
   });
 });
 

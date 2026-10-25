@@ -22,6 +22,12 @@
  *   for (`circle-post`) had no receiver left either. Traffic on every reconnect, for an answer nobody
  *   could send and nobody would have read.
  *
+ * Retired 2026-10-25 (circle chat's store copy — the device log is the record on every shell, and live chat arrives
+ *   as a signed statement at the chat rail): the shared chat inbox (chatMessageInbox, with its self-author check) and its one-time history
+ *   migration (circleChatRehydrate, the `cc.chatHistoryMigrated` latch) · pinboard's `ingestCircleMessage` and
+ *   `listCircleChats` · EvictionRoster and `listEvictedMembers` (it read an invite code's lifetime as a membership
+ *   expiry).
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -42,6 +48,14 @@ const RETIRED = [
   { name: 'getSpineSince',        re: /['"]getSpineSince['"]/ },
   { name: 'handlers/catchUp',     re: /from\s+['"][^'"]*handlers\/catchUp(?:\.js)?['"]|makeRequestCatchUpFromKnownPeers\s*\(|makeHandleCatchUpRequest\s*\(/ },
   { name: 'catch-up-request',     re: /['"]catch-up-request['"]/ },
+  { name: 'chatMessageInbox',     re: /from\s+['"][^'"]*chatMessageInbox(?:\.js)?['"]|createChatMessageInbox\s*\(/ },
+  { name: 'circleChatRehydrate',  re: /from\s+['"][^'"]*circleChatRehydrate(?:\.js)?['"]|migrateCircleChatHistory\s*\(|rehydrateCircleChatsFromPinboard\s*\(/ },
+  { name: 'chatSelfAuthor',       re: /from\s+['"][^'"]*chatSelfAuthor(?:\.js)?['"]|createSelfAuthorCheck\s*\(/ },
+  { name: 'cc.chatHistoryMigrated', re: /['"]cc\.chatHistoryMigrated/ },
+  { name: 'ingestCircleMessage',  re: /['"]ingestCircleMessage['"]/ },
+  { name: 'listCircleChats',      re: /['"]listCircleChats['"]/ },
+  { name: 'EvictionRoster',       re: /from\s+['"][^'"]*EvictionRoster(?:\.js)?['"]|new\s+EvictionRoster\s*\(/ },
+  { name: 'listEvictedMembers',   re: /['"]listEvictedMembers['"]/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

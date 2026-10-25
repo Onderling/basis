@@ -856,8 +856,8 @@ connected bot, a remote handler) build on.
 **One send waist (`deliver`).** Every message a circle emits — a chat line, a broadcast, a 1:1 DM — funnels
 through one primitive rather than the parallel send paths that used to exist. There is **one canonical chat
 `Envelope`** (`@onderling/item-store/chatEnvelope.js`) with declared, pure projections — `toEventLogItem`
-(the in-memory render event), `toWireEnvelope` (the peer fan-out shape), and `chatEnvelopeFromStoreItem` (the
-durable stored item) — so the three shapes that used to be hand-reshaped (and drift) are now views of one datum,
+(the in-memory render event) and `toWireEnvelope` (the peer fan-out shape) — circle chat keeps no store row, its
+record is the device log — so the shapes that used to be hand-reshaped (and drift) are now views of one datum,
 proven byte-identical to their old producers by round-trip tests. Over that envelope: **one circle-broadcast**
 (`broadcastToCircle`) fans to a circle's members, and **one addressed send** (`addressedDeliver.js`) folds the
 two former 1:1 DM paths (the ephemeral contact-thread channel and wireChat's persisted `chat.send`) into a

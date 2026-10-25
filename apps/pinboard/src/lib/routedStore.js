@@ -81,7 +81,9 @@ export function circleRowsView(cs, types = CIRCLE_TYPES) {
 }
 /** Could a read with this filter return a circle row? A filter on another type cannot: the circles are not asked. */
 const mayBeInCircles = (filter) => !filter?.type || CIRCLE_TYPES.includes(filter.type);
-const mayBeOwn = (filter) => !filter?.type || OWN_TYPES.includes(filter.type);
+// an own row (the invite code, who answered) comes out only to a read that names its exact type — never to a no-type read
+const mayBeOwn = (filter) => typeof filter?.type === 'string' && OWN_TYPES.includes(filter.type);
+const namesOwnType = (filter, it) => filter?.type === it?.type;
 
 export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost = isNoticeboardPostType }) {
   // a trail row names its circle always; one that does not stays where it was written
@@ -225,14 +227,14 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     const lists = [(await pile[verb](filter)) ?? []];
     const own = mayBeOwn(filter) ? await ownTaskStore() : null;
     if (own) lists.push(((await own.tasks[verb](filter)) ?? []).filter((it) => OWN_TYPES.includes(it?.type)));
-    if (!mayBeInCircles(filter)) return unionById(lists).filter((r) => r?.type !== ANSWERS);
+    if (!mayBeInCircles(filter)) return unionById(lists).filter((r) => !OWN_TYPES.includes(r?.type) || namesOwnType(filter, r));
     for (const c of await circlesFor(filter)) {
       for (const ts of [await readStoreOf(c), await localStoreOf(c)]) {
         if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isCircleRow(it)));
       }
     }
     // the answers row is this device's own bookkeeping, not an item a reader lists
-    return withPrivate(unionById(lists).filter((r) => r?.type !== ANSWERS));
+    return withPrivate(unionById(lists).filter((r) => !OWN_TYPES.includes(r?.type) || namesOwnType(filter, r)));
   };
   const notFound = (err) => err?.name === 'ItemNotFoundError' || err?.code === 'ITEM_NOT_FOUND' || /not found/i.test(String(err?.message ?? ''));
   /**

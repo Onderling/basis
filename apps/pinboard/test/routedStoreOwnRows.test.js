@@ -59,3 +59,16 @@ describe('who answered my post lives on the host\'s own store', () => {
     expect((await routed.listOpen({})).some((r) => r.type === 'post-answers')).toBe(false);
   });
 });
+
+describe('an own row comes out only to a read that names its type', () => {
+  it('a no-type read never yields a membership-code row; a read for that type does', async () => {
+    const { routed } = setup();
+    await routed.addItems([code('kring-a', 'GEHEIM-A')], { actor: ANN });
+    await routed.addItems([{ type: 'request', text: 'wie heeft een ladder?', source: { groupId: 'kring-a' } }], { actor: ANN });
+    const all = await routed.listOpen({});
+    expect(all.some((r) => r.type === 'membership-code'), 'no-type read').toBe(false);
+    expect(JSON.stringify(all)).not.toContain('GEHEIM-A');
+    expect((await routed.listClosed({})).some((r) => r.type === 'membership-code')).toBe(false);
+    expect((await routed.listOpen({ type: 'membership-code' })).map((r) => r.source.code)).toEqual(['GEHEIM-A']);
+  });
+});

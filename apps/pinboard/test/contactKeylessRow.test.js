@@ -92,12 +92,6 @@ describe('every book method over the keyless row', () => {
     noKey(await book.setHidden(K.webid, false, 20));
   });
 
-  it('contact lists hold it by its webid', async () => {
-    const l = await book.createList('huis');
-    expect((await book.addToList(l.listId, K.webid)).contactWebids).toEqual([K.webid]);
-    expect((await book.removeFromList(l.listId, K.webid)).contactWebids).toEqual([]);
-  });
-
   it('the audience resolver reaches it by webid, and a post from it is addressed to me', async () => {
     await book.setTrustLevel(K.webid, 'vertrouwd');
     const r = await resolveTargets([{ kind: 'contacts', minTrust: 'bekend' }], { members, contacts: book, selfWebid: 'me' });

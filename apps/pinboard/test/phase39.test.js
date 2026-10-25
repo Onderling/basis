@@ -11,13 +11,13 @@
  * Verifies:
  *   - Attachments lib: `validateInboundAttachment` accepts the sealed pointer +
  *     REFUSES inline plaintext; `toBroadcastShape` carries the sealed line, no
- *     local `ref` / `dataB64`; helpers (attachmentPath / freshAttachmentId / caps).
+ *     local `ref` / `dataB64`; helpers (freshAttachmentId / caps).
  *   - 39.2: postRequest stores the sealed pointer on `source.attachments`; the
  *           record + broadcast carry NO plaintext bytes / `data:image` thumbnail.
  *   - 39.3: the substrate mirror copies the sealed pointer into mirrored items
  *           (no local `ref`).
  *   - 39.4: the removed plaintext byte-serving path — postRequest REFUSES inline
- *           plaintext; requestAttachment still rejects an unknown item.
+ *           plaintext (the fetch skill itself is deleted).
  *   - Privacy invariant: no plaintext bytes / `data:image` thumbnail crosses the wire.
  */
 
@@ -28,7 +28,6 @@ import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   validateInboundAttachment,
   toBroadcastShape,
-  attachmentPath,
   freshAttachmentId,
   MAX_NOTICEBOARD_BYTES_PER_ATT,
   MAX_CHAT_BYTES_PER_ATT,
@@ -95,13 +94,6 @@ describe('Phase 39 — Attachments lib (sealed)', () => {
     expect(out[0]).not.toHaveProperty('dataB64');
     expect(out[0]).not.toHaveProperty('thumbnail');
     expect(out[0].source.type).toBe('blob');
-  });
-
-  it('attachmentPath includes the right extension per mime', () => {
-    expect(attachmentPath('item-1', 'att-1', 'image/jpeg')).toMatch(/\.jpg$/);
-    expect(attachmentPath('item-1', 'att-1', 'image/png')).toMatch(/\.png$/);
-    expect(attachmentPath('item-1', 'att-1', 'image/webp')).toMatch(/\.webp$/);
-    expect(() => attachmentPath('item-1', 'att-1', 'image/gif')).toThrow();
   });
 
   it('freshAttachmentId is unique', () => {
@@ -197,10 +189,5 @@ describe('Phase 39.4 — plaintext byte-serving path removed', () => {
     expect(r.error).toBe('attachment-plaintext-refused');
   });
 
-  it('requestAttachment still rejects an unknown item', async () => {
-    const bundle = await buildBundle();
-    expect(await callSkill(bundle.agent, 'requestAttachment', { itemId: 'nope', attId: 'x' }))
-      .toEqual({ error: 'item-not-found' });
-  });
 });
 

@@ -77,30 +77,30 @@ describe('chat-p2p — envelope type config', () => {
       acceptedEnvelopeTypes: ['p2p-chat', 'pinboard-chat'],
       emitEnvelopeType:      'p2p-chat',
     });
-    // Inject a legacy 'pinboard-chat' envelope (a reveal request: a kind this receiver keeps a row of).
+    // Inject a legacy 'pinboard-chat' envelope (a broadcast post: a kind this receiver keeps a row of).
     const legacyEnv = {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
         type:     'pinboard-chat',
-        subtype:  'reveal-request',
-        threadId: 't1',
-        body:     'legacy hello',
+        subtype:  'broadcast-post',
+        postId:   'post-1',
+        text:     'legacy hello',
         fromWebid: 'urn:peer',
         nonce:    'n1',
       }}],
     };
     await h.messageHandlers[0](legacyEnv);
     expect(h.itemStore.addItems).toHaveBeenCalledOnce();
-    expect(h.items[0].type).toBe('reveal-event');
+    expect(h.items[0].type).toBe('request');
 
     // Then a new 'p2p-chat' envelope.
     const newEnv = {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
         type:     'p2p-chat',
-        subtype:  'reveal-request',
-        threadId: 't1',
-        body:     'new hello',
+        subtype:  'broadcast-post',
+        postId:   'post-2',
+        text:     'new hello',
         fromWebid: 'urn:peer',
         nonce:    'n2',
       }}],
@@ -118,9 +118,9 @@ describe('chat-p2p — envelope type config', () => {
       from: 'peer-pub',
       parts: [{ type: 'DataPart', data: {
         type: 'tasks-chat',     // NOT in acceptedEnvelopeTypes
-        subtype: 'reveal-request',
-        threadId: 't1',
-        body: 'spoofed',
+        subtype: 'broadcast-post',
+        postId: 'post-3',
+        text: 'spoofed',
         fromWebid: 'urn:peer',
         nonce: 'n3',
       }}],

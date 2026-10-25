@@ -63,6 +63,7 @@ import { createPodTokenVerifier, PodClient, CapabilityAuth } from '@onderling/po
 
 import { homedir }                     from 'node:os';
 import { join }                        from 'node:path';
+import { existsSync }                  from 'node:fs';
 
 // Folio composition, reused verbatim (relative import into apps/folio/src —
 // folio's node_modules resolves the transitive @onderling/* deps; mirrors folio's
@@ -262,11 +263,17 @@ export async function startCompanionNode(opts = {}) {
   // ── 1. Host identity — persisted so the pubKey is stable across restarts ──
   // sealed under the box's vault passphrase; no passphrase is a misconfigured node (the plaintext mode is the dev
   // harness's, behind its own flag — never a default a role can reach)
-  if (!identityVault && !vaultPassphrase && !devPlaintextVault) {
+  // A node made before this has its identity file already: until the operator re-runs install.sh (which puts the
+  // passphrase in the box's .env) it boots on that file as it is and says so once per boot — nothing new is written in
+  // the clear. A FRESH node without a passphrase refuses: it never mints keys in the clear.
+  const identityFile = join(resolveConfigDir(configDir), IDENTITY_FILE);
+  const keptClear = !identityVault && !vaultPassphrase && !devPlaintextVault && existsSync(identityFile);
+  if (!identityVault && !vaultPassphrase && !devPlaintextVault && !keptClear) {
     throw new Error('companion-node: no vault passphrase (BASIS_VAULT_PASSPHRASE) — refusing to keep the identity keys in the clear');
   }
+  if (keptClear) console.warn('[companion] the identity vault is still in the clear: re-run install.sh to put the vault passphrase in the box\'s .env (the next boot seals it)');
   const vault = identityVault
-    ?? (devPlaintextVault && !vaultPassphrase
+    ?? ((devPlaintextVault || keptClear) && !vaultPassphrase
       ? new VaultNodeFs(join(resolveConfigDir(configDir), IDENTITY_FILE))
       : await openSealedIdentityVault(join(resolveConfigDir(configDir), IDENTITY_FILE), vaultPassphrase, { log: (l) => console.info(l) }));
   const identity = (await vault.has('agent-privkey'))

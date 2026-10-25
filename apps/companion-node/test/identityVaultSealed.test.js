@@ -47,9 +47,30 @@ describe('the companion identity vault is sealed', () => {
     expect(lines).toEqual([]);
   });
 
-  it('a node without a passphrase refuses to boot', async () => {
+  it('a FRESH node without a passphrase refuses to boot, and mints no key in the clear', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'comp-id-'));
     await expect(startCompanionNode({ configDir: dir })).rejects.toThrow(/vault passphrase/);
     expect(existsSync(path.join(dir, 'host-identity.json'))).toBe(false);
   });
+
+  it('an EXISTING node without a passphrase boots on its identity, warns once, and writes nothing new', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'comp-id-'));
+    const file = path.join(dir, 'host-identity.json');
+    const before = await plaintextIdentity(file);
+    const bytes = readFileSync(file, 'utf8');
+    const lines = [];
+    const warn = console.warn; console.warn = (l) => lines.push(String(l));
+    let node;
+    try { node = await startCompanionNode({ configDir: dir }); } finally { console.warn = warn; }
+    try {
+      expect(node.agent.identity?.pubKey ?? node.agent.address).toBeTruthy();
+      expect(lines.filter((l) => /install\.sh/.test(l)).length).toBe(1);
+      // the identity's own entries are exactly what they were; the only additions are trust pins (peers' PUBLIC keys,
+      // learned on first contact, as an older node wrote them too) — no secret is written in the clear
+      const was = JSON.parse(bytes).entries; const now = JSON.parse(readFileSync(file, 'utf8')).entries;
+      for (const [k, v] of Object.entries(was)) expect(now[k], k).toBe(v);
+      expect(Object.keys(now).filter((k) => !(k in was)).every((k) => k.startsWith('trust:')), JSON.stringify(Object.keys(now))).toBe(true);
+      expect((await AgentIdentity.restore(new VaultNodeFs(file))).pubKey).toBe(before.pubKey);
+    } finally { await node?.stop?.(); }
+  }, 60_000);
 });

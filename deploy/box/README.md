@@ -202,8 +202,9 @@ opens nothing. Keep a copy of both somewhere other than the box. What never ente
 
 **The vault passphrase.** `install.sh` writes it into `.env` (a new box gets a fresh one; a box made before kept it as
 `vault.passphrase` in the assistant's volume, and re-running `install.sh` moves it into `.env` once and deletes the
-file — idempotent, the value never printed). The assistant and the companion refuse to boot without it (the assistant
-also when `.env` and a left-over file disagree). The companion's identity vault is sealed under it; one left in the clear
+file — idempotent, the value never printed). Without it, a fresh assistant or companion refuses to boot; an existing
+one boots on what it already has and warns until the move (the assistant also refuses when `.env` and a left-over file
+disagree). The companion's identity vault is sealed under it; one left in the clear
 by an older node is sealed in place on the first boot with the passphrase (the plaintext bytes overwritten).
 `update.sh` never writes `.env`, so an existing box takes the move only by a re-run of `install.sh`.
 

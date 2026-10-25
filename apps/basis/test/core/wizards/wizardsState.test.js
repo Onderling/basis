@@ -1,6 +1,6 @@
 /**
  * Wizard state-machines — unit tests covering the three wizards
- * split in (restoreFromMnemonic, encryptedBackup,
+ * split in (restoreFromMnemonic,
  * postAudience).  Zero DOM; pure functions + async submits with
  * stub callSkills.
  *
@@ -79,62 +79,6 @@ describe('restoreFromMnemonicState', () => {
     await RFM.submitRestore({ state, callSkill });
     expect(state.submitError).toBe('invalid mnemonic');
     expect(state.successResult).toBe(null);
-  });
-});
-
-// ── encryptedBackup ─────────────────────────────────────────────
-import * as EB from '../../../src/core/wizards/encryptedBackupState.js';
-
-describe('encryptedBackupState', () => {
-  it('initialState is step 1 with blank fields', () => {
-    const s = EB.initialState();
-    expect(s.step).toBe(1);
-    expect(s.passphrase).toBe('');
-    expect(s.confirm).toBe('');
-    expect(s.blob).toBe(null);
-  });
-
-  it('canCreateBackup needs matching non-empty passphrase + confirmation', () => {
-    expect(EB.canCreateBackup({ passphrase: '', confirm: '' })).toBe(false);
-    expect(EB.canCreateBackup({ passphrase: 'abc', confirm: '' })).toBe(false);
-    expect(EB.canCreateBackup({ passphrase: 'abc', confirm: 'abd' })).toBe(false);
-    expect(EB.canCreateBackup({ passphrase: 'abc', confirm: 'abc' })).toBe(true);
-    // Minimum-length is advisory — short passphrases pass.
-    expect(EB.canCreateBackup({ passphrase: 'a', confirm: 'a' })).toBe(true);
-  });
-
-  it('suggestedFilename produces a date-stamped .json.enc name', () => {
-    const fn = EB.suggestedFilename(new Date('2026-05-24T15:30:45.000Z'));
-    expect(fn).toBe('pinboard-backup-2026-05-24T15-30-45.json.enc');
-  });
-
-  it('submitCreateBackup happy-path: advances to step 2, stores blob', async () => {
-    const state = EB.initialState();
-    state.passphrase = 'secret'; state.confirm = 'secret';
-    const callSkill = vi.fn().mockResolvedValue({ blob: '{"encrypted":true}' });
-    await EB.submitCreateBackup({ state, callSkill });
-    expect(callSkill).toHaveBeenCalledWith('pinboard', 'encryptedBackup', { passphrase: 'secret' });
-    expect(state.blob).toBe('{"encrypted":true}');
-    expect(state.step).toBe(2);
-    expect(state.submitError).toBe(null);
-  });
-
-  it('submitCreateBackup rejects when substrate returns no blob', async () => {
-    const state = EB.initialState();
-    state.passphrase = 's'; state.confirm = 's';
-    const callSkill = vi.fn().mockResolvedValue({});
-    await EB.submitCreateBackup({ state, callSkill });
-    expect(state.submitError).toMatch(/no blob/);
-    expect(state.step).toBe(1);
-  });
-
-  it('submitCreateBackup surfaces substrate error as submitError', async () => {
-    const state = EB.initialState();
-    state.passphrase = 's'; state.confirm = 's';
-    const callSkill = vi.fn().mockResolvedValue({ error: 'vault locked' });
-    await EB.submitCreateBackup({ state, callSkill });
-    expect(state.submitError).toBe('vault locked');
-    expect(state.step).toBe(1);
   });
 });
 

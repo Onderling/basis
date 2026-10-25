@@ -2,8 +2,7 @@
  * Pinboard V1 — Phase 13 tests.
  *
  * UX completeness — vakantie modus, hop-routing sealedForward at
- * factory, stale-post detection, near-dup detection, encrypted
- * backup round-trip.
+ * factory, stale-post detection, near-dup detection.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -11,10 +10,6 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
-import {
-  encryptBackup,
-  decryptBackup,
-} from '../src/lib/encryptedBackup.js';
 import {
   similarity,
   findNearDuplicate,
@@ -47,61 +42,6 @@ async function buildAgent() {
 }
 
 // ── Encrypted backup round-trip ──────────────────────────────────────────
-
-describe('Pinboard V1 Phase 13.6 — encrypted backup', () => {
-  it('encrypts + decrypts with the right passphrase', async () => {
-    const data = { webid: ANNE, items: [{ id: '1', text: 'paint' }] };
-    const blob = await encryptBackup({ data, passphrase: 'correct horse battery staple' });
-    expect(blob.v).toBe(1);
-    expect(blob.ciphertext).toBeTruthy();
-    expect(blob.salt).toBeTruthy();
-    expect(blob.nonce).toBeTruthy();
-
-    const back = await decryptBackup({ blob, passphrase: 'correct horse battery staple' });
-    expect(back).toEqual(data);
-  });
-
-  it('fails on wrong passphrase', async () => {
-    const blob = await encryptBackup({ data: { x: 1 }, passphrase: 'one' });
-    await expect(decryptBackup({ blob, passphrase: 'two' })).rejects.toThrow(/wrong passphrase/);
-  });
-
-  it('fails on tampered ciphertext', async () => {
-    const blob = await encryptBackup({ data: { x: 1 }, passphrase: 'p' });
-    // always a CHANGE: two fixed characters were the same as the ones they replaced about once in 4096 runs
-    const last = blob.ciphertext.slice(-2);
-    blob.ciphertext = blob.ciphertext.slice(0, -2) + (last === 'xx' ? 'yy' : 'xx');
-    expect(blob.ciphertext.slice(-2)).not.toBe(last);
-    await expect(decryptBackup({ blob, passphrase: 'p' })).rejects.toThrow();
-  });
-
-  it('rejects empty passphrase', async () => {
-    await expect(encryptBackup({ data: {}, passphrase: '' })).rejects.toThrow(/passphrase/);
-  });
-
-  it('encryptedBackup skill returns a blob; wrong passphrase rejects', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'postRequest',
-      { text: 'paint my fence', kind: 'ask', expectClaims: 0, timeoutMs: 1 });
-
-    const r = await callSkill(bundle.agent, 'encryptedBackup', { passphrase: 'mine' });
-    expect(r.blob).toBeTruthy();
-
-    const restored = await decryptBackup({ blob: r.blob, passphrase: 'mine' });
-    expect(restored.webid).toBe(ANNE);
-    expect(restored.items.some(i => i.text === 'paint my fence')).toBe(true);
-
-    // Wrong passphrase fails.
-    await expect(decryptBackup({ blob: r.blob, passphrase: 'wrong' })).rejects.toThrow();
-  });
-
-  it('encryptedBackup skill rejects missing passphrase', async () => {
-    const bundle = await buildAgent();
-    expect(await callSkill(bundle.agent, 'encryptedBackup', {})).toEqual({ error: 'passphrase required' });
-  });
-});
-
-// ── dupCheck ─────────────────────────────────────────────────────────────
 
 describe('Pinboard V1 Phase 13.5 — dupCheck', () => {
   it('similarity is 1.0 for identical text', () => {

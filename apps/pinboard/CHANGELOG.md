@@ -8,6 +8,18 @@
 - Who answered my post (`post-answers`, now a dictionary type) lives on the same own store, written as the self I am
   in the post's circle, and is folded back into the post on my own reads. It is no longer in the pile.
 
+## [Unreleased] — the export-only encrypted backup is gone (2026-10-25)
+
+- `encryptedBackup` / `encryptedBackupWizard` and the "Back up my keys" button (web and phone) are deleted. It sealed
+  the person's own posts and member row, not their keys, into a file nothing could restore. **Release note:** the way
+  to keep and restore what is yours is the recovery phrase and the recovery file (Mijn gegevens).
+
+## [Unreleased] — the noticeboard listing lists posts only (2026-10-25)
+
+- `listOpenRequests` with no `type` or `intent` returns the canonical post types only. Before, it returned every open
+  row of the circle: the rules head, the trail and the admin's membership-code row with its code. Asked for one `type`
+  it answers that type; a secret type (`membership-code`, `post-answers`) is never listed, whatever is asked.
+
 ## [Unreleased] — push subscriptions on the device, the interest profile gone (2026-10-25)
 
 - Push subscriptions live on the device's own sealed push store (`pushStore`), never in pinboard's cache and never on

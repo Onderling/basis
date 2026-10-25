@@ -60,7 +60,11 @@ import {
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
 import { sealingPublicKeyFromNetworkKey as deriveSealingKeyFromAddress } from '@onderling/pod-client';   // one sealing key family: the join grant wraps to the proven address's image
-import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
+import { validateCanonical, isNoticeboardPost, isNoticeboardPostType } from '@onderling/item-types';
+
+// Rows no listing hands out, whatever it is asked for: the admin's invite code (the code itself is in it) and the poster's
+// record of who answered. Each is read where it is used (the invite and redeem paths; the poster's own reads).
+const SECRET_ROW_TYPES = Object.freeze(['membership-code', 'post-answers']);
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
@@ -115,7 +119,6 @@ import {
   circleInviteCeiling, clampInviteMaxRedemptions, inviteMaxRedemptionsOf, redeemersOfCode,
   INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
 } from '../lib/inviteCeiling.js';
-import { encryptBackup, decryptBackup } from '../lib/encryptedBackup.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
 import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
 import { geocode } from '../lib/geocode.js';
@@ -1931,8 +1934,12 @@ export function buildSkills({
     // (ask/offer/lend), so wireSkill would throw. Kept hand-written.
     defineSkill('listOpenRequests', async ({ parts, from }) => {
       const a = dataArgs(parts);
+      // A secret row is never listed, whatever is asked: the admin's invite code, who answered my post.
+      if (typeof a.type === 'string' && SECRET_ROW_TYPES.includes(a.type)) return { items: [], _sync: simulateSync() };
       const filter = {};
       if (a.skill) filter.requiredSkill = a.skill;
+      // asked for one type (the roster seed reads the trail this way), that type
+      if (typeof a.type === 'string' && a.type && !a.intent) filter.type = a.type;
       let kindPostFilter = null;
       if (a.intent) {
         const canon = intentToCanonicalDraft(a.intent);
@@ -1945,13 +1952,15 @@ export function buildSkills({
           kindPostFilter = canon.kind;
         }
       }
-      const open = await store.listOpen(filter);
+      const open = (await store.listOpen(filter)).filter((it) => !SECRET_ROW_TYPES.includes(it?.type))
+        // no type asked: the noticeboard's posts only — never a circle's rules head, trail or other bookkeeping
+        .filter((it) => filter.type || isNoticeboardPostType(it));
       const matched = kindPostFilter
         ? open.filter((it) => it.kind === kindPostFilter)
         : open;
       return { items: decorateWithLastSync(matched), _sync: simulateSync() };
     }, {
-      description: 'List open requests; optional `skill` + `intent` filters.',
+      description: 'List open posts; optional `skill` + `intent` filters, or one `type`.',
       visibility:  'authenticated',
     }),
 
@@ -3146,28 +3155,6 @@ export function buildSkills({
       return { stale: decorateWithLastSync(mine), _sync: simulateSync() };
     }, {
       description: 'Return my open posts older than thresholdDays (default 30).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * encryptedBackup({passphrase})
-     *   — produces a passphrase-protected snapshot.  Replaces the
-     *   plaintext `exportMyData` for testers / public users.
-     */
-    defineSkill('encryptedBackup', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.passphrase !== 'string' || a.passphrase.length === 0) {
-        return { error: 'passphrase required' };
-      }
-      const member  = members ? await members.resolveByWebid(from) : null;
-      const all     = await store.listOpen({});
-      const myItems = all.filter(i => i.addedBy === from);
-      const data    = { webid: from, member, items: myItems, exportedAt: Date.now() };
-      const blob    = await encryptBackup({ data, passphrase: a.passphrase });
-      metrics?.record?.('backup-created');
-      return { blob, _sync: simulateSync() };
-    }, {
-      description: 'Passphrase-encrypted snapshot of my data; the passphrase never leaves the device.',
       visibility:  'authenticated',
     }),
 

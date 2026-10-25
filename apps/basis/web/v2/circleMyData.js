@@ -25,7 +25,6 @@ export function renderCircleMyData(container, {
   t,
   onBack,
   onSignIn,
-  onBackup,
   onViewMnemonic,
   onRestore,
   onEnroll, onReceivePersonas,
@@ -956,7 +955,6 @@ export function renderCircleMyData(container, {
       // Back up / reveal recovery phrase / restore. Each is gated on its callback so
       // the section only appears where the host wired the (existing) wizard/skill.
       const acts = [
-        ['cc-mydata__backup',   'circle.mydata.backup',         onBackup],
         ['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic',  onViewMnemonic],
         ['cc-mydata__restore',  'circle.mydata.restore',        onRestore],
         // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,

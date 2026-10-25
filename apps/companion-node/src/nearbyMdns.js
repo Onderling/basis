@@ -41,7 +41,8 @@ export async function startNearbyMdns({ identity, opts = {}, discovery = null } 
   if (!identity) throw new Error('startNearbyMdns: identity required');
 
   const dnssd = discovery ?? createDnsSdDiscovery();
-  const { native, emitter } = createMdnsNodeBackend({ discovery: dnssd });
+  // a fixed data port when the host names one (the box opens exactly that port in its firewall)
+  const { native, emitter } = createMdnsNodeBackend({ discovery: dnssd, ...(Number.isInteger(opts.port) ? { port: opts.port } : {}) });
   const transport = new MdnsTransport({
     identity,
     hostname: opts.label || undefined,

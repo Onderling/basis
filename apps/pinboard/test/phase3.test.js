@@ -184,11 +184,6 @@ describe('Pinboard V1 — lend lifecycle (postRequest + markReturned + notifier)
   });
 });
 
-// ── Mute / report ─────────────────────────────────────────────────────────
-
-describe('Pinboard V1 — moderation skills (report)', () => {
-});
-
 // ── Author hydration via Reveals + MemberMap ──────────────────────────────
 
 describe('Pinboard V1 — author hydration on listOpen / listMyRequests', () => {

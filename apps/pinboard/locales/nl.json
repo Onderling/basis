@@ -445,12 +445,6 @@
     "recovery_heading":       { "text": "Herstel & back-up", "doc": "H2 above the recovery section." },
     "recovery_intro_html":    { "text": "Je <strong>herstelzin</strong> is de enige manier om je account terug te krijgen op een nieuw apparaat. We tonen hem <em>één keer</em> — schrijf hem op en bewaar hem ergens veilig (geen schermafbeelding).", "doc": "Lead paragraph for the recovery section. Contains <strong> + <em> tags." },
 
-    "backup_heading":         { "text": "Versleutelde back-up", "doc": "H3 above the encrypted-backup form." },
-    "backup_intro":           { "text": "Maak een back-upbestand dat alleen jij met je wachtwoord kunt openen. Het wachtwoord verlaat dit apparaat niet.", "doc": "Lead paragraph for the encrypted-backup form. Explains client-side encryption." },
-    "backup_password_label":  { "text": "Wachtwoord (min. 8 tekens)", "doc": "Label of the backup-password input." },
-    "backup_download":        { "text": "Download back-up", "doc": "Submit button for the encrypted-backup form." },
-    "backup_encrypting":      { "text": "Versleutelen…", "doc": "Inline status while the encryptedBackup skill is running." },
-    "backup_downloaded":      { "text": "Back-up gedownload. Bewaar het bestand én je wachtwoord apart.", "doc": "Inline confirmation after a successful backup download. Reminds the user to keep file and passphrase separate." },
 
     "my_pods_heading":            { "text": "Mijn Solid-pods", "doc": "A6 — heading of the My-Solid-pods section on /profile.html." },
     "my_pods_loading":            { "text": "Aan het laden…", "doc": "Initial placeholder under the My-Solid-pods heading." },

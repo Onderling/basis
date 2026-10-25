@@ -68,14 +68,13 @@ describe('renderCircleMyData', () => {
     const bare = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS, t, podStatus: { signedIn: true } });
     expect(bare.querySelector('.cc-mydata__action')).toBeNull();
 
-    const onBackup = vi.fn(); const onViewMnemonic = vi.fn(); const onRestore = vi.fn();
+    const onViewMnemonic = vi.fn(); const onRestore = vi.fn();
     const el = renderCircleMyData(document.createElement('div'), { only: DEVICES_KEYS,
-      t, podStatus: { signedIn: true }, onBackup, onViewMnemonic, onRestore,
+      t, podStatus: { signedIn: true }, onViewMnemonic, onRestore,
     });
-    el.querySelector('.cc-mydata__backup').click();
     el.querySelector('.cc-mydata__mnemonic').click();
     el.querySelector('.cc-mydata__restore').click();
-    expect(onBackup).toHaveBeenCalled();
+    expect(el.querySelector('.cc-mydata__backup'), 'the export-only backup is gone').toBeNull();
     expect(onViewMnemonic).toHaveBeenCalled();
     expect(onRestore).toHaveBeenCalled();
   });

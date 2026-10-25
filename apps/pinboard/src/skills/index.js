@@ -119,7 +119,6 @@ import {
   circleInviteCeiling, clampInviteMaxRedemptions, inviteMaxRedemptionsOf, redeemersOfCode,
   INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
 } from '../lib/inviteCeiling.js';
-import { encryptBackup, decryptBackup } from '../lib/encryptedBackup.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
 import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
 import { geocode } from '../lib/geocode.js';
@@ -3156,28 +3155,6 @@ export function buildSkills({
       return { stale: decorateWithLastSync(mine), _sync: simulateSync() };
     }, {
       description: 'Return my open posts older than thresholdDays (default 30).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * encryptedBackup({passphrase})
-     *   — produces a passphrase-protected snapshot.  Replaces the
-     *   plaintext `exportMyData` for testers / public users.
-     */
-    defineSkill('encryptedBackup', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.passphrase !== 'string' || a.passphrase.length === 0) {
-        return { error: 'passphrase required' };
-      }
-      const member  = members ? await members.resolveByWebid(from) : null;
-      const all     = await store.listOpen({});
-      const myItems = all.filter(i => i.addedBy === from);
-      const data    = { webid: from, member, items: myItems, exportedAt: Date.now() };
-      const blob    = await encryptBackup({ data, passphrase: a.passphrase });
-      metrics?.record?.('backup-created');
-      return { blob, _sync: simulateSync() };
-    }, {
-      description: 'Passphrase-encrypted snapshot of my data; the passphrase never leaves the device.',
       visibility:  'authenticated',
     }),
 

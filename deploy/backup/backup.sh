@@ -14,6 +14,9 @@ DATA="${BACKUP_DATA:-/backup/data}"
 TARGETS_DIR="${BACKUP_TARGETS_DIR:-/backup/targets}"
 TAG="${BACKUP_TAG:-onderling-box}"
 KEEP="--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
+# What never leaves a device, whatever volume it sits in: the device runner's push store (a subscription lets its holder
+# wake that device). Restic matches the name anywhere under DATA.
+EXCLUDE="--exclude push-device.json"
 
 name_of() { basename "$1" .env; }
 targets() {
@@ -28,7 +31,8 @@ with_target() {
 do_backup() {
   tf="$1"
   with_target "$tf" snapshots >/dev/null 2>&1 || with_target "$tf" init || return 1
-  with_target "$tf" backup --tag "$TAG" "$DATA" || return 1
+  # shellcheck disable=SC2086
+  with_target "$tf" backup --tag "$TAG" $EXCLUDE "$DATA" || return 1
   # shellcheck disable=SC2086
   with_target "$tf" forget --tag "$TAG" --prune $KEEP || return 1
   with_target "$tf" check || return 1

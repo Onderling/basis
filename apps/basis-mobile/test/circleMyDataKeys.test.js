@@ -1,17 +1,17 @@
 /**
  * S5 (mobile) — CircleMyDataScreen's key-management section is locale-driven:
- * the screen surfaces "back up · reveal recovery phrase · restore" + the reveal
+ * the screen surfaces "reveal recovery phrase · restore" + the reveal
  * dialog through `circle.mydata.*` keys that now live in the shared basis
  * source (one place, web ≡ mobile). Following the portable-vitest cadence we
  * cover the locale keys the screen resolves rather than spinning up RN render
- * infra — the backup/restore flows reuse the existing RN wizard modals.
+ * infra — the restore flow reuses the existing RN wizard modal.
  */
 import { describe, it, expect } from 'vitest';
 import { sharedCircleLocale } from '@onderling-app/basis';
 
 // `close` left this set on 2026-08-31: four blocks each carried their own "Close"/"Sluiten", so the
 // screen now reads the one `common.close` in the shared host block. The section's OWN words stay here.
-const KEYS = ['keys', 'backup', 'view_mnemonic', 'restore', 'mnemonic_title', 'mnemonic_warn', 'mnemonic_none'];
+const KEYS = ['keys', 'view_mnemonic', 'restore', 'mnemonic_title', 'mnemonic_warn', 'mnemonic_none'];
 
 describe('mobile My-data key-management locale (shared circle source)', () => {
   for (const lang of ['en', 'nl']) {

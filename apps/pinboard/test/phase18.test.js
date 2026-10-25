@@ -79,12 +79,6 @@ describe('Pinboard V1 Phase 18 — record() fires on key user actions', () => {
     const snap = bundle.metrics.snapshot();
     expect(snap['cancel-request']?.count).toBe(1);
   });
-
-  it('encryptedBackup records backup-created', async () => {
-    const bundle = await buildAgent();
-    await callSkill(bundle.agent, 'encryptedBackup', { passphrase: 'hunter2' });
-    expect(bundle.metrics.snapshot()['backup-created']?.count).toBe(1);
-  });
 });
 
 describe('Pinboard V1 Phase 18 — getMetrics skill', () => {

@@ -172,32 +172,3 @@ describe('wireChat — host-injected hold-forward sender (Wave B: route DMs thro
   });
 });
 
-describe('the attachment fetch route answers only the post\'s audience', () => {
-  const post = { id: 'item-1', addedBy: 'urn:me', source: { attachments: [{ id: 'att-1', ref: 'r1', mime: 'image/jpeg', bytes: 3 }] } };
-  const ask = (h, from) => h.messageHandlers[0]({
-    from, parts: [{ type: 'DataPart', data: { type: 'p2p-chat', subtype: 'attachment-request', itemId: 'item-1', attId: 'att-1', fromWebid: from } }],
-  });
-  const responses = (h) => h.oneWayCalls.filter((c) => c.env.parts[0].data.subtype === 'attachment-response');
-  const support = (extra = {}) => ({
-    dataSource: { read: async () => new Uint8Array([1, 2, 3]), write: async () => {} },
-    attachmentSupport: { attachmentPath: () => 'p', readAttachmentBytesB64: async () => 'AQID', maxBytesPerAttachment: 250_000, ...extra },
-  });
-
-  it('without an audience check the author serves no one (fail closed)', async () => {
-    const h = buildHarness(support());
-    h.itemStore.getById.mockResolvedValue(post);
-    await ask(h, 'stranger');
-    expect(responses(h)).toEqual([]);
-  });
-
-  it('with one, a requester in the audience gets the bytes, anyone else nothing', async () => {
-    const mayServe = vi.fn(async (item, requester) => requester === 'member-pub');
-    const h = buildHarness(support({ mayServe }));
-    h.itemStore.getById.mockResolvedValue(post);
-    await ask(h, 'stranger');
-    expect(responses(h)).toEqual([]);
-    await ask(h, 'member-pub');
-    expect(responses(h).map((c) => c.toPubKey)).toEqual(['member-pub']);
-    expect(mayServe).toHaveBeenCalledWith(post, 'member-pub');
-  });
-});

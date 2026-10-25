@@ -14,7 +14,6 @@
  *   {kind: 'group',     groupId}
  *   {kind: 'contacts',  minTrust: 'bekend' | 'vertrouwd'}
  *   {kind: 'tag',       tag: '<my-personal-label>'}
- *   {kind: 'list',      listId: '<ulid>'}
  *
  * The resolver is sender-perspective: when Anne posts targeting
  * `{kind: 'tag', tag: 'koor'}`, only HER contacts with that tag are
@@ -25,16 +24,15 @@
 
 import { distanceKm } from './geo.js';
 
-const VALID_KINDS = new Set(['group', 'contacts', 'tag', 'list']);
+const VALID_KINDS = new Set(['group', 'contacts', 'tag']);
 const VALID_TRUST = new Set(['bekend', 'vertrouwd']);
 
 /**
  * @typedef {object} Target
- * @property {'group'|'contacts'|'tag'|'list'} kind
+ * @property {'group'|'contacts'|'tag'} kind
  * @property {string} [groupId]   when kind === 'group'
  * @property {'bekend'|'vertrouwd'} [minTrust]   when kind === 'contacts'
  * @property {string} [tag]       when kind === 'tag'
- * @property {string} [listId]    when kind === 'list'
  */
 
 /** Validate a Target shape; returns null on success, error string otherwise. */
@@ -44,7 +42,6 @@ export function validateTarget(t) {
   if (t.kind === 'group'    && (typeof t.groupId !== 'string' || !t.groupId)) return 'group target needs groupId';
   if (t.kind === 'contacts' && !VALID_TRUST.has(t.minTrust)) return 'contacts target needs minTrust (bekend|vertrouwd)';
   if (t.kind === 'tag'      && (typeof t.tag !== 'string' || !t.tag)) return 'tag target needs tag';
-  if (t.kind === 'list'     && (typeof t.listId !== 'string' || !t.listId)) return 'list target needs listId';
   return null;
 }
 
@@ -89,12 +86,6 @@ export async function resolve(targets, { members, contacts, selfWebid } = {}) {
       const list = await contacts.listContactsByTag(t.tag);
       for (const c of list) if (c.webid !== selfWebid) recipients.add(c.webid);
     }
-    else if (t.kind === 'list') {
-      if (!contacts) { errors.push('list target needs ContactBook'); continue; }
-      const cl = await contacts.getList(t.listId);
-      if (!cl) { errors.push(`list '${t.listId}' not found`); continue; }
-      for (const w of cl.contactWebids) if (w !== selfWebid) recipients.add(w);
-    }
   }
 
   return { recipients, errors };
@@ -116,7 +107,7 @@ export async function resolve(targets, { members, contacts, selfWebid } = {}) {
  *   The receiver knows their own groups via their MemberMap (via
  *   their own role in the group config); for the simple case we
  *   accept any 'group' target referencing a group we're in.
- * - 'contacts' / 'tag' / 'list': the sender-side knows; receiver
+ * - 'contacts' / 'tag': the sender-side knows; receiver
  *   can't re-validate this without seeing the sender's data.  We
  *   accept iff the sender is in OUR ContactBook (some basis for
  *   trusting they targeted us specifically).
@@ -134,7 +125,7 @@ export async function isAddressedToMe(targets, { selfWebid, senderWebid, activeG
   for (const t of targets) {
     if (validateTarget(t)) continue;
     if (t.kind === 'group' && t.groupId === activeGroupId) return true;
-    if (t.kind === 'contacts' || t.kind === 'tag' || t.kind === 'list') {
+    if (t.kind === 'contacts' || t.kind === 'tag') {
       // Conservative: accept iff sender is in our ContactBook.
       // (Receiver can't replay the sender's resolve(); good-enough
       // for V2. adds signed-target proofs.)

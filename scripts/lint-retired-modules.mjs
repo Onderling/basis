@@ -33,6 +33,9 @@
  *   rows nothing routed or read (`requestContactAdd`, `acceptContactRequest`, `declineContactRequest`,
  *   `listContactRequests`). Pinboard's report rows (`reportPost`, `listReports`): a report is a signed statement on the
  *   governance rail, for the circle's admins and its reporter only.
+ * Retired 2026-10-25 (the pile's last dead paths): the plaintext attachment request/response and its two readers
+ *   (`getAttachmentDataUrl`, `requestAttachment`) — a post's attachment is sealed behind the circle's media gateway;
+ *   pinboard's contact lists (six skills, no caller); the `reveal-event` row nothing read.
  *
  * Retired 2026-10-25 (a learned profile nothing read): pinboard's Layer-2 interest profile (InterestProfile,
  *   InterestProfileCache, `getInterestProfile`, `resetInterestProfile`) and basis's one-time interests migration. It
@@ -79,6 +82,18 @@ const RETIRED = [
   { name: 'listContactRequests', re: /['"]listContactRequests['"]/ },
   { name: 'reportPost', re: /['"]reportPost['"]/ },
   { name: 'listReports', re: /['"]listReports['"]/ },
+  { name: 'getAttachmentDataUrl', re: /['"]getAttachmentDataUrl['"]/ },
+  { name: 'requestAttachment', re: /['"]requestAttachment['"]/ },
+  { name: 'createContactList', re: /['"]createContactList['"]/ },
+  { name: 'deleteContactList', re: /['"]deleteContactList['"]/ },
+  { name: 'renameContactList', re: /['"]renameContactList['"]/ },
+  { name: 'addToContactList', re: /['"]addToContactList['"]/ },
+  { name: 'removeFromContactList', re: /['"]removeFromContactList['"]/ },
+  { name: 'listContactLists', re: /['"]listContactLists['"]/ },
+  { name: 'getContactList', re: /['"]getContactList['"]/ },
+  { name: 'attachment-request', re: /['"]attachment-request['"]/ },
+  { name: 'attachment-response', re: /['"]attachment-response['"]/ },
+  { name: 'reveal-event', re: /['"]reveal-event['"]/ },
   { name: 'InterestProfile', re: /from\s+['"][^'"]*InterestProfile(?:Cache)?(?:\.js)?['"]/ },
   { name: 'getInterestProfile', re: /['"]getInterestProfile['"]/ },
   { name: 'resetInterestProfile', re: /['"]resetInterestProfile['"]/ },

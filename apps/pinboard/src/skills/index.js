@@ -4249,9 +4249,9 @@ export function buildSkills({
     }),
 
     /**
-     * forgetContact({webid}) / listRefiledContacts() — the HOST's own, never a peer's: a contact re-filed under a self
-     * this device does not hold leaves this self's book (its contact facets; the member row stays), and the book's
-     * record of where its contacts were filed before a move is what the own-devices lane tells the old self's devices.
+     * forgetContact({webid}) — the HOST's own, never a peer's: a contact re-filed under a self this device does not
+     * hold leaves this self's book (its contact facets; the member row stays). The host calls it where the own-devices
+     * lane lands the old self's `contact-refile` row.
      */
     defineSkill('forgetContact', async ({ parts, from }) => {
       if (!from || from !== localActor) return { error: 'not-yours' };
@@ -4261,14 +4261,6 @@ export function buildSkills({
       catch (err) { return { error: err?.message ?? String(err) }; }
     }, {
       description: "The host's own: drop a contact re-filed under a self this device does not hold (the member row stays).",
-      visibility:  'authenticated',
-    }),
-    defineSkill('listRefiledContacts', async ({ from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts?.listRefiled) return { refiled: [] };
-      return { refiled: await bundle.contacts.listRefiled() };
-    }, {
-      description: "The host's own: the contacts re-filed under another persona here (webid, where they were filed, when).",
       visibility:  'authenticated',
     }),
 

@@ -14,6 +14,7 @@ import path from 'node:path';
 import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { EventLog } from '../src/eventLog.js';
+import { lazyOwnStore } from '../src/v2/ownDevicesStore.js';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, readRoster, until, teardown } from './support/pairRealAgents.js';
 
@@ -35,7 +36,9 @@ async function scenario({ second, first = `${OLD}-items.json` }) {
   const boot = async (file) => {
     const n = await bootRealAgentNode('anne', { agentOpts: { ...kept, deviceLog: new EventLog({ initial: [], muted: [] }), pinboardPersistDb: { path: path.join(dir, file) },
       // the circle store is durable on a device, as both shells keep it: a post lives there, not in pinboard's store
-      householdPersistDb: { path: path.join(dir, 'household-items.json') } } });
+      householdPersistDb: { path: path.join(dir, 'household-items.json') },
+      // …and the person's own store, durable as every shell keeps it (the admin's invite code lives there)
+      ownStore: lazyOwnStore({ path: path.join(dir, 'own-devices.json') }) } });
     await connectNodesOverRelay([n], { relayUrl: relay.url });
     return n;
   };

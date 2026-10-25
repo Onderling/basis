@@ -3865,18 +3865,6 @@
         "text": "Volledig",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
-    },
-    "on": {
-      "text": "🔓 Je laat je naam zien aan {{peer}}. Dat werkt van twee kanten: de ander moet het ook aanzetten.",
-      "doc": "Confirmation of /reveal on."
-    },
-    "off": {
-      "text": "🔒 Je laat je naam niet meer zien aan {{peer}}.",
-      "doc": "Confirmation of /reveal off."
-    },
-    "someone": {
-      "text": "(iemand)",
-      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {

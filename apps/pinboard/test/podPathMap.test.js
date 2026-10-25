@@ -52,10 +52,10 @@ describe('podPathMap.classify/unclassify', () => {
   });
 
   it('private plumbing (exact + prefix) → private/state with pinboard/ sub-key', () => {
-    expect(classify('mem://pinboard/reveals.json')).toEqual({
-      storageFn: 'private/state', tail: 'pinboard/reveals.json',
+    expect(classify('mem://pinboard/avatars/alice.png')).toEqual({
+      storageFn: 'private/state', tail: 'pinboard/avatars/alice.png',
     });
-    expect(unclassify('private/state', 'pinboard/reveals.json')).toBe('mem://pinboard/reveals.json');
+    expect(unclassify('private/state', 'pinboard/avatars/alice.png')).toBe('mem://pinboard/avatars/alice.png');
     roundtrip('mem://pinboard/lists/abc.json');
     roundtrip('mem://pinboard/avatars/alice.png');
   });

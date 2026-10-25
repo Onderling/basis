@@ -59,10 +59,12 @@ describe('Canonical types — registration via default registry', () => {
       'list',
       'list-item',
       'media',
+      'membership-code',
       'membership-redemption',
       'neighbourhood-job',
       'note',
       'offer',
+      'post-answers',
       'removed-entry',
       'removed-list',
       'request',
@@ -127,6 +129,10 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'intention':         { op: 'weekOverview', trigger: { every: 'week', on: 'sun', at: '18:00' }, actsAs: 'telegram:1' },
     // A device of the person, own-devices scope only: its default wire id and its internal id.
     'device-link':       { wireId: 'd-0123', internalId: 'i-0123' },
+    // A circle's invite code, the admin's own: which circle, which code.
+    'membership-code':   { source: { groupId: 'g-1', code: 'abc-123' } },
+    // Who answered one of my posts: which post.
+    'post-answers':      { source: { itemId: 'i-1', responders: [] } },
     // A contact that left one of the person's selves: which, and when (never where it went).
     'contact-refile':    { webid: 'w:bea', left: true, at: 1 },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },

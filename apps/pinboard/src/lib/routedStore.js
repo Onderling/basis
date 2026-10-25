@@ -17,6 +17,10 @@ import { isLaneCarriedItem } from '@onderling/circles';
 // proven addresses: the membership lane) and the RULES HEAD (the rules lane's admin-checked rules-update).
 const LOCAL_TYPES = Object.freeze(['membership-redemption', 'group-rules']);
 const CIRCLE_TYPES = Object.freeze([...NOTICEBOARD_POST_TYPES, ...LOCAL_TYPES]);
+// What is the person's own, not the circle's: the invite code (the admin's secret, no circle member may hold it) and who
+// answered my post. With a host own store they live there, written as the self the person is in that circle (the
+// actor, for the answers), so each rides that self's own-devices lane only.
+const OWN_TYPES = Object.freeze(['membership-code', 'post-answers']);
 
 // where a pinboard row names its circle (the same reading the skills' `itemCircleOf` does)
 const circleOf = (it) => it?.source?.groupId
@@ -55,6 +59,8 @@ function asCircleRow(item, from) {
  *                                                  at (a read never opens one, so nothing else can hold a post)
  * @param {(circleId: string, actor: string|null) => string|null} [a.hostCircles.writerIn]  who writes in that circle (the
  *                                                  self this device is there: a persona in a persona's circle)
+ * @param {() => object|Promise<object>} [a.hostCircles.ownStore]  the host's own-devices store (a CircleItemStore):
+ *                                                  where the admin's own rows (OWN_TYPES) live
  * @param {string|null} [a.homeCircle]                 pinboard's own home group (where a post goes when no circle is
  *                                                  active): always read, though no membership names it
  * @param {(item: object) => boolean} [a.isPost]       which rows are posts (the canonical post types)
@@ -75,15 +81,30 @@ export function circleRowsView(cs, types = CIRCLE_TYPES) {
 }
 /** Could a read with this filter return a circle row? A filter on another type cannot: the circles are not asked. */
 const mayBeInCircles = (filter) => !filter?.type || CIRCLE_TYPES.includes(filter.type);
+// an own row (the invite code, who answered) comes out only to a read that names its exact type — never to a no-type read
+const mayBeOwn = (filter) => typeof filter?.type === 'string' && OWN_TYPES.includes(filter.type);
+const namesOwnType = (filter, it) => filter?.type === it?.type;
 
 export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost = isNoticeboardPostType }) {
   // a trail row names its circle always; one that does not stays where it was written
   const isCircleRow = (it) => isPost(it) || (isLaneCarriedItem(it) && !!circleOf(it));
-  const { storeFor: circleStoreFor, circlesOf: knownCircles, openCircles = null, heldCircles = null, peekFor = null, localStoreFor = null, writerIn = (_c, actor) => actor } = hostCircles ?? {};
+  const { storeFor: circleStoreFor, circlesOf: knownCircles, openCircles = null, heldCircles = null, peekFor = null, localStoreFor = null, writerIn = (_c, actor) => actor, ownStore: ownStoreFor = null } = hostCircles ?? {};
   if (!pile || typeof circleStoreFor !== 'function' || typeof knownCircles !== 'function') {
     throw new Error('createRoutedStore: pile and hostCircles { storeFor, circlesOf } are required');
   }
   const taskStores = new Map();
+  // the admin's own rows, on the host's own store (absent → they stay in the pile, as before)
+  const isOwnRow = (it) => typeof ownStoreFor === 'function' && OWN_TYPES.includes(it?.type);
+  let ownTask = null;
+  const ownTaskStore = async () => {
+    if (typeof ownStoreFor !== 'function') return null;
+    if (!ownTask) {
+      const st = await Promise.resolve(ownStoreFor()).catch(() => null);
+      if (!st) return null;
+      ownTask = { raw: st, tasks: createTaskStore(circleRowsView(st, OWN_TYPES)) };
+    }
+    return ownTask;
+  };
   // THE TRAIL AND THE RULES HEAD ARE THIS DEVICE'S OWN VIEW (rosterTrail.js: every device holds its own row for each
   // member, patched by announce; and the rules at the version it last applied), so when the host keeps them apart
   // (`localStoreFor`: the circle's root on the device's local backing) they never sit on a medium other devices write
@@ -155,6 +176,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
   /** The circle stores that hold this id (a post may sit in several of the author's circles under one id). */
   const circleHolders = async (id) => {
     const out = [];
+    const own = await ownTaskStore();
+    if (own && await own.tasks.getById(id).catch(() => null)) return [own.tasks];
     for (const c of await circlesFor(null)) {
       const tr = await localStoreOf(c);
       if (tr && await tr.getById(id).catch(() => null)) { out.push(tr); continue; }
@@ -166,20 +189,22 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     return out;
   };
   // THE POSTER'S OWN KNOWLEDGE — who answered my post (`source.responders`, recorded from 1:1 answers) — is never put on
-  // the circle's store, which syncs to every member and would tell them all who answered. It is kept on this device, a
-  // `post-answers` row per post in the pile, and folded back into the post on every read of it.
+  // the circle's store, which syncs to every member and would tell them all who answered. It is a `post-answers` row per
+  // post on the person's own store (the pile when the host hands none), folded back into the post on every read of it.
   const PRIVATE_SOURCE = ['responders'];
   const ANSWERS = 'post-answers';
-  const answersRowOf = async (itemId) => ((await pile.listOpen({ type: ANSWERS })) ?? []).find((r) => r?.source?.itemId === itemId) ?? null;
+  const answersStore = async () => (await ownTaskStore())?.tasks ?? pile;
+  const answersRowOf = async (itemId) => ((await (await answersStore()).listOpen({ type: ANSWERS })) ?? []).find((r) => r?.source?.itemId === itemId) ?? null;
   const keepPrivate = async (itemId, priv, ctx) => {
+    const st = await answersStore();
     const row = await answersRowOf(itemId);
-    if (row) return pile.update(row.id, { source: { ...row.source, ...priv } }, ctx);
-    return pile.addItems([{ type: ANSWERS, text: 'post-answers', source: { itemId, ...priv } }], ctx);
+    if (row) return st.update(row.id, { source: { ...row.source, ...priv } }, ctx);
+    return st.addItems([{ type: ANSWERS, text: 'post-answers', source: { itemId, ...priv } }], ctx);
   };
   const withPrivate = async (rows) => {
     const posts = rows.filter((r) => isPost(r));
     if (posts.length === 0) return rows;
-    const byItem = new Map(((await pile.listOpen({ type: ANSWERS })) ?? []).map((r) => [r?.source?.itemId, r.source]));
+    const byItem = new Map(((await (await answersStore()).listOpen({ type: ANSWERS })) ?? []).map((r) => [r?.source?.itemId, r.source]));
     return rows.map((r) => {
       const priv = isPost(r) ? byItem.get(r.id) : null;
       if (!priv) return r;
@@ -200,14 +225,16 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
   const read = (verb) => async (filter) => {
     // the pile's rows as they are: what is not a post, and a post no circle could hold (a device with no circle yet)
     const lists = [(await pile[verb](filter)) ?? []];
-    if (!mayBeInCircles(filter)) return lists[0];
+    const own = mayBeOwn(filter) ? await ownTaskStore() : null;
+    if (own) lists.push(((await own.tasks[verb](filter)) ?? []).filter((it) => OWN_TYPES.includes(it?.type)));
+    if (!mayBeInCircles(filter)) return unionById(lists).filter((r) => !OWN_TYPES.includes(r?.type) || namesOwnType(filter, r));
     for (const c of await circlesFor(filter)) {
       for (const ts of [await readStoreOf(c), await localStoreOf(c)]) {
         if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isCircleRow(it)));
       }
     }
     // the answers row is this device's own bookkeeping, not an item a reader lists
-    return withPrivate(unionById(lists).filter((r) => r?.type !== ANSWERS));
+    return withPrivate(unionById(lists).filter((r) => !OWN_TYPES.includes(r?.type) || namesOwnType(filter, r)));
   };
   const notFound = (err) => err?.name === 'ItemNotFoundError' || err?.code === 'ITEM_NOT_FOUND' || /not found/i.test(String(err?.message ?? ''));
   /**
@@ -224,7 +251,12 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       if (verb === 'update') {
         const [patch, ctx] = rest;
         const { shared, priv } = splitPatch(patch);
-        if (priv) await keepPrivate(id, priv, ctx);
+        if (priv) {
+          // kept as the self this device is in the post's circle: who answered a persona's post is the persona's to know
+          const post = await hs[0].getById(id).catch(() => null);
+          const c = circleOf(post);
+          await keepPrivate(id, priv, { ...(ctx ?? {}), actor: (c ? writerIn(c, ctx?.actor ?? null) : null) ?? ctx?.actor ?? null });
+        }
         args = [shared, ctx];
       }
       let first;
@@ -253,6 +285,9 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     getById: async (id) => {
       const hit = await pile.getById(id).catch(() => null);
       if (hit) return hit;
+      const own = await ownTaskStore();
+      const mine = own ? await own.tasks.getById(id).catch(() => null) : null;
+      if (mine) return mine;
       for (const c of await circlesFor(null)) {
         for (const ts of [await localStoreOf(c), await readStoreOf(c)]) {
           const row = ts ? await ts.getById(id).catch(() => null) : null;
@@ -264,6 +299,18 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     addItems: async (partials, ctx = {}) => {
       const created = [];
       for (const p of partials ?? []) {
+        if (isOwnRow(p)) {
+          const own = await ownTaskStore();
+          if (own) {
+            const actor = ctx?.actor ?? p.addedBy ?? null;
+            const by = (circleOf(p) ? writerIn(circleOf(p), actor) : null) ?? actor;
+            const id = (typeof p.id === 'string' && p.id) ? p.id : ulid();
+            const row = await own.raw.put({ ...asCircleRow(p, by), id, addedBy: p.addedBy ?? by, addedAt: p.addedAt ?? Date.now() }, { by });
+            try { pile.emit?.('item-added', row); } catch { /* a listener never breaks a write */ }
+            created.push(row);
+            continue;
+          }
+        }
         if (!isCircleRow(p)) { created.push(...((await pile.addItems([p], ctx)) ?? [])); continue; }
         const actor = ctx?.actor ?? p.addedBy ?? null;
         const circles = circleOf(p) ? [circleOf(p)] : await circlesFor(null, actor);

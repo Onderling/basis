@@ -5069,6 +5069,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // backing, even when the circle itself runs on a pod. The rules head likewise (the version this device applied).
       localStoreFor: (circleId) => householdService.stores.localStore(circleId),
       writerIn: (circleId) => circleSelf(circleId).webid ?? chatId.pubKey,
+      // the admin's own rows (a circle's invite code): the person's own-devices store, written as the circle's self
+      ownStore: getOwnStore,
     },
     membershipEmit,
     membershipRead,

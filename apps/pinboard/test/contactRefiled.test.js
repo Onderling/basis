@@ -19,14 +19,13 @@ beforeEach(() => {
   } });
 });
 
-describe('the re-file record', () => {
-  it('a persona change records where the contact was filed before, and when', async () => {
+describe('a persona change keeps no re-file record in the book', () => {
+  it('the book writes nothing beside the member row (the host writes the old self\'s own-store row)', async () => {
     await book.addContact({ webid: 'w:bea', displayName: 'Bea', persona: 'default' });
+    const before = new Set(blobs.keys());
     await book.setPersona('w:bea', 'p-000000000001', { personaAt: 500 });
-    expect(await book.listRefiled()).toEqual([{ webid: 'w:bea', from: 'default', at: 500 }]);
-    // the same self again is no move
-    await book.setPersona('w:bea', 'p-000000000001', { personaAt: 600 });
-    expect((await book.listRefiled()).length).toBe(1);
+    expect([...blobs.keys()].filter((k) => !before.has(k) && !k.includes('/members/'))).toEqual([]);
+    expect(book.listRefiled).toBeUndefined();
   });
 });
 

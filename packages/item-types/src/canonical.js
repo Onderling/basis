@@ -29,6 +29,7 @@ import { INTENTION_SCHEMA }         from './types/intention.js';
 import { DEVICE_LINK_SCHEMA }       from './types/deviceLink.js';
 import { MEMBERSHIP_CODE_SCHEMA }   from './types/membershipCode.js';
 import { POST_ANSWERS_SCHEMA }      from './types/postAnswers.js';
+import { CONTACT_REFILE_SCHEMA }    from './types/contactRefile.js';
 import { RSVP_SCHEMA }              from './types/rsvp.js';
 import { MEMBERSHIP_REDEMPTION_SCHEMA } from './types/membershipRedemption.js';
 import { GROUP_RULES_SCHEMA }       from './types/groupRules.js';
@@ -104,6 +105,7 @@ export const CANONICAL_TYPES = Object.freeze({
   'device-link':        DEVICE_LINK_SCHEMA,
   'membership-code':    MEMBERSHIP_CODE_SCHEMA,
   'post-answers':       POST_ANSWERS_SCHEMA,
+  'contact-refile':     CONTACT_REFILE_SCHEMA,
   // One person's answer to one appointment (2026-10-20): its own item, so no whole-item write of the appointment can
   // carry or drop it; the appointment's `rsvp` is a read projection over these.
   'rsvp':               RSVP_SCHEMA,

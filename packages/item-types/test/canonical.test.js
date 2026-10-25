@@ -51,6 +51,7 @@ describe('Canonical types — registration via default registry', () => {
       'circle',
       'claim',
       'contact',
+      'contact-refile',
       'device-link',
       'group-rules',
       'inbox-item',
@@ -132,6 +133,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'membership-code':   { source: { groupId: 'g-1', code: 'abc-123' } },
     // Who answered one of my posts: which post.
     'post-answers':      { source: { itemId: 'i-1', responders: [] } },
+    // A contact that left one of the person's selves: which, and when (never where it went).
+    'contact-refile':    { webid: 'w:bea', left: true, at: 1 },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
     // A row of a circle's roster trail: which circle, who redeemed.
     'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },

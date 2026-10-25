@@ -95,6 +95,7 @@ export async function createBrowserPinboardAgent({
   rulesUpdateEmit,
   selfWebidFor = null,
   selfCard = null,      // whom this device's own card and requests name — absent → this agent's own identity
+  hostCircles = null,    // the host's circles: given, a post lives in its circle's own store (lib/routedStore.js)
   matchesMine = null,   // the host's "a post matches what I offer" (a local closure) — see createNeighbourhoodAgent
   mutedSet,
   // This device's content-seal strategy: the member map (the contact book, every roster row, the name a
@@ -139,6 +140,7 @@ export async function createBrowserPinboardAgent({
     rulesUpdateEmit,       // the rules-update rider's governance-lane emitter (absent → store-local only)
     selfWebidFor,          // who this device is per circle (its persona) — absent → the default throughout
     selfCard,              // whom this device's own card and requests name — absent → this agent's own identity
+    hostCircles,
     matchesMine,
     contentSeal,           // the persisted store is sealed under this device's content key
   });

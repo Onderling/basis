@@ -1,8 +1,8 @@
 /**
- * Noticeboard posts have ONE carry (the circle store + task lane). Both shells must bridge a landed post
- * into pinboard's index through `setNoticeboardLandedHook`, and neither may still register the retired
- * `circle-post` envelope — a second carry is exactly the drift this replaced (W1). Shell files have no
- * runtime coverage, so this reads the source.
+ * Noticeboard posts live in their circle's store, and its lane is their only carry. Both shells announce a landed post
+ * through `setNoticeboardLandedHook`, neither registers the retired `circle-post` envelope, and the agent neither
+ * copies a post into the circle store nor bridges one back: pinboard is handed the circles' stores (`hostCircles`)
+ * and writes posts there itself. Shell files have no runtime coverage, so this reads the source.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -20,7 +20,10 @@ describe('one carry for noticeboard posts', () => {
       expect(src).not.toMatch(/'circle-post'\s*:/);
     });
   }
-  it('the agent no longer fans a circle-post envelope by hand', () => {
-    expect(read('../../src/core/agent/realAgent.js')).not.toMatch(/subtype:\s*'circle-post'/);
+  it('the agent no longer fans a circle-post envelope by hand, nor copies a post into the circle store', () => {
+    const ra = read('../../src/core/agent/realAgent.js');
+    expect(ra).not.toMatch(/subtype:\s*'circle-post'/);
+    expect(ra).not.toMatch(/fanNoticeboardItem|toCircleStorePost/);
+    expect(ra).toMatch(/hostCircles:\s*\{/);
   });
 });

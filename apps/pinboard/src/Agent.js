@@ -42,6 +42,7 @@ import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
 import { createContactBook } from './lib/ContactBook.js';
 import { wireChat }          from './chat/wireChat.js';
 import { EvictionRoster }    from './lib/EvictionRoster.js';
+import { createRoutedStore } from './lib/routedStore.js';
 
 /**
  * @param {object} args
@@ -240,6 +241,10 @@ export async function createNeighbourhoodAgent({
   // The identity this device's own card and requests name, `() => ({ pubKey, stableId })` (host-injected; absent → this
   // agent's own).
   selfCard = null,
+  // The host's circles — `{ storeFor(circleId), circlesOf(actor|null), writerIn(circleId, actor) }`. Given, a POST lives
+  // in its circle's own store (the one the circle syncs) and only what is not a post stays in this agent's pile.
+  // Absent → everything in the pile (a standalone pinboard).
+  hostCircles = null,
   // "a post matches what I offer" — the host's local closure over the drivers of the self it is in that circle
   // (`(circleId, post) => Promise<boolean>`); reachable by no op and no wire. Absent = no offering match.
   matchesMine = null,
@@ -351,7 +356,8 @@ export async function createNeighbourhoodAgent({
   // audit + inbound-sync). Pinboard passes NO rolePolicy — parity with the old
   // `new ItemStore({...})` which took none here (the facade defaults to allow).
   const circleStore = new CircleItemStore({ dataSource, rootContainer: 'mem://neighbourhood/' });
-  const itemStore = createTaskStore(circleStore);
+  const pile = createTaskStore(circleStore);
+  const itemStore = hostCircles ? createRoutedStore({ pile, hostCircles, homeCircle: offeringMatchOpts?.group ?? null }) : pile;
   // Member roster: pod-config-backed (Phase 4.1 contract) when `pod` is
   // supplied; hand-built array otherwise. The two paths are mutually
   // exclusive — using both is almost always a bug.

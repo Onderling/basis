@@ -1395,11 +1395,6 @@ export function buildSkills({
     return _buildScopedSkills({ getBundle, dataLocationConfig });
   }
 
-  // Request ids being ingested RIGHT NOW (`ingestRemotePost`). The stored-row check there reads the
-  // store and then writes, and two landings of the same post can interleave between the two — this
-  // makes the claim before the await, so only the first writes. Per skills instance, like the store.
-  const _ingestInFlight = new Set();
-
   // OfferingMatch's #group is private; Agent.js passes the configured
   // groupId through here so list-shaped skills can scope reveal lookups.
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
@@ -3267,104 +3262,6 @@ export function buildSkills({
 
 
     /**
-     * ingestRemotePost({payload, fromPubKey})
-     *   — 2026-05-24 cross-instance fan-out (chat-layer bridge).
-     *
-     *   Called by basis when an NKN envelope of `subtype:
-     *   'circle-post'` arrives.  Mirrors substrateMirror.mirror()'s
-     *   logic — dedupe by `payload.requestId`, eviction-filter by
-     *   `payload.from`, draft + addItems with the same shape pinboard's
-     *   substrate-mirror produces.  This way local UI surfaces the
-     *   remote post identically to a substrate-mirror-delivered post.
-     *
-     *   Reuses the existing broadcast payload shape (Phase 52.7.2 —
-     *   `{requestId, text, from, type, kind, ...}`) so a future
-     *   substrate-multi-transport slice can drop this bridge without
-     *   schema changes.
-     *
-     *   Returns: { ok: true, itemId } | { deduped: true } | { evicted: true }
-     *            | { muted: true } | { error }.
-     */
-    defineSkill('ingestRemotePost', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const payload = a.payload;
-      const fromPubKey = typeof a.fromPubKey === 'string' ? a.fromPubKey : null;
-      // 2026-05-24 — separate NKN address tracking.  fromPubKey is
-      // the sender's substrate chat-agent identity (not NKN-routable
-      // in the browser bundle); fromPeerAddr is the actual transport
-      // address [Help with] uses to send DMs back to the post author.
-      const fromPeerAddr = typeof a.fromPeerAddr === 'string' ? a.fromPeerAddr : null;
-      if (!payload || typeof payload !== 'object') return { error: 'payload required' };
-      const requestId = payload.requestId;
-      if (typeof requestId !== 'string' || !requestId) return { error: 'payload.requestId required' };
-      // Eviction + mute filter — shared with ingestCircleMessage so the two ingest
-      // paths can't drift (E1 drift-guard via _peerIngestVerdict). NB circle-posts
-      // previously honoured eviction but NOT mute — this closes that gap: a muted
-      // member's posts are dropped too, matching the circle-chat path.
-      const verdict = _peerIngestVerdict({
-        evictionRoster: bundle?.evictionRoster ?? null,
-        muted,
-        evictWebid: payload.from ?? null,
-        muteKeys: [payload.fromStableId, payload.from, payload.fromActor],
-      });
-      if (verdict) return verdict;
-      // Dedupe — same O(N) check as substrate-mirror, PLUS the in-flight set below it.
-      //
-      // The list read and the write are not one step, so two ingests of the same post that overlap
-      // both read a store without it and both write: one post, two rows, ULIDs one apart. That became
-      // reachable when the post carry moved onto the circle store (2026-08-30) and the landed snapshot
-      // could arrive twice in a beat — a re-push on circle-open lands the same row again. Seen on the
-      // web board, which showed every post twice while the phone showed each once.
-      //
-      // Claiming the id before the await closes it: within this agent, whoever gets there first writes,
-      // and the loser is `deduped` exactly as if the row had already been on disk.
-      if (_ingestInFlight.has(requestId)) return { deduped: true };
-      _ingestInFlight.add(requestId);
-      try {
-      const open = await store.listOpen();
-      if (open.some(i => i?.source?.requestId === requestId)) return { deduped: true };
-
-      const type = typeof payload.type === 'string' && payload.type
-        ? payload.type
-        : 'request';
-      const draft = {
-        type,
-        ...(typeof payload.kind === 'string' && payload.kind ? { kind: payload.kind } : {}),
-        text:           payload.text ?? '(broadcast)',
-        requiredSkills: payload.requiredSkills ?? [],
-        visibility:     'household',
-        source: {
-          requestId,
-          broadcast:    true,
-          from:         payload.from ?? null,
-          fromPubKey,
-          // 2026-05-24 — wire-level NKN address for back-channel DM
-          // delivery ('s [Help with] routes via this).
-          ...(fromPeerAddr ? { fromPeerAddr } : {}),
-          claimsTopic:  payload.claimsTopic ?? null,
-          categoryId:   payload.categoryId ?? null,
-          skillTags:    Array.isArray(payload.skillTags) ? payload.skillTags : [],
-          attachments:  Array.isArray(payload.attachments) ? payload.attachments : [],
-          ...(Array.isArray(payload.embeds) && payload.embeds.length > 0
-            ? { embeds: payload.embeds }
-            : {}),
-          ...(Array.isArray(payload.targets) && payload.targets.length > 0
-            ? { targets: payload.targets }
-            : {}),
-        },
-      };
-      if (typeof payload.dueAt === 'number') draft.dueAt = payload.dueAt;
-      const [item] = await store.addItems([draft], {
-        actor: payload.from ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'broadcast'),
-      });
-      return { ok: true, itemId: item.id, _sync: simulateSync() };
-      } finally { _ingestInFlight.delete(requestId); }
-    }, {
-      description: 'Ingest a remote post envelope into the local feed (mirrors substrate-mirror logic).',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * getGroupRules({groupId})
      *   — return the latest `group-rules` item for `groupId` (or null).
      */
@@ -4092,7 +3989,7 @@ export function buildSkills({
     /**
      * ingestCircleMessage({payload, fromPubKey, fromPeerAddr})
      *   — receive-side mirror for an inbound circle chat
-     *   envelope.  Sibling of `ingestRemotePost` for the circle-post
+     *   envelope.  Sibling of the retired post ingest for the circle-post
      *   path: dedupe + eviction + mute filtering + addItems.  Hosts
      *   (basis web + mobile) call this from their circle-chat
      *   peer-router handler instead of writing to eventLog directly.
@@ -4115,7 +4012,7 @@ export function buildSkills({
       if (typeof msgId    !== 'string' || !msgId)    return { error: 'msgId required' };
       if (typeof text     !== 'string' || !text)     return { error: 'text required' };
 
-      // Eviction + mute filter — shared with ingestRemotePost so the two ingest
+      // Eviction + mute filter — the ingest's own (posts land on the circle store, verified by its lane) so the
       // paths can't drift (E1 drift-guard via _peerIngestVerdict).
       const verdict = _peerIngestVerdict({
         evictionRoster: bundle?.evictionRoster ?? null,

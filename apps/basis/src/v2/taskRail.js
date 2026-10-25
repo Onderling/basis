@@ -116,6 +116,11 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       if (isRosterTrailItem(item)) return;
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
+      // whether this device held the row before: a snapshot that is an UPDATE (a claim, an edit) is not a new arrival.
+      // A read then a put: two snapshots of one new row landing in the same tick may both read 'new' (one extra
+      // announcement at most, never a missed one).
+      let existed = false;
+      try { existed = !!(await store.get?.(item.id)); } catch { existed = false; }
       try { await store.put(item, { sync: false, origin: true }); }
       catch (err) {
         // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
@@ -129,7 +134,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       }
       // A snapshot that LANDED (verified, merged) — the seam for anything that indexes what the store holds
       // (the noticeboard bridge into pinboard's index). Best-effort: an indexer must never fail the merge.
-      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item); } catch { /* indexed later by catch-up */ } }
+      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item, { fresh: !existed }); } catch { /* indexed later by catch-up */ } }
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;
       if (typeof id === 'string' && id) await store.delete(id, { sync: false });

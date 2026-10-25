@@ -3,7 +3,8 @@
  * before must not open an empty one — an empty store is a device that no longer knows its circles (walked: with the
  * other member online, `listMyCircles`, the roster and the posts all came back EMPTY). Anne and Bob share a circle with
  * a post and a roster; Anne's store is written under the OLD name (what the build before wrote), then she boots the new
- * build: her circle, roster and posts are there. A reboot onto a store with no old one beside it stays empty (control:
+ * build: her circle, roster and posts are there (the posts from the circle's own store, durable on the device as on
+ * both shells). A reboot onto a store with no old one beside it stays empty (control:
  * the move moves only what was there).
  */
 import { describe, it, expect } from 'vitest';
@@ -32,7 +33,9 @@ async function scenario({ second, first = `${OLD}-items.json` }) {
   const dir = mkdtempSync(path.join(tmpdir(), 'pinboard-store-'));
   const kept = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() };
   const boot = async (file) => {
-    const n = await bootRealAgentNode('anne', { agentOpts: { ...kept, deviceLog: new EventLog({ initial: [], muted: [] }), pinboardPersistDb: { path: path.join(dir, file) } } });
+    const n = await bootRealAgentNode('anne', { agentOpts: { ...kept, deviceLog: new EventLog({ initial: [], muted: [] }), pinboardPersistDb: { path: path.join(dir, file) },
+      // the circle store is durable on a device, as both shells keep it: a post lives there, not in pinboard's store
+      householdPersistDb: { path: path.join(dir, 'household-items.json') } } });
     await connectNodesOverRelay([n], { relayUrl: relay.url });
     return n;
   };

@@ -29,6 +29,7 @@ import { INTENTION_SCHEMA }         from './types/intention.js';
 import { DEVICE_LINK_SCHEMA }       from './types/deviceLink.js';
 import { RSVP_SCHEMA }              from './types/rsvp.js';
 import { MEMBERSHIP_REDEMPTION_SCHEMA } from './types/membershipRedemption.js';
+import { GROUP_RULES_SCHEMA }       from './types/groupRules.js';
 
 /**
  * Map of canonical name → schema. Useful for `Object.entries(...)`
@@ -105,6 +106,9 @@ export const CANONICAL_TYPES = Object.freeze({
   // A row of a circle's roster trail (2026-10-25): in the circle's own store, carried by the membership lane's
   // statements and the announces — never by the generic store door (the task lane refuses it).
   'membership-redemption': MEMBERSHIP_REDEMPTION_SCHEMA,
+  // A circle's rules head (2026-10-25): written by the creation, the join and the rules lane's apply — never by the
+  // generic store door (the task lane refuses it).
+  'group-rules':        GROUP_RULES_SCHEMA,
   // The composable CONTAINERS (2026-09-01). They were registered privately by `circleLists.js` on a
   // registry of its own, which is what put lists in a SECOND store per circle — and the architecture is
   // explicit that "two stores for one circle is a defect, not a design", and that a type reaching a peer

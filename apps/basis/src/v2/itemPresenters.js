@@ -31,6 +31,8 @@ export const NOT_MERGED = Object.freeze({
   rsvp: 'one person\'s answer to one appointment; read through its event (withAnswers), never shown on its own',
   // a roster-trail row is what the circle's roster is projected FROM (deriveRoster) — the roster is the view, never the row
   'membership-redemption': 'a row of the roster trail; read through the roster projection only, never shown on its own',
+  // a circle's rules head is read by the rules screen, the consent step and the fold — the rules are the view, not the row
+  'group-rules': "a circle's rules head; read through the rules screen and the fold, never merged into a view",
 });
 
 /**

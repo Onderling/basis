@@ -10,12 +10,13 @@
  */
 import { createTaskStore, ulid } from '@onderling/item-store';
 import { isNoticeboardPostType, NOTICEBOARD_POST_TYPES } from '@onderling/item-types';
-import { isRosterTrailItem } from '@onderling/circles';
+import { isLaneCarriedItem } from '@onderling/circles';
 
-// What a circle's own store holds of pinboard's rows: the noticeboard POSTS, and the ROSTER TRAIL (a member's admission
-// and proven addresses — carried by the membership lane's statements, never by the store's generic lane).
-const TRAIL_TYPE = 'membership-redemption';
-const CIRCLE_TYPES = Object.freeze([...NOTICEBOARD_POST_TYPES, TRAIL_TYPE]);
+// What a circle holds of pinboard's rows: the noticeboard POSTS, and the rows that are this device's own VIEW of the
+// circle, each carried by its own lane, never by the store's generic one — the ROSTER TRAIL (a member's admission and
+// proven addresses: the membership lane) and the RULES HEAD (the rules lane's admin-checked rules-update).
+const LOCAL_TYPES = Object.freeze(['membership-redemption', 'group-rules']);
+const CIRCLE_TYPES = Object.freeze([...NOTICEBOARD_POST_TYPES, ...LOCAL_TYPES]);
 
 // where a pinboard row names its circle (the same reading the skills' `itemCircleOf` does)
 const circleOf = (it) => it?.source?.groupId
@@ -77,27 +78,27 @@ const mayBeInCircles = (filter) => !filter?.type || CIRCLE_TYPES.includes(filter
 
 export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost = isNoticeboardPostType }) {
   // a trail row names its circle always; one that does not stays where it was written
-  const isCircleRow = (it) => isPost(it) || (isRosterTrailItem(it) && !!circleOf(it));
-  const { storeFor: circleStoreFor, circlesOf: knownCircles, openCircles = null, heldCircles = null, peekFor = null, trailStoreFor = null, writerIn = (_c, actor) => actor } = hostCircles ?? {};
+  const isCircleRow = (it) => isPost(it) || (isLaneCarriedItem(it) && !!circleOf(it));
+  const { storeFor: circleStoreFor, circlesOf: knownCircles, openCircles = null, heldCircles = null, peekFor = null, localStoreFor = null, writerIn = (_c, actor) => actor } = hostCircles ?? {};
   if (!pile || typeof circleStoreFor !== 'function' || typeof knownCircles !== 'function') {
     throw new Error('createRoutedStore: pile and hostCircles { storeFor, circlesOf } are required');
   }
   const taskStores = new Map();
-  // THE TRAIL IS THIS DEVICE'S OWN VIEW (rosterTrail.js: every device holds its own row for each member, patched by
-  // announce), so when the host keeps it apart (`trailStoreFor`: the circle's rows on the device's local backing) it
-  // never sits on a medium other devices write too — a pod-backed circle's pod is every member's. The circle's own
-  // store then holds its posts only.
-  const keepTrailApart = typeof trailStoreFor === 'function';
-  const SHARED_TYPES = keepTrailApart ? NOTICEBOARD_POST_TYPES : CIRCLE_TYPES;
-  const trailStores = new Map();
-  const trailStoreOf = async (circleId) => {
-    if (!keepTrailApart) return null;
-    if (!trailStores.has(circleId)) {
-      const cs = await Promise.resolve(trailStoreFor(circleId)).catch(() => null);
+  // THE TRAIL AND THE RULES HEAD ARE THIS DEVICE'S OWN VIEW (rosterTrail.js: every device holds its own row for each
+  // member, patched by announce; and the rules at the version it last applied), so when the host keeps them apart
+  // (`localStoreFor`: the circle's root on the device's local backing) they never sit on a medium other devices write
+  // too — a pod-backed circle's pod is every member's. The circle's own store then holds its posts only.
+  const keepLocalApart = typeof localStoreFor === 'function';
+  const SHARED_TYPES = keepLocalApart ? NOTICEBOARD_POST_TYPES : CIRCLE_TYPES;
+  const localStores = new Map();
+  const localStoreOf = async (circleId) => {
+    if (!keepLocalApart) return null;
+    if (!localStores.has(circleId)) {
+      const cs = await Promise.resolve(localStoreFor(circleId)).catch(() => null);
       if (!cs) return null;
-      trailStores.set(circleId, createTaskStore(circleRowsView(cs, [TRAIL_TYPE])));
+      localStores.set(circleId, createTaskStore(circleRowsView(cs, LOCAL_TYPES)));
     }
-    return trailStores.get(circleId);
+    return localStores.get(circleId);
   };
   // the host may open a circle on first ask (its sync wired before anything is written), so this awaits
   // a READ takes the circle's store only if the host has it open; it never opens one (opening wires the circle's sync,
@@ -155,7 +156,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
   const circleHolders = async (id) => {
     const out = [];
     for (const c of await circlesFor(null)) {
-      const tr = await trailStoreOf(c);
+      const tr = await localStoreOf(c);
       if (tr && await tr.getById(id).catch(() => null)) { out.push(tr); continue; }
       const ts = await readStoreOf(c);
       if (!ts || !(await ts.getById(id).catch(() => null))) continue;
@@ -201,7 +202,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     const lists = [(await pile[verb](filter)) ?? []];
     if (!mayBeInCircles(filter)) return lists[0];
     for (const c of await circlesFor(filter)) {
-      for (const ts of [await readStoreOf(c), await trailStoreOf(c)]) {
+      for (const ts of [await readStoreOf(c), await localStoreOf(c)]) {
         if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isCircleRow(it)));
       }
     }
@@ -253,7 +254,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       const hit = await pile.getById(id).catch(() => null);
       if (hit) return hit;
       for (const c of await circlesFor(null)) {
-        for (const ts of [await trailStoreOf(c), await readStoreOf(c)]) {
+        for (const ts of [await localStoreOf(c), await readStoreOf(c)]) {
           const row = ts ? await ts.getById(id).catch(() => null) : null;
           if (row) return (await withPrivate([row]))[0];
         }
@@ -271,8 +272,8 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
         const id = (typeof p.id === 'string' && p.id) ? p.id : ulid();
         let first = null;
         for (const c of circles) {
-          const cs = (keepTrailApart && isRosterTrailItem(p))
-            ? await Promise.resolve(trailStoreFor(c)).catch(() => null)
+          const cs = (keepLocalApart && isLaneCarriedItem(p))
+            ? await Promise.resolve(localStoreFor(c)).catch(() => null)
             : await Promise.resolve(circleStoreFor(c, { write: true })).catch(() => null);
           if (!cs) continue;
           const by = writerIn(c, actor) ?? actor;
@@ -297,7 +298,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       const out = { ingested: [], skipped: [] };
       if (toPile.length) { const r = (await pile.ingestItems(toPile, ctx)) ?? {}; out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? [])); }
       for (const it of list.filter((x) => isCircleRow(x))) {
-        const ts = keepTrailApart ? await trailStoreOf(circleOf(it))
+        const ts = keepLocalApart ? await localStoreOf(circleOf(it))
           : await (async () => { const cs = await Promise.resolve(circleStoreFor(circleOf(it), { write: true })).catch(() => null); return cs ? createTaskStore(circleRowsView(cs, SHARED_TYPES)) : null; })();
         if (!ts) { const r = (await pile.ingestItems([it], ctx)) ?? {}; out.ingested.push(...(r.ingested ?? [])); out.skipped.push(...(r.skipped ?? [])); continue; }
         const r = (await ts.ingestItems([it], ctx)) ?? {};

@@ -52,6 +52,7 @@ describe('Canonical types — registration via default registry', () => {
       'claim',
       'contact',
       'device-link',
+      'group-rules',
       'inbox-item',
       'intention',
       'list',
@@ -128,6 +129,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
     // A row of a circle's roster trail: which circle, who redeemed.
     'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },
+    // A circle's rules head: which circle.
+    'group-rules':       { source: { groupId: 'g-1', rules: { purpose: 'circle' }, version: 1 } },
   };
 
   for (const [name, extra] of Object.entries(MINIMAL)) {

@@ -5,6 +5,8 @@
 - With a host own store (`hostCircles.ownStore`), a circle's invite code (`membership-code`, now a dictionary type)
   lives there, written as the self the admin is in that circle, so it rides that self's own-devices lane only. It is
   no longer in the pile and never in a circle's store; the trail names it by its id only.
+- Who answered my post (`post-answers`, now a dictionary type) lives on the same own store, written as the self I am
+  in the post's circle, and is folded back into the post on my own reads. It is no longer in the pile.
 
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 

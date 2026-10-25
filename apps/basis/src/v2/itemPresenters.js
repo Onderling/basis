@@ -29,6 +29,8 @@ export const NOT_MERGED = Object.freeze({
   'device-link': 'the private device map; read by the revoke ceremony only, never shown in any view',
   // a membership code is the admin's secret (own-devices scope): read by the invite and redeem paths only, never shown
   'membership-code': "a circle's invite code, the admin's own; read by the invite and redeem paths, never shown in any view",
+  // who answered my post: folded into the post on the poster's own reads only (routedStore), never shown on its own
+  'post-answers': "who answered one of my posts; folded into the post on my own reads, never shown on its own",
   // an answer to an appointment is read through its appointment only (its `rsvp`, projected by rsvpItems.js)
   rsvp: 'one person\'s answer to one appointment; read through its event (withAnswers), never shown on its own',
   // a roster-trail row is what the circle's roster is projected FROM (deriveRoster) — the roster is the view, never the row

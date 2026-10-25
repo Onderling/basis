@@ -17,9 +17,10 @@ import { isLaneCarriedItem } from '@onderling/circles';
 // proven addresses: the membership lane) and the RULES HEAD (the rules lane's admin-checked rules-update).
 const LOCAL_TYPES = Object.freeze(['membership-redemption', 'group-rules']);
 const CIRCLE_TYPES = Object.freeze([...NOTICEBOARD_POST_TYPES, ...LOCAL_TYPES]);
-// What is the ADMIN's own, not the circle's: the invite code, a secret no circle member may hold. With a host own store
-// it lives there, written as the self the admin is in that circle, so it rides that self's own-devices lane only.
-const OWN_TYPES = Object.freeze(['membership-code']);
+// What is the person's own, not the circle's: the invite code (the admin's secret, no circle member may hold it) and who
+// answered my post. With a host own store they live there, written as the self the person is in that circle (the
+// actor, for the answers), so each rides that self's own-devices lane only.
+const OWN_TYPES = Object.freeze(['membership-code', 'post-answers']);
 
 // where a pinboard row names its circle (the same reading the skills' `itemCircleOf` does)
 const circleOf = (it) => it?.source?.groupId
@@ -186,20 +187,22 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     return out;
   };
   // THE POSTER'S OWN KNOWLEDGE — who answered my post (`source.responders`, recorded from 1:1 answers) — is never put on
-  // the circle's store, which syncs to every member and would tell them all who answered. It is kept on this device, a
-  // `post-answers` row per post in the pile, and folded back into the post on every read of it.
+  // the circle's store, which syncs to every member and would tell them all who answered. It is a `post-answers` row per
+  // post on the person's own store (the pile when the host hands none), folded back into the post on every read of it.
   const PRIVATE_SOURCE = ['responders'];
   const ANSWERS = 'post-answers';
-  const answersRowOf = async (itemId) => ((await pile.listOpen({ type: ANSWERS })) ?? []).find((r) => r?.source?.itemId === itemId) ?? null;
+  const answersStore = async () => (await ownTaskStore())?.tasks ?? pile;
+  const answersRowOf = async (itemId) => ((await (await answersStore()).listOpen({ type: ANSWERS })) ?? []).find((r) => r?.source?.itemId === itemId) ?? null;
   const keepPrivate = async (itemId, priv, ctx) => {
+    const st = await answersStore();
     const row = await answersRowOf(itemId);
-    if (row) return pile.update(row.id, { source: { ...row.source, ...priv } }, ctx);
-    return pile.addItems([{ type: ANSWERS, text: 'post-answers', source: { itemId, ...priv } }], ctx);
+    if (row) return st.update(row.id, { source: { ...row.source, ...priv } }, ctx);
+    return st.addItems([{ type: ANSWERS, text: 'post-answers', source: { itemId, ...priv } }], ctx);
   };
   const withPrivate = async (rows) => {
     const posts = rows.filter((r) => isPost(r));
     if (posts.length === 0) return rows;
-    const byItem = new Map(((await pile.listOpen({ type: ANSWERS })) ?? []).map((r) => [r?.source?.itemId, r.source]));
+    const byItem = new Map(((await (await answersStore()).listOpen({ type: ANSWERS })) ?? []).map((r) => [r?.source?.itemId, r.source]));
     return rows.map((r) => {
       const priv = isPost(r) ? byItem.get(r.id) : null;
       if (!priv) return r;
@@ -222,7 +225,7 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
     const lists = [(await pile[verb](filter)) ?? []];
     const own = mayBeOwn(filter) ? await ownTaskStore() : null;
     if (own) lists.push(((await own.tasks[verb](filter)) ?? []).filter((it) => OWN_TYPES.includes(it?.type)));
-    if (!mayBeInCircles(filter)) return unionById(lists);
+    if (!mayBeInCircles(filter)) return unionById(lists).filter((r) => r?.type !== ANSWERS);
     for (const c of await circlesFor(filter)) {
       for (const ts of [await readStoreOf(c), await localStoreOf(c)]) {
         if (ts) lists.push(((await ts[verb](filter)) ?? []).filter((it) => isCircleRow(it)));
@@ -246,7 +249,12 @@ export function createRoutedStore({ pile, hostCircles, homeCircle = null, isPost
       if (verb === 'update') {
         const [patch, ctx] = rest;
         const { shared, priv } = splitPatch(patch);
-        if (priv) await keepPrivate(id, priv, ctx);
+        if (priv) {
+          // kept as the self this device is in the post's circle: who answered a persona's post is the persona's to know
+          const post = await hs[0].getById(id).catch(() => null);
+          const c = circleOf(post);
+          await keepPrivate(id, priv, { ...(ctx ?? {}), actor: (c ? writerIn(c, ctx?.actor ?? null) : null) ?? ctx?.actor ?? null });
+        }
         args = [shared, ctx];
       }
       let first;

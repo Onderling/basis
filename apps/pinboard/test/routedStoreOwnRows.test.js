@@ -44,3 +44,18 @@ describe('a membership code lives on the host\'s own store', () => {
     expect(row.createdBy, 'an update keeps the lane it was written on').toBe(ANN);
   });
 });
+
+describe('who answered my post lives on the host\'s own store', () => {
+  it('kept as the self of the post\'s circle, folded back into my reads, never in the pile or the circle store', async () => {
+    const { stores, own, pile, routed } = setup();
+    const [post] = await routed.addItems([{ type: 'request', text: 'wie heeft een ladder?', source: { groupId: 'kring-p' } }], { actor: ANN });
+    await routed.update(post.id, { source: { ...post.source, responders: ['pk-bea'] } }, { actor: ANN });
+    const answers = (await own.listByType('post-answers')).filter((r) => r?.source?.itemId === post.id);
+    expect(answers.map((r) => r.source.responders)).toEqual([['pk-bea']]);
+    expect(answers[0].createdBy, "a persona circle's post: the persona's to know").toBe('pk-persona');
+    expect((await pile.listOpen({ type: 'post-answers' })) ?? []).toEqual([]);
+    expect((await stores.getStore('kring-p').get(post.id))?.source?.responders).toBeUndefined();
+    expect((await routed.getById(post.id))?.source?.responders).toEqual(['pk-bea']);
+    expect((await routed.listOpen({})).some((r) => r.type === 'post-answers')).toBe(false);
+  });
+});

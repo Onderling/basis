@@ -63,6 +63,7 @@ describe('Canonical types — registration via default registry', () => {
       'neighbourhood-job',
       'note',
       'offer',
+      'post-answers',
       'removed-entry',
       'removed-list',
       'request',
@@ -129,6 +130,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'device-link':       { wireId: 'd-0123', internalId: 'i-0123' },
     // A circle's invite code, the admin's own: which circle, which code.
     'membership-code':   { source: { groupId: 'g-1', code: 'abc-123' } },
+    // Who answered one of my posts: which post.
+    'post-answers':      { source: { itemId: 'i-1', responders: [] } },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
     // A row of a circle's roster trail: which circle, who redeemed.
     'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },

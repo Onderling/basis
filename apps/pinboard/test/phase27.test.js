@@ -83,11 +83,11 @@ async function buildPair({ bobBlocks, bobOffers = null } = {}) {
 /* ── 27.2 targetResolver ──────────────────────────────────── */
 
 describe('Pinboard V2 Phase 27.2 — targetResolver', () => {
-  it('validateTarget accepts all four kinds and rejects others', () => {
+  it('validateTarget accepts the three kinds and rejects others', () => {
     expect(validateTarget({ kind: 'group',    groupId: 'g' })).toBeNull();
     expect(validateTarget({ kind: 'contacts', minTrust: 'bekend' })).toBeNull();
     expect(validateTarget({ kind: 'tag',      tag: 'koor' })).toBeNull();
-    expect(validateTarget({ kind: 'list',     listId: '01HX' })).toBeNull();
+    expect(validateTarget({ kind: 'list',     listId: '01HX' }), 'contact lists are gone').toBeTruthy();
     expect(validateTarget({ kind: 'whatever' })).toBeTruthy();
     expect(validateTarget({ kind: 'group' })).toBeTruthy();   // missing groupId
   });
@@ -122,16 +122,6 @@ describe('Pinboard V2 Phase 27.2 — targetResolver', () => {
       { members: bundle.members, contacts: bundle.contacts, selfWebid: ANNE });
     expect(r.recipients.has(BOB)).toBe(true);
     expect(r.recipients.has(CARL)).toBe(false);
-  });
-
-  it('resolve(list) returns hand-picked members', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'addContact', { webid: BOB });
-    const list = (await callSkill(bundle.agent, 'createContactList', { name: 'Vrienden' })).list;
-    await callSkill(bundle.agent, 'addToContactList', { listId: list.listId, webid: BOB });
-    const r = await resolveTargets([{ kind: 'list', listId: list.listId }],
-      { members: bundle.members, contacts: bundle.contacts, selfWebid: ANNE });
-    expect(r.recipients.has(BOB)).toBe(true);
   });
 
   it('filterByDistance drops out-of-range; keeps unknowns', async () => {

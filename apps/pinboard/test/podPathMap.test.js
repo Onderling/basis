@@ -56,7 +56,6 @@ describe('podPathMap.classify/unclassify', () => {
       storageFn: 'private/state', tail: 'pinboard/avatars/alice.png',
     });
     expect(unclassify('private/state', 'pinboard/avatars/alice.png')).toBe('mem://pinboard/avatars/alice.png');
-    roundtrip('mem://pinboard/lists/abc.json');
     roundtrip('mem://pinboard/avatars/alice.png');
   });
 

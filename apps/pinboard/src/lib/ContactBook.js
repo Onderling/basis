@@ -8,11 +8,6 @@
  * coexist in the same `MemberMap` — the `relation` field
  * distinguishes them.
  *
- * Contact lists (collections of contacts) live as separate blobs
- * under `mem://pinboard/lists/<listId>.json` and write through the
- * same `CachingDataSource` path the rest of the cache uses.  No
- * extra sync wiring needed.
- *
  * **Substrate candidate** (rule of two — first consumer): when a
  * second app needs trust-graded 1:1 contacts (likely the planned
  * `apps/pinboard-hobby` fork), lift this into `@onderling/contacts`.
@@ -36,25 +31,8 @@ import { REVEAL_PRESETS } from '@onderling/agent-registry';
 import { isKnownRole } from '@onderling/core';
 import { isChannel, channelOfWebid } from '@onderling/item-types';
 
-const LISTS_PREFIX = 'mem://pinboard/lists/';
 
 const VALID_TRUST = new Set(['bekend', 'vertrouwd']);
-
-/**
- * Generate a list id.  Uses `crypto.randomUUID()` — available on
- * both Node ≥14.17 and modern browsers.  No external deps.
- */
-function freshListId() {
-  if (typeof globalThis.crypto?.randomUUID === 'function') {
-    return globalThis.crypto.randomUUID();
-  }
-  // Fallback: 16 bytes of randomness, base64url-encoded.
-  const bytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(bytes);
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
 
 /**
  * @param {object} args
@@ -194,7 +172,7 @@ export function createContactBook({ members, dataSource }) {
 
   /**
    * FORGET a contact here: it was re-filed under a self this device does not hold. Its CONTACT facets go — the
-   * relation, the persona and lens, trust, tags, the per-contact flags, its hidden mark, its place in every list —
+   * relation, the persona and lens, trust, tags, the per-contact flags, its hidden mark —
    * and its MEMBER row stays: a circle this device shares with them may still need their name. Null when the webid
    * is not a contact here.
    */
@@ -206,9 +184,6 @@ export function createContactBook({ members, dataSource }) {
       webid, relation: 'group-member', persona: null, revealPreset: null, personaAt: null, trustLevel: null, tags: [],
       shareLocation: false, allowHopThrough: false, allowAutomatching: true, hidden: false, hiddenAt: null, deletedAt: null,
     });
-    for (const l of await listLists().catch(() => [])) {
-      if (Array.isArray(l?.contactWebids) && l.contactWebids.includes(webid)) await removeFromList(l.listId, webid);
-    }
     return row;
   }
 
@@ -259,89 +234,6 @@ export function createContactBook({ members, dataSource }) {
     return all.filter(m => m.trustLevel === 'vertrouwd');
   }
 
-  /* ── Lists ─────────────────────────────────────────────────── */
-
-  /**
-   * @typedef {object} ContactList
-   * @property {string} listId
-   * @property {string} name
-   * @property {string[]} contactWebids
-   */
-
-  function pathFor(listId) { return `${LISTS_PREFIX}${encodeURIComponent(listId)}.json`; }
-
-  async function saveList(list) {
-    await dataSource.write(pathFor(list.listId), JSON.stringify(list));
-    return list;
-  }
-
-  async function createList(name) {
-    if (typeof name !== 'string' || !name.trim()) {
-      throw new TypeError('createList: name required');
-    }
-    const list = {
-      listId: freshListId(),
-      name:   name.trim(),
-      contactWebids: [],
-    };
-    return saveList(list);
-  }
-
-  async function deleteList(listId) {
-    if (!listId) throw new TypeError('deleteList: listId required');
-    await dataSource.delete(pathFor(listId));
-  }
-
-  async function getList(listId) {
-    if (!listId) throw new TypeError('getList: listId required');
-    const raw = await dataSource.read(pathFor(listId));
-    if (raw == null) return null;
-    try { return typeof raw === 'string' ? JSON.parse(raw) : raw; }
-    catch { return null; }
-  }
-
-  async function listLists() {
-    const paths = await dataSource.list(LISTS_PREFIX);
-    const out = [];
-    for (const p of paths) {
-      const raw = await dataSource.read(p);
-      if (raw == null) continue;
-      try {
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (parsed && parsed.listId) out.push(parsed);
-      } catch { /* skip corrupt */ }
-    }
-    return out.sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  async function addToList(listId, webid) {
-    const list = await getList(listId);
-    if (!list) throw new Error('addToList: list not found');
-    if (list.contactWebids.includes(webid)) return list;
-    return saveList({
-      ...list,
-      contactWebids: [...list.contactWebids, webid],
-    });
-  }
-
-  async function removeFromList(listId, webid) {
-    const list = await getList(listId);
-    if (!list) throw new Error('removeFromList: list not found');
-    return saveList({
-      ...list,
-      contactWebids: list.contactWebids.filter(w => w !== webid),
-    });
-  }
-
-  async function renameList(listId, name) {
-    const list = await getList(listId);
-    if (!list) throw new Error('renameList: list not found');
-    if (typeof name !== 'string' || !name.trim()) {
-      throw new TypeError('renameList: name required');
-    }
-    return saveList({ ...list, name: name.trim() });
-  }
-
   return {
     // contact CRUD — the writers one at a time per contact
     addContact:    inTurn(addContact),
@@ -354,13 +246,5 @@ export function createContactBook({ members, dataSource }) {
     listContacts,
     listContactsByTag,
     listContactsByMinTrust,
-    // lists
-    createList,
-    deleteList,
-    getList,
-    listLists,
-    addToList,
-    removeFromList,
-    renameList,
   };
 }

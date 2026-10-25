@@ -124,7 +124,6 @@ import { resolve as resolveTargets, validateTarget, filterByDistance, filterMute
 import {
   validateInboundAttachment,
   persistInboundAttachment,
-  readAttachmentBytesB64,
   toBroadcastShape,
   MAX_ATTACHMENTS_PER_POST,
 } from '../lib/Attachments.js';
@@ -1739,8 +1738,8 @@ export function buildSkills({
         targets,
         maxDistanceKm,
         // Phase 39 — attachment metadata + thumbnails (no
-        // full bytes).  Recipients render the thumbnails and
-        // request the full bytes on demand via `requestAttachment`.
+        // full bytes).  Recipients render the sealed thumbnails and
+        // open the full sealed blob through their circle media gateway.
         attachments: toBroadcastShape(persistedAttachments),
         // A4 (2026-05-14) — cross-pod refs travel with the broadcast.
         ...(embeds.length > 0 ? { embeds } : {}),
@@ -4090,96 +4089,6 @@ export function buildSkills({
     }),
 
     /**
-     * getAttachmentDataUrl({itemId, attId}) — Phase 39.
-     *   Read the locally-cached bytes for an attachment and return
-     *   a `data:<mime>;base64,...` URL the browser can drop straight
-     *   into an <img> tag.  Returns `{error: 'no-bytes'}` when the
-     *   bytes aren't on this machine yet (caller should call
-     *   `requestAttachment` first and re-poll).
-     */
-    defineSkill('getAttachmentDataUrl', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) return { error: 'itemId required' };
-      if (typeof a.attId  !== 'string' || !a.attId)  return { error: 'attId required' };
-      if (!bundle?.cache) return { error: 'no-cache' };
-
-      const item = await store.getById(a.itemId);
-      if (!item) return { error: 'item-not-found' };
-      const attachments = Array.isArray(item.source?.attachments) ? item.source.attachments : [];
-      const att = attachments.find(x => x?.id === a.attId);
-      if (!att) return { error: 'attachment-not-found' };
-      if (!att.ref) return { error: 'no-bytes' };
-
-      const dataB64 = await readAttachmentBytesB64({ dataSource: bundle.cache, ref: att.ref })
-        .catch(() => null);
-      if (!dataB64) return { error: 'no-bytes' };
-      return { ok: true, dataUrl: `data:${att.mime};base64,${dataB64}` };
-    }, {
-      description: 'Return a data: URL for a locally-cached attachment.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * requestAttachment({itemId, attId}) — Phase 39.
-     *   Fetch the full bytes for an attachment that we currently
-     *   only have a thumbnail for.  Looks up the item's
-     *   `source.fromPubKey` (the original author), sends a
-     *   `subtype: 'attachment-request'` chat envelope, and returns
-     *   immediately.  When the response lands, `wireChat` writes
-     *   the bytes locally + patches the item with the local `ref`
-     *   AND emits `agent.on('pinboard:attachment-fetched', ...)`.
-     *   The UI listens for that event to refresh.
-     *
-     *   Returns `{ok: true}` when the request was dispatched; does
-     *   NOT block on the response.  When the bytes are already
-     *   local (we authored the post, or already fetched), returns
-     *   `{ok: true, ref}` immediately.
-     */
-    defineSkill('requestAttachment', async ({ parts, from, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) return { error: 'itemId required' };
-      if (typeof a.attId  !== 'string' || !a.attId)  return { error: 'attId required' };
-
-      const item = await store.getById(a.itemId);
-      if (!item) return { error: 'item-not-found' };
-      const attachments = Array.isArray(item.source?.attachments) ? item.source.attachments : [];
-      const att = attachments.find(x => x?.id === a.attId);
-      if (!att) return { error: 'attachment-not-found' };
-      if (att.ref) return { ok: true, ref: att.ref };  // already local
-
-      const fromPubKey = item.source?.fromPubKey;
-      if (!fromPubKey) return { error: 'no-author-pubkey' };
-      if (typeof agent?.transportFor !== 'function') return { error: 'no-transport' };
-
-      try {
-        // Per-peer routing — `agent.transport` is the primary slot
-        // (InternalTransport on mobile, self-loop only).  Without
-        // this, the attachment-request envelope never reaches the
-        // remote post author.
-        const t = await agent.transportFor(fromPubKey);
-        await t.sendOneWay(fromPubKey, {
-          type:  'message',
-          parts: [{ type: 'DataPart', data: {
-            type:         'pinboard-chat',
-            subtype:      'attachment-request',
-            itemId:       a.itemId,
-            attId:        a.attId,
-            fromWebid:    bundle?.agent?.identity ? from : null,
-            fromStableId: (typeof selfCard === 'function' ? selfCard()?.stableId : null) ?? bundle?.agent?.identity?.stableId ?? null,
-            sentAt:       Date.now(),
-          }}],
-        });
-      } catch (err) {
-        return { error: `transport: ${err?.message ?? err}` };
-      }
-      metrics?.record?.('attachment-requested');
-      return { ok: true, pending: true };
-    }, {
-      description: 'Request the full bytes for an attachment from its original author.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * getBulkSyncStatus()
      *   — Phase 34 (2026-05-06). Reports the latest snapshot
      *   of the cache's bulk-sync state during attachInner.  Phases:
@@ -4412,92 +4321,6 @@ export function buildSkills({
       return { contacts };
     }, {
       description: 'List contacts; optional minTrust ("bekend"|"vertrouwd") or tag filter.',
-      visibility:  'authenticated',
-    }),
-
-    // ── Lists ──────────────────────────────────────────────────
-
-    defineSkill('createContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      if (typeof a.name !== 'string' || !a.name.trim()) return { error: 'name required' };
-      const list = await bundle.contacts.createList(a.name);
-      return { list };
-    }, {
-      description: 'Create a new contact list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('deleteContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      if (!a.listId) return { error: 'listId required' };
-      await bundle.contacts.deleteList(a.listId);
-      return { ok: true };
-    }, {
-      description: 'Delete a contact list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('renameContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      try {
-        const list = await bundle.contacts.renameList(a.listId, a.name);
-        return { list };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Rename a contact list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('addToContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      try {
-        const list = await bundle.contacts.addToList(a.listId, a.webid);
-        return { list };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Add a contact (by webid) to a list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('removeFromContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      try {
-        const list = await bundle.contacts.removeFromList(a.listId, a.webid);
-        return { list };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Remove a contact from a list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('listContactLists', async () => {
-      if (!bundle?.contacts) return { lists: [] };
-      const lists = await bundle.contacts.listLists();
-      return { lists };
-    }, {
-      description: 'List all contact lists.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('getContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { list: null };
-      if (!a.listId) return { error: 'listId required' };
-      const list = await bundle.contacts.getList(a.listId);
-      return { list };
-    }, {
-      description: 'Read one contact list by listId.',
       visibility:  'authenticated',
     }),
 

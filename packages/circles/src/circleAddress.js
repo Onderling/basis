@@ -100,10 +100,12 @@ export async function recordCircleAddress(
   const releasedProps = (proven.personaProperties && typeof proven.personaProperties === 'object'
     && !Array.isArray(proven.personaProperties)) ? proven.personaProperties : null;
 
-  // ONE PATCH AT A TIME PER ROW: what follows reads the member's row and writes a source built from that read, so two
-  // announcements for one member landing together (a new address, the ceremony commitment) would each write back what
-  // the other had not yet written, and one patch would be lost. Chained per circle and member, each reads the last.
-  return oneAtATimeFor(store, `${a.groupId}\u0000${webid}`, async () => {
+  // ONE PATCH AT A TIME PER CIRCLE: what follows reads the trail and writes a row's source built from that read, so two
+  // announcements landing together would each write back what the other had not yet written, and one patch would be
+  // lost. Not per member: a peer join's row names the joiner AND the admin who admitted them, and each one's
+  // announcement patches it (their own address; the admin's address and commitment mirrored on it). Chained per circle,
+  // each reads the last.
+  return oneAtATimeFor(store, a.groupId, async () => {
     let all = [];
     try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
     const forGroup = (all ?? []).filter((i) => i?.source?.groupId === a.groupId);

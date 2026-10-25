@@ -23,7 +23,7 @@
  * (D.2) wants tool-call access.
  *
  * F-SP1-a — every pinboard itemType is app-local (`ask`/`offer`/`lend`/
- *           `report`/`group-rules`/`rules-accept`/`group-leave`/
+ *           `report`/`group-rules`/`group-leave`/
  *           `request`) — none are canonical in `@onderling/item-types`.
  *           Permitted by `validateManifest`.
  * F-SP1-e — non-canonical verbs used here: `report`, `mute`, `set`,
@@ -83,7 +83,6 @@ const ITEM_TYPES = [
   'lend',
   'report',
   'group-rules',
-  'rules-accept',
   'group-leave',
   'request',  // legacy V0 — preserved for back-compat
   // ── Part G dissolve (2026-06-17) — app-local types the chat-shell

@@ -1,5 +1,5 @@
 /**
- * The posts view stands in for a circle store as the backing store of a task store, so it must offer every method the
+ * The circle-rows view stands in for a circle store as the backing store of a task store, so it must offer every method the
  * task store calls on its backing store. A verb it lacks fails only when a person reaches it (a claim on a circle post
  * threw "putIfMatch is not a function" in the browser); this fails it here instead.
  */
@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { postsView } from '../src/lib/routedStore.js';
+import { circleRowsView } from '../src/lib/routedStore.js';
 
 // the package's own sources, beside this app in the monorepo
 const srcDir = join(dirname(fileURLToPath(import.meta.url)), '../../../packages/item-store/src');
@@ -23,12 +23,12 @@ function backingStoreMethods() {
   return [...names].sort();
 }
 
-describe('postsView — the whole backing-store surface', () => {
+describe('circleRowsView — the whole backing-store surface', () => {
   it('implements every method the task store calls on its backing store', () => {
     const called = backingStoreMethods();
     // a floor, so a renamed receiver cannot make the list empty and the test vacuous
     expect(called).toEqual(expect.arrayContaining(['get', 'list', 'put', 'putIfMatch', 'delete']));
-    const view = postsView({ listByType: async () => [] });
+    const view = circleRowsView({ listByType: async () => [] });
     const missing = called.filter((m) => typeof view[m] !== 'function');
     expect(missing).toEqual([]);
   });

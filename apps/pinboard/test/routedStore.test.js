@@ -86,3 +86,79 @@ describe('createRoutedStore — the poster\'s own knowledge stays on the device'
     expect((await routed.listOpen({})).find((i) => i.id === post.id)?.source?.responders).toEqual(['https://id.example/bob']);
   });
 });
+
+describe('createRoutedStore — the roster trail lives in its circle\'s store', () => {
+  const trail = (groupId, extra = {}) => ({ type: 'membership-redemption', text: 'redeemed', source: { groupId, redeemedBy: 'pk-bram', role: 'member', circleAddress: 'addr-1', ...extra } });
+
+  it('a trail row goes to its circle\'s store, not the pile, and the type-filtered read finds it there', async () => {
+    const { stores, pile, routed } = setup();
+    const [row] = await routed.addItems([trail('kring-a')], { actor: ANN });
+    expect(await stores.getStore('kring-a').get(row.id)).toBeTruthy();
+    expect(await pile.getById(row.id).catch(() => null)).toBeFalsy();
+    const reds = await routed.listOpen({ type: 'membership-redemption' });
+    expect(reds.map((r) => r.id)).toEqual([row.id]);
+  });
+
+  it('an ingest (the roster seed) puts the row in its circle; a patch in place lands there too', async () => {
+    const { stores, routed } = setup();
+    const r = await routed.ingestItems([{ id: 'seed-1', ...trail('kring-b') }], { actor: ANN });
+    expect(r.ingested.length).toBe(1);
+    expect(await stores.getStore('kring-b').get('seed-1')).toBeTruthy();
+    const cur = await routed.getById('seed-1');
+    await routed.update('seed-1', { source: { ...cur.source, circleAddress: 'addr-2' } }, { actor: ANN });
+    expect((await stores.getStore('kring-b').get('seed-1')).source.circleAddress).toBe('addr-2');
+  });
+  it('after a restart, a circle that holds rows here but is not open yet is still read — and not opened by the read', async () => {
+    const ds = memoryDataSource();
+    const before = createCircleStores({ dataSource: ds, registry: { validate } });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const host = (stores) => ({
+      storeFor: (c, { write = false } = {}) => (write || stores.has(c) ? stores.getStore(c) : null),
+      circlesOf: () => ['kring-a'],
+      openCircles: () => stores.ids(),
+      heldCircles: () => stores.heldIds(),
+      peekFor: (c) => stores.peek(c),
+    });
+    const [row] = await createRoutedStore({ pile, hostCircles: host(before) }).addItems([trail('kring-a')], { actor: ANN });
+    const after = createCircleStores({ dataSource: ds, registry: { validate } });   // the next run: nothing open
+    const routed = createRoutedStore({ pile, hostCircles: host(after) });
+    expect((await routed.listOpen({ type: 'membership-redemption', groupId: 'kring-a' })).map((r) => r.id)).toEqual([row.id]);
+    expect((await routed.listOpen({ type: 'membership-redemption' })).map((r) => r.id)).toEqual([row.id]);
+    expect((await routed.getById(row.id))?.id).toBe(row.id);
+    expect(after.has('kring-a')).toBe(false);
+  });
+
+  it("a pod-backed circle's trail row stays on this device's local backing — never on the pod every member writes", async () => {
+    const local = memoryDataSource();
+    const pod = memoryDataSource();
+    const stores = createCircleStores({ dataSource: local, registry: { validate }, dataSourceFor: (c) => (c === 'kring-pod' ? pod : null) });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const routed = createRoutedStore({ pile, hostCircles: {
+      storeFor: (c) => stores.getStore(c), circlesOf: () => ['kring-pod'], openCircles: () => stores.ids(),
+      trailStoreFor: (c) => stores.localStore(c),
+    } });
+    const [row] = await routed.addItems([trail('kring-pod')], { actor: ANN });
+    const [post] = await routed.addItems([ask('kring-pod')], { actor: ANN });
+    const onPod = [...pod._map.keys()];
+    expect(onPod.some((k) => k.includes(row.id)), JSON.stringify(onPod)).toBe(false);
+    expect([...local._map.keys()].some((k) => k.includes(row.id))).toBe(true);
+    expect(onPod.some((k) => k.includes(post.id))).toBe(true);   // the post IS the circle's: on its pod
+    expect((await routed.listOpen({ type: 'membership-redemption', groupId: 'kring-pod' })).map((r) => r.id)).toEqual([row.id]);
+    await routed.update(row.id, { source: { ...row.source, circleAddress: 'addr-9' } }, { actor: ANN });
+    expect((await stores.localStore('kring-pod').get(row.id)).source.circleAddress).toBe('addr-9');
+  });
+
+  it('a trail row ingested this run is in the next unscoped read, though its circle never opened and the held list came first', async () => {
+    const local = memoryDataSource();
+    const stores = createCircleStores({ dataSource: local, registry: { validate } });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const routed = createRoutedStore({ pile, hostCircles: {
+      storeFor: (c, { write = false } = {}) => (write || stores.has(c) ? stores.getStore(c) : null), circlesOf: () => [],
+      openCircles: () => stores.ids(), heldCircles: () => stores.heldIds(), peekFor: (c) => stores.peek(c),
+      trailStoreFor: (c) => stores.localStore(c),
+    } });
+    expect(await routed.listOpen({ type: 'membership-redemption' })).toEqual([]);   // the held list is taken (empty)
+    await routed.ingestItems([{ id: 'seed-9', ...trail('kring-new') }], { actor: ANN });
+    expect((await routed.listOpen({ type: 'membership-redemption' })).map((r) => r.id)).toEqual(['seed-9']);
+  });
+});

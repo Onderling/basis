@@ -30,4 +30,20 @@ describe('recordCircleAddress — concurrent announcements for one member', () =
     const addrs = [src.circleAddress, ...(src.circleAddresses ?? []).map((p) => p.address)];
     expect(addrs, JSON.stringify(src)).toContain('addr-2');
   });
+
+  it("a row two members patch — the joiner's own address, and the admitting admin's commitment mirrored on it — keeps both", async () => {
+    // a peer join's row names the joiner (redeemedBy) AND the admin who admitted them (confirmedBy): each one's
+    // announcement patches the same row, so the two patches must not run side by side either
+    const rows = [{ id: 'r1', type: 'membership-redemption', source: { groupId: 'g', redeemedBy: 'pk-bram', circleAddress: 'addr-b', circleAddressProof: 'pb', confirmedBy: 'pk-anna', channel: 'peer' } }];
+    const store = slowStore(rows);
+    const deps = { store, verifyCircleAddressAnnouncement: proven, simulateSync: () => ({}) };
+    await Promise.all([
+      recordCircleAddress(deps, { a: { groupId: 'g', circleAddress: 'addr-b2', circleAddressProof: 'pb2' }, from: 'pk-bram', localActor: 'pk-me' }),
+      recordCircleAddress(deps, { a: { groupId: 'g', circleAddress: 'addr-a', circleAddressProof: 'pa', ceremonyCommitment: 'cc-anna', ceremonyCommitmentProof: 'ccp' }, from: 'pk-anna', localActor: 'pk-me' }),
+    ]);
+    const src = rows[0].source;
+    expect(src.confirmedByCeremonyCommitment, JSON.stringify(src)).toBe('cc-anna');
+    expect(src.confirmedByCircleAddress, JSON.stringify(src)).toBe('addr-a');
+    expect([src.circleAddress, ...(src.circleAddresses ?? []).map((p) => p.address)], JSON.stringify(src)).toContain('addr-b2');
+  });
 });

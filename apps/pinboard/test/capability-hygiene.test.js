@@ -15,7 +15,7 @@ import { capabilitiesOf } from '@onderling/app-manifest';
 import { pinboardManifest } from '../manifest.js';
 
 // itemTypes that exist only to satisfy view/manifest shape — never a member capability noun.
-const INTERNAL_TYPES = ['report', 'group-rules', 'rules-accept'];
+const INTERNAL_TYPES = ['report', 'group-rules'];
 
 describe('pinboard capability hygiene', () => {
   const caps = capabilitiesOf(pinboardManifest);

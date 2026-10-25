@@ -37,7 +37,7 @@ export function parseDuration(text) {
  *
  * @param {string[]} [argv]  process.argv.slice(2)
  * @param {Record<string,string|undefined>} [env]
- * @returns {{nearby: false|{mdns:true, publish?:boolean, publishFor?:number, label?:string},
+ * @returns {{nearby: false|{mdns:true, publish?:boolean, publishFor?:number, label?:string, port?:number},
  *            error?: string}}
  *   `nearby:false` means the plugin is never imported — the module documents that as the OFF path.
  *   `error` is a sentence for the user; the caller decides whether to exit.
@@ -45,18 +45,30 @@ export function parseDuration(text) {
 export function parseNearbyFlag(argv = [], env = {}) {
   let raw = null;
   let label = null;
+  let portRaw = null;
   for (const arg of argv) {
     if (arg === '--nearby') raw = raw ?? '';
     else if (arg.startsWith('--nearby=')) raw = arg.slice('--nearby='.length);
     else if (arg.startsWith('--nearby-label=')) label = arg.slice('--nearby-label='.length) || null;
+    else if (arg.startsWith('--nearby-port=')) portRaw = arg.slice('--nearby-port='.length);
   }
   if (raw === null && env.COMPANION_NEARBY !== undefined) raw = env.COMPANION_NEARBY;
+  if (portRaw === null && env.COMPANION_NEARBY_PORT !== undefined && env.COMPANION_NEARBY_PORT !== '') portRaw = env.COMPANION_NEARBY_PORT;
   if (raw === null) return { nearby: false };
+  // A fixed data port (a box opens exactly this one in its firewall); absent, an ephemeral one.
+  let port;
+  if (portRaw !== null) {
+    port = Number(portRaw);
+    if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+      return { nearby: false, error: `--nearby-port: "${portRaw}" is not a port between 1024 and 65535` };
+    }
+  }
+  const extra = { ...(label ? { label } : {}), ...(port ? { port } : {}) };
 
   const value = String(raw).trim().toLowerCase();
   // `--nearby` with nothing after it, and the env var set to an on-ish word, both mean "browse".
   if (value === '' || value === 'true' || value === '1' || value === 'browse') {
-    return { nearby: { mdns: true, ...(label ? { label } : {}) } };
+    return { nearby: { mdns: true, ...extra } };
   }
   if (value === 'false' || value === '0' || value === 'off') return { nearby: false };
 
@@ -64,11 +76,11 @@ export function parseNearbyFlag(argv = [], env = {}) {
   if (head !== 'publish') {
     return { nearby: false, error: `--nearby: expected "browse", "publish" or "publish:<duration>", got "${raw}"` };
   }
-  if (tail === undefined) return { nearby: { mdns: true, publish: true, ...(label ? { label } : {}) } };
+  if (tail === undefined) return { nearby: { mdns: true, publish: true, ...extra } };
 
   const publishFor = parseDuration(tail);
   if (publishFor === null) {
     return { nearby: false, error: `--nearby: "${tail}" is not a duration — try 90s, 30m or 2h` };
   }
-  return { nearby: { mdns: true, publish: true, publishFor, ...(label ? { label } : {}) } };
+  return { nearby: { mdns: true, publish: true, publishFor, ...extra } };
 }

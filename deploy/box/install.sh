@@ -173,6 +173,21 @@ if [ "$SKIP_SYSTEM" != 1 ]; then
   systemctl enable --now onderling-box.timer
 fi
 
+# ── 5b. the companion's radio in the firewall (a personal box with COMPANION_NEARBY set) ──
+# Applied here, as root and at install only: the updater runs as the box user and never touches the firewall. The
+# rules come from lib.sh, from the box.conf just loaded: mDNS and the radio's data port, bound to the LAN interface.
+# A box that turns the radio on later gets its two rules by hand (`lib.sh nearby_firewall_rules` prints them).
+if [ "$SKIP_SYSTEM" != 1 ] && command -v ufw >/dev/null; then
+  (
+    # shellcheck source=lib.sh
+    . "$RUNNER/lib.sh"
+    while read -r rule; do
+      # shellcheck disable=SC2086
+      ufw $rule >/dev/null
+    done < <(nearby_firewall_rules)
+  )
+fi
+
 # ── 6. first bring-up + health ──
 echo "bringing the stack up (first build takes a few minutes)…"
 if [ "$SKIP_SYSTEM" != 1 ]; then

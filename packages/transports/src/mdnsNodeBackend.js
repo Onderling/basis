@@ -117,9 +117,13 @@ export function createLoopbackDiscovery() {
  * @param {object} deps
  * @param {{advertise:Function, browse:Function}} deps.discovery  the DNS-SD seam (see the header)
  * @param {string} [deps.host]  interface to bind (default: all)
+ * @param {number} [deps.port]  the TCP port to listen on (default 0: an ephemeral one). A host behind a firewall passes
+ *   a fixed one, so the rule it opens is known.
+ * @param {number} [deps.maxInbound]  how many inbound sockets it holds at once (default 8): a device on the LAN that
+ *   opens sockets and never says hello cannot exhaust it.
  * @returns {{native: object, emitter: object}}  pass straight into `new MdnsTransport({...})`
  */
-export function createMdnsNodeBackend({ discovery, host = undefined } = {}) {
+export function createMdnsNodeBackend({ discovery, host = undefined, port = 0, maxInbound = 8 } = {}) {
   if (!discovery || typeof discovery.advertise !== 'function' || typeof discovery.browse !== 'function') {
     throw new Error('createMdnsNodeBackend: a discovery seam with advertise() + browse() is required');
   }
@@ -159,9 +163,11 @@ export function createMdnsNodeBackend({ discovery, host = undefined } = {}) {
       emitter.emit('MdnsClientConnected', { connectionId });
     });
     server.on('error', fail);
+    server.maxConnections = maxInbound;   // beyond the cap the kernel's accept is closed at once
     await new Promise((resolve, reject) => {
       server.once('error', reject);
-      server.listen(0, host, () => { server.off('error', reject); resolve(); });
+      // a fixed port when the host gives one (a firewall has to know what to open); an ephemeral one otherwise
+      server.listen(port, host, () => { server.off('error', reject); resolve(); });
     });
     listenPort = server.address().port;
     return listenPort;
@@ -199,9 +205,17 @@ export function createMdnsNodeBackend({ discovery, host = undefined } = {}) {
     startDiscovery:   (serviceType) => browse(serviceType),
 
     async stopAdvertising() {
-      // Going unlisted must NOT drop the listening socket or open connections: it is about who can find
-      // you, not who can reach you. That is what makes browse-only a usable resting state.
+      // Going unlisted keeps the connections this node has — it is about who can find you — but it shuts the DOOR: a
+      // node that announces nothing accepts nothing new, so the port a firewall opens for the radio is closed while
+      // unlisted. Browse-only stays a usable resting state, because a node nobody can discover always dials out itself
+      // (MdnsTransport's tiebreaker applies only while advertising).
       try { await stopAdvertise?.(); } finally { stopAdvertise = null; }
+      if (server) {
+        // close() stops accepting at once; its callback waits for the kept connections to end, so it is not awaited
+        server.close();
+        server = null;
+        listenPort = 0;
+      }
     },
     async stopDiscovery() {
       try { await stopBrowse?.(); } finally { stopBrowse = null; }

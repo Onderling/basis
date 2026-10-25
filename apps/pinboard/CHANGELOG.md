@@ -6,6 +6,15 @@
   the person's own posts and member row, not their keys, into a file nothing could restore. **Release note:** the way
   to keep and restore what is yours is the recovery phrase and the recovery file (Mijn gegevens).
 
+## [Unreleased] — push subscriptions on the device, the interest profile gone (2026-10-25)
+
+- Push subscriptions live on the device's own sealed push store (`pushStore`), never in pinboard's cache and never on
+  a pod. **Release note:** a person who had notifications on must switch them off and on once; the old subscription
+  is not carried over.
+- The Layer-2 interest profile is deleted (`getInterestProfile`, `resetInterestProfile`, the profile cache, and
+  basis's one-time interests migration). It learned from every answered post and nothing read it.
+  `scorePostRelevance` answers from the person's own offerings only.
+
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 
 Media Phase 1 anti-drift tail: pinboard's inline-bytes attachments now

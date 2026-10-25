@@ -941,16 +941,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'getInterestProfile', visibility: 'authenticated', verb: 'list',
-      // Derived ON THE DEVICE from this person's own reading and posting. It leaves the device only
-      // through an explicit disclosure act, never as a side effect of someone reading their profile.
-      params: [],
-      surfaces: {
-        chat: { hint: "The interest profile derived locally from this person's own activity." },
-        ui:   { control: 'page' },
-      },
-    },
 
     // ── Waking a device ─────────────────────────────────────────────
     // Registration only. WHETHER something may wake you is the recipient's own attention setting,

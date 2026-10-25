@@ -42,6 +42,10 @@
  *   person's own posts and member row (no keys, despite its label) into a file nothing could restore. The person's
  *   backup is the recovery phrase and the circle's recovery file.
  *
+ * Retired 2026-10-25 (a learned profile nothing read): pinboard's Layer-2 interest profile (InterestProfile,
+ *   InterestProfileCache, `getInterestProfile`, `resetInterestProfile`) and basis's one-time interests migration. It
+ *   learned from every answered post; `scorePostRelevance` answers from the person's own offerings only.
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -92,6 +96,10 @@ const RETIRED = [
   { name: 'attachment-request', re: /['"]attachment-request['"]/ },
   { name: 'attachment-response', re: /['"]attachment-response['"]/ },
   { name: 'reveal-event', re: /['"]reveal-event['"]/ },
+  { name: 'InterestProfile', re: /from\s+['"][^'"]*InterestProfile(?:Cache)?(?:\.js)?['"]/ },
+  { name: 'getInterestProfile', re: /['"]getInterestProfile['"]/ },
+  { name: 'resetInterestProfile', re: /['"]resetInterestProfile['"]/ },
+  { name: 'interestsMigration', re: /from\s+['"][^'"]*interestsMigration(?:\.js)?['"]|migrateInterests\s*\(/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

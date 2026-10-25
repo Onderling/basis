@@ -9137,6 +9137,8 @@ async function boot() {
       settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
       // The outbox — held messages + the dead-address verdict — survives a reload (device-local, never the pod).
       outboxPersistDb: { dbName: 'cc-outbox-state', storeName: 'outbox' },
+      // Push subscriptions: their own device-local store (never the pod, never a sibling).
+      pinboardPushPersistDb: { dbName: 'cc-push-device', storeName: 'subscriptions' },
       // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle
       // params ride the user's OWN pod (not a device-local island): `attachInner` write-throughs the local
       // cache to `<pod>/basis/settings/…`, sealed to this agent's key. Not signed in → null → local-only

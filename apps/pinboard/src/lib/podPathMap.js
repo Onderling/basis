@@ -59,7 +59,6 @@ const RULES = [
   { family: 'priv',      prefix: 'mem://pinboard/reveals.json',           circle: false, exact: true, fn: () => 'private/state' },
   { family: 'priv',      prefix: 'mem://pinboard/push-subscriptions.json', circle: false, exact: true, fn: () => 'private/state' },
   { family: 'priv',      prefix: 'mem://pinboard/interest-profile.json',  circle: false, exact: true, fn: () => 'private/state' },
-  { family: 'priv',      prefix: 'mem://pinboard/lists/',                 circle: false, fn: () => 'private/state' },
   { family: 'priv',      prefix: 'mem://pinboard/avatars/',               circle: false, fn: () => 'private/state' },
 ];
 

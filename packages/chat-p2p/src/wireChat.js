@@ -15,7 +15,6 @@
  *     type:         'p2p-chat' | 'pinboard-chat' (legacy),
  *     subtype:      'chat-message' | 'reveal-request' | 'reveal-accept'
  *                    | 'broadcast-post'
- *                    | 'attachment-request' | 'attachment-response',
  *     threadId:     <string>,           // typically the originating post's id
  *     body:         <string>,           // user-typed message body (subtype: chat-message)
  *     fromWebid:    <string>,
@@ -33,12 +32,8 @@
  * default so a mixed-version network keeps working. Apps tweak via
  * `emitEnvelopeType` + `acceptedEnvelopeTypes` constructor args.
  *
- * **Attachments.** Optional. When an app passes
- * `attachmentSupport: { attachmentPath, readAttachmentBytesB64,
- * maxBytesPerAttachment, mayServe }`, the substrate wires the
- * `attachment-request` / `attachment-response` flow and the inline
- * chat-message attachment path. When `attachmentSupport` is absent,
- * those code paths are no-ops.
+ * **Attachments** are not this substrate's: a post's attachment is sealed behind its circle's media gateway, and the
+ * wire carries only the sealed pointer.
  */
 
 import nacl from 'tweetnacl';
@@ -49,18 +44,6 @@ const DEFAULT_EMIT_ENVELOPE_TYPE = 'p2p-chat';
 
 /** Default accepted envelope types (new + legacy). */
 const DEFAULT_ACCEPTED_ENVELOPE_TYPES = Object.freeze(['p2p-chat', 'pinboard-chat']);
-
-/** Tiny base64 helper — same shape as Attachments.js so we don't
- *  drag a dependency. */
-function _b64decode(s) {
-  if (typeof atob === 'function') {
-    const bin = atob(s);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
-    return out;
-  }
-  return new Uint8Array(Buffer.from(s, 'base64'));
-}
 
 function dataArgsOf(parts) {
   if (!Array.isArray(parts)) return null;
@@ -93,7 +76,6 @@ function freshNonce() {
  */
 export function wireChat({
   agent, itemStore, members, muted, metrics, localActor, localStableId,
-  dataSource     = null,
   // Connectivity Phase 2 / Wave B — host-injected hold-forward sender (basis's
   // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`). When wired, a 1:1 DM to a
   // briefly-offline peer is HELD locally and flushed on reconnect (the offline-ladder
@@ -105,23 +87,11 @@ export function wireChat({
   // Phase 6 substrate parameters (Tasks V1 lift):
   emitEnvelopeType      = DEFAULT_EMIT_ENVELOPE_TYPE,
   acceptedEnvelopeTypes = DEFAULT_ACCEPTED_ENVELOPE_TYPES,
-  attachmentSupport     = null,
   // "a post matches what I offer", judged on this device against the drivers of the self I am in that circle — the
   // host's local closure (`(circleId, post) => Promise<boolean>`); absent = no offering match (contacts still count)
   matchesMine           = null,
 }) {
   const acceptedSet = new Set(acceptedEnvelopeTypes);
-
-  // Optional attachment helpers (per-app glue).  When `dataSource` and
-  // these are all supplied, the inline-chat-message + attachment-
-  // request / -response flows are active.  Otherwise those paths
-  // silently no-op.
-  const attachmentPath           = attachmentSupport?.attachmentPath ?? null;
-  const readAttachmentBytesB64   = attachmentSupport?.readAttachmentBytesB64 ?? null;
-  const maxBytesPerAttachment    = attachmentSupport?.maxBytesPerAttachment ?? Infinity;
-  // Who may fetch a post's bytes: the app's audience check `(item, requesterPubKey) => boolean` (the circle's roster,
-  // the thread's contact). Without one the author answers no one — knowing an item and attachment id is not enough.
-  const mayServeAttachment       = typeof attachmentSupport?.mayServe === 'function' ? attachmentSupport.mayServe : null;
 
   /** Track recently-seen nonces so resends don't duplicate items. */
   const seenNonces = new Set();
@@ -203,27 +173,8 @@ export function wireChat({
     // answered a post), so this receiver holds no copy of it
     if (data.subtype === 'chat-message') return;
 
-    if (data.subtype === 'reveal-request' || data.subtype === 'reveal-accept') {
-      // Store as a kind: 'reveal-event' item for audit + UI pickup.
-      await itemStore.addItems([{
-        type:       'reveal-event',
-        text:       `${data.fromWebid ?? '?'} ${data.subtype}`,
-        visibility: 'household',
-        source: {
-          threadId:     data.threadId,
-          fromWebid:    data.fromWebid,
-          fromStableId: data.fromStableId ?? null,
-          fromPubKey,
-          subtype:      data.subtype,
-          sentAt:       data.sentAt ?? Date.now(),
-        },
-      }], { actor: data.fromWebid ?? `pubkey:${fromPubKey?.slice?.(0, 12) ?? '?'}` });
-      agent.emit('pinboard:reveal-event', {
-        threadId: data.threadId, fromWebid: data.fromWebid, subtype: data.subtype,
-      });
-      metrics?.record?.(`${data.subtype}-received`);
-      return;
-    }
+    // a reveal request / accept keeps no row here (none was ever read); the basis shells answer it
+    if (data.subtype === 'reveal-request' || data.subtype === 'reveal-accept') return;
 
     if (data.subtype === 'broadcast-post') {
       // Phase 27.4 — receiver-side filter for direct-fan-out posts
@@ -308,113 +259,6 @@ export function wireChat({
       metrics?.record?.(notifyWorthy
         ? 'contact-broadcast-received-notify'
         : 'contact-broadcast-received-silent');
-      return;
-    }
-
-    if (data.subtype === 'attachment-request') {
-      // Phase 39 — recipient wants the full bytes for an attachment
-      // they only have the thumbnail of.  Look up the ORIGINATING
-      // item in our local store; if we're the original author and
-      // the bytes are local, ship them back via attachment-response.
-      // Other actors silently ignore — only the author serves bytes.
-      // Substrate guard: skip the whole flow when an app didn't wire
-      // attachment support.
-      if (!dataSource || !readAttachmentBytesB64) return;
-      if (muted && (
-        (data.fromStableId && muted.has(data.fromStableId)) ||
-        (data.fromWebid    && muted.has(data.fromWebid))
-      )) return;
-
-      const itemId = data.itemId;
-      const attId  = data.attId;
-      if (typeof itemId !== 'string' || typeof attId !== 'string') return;
-
-      const ours = await itemStore.getById(itemId).catch(() => null);
-      // Author check: addedBy must equal localActor (we're the
-      // sender of the post).  Mirrored items don't pass.
-      if (!ours || ours.addedBy !== localActor) return;
-      // Audience check: only a requester the post was shared with is answered; anyone else is ignored, silently
-      // (no "it exists" signal). No check wired → no one.
-      if (!mayServeAttachment) return;
-      if ((await Promise.resolve(mayServeAttachment(ours, fromPubKey)).catch(() => false)) !== true) return;
-      const attachments = Array.isArray(ours.source?.attachments) ? ours.source.attachments : [];
-      const att = attachments.find(a => a?.id === attId);
-      if (!att || !att.ref) return;
-
-      const dataB64 = await readAttachmentBytesB64({ dataSource, ref: att.ref }).catch(() => null);
-      if (!dataB64) return;
-
-      try {
-        // Same per-peer routing as the main send() path — without
-        // this, the attachment-response goes via the primary slot
-        // and never reaches the requesting peer.
-        const t = await agent.transportFor(fromPubKey);
-        await t.sendOneWay(fromPubKey, {
-          type:  'message',
-          parts: [{ type: 'DataPart', data: {
-            type:         emitEnvelopeType,
-            subtype:      'attachment-response',
-            itemId,
-            attId,
-            mime:         att.mime,
-            width:        att.width,
-            height:       att.height,
-            bytes:        att.bytes,
-            dataB64,
-            fromWebid:    localActor,
-            fromStableId: localStableId ?? null,
-            sentAt:       Date.now(),
-          }}],
-        });
-      } catch { /* swallow — recipient retries */ }
-      metrics?.record?.('attachment-served');
-      return;
-    }
-
-    if (data.subtype === 'attachment-response') {
-      // Phase 39 — we asked for bytes; the author shipped them.
-      // Validate, write to OUR local cache, emit an event the UI
-      // listens to so the modal flips from "loading…" to the image.
-      // Substrate guard: skip when the app didn't wire attachment support.
-      if (!dataSource || !attachmentPath) return;
-      const itemId = data.itemId;
-      const attId  = data.attId;
-      const dataB64 = data.dataB64;
-      if (typeof itemId !== 'string' || typeof attId !== 'string'
-          || typeof dataB64 !== 'string') return;
-      // Defensive size cap on inbound bytes (defence in depth — the
-      // sender is supposed to honour the post's max).
-      const approxBytes = Math.floor(dataB64.length * 0.75);
-      if (approxBytes > maxBytesPerAttachment * 4) return;     // hard cap (4× the soft cap)
-
-      const mime = data.mime ?? 'image/jpeg';
-      const ref  = attachmentPath(itemId, attId, mime);
-      try {
-        const bytes = _b64decode(dataB64);
-        await dataSource.write(ref, bytes);
-      } catch { return; }
-
-      // Patch the local item (mirrored or own) with the ref so the
-      // next render shows the full image.
-      const ours = await itemStore.getById(itemId).catch(() => null);
-      if (ours) {
-        const attachments = Array.isArray(ours.source?.attachments) ? ours.source.attachments : [];
-        const idx = attachments.findIndex(a => a?.id === attId);
-        if (idx >= 0) {
-          const updated = {
-            ...ours,
-            source: {
-              ...(ours.source ?? {}),
-              attachments: attachments.map((a, i) => i === idx ? { ...a, ref } : a),
-            },
-          };
-          // Same write-trick as postRequest: rewrite at the item-store path.
-          await dataSource.write(`mem://neighbourhood/items/${itemId}.json`, JSON.stringify(updated))
-            .catch(() => { /* best-effort */ });
-        }
-      }
-      agent.emit('pinboard:attachment-fetched', { itemId, attId, ref });
-      metrics?.record?.('attachment-fetched');
       return;
     }
   }

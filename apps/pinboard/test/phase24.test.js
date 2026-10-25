@@ -156,39 +156,6 @@ describe('Pinboard V2 Phase 24 — ContactBook', () => {
 
 /* ── Lists ────────────────────────────────────────────────────── */
 
-describe('Pinboard V2 Phase 24 — ContactLists', () => {
-  it('createList → addToList → listLists round-trip; persists via cache', async () => {
-    const { bundle } = await buildBundle();
-    await callSkill(bundle.agent, 'addContact', { webid: BOB });
-    const list = (await callSkill(bundle.agent, 'createContactList', { name: 'Vrienden' })).list;
-    expect(list.listId).toBeTruthy();
-    expect(list.name).toBe('Vrienden');
-
-    await callSkill(bundle.agent, 'addToContactList', { listId: list.listId, webid: BOB });
-    const lists = (await callSkill(bundle.agent, 'listContactLists', {})).lists;
-    expect(lists).toHaveLength(1);
-    expect(lists[0].contactWebids).toEqual([BOB]);
-  });
-
-  it('renameList + removeFromList + deleteList work', async () => {
-    const { bundle } = await buildBundle();
-    const list = (await callSkill(bundle.agent, 'createContactList', { name: 'A' })).list;
-    await callSkill(bundle.agent, 'renameContactList', { listId: list.listId, name: 'B' });
-    let one = (await callSkill(bundle.agent, 'getContactList', { listId: list.listId })).list;
-    expect(one.name).toBe('B');
-
-    await callSkill(bundle.agent, 'addContact', { webid: BOB });
-    await callSkill(bundle.agent, 'addToContactList', { listId: list.listId, webid: BOB });
-    await callSkill(bundle.agent, 'removeFromContactList', { listId: list.listId, webid: BOB });
-    one = (await callSkill(bundle.agent, 'getContactList', { listId: list.listId })).list;
-    expect(one.contactWebids).toEqual([]);
-
-    await callSkill(bundle.agent, 'deleteContactList', { listId: list.listId });
-    const after = (await callSkill(bundle.agent, 'getContactList', { listId: list.listId })).list;
-    expect(after).toBeNull();
-  });
-});
-
 /* ── QR contact-share ─────────────────────────────────────────── */
 
 describe('Pinboard V2 Phase 24 — QR contact-share', () => {

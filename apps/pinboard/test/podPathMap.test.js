@@ -58,7 +58,6 @@ describe('podPathMap.classify/unclassify', () => {
     expect(unclassify('private/state', 'pinboard/reveals.json')).toBe('mem://pinboard/reveals.json');
     roundtrip('mem://pinboard/push-subscriptions.json');
     roundtrip('mem://pinboard/interest-profile.json');
-    roundtrip('mem://pinboard/lists/abc.json');
     roundtrip('mem://pinboard/avatars/alice.png');
   });
 

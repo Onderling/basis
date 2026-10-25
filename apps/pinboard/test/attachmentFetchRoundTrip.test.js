@@ -3,10 +3,9 @@
  *
  * Original intent (S6.5): a recipient holding only an attachment's thumbnail
  * gets the full image. The original mechanism — a plaintext `attachment-request`
- * / `attachment-response` chat round-trip served by the author — is REMOVED:
- * pinboard is key-agnostic and no longer serves plaintext bytes, so the chat-p2p
- * plaintext handlers are structurally INERT (pinboard no longer injects
- * `attachmentSupport`).
+ * / `attachment-response` chat round-trip served by the author — is DELETED:
+ * pinboard is key-agnostic and serves no plaintext bytes, and chat-p2p has no
+ * attachment handlers any more.
  *
  * The sealed replacement preserves the intent: the SEALED inline thumbnail
  * travels ON the pointer, and the full sealed blob lives in the circle media
@@ -73,20 +72,4 @@ describe('sealed recipient round-trip — open the sealed pointer through the ci
     await bob.close?.();
   });
 
-  it('the chat-p2p plaintext round-trip is inert: requestAttachment serves no bytes', async () => {
-    const circle = makeSealCircle();
-    const { att } = await makeSealedImageAttachment(circle, { createdBy: ANNE });
-    const bob = await buildBundle({ actor: BOB });
-    const [mirrored] = await bob.itemStore.addItems([{
-      type: 'request', text: 'ladder', visibility: 'household',
-      source: { fromPubKey: 'pubkey-anne', broadcast: true, attachments: [att] },
-    }], { actor: 'pubkey-anne' });
-
-    // The old plaintext byte-fetch skill cannot surface bytes for a sealed pointer:
-    // there is no local cache `ref` and no author will serve plaintext (handlers inert).
-    const got = await callSkill(bob.agent, 'getAttachmentDataUrl', { itemId: mirrored.id, attId: att.id }, BOB);
-    expect(got.error).toBe('no-bytes');
-
-    await bob.close?.();
-  });
 });

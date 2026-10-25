@@ -57,7 +57,6 @@ const RULES = [
   // Private app-state (non-shareable plumbing). Tail keeps the
   // `pinboard/…` sub-key under `private/state` (D4 — app sub-key OK).
   { family: 'priv',      prefix: 'mem://pinboard/reveals.json',           circle: false, exact: true, fn: () => 'private/state' },
-  { family: 'priv',      prefix: 'mem://pinboard/lists/',                 circle: false, fn: () => 'private/state' },
   { family: 'priv',      prefix: 'mem://pinboard/avatars/',               circle: false, fn: () => 'private/state' },
 ];
 

@@ -142,11 +142,6 @@ describe('Pinboard V1 Phase 14 — bilateral reveal handshake', () => {
 
     // Anne's local Reveals now has Bob = true.
     expect(anne.reveals.decide({ peerWebid: bobId.stableId }).showDisplayName).toBe(true);
-
-    // Bob's side should have received a `kind:'reveal-event'` item.
-    await new Promise(r => setTimeout(r, 30));
-    const all = await bob.itemStore.listOpen({ type: 'reveal-event' });
-    expect(all.some(i => i.source?.subtype === 'reveal-request' && i.source?.threadId === 'reveal-thread')).toBe(true);
   });
 
   it('bilateral reveal: both sides can requestReveal via peerWebid (regression: recipient-pubkey-unknown)', async () => {

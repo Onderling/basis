@@ -31,6 +31,7 @@
  * needs the booted agent's callSkill/sendPeerMessage — is attached after boot). No
  * production code changed; this uses only already-exported seams.
  */
+import { flushPendingSaves } from '@onderling/local-store';
 
 import { InternalBus, InternalTransport } from '@onderling/core';
 import {
@@ -872,6 +873,9 @@ export async function readRoster(node, groupId) {
 /** Best-effort shutdown of the underlying secure-mesh agents. */
 export async function teardown(...nodes) {
   for (const n of nodes) { try { LIVE_NODES.delete(n); } catch { /* */ } }
+  // what every shell does when it goes away (the box on stop, web on pagehide, mobile on background): the saves still
+  // waiting on their debounce are made now — else a node booted next on the same disk can miss the last write
+  try { await flushPendingSaves(); } catch { /* defensive */ }
   for (const n of nodes) {
     try { await n?.agent?.sa?.shutdown?.(); } catch { /* defensive */ }
   }

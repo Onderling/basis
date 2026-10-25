@@ -166,7 +166,8 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
           }
           continue;
         }
-        await contacts.add(c);
+        const added = await contacts.add(c);
+        if (added?.refused) continue;   // the book refused it (a contact that left this self): not added, not a change
         contactsAdded += 1;
         if (c.hidden === true) hiddenChanged.push({ webid: c.webid, hidden: true });   // a row that arrives hidden is a change too
       } catch (err) { warn(`a contact from my own device could not be added: ${err?.message ?? err}`); }

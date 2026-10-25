@@ -2639,6 +2639,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     const st = await getOwnStore();
     return st.put({ type: 'contact-refile', id: `contact-refile:${by}:${webid}`, webid, left: true, at }, { by });
   }
+  // The newest LEFT mark this self holds for a webid (its time), or null — read by the book's sibling-arrival gate.
+  async function contactLeftAt(pid, webid) {
+    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
+    if (!by || typeof webid !== 'string') return null;
+    try {
+      const rows = ((await (await getOwnStore()).listByType?.('contact-refile')) ?? []).filter((r) => r?.webid === webid && r?.createdBy === by && Number.isFinite(r?.at));
+      return rows.length ? Math.max(...rows.map((r) => r.at)) : null;
+    } catch { return null; }
+  }
+  // …and when the contact is filed (back) under that self, its left mark goes: the person chose it again, so a newer
+  // row of it must be let in.
+  async function clearContactLeft(pid, webid) {
+    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
+    if (!by || typeof webid !== 'string') return;
+    try { await (await getOwnStore()).delete(`contact-refile:${by}:${webid}`); } catch { /* none held */ }
+  }
   // …and where one LANDS from a device of the person: the contact leaves this self's book here, only while this device
   // still files it under that self and its own filing is older than the move (so arrival order does not matter). Its
   // member row stays (a circle may still need the name).
@@ -2649,7 +2665,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     const mine = (await rawContacts()).find((c) => c?.webid === row.webid);
     if (!mine || (selfOfContactRow(mine) ?? null) !== pid) return;
     const myAt = Number.isFinite(mine.personaAt) ? mine.personaAt : -Infinity;
-    if (row.at > myAt) await rawPinboard('forgetContact', { webid: row.webid });
+    if (row.at > myAt) {
+      // never swallowed: a refusal is said, and the next landing of the row (a catch-up) tries again
+      const r = await rawPinboard('forgetContact', { webid: row.webid });
+      if (r?.error) console.warn(`[contacts] a contact that left this self stays in the book here (${String(row.webid).slice(0, 16)}…): ${r.error}`);
+    }
   }
   const knownPeersSyncs = new Map();   // personaId → that persona's sync
   const makeKnownPeersSync = (pid) => {
@@ -2679,7 +2699,16 @@ export async function createRealHouseholdAgent(opts = {}) {
         // a landed row is filed under THIS self (the sibling set it came from says whose it is), whatever the row says —
         // the general persona's lane files it under 'default' (an explicit undefined dropped the row's own 'default', and
         // with it the person's choice of whom the contact talks to)
-        add: (contact) => rawPinboard('addContact', { ...contact, persona: pid ?? 'default' }),
+        // DENY WINS BY TIME: a sibling's row of a contact that LEFT this self (a newer left mark than the row's own filing)
+        // is refused — a late catch-up from a device that has not heard of the move yet would otherwise bring it back
+        add: async (contact) => {
+          const leftAt = await contactLeftAt(pid ?? null, contact?.webid);
+          if (leftAt != null && leftAt > (Number.isFinite(contact?.personaAt) ? contact.personaAt : -Infinity)) {
+            console.info(`[contacts] a sibling's row for a contact that left this self was refused (${String(contact?.webid).slice(0, 16)}…)`);
+            return { refused: 'left-this-self' };
+          }
+          return rawPinboard('addContact', { ...contact, persona: pid ?? 'default' });
+        },
         get: async (webid) => (await book()).find((c) => c?.webid === webid) ?? null,
         // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
         setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
@@ -6422,6 +6451,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
       // is a contact on the person's other devices too. Best-effort and after success.
       if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
+        // added here again under a self that it once left: that self's left mark goes
+        clearContactLeft(selfOfContactRow(rawReply.contact) ?? null, rawReply.contact.webid).catch(() => {});
         knownPeersSync.fanContact(rawReply.contact).catch(() => {});
       }
       // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
@@ -6437,6 +6468,8 @@ export async function createRealHouseholdAgent(opts = {}) {
           && (selfOfContactRow(contactBefore) ?? null) !== (selfOfContactRow(rawReply.contact) ?? null)) {
         noteContactLeft(selfOfContactRow(contactBefore) ?? null, rawReply.contact.webid, rawReply.contact.personaAt ?? Date.now())
           .catch((err) => console.warn(`[contacts] the old self's devices will not hear the contact left: ${err?.message ?? err}`));
+        // filed under its new self: a left mark that self held from an earlier move goes
+        clearContactLeft(selfOfContactRow(rawReply.contact) ?? null, rawReply.contact.webid).catch(() => {});
       }
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
       // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how

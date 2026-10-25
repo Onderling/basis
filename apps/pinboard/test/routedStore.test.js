@@ -86,3 +86,45 @@ describe('createRoutedStore — the poster\'s own knowledge stays on the device'
     expect((await routed.listOpen({})).find((i) => i.id === post.id)?.source?.responders).toEqual(['https://id.example/bob']);
   });
 });
+
+describe('createRoutedStore — the roster trail lives in its circle\'s store', () => {
+  const trail = (groupId, extra = {}) => ({ type: 'membership-redemption', text: 'redeemed', source: { groupId, redeemedBy: 'pk-bram', role: 'member', circleAddress: 'addr-1', ...extra } });
+
+  it('a trail row goes to its circle\'s store, not the pile, and the type-filtered read finds it there', async () => {
+    const { stores, pile, routed } = setup();
+    const [row] = await routed.addItems([trail('kring-a')], { actor: ANN });
+    expect(await stores.getStore('kring-a').get(row.id)).toBeTruthy();
+    expect(await pile.getById(row.id).catch(() => null)).toBeFalsy();
+    const reds = await routed.listOpen({ type: 'membership-redemption' });
+    expect(reds.map((r) => r.id)).toEqual([row.id]);
+  });
+
+  it('an ingest (the roster seed) puts the row in its circle; a patch in place lands there too', async () => {
+    const { stores, routed } = setup();
+    const r = await routed.ingestItems([{ id: 'seed-1', ...trail('kring-b') }], { actor: ANN });
+    expect(r.ingested.length).toBe(1);
+    expect(await stores.getStore('kring-b').get('seed-1')).toBeTruthy();
+    const cur = await routed.getById('seed-1');
+    await routed.update('seed-1', { source: { ...cur.source, circleAddress: 'addr-2' } }, { actor: ANN });
+    expect((await stores.getStore('kring-b').get('seed-1')).source.circleAddress).toBe('addr-2');
+  });
+  it('after a restart, a circle that holds rows here but is not open yet is still read — and not opened by the read', async () => {
+    const ds = memoryDataSource();
+    const before = createCircleStores({ dataSource: ds, registry: { validate } });
+    const pile = createTaskStore(new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }));
+    const host = (stores) => ({
+      storeFor: (c, { write = false } = {}) => (write || stores.has(c) ? stores.getStore(c) : null),
+      circlesOf: () => ['kring-a'],
+      openCircles: () => stores.ids(),
+      heldCircles: () => stores.heldIds(),
+      peekFor: (c) => stores.peek(c),
+    });
+    const [row] = await createRoutedStore({ pile, hostCircles: host(before) }).addItems([trail('kring-a')], { actor: ANN });
+    const after = createCircleStores({ dataSource: ds, registry: { validate } });   // the next run: nothing open
+    const routed = createRoutedStore({ pile, hostCircles: host(after) });
+    expect((await routed.listOpen({ type: 'membership-redemption', groupId: 'kring-a' })).map((r) => r.id)).toEqual([row.id]);
+    expect((await routed.listOpen({ type: 'membership-redemption' })).map((r) => r.id)).toEqual([row.id]);
+    expect((await routed.getById(row.id))?.id).toBe(row.id);
+    expect(after.has('kring-a')).toBe(false);
+  });
+});

@@ -5015,6 +5015,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       },
       circlesOf: (actorKey) => circleIdsOnDevice(actorKey),
       openCircles: () => householdService.stores.ids(),
+      // ...and the circles that hold rows here before anything opens them (a restart: boot opens what the registry lists),
+      // read without opening them
+      heldCircles: () => householdService.stores.heldIds(),
+      peekFor: (circleId) => householdService.stores.peek(circleId),
       writerIn: (circleId) => circleSelf(circleId).webid ?? chatId.pubKey,
     },
     membershipEmit,

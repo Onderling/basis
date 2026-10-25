@@ -34,6 +34,12 @@ const CIRCLE_ID = 'per-type-matrix';
  * regression, or a new type wired to the dictionary but not to the lane. Do not grow it.
  */
 const NOT_CROSSING_YET = new Set([]);
+/**
+ * Types that are carried ELSEWHERE, on purpose: by the membership lane's statements (and the announces, and the roster
+ * seed between a person's own devices), never by the generic store door. For these, NOT arriving here is the asserted
+ * behaviour — a roster row riding the task lane would overwrite a peer's proven addresses with this device's view.
+ */
+const CARRIED_ELSEWHERE = new Set(['membership-redemption']);
 
 /** A minimal item that satisfies a canonical schema's `required` list. */
 function minimalItem(typeName, schema, i) {
@@ -130,7 +136,9 @@ describe('per-type sync matrix (two real peers, the generic store door)', () => 
     // A type that the store refuses is a schema/harness problem, not a sync gap — surface it separately.
     expect(rejected, 'every canonical type can be written to a circle store').toEqual([]);
 
-    const newlyBroken = missing.filter((t) => !NOT_CROSSING_YET.has(t));
+    const leaked = crossed.filter((t) => CARRIED_ELSEWHERE.has(t));
+    expect(leaked, 'these are carried by their own lanes and must never cross the generic store door').toEqual([]);
+    const newlyBroken = missing.filter((t) => !NOT_CROSSING_YET.has(t) && !CARRIED_ELSEWHERE.has(t));
     expect(newlyBroken, 'these types stopped crossing (or are new and never did)').toEqual([]);
 
     const fixed = [...NOT_CROSSING_YET].filter((t) => crossed.includes(t));

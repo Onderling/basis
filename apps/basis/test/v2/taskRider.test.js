@@ -113,8 +113,6 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const wire = [];
     const ada = await device('webid:ada', rosterAll, wire);
     const bo  = await device('webid:bo',  rosterAll, wire);
-    ada.registry.registerType('membership-redemption', { type: 'object', properties: { type: { const: 'membership-redemption' } } });
-    bo.registry.registerType('membership-redemption', { type: 'object', properties: { type: { const: 'membership-redemption' } } });
 
     // ada holds a roster row and a task; a catch-up from ada serves the task, never the row.
     await ada.store.put({ id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-in-circle' } }, { by: 'webid:ada', sync: false });

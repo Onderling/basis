@@ -37,6 +37,20 @@ describe('createCircleStores (L1 integration)', () => {
     expect([...ds._map.keys()].some((k) => k.includes('/circles/B/'))).toBe(true);
   });
 
+  it('after a restart, heldIds names the circles with rows here and peek reads one without opening it', async () => {
+    const ds = memoryDataSource();
+    const before = createCircleStores({ dataSource: ds, registry });
+    await before.getStore('A').put({ type: 'task', text: 'in A' });
+    await before.getStore('B').put({ type: 'note', text: 'in B' });
+    const f = createCircleStores({ dataSource: ds, registry });   // the next run over the same backing: nothing open
+    expect(f.ids()).toEqual([]);
+    expect((await f.heldIds()).sort()).toEqual(['A', 'B']);
+    expect((await f.peek('A').list()).map((i) => i.text)).toEqual(['in A']);
+    expect(f.has('A')).toBe(false);                 // a peek opens nothing
+    expect(f.peek('A')).not.toBe(f.peek('A'));      // and caches nothing
+    expect(f.peek(f.getStore('B') && 'B')).toBe(f.getStore('B'));   // an open circle is peeked through its own store
+  });
+
   it('forget drops ONE circle\'s rows from its backing and its cached store, with no removal hook fired', async () => {
     const ds = memoryDataSource();
     const f = createCircleStores({ dataSource: ds, registry });

@@ -67,6 +67,30 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
     /** The circles whose store is open on this device (each opened by a `getStore`), in the order they were opened. */
     ids: () => [...stores.keys()],
     /**
+     * The circles that hold rows on the shared local backing — open or not. A circle is opened by its sync's wiring,
+     * which a join or a boot does in its own order, so after a restart a circle can hold rows here before anything
+     * opens it. A circle on its own backing (`dataSourceFor`) is listed once it is open.
+     */
+    async heldIds() {
+      const held = new Set(stores.keys());
+      for (const k of (await dataSource.list(rootPrefix)) ?? []) {
+        const id = k.slice(rootPrefix.length).split('/')[0];
+        if (id) held.add(id);
+      }
+      return [...held];
+    },
+    /**
+     * A reader for ONE circle's rows that opens nothing: the open store when there is one, else a store over its rows
+     * on the backing, not cached and with no hook — for a read, never for a write (a write goes through `getStore`).
+     */
+    peek(circleId) {
+      if (typeof circleId !== 'string' || !circleId) throw new Error('createCircleStores.peek: a non-empty circleId is required');
+      const open = stores.get(circleId);
+      if (open) return open;
+      const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
+      return new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf });
+    },
+    /**
      * Forget ONE circle on this device: its rows go from the backing it lives on and its cached store with them. The
      * rows are deleted at the DataSource, beneath the store, so no removal hook fires — this is a device letting go
      * of what it held (a member that left), never a removal the circle's other members hear of. Returns the number

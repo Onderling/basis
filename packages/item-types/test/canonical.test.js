@@ -57,6 +57,7 @@ describe('Canonical types — registration via default registry', () => {
       'list',
       'list-item',
       'media',
+      'membership-redemption',
       'neighbourhood-job',
       'note',
       'offer',
@@ -125,6 +126,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     // A device of the person, own-devices scope only: its default wire id and its internal id.
     'device-link':       { wireId: 'd-0123', internalId: 'i-0123' },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
+    // A row of a circle's roster trail: which circle, who redeemed.
+    'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },
   };
 
   for (const [name, extra] of Object.entries(MINIMAL)) {

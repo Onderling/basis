@@ -18,6 +18,9 @@ const NAMES = { 'circle.lists.template.shopping': 'Boodschappen', 'circle.lists.
 const t = (k, vars) => NAMES[k] ?? (vars ? `${k} ${JSON.stringify(vars)}` : k);
 const local = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// a CALENDAR day away (noon, so a clock change never moves it onto today), never now ± 24 h
+const dayFromToday = (n) => { const d = new Date(); d.setDate(d.getDate() + n); d.setHours(12, 0, 0, 0); return d; };
+
 describe('what is done or has passed', () => {
   let dir;
   let agent;
@@ -43,7 +46,7 @@ describe('what is done or has passed', () => {
     await ensureHouseholdLists({ callSkill: call, t });
 
     // "ik ben bij de tandarts geweest": a tick of the appointment — the coming days no longer show it
-    await call('calendar', 'addEvent', { title: 'tandarts', when: `${local(new Date(Date.now() + 86_400_000))}T10:00` });
+    await call('calendar', 'addEvent', { title: 'tandarts', when: `${local(dayFromToday(1))}T10:00` });
     expect((await call('lists', 'markListItemDone', { item: 'tandarts' })).ok).toBe(true);
     expect(((await call('calendar', 'listEvents', { days: 7 })).items ?? []).length).toBe(0);
     // the default keeps nothing on a read: the ticked appointment leaves it at once (it stays in the store)
@@ -53,7 +56,7 @@ describe('what is done or has passed', () => {
     expect((await labels('Agenda')).join('|')).toContain('circle.lists.entry_done');
 
     // a passed appointment (yesterday) is shown marked as passed, not as an open one
-    await call('calendar', 'addEvent', { title: 'huisarts', when: `${local(new Date(Date.now() - 86_400_000))}T10:00` });
+    await call('calendar', 'addEvent', { title: 'huisarts', when: `${local(dayFromToday(-1))}T10:00` });
     expect((await labels('Agenda')).join('|')).toContain('circle.lists.event_passed');
 
     // a ticked entry under hide: shown marked; after the days are up (0 here): gone from the read

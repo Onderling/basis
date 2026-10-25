@@ -1190,7 +1190,20 @@ async function respondToItemCore(scope, a, ctx) {
   let toPubKey = post.source?.fromPubKey ?? null;
   let toWebid  = post.source?.from ?? post.addedBy ?? null;
   let toStableId = null;
-  if (members && toWebid) {
+  // A post read from its circle's own store names its poster by webid only (no carrier stamped a sender key on it):
+  // the poster's key is on the circle's roster, which is where a co-member's address is known.
+  const circleOfPost = post.source?.groupId
+    ?? (Array.isArray(post.source?.targets) ? post.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
+    ?? null;
+  if (!toPubKey && toWebid && circleOfPost) {
+    try {
+      const roster = (await listGroupMembersCore(scope, { groupId: circleOfPost }, { from: ctx.from }))?.members ?? [];
+      const row = roster.find((m) => m && m.webid === toWebid);
+      toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
+    } catch { /* not on the roster: no address, and no guess */ }
+  }
+  // the global member map only for a post that names no circle — a circle post's poster is known by its roster
+  if (members && toWebid && !circleOfPost) {
     const peer = await members.resolveByWebid(toWebid);
     toStableId = peer?.stableId ?? null;
     if (!toPubKey) toPubKey = peer?.pubKey ?? null;

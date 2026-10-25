@@ -51,6 +51,15 @@ describe('createRoutedStore', () => {
     expect((await routed.listOpen({})).some((i) => i.id === post.id)).toBe(false);
     expect((await routed.listClosed({})).some((i) => i.id === post.id)).toBe(true);
   });
+
+  it('a claim on a post reaches its circle store (the accept path claims before it completes)', async () => {
+    const { stores, routed } = setup();
+    const [post] = await routed.addItems([ask('kring-a')], { actor: ANN });
+    const BEA = 'https://id.example/bea';
+    const r = await routed.claim(post.id, { actor: BEA });
+    expect(r?.error).toBeUndefined();
+    expect((await stores.getStore('kring-a').get(post.id))?.assignees).toContain(BEA);
+  });
 });
 
 describe('createRoutedStore — no circle yet', () => {

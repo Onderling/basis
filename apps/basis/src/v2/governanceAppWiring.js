@@ -69,9 +69,9 @@ export function makeGovernanceBroadcast(callSkill) {
 
 /** The rail's key↔ref binding, then — for a report kind only — its admission rule. */
 function withReportAdmission(bind, callSkill) {
-  return async (q) => {
-    if (!(await bind(q))) return false;
-    return reportStatementAdmissible(q ?? {}, { callSkill });
+  return (q) => {
+    if (!isReportStatementKind(q?.kind)) return bind(q);   // every other kind: the binding alone, unchanged
+    return Promise.resolve(bind(q)).then((ok) => (ok ? reportStatementAdmissible(q, { callSkill }) : false));
   };
 }
 import { makeCircleReports } from './reportHost.js';

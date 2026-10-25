@@ -28,8 +28,6 @@
  *     the item.
  *   - blocking a person lives in the shell's own set (one set for the
  *     whole device); this app only READS it, through `scope.muted`.
- *   - `reportPost({itemId, reason})` — appends a `kind: 'report'`
- *     item referencing the original.
  *   - `listOpenRequests` / `listMyRequests` outputs hydrate each item's
  *     author into a `display: {handle, displayName?, isRevealed, render}`
  *     block when a `Reveals` store is wired.  Legacy callers without
@@ -2088,8 +2086,7 @@ export function buildSkills({
     // ── Pinboard V1 Phase 3 (2026-05-06) additions ────────────────────────────
     //
     // **Substrate candidate (rule of two — first consumer):** the
-    // moderation skill set below (`reportPost`, plus the deferred
-    // `removeMember`, `leaveGroup`,
+    // moderation skill set below (the deferred `removeMember`, `leaveGroup`,
     // `setMemberRole`, `requestProofRefresh`) is generic to any
     // closed-group SDK app.  When the second app (likely `apps/household`,
     // `apps/archive`, or `apps/tasks-v0`) needs these, extract into
@@ -2160,34 +2157,6 @@ export function buildSkills({
       return { item: completed, _sync: simulateSync() };
     }, {
       description: 'Mark a lend item as returned; cancels its return reminder.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * reportPost({itemId, reason?})  — append a `kind: 'report'` item.
-     */
-    // B★ B3 NOT wired (conflict a): phase3.test.js pins
-    // `reportPost({})` → `{error:'itemId required'}` as a RETURNED value, but the
-    // op declares itemId required so wireSkill would THROW instead. Kept hand-written.
-    defineSkill('reportPost', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) {
-        return { error: 'itemId required' };
-      }
-      const [report] = await store.addItems(
-        [{
-          type:        'report',
-          text:        a.reason ? `Report on ${a.itemId}: ${a.reason}` : `Report on ${a.itemId}`,
-          // Tag the report with its circle (per-circle moderation; `listReports` scopes on it).
-          source:      { reportTarget: a.itemId, reason: a.reason ?? null, ...(a.groupId ? { groupId: a.groupId } : {}) },
-          visibility:  'household',
-        }],
-        { actor: from },
-      );
-      metrics?.record?.('report-post');
-      return { reportId: report.id, _sync: simulateSync() };
-    }, {
-      description: 'File a report on another item; visible to admins of the group.',
       visibility:  'authenticated',
     }),
 
@@ -4220,30 +4189,6 @@ export function buildSkills({
       return { contact: m, ...(pk ? { personKey: pk } : {}) };
     }, {
       description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listReports({groupId?})
-     *   — admin-only.  Returns all `kind: 'report'` items for the
-     *   group, oldest first so admins see the queue in arrival order.
-     */
-    defineSkill('listReports', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (members) {
-        // The folded head, like every other authority question here, refusing when it has no answer.
-        const isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
-          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
-        if (!isAdmin) return { error: 'admin-only' };
-      }
-      const all = await store.listOpen({ type: 'report' });
-      // Per-circle scoping: keep reports tagged for THIS group, plus untagged legacy
-      // reports (visible to all admins — they predate per-circle tagging).
-      const scoped = all.filter((r) => { const g = r?.source?.groupId; return g == null || g === _groupId; });
-      return { reports: scoped.sort((p, q) => (p.addedAt ?? 0) - (q.addedAt ?? 0)) };
-    }, {
-      description: 'Admin-only: list the open reports for a group.',
       visibility:  'authenticated',
     }),
 

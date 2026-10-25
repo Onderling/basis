@@ -187,29 +187,6 @@ describe('Pinboard V1 — lend lifecycle (postRequest + markReturned + notifier)
 // ── Mute / report ─────────────────────────────────────────────────────────
 
 describe('Pinboard V1 — moderation skills (report)', () => {
-  it('reportPost creates a type:"report" item referencing the original', async () => {
-    const bundle = await buildAgent();
-
-    // First, post something to report on.
-    const original = await callSkill(bundle.agent, 'postRequest', { text: 'spam', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-
-    const r = await callSkill(bundle.agent, 'reportPost', {
-      itemId: original.requestId,
-      reason: 'irrelevant for the circle',
-    });
-    expect(r.reportId).toBeTruthy();
-
-    const stored = await bundle.itemStore.getById(r.reportId);
-    expect(stored.type).toBe('report');
-    expect(stored.text).toMatch(/Report on/);
-    expect(stored.source.reportTarget).toBe(original.requestId);
-    expect(stored.source.reason).toBe('irrelevant for the circle');
-  });
-
-  it('reportPost rejects missing itemId', async () => {
-    const bundle = await buildAgent();
-    expect(await callSkill(bundle.agent, 'reportPost', {})).toEqual({ error: 'itemId required' });
-  });
 });
 
 // ── Author hydration via Reveals + MemberMap ──────────────────────────────

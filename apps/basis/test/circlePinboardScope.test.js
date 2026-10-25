@@ -39,7 +39,7 @@ describe('scopePinboardCallSkill', () => {
   it('injects groupId on every scoped mutate op', async () => {
     const cs = vi.fn().mockResolvedValue({ ok: true });
     const scoped = scopePinboardCallSkill(cs, 'circle-a');
-    for (const op of ['respondToItem', 'cancelRequest', 'markReturned', 'assignLend', 'reportPost']) {
+    for (const op of ['respondToItem', 'cancelRequest', 'markReturned', 'assignLend']) {
       await scoped('pinboard', op, { itemId: 'p1' });
     }
     for (const call of cs.mock.calls) expect(call[2].groupId).toBe('circle-a');

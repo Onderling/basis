@@ -70,6 +70,7 @@ function subtypesOf(block) {
 }
 
 const LANES = readFileSync(dir('../../src/v2/circleLanes.js'), 'utf8');
+const BOX   = readFileSync(dir('../../bin/device-runner.mjs'), 'utf8');
 
 const webBlock    = region(WEB,    /const peerMessageRouter = makePeerRouter\(\{/, /\n\s*defaultHandler/);
 const mobileBlock = region(MOBILE, /const buildPeerWiring = useCallback/,           /const defaultHandler/);
@@ -87,6 +88,14 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
     expect(mobileBlock, 'mobile no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
     expect(WEB,    'web does not import buildCircleLanes').toContain('buildCircleLanes');
     expect(MOBILE, 'mobile does not import buildCircleLanes').toContain('buildCircleLanes');
+  });
+
+  it('a REPORT is received through the shared table on every shell, the box included — never a shell\'s own route', () => {
+    // reports are signed statements on the governance rail; a shell's own unsigned route would bypass the rail's rule
+    expect(subtypesOf(LANES).has('circle-report-broadcast'), 'the shared lane table routes reports').toBe(true);
+    expect(subtypesOf(webBlock).has('circle-report-broadcast'), 'web routes reports itself').toBe(false);
+    expect(subtypesOf(mobileBlock).has('circle-report-broadcast'), 'mobile routes reports itself').toBe(false);
+    expect(BOX, 'the box no longer spreads the lane table').toMatch(/\.\.\.\w*[Ll]anes\.handlers/);
   });
 
   const web = subtypesOf(webBlock);
@@ -116,7 +125,7 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
     // every lane, which is the deduplication that made it worth extracting. So name the lanes instead.
     const shared = subtypesOf(LANES);
     for (const lane of ['CHAT_STATEMENT_BROADCAST', 'KEY_STATEMENT_BROADCAST', 'TASK_BROADCAST',
-                        'MEMBERSHIP_BROADCAST', 'GRANTS_BROADCAST']) {
+                        'MEMBERSHIP_BROADCAST', 'GRANTS_BROADCAST', 'circle-report-broadcast']) {
       expect(shared.has(lane), `the shared lane table no longer routes ${lane}`).toBe(true);
     }
     expect([...shared].filter((x) => x.startsWith('catchup:')).length,

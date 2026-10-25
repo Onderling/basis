@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { signSpine } from '@onderling/core';
-import { reportEntryId } from '../../src/v2/reportModel.js';
 
 // Warm the secure mesh so A can reach B: a real circle's members have already exchanged HI
 // (they've been connected/chatting) before any governance fan. A cold broadcast fails
@@ -60,18 +59,28 @@ describe('governance/report propagation via the REAL receiver (InternalTransport
 
   it('broadcastCircleReport A -> B ingests the report event into B\'s log', async () => {
     const A = await bootRealAgentNode('A');
-    const B = await bootRealAgentNode('B');
+    const aCidHolder = {};
+    const B = await bootRealAgentNode('B', {
+      verifyGovernanceBinding: async ({ author, ref }) => ref === A.pubKey && author === aCidHolder.pubKey,
+    });
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B);
     await warmMesh(A, B, 'peer-circle');
 
     const groupId = 'peer-circle';
-    const event = { kind: 'report', event: 'report', reportId: 'r-headless', targetType: 'member', targetRef: 'someone', reason: 'spam', by: 'A' };
-    const r = await A.agent.callSkill('pinboard', 'broadcastCircleReport', { groupId, event, msgId: reportEntryId(event) });
+    // a report is a SIGNED statement on the governance rail (report-file), signed with A's real per-circle key
+    const cid = await A.agent.circleIdentityFor(groupId);
+    aCidHolder.pubKey = cid.pubKey;
+    const event = signSpine(cid, {
+      kind: 'report-file', circleId: groupId, subject: 'r-headless',
+      payload: { targetType: 'member', targetRef: 'someone', reason: 'spam', by: A.pubKey, authorRef: A.pubKey, at: 1 },
+      parent: null,
+    });
+    const r = await A.agent.callSkill('pinboard', 'broadcastCircleReport', { groupId: groupId, event, msgId: `gov:${event.body.hash}` });
     expect(r?.error, `broadcast failed: ${JSON.stringify(r)}`).toBeFalsy();
 
     const got = await until(
-      () => B.chatEvents.some((e) => e?.type === 'report' && e?.payload?.reportId === 'r-headless'),
+      () => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.kind === 'report-file' && e?.payload?.body?.subject === 'r-headless'),
       { timeout: 3000 },
     );
     expect(got, 'B ingested the report event via the REAL receiver').toBeTruthy();

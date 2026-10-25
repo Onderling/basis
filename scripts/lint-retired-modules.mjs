@@ -31,7 +31,8 @@
  * Retired 2026-10-25 (a 1:1 turn's record is the contact thread the basis shells keep): chat-p2p's item mirror of
  *   every DM and its readers (`getChatThread`, `listChatThreads`, `sendChatMessage`), and the contact-request
  *   rows nothing routed or read (`requestContactAdd`, `acceptContactRequest`, `declineContactRequest`,
- *   `listContactRequests`).
+ *   `listContactRequests`). Pinboard's report rows (`reportPost`, `listReports`): a report is a signed statement on the
+ *   governance rail, for the circle's admins and its reporter only.
  *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
@@ -68,6 +69,8 @@ const RETIRED = [
   { name: 'acceptContactRequest', re: /['"]acceptContactRequest['"]/ },
   { name: 'declineContactRequest', re: /['"]declineContactRequest['"]/ },
   { name: 'listContactRequests', re: /['"]listContactRequests['"]/ },
+  { name: 'reportPost', re: /['"]reportPost['"]/ },
+  { name: 'listReports', re: /['"]listReports['"]/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

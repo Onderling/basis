@@ -71,15 +71,12 @@ describe('Pinboard V1 Phase 18 — record() fires on key user actions', () => {
     expect(snap['post-lend']?.count).toBe(1);
   });
 
-  it('reportPost + cancelRequest all record', async () => {
+  it('cancelRequest records', async () => {
     const bundle = await buildAgent();
     const r = await callSkill(bundle.agent, 'postRequest',
       { text: 'foo', intent: 'ask', expectClaims: 0, timeoutMs: 1 });
-    await callSkill(bundle.agent, 'reportPost',
-      { itemId: r.requestId, reason: 'spam' });
     await callSkill(bundle.agent, 'cancelRequest', { requestId: r.requestId });
     const snap = bundle.metrics.snapshot();
-    expect(snap['report-post']?.count).toBe(1);
     expect(snap['cancel-request']?.count).toBe(1);
   });
 

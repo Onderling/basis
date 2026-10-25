@@ -394,7 +394,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         onChange: (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); },
       });
     })(),
-    'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: chatEventLog }),
+    // a report is a signed statement on the same governance rail (this node's log, the same binding source)
+    'circle-report-broadcast':     makeCircleReportPeerHandler({ rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }) }),
     // The task lane's receive half — the same registration both shells make (`circleApp.js` /
     // `ChatScreen.js`), over the rail the factory built on this node's device log. Its ingest verifies
     // the statement and causally merges the item snapshot into the circle's store head, which is what

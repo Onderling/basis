@@ -229,7 +229,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
-import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
+import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -248,10 +248,9 @@ import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
-import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
+import { foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
-import { reportEntryId } from '../../src/v2/reportModel.js';
-import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
@@ -8497,13 +8496,9 @@ let _govRerender = null;
 // "A decision opened" is RENDERED from the proposal statement on the log (`governanceNotices.js`, through
 // `chatRows`) — the appended `gov-notif` nudge that used to live here is retired (2-TER's rule: no write
 // whose payload is derivable from an entry already on the log). `type: 'notification'` keeps its real job.
-function govBroadcast(channel, circleId, event, opts) {
-  const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-  const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
-  // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
-  // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
-  const to = Array.isArray(opts?.to) ? opts.to : undefined;
-  rawCallSkill('pinboard', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
+function govBroadcast(channel, circleId, statement, opts) {
+  // the one shared fan (governanceAppWiring); `rawCallSkill` is read at call time
+  return makeGovernanceBroadcast((...args) => rawCallSkill(...args))(channel, circleId, statement, opts);
 }
 
 // Remove a reported post/message when an admin ACTS on it (the §8 report host's `act` calls
@@ -9482,7 +9477,6 @@ async function boot() {
             circlePolicyLane.apply(cid, govShellRail).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
           } }),
-          'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // Calendar INBOUND — receive what the fan-out sends. invite persists
           // the event locally (→ shows on the calendar surface) + a circle
           // heads-up; rsvp/cancel apply to local calendar state. (A richer

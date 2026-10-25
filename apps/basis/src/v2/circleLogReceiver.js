@@ -1,35 +1,13 @@
 /**
- * basis v2 — governance/report ingest receivers (Wave C propagation).
+ * basis v2 — governance and report receivers.
  *
- * Governance rides the ONE circle log; these handlers ingest a fanned governance or report
- * event (from the pinboard `broadcastCircle{Governance,Report}` skills) into the LOCAL EventLog,
- * so a vote/report raised on one device shows up on every member's device. The EventLog dedups
- * by the STABLE entry id (governanceEntryId / reportEntryId), so a re-delivered event never
- * double-appends. Registered on the peer router under the two broadcast subtypes, next to the
- * chat/policy/rules handlers. `onChange` lets the shell re-render an open governance panel.
+ * Both ride the governance rail as SIGNED statements: a fanned vote, proposal, report or resolution lands only through
+ * the rail's ingest (signature · chain · declared kind · key↔ref binding · and, for reports, `reportLane.js`'s rule), so
+ * an unsigned event is refused. The EventLog dedups by the statement's hash. `onChange` lets the shell re-render an open
+ * governance panel.
  */
 import { GOVERNANCE_KIND } from './governanceLog.js';
-import { REPORT_KIND, reportEntryId } from './reportModel.js';
-
-function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange, notify, wakeHint }) {
-  return async function onCircleLogBroadcast(_fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== subtype) return;
-    const { circleId, event, ts } = payload;
-    if (typeof circleId !== 'string' || !circleId || !event || typeof event !== 'object') return;
-    // Idempotency + not-mine: only nudge if this is genuinely NEW to us (not already logged)
-    // and worth attention (wakeHint) — an already-seen re-delivery re-appends to the same id
-    // and must NOT re-notify.
-    const id = idFor(event);
-    const isNew = eventLog.query({}).every((e) => e.id !== id);
-    try {
-      eventLog.appendSilentEntry({ circleId, kind, payload: event, id, ts });
-      try { onChange?.(circleId); } catch { /* re-render is best-effort */ }
-      if (isNew && typeof notify === 'function' && (typeof wakeHint !== 'function' || wakeHint(event))) {
-        try { notify(circleId, event); } catch { /* in-app nudge is best-effort */ }
-      }
-    } catch { /* ingest is best-effort — never throw on a peer message */ }
-  };
-}
+import { isReportStatementKind } from './reportLane.js';
 
 /** Peer handler for `circle-governance-broadcast` → ingest the vote/proposal event locally.
  *  `notify(circleId, event)` fires an IN-APP nudge for wake-worthy events (a decision opened),
@@ -64,8 +42,22 @@ export function makeCircleGovernancePeerHandler({ eventLog, onChange, notify, ra
   }
 }
 
-/** Peer handler for `circle-report-broadcast` → ingest the report event locally. `notify` fires
- *  on every report (an admin should see them). */
-export function makeCircleReportPeerHandler({ eventLog, onChange, notify } = {}) {
-  return makeIngestHandler({ eventLog, subtype: 'circle-report-broadcast', kind: REPORT_KIND, idFor: reportEntryId, onChange, notify });
+/**
+ * Peer handler for `circle-report-broadcast`: a report or its resolution, a SIGNED statement on the governance rail. It
+ * lands only through the rail's ingest — signature, key↔ref binding and the report rule (`reportLane.js`: a filing's
+ * `by` is its author, a resolution's author an admin). A bare unsigned event is refused. Registered in the lane table
+ * (`buildCircleLanes`), so every shell — web, mobile, the box — receives reports the same way.
+ */
+export function makeCircleReportPeerHandler({ rail, onChange = null } = {}) {
+  if (!rail) throw new Error('makeCircleReportPeerHandler: the governance rail is required — a report must verify before it lands');
+  return async function onCircleReport(_fromPeerAddr, payload) {
+    if (!payload || payload.subtype !== 'circle-report-broadcast') return;
+    const { circleId, event: statement } = payload;
+    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;   // signed-only
+    if (!isReportStatementKind(statement.body.kind)) return;   // this door carries reports, nothing else of the lane
+    try {
+      const res = await rail.ingest(circleId, statement);
+      if (res?.ok) { try { onChange?.(circleId); } catch { /* re-render is best-effort */ } }
+    } catch { /* ingest is best-effort — never throw on a peer message */ }
+  };
 }

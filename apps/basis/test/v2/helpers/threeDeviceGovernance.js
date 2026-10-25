@@ -81,7 +81,7 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
       enacted: [],                                   // real-world side effects THIS device performed
       removed: [],                                   // reported posts/messages THIS device deleted
       ingestGovernance: makeCircleGovernancePeerHandler({ eventLog: log, rail }),
-      ingestReport: makeCircleReportPeerHandler({ eventLog: log }),
+      ingestReport: makeCircleReportPeerHandler({ rail }),
     };
     held[ref] = [];
   }
@@ -141,6 +141,12 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
         return { ok: true };
       },
     });
+  }
+
+  // a report read settles first too: reports are signed statements, and their ingest is as async as a vote's
+  for (const d of Object.values(devices)) {
+    const list = d.gov.reports.list;
+    d.gov.reports.list = async (...args) => { await settle(); return list(...args); };
   }
 
   const h = {

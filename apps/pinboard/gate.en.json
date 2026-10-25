@@ -54,15 +54,5 @@
     "examples": [
       "returned the ladder"
     ]
-  },
-  "pinboard.reportPost": {
-    "doc": "Report a post to the circle's admins.",
-    "verbs": [
-      "report",
-      "flag"
-    ],
-    "examples": [
-      "report the spam"
-    ]
   }
 }

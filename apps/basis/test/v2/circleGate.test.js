@@ -111,7 +111,6 @@ describe('circle gate — Part C: multi-app verbs, collisions, removed declarati
     expect(await op('post a ladder')).toBe('postRequest');
     expect(await op('help with the drill')).toBe('respondToItem');
     expect(await op('returned the ladder')).toBe('markReturned');
-    expect(await op('report the spam')).toBe('reportPost');
     expect(await op('download budget.xlsx')).toBe('downloadFile');
     expect(await op('sync')).toBe('syncOnce');
     expect(await op('schedule lunch')).toBe('addEvent');

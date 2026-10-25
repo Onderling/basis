@@ -26,6 +26,8 @@
  */
 
 import { makeGovernanceCatchUp } from './governanceCatchUp.js';
+import { makeCircleReportPeerHandler } from './circleLogReceiver.js';
+import { narrowReportStatements } from './reportLane.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { makeSyncSelection, HOLD_EVERYTHING } from './syncSelection.js';
 import { GRANTS_BROADCAST } from './grantsRail.js';
@@ -110,6 +112,9 @@ export function buildCircleLanes({
     sendToPeer: send,
     ...aim,
     onChange: govChange,
+    // A report statement is served only to its readers — the circle's admins and the person who filed it
+    // (`reportLane.js`, the same rule the report fan applies). The reported member never learns one exists.
+    narrowServe: (statements, who) => narrowReportStatements(statements, who, { callSkill: (...a) => agent.callSkill(...a) }),
     // The durable-head serve: a member offline past the lane's audit window still receives the
     // preserved, originally-signed rules-update statement — the final setting never deletes.
     ...(typeof extraGovStatementsFor === 'function' ? { extraStatementsFor: extraGovStatementsFor } : {}),
@@ -271,6 +276,8 @@ export function buildCircleLanes({
       })),
     } : {}),
     ...catchUpEntries(membership),
+    // a report or its resolution, signed on the governance rail — every shell receives it here, the box included
+    ...(govRail ? { 'circle-report-broadcast': makeCircleReportPeerHandler({ rail: govRail, onChange: govChange }) } : {}),
     ...catchUpEntries(gov),
     // The personal lanes. A connection belongs to the PERSON, so a grant or revoke made on one of
     // their devices has to bind at every other device's door; the roster seed answers a freshly

@@ -405,37 +405,6 @@ export const pinboardManifest = {
       },
     },
 
-    // ── Moderation ──────────────────────────────────────────────────
-    {
-      id:   'reportPost', visibility: 'authenticated',
-      circleScoped: true,
-      verb: 'report',  // F-SP1-e: non-canonical.  Resolved 2026-05-21
-                       // (owner): kept `report` (truer to intent).
-                       // Squeezing into canonical `add` would obscure
-                       // the action's nature.
-      writes: { scope: 'circle' },
-      appliesTo: { type: 'report' },
-      params: [
-        // Part G dissolve (2026-06-17) — `/report` was in BOTH manifests;
-        // the former mock added a `pickerSource` (label→id) + a row button.
-        { name: 'itemId', kind: 'string', required: true, ...ID_NONEMPTY,
-          pickerSource: { listOp: 'listFeed' } },
-        { name: 'reason', kind: 'string', ...STR_NONEMPTY },  // optional but if present must be non-empty
-      ],
-      surfaces: {
-        chat:  { hint: 'File a report on another item; visible to admins of the group.' },
-        slash: {
-          // Collision-free.  No NL synonym in V0; UI calls it
-          // "rapporteer".
-          command: '/report',
-          match: {
-            body:    'match',
-            onEmpty: { skillId: 'reportPost', args: {} },
-          },
-        },
-        ui: { control: 'button', labelKey: 'circle.button.pinboard.reportPost' },
-      },
-    },
     // ── Profile / reveals ───────────────────────────────────────────
     {
       id:   'setPeerReveal', visibility: 'authenticated', group: 'compose',

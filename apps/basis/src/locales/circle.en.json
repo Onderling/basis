@@ -6101,7 +6101,7 @@
       },
       "report": {
         "text": "Report",
-        "doc": "S1 — per-post action: report abuse (reportPost)."
+        "doc": "S1 — per-post action: report abuse (a signed report to the circle's admins)."
       },
       "mute": {
         "text": "Block",
@@ -8845,10 +8845,6 @@
       "markReturned": {
         "text": "Returned",
         "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
-      },
-      "reportPost": {
-        "text": "Report",
-        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Message",

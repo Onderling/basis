@@ -1,5 +1,11 @@
 # Changelog — @onderling-app/pinboard
 
+## [Unreleased] — the membership code is the admin's own (2026-10-25)
+
+- With a host own store (`hostCircles.ownStore`), a circle's invite code (`membership-code`, now a dictionary type)
+  lives there, written as the self the admin is in that circle, so it rides that self's own-devices lane only. It is
+  no longer in the pile and never in a circle's store; the trail names it by its id only.
+
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 
 Media Phase 1 anti-drift tail: pinboard's inline-bytes attachments now

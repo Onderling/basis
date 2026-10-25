@@ -27,6 +27,7 @@ import { MEDIA_SCHEMA }             from './types/media.js';
 import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
 import { INTENTION_SCHEMA }         from './types/intention.js';
 import { DEVICE_LINK_SCHEMA }       from './types/deviceLink.js';
+import { MEMBERSHIP_CODE_SCHEMA }   from './types/membershipCode.js';
 import { RSVP_SCHEMA }              from './types/rsvp.js';
 import { MEMBERSHIP_REDEMPTION_SCHEMA } from './types/membershipRedemption.js';
 import { GROUP_RULES_SCHEMA }       from './types/groupRules.js';
@@ -100,6 +101,7 @@ export const CANONICAL_TYPES = Object.freeze({
   // task lifecycle's verbs, so no chore list ever shows a machine row.
   'intention':          INTENTION_SCHEMA,
   'device-link':        DEVICE_LINK_SCHEMA,
+  'membership-code':    MEMBERSHIP_CODE_SCHEMA,
   // One person's answer to one appointment (2026-10-20): its own item, so no whole-item write of the appointment can
   // carry or drop it; the appointment's `rsvp` is a read projection over these.
   'rsvp':               RSVP_SCHEMA,

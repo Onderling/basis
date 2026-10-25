@@ -1,25 +1,19 @@
 /**
  * Pinboard V2 — Phase 29 tests.
  *
- *   29.1  RevealsCache: round-trip; cold-boot hydration
  *   29.3  PushRegistryCache: round-trip; cold-boot hydration
  *   29.4  All three flush to a stubbed pod source on attachInner
  *         (the existing Phase 23.6 pattern, now covering more entities)
  */
 
 import { describe, it, expect } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
-import { RevealsCache, REVEALS_STORAGE_PATH } from '../src/lib/RevealsCache.js';
 import { PUSH_REGISTRY_STORAGE_PATH } from '../src/lib/PushRegistryCache.js';
 
 const ANNE = 'https://id.example/anne';
-const BOB  = 'https://id.example/bob';
 
 async function callSkill(agent, skillId, args, fromWebid = ANNE) {
   const def = agent.skills.get(skillId);
@@ -32,79 +26,25 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
   });
 }
 
-async function makeTmpDir() {
-  const dir = await mkdtemp(join(tmpdir(), 'pinboard-phase29-'));
-  return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
-}
-
 /** A device-local medium, as a shell hands one: read/write by path, nothing else. */
 function memoryMedium() {
   const m = new Map();
   return { m, async read(p) { return m.has(p) ? m.get(p) : null; }, async write(p, d) { m.set(p, d); } };
 }
 
-async function buildBundle({ persistPath, pushStore } = {}) {
+async function buildBundle({ pushStore } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
   const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    [{ webid: ANNE }],
-    persistPath,
     pushStore,
   });
   await bundle.offeringMatch.start();
   return bundle;
 }
 
-/* ── 29.1 RevealsCache ─────────────────────────────────────── */
-
-
-/**
- * Wait until the store's files under `dir` hold `marker` — the write behind them is debounced and fire-and-forget
- * (FilePersist), so a fixed sleep raced it on a loaded CI runner. Then a cold boot asks the real question: does it
- * find it on disk. Bounded, and says so when the write never came.
- */
-async function onDisk(dir, marker, { timeoutMs = 10_000, everyMs = 50 } = {}) {
-  const { readdir, readFile, stat } = await import('node:fs/promises');
-  const filesUnder = async (d) => (await Promise.all((await readdir(d).catch(() => [])).map(async (n) => {
-    const p = join(d, n);
-    return (await stat(p).catch(() => null))?.isDirectory() ? filesUnder(p) : [p];
-  }))).flat();
-  const until = Date.now() + timeoutMs;
-  while (Date.now() < until) {
-    for (const f of await filesUnder(dir)) if (!f.endsWith('.tmp') && (await readFile(f, 'utf8').catch(() => '')).includes(marker)) return true;
-    await new Promise((r) => setTimeout(r, everyMs));
-  }
-  throw new Error(`the write never reached disk under ${dir} (looked for ${marker})`);
-}
-
-describe('Pinboard V2 Phase 29.1 — RevealsCache', () => {
-  it('Reveals mutations write through to mem://pinboard/reveals.json', async () => {
-    const bundle = await buildBundle();
-    bundle.reveals.setPeerReveal(BOB, true);
-    bundle.reveals.setGroupReveal('oosterpoort', true);
-
-    // Settled — flush is sync from the event listener.  Read back via cache.
-    const raw = await bundle.cache.read(REVEALS_STORAGE_PATH);
-    expect(raw).toBeTruthy();
-    const parsed = JSON.parse(raw);
-    expect(parsed.peers.find(p => p.peerWebid === BOB)?.showDisplayName).toBe(true);
-    expect(parsed.groups.find(g => g.groupId === 'oosterpoort')?.showDisplayName).toBe(true);
-  });
-
-  it('cold-boot bundle (same persistPath) hydrates Reveals from disk', async () => {
-    const { dir, cleanup } = await makeTmpDir();
-    try {
-      const b1 = await buildBundle({ persistPath: dir });
-      b1.reveals.setPeerReveal(BOB, true);
-      await onDisk(dir, BOB);
-      const b2 = await buildBundle({ persistPath: dir });
-      const decision = b2.reveals.decide({ peerWebid: BOB });
-      expect(decision.showDisplayName).toBe(true);
-    } finally { await cleanup(); }
-  });
-});
 
 /* ── 29.3 the push registry on its own device-local store ──── */
 
@@ -153,7 +93,7 @@ describe('the push registry lives on the device-local push store, never in the p
 
 /* ── 29.4 Pod-attach flush ─────────────────────────────────── */
 
-describe('Pinboard V2 Phase 29 — pod-attach flush carries Reveals, never a push subscription', () => {
+describe('Pinboard V2 Phase 29 — the pod-attach flush never carries a push subscription', () => {
   it('post-attach writes flow to a stubbed pod source', async () => {
     const bundle = await buildBundle();
     const writes = [];
@@ -165,15 +105,14 @@ describe('Pinboard V2 Phase 29 — pod-attach flush carries Reveals, never a pus
     };
     await bundle.cache.attachInner(stubPod);
 
-    // Trigger writes for all three entities.  The cache.write paths
-    // are fire-and-forget at the persist hook; await a tick so the
-    // queued ops flush through to the stub.
-    bundle.reveals.setPeerReveal(BOB, true);
+    // A member-map write does reach the pod; a push subscription never does. The cache.write paths are
+    // fire-and-forget at the persist hook; await a tick so the queued ops flush through to the stub.
+    await callSkill(bundle.agent, 'setMyDisplayName', { displayName: 'Anne' });
     bundle.pushRegistry.add(ANNE, { endpoint: 'https://push.example/x', keys: {} });
     await new Promise(r => setTimeout(r, 50));
 
     const paths = writes.map(w => w.path);
-    expect(paths.some(p => p === REVEALS_STORAGE_PATH)).toBe(true);
+    expect(paths.length).toBeGreaterThan(0);
     expect(paths.some(p => p === PUSH_REGISTRY_STORAGE_PATH)).toBe(false);
   });
 });

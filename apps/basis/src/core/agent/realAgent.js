@@ -5245,12 +5245,6 @@ export async function createRealHouseholdAgent(opts = {}) {
    *   /feed       → listOpen     (no `listFeed` in real pinboard)
    *   /pinboard-profile → getMyProfile
    *
-   * Part G dissolve (2026-06-17) — the `revealPeer → setPeerReveal`
-   * alias was DROPPED: the `revealPeer` op no longer exists (the
-   * `/reveal` collision was resolved by keeping ONE op, `setPeerReveal`,
-   * in the merged manifest).  `setPeerReveal` dispatches directly; the
-   * `peer→peerWebid` + `action→reveal` value transforms below STAY.
-   *
    * F1 circle content (5.3d) — `loadCircleItems` reads a circle's
    * pinboard posts via the source ops `getBulletin` / `getFeed`.  Pinboard
    * has neither as a real skill; both are aspirational names in
@@ -6208,16 +6202,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       const realOpId = PINBOARD_OP_ALIAS[opId] ?? opId;
       // Arg normalisation between chat-shell vocabulary + real pinboard.
       let realArgs = args ?? {};
-      if (realOpId === 'setPeerReveal') {
-        // Chat-shell sends {peer, action: 'on'/'off'}; real takes
-        // {peerWebid, reveal: boolean}.
-        if (realArgs.peer && !realArgs.peerWebid) {
-          realArgs = { ...realArgs, peerWebid: realArgs.peer };
-        }
-        if (typeof realArgs.action === 'string' && realArgs.reveal === undefined) {
-          realArgs = { ...realArgs, reveal: realArgs.action.toLowerCase() === 'on' };
-        }
-      }
       // Part G dissolve (2026-06-17) — the markReturned itemId→requestId
       // bridge was REMOVED: the merged manifest declares the real param
       // `requestId` directly (the `/lend-return` gate binds `arg:
@@ -7352,7 +7336,6 @@ export async function createRealHouseholdAgent(opts = {}) {
    *   postRequest     → {ok, message, itemId, _sync}
    *   listFeed/Open   → {items: [{id, label, state, ...}], _sync}
    *   getMyProfile    → {title, handle, displayName, circle, ...}
-   *   setPeerReveal   → {ok, message, peer, action}
    */
   function adaptPinboardReply(opId, data, args, tr = agentT) {
     if (data == null) return null;
@@ -7419,22 +7402,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         handle:      e.handle ?? null,
         displayName: e.displayName ?? null,
         circle:       opts.pinboardGroup ?? 'cc-default-circle',
-      };
-    }
-    // setPeerReveal: real returns {} on success → adapt to chat shape.
-    // Part G dissolve (2026-06-17) — keyed on `setPeerReveal` (was
-    // `revealPeer`, the dropped alias op).  args still carry the
-    // chat-shell `peer`/`action` vocab; the peer→peerWebid +
-    // action→reveal transforms happen before invoke.
-    if (opId === 'setPeerReveal') {
-      const peer   = args?.peer ?? args?.peerWebid ?? tr('circle.reveal.someone');
-      const action = args?.action ?? (args?.reveal ? 'on' : 'off');
-      return {
-        ok: true,
-        message: action === 'on'
-          ? tr('circle.reveal.on', { peer })
-          : tr('circle.reveal.off', { peer }),
-        peer, action,
       };
     }
     // setHolidayMode: real returns {holidayMode: bool} → friendly text.

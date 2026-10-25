@@ -341,7 +341,6 @@ the following Pinboard-local code is flagged as substrate candidates —
 extracted when a second app needs the shape:
 
 - `src/lib/CachingDataSource.js` + `src/lib/SyncCadence.js` → likely `@onderling/local-store` (or extend `@onderling/sync-engine`).
-- `src/skills/index.js` `hydrateItem` / `hydrateItems` → likely promoted into `@onderling/identity-resolver`.
 - `src/skills/index.js` moderation skill block → likely `@onderling/group-mod`.
 
 Inventory + promotion rule:

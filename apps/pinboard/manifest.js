@@ -53,8 +53,7 @@
  *
  * `surfaces.slash.match` is provided for ops whose body is a single
  * scalar (text/itemId/reason); ops requiring two-arg bodies
- * (`assignLend({itemId, borrowerWebid})`,
- * `setPeerReveal({peerWebid, showDisplayName})`) declare the slash
+ * (`assignLend({itemId, borrowerWebid})`) declare the slash
  * `command` only (no `match` parser); they remain reachable as
  * pure-command shells that surface the form / picker in the consumer.
  *
@@ -365,7 +364,7 @@ export const pinboardManifest = {
           // positional slash → always needsForm at resolveDispatch.
           // The consumer's composer surfaces the form/picker UI; slash
           // bodies are line-oriented and can't bind two positional
-          // args cleanly.  Same pattern setPeerReveal uses.
+          // args cleanly.
           command: '/lend-assign',
           shape:   '/lend-assign <itemId> <borrower-webid>',
         },
@@ -402,38 +401,6 @@ export const pinboardManifest = {
           },
         },
         ui: { control: 'button', labelKey: 'circle.button.pinboard.markReturned' },
-      },
-    },
-
-    // ── Profile / reveals ───────────────────────────────────────────
-    {
-      id:   'setPeerReveal', visibility: 'authenticated', group: 'compose',
-      verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
-      writes: { scope: 'device' },   // a reveal flag kept on this device
-      // Part G dissolve (2026-06-17) — `/reveal` was a COLLISION: the real
-      // op is `setPeerReveal`; the former mock declared `revealPeer` (a
-      // SEMANTIC alias of setPeerReveal via PINBOARD_OP_ALIAS) on the SAME
-      // `/reveal` command.  Resolved by keeping ONE op — `setPeerReveal`
-      // — with the RICHER mock `/reveal` slash (`body: 'flags'`, so
-      // `/reveal <peer> --action=on` parses the flag).  The `revealPeer`
-      // op AND its PINBOARD_OP_ALIAS entry are DROPPED (the op is gone).
-      //
-      // PARAMS keep the chat-shell presentation vocab (`peer` + `action`
-      // on|off) — the realAgent adapter's `peer→peerWebid` +
-      // `action→reveal(boolean)` transforms are KEPT (legitimate
-      // presentation→storage mapping, NOT a redundant rename).  The
-      // adaptPinboardReply branch now keys on `setPeerReveal`.
-      params: [
-        { name: 'peer',   kind: 'string', required: true, ...STR_NONEMPTY },
-        { name: 'action', kind: 'enum', of: ['on', 'off'], required: false },
-      ],
-      surfaces: {
-        chat:  { hint: 'reveal (or hide) a peer\'s real name' },
-        slash: {
-          command: '/reveal',
-          shape:   '/reveal <peer-webid> [on|off]',
-          body:    'flags',
-        },
       },
     },
 

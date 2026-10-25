@@ -383,24 +383,6 @@ describe('CC-ST.4 — pinboard profile record', () => {
   });
 });
 
-describe('CC-ST.5 — reveal a peer connection', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspace(); });
-
-  it('/reveal webid:anne (default --action=on) flips local reveal', async () => {
-    const r = await ws.userInput('/reveal webid:anne --action=on');
-    expect(r.payload.ok).toBe(true);
-    expect(r.payload.action).toBe('on');
-  });
-
-  it('/reveal --action=off undoes it', async () => {
-    await ws.userInput('/reveal webid:anne --action=on');
-    const r = await ws.userInput('/reveal webid:anne --action=off');
-    expect(r.payload.ok).toBe(true);
-    expect(r.payload.action).toBe('off');
-  });
-});
-
 describe('CC-ST.9 — mute a noisy peer', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });

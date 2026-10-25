@@ -21,7 +21,6 @@ const row = (over = {}) => ({
   role: 'member', handle: 'bram',
   displayName: 'Bram de Wit',            // ← local cache — PRIVATE to this device
   avatarUrl: 'https://x/bram.png',       // ← local cache — PRIVATE
-  viewerNameOptIn: true,                  // ← this viewer's own preference — PRIVATE
   relation: 'contact', trustLevel: 'vertrouwd',   // ← this device's classification — PRIVATE
   personaProperties: { realName: 'B. de Wit', circle: 'oost' },   // ← the member's RELEASE — public to circle
   ...over,
@@ -62,7 +61,6 @@ describe('projectRosterRowForPeer — the allowlist', () => {
     // dropped — the local cache and the viewer's private classifications
     expect(out).not.toHaveProperty('displayName');
     expect(out).not.toHaveProperty('avatarUrl');
-    expect(out).not.toHaveProperty('viewerNameOptIn');
     expect(out).not.toHaveProperty('relation');
     expect(out).not.toHaveProperty('trustLevel');
     // and nothing outside the allowlist survives, whatever its name

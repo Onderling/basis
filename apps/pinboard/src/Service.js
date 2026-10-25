@@ -52,14 +52,13 @@ const noopOfferingMatch = () => ({ broadcast: async () => ({ claims: [] }), addP
  * @param {object}  [deps.store]        an `ItemStore` (defaults to an in-memory MemorySource-backed one)
  * @param {object}  [deps.offeringMatch]   L1e OfferingMatch (defaults to a no-op broadcast stub)
  * @param {object}  [deps.manifest]     defaults to the real `pinboardManifest`
- *  …plus the remaining `buildSkills` deps (notifier, reveals, members, controlAgent, muted, localActor,
+ *  …plus the remaining `buildSkills` deps (notifier, members, controlAgent, muted, localActor,
  *    groupId, dataLocationConfig, chat, metrics, bundle) — all optional, forwarded verbatim.
  */
 export function createPinboardService({
   store,
   offeringMatch,
   notifier,
-  reveals,
   members,
   controlAgent,
   muted,
@@ -82,7 +81,6 @@ export function createPinboardService({
     store:      itemStore,
     offeringMatch: offeringMatch ?? noopOfferingMatch(),
     notifier:   notifier ?? null,
-    reveals:    reveals ?? null,
     members:    members ?? null,
     controlAgent,
     muted:      muted ?? new Set(),

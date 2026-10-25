@@ -18,8 +18,6 @@
  *           (no local `ref`).
  *   - 39.4: the removed plaintext byte-serving path — postRequest REFUSES inline
  *           plaintext; requestAttachment still rejects an unknown item.
- *   - 39.5: sendChatMessage requires body-or-attachment, and REFUSES an inline
- *           plaintext attachment (accepts a sealed pointer).
  *   - Privacy invariant: no plaintext bytes / `data:image` thumbnail crosses the wire.
  */
 
@@ -206,18 +204,3 @@ describe('Phase 39.4 — plaintext byte-serving path removed', () => {
   });
 });
 
-describe('Phase 39.5 — sendChatMessage with a sealed attachment', () => {
-  it('rejects empty body + no attachment', async () => {
-    const bundle = await buildBundle();
-    const r = await callSkill(bundle.agent, 'sendChatMessage', { threadId: 't1', toWebid: BOB });
-    expect(r.error).toBe('body-or-attachment-required');
-  });
-
-  it('REFUSES an inline-plaintext chat attachment', async () => {
-    const bundle = await buildBundle();
-    const r = await callSkill(bundle.agent, 'sendChatMessage', {
-      threadId: 't1', toWebid: BOB, attachment: makePlaintextAttachment(),
-    });
-    expect(r.error).toBe('attachment-plaintext-refused');
-  });
-});

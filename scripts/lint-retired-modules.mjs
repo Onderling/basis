@@ -28,6 +28,11 @@
  *   `listCircleChats` · EvictionRoster and `listEvictedMembers` (it read an invite code's lifetime as a membership
  *   expiry).
  *
+ * Retired 2026-10-25 (a 1:1 turn's record is the contact thread the basis shells keep): chat-p2p's item mirror of
+ *   every DM and its readers (`getChatThread`, `listChatThreads`, `sendChatMessage`), and the contact-request
+ *   rows nothing routed or read (`requestContactAdd`, `acceptContactRequest`, `declineContactRequest`,
+ *   `listContactRequests`).
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -56,6 +61,13 @@ const RETIRED = [
   { name: 'listCircleChats',      re: /['"]listCircleChats['"]/ },
   { name: 'EvictionRoster',       re: /from\s+['"][^'"]*EvictionRoster(?:\.js)?['"]|new\s+EvictionRoster\s*\(/ },
   { name: 'listEvictedMembers',   re: /['"]listEvictedMembers['"]/ },
+  { name: 'getChatThread', re: /['"]getChatThread['"]/ },
+  { name: 'listChatThreads', re: /['"]listChatThreads['"]/ },
+  { name: 'sendChatMessage', re: /['"]sendChatMessage['"]/ },
+  { name: 'requestContactAdd', re: /['"]requestContactAdd['"]/ },
+  { name: 'acceptContactRequest', re: /['"]acceptContactRequest['"]/ },
+  { name: 'declineContactRequest', re: /['"]declineContactRequest['"]/ },
+  { name: 'listContactRequests', re: /['"]listContactRequests['"]/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

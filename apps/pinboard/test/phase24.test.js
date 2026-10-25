@@ -1,8 +1,7 @@
 /**
  * Pinboard V2 — Phase 24 tests.
  *
- * ContactBook + trust + tags + lists + QR contact-share +
- * asymmetric contact-add envelopes (kind: 'contact-request').
+ * ContactBook + trust + tags + lists + QR contact-share.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -299,55 +298,3 @@ describe('Pinboard V2 Phase 24 — QR contact-share', () => {
 
 /* ── Asymmetric contact-add request envelope ─────────────────── */
 
-describe('Pinboard V2 Phase 24 — asymmetric contact-add request', () => {
-  it('Anne sends → Bob sees a contact-request item; accept adds Anne to Bob\'s ContactBook', async () => {
-    const { anne, bob, anneId } = await buildPair();
-    await callSkill(anne.agent, 'setMyHandle', { handle: 'anne-23' }, ANNE);
-
-    const r = await callSkill(anne.agent, 'requestContactAdd', {
-      toWebid: BOB, trustOffer: 'vertrouwd',
-    }, ANNE);
-    expect(r.ok).toBe(true);
-
-    // Wait for the envelope to be received + stored.
-    await new Promise(r => setTimeout(r, 50));
-
-    const requests = (await callSkill(bob.agent, 'listContactRequests', undefined, BOB)).requests;
-    expect(requests).toHaveLength(1);
-    const req = requests[0];
-    expect(req.source.fromWebid).toBe(ANNE);
-    expect(req.source.handle).toBe('anne-23');
-    expect(req.source.trustOffer).toBe('vertrouwd');
-
-    // Bob accepts.
-    const accept = await callSkill(bob.agent, 'acceptContactRequest', { requestId: req.id }, BOB);
-    expect(accept.ok).toBe(true);
-    expect(accept.contact.trustLevel).toBe('vertrouwd');
-    expect(accept.contact.pubKey).toBe(anneId.pubKey);
-
-    // Anne should NOT have been auto-added to Bob's bundle without
-    // her clicking accept on her own (asymmetric).  But here, BOB
-    // accepted, and Anne has not run any reciprocal flow — her
-    // ContactBook stays empty for Bob.
-    const anneContacts = (await callSkill(anne.agent, 'listContacts', undefined, ANNE)).contacts;
-    expect(anneContacts).toEqual([]);
-  });
-
-  it('declineContactRequest closes the prompt without adding', async () => {
-    const { anne, bob } = await buildPair();
-    await callSkill(anne.agent, 'requestContactAdd', { toWebid: BOB, trustOffer: 'bekend' }, ANNE);
-    await new Promise(r => setTimeout(r, 50));
-
-    const requests = (await callSkill(bob.agent, 'listContactRequests', undefined, BOB)).requests;
-    expect(requests).toHaveLength(1);
-    const r = await callSkill(bob.agent, 'declineContactRequest', { requestId: requests[0].id }, BOB);
-    expect(r.ok).toBe(true);
-
-    const bobContacts = (await callSkill(bob.agent, 'listContacts', undefined, BOB)).contacts;
-    expect(bobContacts).toEqual([]);
-
-    // After decline, the request item is closed (not in listOpen).
-    const stillOpen = (await callSkill(bob.agent, 'listContactRequests', undefined, BOB)).requests;
-    expect(stillOpen).toEqual([]);
-  });
-});

@@ -111,6 +111,12 @@ describe("a persona's contact book, per self", () => {
     for (const n of [box, laptop]) { await n.agent.knownPeersSync.requestFromSiblings(); await n.agent.ownStoreSync?.requestFromSiblings?.(); }
     const gone = await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? null : true), { timeout: 30_000, step: 300 });
     expect(gone, "the box — the general persona's device only — no longer has the friend as a contact").toBe(true);
+    // …and a LATE book-sync batch from a sibling that still files the friend under the general self (the laptop, before
+    // W's carry reaches it) does not bring the contact back: the general self's left row is newer than that row
+    const sync = box.agent.knownPeersSync;
+    await sync.handlers[sync.subtypes.broadcast](laptop.agent.circleAddressFor(X), { subtype: sync.subtypes.broadcast, peers: [], contacts: [{ webid: friend, displayName: 'Buur', persona: 'default' }] });
+    await new Promise((r) => setTimeout(r, 500));
+    expect((await contactsOf(box)).some((c) => c.webid === friend), 'a stale sibling row does not re-add a contact that left this self').toBe(false);
     const onLaptop = await until(async () => { const c = (await contactsOf(laptop)).find((x) => x.webid === friend); return c?.persona === w ? c : null; }, { timeout: 30_000, step: 300 });
     expect(onLaptop, "the laptop holds W: the friend is filed under W there").toBeTruthy();
     box._routerRef.fn = prior;
@@ -119,6 +125,16 @@ describe("a persona's contact book, per self", () => {
     const rows = ((await (await box.agent.ownStore()).list?.()) ?? []).filter((r) => r?.type === 'contact-refile');
     expect(rows.map((r) => r.webid), "the box holds the general self's left row").toEqual([friend]);
     expect(JSON.stringify(rows).includes(w), 'the row never names W').toBe(false);
+    // …but filed BACK under the general self on the phone, the person chose it again: the left mark goes, and the row
+    // reaches the box once more
+    expect((await phone.agent.callSkill('pinboard', 'setContactPersona', { webid: friend, persona: 'default' }))?.contact?.persona).toBe('default');
+    for (const n of [box]) await n.agent.knownPeersSync.requestFromSiblings();
+    const back = await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? true : null), { timeout: 30_000, step: 300 });
+    expect(back, 'filed back under the general self, the friend is on the box again').toBe(true);
+    // the phone's clear is an own-store DELETE that rides the general self's own lane: the box drops its copy of the left
+    // mark too (else it would refuse the next plain re-add of this contact for ever)
+    const markGone = await until(async () => ((((await (await box.agent.ownStore()).list?.()) ?? []).some((r) => r?.type === 'contact-refile' && r.webid === friend)) ? null : true), { timeout: 30_000, step: 300 });
+    expect(markGone, "the general self's left mark is gone on the box too").toBe(true);
   }, 120_000);
 
   it("a W contact's turn reaches the laptop and never the box; a general contact's reaches both", async () => {

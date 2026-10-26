@@ -11,11 +11,11 @@ import { DEVICE_DELEGATIONS_KEY } from './deviceDelegations.js';
 import { CIRCLE_MEMBERSHIPS_KEY } from './circleMembership.js';
 import { OWNED_NODES_KEY } from './ownedNodes.js';
 import { PROFILE_PICTURE_KEY } from './mediaProperty.js';
-import { FACTS_AT_KEY } from './profileFacts.js';
+import { FACTS_AT_KEY, FACTS_KEYS_KEY } from './profileFacts.js';
 import { MODEL_CONSENT_KEY } from './modelConsent.js';
 
 /** The registry's machine keys on a profile — refused by the person-facing property ops. */
-export const RESERVED_PROPERTY_KEYS = Object.freeze([DEVICE_DELEGATIONS_KEY, CIRCLE_MEMBERSHIPS_KEY, OWNED_NODES_KEY, FACTS_AT_KEY]);
+export const RESERVED_PROPERTY_KEYS = Object.freeze([DEVICE_DELEGATIONS_KEY, CIRCLE_MEMBERSHIPS_KEY, OWNED_NODES_KEY, FACTS_AT_KEY, FACTS_KEYS_KEY]);
 /** The registry's marker namespace (`_inherit.offering`, …): every key under it is the registry's. */
 export const RESERVED_PROPERTY_PREFIXES = Object.freeze(['_inherit.']);
 /** The keys a person may set through the property ops although this package defines them (their picture, their word on a model). */

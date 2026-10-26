@@ -175,7 +175,7 @@ import {
   ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf,
   isRequestable,
   effectiveProperties,
-  profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt, FACTS_AT_KEY,
+  profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -1464,7 +1464,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         let before = null;
         try { before = await agentsRegistry.lookup(entry.agentId); } catch { before = null; }
         if (!factsDiffer(before ?? {}, entry)) return rawRegister(entry);
-        const out = await rawRegister({ ...entry, properties: { ...(entry.properties ?? {}), [FACTS_AT_KEY]: factsStamp(nextFactsAt(profileFactsOf(before ?? {}).factsAt, Date.now())) } });
+        // stamped PER KEY: the facts that changed here take this time, the rest keep theirs (profileFacts.js)
+        const at = nextFactsAt(profileFactsOf(before ?? {}).factsAt, Date.now());
+        const out = await rawRegister(withProfileFacts(entry, { ...profileFactsOf(entry), factsAt: at, keyTimes: stampChangedFacts(before ?? {}, entry, at) }));
         try { profileFactsChanged?.(entry.agentId); } catch { /* the siblings ask on connect */ }
         return out;
       };

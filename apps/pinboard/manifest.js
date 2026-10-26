@@ -1451,7 +1451,7 @@ export const pinboardManifest = {
       },
     },
     {
-      id:   'broadcastCircleTask', visibility: 'authenticated', verb: 'share',
+      id:   'broadcastCircleItems', visibility: 'authenticated', verb: 'share',
       writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1460,7 +1460,7 @@ export const pinboardManifest = {
         { name: 'ts',      kind: 'number' },
       ],
       surfaces: {
-        chat: { hint: 'Fan a task statement to a circle.' },
+        chat: { hint: 'Fan an item statement to a circle.' },
         ui:   { control: 'page' },
       },
     },

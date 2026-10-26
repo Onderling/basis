@@ -1,7 +1,7 @@
 /**
  * chatManifest — the DECLARED contract for the chat lane's log entries.
  *
- * Fourth sibling of `governanceManifest` / `membershipManifest` / `taskManifest`: which signed statement
+ * Fourth sibling of `governanceManifest` / `membershipManifest` / `itemsManifest`: which signed statement
  * kinds the chat lane of the device log carries. The rail refuses anything else at both ends.
  *
  * The chat lane differs from every other lane in one way: its log entries ARE the product surface. A chat

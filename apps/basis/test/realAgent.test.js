@@ -361,7 +361,7 @@ describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', (
 
   it('the unsigned mirror carry stays DELETED — a write never reaches mirror.publishItem', async () => {
     // This test used to pin the opposite (publish-on-write over the unsigned mirror). That carry is
-    // deleted: production fan is the SIGNED task lane, proven end-to-end by appTaskFanTwoDevice +
+    // deleted: production fan is the SIGNED items lane, proven end-to-end by appTaskFanTwoDevice +
     // appCircleFanOfflineDelivery (real joins, real wire, store-head assertions). What must not
     // regress HERE is the closure itself: even with a hand-paired transport peer, a write on a
     // no-lane composition calls no mirror publish — there is no unsigned fallback left to take.

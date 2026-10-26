@@ -39,7 +39,7 @@ const phoneHost = arg('phone-host', '10.0.2.2');
 
 const relay = await startJourneyRelay();
 say({ step: 'relay', url: relay.url });
-const peer = await bootRealAgentNode(handle, { taskLane: true });
+const peer = await bootRealAgentNode(handle, { itemsLane: true });
 await connectNodesOverRelay([peer], { relayUrl: relay.url });
 
 const groupId = `walk-${Date.now().toString(36)}`;

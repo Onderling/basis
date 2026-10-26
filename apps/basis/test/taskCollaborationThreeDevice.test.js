@@ -59,9 +59,9 @@ describe('the collaborative task corridor — three people, one circle', () => {
 
   it('create → claim → decompose → the parent is blocked until the child closes → submit + approve, seen by all three', async () => {
     [A, B, C] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true, agentOpts: { t: tEn } }),
-      bootRealAgentNode('B', { taskLane: true, agentOpts: { t: tEn } }),
-      bootRealAgentNode('C', { taskLane: true, agentOpts: { t: tEn } }),
+      bootRealAgentNode('A', { itemsLane: true, agentOpts: { t: tEn } }),
+      bootRealAgentNode('B', { itemsLane: true, agentOpts: { t: tEn } }),
+      bootRealAgentNode('C', { itemsLane: true, agentOpts: { t: tEn } }),
     ]);
     await connectNodesOverBus([A, B, C]);
     for (const n of [A, B, C]) wireInboundLikeShell(n);

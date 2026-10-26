@@ -32,7 +32,7 @@ export async function run({ relayUrl }) {
     check('the app composition booted — the membership rail exists',
       !!anne.agent.membershipRail && !!bram.agent.membershipRail);
     check('…and so do the other lanes the shells register',
-      !!anne.agent.taskRail && !!anne.agent.chatRail && !!anne.agent.keyRail);
+      !!anne.agent.itemsRail && !!anne.agent.chatRail && !!anne.agent.keyRail);
     check('three people are on the relay', circle.people.every((p) => !!p.agent));
 
     // Everyone sees everyone: the roster is a FOLD of signed statements here, not a seeded list.

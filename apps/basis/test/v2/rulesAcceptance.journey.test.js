@@ -33,9 +33,9 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
 
   it('the acceptance is on the record everywhere · the acceptance-less join lands nowhere', async () => {
     [A, B, X] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }),
-      bootRealAgentNode('B', { taskLane: true }),
-      bootRealAgentNode('X', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
+      bootRealAgentNode('X', { itemsLane: true }),
     ]);
     await connectNodesOverBus([A, B, X]);
     for (const n of [A, B, X]) wireMembershipReceiver(n);

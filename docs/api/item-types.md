@@ -133,6 +133,14 @@ Project namespace for type IRIs.
 
 The canonical item types every store knows, by name → JSON schema.
 
+### `OWN_SCOPE_TYPES`
+
+**Kind:** constant · **Import:** `OWN_SCOPE_TYPES` from `'@onderling/item-types'`
+
+The types that live ONLY in a person's own-devices scope: written by that person's devices, carried between them,
+never into a circle. A rule that trusts its writers to be one person (a writer-stamped clock) may hold only for
+these; `@onderling/item-store`'s resolution registry reads this list to refuse it elsewhere.
+
 ### `CANONICAL_FIELD_CLOCKS`
 
 **Kind:** constant · **Import:** `CANONICAL_FIELD_CLOCKS` from `'@onderling/item-types'`

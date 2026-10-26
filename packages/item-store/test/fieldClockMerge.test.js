@@ -99,6 +99,12 @@ describe('the field-clock declaration', () => {
     ]));
   });
 
+  it('is refused for a type that is not own-devices-only: a writer-stamped clock is safe only among one person\'s devices', () => {
+    expect(() => createResolutionRegistry().declareFieldClock('task', 'doneAt', ['done'])).toThrow(/own-devices/);
+    expect(() => createResolutionRegistry().declareFieldClock('note', 'editedAt', ['text'])).toThrow(/own-devices/);
+    expect(() => createResolutionRegistry().declareFieldClock('contact', 'hiddenAt', ['hidden'])).not.toThrow();
+  });
+
   it('a field-clock cannot be declared one field at a time (it needs its clock)', () => {
     expect(() => createResolutionRegistry().declare('contact', 'hidden', RESOLUTION.FIELD_CLOCK)).toThrow(/declareFieldClock/);
   });

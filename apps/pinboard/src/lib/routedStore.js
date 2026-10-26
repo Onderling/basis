@@ -20,7 +20,8 @@ const CIRCLE_TYPES = Object.freeze([...NOTICEBOARD_POST_TYPES, ...LOCAL_TYPES]);
 // What is the person's own, not the circle's: the invite code (the admin's secret, no circle member may hold it) and who
 // answered my post. With a host own store they live there, written as the self the person is in that circle (the
 // actor, for the answers), so each rides that self's own-devices lane only.
-const OWN_TYPES = Object.freeze(['membership-code', 'post-answers']);
+// the own-devices types this store routes to the own store (each is one of the dictionary's OWN_SCOPE_TYPES)
+export const OWN_TYPES = Object.freeze(['membership-code', 'post-answers']);
 
 // where a pinboard row names its circle (the same reading the skills' `itemCircleOf` does)
 const circleOf = (it) => it?.source?.groupId

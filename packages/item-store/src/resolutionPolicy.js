@@ -18,7 +18,11 @@
  *               clock is newer supplies the whole set, whichever row won the content merge. For rows that
  *               different devices change in different parts (a contact's hidden mark, its persona). Declared on
  *               the TYPE (`@onderling/item-types` CANONICAL_FIELD_CLOCKS), read here; merged by
- *               `causalMerge.mergeFieldClocks`. Fields outside every set stay content-LWW.
+ *               `causalMerge.mergeFieldClocks`. Fields outside every set stay content-LWW. The clock is
+ *               WRITER-STAMPED (a device's own time), which is safe only when every writer is one person's own
+ *               device: so it is refused for any type not in the dictionary's OWN_SCOPE_TYPES. The spine refuses
+ *               wall clocks for the same reason (a revote supersedes by ancestry); a circle-shared type that needs
+ *               a per-field merge gets a causal (ancestry) version of this, never a wall clock.
  *   • spine   — deny-wins meet-semilattice (membership / authority). Selected by ITEM-TYPE, NOT by this
  *               (type,field) table, and merged on a SEPARATE path (`@onderling/core` rosterFold / spine
  *               appender) — it never reaches `CircleItemStore.put`'s content/claim funnel. It appears here
@@ -41,7 +45,7 @@
  */
 
 import { CLAIM_FIELDS } from './causalMerge.js';
-import { CANONICAL_FIELD_CLOCKS } from '@onderling/item-types';
+import { CANONICAL_FIELD_CLOCKS, OWN_SCOPE_TYPES } from '@onderling/item-types';
 
 /** The resolution policies, under their CRDT-system names. */
 export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine', FIELD_CLOCK: 'field-clock' });
@@ -128,6 +132,9 @@ export function createResolutionRegistry() {
     declareFieldClock(itemType, clock, fields = []) {
       if (typeof itemType !== 'string' || !itemType) throw new Error('resolutionRegistry.declareFieldClock: itemType (string) required');
       if (typeof clock !== 'string' || !clock) throw new Error('resolutionRegistry.declareFieldClock: clock (string) required');
+      if (!OWN_SCOPE_TYPES.includes(itemType)) {
+        throw new Error(`resolutionRegistry.declareFieldClock: "${itemType}" is not an own-devices type — a writer-stamped clock is safe only among one person's own devices (OWN_SCOPE_TYPES)`);
+      }
       const list = Array.isArray(fields) ? fields.filter((f) => typeof f === 'string' && f) : [];
       const sets = clockSets.get(itemType) ?? [];
       const taken = new Set(sets.flatMap((s) => [s.clock, ...s.fields]));

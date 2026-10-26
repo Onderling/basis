@@ -48,7 +48,7 @@ export { createRegistry }         from './src/registry.js';
 export { registerCanonicalTypes } from './src/canonical.js';
 export { registerDeclaredTypes }  from './src/declaredTypes.js';
 export { CANONICAL_TYPES }        from './src/canonical.js';
-export { CANONICAL_FIELD_CLOCKS } from './src/canonical.js';
+export { CANONICAL_FIELD_CLOCKS, OWN_SCOPE_TYPES } from './src/canonical.js';
 export { NAMESPACE }              from './src/baseSchema.js';
 export { EMBEDS_SCHEMA }          from './src/embedsSchema.js';
 

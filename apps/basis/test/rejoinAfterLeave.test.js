@@ -19,8 +19,8 @@ describe('a member who left joins again', () => {
   afterAll(async () => { await teardown(ann, bob, cas); });
 
   it('back on the admin\'s roster after a leave and a second join with the same invite', async () => {
-    ann = await bootRealAgentNode('ann', { taskLane: true });
-    bob = await bootRealAgentNode('bob', { taskLane: true });
+    ann = await bootRealAgentNode('ann', { itemsLane: true });
+    bob = await bootRealAgentNode('bob', { itemsLane: true });
     await connectNodesOverBus([ann, bob]);
     await createCircle(ann, { groupId: CIRCLE, name: 'Rejoin', purpose: 'test' });
     const first = await joinExistingCircle(ann, bob, { groupId: CIRCLE, handle: 'bob' });
@@ -55,7 +55,7 @@ describe('a member who left joins again', () => {
   }, 120_000);
 
   it('one the admin REMOVED does not walk back in on the old invite: refused, not on the roster', async () => {
-    cas = await bootRealAgentNode('cas', { taskLane: true });
+    cas = await bootRealAgentNode('cas', { itemsLane: true });
     await connectNodesOverBus([ann, bob, cas]);
     const first = await joinExistingCircle(ann, cas, { groupId: CIRCLE, handle: 'cas' });
     expect(first.joined?.ok).toBe(true);

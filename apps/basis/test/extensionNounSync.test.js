@@ -34,9 +34,9 @@ describe('a third-party noun across the circle', () => {
 
   it('crosses to a member with the extension; a member without it holds none of it', async () => {
     [A, B, C] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true, agentOpts: EXT }),
-      bootRealAgentNode('B', { taskLane: true, agentOpts: EXT }),
-      bootRealAgentNode('C', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true, agentOpts: EXT }),
+      bootRealAgentNode('B', { itemsLane: true, agentOpts: EXT }),
+      bootRealAgentNode('C', { itemsLane: true }),
     ]);
     await connectNodesOverBus([A, B, C]);   // one bus for all three (two pairwise buses would replace A's transport)
     wireInbound(B); wireInbound(C);

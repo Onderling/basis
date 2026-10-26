@@ -1,7 +1,7 @@
 /**
- * taskRail — task items ride THE RAIL (the content re-root, tasks first).
+ * itemsRail — task items ride THE RAIL (the content re-root, tasks first).
  *
- * The task lane is the first CONTENT lane: no authority fold — the truth about a task is its materialised
+ * The items lane is the first CONTENT lane: no authority fold — the truth about a task is its materialised
  * STORE ROW, and the lane's job is to carry each writer's row (a full-item snapshot, signed with the
  * per-circle key) to the circle's other devices, where it lands through the SAME causal merge every store
  * ingest uses (`put(..., {sync:false, origin:true})`: content LWW on the Lamport clock + the claim fold, so
@@ -11,43 +11,43 @@
  * republished head remains as valid as a fresh write.
  *
  * This lane replaces the unsigned peer-mirror carry for task items (per-type one-path): the store's publish
- * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
+ * hook routes every circle-content publish onto the lane — see `routeItemsMirror` (unsigned carry deleted).
  */
 import { selfRefIn } from './selfRef.js';
 import { isLaneCarriedItem } from '@onderling/circles';
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
-import { taskManifest, TASK_LANE } from './taskManifest.js';
+import { itemsManifest, ITEMS_LANE } from './itemsManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
 
-/** The statement kinds the task lane carries — DERIVED from the manifest's declared appends. */
-export const TASK_RAIL_KINDS = entryKindRegistryFromManifests(taskManifest).kindsFor(TASK_LANE);
+/** The statement kinds the items lane carries — DERIVED from the manifest's declared appends. */
+export const ITEMS_RAIL_KINDS = entryKindRegistryFromManifests(itemsManifest).kindsFor(ITEMS_LANE);
 
 /*
  * There is deliberately NO list of item types here. Whatever the circle's store holds rides this lane: the
  * store's registry already decided what may be written, and a second list at the valve could only disagree
  * with it — a type the registry accepted but the list did not know (an announcement, a calendar entry, the
  * next feature's rows) silently never reached a device that was away. The publish valve has no type gate
- * either (`routeTaskMirror`); catch-up below serves every row the store has a head for.
+ * either (`routeItemsMirror`); catch-up below serves every row the store has a head for.
  */
 
-/** The wire subtypes for the task lane's fan + catch-up (the governance/membership pairs' sibling). */
-export const TASK_BROADCAST = 'circle-task-broadcast';
-export const TASK_CATCHUP_SUBTYPES = Object.freeze({
-  request: 'circle-task-catchup-request',
-  batch:   'circle-task-catchup-batch',
-  offer:   'circle-task-catchup-offer',
+/** The wire subtypes for the items lane's fan + catch-up (the governance/membership pairs' sibling). */
+export const ITEMS_BROADCAST = 'circle-items-broadcast';
+export const ITEMS_CATCHUP_SUBTYPES = Object.freeze({
+  request: 'circle-items-catchup-request',
+  batch:   'circle-items-catchup-batch',
+  offer:   'circle-items-catchup-offer',
 });
 /** The same replay for the person's OWN scope — its own wire pair, asked of and served to the person's devices only. */
-export const OWN_TASK_CATCHUP_SUBTYPES = Object.freeze({
-  request: 'own-task-catchup-request',
-  batch:   'own-task-catchup-batch',
-  offer:   'own-task-catchup-offer',
+export const OWN_ITEMS_CATCHUP_SUBTYPES = Object.freeze({
+  request: 'own-items-catchup-request',
+  batch:   'own-items-catchup-batch',
+  offer:   'own-items-catchup-offer',
 });
 
 /**
- * Build the task rail over the device log. Mirrors `makeMembershipRail`, with one addition: a VERIFIED
+ * Build the items rail over the device log. Mirrors `makeMembershipRail`, with one addition: a VERIFIED
  * ingest also APPLIES the statement to the circle's store head (the causal merge), so every arrival path —
  * live fan and catch-up alike — materialises without extra wiring.
  *
@@ -67,7 +67,7 @@ export const OWN_TASK_CATCHUP_SUBTYPES = Object.freeze({
  *   carried so a sibling verifies the chain without the registry. `belongs(scope, item)` says which lane an item of the
  *   one shared own store rides: a lane serves and applies only its own items (none of another self's).
  */
-export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, own = null }) {
+export function makeItemsRail({ eventLog, circleIdentityFor, myRef, callSkill, storeFor, verifyBinding = null, onItemApplied = null, own = null }) {
   const refIn = selfRefIn(myRef);   // in each circle, the self this device is there
   if (typeof circleIdentityFor !== 'function' || typeof storeFor !== 'function') return null;
   const isOwn = (circleId) => (typeof own?.isOwn === 'function' ? own.isOwn(circleId) === true : (Boolean(own?.scope) && circleId === own.scope));
@@ -85,8 +85,8 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
   const base = makeCircleEntryRail({
     eventLog,
     signerFor: async (circleId) => (isOwn(circleId) ? ownSigner(circleId) : { identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
-    entryKind: TASK_LANE,
-    declaredKinds: TASK_RAIL_KINDS,
+    entryKind: ITEMS_LANE,
+    declaredKinds: ITEMS_RAIL_KINDS,
     verifyBinding: (a) => (isOwn(a?.circleId) ? (own.verifyBinding?.(a) ?? false) : rosterBinding(a)),
   });
 
@@ -98,7 +98,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     try { return JSON.parse(strategy.open(body.payload.sealed)); } catch { return null; }
   }
 
-  /** Apply a VERIFIED task statement to the circle's materialised head. Idempotent: a re-delivered
+  /** Apply a VERIFIED item statement to the circle's materialised head. Idempotent: a re-delivered
    *  snapshot re-merges to the same result; a re-delivered remove re-deletes nothing. */
   /** The item types this node was handed a row of and does not hold — each said once. */
   const notHeldTypes = new Set();
@@ -115,7 +115,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     const key = `${circleId}\u0000${ref}`;
     if (refusedAuthors.has(key)) return;
     refusedAuthors.add(key);
-    console.warn(`[task-lane] refused an announcement in ${circleId}: its author ${String(ref).slice(0, 12)}… is not an admin there`);
+    console.warn(`[items-lane] refused an announcement in ${circleId}: its author ${String(ref).slice(0, 12)}… is not an admin there`);
   }
 
   async function applyToHead(circleId, body) {
@@ -269,7 +269,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
  * (best-effort — the local write never blocks on delivery). The local STORE write already happened
  * (the emitter is fed by the store's publish hook), so there is no head apply here.
  */
-export function makeTaskEmitter({ rail, fan = null }) {
+export function makeItemsEmitter({ rail, fan = null }) {
   if (!rail) return null;
   async function emit(circleId, kind, subject, payload) {
     const res = await rail.append(circleId, { kind, subject, payload });
@@ -280,7 +280,7 @@ export function makeTaskEmitter({ rail, fan = null }) {
       // delivered, which is exactly how a lost statement cost a bisect to find (2026-08-20).
       try { fan(circleId, res.statement); }
       catch (err) {
-        console.warn(`[task-lane] fan threw for ${circleId} ${kind}(${String(subject).slice(0, 24)}):`, err?.message ?? err);
+        console.warn(`[items-lane] fan threw for ${circleId} ${kind}(${String(subject).slice(0, 24)}):`, err?.message ?? err);
       }
     }
     return res.statement;
@@ -302,11 +302,11 @@ export function makeTaskEmitter({ rail, fan = null }) {
  * valve is wired when a circle opens — a write in between must fail visibly on a composition that asked
  * for signed lanes, never silently not-fan.
  */
-export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {}) {
+export function routeItemsMirror({ circleId, emitter, requireSigned = false } = {}) {
   const noDowngrade = () => {
     if (requireSigned && !emitter) {
       throw new Error(
-        `routeTaskMirror(${circleId}): a signed lane was required but no emitter is wired yet — `
+        `routeItemsMirror(${circleId}): a signed lane was required but no emitter is wired yet — `
         + 'refusing to publish (the unsigned mirror carry is deleted)',
       );
     }
@@ -327,12 +327,12 @@ export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {
   };
 }
 
-/** Peer handler for `circle-task-broadcast` → the rail's full ingest gate + the head apply. */
+/** Peer handler for `circle-items-broadcast` → the rail's full ingest gate + the head apply. */
 /** `onLanded(circleId, statement, fromPeerAddr)` fires once per NEW statement — the sibling carry's seam. */
-export function makeTaskPeerHandler({ rail, onChange = null, onLanded = null, holds = null, onPassed = null } = {}) {
-  if (!rail) throw new Error('makeTaskPeerHandler: a task rail is required');
+export function makeItemsPeerHandler({ rail, onChange = null, onLanded = null, holds = null, onPassed = null } = {}) {
+  if (!rail) throw new Error('makeItemsPeerHandler: a items rail is required');
   return async function onCircleTask(fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== TASK_BROADCAST) return;
+    if (!payload || payload.subtype !== ITEMS_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
     // This device's selection (sync-policy §11) — the same three answers as the chat handler: land · verify

@@ -63,12 +63,12 @@ describe('a list entry created on one device reaches another device (the circle 
   afterAll(async () => { await teardown(A, B); });
 
   it('crosses a list + its entry from A to B — the store lists ride is the store every item rides', async () => {
-    // `taskLane: true` composes the DEVICE LOG, which is what makes the fan real: without it there is no
-    // emitter, `routeTaskMirror` publishes nothing, and the test would pass or fail for a harness reason
+    // `itemsLane: true` composes the DEVICE LOG, which is what makes the fan real: without it there is no
+    // emitter, `routeItemsMirror` publishes nothing, and the test would pass or fail for a harness reason
     // rather than a product one. (The repo has paid for this once already — a day of "product defects"
     // that were a harness booted without it.)
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true }), bootRealAgentNode('B', { itemsLane: true }),
     ]);
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'List Fan', handle: 'lister' });

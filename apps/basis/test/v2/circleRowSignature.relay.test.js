@@ -18,7 +18,7 @@ describe('a member\'s signed row, checked against the real roster', () => {
   afterAll(async () => { await teardown(A, B); });
 
   it('runs as its author on the other node; changed on the way, or naming another, it does not', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('anna', { taskLane: true }), bootRealAgentNode('box', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('anna', { itemsLane: true }), bootRealAgentNode('box', { itemsLane: true })]);
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B, { groupId: CIRCLE, name: 'Signed', handle: 'signed' });
     await bindCircleAddresses([A, B], CIRCLE);

@@ -45,11 +45,11 @@ describe('subtask claim-confirmation over a real bus (§7)', () => {
   afterAll(async () => { await teardown(A, B); });
 
   it('a confirmed claim + its containment subtree, created on A, arrive intact on B', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { itemsLane: true }), bootRealAgentNode('B', { itemsLane: true })]);
     await connectAgentsOverBus(A, B);
     wireInboundLikeShell(A);
     wireInboundLikeShell(B);
-    // A REAL join, not hand-wired peers: the signed task lane verifies the sender's key↔ref binding
+    // A REAL join, not hand-wired peers: the signed items lane verifies the sender's key↔ref binding
     // against the circle roster, so `addCirclePeer` (a transport peer, no membership) is refused.
     await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Claim circle', handle: 'bee' });
     await warm(A, B);

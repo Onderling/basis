@@ -3462,14 +3462,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCircleTask({groupId, event, msgId, ts?})
-     *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
-     *   other member; receivers verify it at their task rail before it lands on their device log and
+     * broadcastCircleItems({groupId, event, msgId, ts?})
+     *   — the content re-root: fan a SIGNED item statement (a full-item snapshot, or a remove) to every
+     *   other member; receivers verify it at their items rail before it lands on their device log and
      *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
-     *   circle-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   circle-items-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
-    defineSkill('broadcastCircleTask', async ({ parts, from }) => {
+    defineSkill('broadcastCircleItems', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3477,13 +3477,13 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-task-broadcast', from,
+        circleId: _groupId, kind: 'circle-items-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'circle-task-fanout',
+        metric: 'circle-items-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:circle-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      description: 'Fan a signed item statement (full-item snapshot or remove) to every other member via subtype:circle-items-broadcast; receivers verify at their items rail and causally merge the head. Never wakes.',
       visibility:  'authenticated',
     }),
 

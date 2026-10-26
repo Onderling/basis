@@ -25,7 +25,7 @@ const board = async (node) => ((await node.agent.callSkill('pinboard', 'listOpen
 describe('posts live in the circle store (three devices)', () => {
   let ann, bob, carol;
   beforeAll(async () => {
-    [ann, bob, carol] = await Promise.all(['ann', 'bob', 'carol'].map((l) => bootRealAgentNode(l, { taskLane: true, redeemTimeoutMs: 30_000 })));
+    [ann, bob, carol] = await Promise.all(['ann', 'bob', 'carol'].map((l) => bootRealAgentNode(l, { itemsLane: true, redeemTimeoutMs: 30_000 })));
     await connectNodesOverBus([ann, bob, carol]);
     await createCircle(ann, { groupId: G, name: 'Buurt', purpose: 'samen' });
     for (const [n, h] of [[bob, 'bob'], [carol, 'carol']]) {

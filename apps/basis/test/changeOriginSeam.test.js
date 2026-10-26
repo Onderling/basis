@@ -21,8 +21,8 @@ describe('a write made by a fired row, between two real nodes', () => {
     const heardB = [];
     const feeds = {};
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true, agentOpts: { writeOrigin: () => running.getStore() ?? null, onCircleWrite: (c, item) => feeds.A?.own(c, item) } }),
-      bootRealAgentNode('B', { taskLane: true, agentOpts: { onItemLanded: (c, item) => feeds.B?.landed(c, item) } }),
+      bootRealAgentNode('A', { itemsLane: true, agentOpts: { writeOrigin: () => running.getStore() ?? null, onCircleWrite: (c, item) => feeds.A?.own(c, item) } }),
+      bootRealAgentNode('B', { itemsLane: true, agentOpts: { onItemLanded: (c, item) => feeds.B?.landed(c, item) } }),
     ]);
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Origin', handle: 'origin' });

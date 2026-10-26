@@ -7,7 +7,7 @@
  * lives on the admin/host side, which holds the roster.
  *
  * Two claim points are guarded:
- *   - `setMyHandle` (set / change-handle) — checks the in-circle MemberMap.
+ *   - `setMyHandle` (set / change-handle) — checks the circle's roster (what its members said).
  *   - `verifyMembershipCodeForPeer` (admin-side join-redeem) — checks the
  *     durable `membership-redemption` trail (`peerDisplay`) for THIS circle.
  *
@@ -49,24 +49,29 @@ async function buildBundle({ group = GROUP, localActor = ANNE, members } = {}) {
 // ── setMyHandle (set / change-handle) ─────────────────────────────────────
 
 describe('setMyHandle — per-circle handle uniqueness', () => {
-  it('rejects a handle already held by another member of the circle', async () => {
-    const bundle = await buildBundle();
-    const first = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
-    expect(first.handle).toBe('jan');
+  // Another member's handle reaches this device only as a ROSTER fact (what they said when they joined, or later):
+  // Bob joins Anne's circle as `jan`, and Anne may not then take `jan` there.
+  async function circleWithBobAsJan() {
+    const bundle = await buildBundle({ members: [{ webid: ANNE, role: 'admin' }] });
+    const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES }, ANNE);
+    const joined = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
+    expect(joined.error).toBeUndefined();
+    return bundle;
+  }
 
-    const clash = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, BOB);
+  it('rejects a handle another member of the circle already goes by', async () => {
+    const bundle = await circleWithBobAsJan();
+    const clash = await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
     expect(clash.error).toBe('invalid-handle');
     expect(clash.reason).toBe('handle-taken');
-
-    // The rejected claim must NOT have mutated BOB's row.
-    const bob = await bundle.members.resolveByWebid(BOB);
-    expect(bob.handle).toBe(null);
+    // The rejected claim did not change Anne's own profile.
+    expect((await callSkill(bundle.agent, 'getMyProfile', {}, ANNE)).entry?.handle ?? null).toBe(null);
   });
 
-  it('is case-insensitive — `Jan` collides with an existing `jan`', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, ANNE);
-    const clash = await callSkill(bundle.agent, 'setMyHandle', { handle: 'Jan' }, BOB);
+  it('is case-insensitive — `Jan` collides with a member on `jan`', async () => {
+    const bundle = await circleWithBobAsJan();
+    const clash = await callSkill(bundle.agent, 'setMyHandle', { handle: 'Jan' }, ANNE);
     expect(clash.error).toBe('invalid-handle');
     expect(clash.reason).toBe('handle-taken');
   });

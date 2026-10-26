@@ -37,6 +37,7 @@ import { MemberMapCache }    from './lib/MemberMapCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
 import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
 import { createContactBook } from './lib/ContactBook.js';
+import { createMemorySelfProfile } from './lib/selfProfile.js';
 import { wireChat }          from './chat/wireChat.js';
 import { createRoutedStore } from './lib/routedStore.js';
 
@@ -224,6 +225,8 @@ export async function createNeighbourhoodAgent({
   membershipEmit,
   membershipRead,
   currentPersonKey,
+  // The person's own profile (host-injected over the persona record, see lib/selfProfile.js); absent → in memory.
+  selfProfile = null,
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
@@ -584,6 +587,7 @@ export async function createNeighbourhoodAgent({
       membershipEmit,  // the membership rider's device-log emitter (absent → the store-based spine path)
       membershipRead,  // the rider's verified statement reader for the roster fold
       currentPersonKey,
+      selfProfile: selfProfile ?? createMemorySelfProfile(),   // the person's own profile (handle, name, away, place)
       rulesUpdateEmit, // the rules-update rider's governance-lane emitter (absent → store-local only)
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).

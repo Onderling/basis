@@ -30,10 +30,10 @@ export async function setGeneralProperty({ callSkill, defaultId, key, value }) {
 }
 
 /** The shared offering key derivation — keyed by the phrase; re-using it edits. */
-export { offeringKeyFor } from '../../../basis/src/core/offeringsMigration.js';
+export { offeringKeyFor } from '../../../basis/src/v2/offeringKey.js';
 import { newPersonaArgs } from '../../../basis/src/v2/newPersona.js';
 import { pictureRefOf } from '../../../basis/src/v2/personaAvatar.js';
-import { offeringKeyFor as sharedOfferingKeyFor } from '../../../basis/src/core/offeringsMigration.js';
+import { offeringKeyFor as sharedOfferingKeyFor } from '../../../basis/src/v2/offeringKey.js';
 
 /** Offerings — add an offering-kind driver ({text, tags}) to the GENERAL persona. */
 export async function addGeneralOffering({ callSkill, defaultId, text, tags }) {

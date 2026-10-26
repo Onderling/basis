@@ -1783,7 +1783,7 @@ export const pinboardManifest = {
     // matches the established convention for record-shape views.
     //
     // `dataSource: { skillId: 'getMyProfile' }` — `getMyProfile()`
-    // returns `{entry, renderForCurrentGroup}`; the page already
+    // returns `{entry}`; the page already
     // extracts `.entry` (line 208 of profile.html: `r?.entry?.handle`).
     // Same "page extracts the record key from the envelope" pattern
     // settings uses with `.settings`.
@@ -1834,7 +1834,7 @@ export const pinboardManifest = {
       type:  'group-rules',  // placeholder; profile is singleton-record,
                              // not a list of group-rules items.
       // shape: 'record' marks this section as a singleton.
-      // `getMyProfile` returns `{entry, renderForCurrentGroup}`; the
+      // `getMyProfile` returns `{entry}`; the
       // page extracts `.entry` (mirrors settings's `.settings` envelope
       // extraction).
       shape:       'record',

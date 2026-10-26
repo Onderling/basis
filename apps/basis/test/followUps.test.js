@@ -17,15 +17,13 @@ function fakeCatalogue(perOpHints) {
 describe('collectFollowUps — per-op Q31 hints', () => {
   it('returns same-app hints when the catalogue has them', () => {
     const catalogue = fakeCatalogue({
-      addMember: [{ opId: 'listOpen' }],
+      postRequest: [{ opId: 'listMyRequests' }],
     });
-    const out = collectFollowUps('addMember', 'household', { ok: true }, catalogue);
+    const out = collectFollowUps('postRequest', 'pinboard', { ok: true }, catalogue);
     expect(out).toEqual([
-      // J3: cross-app chain also fires (DEFAULT_CROSS_APP_CHAINS has
-      // household.addMember → folio.shareFolder + pinboard.postRequest)
-      { opId: 'listOpen', appOrigin: 'household', prefilledArgs: undefined, label: undefined },
-      { opId: 'shareFolder', appOrigin: 'folio',  prefilledArgs: {}, label: 'Share folio folder' },
-      { opId: 'postRequest', appOrigin: 'pinboard',  prefilledArgs: undefined, label: 'Post intro on circle' },
+      // the cross-app chain also fires (DEFAULT_CROSS_APP_CHAINS has pinboard.postRequest → pinboard.listFeed)
+      { opId: 'listMyRequests', appOrigin: 'pinboard', prefilledArgs: undefined, label: undefined },
+      { opId: 'listFeed', appOrigin: 'pinboard', prefilledArgs: undefined, label: 'View feed' },
     ]);
   });
 
@@ -44,13 +42,6 @@ describe('collectFollowUps — per-op Q31 hints', () => {
 });
 
 describe('collectFollowUps — cross-app chains', () => {
-  it("fires household.addMember → folio.shareFolder", () => {
-    const catalogue = fakeCatalogue({});
-    const out = collectFollowUps('addMember', 'household', { ok: true, memberName: 'Anne' }, catalogue);
-    expect(out.some((e) => e.appOrigin === 'folio' && e.opId === 'shareFolder')).toBe(true);
-    expect(out.some((e) => e.appOrigin === 'pinboard' && e.opId === 'postRequest')).toBe(true);
-  });
-
   it("fires pinboard.postRequest → pinboard.listFeed", () => {
     const catalogue = fakeCatalogue({});
     const out = collectFollowUps('postRequest', 'pinboard', { ok: true }, catalogue);
@@ -94,21 +85,21 @@ describe('createFollowUpResolver — custom chains', () => {
 describe('collectFollowUps — dedup', () => {
   it('dedupes by appOrigin.opId across per-op + cross-app sources', () => {
     const catalogue = fakeCatalogue({
-      addMember: [
+      postRequest: [
         // Same as the cross-app chain — should dedup
-        { opId: 'shareFolder', appOrigin: 'folio' },
+        { opId: 'listFeed', appOrigin: 'pinboard' },
       ],
     });
-    const out = collectFollowUps('addMember', 'household', { ok: true }, catalogue);
-    const folioShares = out.filter((e) => e.appOrigin === 'folio' && e.opId === 'shareFolder');
-    expect(folioShares.length).toBe(1);
+    const out = collectFollowUps('postRequest', 'pinboard', { ok: true }, catalogue);
+    const feeds = out.filter((e) => e.appOrigin === 'pinboard' && e.opId === 'listFeed');
+    expect(feeds.length).toBe(1);
   });
 });
 
 describe('DEFAULT_CROSS_APP_CHAINS — sanity', () => {
-  it('declares the J3 chains', () => {
+  it('declares the post → feed chain, and none on the retired member-add shim', () => {
     const triggers = DEFAULT_CROSS_APP_CHAINS.map((c) => `${c.trigger.appOrigin}.${c.trigger.opId}`);
-    expect(triggers).toContain('household.addMember');
+    expect(triggers).not.toContain('household.addMember');
     expect(triggers).toContain('pinboard.postRequest');
   });
 });

@@ -434,7 +434,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   let chatRail = null;
   let chatEmit = null;
   // The wired household ops (dissolved cores on the host). Everything else on the 'household'
-  // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
+  // app-origin (calendar_* passthrough, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
   const HOUSEHOLD_WIRED_OPS = new Set([
     'addItem', 'markComplete', 'removeItem', 'listOpenItems',
@@ -1847,9 +1847,9 @@ export async function createRealHouseholdAgent(opts = {}) {
      * is the convergence: "a request to a human IS a task."
      *
      * Wired as a PEER-FACING dispatcher op — same direct-register pattern as
-     * `addMember`/`resolveContact`; `from` is the A2A caller (requester A). It is NOT
+     * `resolveContact`; `from` is the A2A caller (requester A). It is NOT
      * on `manifest.js` (this is an agent-to-agent op, not a local chat/web surface —
-     * exactly like addMember), so it carries NO coverage-snapshot entry.
+     * exactly like resolveContact), so it carries NO coverage-snapshot entry.
      *
      * ARCHITECTURAL CHOICE — resolve the circle context at INVOCATION time inside the
      * handler, NOT by pre-projecting one skill per offering onto the AgentCard. A
@@ -1889,8 +1889,8 @@ export async function createRealHouseholdAgent(opts = {}) {
 
         // The recipient's task surface for THAT circle — the per-circle CircleItemStore
         // (the established accessor, as the household wired path uses). `recipient` is this
-        // device's local household member webid — the same local webid the addMember / seed
-        // / calendar host ops use, so the minted task's `forMember` is legible alongside them.
+        // device's local household member webid — the same local webid the seed / calendar
+        // host ops use, so the minted task's `forMember` is legible alongside them.
         const recipient = 'webid:local-demo-user';
         const taskStore = createTaskStore(householdService.stores.getStore(contextId), {});
 
@@ -1904,32 +1904,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
     }, { visibility: 'authenticated' });
   }
-
-  // v0.4 — household membership demo.  The real manifest declares
-  // `registerName` (writes a `contact` item); the legacy `/addmember`
-  // membership demo + the cross-app follow-up chain (followUps.js) still
-  // reference an `addMember` op, so keep a thin shim that records the member
-  // as a real contact item AND returns the `{memberName}` shape the demo +
-  // membership-redemption path expect.  (registerName is also wired above via
-  // the registry, reachable through the manifest's /register surface.)
-  hostAgent.register('addMember', async ({ parts, from }) => {
-    const args = parts?.[0]?.data ?? {};
-    const name = String(args.name ?? '').trim();
-    if (!name) {
-      return [DataPart({ ok: false, error: 'name required' })];
-    }
-    try {
-      await householdService.stores.getStore(homeCircleId).put(
-        { type: 'contact', text: name, addedBy: from ?? 'webid:local-demo-user' },
-        { by: from ?? 'webid:local-demo-user' },
-      );
-    } catch { /* defensive — the member reply doesn't depend on the write */ }
-    return [DataPart({
-      ok:         true,
-      message:    `✓ Added member: ${name}`,
-      memberName: name,
-    })];
-  });
 
   // v0.5 — snapshot factory for the J7 embed primitive. Consumed by
   // basis's /embed built-in.  Reads a real household item by id (or
@@ -6027,7 +6001,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // /brief contributor — derived from the wired store (the dissolved app has no briefSummary core).
       if (opId === 'household_briefSummary') return householdBriefSummary(circleId, tr);
-      // Everything else on the 'household' app-origin (calendar_* passthrough, addMember, getChoreSnapshot,
+      // Everything else on the 'household' app-origin (calendar_* passthrough, getChoreSnapshot,
       // resolveContact, help, registerName) is a hostAgent skill — route it there unchanged.
       const parts = [DataPart(args ?? {})];
       const result = await chatAgent.invoke(hostAgent.address, opId, parts);

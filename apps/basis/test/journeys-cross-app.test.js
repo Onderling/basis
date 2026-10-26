@@ -261,15 +261,6 @@ describe('CC-HH.6 — add member with capability-like audit trail', () => {
     secureAgentOpts: { capabilityIssuer: true, auditLog: true },
   }); });
 
-  it('addMember anne returns success', async () => {
-    // Part G — the real household manifest has no `/addmember` slash; the
-    // `addMember` op is kept as a membership shim (writes a contact item) for
-    // the cross-app follow-up chain (followUps.js).  Dispatch it via the op.
-    const r = await ws.callSkill('household', 'addMember', { name: 'anne' });
-    expect(r.ok).toBe(true);
-    expect(r.message).toMatch(/Added member/);
-  });
-
   it('sa.caps.issue records to audit log when used', async () => {
     await ws.agent.sa.caps.issue({ subject: 'pk-anne', skill: 'household.*' });
     await Promise.resolve();
@@ -868,21 +859,6 @@ describe('CC-XA.2 — find across all apps', () => {
     // At least one group should have items.
     const total = r.payload.groups.reduce((sum, g) => sum + g.items.length, 0);
     expect(total).toBeGreaterThan(0);
-  });
-});
-
-describe('CC-XA.3 — Anne is moving in (cross-app cascade)', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspace(); });
-
-  it('addMember anne reply declares cross-app follow-ups', async () => {
-    // Part G — addMember has no slash in the real manifest; dispatch the op.
-    const r = await ws.callSkill('household', 'addMember', { name: 'anne' });
-    expect(r.ok).toBe(true);
-    // The follow-ups list is wired in followUps.js + manifest; we
-    // verify the reply shape carries enough info for the renderer to
-    // build them (contract).
-    expect(r.memberName).toBe('anne');
   });
 });
 

@@ -35,6 +35,8 @@ services:
       # Conversation turns in the walk log: off (default) · redacted (a fixture-collecting week) · full (tests only).
       ONDERLING_WALK_LOG_TURNS: "${ONDERLING_WALK_LOG_TURNS:-off}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
+      # the vault key, from the box's .env (never a file in this role's backed-up volume); absent → the runner refuses
+      BASIS_VAULT_PASSPHRASE: "${BOX_VAULT_PASSPHRASE:-}"
       # the model, when the operator picks one (the code's default otherwise)
       PRIVATEMODE_MODEL: "${PRIVATEMODE_MODEL:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"

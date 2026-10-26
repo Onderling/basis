@@ -48,6 +48,31 @@ check_companion_nearby() {
 # The companion's radio data port: fixed, so the firewall knows what to open (box.conf COMPANION_NEARBY_PORT).
 nearby_port() { echo "${COMPANION_NEARBY_PORT:-45210}"; }
 
+# THE VAULT PASSPHRASE LIVES IN .env (BOX_VAULT_PASSPHRASE), outside every volume the box backs up: a snapshot that held
+# the sealed stores and the key that opens them would open everything. A box made before kept it as vault.passphrase in
+# the assistant's volume ($1, that volume's directory; empty when there is none): moved here once, the file deleted.
+# A box with neither gets a fresh one. Two that differ are left for the operator (the assistant refuses to boot on them).
+# Idempotent; one log line when it acts; the value is never printed. Called by install.sh (update.sh never writes .env).
+vault_passphrase_into_env() {
+  local vdir="${1:-}" env="$BOX_DIR/.env" f="" have="" old=""
+  [ -n "$vdir" ] && f="$vdir/vault.passphrase"
+  have="$(sed -n 's/^BOX_VAULT_PASSPHRASE=//p' "$env" 2>/dev/null | tail -1)"
+  [ -n "$f" ] && [ -f "$f" ] && old="$(tr -d '\n' < "$f")"
+  if [ -n "$have" ] && [ -n "$old" ] && [ "$have" != "$old" ]; then
+    log "vault passphrase: .env and the assistant's volume hold two different ones — both left; keep the one the vault was made with"
+    return 1
+  fi
+  if [ -z "$have" ]; then
+    local val="$old"
+    [ -n "$val" ] || val="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
+    touch "$env"; chmod 600 "$env"
+    printf 'BOX_VAULT_PASSPHRASE=%s\n' "$val" >> "$env"
+    if [ -n "$old" ]; then log "vault passphrase moved from the assistant's volume into .env"; else log "vault passphrase made in .env"; fi
+  fi
+  if [ -n "$old" ]; then rm -f "$f"; [ -n "$have" ] && log "vault passphrase: removed the copy in the assistant's volume (.env holds it)"; fi
+  return 0
+}
+
 # The home LAN's interface: the one the default route leaves by (LAN_IFACE overrides; set but empty means "none").
 lan_iface() {
   if [ "${LAN_IFACE+set}" = set ]; then echo "$LAN_IFACE"; return 0; fi

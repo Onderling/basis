@@ -26,7 +26,7 @@ describe('a person grants an agent a place on their companion', () => {
   beforeAll(async () => {
     relay = await startJourneyRelay();
     dir = mkdtempSync(path.join(tmpdir(), 'basis-companion-grant-'));
-    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, management: true, feeds: true });
+    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, vaultPassphrase: 'test-only-passphrase', management: true, feeds: true });
     web = await bootRealAgentNode('web', {});
     await connectNodesOverRelay([web], { relayUrl: relay.url });
     // the agent to be granted: any agent on the relay, keeping what reaches it
@@ -105,7 +105,7 @@ describe('a person grants an agent a place on their companion', () => {
     expect(await owed()).toEqual([{ node, key: bot.pubKey }]);
 
     // the node comes back; the next time it answers, what it is owed lands
-    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, management: true, feeds: true });
+    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, vaultPassphrase: 'test-only-passphrase', management: true, feeds: true });
     expect(host.agent.address).toBe(node);
     const tries = [];
     const back = await until(async () => { const r = await call('companionGrantList', { node }); tries.push(r?.outcome); return r?.ok ? r : null; }, { timeout: 60_000, step: 500 });

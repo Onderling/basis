@@ -67,7 +67,7 @@ describe('the agenda link, on a real box and a real companion', () => {
     const compDir = mkdtempSync(path.join(tmpdir(), 'agenda-companion-'));
     cleanup.push(() => rmSync(boxDir, { recursive: true, force: true }), () => rmSync(compDir, { recursive: true, force: true }));
     // 0 · the companion, on the relay, no port of its own: its address
-    const comp = proc(COMPANION, [], { COMPANION_RELAY_URL: relay.url, COMPANION_NODE_CONFIG_DIR: compDir, COMPANION_FEEDS: 'on' });
+    const comp = proc(COMPANION, [], { COMPANION_RELAY_URL: relay.url, COMPANION_NODE_CONFIG_DIR: compDir, COMPANION_FEEDS: 'on', BASIS_VAULT_PASSPHRASE: 'test-only-passphrase' });
     const companionAddress = (await comp.waitFor(/Host agent:\s+(\S+)/))[1];
     expect((await fetchFeed(`${base}/feed/${companionAddress}/${'a'.repeat(32)}.${'b'.repeat(43)}.ics`)).status, 'the relay\'s route before any put').toBe(404);
 

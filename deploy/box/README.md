@@ -194,6 +194,26 @@ A restic sidecar snapshots every box volume (relay, pod, companion, assistant, f
 prunes and verifies. No target files ⇒ the run says so and backs up nothing. Restore:
 `docker compose --project-name onderling exec backup sh /backup/backup.sh restore <target> latest /tmp/r`.
 
+**What a restore needs: two secrets, both kept OFF the box.** The restic password (in the target's `.env`) opens the
+snapshot; the vault passphrase (`BOX_VAULT_PASSPHRASE` in `/opt/onderling/.env`) opens the sealed stores inside it. The
+`.env` is not in any snapshot — the backup mounts the named volumes and `state.json` only — so a leaked snapshot alone
+opens nothing. Keep a copy of both somewhere other than the box. What never enters a snapshot at all (`backup.sh`,
+`DEVICE_ONLY`): the device runner's push store and any `vault.passphrase` a box made before still holds.
+
+**The vault passphrase.** `install.sh` writes it into `.env` (a new box gets a fresh one; a box made before kept it as
+`vault.passphrase` in the assistant's volume, and re-running `install.sh` moves it into `.env` once and deletes the
+file — idempotent, the value never printed). Without it, a fresh assistant or companion refuses to boot; an existing
+one boots on what it already has and warns until the move (the assistant also refuses when `.env` and a left-over file
+disagree). The companion's identity vault is sealed under it; one left in the clear
+by an older node is sealed in place on the first boot with the passphrase (the plaintext bytes overwritten).
+`update.sh` never writes `.env`, so an existing box takes the move only by a re-run of `install.sh`.
+
+**Before any copy of the restic repository leaves the box's operator** (a cloud target added later, a copy handed on):
+every snapshot taken before this box ran the release that carries this change (the first after v0.1.75-alpha; check the
+box's `state.json` for when it took it) holds the companion's identity keys in the clear, and the assistant's vault
+passphrase beside its vaults, under the restic password alone. `restic forget` those snapshots and `prune` the
+repository first — or rotate the companion identity instead.
+
 ## Tests
 
 `node --test deploy/box/test/` proves the updater against a real git remote and a fake `docker`: no

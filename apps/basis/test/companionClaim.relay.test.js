@@ -20,7 +20,7 @@ describe('a person claims their companion from their app', () => {
   beforeAll(async () => {
     relay = await startJourneyRelay();
     dir = mkdtempSync(path.join(tmpdir(), 'basis-companion-claim-'));
-    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, management: true });
+    host = await startCompanionNode({ relayUrl: relay.url, configDir: dir, vaultPassphrase: 'test-only-passphrase', management: true });
     web = await bootRealAgentNode('web', {});
     await connectNodesOverRelay([web], { relayUrl: relay.url });
   }, 60_000);

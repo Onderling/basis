@@ -37,7 +37,7 @@ export async function run({ relayUrl }) {
   const bob = new Agent({ identity: bobId, transport: new RelayTransport({ relayUrl, identity: bobId }) });
   const bobSeal = generateKeypair();
 
-  const node = await startCompanionNode({
+  const node = await startCompanionNode({ vaultPassphrase: 'test-only-passphrase',
     relayUrl, configDir: cfg, gate: false,
     inbox: true, inboxOwnerPubKey: bob.address,
     inboxWakeSender: wakeSender, inboxWakeToken: 'tok-bob', inboxWakePlatform: 'ios',

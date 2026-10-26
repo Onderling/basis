@@ -188,6 +188,19 @@ if [ "$SKIP_SYSTEM" != 1 ] && command -v ufw >/dev/null; then
   )
 fi
 
+# ── 5c. the vault passphrase in .env, outside every backed-up volume ──
+# A box made before kept it in the assistant's volume (vault.passphrase): moved into .env here, once (re-running install.sh
+# is how an existing box takes it; update.sh never writes .env). A new box gets a fresh one. Two that differ stop here.
+(
+  # shellcheck source=lib.sh
+  . "$RUNNER/lib.sh"
+  vdir=""
+  if [ "$SKIP_SYSTEM" != 1 ] && command -v "$DOCKER" >/dev/null; then
+    vdir="$("$DOCKER" volume inspect -f '{{.Mountpoint}}' "${COMPOSE_PROJECT}_assistant-data" 2>/dev/null || true)"
+  fi
+  vault_passphrase_into_env "$vdir"
+) || { echo "install: the vault passphrase needs a decision first (see box.log)" >&2; exit 1; }
+
 # ── 6. first bring-up + health ──
 echo "bringing the stack up (first build takes a few minutes)…"
 if [ "$SKIP_SYSTEM" != 1 ]; then

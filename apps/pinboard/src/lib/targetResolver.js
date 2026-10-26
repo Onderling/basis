@@ -22,7 +22,6 @@
  * accidentally subscribed to a topic).
  */
 
-import { distanceKm } from './geo.js';
 
 const VALID_KINDS = new Set(['group', 'contacts', 'tag']);
 const VALID_TRUST = new Set(['bekend', 'vertrouwd']);
@@ -135,35 +134,6 @@ export async function isAddressedToMe(targets, { selfWebid, senderWebid, activeG
     }
   }
   return false;
-}
-
-/**
- * Distance-filter a recipient set: drop recipients whose
- * MemberMap.location.cell is beyond `maxDistanceKm` from the
- * sender's own location.  Recipients without a known location
- * are KEPT (we don't know if they're far away).
- *
- * @param {Set<string>} recipients
- * @param {object} ctx
- * @param {object} ctx.members
- * @param {string} ctx.selfWebid
- * @param {number} ctx.maxDistanceKm
- * @returns {Promise<Set<string>>}
- */
-export async function filterByDistance(recipients, { members, selfWebid, maxDistanceKm }) {
-  if (!Number.isFinite(maxDistanceKm) || maxDistanceKm <= 0) return recipients;
-  const me = await members.resolveByWebid(selfWebid);
-  const myCell = me?.location?.cell;
-  if (!myCell) return recipients;   // no own location → can't filter
-
-  const out = new Set();
-  for (const w of recipients) {
-    const m = await members.resolveByWebid(w);
-    const c = m?.location?.cell;
-    if (!c) { out.add(w); continue; }   // unknown location → keep
-    if (distanceKm(myCell, c) <= maxDistanceKm) out.add(w);
-  }
-  return out;
 }
 
 /**

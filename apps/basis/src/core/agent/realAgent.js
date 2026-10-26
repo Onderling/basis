@@ -137,6 +137,7 @@ import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
 import { createBrowserPinboardAgent } from '@onderling-app/pinboard/browser';
 import { assertPinboardHostBindings } from './pinboardHostBindings.js';
+import { createRegistrySelfProfile } from '../../v2/selfProfileOverRegistry.js';
 import { PINBOARD_OP_ALIAS } from '../../v2/pinboardOpAliases.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
 // agents — the read-only "your agents" surface (2026-07-09). buildAgentSkills
@@ -5020,6 +5021,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     // In a persona's circle both are the persona's: its per-circle key (`circleIdentityFor` routes through `personaOf`)
     // and its webid as the ref the roster verifies.
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: circleSelf(circleId).webid ?? chatId.pubKey }),
+    // The person's OWN profile (handle, display name, availability, place) is the persona record of the caller's self:
+    // the general persona's for this device's own webid, a persona's for that persona's webid, nothing for anyone else.
+    selfProfile: createRegistrySelfProfile({
+      registry: () => agentsRegistryRef,
+      profileIdOf: (webid) => {
+        if (typeof webid !== 'string' || !webid) return null;
+        if (webid === chatId.pubKey) return primaryId;
+        for (const [id, rt] of personas) if (rt?.chatId?.pubKey === webid) return id;
+        return null;
+      },
+    }),
     // ...and pinboard's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
     // about it arrive AS the persona (`pinboardActAs`).
     selfWebidFor: (circleId) => circleSelf(circleId).webid,

@@ -1413,7 +1413,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // it wrote. A failed write does not stop the next.
   const profileTurns = new Map();
   const profileTurn = (profileId, fn) => {
-    const key = typeof profileId === 'string' && profileId ? profileId : 'default';
+    const key = typeof profileId === 'string' ? profileId : '';
     const prev = profileTurns.get(key) ?? Promise.resolve();
     const run = prev.catch(() => {}).then(fn);
     const settled = run.catch(() => {});

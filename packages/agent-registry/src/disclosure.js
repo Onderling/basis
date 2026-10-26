@@ -25,7 +25,6 @@
 // object (persist it wherever); all functions are pure transforms.
 
 import { resolveProperty, isMarkerKey } from './profileProperties.js';
-import { isPresentedAttributeKey } from './personaHandle.js';
 
 /** A fresh, share-nothing policy. */
 export function createDisclosurePolicy() {
@@ -119,7 +118,6 @@ export function releasedValues({ getProfile, profileId, defaultProfileId = null 
   for (const item of items) {
     const key = item?.key;
     if (typeof key !== 'string' || !key || isMarkerKey(key)) continue;   // a marker is never released
-    if (isPresentedAttributeKey(key)) continue;   // nor the handle: the persona's own statements present it
     // ONLY the disclosed axis (enabled/rung) releases a VALUE. matchable/requestable are
     // deliberately NOT consulted here — a matchable-but-not-disclosed property never leaks.
     const { enabled, rung } = getDisclosure(policy, contextId, key);

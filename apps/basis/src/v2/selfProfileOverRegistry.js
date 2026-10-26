@@ -32,8 +32,10 @@ export const SELF_PROFILE_KEYS = Object.freeze({
  * @param {() => ({lookup: Function, register: Function, list?: Function}|null)} a.registry  the agents registry
  * @param {(webid: string) => (string|null)} a.profileIdOf  which profile a webid of this device is (null: not ours)
  * @param {string} [a.defaultProfileId]  the general persona's profile id, the one a persona inherits from
+ * @param {(profileId: string, fn: () => Promise<any>) => Promise<any>} [a.turn]  the host's one-writer-per-profile turn:
+ *   a profile is written whole, so this write waits for any other writer of the same profile (and they for it)
  */
-export function createRegistrySelfProfile({ registry, profileIdOf, defaultProfileId = 'default' } = {}) {
+export function createRegistrySelfProfile({ registry, profileIdOf, defaultProfileId = 'default', turn = (_id, fn) => fn() } = {}) {
   const reg = () => (typeof registry === 'function' ? registry() : registry) ?? null;
   const read = async (profileId) => {
     const r = reg();
@@ -60,14 +62,17 @@ export function createRegistrySelfProfile({ registry, profileIdOf, defaultProfil
       const profileId = typeof profileIdOf === 'function' ? profileIdOf(webid) : null;
       const r = reg();
       if (!profileId || !r) return null;
-      const cur = await r.lookup(profileId);
-      if (!cur) return null;
-      let properties = cur.properties ?? {};
-      for (const [field, key] of Object.entries(SELF_PROFILE_KEYS)) {
-        if (Object.prototype.hasOwnProperty.call(patch, field)) properties = setOwn(properties, key, patch[field] ?? null);
-      }
-      await r.register({ ...cur, properties });
-      return read(profileId);
+      const written = await turn(profileId, async () => {
+        const cur = await r.lookup(profileId);
+        if (!cur) return false;
+        let properties = cur.properties ?? {};
+        for (const [field, key] of Object.entries(SELF_PROFILE_KEYS)) {
+          if (Object.prototype.hasOwnProperty.call(patch, field)) properties = setOwn(properties, key, patch[field] ?? null);
+        }
+        await r.register({ ...cur, properties });
+        return true;
+      });
+      return written ? read(profileId) : null;
     },
   };
 }

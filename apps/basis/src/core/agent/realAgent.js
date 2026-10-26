@@ -1407,6 +1407,20 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The registry handle, bridged OUT of the agents block for the host-skill ceremonies
   // (revokeDevice's tombstone write) — same outer-let idiom as its neighbours.
   let agentsRegistryRef = null;
+  // ONE WRITE AT A TIME PER PROFILE. A profile is written whole (lookup, change, register), so two writers of one profile
+  // at once lose one of them: a join's circle record went missing when a rename's write landed in between (the two-
+  // devices walk, 2026-10-26). Every read-modify-write of a profile takes its turn here; each reads what the one before
+  // it wrote. A failed write does not stop the next.
+  const profileTurns = new Map();
+  const profileTurn = (profileId, fn) => {
+    const key = typeof profileId === 'string' && profileId ? profileId : 'default';
+    const prev = profileTurns.get(key) ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(fn);
+    const settled = run.catch(() => {});
+    profileTurns.set(key, settled);
+    settled.then(() => { if (profileTurns.get(key) === settled) profileTurns.delete(key); });
+    return run;
+  };
   /** Whether THIS node runs a function profile (a household bot), from its own profile record — one read, every use. */
   const myProfileKind = async () => ((await agentsRegistryRef?.lookup?.('default').catch?.(() => null))?.kind === 'function' ? 'function' : 'person');
   // Patch the wrapped-key POINTER into an EXISTING circle-membership record. Set inside the block; a
@@ -1497,13 +1511,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // FACET MERGE (the pure setter keeps handle/address). No-op if there is no record yet (nothing to
     // attach to) or the ref is absent. Only touches the OWN record; never carries a secret — `keyRef` is a
     // pod-URI pointer + posture, and every key still re-derives from the recovery phrase.
-    upsertCircleKeyRef = async (circleId, keyRef) => {
+    upsertCircleKeyRef = async (circleId, keyRef) => profileTurn('default', async () => {
       if (!circleId || !keyRef?.ref) return false;
       const cur = personas.has('default') ? await agentsRegistry.lookup('default') : null;
       if (!cur || !circleMembershipsOf(cur)[circleId]) return false;
       await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, { key: keyRef }) });
       return true;
-    };
+    });
 
     /* control ops — LIVE token binding (2026-07-09). hostAgent (the skills' home)
      * is the ISSUER: `issueCapabilityToken` signs with its identity and needs no other
@@ -1784,6 +1798,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         return releaseFromPolicy({ getProfile: (id) => byId[id] ?? null, profileId, defaultProfileId }, request, self?.disclosure ?? { perContext: {} }, contextId);
       },
     };
+    // each writer of a profile takes that profile's turn (see `profileTurn`)
+    for (const m of ['setProperty', 'setDriver', 'setCircleMembership', 'removeCircleMembership', 'setDisclosure']) {
+      const raw = agentsProfiles[m];
+      if (typeof raw === 'function') agentsProfiles[m] = (args) => profileTurn(args?.profileId, () => raw(args));
+    }
     for (const { id, handler, visibility } of buildAgentSkills({ registry: agentsRegistry, tokens: agentsTokens, versionStoreFor, catalogue: agentsCatalogue, profiles: agentsProfiles })) {
       hostAgent.register(id, handler, { visibility: TRUSTED_AGENT_OPS.has(id) ? 'trusted' : visibility });
     }
@@ -2720,13 +2739,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       siblings: general ? ownDeviceSiblings : () => personaSiblings(pid),
       sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, general ? null : pid),
       current: async () => { const e = await agentsRegistryRef?.lookup?.(pid); return e ? profileFactsOf(e) : null; },
-      store: async (facts) => {
+      store: (facts) => profileTurn(pid, async () => {
         const cur = await agentsRegistryRef?.lookup?.(pid);
         if (!cur) return false;
         factsLanding.add(pid);
         try { await agentsRegistryRef.register(withProfileFacts(cur, facts)); } finally { factsLanding.delete(pid); }
         return true;
-      },
+      }),
       onRefused: (reason, from) => console.warn(`[profile-facts] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
     });
     profileFactsSyncs.set(pid, s);
@@ -3891,12 +3910,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   /* Revokes OWED to a node (a contact deleted while the node was away): kept on the node's record in the person's own
    * registry (sealed, carried, restored with it), told at the next connect and whenever the node answers again. */
   const ownProfile = async () => { try { return await agentsRegistryRef?.lookup?.('default'); } catch { return null; } };
-  const writeOwnProperties = async (fn) => {
+  const writeOwnProperties = (fn) => profileTurn('default', async () => {
     const cur = await ownProfile();
     if (!cur || !agentsRegistryRef?.register) return false;
     await agentsRegistryRef.register({ ...cur, properties: fn(cur.properties ?? {}) });
     return true;
-  };
+  });
   let retrying = null;
   /** Tell the nodes what they are owed (one node, or all); a node that answers clears its debt. */
   function retryPendingRevokes(onlyNode = null) {
@@ -5025,6 +5044,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the general persona's for this device's own webid, a persona's for that persona's webid, nothing for anyone else.
     selfProfile: createRegistrySelfProfile({
       registry: () => agentsRegistryRef,
+      turn: profileTurn,
       profileIdOf: (webid) => {
         if (typeof webid !== 'string' || !webid) return null;
         if (webid === chatId.pubKey) return primaryId;

@@ -133,6 +133,14 @@ Project namespace for type IRIs.
 
 The canonical item types every store knows, by name → JSON schema.
 
+### `CANONICAL_FIELD_CLOCKS`
+
+**Kind:** constant · **Import:** `CANONICAL_FIELD_CLOCKS` from `'@onderling/item-types'`
+
+The canonical types that declare field-sets merging by their own clock (`field-clock`), by type name. The item
+store's default resolution registry reads this; a type with per-field rules declares them here and writes no merge
+code of its own.
+
 ### `LISTS_TYPES`
 
 **Kind:** constant · **Import:** `LISTS_TYPES` from `'@onderling/item-types'`

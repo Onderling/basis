@@ -756,7 +756,6 @@ import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
 import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
-import { normalizeHopMode } from '@onderling/kring-host/circleHop';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
 import { buildCircleFiles, circleFilesFromListFiles } from '../../src/v2/circleFolio.js';
 import { myThingsFromListFiles } from '../../src/v2/folioMyThings.js';
@@ -772,7 +771,6 @@ import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
 import { renderCircleAdvisor } from './circleAdvisor.js';
-import { renderCircleHop } from './circleHop.js';
 import { renderOfferingEditor } from './circleOfferingEditor.js';
 import { renderCircleFolioBrowser } from './circleFolio.js';
 import {
@@ -2645,19 +2643,15 @@ function buildCircleBot(agent) {
     }
   }
 
-  // After /find returns, append (1) in-circle SKILL MATCHES for the query, and (2) a HOP PROMPT when the
-  // search came up short but the user has hop-eligible contacts + hop is on. Ported from classic main.js
-  // (appendFindExtras); the building blocks (findOfferingMatches / hopPrompt) are shared.
+  // After /find returns, append the in-circle SKILL MATCHES for the query (the shared buildFindExtras).
   async function appendFindExtras(reply) {
-    const { offeringMatches, hopCard } = await buildFindExtras({
-      query: reply?.payload?.query, groups: reply?.payload?.groups,
-      circleId: getActiveCircle(), callSkill: resolveSkill, t,
+    const { offeringMatches } = await buildFindExtras({
+      query: reply?.payload?.query, circleId: getActiveCircle(), callSkill: resolveSkill,
     });
     if (offeringMatches.length) {
       const lines = offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n');
       _circleRender?.botBubble(`${t('circle.offeringMatches.title')}\n${lines}`);
     }
-    if (hopCard) _circleRender?.botBubble(`${hopCard.title}\n${hopCard.body}`);
   }
 
   // run a bulk route ("/done all") over the most-recent listing's items; item-changed events fan out
@@ -4184,32 +4178,6 @@ async function showMyThings() {
       rerender();
     } catch { /* keep empty */ }
   }
-}
-
-// Hopping is a DEVICE-global stance (Pinboard getHopMode/setHopMode); it lives
-// under the Mij tab (personal settings). Chain-card data lands later.
-async function showHop() {
-  hideCircleTabBar(tabBarEl);
-  let hopMode = { global: false };
-  if (resolveSkill) {
-    try { hopMode = normalizeHopMode(await resolveSkill('getHopMode', {})); } catch { /* default */ }
-  }
-  const rerender = () => renderCircleHop(rootEl, {
-    hopMode,
-    t,
-    onToggleGlobal: async (v) => {
-      hopMode = { global: v };
-      rerender();
-      if (resolveSkill) {
-        try {
-          const r = await resolveSkill('setHopMode', { global: v });
-          if (r && !r.error) { hopMode = normalizeHopMode(r); rerender(); }
-        } catch { /* keep optimistic */ }
-      }
-    },
-    onBack: showMij,
-  });
-  rerender();
 }
 
 // α.3 — Screens tab.  Two sub-modes:
@@ -6708,7 +6676,6 @@ async function showAvailability() {
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
     onSave: async () => { await availabilityStore.update(working); showMyData({ group: 'connection' }); },
-    onHop: showHop,
   });
   rerender();
   showTabBar('mij');

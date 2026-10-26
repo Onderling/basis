@@ -20,9 +20,9 @@
  *     `routing/callWithHop.js`, `routing/invokeWithHop.js`) is peer-as-relay
  *     ROUTING: forwarding a sealed/plaintext payload through an intermediary
  *     peer to reach a target.
- *   - the SOCIAL match-hop (`@onderling/kring-host` `circleHop.js` /
- *     `hopPrompt.js`) is DISCOVERY: relaying a skill query one degree further
- *     through a contact who allows it. It never appears in this ladder.
+ *   - a SOCIAL match-hop (relaying a skill query one degree further through a
+ *     contact who allows it) would be DISCOVERY, not routing, and would never
+ *     appear in this ladder. None is built.
  * `tierForRouteVia` only ever means the transport-hop.
  *
  * Use `tierForTransport(transport)` to classify a chosen transport, or

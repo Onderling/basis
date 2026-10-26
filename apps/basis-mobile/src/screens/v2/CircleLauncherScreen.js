@@ -273,7 +273,6 @@ import CircleAvailabilityScreen from './CircleAvailabilityScreen.js';
 import CircleViewAsScreen from './CircleViewAsScreen.js';
 import CircleMemberCardScreen from './CircleMemberCardScreen.js';   // §2 — member-persona card + self-view
 import CircleAdvisorScreen from './CircleAdvisorScreen.js';
-import CircleHopScreen from './CircleHopScreen.js';
 import CircleOfferingEditorScreen from './CircleOfferingEditorScreen.js';
 import CircleFolioScreen from './CircleFolioScreen.js';
 import CircleRulesScreen from './CircleRulesScreen.js';
@@ -1724,8 +1723,6 @@ export default function CircleLauncherScreen({
       )) { setView('detail'); return true; }
       // Rules consent preview → back to rules editor.
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
-      // Hop screen lives under the Mij tab.
-      if (view === 'hop') { setView('availability'); return true; }
       if (view === 'blocked') { setView('contacten'); return true; }
       if (view === 'logReport') { setSettingsGroupId('my-data'); setView('settingsGroup'); return true; }
       if (view === 'shareContact') { setView('profile'); return true; }
@@ -2288,7 +2285,6 @@ export default function CircleLauncherScreen({
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
-          onHop={() => setView('hop')}
         />
       </WithTabBar>
     );
@@ -2432,10 +2428,6 @@ export default function CircleLauncherScreen({
   if (selected && view === 'viewas') {
     // F-5.1 — real member directory loaded in onViewAs via listGroupMembers.
     return <CircleViewAsScreen members={viewAsMembers} policy={viewAsPolicy} onBack={() => setView('detail')} />;
-  }
-  if (view === 'hop') {
-    // Hopping lives under the Mij tab (personal settings).
-    return <CircleHopScreen resolveSkill={resolveSkill} onBack={() => setView('availability')} />;
   }
   if (view === 'points') {
     // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
@@ -3767,14 +3759,12 @@ function CircleDetail({
       appendCircleMessage({ actor: 'bot', text: circleReplyText(reply, { verb, t }), buttons, scope, embeds });
       // Remember the most-recent listing so a bulk "/done all" can fan out over it (web≡mobile).
       if (Array.isArray(reply?.payload?.items)) lastCircleListingRef.current = { appOrigin: entry?.appOrigin, items: reply.payload.items };
-      // Shared find-result enrichment (skill matches + hop prompt), web≡mobile via buildFindExtras. Best-effort.
+      // Shared find-result enrichment (skill matches), web≡mobile via buildFindExtras. Best-effort.
       try {
-        const { offeringMatches, hopCard } = await buildFindExtras({
-          query: reply?.payload?.query, groups: reply?.payload?.groups,
-          circleId: circle?.id, callSkill: (op, a) => rawCallSkill('pinboard', op, a), t,
+        const { offeringMatches } = await buildFindExtras({
+          query: reply?.payload?.query, circleId: circle?.id, callSkill: (op, a) => rawCallSkill('pinboard', op, a),
         });
         if (offeringMatches.length) appendCircleMessage({ actor: 'bot', text: `${t('circle.offeringMatches.title')}\n${offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n')}` });
-        if (hopCard) appendCircleMessage({ actor: 'bot', text: `${hopCard.title}\n${hopCard.body}` });
       } catch { /* enrichment is non-essential */ }
     }
   }, [catalogue, circle?.id, rawCallSkill, appendCircleMessage, manifestsByOrigin, policy, capabilitySources, overrideStore, capabilityDenyFor]);

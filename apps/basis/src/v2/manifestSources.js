@@ -29,7 +29,7 @@ import { governanceManifest } from './governanceManifest.js';
 import { membershipManifest } from './membershipManifest.js';
 import { keyManifest } from './keyManifest.js';
 import { grantsManifest } from './grantsManifest.js';
-import { taskManifest } from './taskManifest.js';
+import { itemsManifest } from './itemsManifest.js';
 import { chatManifest } from './chatManifest.js';
 import { assistantManifest } from './assistantManifest.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
@@ -61,7 +61,7 @@ export const PLUMBING_MANIFESTS = Object.freeze([
   membershipManifest,
   keyManifest,
   grantsManifest,
-  taskManifest,
+  itemsManifest,
   chatManifest,
 ]);
 

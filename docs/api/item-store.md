@@ -1534,8 +1534,9 @@ onto it.
 defaultResolutionRegistry()
 ```
 
-The built-in SAFE DEFAULT registry — the "code default per type". Behaviour-preserving: task's whole
-claim cluster (`CLAIM_FIELDS`) resolves `claim` (first-wins), everything else falls to the content default.
+The built-in SAFE DEFAULT registry — the "code default per type": task's whole claim cluster (`CLAIM_FIELDS`)
+resolves `claim` (first-wins), the canonical types' declared field-clock sets resolve `field-clock`, and
+everything else falls to the content default.
 Reuses `causalMerge`'s `CLAIM_FIELDS` so there is no second definition of what the claim cluster is.
 
 ### `declareManifestPolicies`

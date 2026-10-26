@@ -7,9 +7,9 @@ import {
 } from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
 import {
-  makeTaskRail, makeTaskEmitter, makeTaskPeerHandler, routeTaskMirror,
-  TASK_BROADCAST, TASK_CATCHUP_SUBTYPES,
-} from '../../src/v2/taskRail.js';
+  makeItemsRail, makeItemsEmitter, makeItemsPeerHandler, routeItemsMirror,
+  ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES,
+} from '../../src/v2/itemsRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 
 // The content re-root's acceptance (tasks first): a task write on one device rides the device log's task
@@ -47,7 +47,7 @@ async function device(ref, rosterAll, wire) {
   registry.registerType('shopping', { type: 'object', properties: { type: { const: 'shopping' }, text: { type: 'string' } }, required: ['type', 'text'] });
   const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
   const eventLog = fakeEventLog();
-  const rail = makeTaskRail({
+  const rail = makeItemsRail({
     eventLog,
     circleIdentityFor: async () => cid,
     myRef: ref,
@@ -56,13 +56,13 @@ async function device(ref, rosterAll, wire) {
     storeFor: (circleId) => stores.getStore(circleId),
     verifyBinding: async ({ author, ref: r }) => rosterAll.some((m) => m.circleAddress === author && m.webid === r),
   });
-  const emitter = makeTaskEmitter({
+  const emitter = makeItemsEmitter({
     rail,
     fan: (circleId, statement) => wire.push({ from: ref, circleId, statement }),
   });
   const store = stores.getStore(CIRCLE);
-  wireStoreMirror(store, routeTaskMirror({ circleId: CIRCLE, emitter }));
-  const receiver = makeTaskPeerHandler({ rail });
+  wireStoreMirror(store, routeItemsMirror({ circleId: CIRCLE, emitter }));
+  const receiver = makeItemsPeerHandler({ rail });
   return { registry, ref, cid, eventLog, store, rail, emitter, receiver };
 }
 
@@ -72,12 +72,12 @@ async function pump(wire, devices) {
     const w = wire.shift();
     for (const d of devices) {
       if (d.ref === w.from) continue;
-      await d.receiver(null, { subtype: TASK_BROADCAST, circleId: w.circleId, event: w.statement });
+      await d.receiver(null, { subtype: ITEMS_BROADCAST, circleId: w.circleId, event: w.statement });
     }
   }
 }
 
-describe('the task lane — snapshots on the device log, heads causally merged', () => {
+describe('the items lane — snapshots on the device log, heads causally merged', () => {
   it('an added task fans as a SIGNED snapshot and materialises on the peer; the mirror no longer carries it', async () => {
     const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
     const wire = [];
@@ -107,7 +107,7 @@ describe('the task lane — snapshots on the device log, heads causally merged',
 
   it('a ROSTER row never rides this lane: not served in a catch-up, and refused if a peer snapshots one (2026-09-13)', async () => {
     // Two devices of one person each hold "the person's row" with a different primary (a device never
-    // records its own address; it records its siblings' by announce). Carried as a task-lane snapshot,
+    // records its own address; it records its siblings' by announce). Carried as a items-lane snapshot,
     // the phone's version replaced the box's freshly patched one and everything the phone signed was
     // refused on the box as unbindable — one enrol in ten. The roster converges by its own carriers.
     const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
@@ -121,12 +121,12 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const served = await ada.rail.catchUpStatements(CIRCLE);
     const servedIds = served.map((s) => s.body?.payload?.item?.id ?? s.body?.subject);
     expect(servedIds).toContain('task-1');
-    expect(servedIds, 'a roster row is not task-lane content').not.toContain('row-ada');
+    expect(servedIds, 'a roster row is not items-lane content').not.toContain('row-ada');
 
     // …and a peer that DOES snapshot one (an older device, or a hostile one) does not overwrite bo's row.
     await bo.store.put({ id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-as-bo-knows-it', circleAddressProof: 'p' } }, { by: 'webid:bo', sync: false });
     const stmt = await ada.rail.append(CIRCLE, { kind: 'snapshot', subject: 'row-ada', payload: { item: { id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-in-circle' } } } });
-    await bo.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: stmt.statement });
+    await bo.receiver(null, { subtype: ITEMS_BROADCAST, circleId: CIRCLE, event: stmt.statement });
     const boRow = await bo.store.get('row-ada');
     expect(boRow?.source?.circleAddress, 'bo\'s proven row survived a peer\'s snapshot of it').toBe('ada-as-bo-knows-it');
   });
@@ -142,12 +142,12 @@ describe('the task lane — snapshots on the device log, heads causally merged',
 
     await ada.store.put(rules(1, 'webid:ada'), { by: 'webid:ada', sync: false });
     const served = (await ada.rail.catchUpStatements(CIRCLE)).map((s) => s.body?.payload?.item?.id ?? s.body?.subject);
-    expect(served, 'a rules head is not task-lane content').not.toContain('rules-1');
+    expect(served, 'a rules head is not items-lane content').not.toContain('rules-1');
 
     await ada.store.put(rules(1, 'webid:ada'), { by: 'webid:ada', sync: false });
     await bo.store.put(rules(1, 'webid:ada'), { by: 'webid:bo', sync: false });
     const stmt = await bo.rail.append(CIRCLE, { kind: 'snapshot', subject: 'rules-1', payload: { item: rules(7, 'webid:bo') } });
-    await ada.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: stmt.statement });
+    await ada.receiver(null, { subtype: ITEMS_BROADCAST, circleId: CIRCLE, event: stmt.statement });
     expect((await ada.store.get('rules-1'))?.source?.version, "a member's snapshot of the rules did not replace ada's head").toBe(1);
   });
 
@@ -159,11 +159,11 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const note = (id, who) => ({ id, type: 'announcement', text: 'vergadering vanavond', body: 'vergadering vanavond', createdAt: new Date().toISOString(), createdBy: who, source: { groupId: CIRCLE, postedBy: who } });
 
     const fromMember = await bo.rail.append(CIRCLE, { kind: 'snapshot', subject: 'a-bo', payload: { item: note('a-bo', 'webid:bo') } });
-    await ada.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: fromMember.statement });
+    await ada.receiver(null, { subtype: ITEMS_BROADCAST, circleId: CIRCLE, event: fromMember.statement });
     expect(await ada.store.get('a-bo'), "a member's announcement did not land").toBeFalsy();
 
     const fromAdmin = await ada.rail.append(CIRCLE, { kind: 'snapshot', subject: 'a-ada', payload: { item: note('a-ada', 'webid:ada') } });
-    await bo.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: fromAdmin.statement });
+    await bo.receiver(null, { subtype: ITEMS_BROADCAST, circleId: CIRCLE, event: fromAdmin.statement });
     expect((await bo.store.get('a-ada'))?.id, "the admin's announcement landed").toBe('a-ada');
   });
 
@@ -218,7 +218,7 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const rogue = await AgentIdentity.generate(new VaultMemory());
 
     await ada.receiver(null, {
-      subtype: TASK_BROADCAST, circleId: CIRCLE,
+      subtype: ITEMS_BROADCAST, circleId: CIRCLE,
       event: signSpine(rogue, {
         kind: 'snapshot', circleId: CIRCLE, subject: 't-x',
         payload: { item: { id: 't-x', type: 'task', text: 'planted' }, authorRef: 'webid:bo' }, parent: null,
@@ -263,13 +263,13 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const batches = [];
     const serve = makeFrontierReplay({
       rail: ada.rail, sendToPeer: (a, p) => batches.push(p),
-      subtypes: TASK_CATCHUP_SUBTYPES, statementsFor: (cid) => ada.rail.catchUpStatements(cid),
+      subtypes: ITEMS_CATCHUP_SUBTYPES, statementsFor: (cid) => ada.rail.catchUpStatements(cid),
     });
     const pull = makeFrontierReplay({
-      rail: cato.rail, sendToPeer: () => {}, subtypes: TASK_CATCHUP_SUBTYPES,
+      rail: cato.rail, sendToPeer: () => {}, subtypes: ITEMS_CATCHUP_SUBTYPES,
     });
     await serve.onRequest('peer:cato', {
-      subtype: TASK_CATCHUP_SUBTYPES.request, circleId: CIRCLE,
+      subtype: ITEMS_CATCHUP_SUBTYPES.request, circleId: CIRCLE,
       frontier: pull.localFrontier(CIRCLE),                             // cato's (empty) head set
     });
     expect(batches).toHaveLength(1);
@@ -296,16 +296,16 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const batches = [];
     const serve = makeFrontierReplay({
       rail: ada.rail, sendToPeer: (a, p) => batches.push(p),
-      subtypes: TASK_CATCHUP_SUBTYPES, statementsFor: (cid) => ada.rail.catchUpStatements(cid),
+      subtypes: ITEMS_CATCHUP_SUBTYPES, statementsFor: (cid) => ada.rail.catchUpStatements(cid),
     });
-    const pull = makeFrontierReplay({ rail: cato.rail, sendToPeer: () => {}, subtypes: TASK_CATCHUP_SUBTYPES });
-    await serve.onRequest('peer:cato', { subtype: TASK_CATCHUP_SUBTYPES.request, circleId: CIRCLE, frontier: pull.localFrontier(CIRCLE) });
+    const pull = makeFrontierReplay({ rail: cato.rail, sendToPeer: () => {}, subtypes: ITEMS_CATCHUP_SUBTYPES });
+    await serve.onRequest('peer:cato', { subtype: ITEMS_CATCHUP_SUBTYPES.request, circleId: CIRCLE, frontier: pull.localFrontier(CIRCLE) });
     expect(batches[0]?.statements.map((st) => st.body.payload?.item?.type), 'the plant row must be served').toContain('plant');
   });
 
   it('THE VALVE, CLOSED: every store type rides the lane — the unsigned mirror carry is DELETED', () => {
     const laneCalls = [];
-    const valve = routeTaskMirror({
+    const valve = routeItemsMirror({
       circleId: 'circle-v',
       emitter: { snapshot: (cid, it) => laneCalls.push(it.type), remove: (cid, id) => laneCalls.push(`rm:${id}`) },
     });
@@ -318,12 +318,12 @@ describe('the task lane — snapshots on the device log, heads causally merged',
 
     // No emitter + not required (a composition without a lane): a publish is a NO-OP — there is no
     // unsigned fallback left to take. The write stays local; convergence needs the lane.
-    const bare = routeTaskMirror({ circleId: 'circle-v' });
+    const bare = routeItemsMirror({ circleId: 'circle-v' });
     expect(bare.publishItem({ id: 'i-x', type: 'task' })).toBeUndefined();
     expect(bare.publishItemRemoved('i-x')).toBeUndefined();
 
     // Required + no emitter (a device-log composition before the emitter lands): LOUD refusal.
-    const strict = routeTaskMirror({ circleId: 'circle-v', requireSigned: true });
+    const strict = routeItemsMirror({ circleId: 'circle-v', requireSigned: true });
     expect(() => strict.publishItem({ id: 'i-y', type: 'task' })).toThrow(/unsigned mirror carry is deleted/);
   });
 });
@@ -340,7 +340,7 @@ describe('the task lane — snapshots on the device log, heads causally merged',
  * verified, chained, stored on their rail, never applied. Catch-up could not heal it either —
  * catch-up fetches what the rail LACKS, and the rail had it.
  */
-describe('taskRail.rebuildHead — the head a circle already owes itself', () => {
+describe('itemsRail.rebuildHead — the head a circle already owes itself', () => {
   it('applies statements that arrived before the store existed, and is idempotent', async () => {
     const roster = [{ webid: 'anne' }, { webid: 'cato' }];
     const wire = [];
@@ -354,7 +354,7 @@ describe('taskRail.rebuildHead — the head a circle already owes itself', () =>
     registerCanonicalTypes(registry);
     const catoStores = createCircleStores({ dataSource: memoryDataSource(), registry });
     let circleOpen = false;
-    const catoRail = makeTaskRail({
+    const catoRail = makeItemsRail({
       eventLog: fakeEventLog(),
       circleIdentityFor: async () => catoId,
       myRef: 'cato',
@@ -362,7 +362,7 @@ describe('taskRail.rebuildHead — the head a circle already owes itself', () =>
       storeFor: (cid) => (circleOpen ? catoStores.getStore(cid) : null),
       verifyBinding: async ({ author, ref: r }) => roster.some((m) => m.circleAddress === author && m.webid === r),
     });
-    const catoReceiver = makeTaskPeerHandler({ rail: catoRail });
+    const catoReceiver = makeItemsPeerHandler({ rail: catoRail });
 
     // Anne writes while cato's circle is still closed — the join-window this reproduces.
     await anne.store.put({ id: 'task-1', type: 'task', text: 'de schuur opruimen' });
@@ -388,7 +388,7 @@ describe('taskRail.rebuildHead — the head a circle already owes itself', () =>
 
   it('does nothing, without throwing, while the store is still absent', async () => {
     const cid = await AgentIdentity.generate(new VaultMemory());
-    const rail = makeTaskRail({
+    const rail = makeItemsRail({
       eventLog: fakeEventLog(),
       circleIdentityFor: async () => cid,
       myRef: 'nobody',

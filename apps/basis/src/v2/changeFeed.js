@@ -1,6 +1,6 @@
 /**
  * changeFeed — ONE place where a host hears that an item it holds changed, whoever changed it: its own write (the
- * circle store's publish) and a snapshot that LANDED from another member (the task rail's `onItemApplied`). Each
+ * circle store's publish) and a snapshot that LANDED from another member (the items rail's `onItemApplied`). Each
  * change goes to every consumer as `{ circleId, before, after }` with its origin — the planned-work runner's event rows,
  * a bot's screen nudge, and whatever else needs "something changed" (one seam, not one detector per feature).
  *

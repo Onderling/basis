@@ -6,7 +6,7 @@
  * The entry-kind table (`ENTRY_KINDS`, `packages/item-store/src/entryKinds.js`) declares per kind which verifier a
  * receiver folds it with (`accepts`). The rails choose their verifier at wiring time. Two layers, one fact: a rail
  * whose default verifier drifts from the table — or a rail composed with none — is a door with the wrong lock or no
- * lock, and nothing failed when the task lane's kind name disagreed with the table (2026-09-14). This guard reads
+ * lock, and nothing failed when the items lane's kind name disagreed with the table (2026-09-14). This guard reads
  * both statically, off disk, the stance every tier-1 lint here takes.
  *
  * Three rules:
@@ -37,7 +37,7 @@ export const VERIFIER_ACCEPTS = Object.freeze({
  */
 export const RAILS = Object.freeze([
   { file: 'apps/basis/src/v2/chatRail.js',            laneFile: 'apps/basis/src/v2/chatManifest.js',       laneConst: 'CHAT_LANE' },
-  { file: 'apps/basis/src/v2/taskRail.js',            laneFile: 'apps/basis/src/v2/taskManifest.js',       laneConst: 'TASK_LANE' },
+  { file: 'apps/basis/src/v2/itemsRail.js',            laneFile: 'apps/basis/src/v2/itemsManifest.js',       laneConst: 'ITEMS_LANE' },
   { file: 'apps/basis/src/v2/governanceAppWiring.js', laneFile: 'apps/basis/src/v2/governanceManifest.js', laneConst: 'GOVERNANCE_LANE' },
   { file: 'apps/basis/src/v2/membershipRail.js',      laneFile: 'apps/basis/src/v2/membershipManifest.js', laneConst: 'MEMBERSHIP_LANE' },
   { file: 'apps/basis/src/v2/keyRail.js',             laneFile: 'apps/basis/src/v2/keyManifest.js',        laneConst: 'KEY_LANE' },

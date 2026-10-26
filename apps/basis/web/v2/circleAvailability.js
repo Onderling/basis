@@ -10,7 +10,7 @@
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderCircleAvailability(container, { availability, t, onChange, onBack, onSave, onHop } = {}) {
+export function renderCircleAvailability(container, { availability, t, onChange, onBack, onSave } = {}) {
   const tr = translatorOr(t, 'circleAvailability.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   const a = availability || {};
@@ -75,16 +75,6 @@ export function renderCircleAvailability(container, { availability, t, onChange,
   save.textContent = tr('circle.settings.save');
   save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
   container.appendChild(save);
-
-  // Mij tab also surfaces the device-global Hopping stance.
-  if (typeof onHop === 'function') {
-    const hop = document.createElement('button');
-    hop.type = 'button';
-    hop.className = 'circle-availability__hop';
-    hop.textContent = tr('circle.hop.title');
-    hop.addEventListener('click', () => onHop());
-    container.appendChild(hop);
-  }
 
   return container;
 }

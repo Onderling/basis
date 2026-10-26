@@ -119,7 +119,6 @@ import {
   INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
 } from '../lib/inviteCeiling.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
-import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
 import { geocode } from '../lib/geocode.js';
 import { resolve as resolveTargets, validateTarget, filterMuted } from '../lib/targetResolver.js';
 import {
@@ -748,20 +747,16 @@ async function listGroupMembersCore(scope, a, ctx) {
  * key on the row), and it holds nothing for a circle whose members this device
  * learned from the trail alone — which is exactly a JOINER's view of the admin
  * (`recordRemoteRedemption` records only the joiner's own row; the admin is known
- * only through `confirmedBy`). `deriveRoster` starts FROM the trail and left-joins
- * the MemberMap for display only. (plans/DESIGN-connectivity-phase1-membership.md,
- * Part A.)
+ * only through `confirmedBy`). `deriveRoster` starts FROM the trail and joins nothing in from outside it.
  *
  * @param {object} a
  * @param {{listOpen: Function}} a.store
  * @param {string} a.groupId
- * @param {Array<object>} [a.memberMapList]  `MemberMap.list()` — display left-join + legacy admins.
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
+export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
-  const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const forGroup = (redemptions ?? []).filter((i) => i?.source?.groupId === groupId);
@@ -795,6 +790,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   // founder — and a member's own rules write promoted them to admin two steps later.
   const founderWebids = new Set();
   const founderKinds = {};   // founder → 'function', from its own verified creation statement
+  const founderFacts = {};   // founder → what their creation statement says: their proven address, their handle
   {
     const admitters = new Set();
     const redeemers = new Set();
@@ -858,6 +854,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
         // a function profile that FOUNDS says so in its own signed creation: the founder is the circle's root
         // authority, so the claim grants nothing it could not take; the fold carries it as the founder's kind
         if (b.payload && typeof b.payload === 'object' && b.payload.kind === 'function') founderKinds[b.author] = 'function';
+        // …and what the founder said about themselves there: their per-circle address (proven like a joiner's;
+        // deriveRoster checks the proof before it projects) and the handle they go by
+        const p = b.payload && typeof b.payload === 'object' ? b.payload : {};
+        founderFacts[b.author] = {
+          groupId,
+          ...(typeof p.circleAddress === 'string' && typeof p.circleAddressProof === 'string' ? { circleAddress: p.circleAddress, circleAddressProof: p.circleAddressProof } : {}),
+          ...(typeof p.peerDisplay === 'string' && p.peerDisplay ? { handle: p.peerDisplay } : {}),
+        };
       }
     }
   };
@@ -1042,7 +1046,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     founderKinds,
-    memberMapForDisplay: list,
+    founderFacts,
     // Authoritative ONLY on the rail path: its statements carry verified per-circle-key bindings. The
     // legacy store path keeps the pre-rider semantics until pinboard dissolves.
     foldAuthoritative: typeof membershipRead === 'function',
@@ -1375,7 +1379,7 @@ export function buildSkills({
     memberStatus: async (gid, webid) => {
       let folded = null;
       const rows = await projectCircleRoster({
-        store: scope.store, groupId: gid, memberMapList: [], circleSignerFor: scope.circleSignerFor,
+        store: scope.store, groupId: gid, circleSignerFor: scope.circleSignerFor,
         membershipRead: scope.membershipRead, selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
       });
       if (!Array.isArray(rows)) return null;
@@ -1499,8 +1503,7 @@ export function buildSkills({
     // without the self-binding the fold cannot tell they are the same person — which locked a
     // creator out of the circle they had just made.
     const rows = await projectCircleRoster({
-      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead, selfSigner,
+      store, groupId: circleId, circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
@@ -1513,8 +1516,7 @@ export function buildSkills({
   const circleRowOf = async (circleId, webid) => {
     if (!circleId || !webid) return null;
     const rows = await projectCircleRoster({
-      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead, selfSigner,
+      store, groupId: circleId, circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid) ?? null;
@@ -3019,7 +3021,7 @@ export function buildSkills({
           // The SAME folded projection every other authority answer here reads, spine and all — so
           // "am I still in this circle" gets the same answer at this door as at every other.
           projectCircleRoster: ({ groupId: gid }) => projectCircleRoster({
-            store, groupId: gid, memberMapList: [], circleSignerFor, membershipRead, selfSigner,
+            store, groupId: gid, circleSignerFor, membershipRead, selfSigner,
           }),
         },
         { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
@@ -3428,14 +3430,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCircleTask({groupId, event, msgId, ts?})
-     *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
-     *   other member; receivers verify it at their task rail before it lands on their device log and
+     * broadcastCircleItems({groupId, event, msgId, ts?})
+     *   — the content re-root: fan a SIGNED item statement (a full-item snapshot, or a remove) to every
+     *   other member; receivers verify it at their items rail before it lands on their device log and
      *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
-     *   circle-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   circle-items-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
-    defineSkill('broadcastCircleTask', async ({ parts, from }) => {
+    defineSkill('broadcastCircleItems', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3443,13 +3445,13 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-task-broadcast', from,
+        circleId: _groupId, kind: 'circle-items-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'circle-task-fanout',
+        metric: 'circle-items-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:circle-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      description: 'Fan a signed item statement (full-item snapshot or remove) to every other member via subtype:circle-items-broadcast; receivers verify at their items rail and causally merge the head. Never wakes.',
       visibility:  'authenticated',
     }),
 
@@ -4254,98 +4256,6 @@ export function buildSkills({
       return { contacts };
     }, {
       description: 'List contacts; optional minTrust ("bekend"|"vertrouwd") or tag filter.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getHopMode()  — Phase 28.1.  Returns `{global}` reflecting
-     * whether hop-relay is enabled for any contact on this device.
-     * Mirror of `bundle.settings.allowHopThrough`.
-     */
-    defineSkill('getHopMode', async () => ({
-      global: bundle?.settings?.allowHopThrough === true,
-    }), {
-      description: 'Read whether global hop-relay is enabled.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * setHopMode({global})  — Phase 28.1.  Toggles
-     * `bundle.settings.allowHopThrough` AND wires
-     * `agent.enableRelayForward({policy: 'authenticated'})` when
-     * turning on (idempotent at the SDK level).  When turning off,
-     * policy is downgraded to `'never'` so the registered skill
-     * rejects any relay request.  Stays registered to avoid
-     * needing a restart; the policy gate is the actual switch.
-     */
-    defineSkill('setHopMode', async ({ parts, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.global !== 'boolean') return { error: 'global (bool) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      { allowHopThrough: a.global },
-      });
-      bundle.settings = next;
-
-      try {
-        if (a.global) {
-          agent.enableRelayForward({ policy: 'authenticated' });
-        } else if (agent?.config?.set) {
-          agent.config.set('policy.allowRelayFor', 'never');
-        }
-      } catch (err) {
-        return { error: `enableRelayForward failed: ${err?.message ?? err}` };
-      }
-      metrics?.record?.(a.global ? 'hop-mode-on' : 'hop-mode-off');
-      return { global: a.global };
-    }, {
-      description: 'Enable or disable global hop-relay; persists in settings + flips core policy.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getSettings()  — Phase 23.5.  Read-only snapshot of cadence /
-     * hop / broadcastable / defaultShareLocation settings.  Cached
-     * in `bundle.settings`; reload from cache via `_reload: true`.
-     */
-    defineSkill('getSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (a._reload && bundle?.cache) {
-        bundle.settings = await loadSettings({
-          dataSource: bundle.cache,
-          deviceId:   bundle?.deviceId ?? null,
-        });
-      }
-      return { settings: bundle?.settings ?? null };
-    }, {
-      description: 'Read the bundle\'s user-tunable settings (cadence + hop + broadcastable).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * updateSettings({patch})  — Phase 23.5.  Patch a subset of the
-     * settings; persists via the same CachingDataSource path that
-     * MemberMap uses, so a connected pod gets the update too.
-     * Returns the merged + saved settings.
-     */
-    defineSkill('updateSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!a.patch || typeof a.patch !== 'object') return { error: 'patch (object) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      a.patch,
-        scope:      a.scope === 'device' || a.scope === 'shared' ? a.scope : null,
-      });
-      bundle.settings = next;
-      metrics?.record?.('settings-updated');
-      return { settings: next };
-    }, {
-      description: 'Patch a subset of the bundle\'s settings; persists immediately.',
       visibility:  'authenticated',
     }),
 

@@ -30,7 +30,7 @@ import {
   makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES, rosterBindingVerifier,
 } from '../../src/v2/membershipRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
-import { TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
+import { ITEMS_CATCHUP_SUBTYPES } from '../../src/v2/itemsRail.js';
 import { CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
@@ -98,17 +98,17 @@ function wireGovernanceCatchUp(node) {
 }
 
 /**
- * The CONTENT catch-up pairs — the shells' exact wiring shape: the task lane over the agent's
+ * The CONTENT catch-up pairs — the shells' exact wiring shape: the items lane over the agent's
  * rail (serve set = catchUpStatements, so aged-out heads still serve), the chat lane over the
  * node's rail. Returns the instances so the consume's `contentPulls` can aim `requestFrom` at
  * the offer's sibling, exactly as the shells hand it in.
  */
 function wireContentCatchUp(node) {
-  const taskCU = node.agent.taskRail ? makeFrontierReplay({
-    rail: node.agent.taskRail,
+  const taskCU = node.agent.itemsRail ? makeFrontierReplay({
+    rail: node.agent.itemsRail,
     sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the circle scope rides through, as in the lane table
-    subtypes: TASK_CATCHUP_SUBTYPES,
-    statementsFor: (cid) => node.agent.taskRail.catchUpStatements(cid),
+    subtypes: ITEMS_CATCHUP_SUBTYPES,
+    statementsFor: (cid) => node.agent.itemsRail.catchUpStatements(cid),
   }) : null;
   const chatCU = makeFrontierReplay({
     rail: node.chatRail,
@@ -135,9 +135,9 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
 
   it('roles, the authoritative fold, the rules version, and the stale banner — all on the seeded device', async () => {
     [B, A] = await Promise.all([
-      bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
       bootRealAgentNode('A', {
-        taskLane: true,
+        itemsLane: true,
         agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() },
       }),
     ]);

@@ -41,7 +41,7 @@ describe('the circle fan-out and a door person', () => {
         { webid: DOOR, channel: 'telegram', role: 'admin', relation: 'contact', displayName: 'Frits' },
       ],
     });
-    const def = bundle.agent.skills.get('broadcastCircleTask');
+    const def = bundle.agent.skills.get('broadcastCircleItems');
     await def.handler({ parts: [DataPart({ groupId: 'household', event: { body: { hash: 'h', kind: 'snapshot' }, sig: 's' }, msgId: 'task:h', ts: 1 })], from: ME, agent: bundle.agent, envelope: null });
     expect(sends.some((a) => String(a).startsWith('telegram:')), `sent to ${JSON.stringify(sends)}`).toBe(false);
   });

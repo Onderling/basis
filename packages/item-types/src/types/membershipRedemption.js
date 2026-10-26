@@ -5,7 +5,7 @@
  * It lives in the circle's own store, but it is not carried like the store's other rows: a roster row's addresses
  * enter the roster only PROVEN, it is patched in place by the announce path, and it reaches other devices by the
  * carriers that keep that trust — the join statements on the membership lane, the announces, the roster seed between
- * a person's own devices. The task lane neither publishes, serves nor applies it (`@onderling/circles` rosterTrail).
+ * a person's own devices. The items lane neither publishes, serves nor applies it (`@onderling/circles` rosterTrail).
  */
 
 import { BASE_PROPERTIES, BASE_REQUIRED, NAMESPACE } from '../baseSchema.js';

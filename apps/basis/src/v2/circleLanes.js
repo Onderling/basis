@@ -31,7 +31,7 @@ import { narrowReportStatements } from './reportLane.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { makeSyncSelection, HOLD_EVERYTHING } from './syncSelection.js';
 import { GRANTS_BROADCAST } from './grantsRail.js';
-import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from './taskRail.js';
+import { makeItemsPeerHandler, ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES } from './itemsRail.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { makeFrontierReplay } from './frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from './chatRail.js';
@@ -56,7 +56,7 @@ export function carryLandedStatement({ carry, subtype, circleId, statement, from
  * Build the lane half of a shell's peer-router table.
  *
  * @param {object} a
- * @param {object} a.agent  the basis agent — its rails (`chatRail`, `taskRail`, `keyRail`,
+ * @param {object} a.agent  the basis agent — its rails (`chatRail`, `itemsRail`, `keyRail`,
  *   `membershipRail`), its ready-made receivers (`grantsPeerHandler`, `grantsCatchUp`, `rosterSeed`,
  *   `contactTurnHandler`, `knownPeersSync`) and `rosterReads`. A rail this agent does not have yields no entry.
  * @param {(addr: string, payload: object, opts?: object) => any} [a.sendToPeer]
@@ -140,12 +140,12 @@ export function buildCircleLanes({
 
   // Content lanes never pull all of it. Tasks replay from the receiver's frontier, paging as needed,
   // and the serve set includes signed snapshots of live heads whose entries have aged out of the lane.
-  const task = agent.taskRail ? makeFrontierReplay({
-    rail: agent.taskRail,
+  const task = agent.itemsRail ? makeFrontierReplay({
+    rail: agent.itemsRail,
     sendToPeer: send,
     ...aim,
-    subtypes: TASK_CATCHUP_SUBTYPES,
-    statementsFor: (circleId) => agent.taskRail.catchUpStatements(circleId),
+    subtypes: ITEMS_CATCHUP_SUBTYPES,
+    statementsFor: (circleId) => agent.itemsRail.catchUpStatements(circleId),
     // the person's own scope is never served on a circle's catch-up: it has its own, between their devices only
     mayServe: (fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
   }) : null;
@@ -256,13 +256,13 @@ export function buildCircleLanes({
     // the circle's truth (keys, membership) is not a silo — but a kring this device declines is refused whole
     ...(keyStatementHandler ? { [KEY_STATEMENT_BROADCAST]: unlessKringOff(keyStatementHandler) } : {}),
     ...catchUpEntries(key),
-    ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({
-      rail: agent.taskRail,
+    ...(agent.itemsRail ? { [ITEMS_BROADCAST]: makeItemsPeerHandler({
+      rail: agent.itemsRail,
       holds: holdsFor('tasks'),
       onPassed: (circleId, statement, fromPeerAddr) =>
-        carryLandedStatement({ carry, subtype: TASK_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
+        carryLandedStatement({ carry, subtype: ITEMS_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
       onLanded: (circleId, statement, fromPeerAddr) =>
-        carryLandedStatement({ carry, subtype: TASK_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
+        carryLandedStatement({ carry, subtype: ITEMS_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
     }) } : {}),
     ...catchUpEntries(task),
     // …and the person's own scope, asked of and served to their own devices only
@@ -334,7 +334,7 @@ export function buildCircleLanes({
 
 /**
  * The lanes a device pulls for ONE circle right after it joins: its authority (membership, governance, keys) AND its
- * content (the task lane carries every list, chore and appointment; the chat lane the conversation). Without the
+ * content (the items lane carries every list, chore and appointment; the chat lane the conversation). Without the
  * content lanes a fresh joiner saw the circle empty until its next boot.
  */
 export const JOIN_PULL_LANES = Object.freeze(['membership', 'gov', 'key', 'task', 'chat']);

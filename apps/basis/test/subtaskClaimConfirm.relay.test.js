@@ -40,11 +40,11 @@ describe('subtask claim-confirmation race over a real relay (§7)', () => {
   beforeAll(async () => {
     relay = await startJourneyRelay();
     relayUrl = relay.url;
-    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { itemsLane: true }), bootRealAgentNode('B', { itemsLane: true })]);
     await connectNodesOverRelay([A, B], { relayUrl });
     wireInboundLikeShell(A);
     wireInboundLikeShell(B);
-    // A REAL join, not hand-wired peers: the signed task lane verifies the sender's key↔ref binding
+    // A REAL join, not hand-wired peers: the signed items lane verifies the sender's key↔ref binding
     // against the circle roster, so `addCirclePeer` (a transport peer, no membership) is refused.
     await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Claim circle (relay)', handle: 'bee' });
     await warm(A, B);

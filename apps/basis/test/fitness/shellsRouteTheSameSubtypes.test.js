@@ -124,7 +124,7 @@ describe('FITNESS — both shells route the same peer-message subtypes', () => {
     // Counted by SHAPE, not by lane: the shared table writes the catch-up trio once and reuses it for
     // every lane, which is the deduplication that made it worth extracting. So name the lanes instead.
     const shared = subtypesOf(LANES);
-    for (const lane of ['CHAT_STATEMENT_BROADCAST', 'KEY_STATEMENT_BROADCAST', 'TASK_BROADCAST',
+    for (const lane of ['CHAT_STATEMENT_BROADCAST', 'KEY_STATEMENT_BROADCAST', 'ITEMS_BROADCAST',
                         'MEMBERSHIP_BROADCAST', 'GRANTS_BROADCAST', 'circle-report-broadcast']) {
       expect(shared.has(lane), `the shared lane table no longer routes ${lane}`).toBe(true);
     }

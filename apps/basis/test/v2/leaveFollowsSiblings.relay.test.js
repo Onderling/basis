@@ -39,8 +39,8 @@ describe('a circle left on one device is left on the person\'s others', () => {
 
   it('the live half: A leaves X → A2 leaves X too (marker, registry, presence) without a statement of its own; B sees one leave', async () => {
     [B, A] = await Promise.all([
-      bootRealAgentNode('B', { taskLane: true }),
-      bootRealAgentNode('A', { taskLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() } }),
+      bootRealAgentNode('B', { itemsLane: true }),
+      bootRealAgentNode('A', { itemsLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() } }),
     ]);
     bus = await connectNodesOverBus([B, A]);
     for (const cid of [X, Y, Z]) {
@@ -61,7 +61,7 @@ describe('a circle left on one device is left on the person\'s others', () => {
     const phrase = (await A.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'tablet' })).ok).toBe(true);
     await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { taskLane: true, agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
+    A2 = await bootRealAgentNode('A2', { itemsLane: true, agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) } });
     expect(A2.pubKey).toBe(A.pubKey);
     const tx = new InternalTransport(bus, A2.pubKey);
     await A2.agent.sa.addSecureTransport('relay', tx);

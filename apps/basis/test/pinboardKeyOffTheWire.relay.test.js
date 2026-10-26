@@ -35,8 +35,8 @@ describe('the pinboard key stays in the process', () => {
   beforeAll(async () => {
     relay = await startJourneyRelay();
     proxy = await startCapturingProxy(relay.url);
-    ann = await bootRealAgentNode('ann', { taskLane: true, contactChannel: true, redeemTimeoutMs: 30_000 });
-    bob = await bootRealAgentNode('bob', { taskLane: true, redeemTimeoutMs: 30_000 });
+    ann = await bootRealAgentNode('ann', { itemsLane: true, contactChannel: true, redeemTimeoutMs: 30_000 });
+    bob = await bootRealAgentNode('bob', { itemsLane: true, redeemTimeoutMs: 30_000 });
     await connectNodesOverRelay([ann, bob], { relayUrl: proxy.url });
   }, 120_000);
   afterAll(async () => { await teardown(ann, bob); await proxy?.close?.(); await relay?.close?.(); });

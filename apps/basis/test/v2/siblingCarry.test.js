@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { makeSiblingCarry } from '../../src/v2/siblingCarry.js';
 import { buildCircleLanes, carryLandedStatement } from '../../src/v2/circleLanes.js';
 import { CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
-import { TASK_BROADCAST } from '../../src/v2/taskRail.js';
+import { ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
 import { MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
 import { KEY_STATEMENT_BROADCAST } from '../../src/v2/keyRail.js';
 import { makeGrantsFan, GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
@@ -63,7 +63,7 @@ describe('makeSiblingCarry', () => {
   });
 });
 
-describe('the lane table hands every landed chat and task statement to the carry', () => {
+describe('the lane table hands every landed chat and item statement to the carry', () => {
   // Enough of a rail for the lane table's catch-ups to construct; only ingest matters here.
   const railStub = (ingest) => ({
     ingest, hasEntry: () => false, storedStatements: () => [], statementsFor: () => [], frontier: () => ({}),
@@ -72,7 +72,7 @@ describe('the lane table hands every landed chat and task statement to the carry
   const fakeAgent = (carry) => ({
     siblingCarry: { carry },
     chatRail: railStub(async (_c, s) => ({ ok: true, existed: false, entry: { id: s.body.subject } })),
-    taskRail: railStub(async () => ({ ok: true, existed: false, entry: { id: 'task:h1' } })),
+    itemsRail: railStub(async () => ({ ok: true, existed: false, entry: { id: 'task:h1' } })),
     sendPeerMessage: async () => ({}),
   });
 
@@ -90,8 +90,8 @@ describe('the lane table hands every landed chat and task statement to the carry
     const carry = vi.fn(async () => ({ attempted: 1 }));
     const { handlers } = buildCircleLanes({ agent: fakeAgent(carry) });
     const taskStmt = { body: { kind: 'snapshot', subject: 't1', hash: 'h1' }, sig: 'sig' };
-    await handlers[TASK_BROADCAST]('addr:member-bea', { subtype: TASK_BROADCAST, circleId: 'k1', event: taskStmt, msgId: 'task:h1', ts: 1 });
-    expect(carry.mock.calls[0][0]).toMatchObject({ subtype: TASK_BROADCAST, circleId: 'k1', event: taskStmt, msgId: 'task:h1' });
+    await handlers[ITEMS_BROADCAST]('addr:member-bea', { subtype: ITEMS_BROADCAST, circleId: 'k1', event: taskStmt, msgId: 'task:h1', ts: 1 });
+    expect(carry.mock.calls[0][0]).toMatchObject({ subtype: ITEMS_BROADCAST, circleId: 'k1', event: taskStmt, msgId: 'task:h1' });
     expect(carry.mock.calls[0][1]).toEqual({ from: 'addr:member-bea' });
   });
 
@@ -99,10 +99,10 @@ describe('the lane table hands every landed chat and task statement to the carry
     const carry = vi.fn();
     const agent = fakeAgent(carry);
     agent.chatRail.ingest = async () => ({ ok: true, existed: true, entry: { id: 'm1' } });
-    agent.taskRail.ingest = async () => ({ ok: true, existed: true, entry: { id: 'task:h1' } });
+    agent.itemsRail.ingest = async () => ({ ok: true, existed: true, entry: { id: 'task:h1' } });
     const { handlers } = buildCircleLanes({ agent });
     await handlers[CHAT_STATEMENT_BROADCAST]('addr:x', chatPayload);
-    await handlers[TASK_BROADCAST]('addr:x', { subtype: TASK_BROADCAST, circleId: 'k1', event: stmt, msgId: 'task:h1' });
+    await handlers[ITEMS_BROADCAST]('addr:x', { subtype: ITEMS_BROADCAST, circleId: 'k1', event: stmt, msgId: 'task:h1' });
     expect(carry).not.toHaveBeenCalled();
   });
 

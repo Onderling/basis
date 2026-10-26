@@ -45,7 +45,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
   if (typeof sendToPeer !== 'function') throw new Error('governanceCatchUp: sendToPeer required');
 
   /** SERVE — a reconnecting peer asks for a circle's governance statements; reply with all of them.
-   *  `extraStatementsFor` adds DURABLE-HEAD statements whose lane entries aged out (the task-lane
+   *  `extraStatementsFor` adds DURABLE-HEAD statements whose lane entries aged out (the items-lane
    *  relationship: the entry compacts, the head survives elsewhere and is still the ORIGINAL signed
    *  statement — the receiver's ingest gate verifies it exactly like a live one). Deduped by hash. */
   async function onRequest(fromPeerAddr, payload) {

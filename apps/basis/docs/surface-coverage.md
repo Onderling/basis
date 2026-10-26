@@ -209,7 +209,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `broadcastCircleKeyStatement` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleMembership` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleChatStatement` | share | ✅ | · | · | · | ✅ | · |  |
-|  | `broadcastCircleTask` | share | ✅ | · | · | · | ✅ | · |  |
+|  | `broadcastCircleItems` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleRules` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleRecipe` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleAddresses` | share | ✅ | · | · | · | ✅ | · |  |

@@ -238,11 +238,6 @@ export {
   isRecipientUnavailable, buildUnavailableNotice,
   createMessageQueue,
 } from './v2/reciprocity.js';
-// auto-hop-prompt when a skill search returns no in-circle hits.
-export {
-  shouldAutoSuggestHop, buildHopPromptCard,
-  rememberDismissed, hasDismissed,
-} from '@onderling/kring-host/hopPrompt';
 // skill-match source: rank circle members / agents / hop candidates
 // against a free-text question. Renderer is `buildOfferingMatches`.
 export { findOfferingMatches, tokenize as tokenizeOfferingQuery } from '@onderling/kring-host/findOfferingMatches';
@@ -349,11 +344,6 @@ export { buildTaskRows, taskItemToStreamRow, taskStatusOf } from './v2/taskRows.
 export {
   extendHolidayDays, setHolidayUntil, buildHolidayAutoReply,
 } from './v2/holidayShortcuts.js';
-// per-contact hop overrides.
-export {
-  normalizeContactHopMode, effectiveHopMode, buildContactHopList,
-  HOP_PER_CONTACT_MODES,
-} from './v2/contactHopOverrides.js';
 // Folio "My things" notes-list (private circle).
 export {
   itemOwner, isMyPrivateItem, buildMyThings, myThingsFromListFiles,
@@ -377,9 +367,6 @@ export { getCirclePolStatus, formatPolStatus, formatAttestedAt } from './v2/circ
 export {
   COMPLAINT_TYPES, ADVISOR_DEFAULTS, makeTooBusyEvent, computeAdvice,
 } from './v2/circleAdvisor.js';
-export {
-  MAX_HOPS, normalizeHopMode, buildHopChain, makeHopRelayRequest,
-} from '@onderling/kring-host/circleHop';
 export {
   OFFERING_AXES, DEFAULT_OFFERING, normalizeOffering, mergeOffering,
   MATCH_SOURCES, buildOfferingMatches,

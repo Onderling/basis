@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 /** The lane modules: everything that signs, fans, serves or admits a statement between devices. */
 export const LANE_MODULES = [
   'apps/basis/src/v2/chatRail.js',
-  'apps/basis/src/v2/taskRail.js',
+  'apps/basis/src/v2/itemsRail.js',
   'apps/basis/src/v2/grantsRail.js',
   'apps/basis/src/v2/membershipRail.js',
   'apps/basis/src/v2/keyRail.js',

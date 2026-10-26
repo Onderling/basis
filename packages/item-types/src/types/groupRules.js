@@ -4,7 +4,7 @@
  *
  * Written only by the circle's creation, the join (the invite carries the rules, mirrored here) and the rules lane's
  * apply (a signed `rules-update` statement from an admin, highest version wins). It is this device's applied view, so it
- * is never carried by the generic store door: the task lane refuses it, or any member's write would ride past the rules
+ * is never carried by the generic store door: the items lane refuses it, or any member's write would ride past the rules
  * lane's receiver-side admin check.
  */
 

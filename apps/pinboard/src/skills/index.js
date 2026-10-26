@@ -120,7 +120,6 @@ import {
   INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
 } from '../lib/inviteCeiling.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
-import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
 import { geocode } from '../lib/geocode.js';
 import { cellFor, distanceKm, snapToGrid, DISTANCE_PRESETS } from '../lib/geo.js';
 import { resolve as resolveTargets, validateTarget, filterByDistance, filterMuted } from '../lib/targetResolver.js';
@@ -3463,14 +3462,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCircleTask({groupId, event, msgId, ts?})
-     *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
-     *   other member; receivers verify it at their task rail before it lands on their device log and
+     * broadcastCircleItems({groupId, event, msgId, ts?})
+     *   — the content re-root: fan a SIGNED item statement (a full-item snapshot, or a remove) to every
+     *   other member; receivers verify it at their items rail before it lands on their device log and
      *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
-     *   circle-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   circle-items-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
-    defineSkill('broadcastCircleTask', async ({ parts, from }) => {
+    defineSkill('broadcastCircleItems', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3478,13 +3477,13 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-task-broadcast', from,
+        circleId: _groupId, kind: 'circle-items-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'circle-task-fanout',
+        metric: 'circle-items-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:circle-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      description: 'Fan a signed item statement (full-item snapshot or remove) to every other member via subtype:circle-items-broadcast; receivers verify at their items rail and causally merge the head. Never wakes.',
       visibility:  'authenticated',
     }),
 
@@ -4308,98 +4307,6 @@ export function buildSkills({
       return { contacts };
     }, {
       description: 'List contacts; optional minTrust ("bekend"|"vertrouwd") or tag filter.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getHopMode()  — Phase 28.1.  Returns `{global}` reflecting
-     * whether hop-relay is enabled for any contact on this device.
-     * Mirror of `bundle.settings.allowHopThrough`.
-     */
-    defineSkill('getHopMode', async () => ({
-      global: bundle?.settings?.allowHopThrough === true,
-    }), {
-      description: 'Read whether global hop-relay is enabled.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * setHopMode({global})  — Phase 28.1.  Toggles
-     * `bundle.settings.allowHopThrough` AND wires
-     * `agent.enableRelayForward({policy: 'authenticated'})` when
-     * turning on (idempotent at the SDK level).  When turning off,
-     * policy is downgraded to `'never'` so the registered skill
-     * rejects any relay request.  Stays registered to avoid
-     * needing a restart; the policy gate is the actual switch.
-     */
-    defineSkill('setHopMode', async ({ parts, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.global !== 'boolean') return { error: 'global (bool) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      { allowHopThrough: a.global },
-      });
-      bundle.settings = next;
-
-      try {
-        if (a.global) {
-          agent.enableRelayForward({ policy: 'authenticated' });
-        } else if (agent?.config?.set) {
-          agent.config.set('policy.allowRelayFor', 'never');
-        }
-      } catch (err) {
-        return { error: `enableRelayForward failed: ${err?.message ?? err}` };
-      }
-      metrics?.record?.(a.global ? 'hop-mode-on' : 'hop-mode-off');
-      return { global: a.global };
-    }, {
-      description: 'Enable or disable global hop-relay; persists in settings + flips core policy.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getSettings()  — Phase 23.5.  Read-only snapshot of cadence /
-     * hop / broadcastable / defaultShareLocation settings.  Cached
-     * in `bundle.settings`; reload from cache via `_reload: true`.
-     */
-    defineSkill('getSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (a._reload && bundle?.cache) {
-        bundle.settings = await loadSettings({
-          dataSource: bundle.cache,
-          deviceId:   bundle?.deviceId ?? null,
-        });
-      }
-      return { settings: bundle?.settings ?? null };
-    }, {
-      description: 'Read the bundle\'s user-tunable settings (cadence + hop + broadcastable).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * updateSettings({patch})  — Phase 23.5.  Patch a subset of the
-     * settings; persists via the same CachingDataSource path that
-     * MemberMap uses, so a connected pod gets the update too.
-     * Returns the merged + saved settings.
-     */
-    defineSkill('updateSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!a.patch || typeof a.patch !== 'object') return { error: 'patch (object) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      a.patch,
-        scope:      a.scope === 'device' || a.scope === 'shared' ? a.scope : null,
-      });
-      bundle.settings = next;
-      metrics?.record?.('settings-updated');
-      return { settings: next };
-    }, {
-      description: 'Patch a subset of the bundle\'s settings; persists immediately.',
       visibility:  'authenticated',
     }),
 

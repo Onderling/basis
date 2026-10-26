@@ -25,7 +25,7 @@ describe('a function profile on the roster', () => {
   afterEach(async () => { await teardown(A, B); A = B = null; });
 
   it('the bot that founds is proven a function profile on both replicas; the person who joins is not', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('bot', { taskLane: true }), bootRealAgentNode('frits', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('bot', { itemsLane: true }), bootRealAgentNode('frits', { itemsLane: true })]);
     await A.agent.markFunctionProfile();
     await connectAgentsOverBus(A, B);
     const { joined, groupId } = await pairCircle(A, B, { groupId: 'household', name: 'Huis', handle: 'frits' });
@@ -36,7 +36,7 @@ describe('a function profile on the roster', () => {
   });
 
   it('a bot admitted on a BOT invite is proven one; on an ordinary invite it is not', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('frits', { taskLane: true }), bootRealAgentNode('bot', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('frits', { itemsLane: true }), bootRealAgentNode('bot', { itemsLane: true })]);
     await B.agent.markFunctionProfile();
     await connectAgentsOverBus(A, B);
     await createCircle(A, { groupId: 'with-bot', name: 'Met bot' });

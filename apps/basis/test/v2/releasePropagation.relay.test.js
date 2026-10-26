@@ -37,7 +37,7 @@ describe('a released name reaches co-members (real relay, three devices)', () =>
     relay = await startJourneyRelay();
     relayUrl = relay.url;
     [admin, bram, cato] = await Promise.all([
-      bootRealAgentNode('admin', { taskLane: true }), bootRealAgentNode('bram', { taskLane: true }), bootRealAgentNode('cato', { taskLane: true }),
+      bootRealAgentNode('admin', { itemsLane: true }), bootRealAgentNode('bram', { itemsLane: true }), bootRealAgentNode('cato', { itemsLane: true }),
     ]);
     await connectNodesOverRelay([admin, bram, cato], { relayUrl });
 

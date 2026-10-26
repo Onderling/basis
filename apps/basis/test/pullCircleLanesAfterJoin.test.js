@@ -1,6 +1,6 @@
 /**
  * After a join, a device pulls the circle's lanes from the members it now knows — ALL of them. Every shell pulled only
- * membership · governance · keys there, so the circle's CONTENT (lists, chores, appointments on the task lane; the
+ * membership · governance · keys there, so the circle's CONTENT (lists, chores, appointments on the items lane; the
  * conversation on the chat lane) reached a fresh joiner only at its next boot: someone who joined the household from
  * a running app saw an empty household. One shared pull, every shell through it.
  */

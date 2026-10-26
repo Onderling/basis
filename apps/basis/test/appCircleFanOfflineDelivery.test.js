@@ -3,7 +3,7 @@
  *
  * appOfflineDelivery.test.js proves the hold-forward rung at the raw send level. THIS test proves the
  * guarantee is carried END-TO-END by the APP on the lane the production shells actually use: a task
- * written through the real `callSkill` path rides the signed task lane (`broadcastCircleTask` →
+ * written through the real `callSkill` path rides the signed items lane (`broadcastCircleItems` →
  * `broadcastToCircle`, whose sends carry `guarantee:'hold-forward'` at the fan, not per call site) to
  * every member's per-circle address. A member who is briefly offline has the STATEMENT held and
  * delivered on reconnect — and the assertion is made where it matters: the task appears in the offline
@@ -52,8 +52,8 @@ describe('offline delivery for a REAL circle task on the signed lane (held at th
 
   it('holds a task added while a member is offline, then delivers it into their TASKS STORE on reconnect', async () => {
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }),
-      bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
     ]);
     await connectAgentsOverBus(A, B);
     wireInboundLikeShell(B);

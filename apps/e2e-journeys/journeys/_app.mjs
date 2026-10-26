@@ -49,7 +49,7 @@ import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { KEY_STATEMENT_BROADCAST, makeKeyPeerHandler } from '../../basis/src/v2/keyRail.js';
 import { CHAT_CATCHUP_SUBTYPES } from '../../basis/src/v2/chatRail.js';
 import { makeFrontierReplay } from '../../basis/src/v2/frontierReplay.js';
-import { TASK_CATCHUP_SUBTYPES } from '../../basis/src/v2/taskRail.js';
+import { ITEMS_CATCHUP_SUBTYPES } from '../../basis/src/v2/itemsRail.js';
 import { applyRulesUpdates } from '../../basis/src/v2/rulesUpdateLane.js';
 
 /**
@@ -151,12 +151,12 @@ function wireLanes(node) {
     })
     : null;
   node._chatReplay = chatReplay;
-  const taskReplay = node.agent.taskRail
+  const taskReplay = node.agent.itemsRail
     ? makeFrontierReplay({
-      rail: node.agent.taskRail,
+      rail: node.agent.itemsRail,
       sendToPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),   // the OPTIONS too (`circleId`: sign as this circle) — as the shells' lane table forwards them
-      subtypes: TASK_CATCHUP_SUBTYPES,
-      statementsFor: (cid) => node.agent.taskRail.catchUpStatements(cid),
+      subtypes: ITEMS_CATCHUP_SUBTYPES,
+      statementsFor: (cid) => node.agent.itemsRail.catchUpStatements(cid),
     })
     : null;
   node._taskReplay = taskReplay;
@@ -172,9 +172,9 @@ function wireLanes(node) {
     if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.request) { chatReplay.onRequest(env?.from, env.payload); return undefined; }
     if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.batch)   { chatReplay.onBatch(env?.from, env.payload); return undefined; }
     if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.offer)   { chatReplay.onOffer(env?.from, env.payload); return undefined; }
-    if (taskReplay && st === TASK_CATCHUP_SUBTYPES.request) { taskReplay.onRequest(env?.from, env.payload); return undefined; }
-    if (taskReplay && st === TASK_CATCHUP_SUBTYPES.batch)   { taskReplay.onBatch(env?.from, env.payload); return undefined; }
-    if (taskReplay && st === TASK_CATCHUP_SUBTYPES.offer)   { taskReplay.onOffer(env?.from, env.payload); return undefined; }
+    if (taskReplay && st === ITEMS_CATCHUP_SUBTYPES.request) { taskReplay.onRequest(env?.from, env.payload); return undefined; }
+    if (taskReplay && st === ITEMS_CATCHUP_SUBTYPES.batch)   { taskReplay.onBatch(env?.from, env.payload); return undefined; }
+    if (taskReplay && st === ITEMS_CATCHUP_SUBTYPES.offer)   { taskReplay.onOffer(env?.from, env.payload); return undefined; }
     if (st === 'circle-governance-broadcast') { govHandler(env?.from, env.payload); return undefined; }
     if (st === GOV_CATCHUP_REQUEST) { govCatchUp.onRequest(env?.from, env.payload); return undefined; }
     if (st === govCatchUp.subtypes.batch) { govCatchUp.onBatch(env?.from, env.payload); return undefined; }
@@ -204,7 +204,7 @@ function wireLanes(node) {
 export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, outsiders = [] }) {
   const people = await Promise.all(
     [...handles, ...outsiders].map((h) => bootRealAgentNode(h, {
-      taskLane: true,                                              // composes the DEVICE LOG
+      itemsLane: true,                                              // composes the DEVICE LOG
       ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
     })),
   );

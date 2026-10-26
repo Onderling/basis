@@ -35,10 +35,10 @@ describe('PROBE — a voluntary leave reaches the circle', () => {
   afterAll(async () => { await teardown(A, B); });
 
   it('when B leaves, A stops listing B as a member', async () => {
-    // `taskLane: true` composes a DEVICE LOG, which is what builds the membership rail.
+    // `itemsLane: true` composes a DEVICE LOG, which is what builds the membership rail.
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }),
-      bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
     ]);
     await connectNodesOverBus([A, B]);
     for (const n of [A, B]) wireMembershipReceiver(n);

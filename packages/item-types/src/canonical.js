@@ -110,10 +110,10 @@ export const CANONICAL_TYPES = Object.freeze({
   // carry or drop it; the appointment's `rsvp` is a read projection over these.
   'rsvp':               RSVP_SCHEMA,
   // A row of a circle's roster trail (2026-10-25): in the circle's own store, carried by the membership lane's
-  // statements and the announces — never by the generic store door (the task lane refuses it).
+  // statements and the announces — never by the generic store door (the items lane refuses it).
   'membership-redemption': MEMBERSHIP_REDEMPTION_SCHEMA,
   // A circle's rules head (2026-10-25): written by the creation, the join and the rules lane's apply — never by the
-  // generic store door (the task lane refuses it).
+  // generic store door (the items lane refuses it).
   'group-rules':        GROUP_RULES_SCHEMA,
   // The composable CONTAINERS (2026-09-01). They were registered privately by `circleLists.js` on a
   // registry of its own, which is what put lists in a SECOND store per circle — and the architecture is

@@ -7,7 +7,7 @@
  * agent yet.
  *
  * On 2026-08-29 that turned the entire inbound peer router OFF on a real device. Every lane was read from
- * the stale null (`bundle?.agent?.circleIdentityFor`, `?.membershipRail`, `?.taskRail`, `?.chatRail`,
+ * the stale null (`bundle?.agent?.circleIdentityFor`, `?.membershipRail`, `?.itemsRail`, `?.chatRail`,
  * `?.keyRail`, `?.grantsPeerHandler`, `?.rosterSeed`, and every `callSkill: bundle.callSkill`), so they all
  * came out null. The governance one is simply the only rail whose absence THROWS — by design, because a
  * fanned statement must verify before it lands — and it throws inside the handler-map literal, in an effect

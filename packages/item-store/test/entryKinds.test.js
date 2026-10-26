@@ -58,7 +58,7 @@ describe('the table also answers WHO signs, WHAT it is about, HOW it is accepted
 
   it('a circle lane is signed per circle and folded with the roster rule; the spine kinds name their stricter rule', () => {
     expect(bindingOf('chat-message')).toEqual({ signs: ['device-in-circle'], subject: ['none'], accepts: 'roster-binding', syncPolicy: 'circle-default' });
-    expect(bindingOf('task-statement').accepts).toBe('roster-binding');
+    expect(bindingOf('items').accepts).toBe('roster-binding');
     expect(bindingOf('membership')).toEqual({ signs: ['device-in-circle', 'root'], subject: ['person', 'device'], accepts: 'membership-binding', syncPolicy: 'circle-default' });
     expect(bindingOf('key-event').accepts).toBe('key-binding');
     expect(bindingOf('grants')).toEqual({ signs: ['device', 'person'], subject: ['none'], accepts: 'device-set', syncPolicy: 'siblings' });

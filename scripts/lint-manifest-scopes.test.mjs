@@ -86,7 +86,7 @@ describe('lint-manifest-scopes', () => {
     const apps = loaded.map((m) => m.app);
     for (const a of ['basis', 'household', 'pinboard', 'tasks', 'folio', 'calendar', 'lists', 'agents']) expect(apps).toContain(a);
     // Declared outside `apps/*/manifest.js`: the parameter register and the device-log lanes.
-    for (const a of ['params', 'governance', 'membership', 'keys', 'grants', 'task-lane', 'chat-lane']) expect(apps).toContain(a);
+    for (const a of ['params', 'governance', 'membership', 'keys', 'grants', 'items-lane', 'chat-lane']) expect(apps).toContain(a);
     for (const m of loaded) expect(Array.isArray(m.manifest?.operations), m.app).toBe(true);
   });
 });

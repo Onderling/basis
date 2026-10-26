@@ -1,5 +1,5 @@
 /**
- * The own-devices scope on the task lane: a person's own items ride between THEIR devices only — signed by the
+ * The own-devices scope on the items lane: a person's own items ride between THEIR devices only — signed by the
  * device's delegation key (never the person key), verified by the device-set binding, and sealed in flight to the
  * person's own seal-to-self key, so no relay and no stranger reads them. A device that cannot sign (not enrolled) or
  * cannot seal sends nothing: its own store stays local. A circle's lane is unchanged.
@@ -11,7 +11,7 @@ import { VaultMemory, seedToString } from '@onderling/vault';
 import { groupKeyStrategy } from '@onderling/pod-client';
 import { createCircleStores, memoryDataSource, wireStoreMirror } from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
-import { makeTaskRail, makeTaskEmitter, makeTaskPeerHandler, routeTaskMirror, TASK_BROADCAST } from '../../src/v2/taskRail.js';
+import { makeItemsRail, makeItemsEmitter, makeItemsPeerHandler, routeItemsMirror, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
 
 const PERSON = 'person-key';
@@ -40,7 +40,7 @@ async function world() {
     const registry = createRegistry();
     registerCanonicalTypes(registry);
     const stores = createCircleStores({ dataSource: memoryDataSource(), registry });
-    const rail = makeTaskRail({
+    const rail = makeItemsRail({
       eventLog: fakeEventLog(),
       circleIdentityFor: async () => key,
       myRef: PERSON,
@@ -56,17 +56,17 @@ async function world() {
         delegation: () => ({ deviceId: name, pubKey: key.pubKey }),
       },
     });
-    const emitter = makeTaskEmitter({ rail, fan: (circleId, statement) => wire.push({ from: name, circleId, statement }) });
+    const emitter = makeItemsEmitter({ rail, fan: (circleId, statement) => wire.push({ from: name, circleId, statement }) });
     const own = stores.getStore(OWN_DEVICES_SCOPE);
-    wireStoreMirror(own, routeTaskMirror({ circleId: OWN_DEVICES_SCOPE, emitter }));
-    return { name, key, rail, own, receive: makeTaskPeerHandler({ rail }) };
+    wireStoreMirror(own, routeItemsMirror({ circleId: OWN_DEVICES_SCOPE, emitter }));
+    return { name, key, rail, own, receive: makeItemsPeerHandler({ rail }) };
   }
-  const pump = async (to) => { while (wire.length) { const w = wire.shift(); for (const d of to) if (d.name !== w.from) await d.receive(null, { subtype: TASK_BROADCAST, circleId: w.circleId, event: w.statement }); } };
+  const pump = async (to) => { while (wire.length) { const w = wire.shift(); for (const d of to) if (d.name !== w.from) await d.receive(null, { subtype: ITEMS_BROADCAST, circleId: w.circleId, event: w.statement }); } };
   return { device, wire, pump, personSeal };
 }
 const settle = async () => { for (let i = 0; i < 12; i += 1) await new Promise((r) => setTimeout(r, 0)); };
 
-describe('the own-devices scope on the task lane', () => {
+describe('the own-devices scope on the items lane', () => {
   it('a row written on one device reaches the other, sealed in flight: its words never ride in the clear', async () => {
     const w = await world();
     const phone = await w.device('phone');
@@ -86,7 +86,7 @@ describe('the own-devices scope on the task lane', () => {
     const w = await world();
     const laptop = await w.device('laptop');
     const strangerKey = await AgentIdentity.generate(new VaultMemory());
-    const { makeTaskRail: mk } = await import('../../src/v2/taskRail.js');
+    const { makeItemsRail: mk } = await import('../../src/v2/itemsRail.js');
     const strangerStores = createCircleStores({ dataSource: memoryDataSource() });
     const stranger = mk({
       eventLog: fakeEventLog(), circleIdentityFor: async () => strangerKey, myRef: PERSON, callSkill: async () => ({}),

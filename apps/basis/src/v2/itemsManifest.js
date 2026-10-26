@@ -1,8 +1,8 @@
 /**
- * taskManifest — the DECLARED contract for the task lane's log entries.
+ * itemsManifest — the DECLARED contract for the items lane's log entries.
  *
  * Third sibling of `governanceManifest` / `membershipManifest`: a cross-cutting plumbing manifest declaring
- * which signed statement kinds the task lane of the device log carries. The rail refuses anything else at
+ * which signed statement kinds the items lane of the device log carries. The rail refuses anything else at
  * both ends (append + verify-on-ingest).
  *
  * Unlike governance/membership — where each statement is a distinct ACT the fold interprets — a task
@@ -18,34 +18,34 @@
  * just a snapshot the causal merge judges.
  */
 
-/** The device-log lane task statements ride. The lane name doubles as the log-entry type, which the shared
+/** The device-log lane item statements ride. The lane name doubles as the log-entry type, which the shared
  *  entry-kind table already classes as 14-day retention — the entries age out; the STORE ROW is the durable
  *  head, and catch-up serves both. */
-// The device-log kind the task lane's SIGNED STATEMENTS ride (a snapshot of a store head, a removal). It is
+// The device-log kind the items lane's SIGNED STATEMENTS ride (a snapshot of a store head, a removal). It is
 // deliberately not `'task'`: that name is the kinds table's HUMAN-facing task kind — the line a conversation
 // may show — and a lane statement is not a line, it is the carrier of one. When the two shared a name, the
 // conversation projection painted every statement as an empty bubble (walked 2026-09-14).
-export const TASK_LANE = 'task-statement';
+export const ITEMS_LANE = 'items';
 
-export const taskManifest = Object.freeze({
-  app: 'task-lane',
+export const itemsManifest = Object.freeze({
+  app: 'items-lane',
   hosts: [],
   itemTypes: [],
   nouns: {},
   operations: [
     {
-      id: 'task.snapshot',
+      id: 'items.snapshot',
       description: 'Any task write (add / claim / reassign / complete / update) fans the writer\'s full item snapshot; receivers causally merge it into their head.',
       writes: { scope: 'circle' },
-      appends: [{ lane: TASK_LANE, kind: 'snapshot' }],
+      appends: [{ lane: ITEMS_LANE, kind: 'snapshot' }],
     },
     {
-      id: 'task.remove',
+      id: 'items.remove',
       description: 'A task hard-delete; receivers delete their head row by id.',
       writes: { scope: 'circle' },
-      appends: [{ lane: TASK_LANE, kind: 'remove' }],
+      appends: [{ lane: ITEMS_LANE, kind: 'remove' }],
     },
   ],
 });
 
-export default taskManifest;
+export default itemsManifest;

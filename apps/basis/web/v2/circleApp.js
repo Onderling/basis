@@ -1471,7 +1471,7 @@ function circleOnJoined({ circleId, invite = null }) {
     recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
-    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: taskCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
+    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
   });
 }
 let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
@@ -1484,7 +1484,7 @@ let govShellRail = null;             // the governance rail for the RECEIVE side
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
 let memCatchUpShell = null;
 let keyCatchUpShell = null;          // pull-all key-lane catch-up (the group-key chain's offline half)          // the membership lane's catch-up (same mechanism, its own subtypes)
-let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
+let itemsCatchUpShell = null;         // the items lane's catch-up (serves stored entries + signed live heads)
 let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
@@ -9426,7 +9426,7 @@ async function boot() {
       govCatchUpShell     = circleLanes.catchUps.gov;
       memCatchUpShell     = circleLanes.catchUps.membership;
       keyCatchUpShell     = circleLanes.catchUps.key;
-      taskCatchUpShell    = circleLanes.catchUps.task;
+      itemsCatchUpShell    = circleLanes.catchUps.task;
       chatCatchUpShell    = circleLanes.catchUps.chat;
       podChatCatchUpShell = circleLanes.catchUps.podChat;
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
@@ -9576,7 +9576,7 @@ async function boot() {
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       refreshUnreadMyRefs();
-      // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
+      // A noticeboard post from another member LANDS in the circle store through the items lane (one carry);
       // the shell bridges it into pinboard's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
         // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
@@ -9685,7 +9685,7 @@ async function boot() {
           // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
           // address — the requestAll kick below walks the roster, still empty on an enrolling boot.
           contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-            taskCatchUpShell?.requestFrom(siblingAddress, circleId),
+            itemsCatchUpShell?.requestFrom(siblingAddress, circleId),
             chatCatchUpShell?.requestFrom(siblingAddress, circleId),
           ]),
         };
@@ -9701,7 +9701,7 @@ async function boot() {
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         agent.bootstrapFromStashedOffer();
-        taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        itemsCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The shipped contact, once: added through the scanned-card path if the card is set and the
         // person is not in the book yet.

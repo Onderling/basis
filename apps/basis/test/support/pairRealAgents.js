@@ -277,7 +277,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     },
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid, logger: QUIET }),
-    myHandle: () => label.toLowerCase(),
+    // the handle this person joins under, as the shells read it (their own whoAmI handle), not the node's label
+    myHandle: async () => { try { return (await agent.callSkill('pinboard', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     logger: process.env.PAIR_ROSTER_LOUD ? console : QUIET,
   });
   const contactThreadChannel = contactChannel

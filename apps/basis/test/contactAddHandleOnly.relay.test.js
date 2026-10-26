@@ -64,6 +64,7 @@ describe('added at a level — what the other side sees of you', () => {
       const bea = o.roster.find((m) => m.webid !== o.anna.pubKey);
       expect(typeof bea?.handle === 'string' && bea.handle.length > 0, `their pair circle's roster: ${JSON.stringify(bea)}`).toBe(true);
       expect(bea?.handle, 'Anna sees what Bea said').toBe(o.beaSaid?.handle);
+      expect(bea?.handle, 'and what Bea said is the handle she set').toBe('bea');
     }, 120_000);
   }
 });

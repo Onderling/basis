@@ -1019,7 +1019,10 @@ and bad actors, weakest concern to strongest:
   conflict; eventual connectivity converges. The merge is a **declared resolution policy** per
   `(item-type, field)`, receiver-enforced so a sender cannot pick a weaker one: **content** (last-writer-wins —
   posts, notes, task text) · **claim** (first-wins / immutable-once-set — a task's assignee, a reservation) ·
-  **spine** (deny-wins — membership, roles, keys; enforced by the L3 hash-chain below). (Rich collaborative
+  **field-clock** (a declared field-set merges by its own `*At` clock, whichever row won — a contact's hidden
+  mark on one device and its persona on another both survive; declared on the type, `CANONICAL_FIELD_CLOCKS` in
+  `@onderling/item-types`) · **spine** (deny-wins — membership, roles, keys; enforced by the L3 hash-chain
+  below). (Rich collaborative
   content-merge — sequences, text — lands later with folio versioning.)
 - **L2 · forgery** — every event is signed by the author's **per-circle key** + proof-of-membership, so
   non-members can't inject and members can't forge each other's events.

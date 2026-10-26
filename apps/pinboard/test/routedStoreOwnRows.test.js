@@ -72,3 +72,11 @@ describe('an own row comes out only to a read that names its type', () => {
     expect((await routed.listOpen({ type: 'membership-code' })).map((r) => r.source.code)).toEqual(['GEHEIM-A']);
   });
 });
+
+describe('the own types this store routes', () => {
+  it('are own-devices types in the dictionary', async () => {
+    const { OWN_TYPES } = await import('../src/lib/routedStore.js');
+    const { OWN_SCOPE_TYPES } = await import('@onderling/item-types');
+    for (const t of OWN_TYPES) expect(OWN_SCOPE_TYPES, t).toContain(t);
+  });
+});

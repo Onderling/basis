@@ -235,3 +235,35 @@ export function claimClusterEqual(a, b) {
     && sa.assignees.length === sb.assignees.length
     && sa.assignees.every((x, i) => x === sb.assignees[i]);
 }
+
+/**
+ * FIELD-CLOCK MERGE (the `field-clock` resolution policy). `base` is the content winner of the row merge; `local` and
+ * `incoming` are the two sides. For each declared set, the side whose clock is NEWER supplies the whole set — its
+ * clock and its fields, a field absent on that side is absent in the result — so a set can never carry the other
+ * side's old value just because the other row won. A clock that is not a finite number counts as never set. On an
+ * equal clock the content winner's set stands (deterministic: the row merge already broke that tie).
+ * @param {object} base      the row the content merge kept
+ * @param {object|null} local
+ * @param {object} incoming
+ * @param {Array<{clock:string, fields:string[]}>} sets
+ * @returns {object} `base` with every set taken from its newer side (a new object only when something changed)
+ */
+export function mergeFieldClocks(base, local, incoming, sets) {
+  if (!Array.isArray(sets) || sets.length === 0 || !base) return base;
+  const at = (row, clock) => (Number.isFinite(row?.[clock]) ? row[clock] : -Infinity);
+  let out = base;
+  for (const { clock, fields } of sets) {
+    const l = at(local, clock);
+    const i = at(incoming, clock);
+    if (l === i) continue;                       // same clock: the content winner's set stands
+    const from = l > i ? local : incoming;
+    if (from === base) continue;
+    for (const f of [clock, ...fields]) {
+      if (out[f] === from[f]) continue;
+      if (out === base) out = { ...base };
+      if (from[f] === undefined) delete out[f]; else out[f] = from[f];
+    }
+  }
+  return out;
+}
+

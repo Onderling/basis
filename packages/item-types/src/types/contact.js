@@ -69,6 +69,20 @@ export const KEYLESS_CONTACT_EXAMPLE = Object.freeze({
   role:        'member',
 });
 
+/**
+ * The contact row's FIELD-SETS that merge by their own clock (the `field-clock` resolution policy, read by the item
+ * store's resolution registry). A person's devices change different parts of one row: a hide on one, the persona
+ * this contact sees on another. Merged as a whole row, the newer row would carry the other part's old value; merged
+ * per set, each set keeps the side whose clock is newer. The rest of the row stays row last-writer-wins.
+ * `deletedAt` is its own clock: the delete mark stays after a return, and an older edit cannot drop it.
+ */
+export const CONTACT_FIELD_CLOCKS = Object.freeze([
+  Object.freeze({ clock: 'hiddenAt',  fields: Object.freeze(['hidden']) }),
+  Object.freeze({ clock: 'personaAt', fields: Object.freeze(['persona', 'revealPreset']) }),
+  Object.freeze({ clock: 'linkedAt',  fields: Object.freeze(['linkedRow', 'linkedRoot']) }),
+  Object.freeze({ clock: 'deletedAt', fields: Object.freeze([]) }),
+]);
+
 export const CONTACT_SCHEMA = {
   iri:         `${NAMESPACE}Contact`,
   description: 'A person the user knows. webid + displayName + optional key, trust, flags; a person admitted through a keyless door carries a channel and a role instead of a key.',

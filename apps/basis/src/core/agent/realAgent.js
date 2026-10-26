@@ -6397,6 +6397,21 @@ export async function createRealHouseholdAgent(opts = {}) {
           realArgs = { ...realArgs, circleAddress: circleAddressFor(realArgs.groupId) };
         } catch { /* address derivation is additive — never block the redeem/create */ }
       }
+      // A founder proves their address in the creation statement, as a joiner proves theirs on the trail.
+      if (realOpId === 'createGroupV2' && typeof realArgs.circleAddress === 'string' && realArgs.circleAddress && !realArgs.circleAddressProof) {
+        try {
+          const proof = signCircleLinkFromSeed(deviceSeedFor(realArgs.groupId), realArgs.groupId, realArgs.groupId, realArgs.circleAddress);
+          if (proof) realArgs = { ...realArgs, circleAddressProof: proof };
+        } catch { /* unproven: the founder's row shows no address, as before the statement carried it */ }
+      }
+      // …and says their handle there, as a joiner does with the handle they join under: the founder never joins,
+      // so without it the founder is nameless on every other member's roster.
+      if (realOpId === 'createGroupV2' && !realArgs.peerDisplay) {
+        try {
+          const h = (await rawPinboard('whoAmI', {}))?.handle;
+          if (typeof h === 'string' && h.trim()) realArgs = { ...realArgs, peerDisplay: h.trim() };
+        } catch { /* a nameless founder, as before */ }
+      }
       // A FUNCTION PROFILE that FOUNDS says so in its own signed creation statement: the founder is the circle's
       // root authority, so the claim grants nothing it could not take. A person's create carries nothing.
       if (realOpId === 'createGroupV2' && realArgs.profileKind == null) {

@@ -42,7 +42,9 @@ async function walk(level) {
   const row = (await book(anna)).find((c) => c.webid === bea.pubKey) ?? null;
   const roster = await readRoster(anna, pairId);
   const rosterRow = roster.find((m) => m.webid === bea.pubKey || m.circleAddress) ?? null;
-  return { relay, anna, bea, row, rosterRow, roster };
+  // …and what Bea SAID about herself on that circle, read on her own side: her own row there
+  const beaSaid = (await readRoster(bea, pairId)).find((m) => m.webid === bea.pubKey) ?? null;
+  return { relay, anna, bea, row, rosterRow, roster, beaSaid };
 }
 
 describe('added at a level — what the other side sees of you', () => {
@@ -57,8 +59,11 @@ describe('added at a level — what the other side sees of you', () => {
         roster: o.roster.map((m) => ({ webid: String(m.webid).slice(0, 8), handle: m.handle, displayName: m.displayName, name: m.name, props: m.personaProperties })),
       }));
       expect(o.row?.handle, 'her book').toBe('bea');
+      // The pair circle's roster shows what Bea SAID there (her join-time handle, or a later member-props), never
+      // the name Anna's book holds for her: a book name is Anna's label, not a roster fact.
       const bea = o.roster.find((m) => m.webid !== o.anna.pubKey);
-      expect(bea?.handle, `their pair circle's roster: ${JSON.stringify(bea)}`).toBe('bea');
+      expect(typeof bea?.handle === 'string' && bea.handle.length > 0, `their pair circle's roster: ${JSON.stringify(bea)}`).toBe(true);
+      expect(bea?.handle, 'Anna sees what Bea said').toBe(o.beaSaid?.handle);
     }, 120_000);
   }
 });

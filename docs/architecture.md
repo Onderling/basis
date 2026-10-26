@@ -999,9 +999,10 @@ pretending to carry. Offline **hold-and-forward** exists today as a send *guaran
 *dedicated* hold-and-forward port is forward work.
 
 **Two unrelated "hop"s — don't conflate them.** The **transport-hop** above (the `hop` rung) is peer-as-relay
-*routing*: forwarding a payload through an intermediary peer to reach a target. The **social match-hop**
-(`@onderling/kring-host` `circleHop.js`) is *discovery*: relaying a skill query one degree further through a
-contact who allows it — it never appears in this reachability ladder.
+*routing*: forwarding a payload through an intermediary peer to reach a target. A **social match-hop** —
+relaying a skill query one degree further through a contact who allows it — would be *discovery* and would never
+appear in this reachability ladder. None is built: the inert stance toggle and hop-prompt that stood for it were
+removed, and relaying for others is to be designed as a rung with its tier policy and sender binding.
 
 Transport details: [project overview → Reachability](../README.md#reachability--transports).
 

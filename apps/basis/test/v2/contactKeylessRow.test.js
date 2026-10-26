@@ -25,7 +25,6 @@ import { contactLensModel, changeContactLens } from '../../src/v2/contactLens.js
 import { deleteContact } from '../../src/v2/contactDelete.js';
 import { backfillContactPersonas } from '../../src/v2/contactPersona.js';
 import { knownPeersToWire } from '../../src/v2/knownPeersSync.js';
-import { buildContactHopList } from '../../src/v2/contactHopOverrides.js';
 
 const K = KEYLESS_CONTACT_EXAMPLE;
 const admit = { webid: K.webid, displayName: K.displayName, channel: K.channel, role: K.role };
@@ -172,8 +171,3 @@ describe('the own-devices carry', () => {
   });
 });
 
-describe('the hop list', () => {
-  it('lists it by name', () => {
-    expect(buildContactHopList({ contacts: [h.row] })).toMatchObject([{ id: K.webid, label: K.displayName, mode: 'off' }]);
-  });
-});

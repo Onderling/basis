@@ -93,7 +93,6 @@ describe('renderCircleLauncher', () => {
       // Even if a host passes these legacy handlers, no buttons must render.
       onStream:       vi.fn(),
       onAvailability: vi.fn(),
-      onHop:          vi.fn(),
       onNearby:       vi.fn(),
       onMyThings:     vi.fn(),
     });

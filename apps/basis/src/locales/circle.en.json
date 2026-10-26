@@ -2903,48 +2903,6 @@
       "doc": "Dismiss the advice card."
     }
   },
-  "hop": {
-    "title": {
-      "text": "Hopping",
-      "doc": "Heading of the hopping screen (board 7)."
-    },
-    "global_label": {
-      "text": "Let trusted contacts relay my requests one hop",
-      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
-    },
-    "explain": {
-      "text": "When you ask for something no one nearby has, a contact who allows it can pass your request one step further — to their contacts. Max one hop, and the relay is anonymized.",
-      "doc": "Explanation of how hopping works."
-    },
-    "ask_relay": {
-      "text": "Ask to relay",
-      "doc": "Button: ask the gate contact to relay the request one hop."
-    },
-    "over_limit": {
-      "text": "Too many hops — requests travel at most one step.",
-      "doc": "Shown when a chain exceeds max-one-hop."
-    },
-    "per_contact_title": {
-      "text": "Per contact",
-      "doc": "Board 7B section heading (P6.M6)."
-    },
-    "mode_always": {
-      "text": "Always",
-      "doc": "Per-contact mode: always relay (P6.M6)."
-    },
-    "mode_withOk": {
-      "text": "With my OK",
-      "doc": "Per-contact mode: relay with approval."
-    },
-    "mode_off": {
-      "text": "Off",
-      "doc": "Per-contact mode: never relay."
-    },
-    "default_label": {
-      "text": "Default",
-      "doc": "Chip shown when the per-contact mode falls through to the global stance."
-    }
-  },
   "offerings": {
     "editor_title": {
       "text": "Offering",
@@ -3161,28 +3119,6 @@
     "no_delivery_note": {
       "text": "{{name}} won't be notified you tried.",
       "doc": "Secondary line clarifying the non-event per board 5C (no \"tried to reach you\" leak)."
-    }
-  },
-  "hopPrompt": {
-    "title": {
-      "text": "Search further?",
-      "doc": "Board 7A auto-hop-prompt card heading (P6.6) when an in-circle skill search returns nothing."
-    },
-    "body": {
-      "text": "No one in your circles matches \"{{skill}}\". Want me to search via your {{count}} eligible contact(s)?",
-      "doc": "Card body with the user's query interpolated."
-    },
-    "body_anon": {
-      "text": "No one in your circles matches that. Want me to search via your {{count}} eligible contact(s)?",
-      "doc": "Anon body when the query string can't be safely echoed."
-    },
-    "accept": {
-      "text": "Yes, one step further",
-      "doc": "Primary CTA — triggers the hop-relay request."
-    },
-    "dismiss": {
-      "text": "Skip",
-      "doc": "Secondary CTA — records dismissal so we don't re-prompt the same query."
     }
   },
   "offeringMatches": {

@@ -164,46 +164,27 @@ describe('Pinboard V2 Phase 26.2 — geocode skill', () => {
 /* ── 26.3 location skills ─────────────────────────────────────── */
 
 describe('Pinboard V2 Phase 26.3 — location skills', () => {
-  it('setMyLocation persists; getMyLocation reads back', async () => {
+  it('setMyLocation keeps the coarse LABEL only; getMyLocation reads it back', async () => {
     const bundle = await buildBundle();
     const cell = cellFor({ lat: 53.22, lng: 6.57 });
-    await callSkill(bundle.agent, 'setMyLocation', {
-      cell, label: 'Groningen', source: 'geocode',
-    });
+    const set = await callSkill(bundle.agent, 'setMyLocation', { cell, label: 'Groningen', source: 'geocode' });
+    expect(set.location).toBe('Groningen');
     const r = await callSkill(bundle.agent, 'getMyLocation', {});
-    expect(r.location.cell).toBe(cell);
-    expect(r.location.label).toBe('Groningen');
-    expect(r.location.source).toBe('geocode');
+    expect(r.location).toBe('Groningen');   // no grid cell, no source: a place is a label
   });
 
   it('clearMyLocation resets to null', async () => {
     const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyLocation', {
-      cell: cellFor({ lat: 0, lng: 0 }), label: 'Null Island',
-    });
+    await callSkill(bundle.agent, 'setMyLocation', { label: 'Null Island' });
     await callSkill(bundle.agent, 'clearMyLocation', {});
     const r = await callSkill(bundle.agent, 'getMyLocation', {});
     expect(r.location).toBeNull();
   });
 
-  it('rejects missing cell', async () => {
+  it('rejects a place without a label', async () => {
     const bundle = await buildBundle();
-    expect(await callSkill(bundle.agent, 'setMyLocation', {}))
-      .toEqual({ error: 'cell required' });
-  });
-
-  it('coerces invalid `source` to null', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyLocation', {
-      cell: '500:0:0', label: 'X', source: 'evil-source',
-    });
-    const r = await callSkill(bundle.agent, 'getMyLocation', {});
-    expect(r.location.source).toBeNull();
-  });
-
-  it('distancePresets skill returns the canonical list', async () => {
-    const bundle = await buildBundle();
-    const r = await callSkill(bundle.agent, 'distancePresets', {});
-    expect(r.presets).toEqual([1, 2, 5, 10, 25]);
+    expect(await callSkill(bundle.agent, 'setMyLocation', { cell: '500:0:0' }))
+      .toEqual({ error: 'label required' });
   });
 });
+

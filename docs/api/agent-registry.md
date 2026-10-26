@@ -1746,6 +1746,24 @@ pendingRevokesOf(entry)
 
 Every revoke still owed, as `[{node, key}]`.
 
+## `src/personaHandle.js`
+
+### `HANDLE_KEY`
+
+**Kind:** constant · **Import:** `HANDLE_KEY` from `'@onderling/agent-registry'`
+
+The profile key that holds the persona's handle.
+
+### `isPresentedAttributeKey`
+
+**Kind:** function · **Import:** `isPresentedAttributeKey` from `'@onderling/agent-registry'`
+
+```js
+isPresentedAttributeKey(key)
+```
+
+Is this key a persona attribute that statements present, so no release ever carries it?
+
 ## `src/profileFacts.js`
 
 ### `FACTS_AT_KEY`
@@ -2106,7 +2124,7 @@ The registry's marker namespace (`_inherit.offering`, …): every key under it i
 
 **Kind:** constant · **Import:** `PERSON_SETTABLE_KEYS` from `'@onderling/agent-registry'`
 
-The keys a person may set through the property ops although this package defines them (their picture, their word on a model).
+The keys a person may set through the property ops although this package defines them (their picture, their word on a model, their handle).
 
 ### `isReservedPropertyKey`
 

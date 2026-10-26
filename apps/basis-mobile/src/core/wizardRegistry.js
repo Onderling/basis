@@ -20,7 +20,6 @@ import CreateGroupWizardModal         from '../../../basis/src/rn/wizards/create
 import JoinGroupWizardModal           from '../../../basis/src/rn/wizards/joinGroupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import PostAudienceWizardModal        from '../../../basis/src/rn/wizards/postAudienceWizardModal.js';
-import EncryptedBackupWizardModal     from '../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import SettingsWizardModal            from '../../../basis/src/rn/wizards/settingsWizardModal.js';
 import EmbedTimeWizardModal           from '../../../basis/src/rn/wizards/embedTimeWizardModal.js';
 
@@ -30,7 +29,6 @@ export const WIZARD_REGISTRY = Object.freeze({
   joinGroupWizard:           JoinGroupWizardModal,
   restoreFromMnemonicWizard: RestoreFromMnemonicWizardModal,
   postAudienceWizard:        PostAudienceWizardModal,
-  encryptedBackupWizard:     EncryptedBackupWizardModal,
   settings:                  SettingsWizardModal,
   // embed-time launches the wizard on mobile;
   // web still uses slash flags + the same localBuiltins.createTimeEmbed

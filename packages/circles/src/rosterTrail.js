@@ -24,3 +24,16 @@ const ROSTER_TRAIL_TYPE = 'membership-redemption';
 export function isRosterTrailItem(item) {
   return !!item && (item.type === ROSTER_TRAIL_TYPE || item.kind === ROSTER_TRAIL_TYPE);
 }
+
+/**
+ * The rows a circle store holds that its generic lane must never carry, because their own lane carries them with a
+ * check the store door would skip: the roster TRAIL (above — the membership lane, the announces, the roster seed)
+ * and the circle's RULES HEAD (`group-rules` — the rules lane's signed `rules-update` statements, whose receiver checks
+ * the author is an admin; the creation and the join write the first one). The task lane neither publishes, serves nor
+ * applies either.
+ *
+ * @param {object} item  @returns {boolean}
+ */
+export function isLaneCarriedItem(item) {
+  return isRosterTrailItem(item) || (!!item && (item.type === 'group-rules' || item.kind === 'group-rules'));
+}

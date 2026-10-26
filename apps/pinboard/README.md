@@ -77,9 +77,9 @@ Phases 0–22 of the coding plan have landed:
 - 21: Web Push scaffold — `WebPushSender`, `PushRegistry`,
   `subscribeWebPush` / `triggerSelfPush` skills, `/sw.js`,
   `/push.html`.
-- 22: Layer-2 personal-interest profile — TF-IDF over post bodies
-  the user responded to; `scorePostRelevance` combines Layer 1
-  (deterministic skills) with Layer 2 (interest cosine).
+- 22: post relevance — `scorePostRelevance` (does a post meet what I
+  offer). The Layer-2 interest profile it once added was deleted on
+  2026-10-25: it learned from every answered post and nothing read it.
 
 Current test count: **378** in `apps/pinboard` (34 test files).
 
@@ -341,7 +341,6 @@ the following Pinboard-local code is flagged as substrate candidates —
 extracted when a second app needs the shape:
 
 - `src/lib/CachingDataSource.js` + `src/lib/SyncCadence.js` → likely `@onderling/local-store` (or extend `@onderling/sync-engine`).
-- `src/skills/index.js` `hydrateItem` / `hydrateItems` → likely promoted into `@onderling/identity-resolver`.
 - `src/skills/index.js` moderation skill block → likely `@onderling/group-mod`.
 
 Inventory + promotion rule:

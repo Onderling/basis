@@ -19,14 +19,13 @@ beforeEach(() => {
   } });
 });
 
-describe('the re-file record', () => {
-  it('a persona change records where the contact was filed before, and when', async () => {
+describe('a persona change keeps no re-file record in the book', () => {
+  it('the book writes nothing beside the member row (the host writes the old self\'s own-store row)', async () => {
     await book.addContact({ webid: 'w:bea', displayName: 'Bea', persona: 'default' });
+    const before = new Set(blobs.keys());
     await book.setPersona('w:bea', 'p-000000000001', { personaAt: 500 });
-    expect(await book.listRefiled()).toEqual([{ webid: 'w:bea', from: 'default', at: 500 }]);
-    // the same self again is no move
-    await book.setPersona('w:bea', 'p-000000000001', { personaAt: 600 });
-    expect((await book.listRefiled()).length).toBe(1);
+    expect([...blobs.keys()].filter((k) => !before.has(k) && !k.includes('/members/'))).toEqual([]);
+    expect(book.listRefiled).toBeUndefined();
   });
 });
 
@@ -35,8 +34,6 @@ describe('forgetContact', () => {
     await members.addMember({ webid: 'w:bea', displayName: 'Bea', role: 'member' });
     await book.addContact({ webid: 'w:bea', persona: 'default', trustLevel: 'vertrouwd' });
     await book.setTags('w:bea', ['koor']);
-    const list = await book.createList('Koor');
-    await book.addToList(list.listId, 'w:bea');
     await book.forgetContact('w:bea');
     expect((await book.listContacts()).map((c) => c.webid)).toEqual([]);
     const row = await members.resolveByWebid('w:bea');
@@ -44,7 +41,6 @@ describe('forgetContact', () => {
     expect(row?.persona ?? null).toBe(null);
     expect(row?.trustLevel ?? null).toBe(null);
     expect(row?.tags ?? []).toEqual([]);
-    expect((await book.getList(list.listId)).contactWebids).toEqual([]);
   });
   it('a webid that is not a contact here is left alone', async () => {
     await members.addMember({ webid: 'w:cor', displayName: 'Cor' });

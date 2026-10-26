@@ -1,12 +1,13 @@
 /**
- * circle-post handler coverage.
+ * The announcement of a circle post that landed from another member: a notification, no ingest (the post is already
+ * in the circle's store), and the driver match.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { makeHandleCirclePost } from '../../src/core/handlers/circlePost.js';
 
 function deps(overrides = {}) {
   return {
-    callSkill:    vi.fn(async () => ({ itemId: 'i-new' })),
+    callSkill:    vi.fn(async () => ({ drivers: {} })),
     publishEvent: vi.fn(),
     logger:       { info: () => {}, warn: () => {}, error: () => {} },
     ...overrides,
@@ -28,46 +29,17 @@ describe('makeHandleCirclePost', () => {
     const d = deps();
     const handle = makeHandleCirclePost(d);
     await handle('peer-A', env({ payload: { text: 'hi' } }));
-    expect(d.callSkill).not.toHaveBeenCalled();
+    expect(d.publishEvent).not.toHaveBeenCalled();
   });
 
-  it('ingests + publishes notification on success', async () => {
+  it('publishes the notification and ingests nothing: the post is already in the circle\'s store', async () => {
     const d = deps();
     const handle = makeHandleCirclePost(d);
     await handle('peer-A', env());
-    expect(d.callSkill).toHaveBeenCalledWith('pinboard', 'ingestRemotePost',
-      expect.objectContaining({ fromPubKey: 'pk-A', fromPeerAddr: 'peer-A' }));
+    expect(d.callSkill.mock.calls.filter(([app, op]) => app === 'pinboard')).toEqual([]);
     expect(d.publishEvent).toHaveBeenCalledWith(expect.objectContaining({
       app: 'pinboard', type: 'notification',
+      payload: expect.objectContaining({ postId: 'req-1', groupId: 'g1' }),
     }));
-  });
-
-  it('falls back to fromAddr when fromPubKey missing', async () => {
-    const d = deps();
-    const handle = makeHandleCirclePost(d);
-    await handle('peer-A', env({ fromPubKey: undefined }));
-    const args = d.callSkill.mock.calls[0][2];
-    expect(args.fromPubKey).toBe('peer-A');
-  });
-
-  it('skips notification on deduped result', async () => {
-    const d = deps({ callSkill: vi.fn(async () => ({ deduped: true })) });
-    const handle = makeHandleCirclePost(d);
-    await handle('peer-A', env());
-    expect(d.publishEvent).not.toHaveBeenCalled();
-  });
-
-  it('skips notification on evicted result', async () => {
-    const d = deps({ callSkill: vi.fn(async () => ({ evicted: true })) });
-    const handle = makeHandleCirclePost(d);
-    await handle('peer-A', env());
-    expect(d.publishEvent).not.toHaveBeenCalled();
-  });
-
-  it('skips notification on error result', async () => {
-    const d = deps({ callSkill: vi.fn(async () => ({ error: 'not a member' })) });
-    const handle = makeHandleCirclePost(d);
-    await handle('peer-A', env());
-    expect(d.publishEvent).not.toHaveBeenCalled();
   });
 });

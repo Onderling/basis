@@ -51,7 +51,7 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
     const rail = makeGovernanceRail({ eventLog: log, circleIdentityFor: async () => cids[ref], myRef: ref, callSkill });
     devices[ref] = { ref, log, rail, callSkill };
     devices[ref].ingest = makeCircleGovernancePeerHandler({ eventLog: log, rail });
-    devices[ref].ingestReport = makeCircleReportPeerHandler({ eventLog: log });
+    devices[ref].ingestReport = makeCircleReportPeerHandler({ rail });
     devices[ref].gov = bindCircleGovernance({
       eventLog: log, callSkill, getPolicy: async () => policy, myRef: ref,
       genId: () => `p${(n += 1)}`, now: () => 1,
@@ -130,10 +130,13 @@ describe('governance propagation (signed statements across the mesh)', () => {
   it('a report filed by a member lands on the ADMIN\'s device (the narrowed report fan)', async () => {
     const { devices } = await mesh();
     await devices.m0.gov.reports.file({ circleId: 'c1', targetType: 'member', targetRef: 'm2', reason: 'spam' });
-    const repEntries = devices.admin0.log.query({}).filter((e) => e.type === 'report' && e.circleId === 'c1');
-    expect(repEntries.length).toBe(1);
-    expect(repEntries[0].payload).toMatchObject({ targetType: 'member', targetRef: 'm2', reason: 'spam' });
+    await new Promise((r) => setTimeout(r, 20));   // the fanned statement's ingest (signature + binding + the report rule)
+    const onAdmin = (await devices.admin0.gov.reports.list('c1')).open;
+    expect(onAdmin).toHaveLength(1);
+    expect(onAdmin[0]).toMatchObject({ targetType: 'member', targetRef: 'm2', reason: 'spam', by: 'm0' });
     // …and the non-admin bystander does NOT hold it (story 3.6: the fan narrows to admins ∪ reporter).
-    expect(devices.m1.log.query({}).filter((e) => e.type === 'report')).toHaveLength(0);
+    const reportKinds = (d) => d.rail.storedStatements('c1').filter((st) => String(st.body.kind).startsWith('report-'));
+    expect(reportKinds(devices.m1)).toHaveLength(0);
+    expect(reportKinds(devices.admin0)).toHaveLength(1);
   });
 });

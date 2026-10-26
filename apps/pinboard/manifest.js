@@ -16,14 +16,14 @@
  *
  * Admin-only flows (`createGroupV2`, `editGroupRules`, `removeMember`,
  * `rotateMyGroupCode`, `postAnnouncement`) and plumbing
- * (`encryptedBackup`, `startPodSignIn`, attachments,
+ * (`startPodSignIn`, attachments,
  * push subscription, contact-QR exchange, …) stay un-manifested in D.1
  * — they are not slash-natural and the chat surface doesn't need
  * them.  They can be added in a follow-on D.x slice if the LLM layer
  * (D.2) wants tool-call access.
  *
  * F-SP1-a — every pinboard itemType is app-local (`ask`/`offer`/`lend`/
- *           `report`/`group-rules`/`rules-accept`/`group-leave`/
+ *           `report`/`group-rules`/`group-leave`/
  *           `request`) — none are canonical in `@onderling/item-types`.
  *           Permitted by `validateManifest`.
  * F-SP1-e — non-canonical verbs used here: `report`, `mute`, `set`,
@@ -53,8 +53,7 @@
  *
  * `surfaces.slash.match` is provided for ops whose body is a single
  * scalar (text/itemId/reason); ops requiring two-arg bodies
- * (`assignLend({itemId, borrowerWebid})`,
- * `setPeerReveal({peerWebid, showDisplayName})`) declare the slash
+ * (`assignLend({itemId, borrowerWebid})`) declare the slash
  * `command` only (no `match` parser); they remain reachable as
  * pure-command shells that surface the form / picker in the consumer.
  *
@@ -83,7 +82,6 @@ const ITEM_TYPES = [
   'lend',
   'report',
   'group-rules',
-  'rules-accept',
   'group-leave',
   'request',  // legacy V0 — preserved for back-compat
   // ── Part G dissolve (2026-06-17) — app-local types the chat-shell
@@ -366,7 +364,7 @@ export const pinboardManifest = {
           // positional slash → always needsForm at resolveDispatch.
           // The consumer's composer surfaces the form/picker UI; slash
           // bodies are line-oriented and can't bind two positional
-          // args cleanly.  Same pattern setPeerReveal uses.
+          // args cleanly.
           command: '/lend-assign',
           shape:   '/lend-assign <itemId> <borrower-webid>',
         },
@@ -403,69 +401,6 @@ export const pinboardManifest = {
           },
         },
         ui: { control: 'button', labelKey: 'circle.button.pinboard.markReturned' },
-      },
-    },
-
-    // ── Moderation ──────────────────────────────────────────────────
-    {
-      id:   'reportPost', visibility: 'authenticated',
-      circleScoped: true,
-      verb: 'report',  // F-SP1-e: non-canonical.  Resolved 2026-05-21
-                       // (owner): kept `report` (truer to intent).
-                       // Squeezing into canonical `add` would obscure
-                       // the action's nature.
-      writes: { scope: 'circle' },
-      appliesTo: { type: 'report' },
-      params: [
-        // Part G dissolve (2026-06-17) — `/report` was in BOTH manifests;
-        // the former mock added a `pickerSource` (label→id) + a row button.
-        { name: 'itemId', kind: 'string', required: true, ...ID_NONEMPTY,
-          pickerSource: { listOp: 'listFeed' } },
-        { name: 'reason', kind: 'string', ...STR_NONEMPTY },  // optional but if present must be non-empty
-      ],
-      surfaces: {
-        chat:  { hint: 'File a report on another item; visible to admins of the group.' },
-        slash: {
-          // Collision-free.  No NL synonym in V0; UI calls it
-          // "rapporteer".
-          command: '/report',
-          match: {
-            body:    'match',
-            onEmpty: { skillId: 'reportPost', args: {} },
-          },
-        },
-        ui: { control: 'button', labelKey: 'circle.button.pinboard.reportPost' },
-      },
-    },
-    // ── Profile / reveals ───────────────────────────────────────────
-    {
-      id:   'setPeerReveal', visibility: 'authenticated', group: 'compose',
-      verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
-      writes: { scope: 'device' },   // a reveal flag kept on this device
-      // Part G dissolve (2026-06-17) — `/reveal` was a COLLISION: the real
-      // op is `setPeerReveal`; the former mock declared `revealPeer` (a
-      // SEMANTIC alias of setPeerReveal via PINBOARD_OP_ALIAS) on the SAME
-      // `/reveal` command.  Resolved by keeping ONE op — `setPeerReveal`
-      // — with the RICHER mock `/reveal` slash (`body: 'flags'`, so
-      // `/reveal <peer> --action=on` parses the flag).  The `revealPeer`
-      // op AND its PINBOARD_OP_ALIAS entry are DROPPED (the op is gone).
-      //
-      // PARAMS keep the chat-shell presentation vocab (`peer` + `action`
-      // on|off) — the realAgent adapter's `peer→peerWebid` +
-      // `action→reveal(boolean)` transforms are KEPT (legitimate
-      // presentation→storage mapping, NOT a redundant rename).  The
-      // adaptPinboardReply branch now keys on `setPeerReveal`.
-      params: [
-        { name: 'peer',   kind: 'string', required: true, ...STR_NONEMPTY },
-        { name: 'action', kind: 'enum', of: ['on', 'off'], required: false },
-      ],
-      surfaces: {
-        chat:  { hint: 'reveal (or hide) a peer\'s real name' },
-        slash: {
-          command: '/reveal',
-          shape:   '/reveal <peer-webid> [on|off]',
-          body:    'flags',
-        },
       },
     },
 
@@ -805,15 +740,6 @@ export const pinboardManifest = {
       },
     },
     {
-      id:   'encryptedBackupWizard', visibility: 'private', verb: 'list',
-      params: [],
-      surfaces: {
-        slash: { command: '/encrypted-backup' },
-        chat:  { hint: 'download a passphrase-encrypted snapshot of your data' },
-        page:  { kind: 'side-panel', title: 'Encrypted backup' },
-      },
-    },
-    {
       id:   'createGroupWizard', visibility: 'authenticated', verb: 'add',
       writes: { scope: 'circle' },
       params: [],
@@ -982,16 +908,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'getInterestProfile', visibility: 'authenticated', verb: 'list',
-      // Derived ON THE DEVICE from this person's own reading and posting. It leaves the device only
-      // through an explicit disclosure act, never as a side effect of someone reading their profile.
-      params: [],
-      surfaces: {
-        chat: { hint: "The interest profile derived locally from this person's own activity." },
-        ui:   { control: 'page' },
-      },
-    },
 
     // ── Waking a device ─────────────────────────────────────────────
     // Registration only. WHETHER something may wake you is the recipient's own attention setting,
@@ -1079,16 +995,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'encryptedBackup', visibility: 'authenticated', verb: 'list',
-      // Returns a SEALED archive. The passphrase never leaves the device and is not stored — losing it
-      // loses the archive, which is the point: nobody else can open it either.
-      params: [{ name: 'passphrase', kind: 'secret', required: true }],
-      surfaces: {
-        chat: { hint: "Produce a passphrase-sealed backup of this person's data." },
-        ui:   { control: 'button' },
-      },
-    },
 
     // ── Reading a circle back ───────────────────────────────────────
     // The catch-up reads. Each is scoped to ONE circle on purpose: you fetch the circle you are in,
@@ -1109,18 +1015,6 @@ export const pinboardManifest = {
       ],
       surfaces: {
         chat: { hint: 'Posts in one circle since a timestamp — the bulletin catch-up.' },
-        ui:   { control: 'page' },
-      },
-    },
-    {
-      id:   'listCircleChats', visibility: 'authenticated', verb: 'list',
-      params: [
-        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'sinceTs', kind: 'number' },
-        { name: 'limit',   kind: 'number' },
-      ],
-      surfaces: {
-        chat: { hint: 'Chat messages in one circle, newest first, optionally since a timestamp.' },
         ui:   { control: 'page' },
       },
     },
@@ -1635,34 +1529,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'ingestCircleMessage', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      params: [
-        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'payload',      kind: 'object', required: true },
-      ],
-      resolves: [{ field: 'text', policy: 'content' }],
-      surfaces: {
-        chat: { hint: 'Ingest a circle message from an authenticated peer.' },
-        ui:   { control: 'page' },
-      },
-    },
-    {
-      id:   'ingestRemotePost', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      params: [
-        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'payload',      kind: 'object', required: true },
-      ],
-      resolves: [{ field: 'text', policy: 'content' }],
-      surfaces: {
-        chat: { hint: 'Ingest a bulletin post from an authenticated peer.' },
-        ui:   { control: 'page' },
-      },
-    },
   ],
 
   // first pinboard web page via renderWeb.
@@ -1955,10 +1821,9 @@ export const pinboardManifest = {
     //  10. `location` is also list-/wizard-shape (search → preview →
     //      confirm) with an intermediate geocode skill call. No
     //      slot for "multi-step mutation".  Stays hand-coded.
-    //  11. `mnemonic` + `encryptedBackup` are SECURITY-sensitive
-    //      one-shot reveals (mnemonic shows once) + dangerous-action
-    //      flows (backup needs a passphrase). has no notion of
-    //      "consent gate" or "one-shot read".  Stays hand-coded.
+    //  11. `mnemonic` is a SECURITY-sensitive one-shot reveal (it
+    //      shows once). has no notion of "consent gate" or
+    //      "one-shot read".  Stays hand-coded.
     //
     // None of these block E.4: the -adopt proof-point is the
     // record + 3 flat fields.  The signals are forward-additive
@@ -2016,7 +1881,7 @@ export const pinboardManifest = {
           patch:    { opId: 'setHolidayMode', argName: 'on' },
         },
         // Other profile.html fields (avatar, skills[], location,
-        // mnemonic, encryptedBackup, my-pods) stay hand-coded — see
+        // mnemonic, my-pods) stay hand-coded — see
         // signals (7–11) above. Forward-additive: any of them
         // can land per-field when the substrate has a fit.
       ],

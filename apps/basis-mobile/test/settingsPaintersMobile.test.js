@@ -56,11 +56,11 @@ describe('mobile settings painters', () => {
     for (const [id, title] of Object.entries(OWN_TITLE)) expect(titles(bodies[id] ?? ''), id).toEqual([title]);
   });
 
-  it('the wizards a section opens are mounted on the group screen too (the keys painter opens backup, restore, enrol)', () => {
+  it('the wizards a section opens are mounted on the group screen too (the keys painter opens restore, enrol)', () => {
     const at = SRC.indexOf('testID="circle-settings-group"');
     const group = SRC.slice(at, SRC.indexOf('</ScrollView>', at));
     expect(group).toMatch(/\{overlays\}/);
-    expect(SRC.slice(SRC.indexOf('const overlays = ('), SRC.indexOf('if (Array.isArray(only))'))).toMatch(/EncryptedBackupWizardModal[\s\S]*EnrollDeviceModal[\s\S]*mydata-mnemonic-reveal/);
+    expect(SRC.slice(SRC.indexOf('const overlays = ('), SRC.indexOf('if (Array.isArray(only))'))).toMatch(/RestoreFromMnemonicWizardModal[\s\S]*EnrollDeviceModal[\s\S]*mydata-mnemonic-reveal/);
   });
 
   it('there is no old My data page: the screen paints a settings group, and nothing outside one', () => {

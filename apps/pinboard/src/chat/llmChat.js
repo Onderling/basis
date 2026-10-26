@@ -145,7 +145,6 @@ const SHELL_ONLY_OPS = new Set([
   'getCurrentGroup',            // synthesized in realAgent (single-circle /groups)
   'conflictDisputeWizard',      // customRenderer
   'postAudienceWizard',         // customRenderer
-  'encryptedBackupWizard',      // customRenderer
   'createGroupWizard',          // customRenderer
   'joinGroupWizard',            // customRenderer
 ]);

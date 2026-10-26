@@ -30,6 +30,8 @@ describe('a persona\'s restore record', () => {
     const boot = () => createRealHouseholdAgent({
       ...vaults, registryBackend, seedHousehold: false, seedDemoData: false,
       pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') }, deviceLog: new EventLog({ initial: [], muted: [] }),
+      // the circle store is durable on a device, as both shells keep it (the circle's trail and rules live there)
+      householdPersistDb: { path: path.join(dir, 'household-items.json') },
     });
     const first = await boot();
     const { id } = await first.callSkill('agents', 'createProfile', { name: 'Buurt' });
@@ -75,6 +77,7 @@ describe('a persona\'s restore record', () => {
       const boot = () => createRealHouseholdAgent({
         ...vaults, registryBackend, seedHousehold: false, seedDemoData: false,
         pinboardPersistDb: { path: path.join(d2, 'pinboard-state.json') }, deviceLog: new EventLog({ initial: [], muted: [] }),
+        householdPersistDb: { path: path.join(d2, 'household-items.json') },
       });
       const first = await boot();
       const state = createInitial();

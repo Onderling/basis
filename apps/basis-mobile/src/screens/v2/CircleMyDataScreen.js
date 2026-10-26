@@ -3,9 +3,9 @@
  *
  * RN mirror of web's circleMyData: where your data lives (getDataLocation +
  * podSignInStatus), the getPrivacyNotice disclosure, a getMetrics usage snapshot,
- * and the S5 key-management actions (back up · reveal recovery phrase · restore).
+ * and the S5 key-management actions (reveal recovery phrase · restore).
  * Self-contained: loads + mutates via the injected pinboard-capable `callSkill`.
- * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
+ * The restore flow reuses the existing RN wizard modal — no reimpl.
  */
 import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,7 +42,6 @@ import { CONNECTION_MANIFESTS } from '../../../../basis/src/v2/connectionManifes
 import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
 import UserLlmSettings from './UserLlmSettings.js';
-import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
@@ -106,7 +105,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [signInErr, setSignInErr] = useState('');
   const [privacy, setPrivacy] = useState([]);
   const [metrics, setMetrics] = useState({});
-  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | 'receive-personas' | null
+  const [wizard, setWizard] = useState(null);          // 'restore' | 'enroll' | 'receive-personas' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
   const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
   const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
@@ -981,9 +980,6 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     'keys': () => (
       <>
         <Section title={t('circle.mydata.keys')}>
-          <Pressable style={styles.action} onPress={() => setWizard('backup')} testID="mydata-backup">
-            <Text style={styles.actionLabel}>{t('circle.mydata.backup')}</Text>
-          </Pressable>
           <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
             <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
           </Pressable>
@@ -1126,11 +1122,10 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
     ),
   };
 
-  // the wizards and sheets a section opens (backup, restore, recovery file, enrol, replace, revoke, the phrase):
+  // the wizards and sheets a section opens (restore, recovery file, enrol, replace, revoke, the phrase):
   // mounted on whichever screen paints that section
   const overlays = (
     <>
-        <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
         <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
         {(wizard === 'recovery-export' || wizard === 'recovery-import') && (
           <RecoveryFileWizardModal

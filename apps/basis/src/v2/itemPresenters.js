@@ -27,8 +27,18 @@ export const NOT_MERGED = Object.freeze({
   intention: 'pending work; read by `upcoming` only, never merged into chores, "Mijn dingen" or reminders',
   // a device-link is the person's private device map (own-devices scope, read by the revoke ceremony) — never shown
   'device-link': 'the private device map; read by the revoke ceremony only, never shown in any view',
+  // a membership code is the admin's secret (own-devices scope): read by the invite and redeem paths only, never shown
+  'membership-code': "a circle's invite code, the admin's own; read by the invite and redeem paths, never shown in any view",
+  // who answered my post: folded into the post on the poster's own reads only (routedStore), never shown on its own
+  'post-answers': "who answered one of my posts; folded into the post on my own reads, never shown on its own",
+  // a contact-refile tells one self's devices a contact left it (read by the own lane's landing only) — never shown
+  'contact-refile': 'a contact that left one self; read where it lands on that self\'s devices, never shown in any view',
   // an answer to an appointment is read through its appointment only (its `rsvp`, projected by rsvpItems.js)
   rsvp: 'one person\'s answer to one appointment; read through its event (withAnswers), never shown on its own',
+  // a roster-trail row is what the circle's roster is projected FROM (deriveRoster) — the roster is the view, never the row
+  'membership-redemption': 'a row of the roster trail; read through the roster projection only, never shown on its own',
+  // a circle's rules head is read by the rules screen, the consent step and the fold — the rules are the view, not the row
+  'group-rules': "a circle's rules head; read through the rules screen and the fold, never merged into a view",
 });
 
 /**

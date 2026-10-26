@@ -25,8 +25,8 @@
  * - `source` — the embeds-shaped `{type, ref}` storage pointer the
  *   media schema requires.  Pinboard's ref convention is
  *   `pinboard-att://<itemId>/<attId>`: install-independent (any pinboard
- *   instance resolves it via the item's attachment list — local cache
- *   when the bytes are here, `requestAttachment` round-trip when not).
+ *   instance resolves it via the item's attachment list, then opens it
+ *   through the circle's media gateway).
  *   NOT a local path, NOT a pod URL — safe on the wire.
  * - `mime` / `width` / `height` — canonical writer-asserted render
  *   hints (same keys as the legacy shape — old peers read them
@@ -36,9 +36,6 @@
  * - `thumbnail` — `data:image/jpeg;base64,...` (~3-8 KB after
  *   client-side resize to ~120px).  Travels in broadcasts.  UNSEALED
  *   today — see the sealing note below.
- * - `ref` — local cache path (sender) or absent (recipient that
- *   hasn't fetched the full bytes yet).  Recipients populate
- *   `ref` after a `requestAttachment` round-trip.
  *
  * **Privacy invariants** (per the project-wide rule
  * `Project Files/projects/README.md#personal-pod-urls-stay-out-of-peer-to-peer-messages`):
@@ -65,10 +62,8 @@
  * plaintext bytes, and the old inline-`dataB64` path is REMOVED
  * (`validateInboundAttachment` refuses it).  Recipients open the sealed inline
  * thumbnail (`openThumbnail`) + the full image (`openBlob`, gated) through
- * their own circle media gateway — the sealing key stays out of pinboard.  The
- * `@onderling/chat-p2p` plaintext `attachment-request`/`-response` handlers are
- * now structurally inert (pinboard no longer injects `attachmentSupport`, and no
- * plaintext bytes exist to serve).
+ * their own circle media gateway — the sealing key stays out of pinboard, and no
+ * plaintext bytes exist here to serve.
  */
 
 import nacl from 'tweetnacl';
@@ -105,10 +100,6 @@ export const ALLOWED_MIMES = Object.freeze(new Set([
   'image/jpeg', 'image/png', 'image/webp',
 ]));
 
-const MIME_TO_EXT = Object.freeze({
-  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
-});
-
 /**
  * Generate a fresh attachment id.  ULID-ish: time-prefixed +
  * randomness.  Short enough to fit in a path segment.
@@ -120,23 +111,11 @@ export function freshAttachmentId() {
   return `att-${time}-${rand}`;
 }
 
-/**
- * Build the local cache path for an attachment.
- */
-export function attachmentPath(itemId, attId, mime) {
-  const ext = MIME_TO_EXT[mime];
-  if (!ext) throw new Error(`Attachments: unsupported mime ${mime}`);
-  return `mem://pinboard/items/${itemId}/attachments/${attId}.${ext}`;
-}
-
 /* ── Canonical media wire-ref convention ──────────────────────
  * `pinboard-att://<itemId>/<attId>` — the install-independent name of
  * an attachment.  Any pinboard instance resolves it: locate the item,
- * find the attachment by id, then read the local cache (when `ref`
- * is present) or run the `requestAttachment` round-trip.  This is
- * the `source.ref` of the canonical media item; it replaces nothing
- * local (bytes stay at `attachmentPath(...)`) and leaks nothing
- * (no local path, no pod URL).
+ * find the attachment by id, and open it through the circle's media gateway.  This is
+ * the `source.ref` of the canonical media item; it leaks nothing (no local path, no pod URL).
  * ────────────────────────────────────────────────────────────── */
 
 /** `source.type` of a pinboard-resolved media item. */
@@ -233,19 +212,6 @@ export async function persistInboundAttachment({ att, actor } = {}) {
     ...(att?.width  != null ? { width:  att.width }  : {}),
     ...(att?.height != null ? { height: att.height } : {}),
   };
-}
-
-/**
- * Read attachment bytes from the local cache.  Returns base64 (so
- * it can travel in a chat envelope as a string).  null when the
- * blob isn't on this machine.
- */
-export async function readAttachmentBytesB64({ dataSource, ref }) {
-  const data = await dataSource.read(ref);
-  if (data == null) return null;
-  if (data instanceof Uint8Array) return _b64encode(data);
-  if (typeof data === 'string') return data;       // already-encoded; legacy path
-  return null;
 }
 
 /**

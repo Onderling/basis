@@ -214,6 +214,8 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
 });
 
 describe('3.6 — a report reaches the admin; it must not reach the person reported', () => {
+  // what a device's log holds of reports: the signed report statements on its governance rail
+  const reportStatementsOn = (d) => d.rail.storedStatements('c1').filter((st) => String(st?.body?.kind).startsWith('report-'));
   const fileReport = (d) => d.gov.reports.file({
     circleId: 'c1', targetType: 'post', targetRef: 'post-7', targetLabel: 'Bram\'s post',
     reason: 'Cato says this is harassment',
@@ -232,6 +234,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   it('acting on it removes the post, and the report closes on every device', async () => {
     const h = await threeDevices();
     const { reportId } = await fileReport(h.devices.m1);
+    await h.settle();                                      // the report has reached Anna before she acts on it
     await h.devices.admin0.gov.reports.act({ circleId: 'c1', reportId });
 
     expect(h.devices.admin0.removed).toEqual([{ circleId: 'c1', targetType: 'post', targetRef: 'post-7' }]);
@@ -266,21 +269,22 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
     const h = await threeDevices();
     await fileReport(h.devices.m1);
 
-    // Bram is neither the reporter nor an admin — his raw log must not carry the event at all.
-    const bramsReports = h.devices.m0.log.query({}).filter((e) => e.type === 'report');
-    expect(bramsReports).toHaveLength(0);
+    // Bram is neither the reporter nor an admin — his raw log must not carry the statement at all.
+    await h.settle();
+    expect(reportStatementsOn(h.devices.m0)).toHaveLength(0);
     // Anna (admin) does hold it — proving the fan still works and the empty log above is not vacuous.
-    expect(h.devices.admin0.log.query({}).filter((e) => e.type === 'report').length).toBeGreaterThan(0);
+    expect(reportStatementsOn(h.devices.admin0).length).toBeGreaterThan(0);
   });
 
   it('layer 2 (access): even holding the event, a non-admin is not served it', async () => {
     const h = await threeDevices();
     await fileReport(h.devices.m1);
 
-    // Force the event onto Bram's device, bypassing the narrowed fan — the demoted-admin / replay case.
-    const ev = h.devices.admin0.log.query({}).find((e) => e.type === 'report').payload;
-    h.devices.m0.ingestReport(null, { subtype: 'circle-report-broadcast', circleId: 'c1', event: ev, ts: Date.now() });
-    expect(h.devices.m0.log.query({}).filter((e) => e.type === 'report')).toHaveLength(1);   // he holds it…
+    // Force the statement onto Bram's device, bypassing the narrowed fan — the demoted-admin / replay case.
+    await h.settle();
+    const stmt = reportStatementsOn(h.devices.admin0)[0];
+    await h.devices.m0.ingestReport(null, { subtype: 'circle-report-broadcast', circleId: 'c1', event: stmt, ts: Date.now() });
+    expect(reportStatementsOn(h.devices.m0)).toHaveLength(1);   // he holds it…
 
     const { open, scope } = await h.devices.m0.gov.reports.list('c1');
     expect(scope).toBe('own');                                       // …but is served only his own
@@ -300,7 +304,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
     expect(cato.open).toHaveLength(0);                               // it closed on his device too
     expect(cato.resolved.map((r) => r.reportId)).toContain(reportId);
     // …and Bram, who is neither, still holds nothing at all.
-    expect(h.devices.m0.log.query({}).filter((e) => e.type === 'report')).toHaveLength(0);
+    expect(reportStatementsOn(h.devices.m0)).toHaveLength(0);
   });
 
   it('an admin still sees the whole picture — the scope marker says so', async () => {

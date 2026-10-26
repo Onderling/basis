@@ -1,16 +1,9 @@
 import { notifyIfResonant } from './driverMatchNotify.js';
 
 /**
- * Inbound circle-post handler. Bundle H Phase 2 — lifted from
- * `apps/basis/web/main.js:807` (2026-05-24).
- *
- * Ingests a peer's fan-out post into the local pinboard substrate via
- * `pinboard.ingestRemotePost`.  Handles dedup + eviction-filter inside
- * the skill; we just publish a notification on success.
- *
- * The NKN sender address is recorded alongside `fromPubKey` so
- * [Help with] / row-button actions can route a follow-up back over
- * the wire to the original poster.
+ * A circle post from another member that arrived on this device for the first time: announce it. The post itself is
+ * already in the circle's store (the lane put it there, verified against the roster); this publishes the notification
+ * and runs the on-device driver match, so a post that resonates with this self's drivers says why.
  *
  * @param {object} args
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
@@ -41,30 +34,8 @@ export function makeHandleCirclePost({
       logger.warn?.('[peer] circle-post missing payload.requestId', envelope);
       return;
     }
-    let result;
-    try {
-      result = await callSkill('pinboard', 'ingestRemotePost', {
-        payload,
-        fromPubKey:  fromPubKey ?? fromAddr,
-        fromPeerAddr: fromAddr,
-      });
-    } catch (err) {
-      logger.error?.('[peer] handleCirclePost failed', err);
-      return;
-    }
-    if (result?.error) {
-      logger.warn?.('[peer] ingestRemotePost rejected', result.error, payload.requestId);
-      return;
-    }
-    if (result?.deduped) {
-      logger.info?.('[peer] circle-post deduped (already have requestId=' + payload.requestId + ')');
-      return;
-    }
-    if (result?.evicted) {
-      logger.info?.('[peer] circle-post from evicted member dropped', payload.from);
-      return;
-    }
-    logger.info?.('[peer] circle-post ingested: new itemId=' + result?.itemId);
+    // the post is already in the circle's store (the lane put it there, verified against the roster): announce it
+    const result = { itemId: payload.requestId };
     publishEvent?.({
       app:   'pinboard',
       type:  'notification',

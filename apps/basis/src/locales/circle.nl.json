@@ -3865,18 +3865,6 @@
         "text": "Volledig",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
-    },
-    "on": {
-      "text": "🔓 Je laat je naam zien aan {{peer}}. Dat werkt van twee kanten: de ander moet het ook aanzetten.",
-      "doc": "Confirmation of /reveal on."
-    },
-    "off": {
-      "text": "🔒 Je laat je naam niet meer zien aan {{peer}}.",
-      "doc": "Confirmation of /reveal off."
-    },
-    "someone": {
-      "text": "(iemand)",
-      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {
@@ -6101,7 +6089,7 @@
       },
       "report": {
         "text": "Rapporteren",
-        "doc": "S1 — per-post action: report abuse (reportPost)."
+        "doc": "S1 — per-post action: report abuse (a signed report to the circle's admins)."
       },
       "mute": {
         "text": "Blokkeren",
@@ -6557,10 +6545,6 @@
     "keys": {
       "text": "Sleutels & back-up",
       "doc": "S5 — key-management section heading."
-    },
-    "backup": {
-      "text": "Back-up van mijn sleutels",
-      "doc": "S5 — launch the encrypted-backup wizard."
     },
     "view_mnemonic": {
       "text": "Herstelzin tonen",
@@ -8451,60 +8435,6 @@
         "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
-    "backup": {
-      "confirm_passphrase": {
-        "text": "Herhaal het wachtwoord",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "building": {
-        "text": "Back-up maken…",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "passphrase_warning": {
-        "text": "Raak je het wachtwoord kwijt, dan is de back-up weg. Er is geen herstel. Schrijf het op.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "download": {
-        "text": "Downloaden",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "title": {
-        "text": "Versleutelde back-up",
-        "doc": "Mobile backup wizard heading."
-      },
-      "ready": {
-        "text": "Back-up klaar",
-        "doc": "Mobile backup wizard, the done step."
-      },
-      "intro": {
-        "text": "Een momentopname van je eigen gegevens, beveiligd met een wachtwoordzin. Die zin verlaat dit apparaat nooit — zonder de zin heeft niemand iets aan de back-up, jij ook niet.",
-        "doc": "Backup wizard step 1 body."
-      },
-      "ready_title": {
-        "text": "✓ Back-up klaar",
-        "doc": "Backup wizard, the final screen."
-      },
-      "ready_intro": {
-        "text": "Download hem en bewaar hem ergens veilig — mail hem naar jezelf, zet hem op een usb-stick, of in een cloud die je vertrouwt. Hij is versleuteld, dus waar hij staat maakt minder uit dan of je hem nog hebt.",
-        "doc": "Backup wizard, the final screen."
-      },
-      "passphrase_label": {
-        "text": "Wachtzin",
-        "doc": "Backup wizard, both shells: the passphrase field and its step."
-      },
-      "passphrase_hint": {
-        "text": "Minstens 12 tekens is verstandig — kies er een die je onthoudt.",
-        "doc": "Backup wizard, both shells: the passphrase placeholder."
-      },
-      "step_save": {
-        "text": "Opslaan",
-        "doc": "Backup wizard, both shells: the second step."
-      },
-      "create_button": {
-        "text": "Back-up maken",
-        "doc": "Backup wizard, both shells: the button that builds the backup."
-      }
-    },
     "restore": {
       "phrase": {
         "text": "Herstelzin",
@@ -8845,10 +8775,6 @@
       "markReturned": {
         "text": "Teruggebracht",
         "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
-      },
-      "reportPost": {
-        "text": "Melden",
-        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Bericht sturen",

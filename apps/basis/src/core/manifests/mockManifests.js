@@ -69,10 +69,8 @@ export const mockTasksManifest = tasksManifest;
  *     intentToCanonicalDraft(intent, kind) is the value-map.
  *   - /lend-return → markReturned: param `requestId` (real) — the
  *     former realAgent itemId→requestId bridge is REMOVED.
- *   - /reveal: COLLISION (real setPeerReveal vs mock revealPeer alias).
- *     Kept ONE op `setPeerReveal` (richer flags gate); the `revealPeer`
- *     op + its PINBOARD_OP_ALIAS entry are DROPPED.  adaptPinboardReply now
- *     keys its reveal branch on `setPeerReveal`.
+ *   - /reveal: deleted 2026-10-25 (a viewer-side flag nothing read; a name
+ *     is disclosed by the persona/disclosure release only).
  *   - /report, /lend-assign, /skills, /leave-group, /tree, /sign-out,
  *     /respond, /bulletin: merged to one op each, real params.
  *

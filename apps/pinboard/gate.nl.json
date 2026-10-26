@@ -59,14 +59,5 @@
     "examples": [
       "teruggebracht ladder"
     ]
-  },
-  "pinboard.reportPost": {
-    "doc": "Report a post to the circle's admins.",
-    "verbs": [
-      "rapporteer"
-    ],
-    "examples": [
-      "rapporteer de spam"
-    ]
   }
 }

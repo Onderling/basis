@@ -116,24 +116,22 @@ export function inviteMaxRedemptionsOf(codeItem, ceiling) {
 /**
  * The DISTINCT identities that have already redeemed one code.
  *
- * Matched on `codeId` when the trail carries it (every peer-path row does) and on the code STRING
- * otherwise, so a same-store local redeem is counted against the same invite. Returns a Map so a
- * caller can both count and ask "is this webid already in?" from one pass.
+ * Matched on `codeId`: a trail row names the code it was redeemed with by the code item's id, never by the code
+ * itself (an admin's secret, and the row lives in the circle's store). Returns a Map so a caller can both count and
+ * ask "is this webid already in?" from one pass.
  *
  * @param {object} a
  * @param {Array<object>} a.redemptions  `membership-redemption` items (any group)
  * @param {string} a.groupId
  * @param {string|null} [a.codeId]
- * @param {string|null} [a.code]
  * @returns {Map<string, object>} redeemer webid → the earliest redemption item for them
  */
-export function redeemersOfCode({ redemptions = [], groupId, codeId = null, code = null } = {}) {
+export function redeemersOfCode({ redemptions = [], groupId, codeId = null } = {}) {
   const out = new Map();
   for (const it of Array.isArray(redemptions) ? redemptions : []) {
     const src = it?.source ?? {};
     if (src.groupId !== groupId) continue;
-    const sameCode = (codeId && src.codeId === codeId) || (code && src.code === code);
-    if (!sameCode) continue;
+    if (!codeId || src.codeId !== codeId) continue;
     const who = typeof src.redeemedBy === 'string' && src.redeemedBy ? src.redeemedBy : null;
     if (!who || out.has(who)) continue;
     out.set(who, it);

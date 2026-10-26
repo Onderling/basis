@@ -14,6 +14,12 @@ DATA="${BACKUP_DATA:-/backup/data}"
 TARGETS_DIR="${BACKUP_TARGETS_DIR:-/backup/targets}"
 TAG="${BACKUP_TAG:-onderling-box}"
 KEEP="--keep-daily 7 --keep-weekly 4 --keep-monthly 6"
+# WHAT NEVER LEAVES THE BOX, whatever volume it sits in (restic matches each name anywhere under DATA), one name a line:
+#   push-device.json   the device runner's push store — a subscription lets its holder wake that device
+#   vault.passphrase   the vault key, which lives in .env now (a box made before kept it here until install.sh moved it)
+DEVICE_ONLY="push-device.json vault.passphrase"
+EXCLUDE=""
+for n in $DEVICE_ONLY; do EXCLUDE="$EXCLUDE --exclude $n"; done
 
 name_of() { basename "$1" .env; }
 targets() {
@@ -28,7 +34,8 @@ with_target() {
 do_backup() {
   tf="$1"
   with_target "$tf" snapshots >/dev/null 2>&1 || with_target "$tf" init || return 1
-  with_target "$tf" backup --tag "$TAG" "$DATA" || return 1
+  # shellcheck disable=SC2086
+  with_target "$tf" backup --tag "$TAG" $EXCLUDE "$DATA" || return 1
   # shellcheck disable=SC2086
   with_target "$tf" forget --tag "$TAG" --prune $KEEP || return 1
   with_target "$tf" check || return 1

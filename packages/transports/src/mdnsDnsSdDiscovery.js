@@ -18,6 +18,7 @@
  * The TXT record carries `pubKey` — the agent's address. That is the whole identity payload; the transport
  * proves possession afterwards over TCP. A record without a `pubKey` is ignored rather than guessed at.
  */
+import os from 'node:os';
 import Bonjour from 'bonjour-service';
 import { SERVICE_TYPE } from './MdnsTransport.js';
 
@@ -30,13 +31,26 @@ export function dnsSdType(serviceType) {
 }
 
 /**
+ * The SRV record's target: this host's name in the `.local` domain. Left to the library, the target is the bare
+ * `os.hostname()` (`surface-go.`), and every resolver — Android's NSD on the phone included — then asks UNICAST DNS
+ * for a name only multicast DNS answers, finds nothing, and the service is listed but never resolved (found on the
+ * household tablet, 2026-10-25: an empty room with the companion announcing correctly). A name that already ends in
+ * `.local` (a laptop that reports it that way) is kept as it is.
+ */
+export function srvHost(hostname) {
+  const name = String(hostname ?? '').replace(/\.+$/, '');
+  return /\.local$/i.test(name) ? name : `${name}.local`;
+}
+
+/**
  * Build the DNS-SD seam.
  *
  * @param {object} [opts]
  * @param {object} [opts.bonjour]  inject an instance (tests); otherwise one is created lazily and shared
+ * @param {() => string} [opts.hostname]  this host's name (tests); the OS's otherwise
  * @returns {{advertise:Function, browse:Function, destroy:Function}}
  */
-export function createDnsSdDiscovery({ bonjour = null } = {}) {
+export function createDnsSdDiscovery({ bonjour = null, hostname = () => os.hostname() } = {}) {
   let instance = bonjour;
   const ensure = () => (instance ??= new Bonjour());
 
@@ -51,6 +65,7 @@ export function createDnsSdDiscovery({ bonjour = null } = {}) {
         name:     serviceName,
         type:     dnsSdType(serviceType),
         protocol: 'tcp',
+        host:     srvHost(hostname()),
         port,
         txt,
       });

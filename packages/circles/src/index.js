@@ -36,7 +36,7 @@ export { createCircleFanOut } from './circleFanOut.js';
 // half (`fanCircleAddresses`). Pure DI lift out of pinboard; the caller injects the
 // store, the core verify helpers, the announce kind, and the fan.
 export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';
-export { isRosterTrailItem } from './rosterTrail.js';
+export { isRosterTrailItem, isLaneCarriedItem } from './rosterTrail.js';
 
 // Roster read, plus the full member
 // roster read (`listCircleMembers` — the read with the per-peer ALLOWLIST projection).
@@ -49,7 +49,7 @@ export {
 
 // Circle-creation writers (§8c slice-a, ZERO-KEY) — pure DI lift out of pinboard; the group key bootstraps
 // lazily on the first addMember, so creation moves without the key-custody plumbing.
-export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './circleCreate.js';
+export { createGroupWithRules, createGroupV2 } from './circleCreate.js';
 
 // Key-coupled membership writers (§8c slice-b) — the membership-STATE bodies of the four writers lifted as
 // pure store functions; the single trailing group-key grant/revoke is left as an INJECTED `grantKey`/

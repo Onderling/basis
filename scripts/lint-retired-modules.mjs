@@ -22,6 +22,38 @@
  *   for (`circle-post`) had no receiver left either. Traffic on every reconnect, for an answer nobody
  *   could send and nobody would have read.
  *
+ * Retired 2026-10-25 (circle chat's store copy — the device log is the record on every shell, and live chat arrives
+ *   as a signed statement at the chat rail): the shared chat inbox (chatMessageInbox, with its self-author check) and its one-time history
+ *   migration (circleChatRehydrate, the `cc.chatHistoryMigrated` latch) · pinboard's `ingestCircleMessage` and
+ *   `listCircleChats` · EvictionRoster and `listEvictedMembers` (it read an invite code's lifetime as a membership
+ *   expiry).
+ *
+ * Retired 2026-10-25 (a 1:1 turn's record is the contact thread the basis shells keep): chat-p2p's item mirror of
+ *   every DM and its readers (`getChatThread`, `listChatThreads`, `sendChatMessage`), and the contact-request
+ *   rows nothing routed or read (`requestContactAdd`, `acceptContactRequest`, `declineContactRequest`,
+ *   `listContactRequests`). Pinboard's report rows (`reportPost`, `listReports`): a report is a signed statement on the
+ *   governance rail, for the circle's admins and its reporter only.
+ * Retired 2026-10-25 (the pile's last dead paths): the plaintext attachment request/response and its two readers
+ *   (`getAttachmentDataUrl`, `requestAttachment`) — a post's attachment is sealed behind the circle's media gateway;
+ *   pinboard's contact lists (six skills, no caller); the `reveal-event` row nothing read.
+ *
+ * Retired 2026-10-25 (an export with no import): pinboard's encrypted backup — the `encryptedBackup` and
+ *   `encryptedBackupWizard` ops, the skill and its lib, the web and phone wizards and their state. It sealed the
+ *   person's own posts and member row (no keys, despite its label) into a file nothing could restore. The person's
+ *   backup is the recovery phrase and the circle's recovery file.
+ *
+ * Retired 2026-10-25 (a learned profile nothing read): pinboard's Layer-2 interest profile (InterestProfile,
+ *   InterestProfileCache, `getInterestProfile`, `resetInterestProfile`) and basis's one-time interests migration. It
+ *   learned from every answered post; `scorePostRelevance` answers from the person's own offerings only.
+ *
+ * Retired 2026-10-25 (a viewer-side flag nothing read): pinboard's Reveals — the `setPeerReveal` op and its /reveal
+ *   slash, `setGroupReveal`, `requestReveal`, `getMyReveals`, RevealsCache, item hydration and the roster's
+ *   `viewerNameOptIn`. A name is disclosed by the persona/disclosure release (revealPreset, personaProperties) only.
+ *
+ * Retired 2026-10-25 (a contact that left a self is one own-store row, written as that self): book-sync's re-file
+ *   carry (`fanRefiled`, the snapshot's `refiled` list and its receive loop) and pinboard's re-file record
+ *   (`listRefiledContacts`, the book's `refiled.json`).
+ *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
  */
@@ -42,6 +74,48 @@ const RETIRED = [
   { name: 'getSpineSince',        re: /['"]getSpineSince['"]/ },
   { name: 'handlers/catchUp',     re: /from\s+['"][^'"]*handlers\/catchUp(?:\.js)?['"]|makeRequestCatchUpFromKnownPeers\s*\(|makeHandleCatchUpRequest\s*\(/ },
   { name: 'catch-up-request',     re: /['"]catch-up-request['"]/ },
+  { name: 'chatMessageInbox',     re: /from\s+['"][^'"]*chatMessageInbox(?:\.js)?['"]|createChatMessageInbox\s*\(/ },
+  { name: 'circleChatRehydrate',  re: /from\s+['"][^'"]*circleChatRehydrate(?:\.js)?['"]|migrateCircleChatHistory\s*\(|rehydrateCircleChatsFromPinboard\s*\(/ },
+  { name: 'chatSelfAuthor',       re: /from\s+['"][^'"]*chatSelfAuthor(?:\.js)?['"]|createSelfAuthorCheck\s*\(/ },
+  { name: 'cc.chatHistoryMigrated', re: /['"]cc\.chatHistoryMigrated/ },
+  { name: 'ingestCircleMessage',  re: /['"]ingestCircleMessage['"]/ },
+  { name: 'listCircleChats',      re: /['"]listCircleChats['"]/ },
+  { name: 'EvictionRoster',       re: /from\s+['"][^'"]*EvictionRoster(?:\.js)?['"]|new\s+EvictionRoster\s*\(/ },
+  { name: 'listEvictedMembers',   re: /['"]listEvictedMembers['"]/ },
+  { name: 'getChatThread', re: /['"]getChatThread['"]/ },
+  { name: 'listChatThreads', re: /['"]listChatThreads['"]/ },
+  { name: 'sendChatMessage', re: /['"]sendChatMessage['"]/ },
+  { name: 'requestContactAdd', re: /['"]requestContactAdd['"]/ },
+  { name: 'acceptContactRequest', re: /['"]acceptContactRequest['"]/ },
+  { name: 'declineContactRequest', re: /['"]declineContactRequest['"]/ },
+  { name: 'listContactRequests', re: /['"]listContactRequests['"]/ },
+  { name: 'reportPost', re: /['"]reportPost['"]/ },
+  { name: 'listReports', re: /['"]listReports['"]/ },
+  { name: 'encryptedBackup', re: /['"]encryptedBackup(?:Wizard)?['"]|from\s+['"][^'"]*encryptedBackup(?:State|Wizard|WizardModal)?(?:\.js)?['"]/ },
+  { name: 'getAttachmentDataUrl', re: /['"]getAttachmentDataUrl['"]/ },
+  { name: 'requestAttachment', re: /['"]requestAttachment['"]/ },
+  { name: 'createContactList', re: /['"]createContactList['"]/ },
+  { name: 'deleteContactList', re: /['"]deleteContactList['"]/ },
+  { name: 'renameContactList', re: /['"]renameContactList['"]/ },
+  { name: 'addToContactList', re: /['"]addToContactList['"]/ },
+  { name: 'removeFromContactList', re: /['"]removeFromContactList['"]/ },
+  { name: 'listContactLists', re: /['"]listContactLists['"]/ },
+  { name: 'getContactList', re: /['"]getContactList['"]/ },
+  { name: 'attachment-request', re: /['"]attachment-request['"]/ },
+  { name: 'attachment-response', re: /['"]attachment-response['"]/ },
+  { name: 'reveal-event', re: /['"]reveal-event['"]/ },
+  { name: 'InterestProfile', re: /from\s+['"][^'"]*InterestProfile(?:Cache)?(?:\.js)?['"]/ },
+  { name: 'getInterestProfile', re: /['"]getInterestProfile['"]/ },
+  { name: 'resetInterestProfile', re: /['"]resetInterestProfile['"]/ },
+  { name: 'setPeerReveal', re: /['"]setPeerReveal['"]/ },
+  { name: 'setGroupReveal', re: /['"]setGroupReveal['"]/ },
+  { name: 'requestReveal', re: /['"]requestReveal['"]/ },
+  { name: 'getMyReveals', re: /['"]getMyReveals['"]/ },
+  { name: 'RevealsCache', re: /from\s+['"][^'"]*RevealsCache(?:\.js)?['"]/ },
+  { name: 'viewerNameOptIn', re: /viewerNameOptIn\s*:/ },
+  { name: 'fanRefiled', re: /fanRefiled\s*\(/ },
+  { name: 'listRefiledContacts', re: /['"]listRefiledContacts['"]/ },
+  { name: 'interestsMigration', re: /from\s+['"][^'"]*interestsMigration(?:\.js)?['"]|migrateInterests\s*\(/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

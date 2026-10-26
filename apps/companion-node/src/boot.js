@@ -20,6 +20,7 @@
  *                                  name (`ws://relay:8787`); otherwise the card maps it from COMPANION_RELAY_URL
  *   ── the local radio (opt-in) ──
  *   COMPANION_NEARBY               same values as `--nearby` below; the flag wins when both are given
+ *   COMPANION_NEARBY_PORT          the radio's fixed TCP data port (`--nearby-port`); absent, an ephemeral one
  *
  * Usage:
  *   node src/boot.js
@@ -55,10 +56,20 @@ const { nearby, error: nearbyError } = parseNearbyFlag(process.argv.slice(2), pr
 if (nearbyError) { console.error(`\n  ${nearbyError}\n`); process.exit(1); }
 
 // the claim code goes to this log only — the person who can read the node's log is the one who may claim it
-const node = await startCompanionNode({
-  relayUrl, port, host, management, manageHttp, manageHttpHost, nearby, feeds, publicUrl,
+// The identity vault is sealed under the box's vault passphrase (BASIS_VAULT_PASSPHRASE, from the box's .env); without one
+// the node refuses to boot. `--dev-plaintext-vault` (the dev harness, never a role's CMD) keeps it in the clear, as before.
+const vaultPassphrase = process.env.BASIS_VAULT_PASSPHRASE || undefined;
+const devPlaintextVault = process.argv.slice(2).includes('--dev-plaintext-vault');
+let node;
+try {
+  node = await startCompanionNode({
+  relayUrl, port, host, management, manageHttp, manageHttpHost, nearby, feeds, publicUrl, vaultPassphrase, devPlaintextVault,
   onClaimCode: (claim) => { console.log(`  Claim:        ${claim}  (valid 10 minutes — paste it in your app to become this node's owner)`); },
-});
+  });
+} catch (err) {
+  console.error(`\n  ${err?.message ?? err}\n`);
+  process.exit(1);
+}
 
 console.log('');
 // what the node IS: its gate decides who may call it (a granted token, the owner's devices), so the banner says it

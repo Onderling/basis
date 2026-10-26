@@ -111,6 +111,7 @@ export const SEAMS = Object.freeze([
   // timer the foreground cadence. The box keeps its own clock (`host-tick`).
   { id: 'person-clock', pattern: /createPersonClock\(/, shells: ['web', 'mobile'], why: 'a person\'s own planned rows (their week overview) run on their phone and in their browser while the app is open' },
   { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'mobile', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
+  { id: 'device-push-store', pattern: /pinboardPushPersistDb:/, shells: ['web', 'mobile', 'box'], why: 'push subscriptions survive a restart on the device\'s own sealed store, never in the pinboard store a pod can reach' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.

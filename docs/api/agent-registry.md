@@ -1023,8 +1023,7 @@ its coarse rung (categoryId under disclosure) lives in `offeringsTaxonomy.js`, n
 `interest` (interests→drivers fold-in, NOTE-skills-properties-audit 4) is likewise a
 driver-kind open item — what someone ENGAGES WITH / cares about — carried as tags on the
 `{ kind, text, tags[] }` shape (no taxonomy / coarse rung: interests are FREE drivers, matched
-on-device by tag overlap). It folds the bespoke learned Layer-2 interest signal
-(pinboard InterestProfile top terms) into one disclosure-controlled property on the profile graph.
+on-device by tag overlap). A person writes them; nothing learns them behind their back.
 
 Legacy `skill` (the pre-rename name for the human "I can do X" DATA — see
 NOTE-offering-rename-inventory.md) is READ-ACCEPTED and normalized to `offering`; new writes use

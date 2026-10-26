@@ -16,6 +16,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { execFileSync, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { fakeBotApi } from '../test/support/fakeBotApi.js';
@@ -51,6 +52,8 @@ test('step 0: link, claim the companion, give the bot the agenda files, the link
     COMPANION_RELAY_URL: relay.url, COMPANION_PUBLIC_URL: base,
     TG_BOT_TOKEN: '123:fake', TG_ADMIN_UID: ADMIN, ONDERLING_PROFILE_KIND: 'function', ONDERLING_PRIMARY_DEVICE: '0',
     BASIS_APP_URL: appUrl.replace(/\/$/, ''), STEP0_TELEGRAM_API_ROOT: api.root, TZ: 'Europe/Amsterdam',
+    // the vault passphrase install.sh writes into a box's .env: the runner and the companion refuse to boot without one
+    BOX_VAULT_PASSPHRASE: randomBytes(32).toString('hex'),
   };
   const said = (uid = ADMIN) => api.said(uid).map((m) => m.text);
   async function ask(text, test = () => true, uid = ADMIN) {

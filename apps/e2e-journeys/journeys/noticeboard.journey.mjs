@@ -94,6 +94,15 @@ export async function run({ relayUrl }) {
     const seenPost = openItems.find((i) => i.source?.broadcast) ?? openItems.find((i) => i.text?.includes('boormachine'));
     check('stranger sees the noticeboard post (mirror over relay)', !!seenPost);
 
+    // what reaches the host's agent — a 1:1 turn is not kept by pinboard (its record is a shell's contact thread), so
+    // the journey reads the delivery itself
+    const reachedHost = [];
+    host.agent.on('message', (m) => {
+      for (const p of m?.parts ?? []) {
+        const d = p?.data;
+        if (d?.subtype === 'chat-message') reachedHost.push(d);
+      }
+    });
     let reply;
     if (seenPost) {
       reply = await call(stranger, 'respondToItem',
@@ -102,10 +111,8 @@ export async function run({ relayUrl }) {
     check('reply spins a private 1:1 thread', !!reply?.threadId);
     await wait(1800);
 
-    let thread = { messages: [] };
-    if (reply?.threadId) { try { thread = await call(host, 'getChatThread', { threadId: reply.threadId }, HOST); } catch { /* */ } }
     check('host receives the reply privately (1:1 over relay)',
-      (thread.messages ?? []).some((x) => (x.body ?? x.text ?? '').includes('kom maar langs')));
+      reachedHost.some((d) => d.threadId === reply?.threadId && String(d.body ?? '').includes('kom maar langs')));
 
     // ── removal (the coupling fix, live): the admin bans the stranger → nothing more reaches them ──
     const removal = await call(host, 'removeMember', { groupId: GROUP, memberWebid: STRANGER, policy: 'ban' }, HOST);

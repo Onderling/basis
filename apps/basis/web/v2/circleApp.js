@@ -202,9 +202,8 @@ import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 import {
   applyChatFilter, chatFilterChips, normalizeChatFilter, localStorageChatFilterIo,
 } from '../../src/v2/chatFilter.js';
-// key management: reuse the existing encrypted-backup + restore wizards
+// key management: reuse the existing restore wizard
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
-import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
 import { renderRecoveryExportWizard, renderRecoveryImportWizard } from '../../src/web/wizards/recoveryFileWizard.js';
 // OBJ-2 membership — reuse the classic join wizard renderer in v2 via the same overlay adapter.
@@ -229,7 +228,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
-import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
+import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -248,10 +247,9 @@ import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
-import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
+import { foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
-import { reportEntryId } from '../../src/v2/reportModel.js';
-import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
@@ -390,9 +388,6 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
 import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
-import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/circleChatRehydrate.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
@@ -4857,9 +4852,8 @@ async function showMyData(opts) {
   // same capability, and the manifest stops describing what the buttons do.
   const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
-  // launch the existing backup/restore wizards in a modal overlay; reveal
+  // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
-  const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
   const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
@@ -4973,7 +4967,7 @@ async function showMyData(opts) {
     // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
     weekOverview,
-    onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -5146,7 +5140,7 @@ function showSettingsCircleChooser() {
   });
 }
 
-// mount one of the existing wizard renderers (encrypted-backup / restore)
+// mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
 function mountMyDataWizard(renderWizard, extra = {}) {
@@ -8500,13 +8494,9 @@ let _govRerender = null;
 // "A decision opened" is RENDERED from the proposal statement on the log (`governanceNotices.js`, through
 // `chatRows`) — the appended `gov-notif` nudge that used to live here is retired (2-TER's rule: no write
 // whose payload is derivable from an entry already on the log). `type: 'notification'` keeps its real job.
-function govBroadcast(channel, circleId, event, opts) {
-  const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-  const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
-  // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
-  // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
-  const to = Array.isArray(opts?.to) ? opts.to : undefined;
-  rawCallSkill('pinboard', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
+function govBroadcast(channel, circleId, statement, opts) {
+  // the one shared fan (governanceAppWiring); `rawCallSkill` is read at call time
+  return makeGovernanceBroadcast((...args) => rawCallSkill(...args))(channel, circleId, statement, opts);
 }
 
 // Remove a reported post/message when an admin ACTS on it (the §8 report host's `act` calls
@@ -9147,6 +9137,8 @@ async function boot() {
       settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
       // The outbox — held messages + the dead-address verdict — survives a reload (device-local, never the pod).
       outboxPersistDb: { dbName: 'cc-outbox-state', storeName: 'outbox' },
+      // Push subscriptions: their own device-local store (never the pod, never a sibling).
+      pinboardPushPersistDb: { dbName: 'cc-push-device', storeName: 'subscriptions' },
       // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle
       // params ride the user's OWN pod (not a device-local island): `attachInner` write-throughs the local
       // cache to `<pod>/basis/settings/…`, sealed to this agent's key. Not signed in → null → local-only
@@ -9361,32 +9353,8 @@ async function boot() {
       sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name });
       // Phase 5 — build the circle composer's bot now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
-      // register a peer-router with the circle-chat-message
-      // handler + connect the NKN transport (best-effort; no-op when
-      // nkn-sdk failed to load).  The ingest hook mirrors the envelope
-      // into pinboard's itemStore so circle chat history is durable,
-      // searchable, and mute/eviction-filtered (parity with /post
-      // delivery via `ingestRemotePost`).  EventLog append still drives
-      // the live bubble render.
-      const ingestCircleMessage = async (payload, fromPeerAddr) => {
-        try {
-          return await agent.callSkill('pinboard', 'ingestCircleMessage', {
-            payload, fromPeerAddr,
-          });
-        } catch (err) {
-          console.warn('[circleApp] ingestCircleMessage failed:', err?.message ?? err);
-          return { error: String(err?.message ?? err) };
-        }
-      };
-      // ε.1 — single normalization gate.  Every circle-chat insert
-      // path (receiver / rehydrator / future catch-up / pod) routes
-      // through this inbox so envelope validation + msgId dedup +
-      // ingest mirror + eventLog append happen in ONE place with
-      // shared state.  Sibling of `eventLog` so the rehydrator's
-      // backfill + the live NKN handler dedupe through the same LRU.
-      // Delivery honesty + repaint — SHARED by the legacy-envelope inbox and the signed-statement
-      // receive path (one set of side effects, not two): a LIVE inbound insert answers the sender with
-      // a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
+      // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender
+      // with a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
       const onCircleStored = ((sendReceipt) => (info) => {
           try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
           // …and REPAINT, because a message that arrived while the circle is open has to APPEAR.
@@ -9417,29 +9385,9 @@ async function boot() {
         }));
       // The Nearby room confirms what lands with the SAME receipt (nearbyRoomBinding.js).
       try { ensureNearbyRoom(agent)?.setLandedHook(onCircleStored); } catch { /* the room works without receipts */ }
-      const circleChatInbox = createChatMessageInbox({
-        eventLog,
-        ingest: ingestCircleMessage,
-        onStored: onCircleStored,
-        // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
-        // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
-        // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
-        resolveRef: circleResolveRef,
-        // "Did I write this?" — so a message of mine read back out of storage (boot rehydrate,
-        // catch-up, pod replay) comes back as MINE (`LOCAL_ACTOR`) instead of as a stranger's.
-        // Per-circle by construction; never consulted on the live receive path (chatSelfAuthor.js).
-        isSelfAuthored: createSelfAuthorCheck({
-          whoAmI: () => agent.callSkill('pinboard', 'whoAmI', {}),
-          circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-        }),
-        localActor: LOCAL_ACTOR,
-        logger: console,
-      });
-      // (the legacy plain-envelope receive is gone — every live chat message arrives as a SIGNED statement)
       // The SIGNED chat receive path (the content re-root): a fanned statement verifies at the agent's
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
-      // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
-      // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
+      // entry (bubble + proof) — the device log is the record — with the delivery receipt and the repaint.
       // THE LANE TABLE, built once for every shell (`buildCircleLanes`): the five signed lanes with
       // their catch-ups, plus the personal ones — grants, the roster seed, and the turns this person's
       // own devices hand each other. This shell passes only its own reactions: what to repaint, where
@@ -9481,18 +9429,6 @@ async function boot() {
       taskCatchUpShell    = circleLanes.catchUps.task;
       chatCatchUpShell    = circleLanes.catchUps.chat;
       podChatCatchUpShell = circleLanes.catchUps.podChat;
-      // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log): the log is the record now
-      // (durable since the persistence slice), so the store-era history lands on it ONCE through the
-      // shared inbox and a device-local latch skips every later boot. The per-boot rehydrate is retired
-      // — this was its final job.
-      migrateCircleChatHistory({
-        callSkill: agent.callSkill,
-        inbox:     circleChatInbox,
-        marker: {
-          get: () => { try { return localStorage.getItem(CHAT_MIGRATION_MARKER_KEY); } catch { return null; } },
-          set: (v) => { try { localStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v); } catch { /* retried next boot */ } },
-        },
-      }).catch(() => { /* logged inside */ });
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
       // recipes per-circle; the editor pulls on mount + passes via
       // γ.3's `incomingRecipe` opt.
@@ -9541,7 +9477,6 @@ async function boot() {
             circlePolicyLane.apply(cid, govShellRail).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
           } }),
-          'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // Calendar INBOUND — receive what the fan-out sends. invite persists
           // the event locally (→ shows on the calendar surface) + a circle
           // heads-up; rsvp/cancel apply to local calendar state. (A richer

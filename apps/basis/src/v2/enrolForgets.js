@@ -40,6 +40,7 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc-own-devices',           // the person's own items: their appointments of no circle, their planned rows
     'cc-outbox-state',          // web's outbox
     'cc-outbox-cache',          // mobile's
+    'cc-push-device',           // push subscriptions (the former self's wake tokens), on every shell
     // Settings, the pinboard and the household — each shell names its own, and the two sets are NOT the same
     // words. `lint-content-classification` found the web half missing from this list on its first run, which
     // is the entire reason it exists: the table was assembled by hand and reviewed by hand, and three of the
@@ -88,7 +89,6 @@ export const THROWAWAY_CONTENT = Object.freeze({
     'cc.sharedWithMe',
     'cc.userScreens',
     'cc.actionFrequency',       // which ops the former self used
-    'cc.chatHistoryMigrated.v1',
     'cc.firstBootSeeded.v1',
     'basis.nearbyAllows',       // who this device was told to allow — the former self's consent…
     'basis.nearbyMineSeen',

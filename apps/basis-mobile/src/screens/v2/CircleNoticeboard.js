@@ -4,7 +4,7 @@
  * RN mirror of web's `circleNoticeboard.js`: the circle noticeboard inside a
  * circle's NOTICEBOARD tab — an ask/offer/lend composer and the open-post list with
  * per-row actions. Self-contained: loads `listOpen` and dispatches `postRequest`/
- * `respondToItem`/`cancelRequest`/`reportPost`/`markReturned` via the injected
+ * `respondToItem`/`cancelRequest`/`markReturned` via the injected
  * `callSkill` (the same already-wired pinboard ops). Shows the shared circle's posts
  * (one pinboard agent today); per-circle scoping arrives with the pod foundation.
  */
@@ -185,9 +185,8 @@ export default function CircleNoticeboard({ selfProfileId = 'default', callSkill
       if (action === 'respond') { setReplyingTo(post.id); setReplyText(''); return; }
       if (action === 'assign') { setAssigningTo(post.id); setAssignText(''); return; }
       if (action === 'cancel') await callSkill('pinboard', 'cancelRequest', { requestId: post.id });
-      // §8 unification — a post report is now a governance report event (propagates + shows
-      // in the governance Reports section), not the older reportPost item. Falls back if unwired.
-      else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('pinboard', 'reportPost', { itemId: post.id }); }
+      // a post report is a signed governance report (to the circle's admins only) — the one report door
+      else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); }
       else if (action === 'markReturned') await callSkill('pinboard', 'markReturned', { requestId: post.id });
       else if (action === 'accept' && responder) await callSkill('pinboard', 'acceptResponder', { requestId: post.id, responderWebid: responder });
       else if (action === 'mute' && post.addedBy) {

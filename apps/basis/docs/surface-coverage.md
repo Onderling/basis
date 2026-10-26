@@ -138,8 +138,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `cancelRequest` | remove | ✅ | ✅ | ✅ | · | ✅ | ✅ | withdraw, intrekken, annuleer |
 |  | `assignLend` | reassign | ✅ | ✅ | · | · | · | · |  |
 |  | `markReturned` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | returned, mark returned, teruggebracht, terug |
-|  | `reportPost` | report | ✅ | ✅ | ✅ | · | ✅ | ✅ | report, flag, rapporteer |
-|  | `setPeerReveal` | set | ✅ | ✅ | · | · | · | · |  |
 |  | `leaveGroup` | remove | ✅ | ✅ | · | · | · | · |  |
 |  | `getItemTree` | tree | ✅ | ✅ | · | · | · | · |  |
 |  | `signOutOfPod` | remove | ✅ | ✅ | · | · | ✅ | ✅ |  |
@@ -157,7 +155,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getContactShareQr` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `conflictDisputeWizard` | add | ✅ | ✅ | · | · | ✅ | ✅ |  |
 |  | `postAudienceWizard` | add | ✅ | ✅ | · | · | ✅ | · |  |
-|  | `encryptedBackupWizard` | list | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `createGroupWizard` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `joinGroupWizard` | add | ✅ | ✅ | · | · | ✅ | · |  |
 |  | `getCurrentGroup` | list | ✅ | ✅ | · | · | · | · |  |
@@ -175,7 +172,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `setMyDisplayName` | set | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `listMyHandles` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `getMyProfile` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `getInterestProfile` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `subscribeWebPush` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `unsubscribeWebPush` | remove | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `subscribeExpoPush` | add | ✅ | · | · | · | ✅ | ✅ |  |
@@ -184,10 +180,8 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getCircleStoragePolicy` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `setCircleStoragePolicy` | set | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `podSignInStatus` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `encryptedBackup` | list | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `listMyCircles` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `listCirclePostsSince` | list | ✅ | · | · | · | ✅ | · |  |
-|  | `listCircleChats` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `getLatestPostAddedAt` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `listConsentingPeers` | list | ✅ | · | · | · | ✅ | · |  |
 |  | `getPrivacyNotice` | list | ✅ | · | · | · | ✅ | · |  |
@@ -220,8 +214,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `broadcastCircleRecipe` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `broadcastCircleAddresses` | share | ✅ | · | · | · | ✅ | · |  |
 |  | `recordCircleAddressAnnouncement` | add | ✅ | · | · | · | ✅ | · |  |
-|  | `ingestCircleMessage` | add | ✅ | · | · | · | ✅ | · |  |
-|  | `ingestRemotePost` | add | ✅ | · | · | · | ✅ | · |  |
 | **folio** | `deleteFromPod` | remove | · | · | · | · | ✅ | ✅ |  |
 |  | `deleteLocally` | remove | · | · | · | · | ✅ | ✅ |  |
 |  | `forceRepush` | sync | · | · | · | · | ✅ | ✅ |  |
@@ -337,7 +329,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `assistant-export` | export-household | · | ✅ | · | · | · | · |  |
 |  | `assistant-import` | import-household | · | ✅ | · | · | ✅ | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 332 ops | | 241 | 183 | 29 | 7 | 152 | 70 | |
+| **totals** | 324 ops | | 233 | 180 | 28 | 7 | 145 | 68 | |
 
 ### Flows
 
@@ -354,6 +346,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (303/332): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block …
-- **missing inline** (262/332): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block …
-- **missing chat** (91/332): basis:signin, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block, basis:screen-set-block-config, basis:screen-undo, household:revokeDevice, household:pairCirclePeer, household:stashEnrollOffer, household:bindCirclePersona, household:claimCompanion, household:companionGrantChoices, household:grantCompanion, household:companionGrantList, household:revokeCompanionGrant, household:listRecoveryCircles, household:exportRecoveryFile, household:listReceivablePersonas, household:removePersonaHere, household:setNearbyLevel, household:listPersonasHere, household:pausePersona, household:resumePersona, household:receivePersonas, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer …
+- **missing gate** (296/324): basis:help, basis:help-with, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block …
+- **missing inline** (256/324): basis:help, basis:help-with, basis:embed-file, basis:embed-time, basis:logs, basis:feedback, basis:scanQr, basis:find, basis:brief, basis:signin, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block …
+- **missing chat** (91/324): basis:signin, basis:signout, basis:screen-add-page, basis:screen-remove-page, basis:screen-rename-page, basis:screen-set-active, basis:screen-set-personas, basis:screen-set-circles, basis:screen-pin, basis:screen-unpin, basis:screen-add-block, basis:screen-remove-block, basis:screen-move-block, basis:screen-set-block-config, basis:screen-undo, household:revokeDevice, household:pairCirclePeer, household:stashEnrollOffer, household:bindCirclePersona, household:claimCompanion, household:companionGrantChoices, household:grantCompanion, household:companionGrantList, household:revokeCompanionGrant, household:listRecoveryCircles, household:exportRecoveryFile, household:listReceivablePersonas, household:removePersonaHere, household:setNearbyLevel, household:listPersonasHere, household:pausePersona, household:resumePersona, household:receivePersonas, household:importRecoveryFile, household:restoreStatus, household:restoreSource, household:restoreIntent, household:replaceDevice, household:enrollDevice, household:buildEnrollOffer …

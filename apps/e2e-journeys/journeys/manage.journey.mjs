@@ -24,7 +24,7 @@ export async function run({ relayUrl }) {
   const owner    = new Agent({ identity: ownerId,    transport: new RelayTransport({ relayUrl, identity: ownerId }) });
   const attacker = new Agent({ identity: attackerId, transport: new RelayTransport({ relayUrl, identity: attackerId }) });
 
-  const node = await startCompanionNode({
+  const node = await startCompanionNode({ vaultPassphrase: 'test-only-passphrase',
     relayUrl, configDir: cfg, gate: false,
     inbox: true, inboxOwnerPubKey: owner.address,           // a real tenant to report
     management: true,                                       // claimed below, with the code it prints

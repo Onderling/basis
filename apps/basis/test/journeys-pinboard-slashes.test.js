@@ -10,7 +10,6 @@
  *   /leave-group  → leaveGroup       (destructive — confirm-gated in mock)
  *   /tree         → getItemTree      (read-only graph walk)
  *   sign-out → signOutOfPod (confirm-gated)
- *   /report       → reportPost       (moderation)
  *   /bulletin     → listOpen         (cross-app substrate — read noticeboard)
  *
  * SUBSTRATE GAP SURFACED — `apps/basis/src/core/manifests/
@@ -174,12 +173,12 @@ describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
 
-  it('commandMenu declares /lend-assign /lend-return /leave-group /tree /sign-out /report /bulletin', () => {
+  it('commandMenu declares /lend-assign /lend-return /leave-group /tree /sign-out /bulletin', () => {
     const cmds = new Set(ws.catalogue().commandMenu.map((e) => e.command));
     for (const cmd of [
       // `/offerings` retired 2026-10-15 with the per-person offering writers (offerings are the person's drivers).
       '/lend-assign', '/lend-return', '/leave-group',
-      '/tree', '/sign-out', '/report', '/bulletin',
+      '/tree', '/sign-out', '/bulletin',
     ]) {
       expect(cmds.has(cmd)).toBe(true);
     }
@@ -189,7 +188,7 @@ describe('CC-ST-audit — catalogue has all 7 audit slashes', () => {
     const menu = ws.catalogue().commandMenu;
     const audit = [
       '/lend-assign', '/lend-return', '/leave-group',
-      '/tree', '/sign-out', '/report', '/bulletin',
+      '/tree', '/sign-out', '/bulletin',
     ];
     for (const cmd of audit) {
       const entry = menu.find((e) => e.command === cmd);
@@ -387,39 +386,6 @@ describe('CC-ST.A6 — /sign-out wires signOutOfPod (Q27 confirm-gated)', () => 
       expect(r.payload).toBeDefined();
       expect(typeof r.payload).toBe('object');
     }
-  });
-});
-
-/* ════════════════════════════════════════════════════════════
- * 7. /report — reportPost (moderation)
- *    Two-arg substrate (itemId required, reason optional).  Manifest
- *    slash has match.body:'match', so body → _match → itemId.
- *    Reason is opt-in (would need --reason= flag, but body default
- *    is 'match' not 'flags' — declared opt-out for V0 per header).
- * ══════════════════════════════════════════════════════════ */
-
-describe('CC-ST.A7 — /report wires reportPost', () => {
-  let ws;
-  beforeEach(async () => { ws = await bootWorkspaceWithRealPinboard(); });
-
-  it('/report <itemId> dispatches; substrate returns {reportId}', async () => {
-    const r = await ws.userInput('/report bad-post-id');
-    if (r.error) {
-      expect(typeof r.error.message).toBe('string');
-    } else {
-      expect(r.payload).toBeTruthy();
-      const reply = r.payload;
-      // Substrate addItems({type:'report', ...}) returns a new report
-      // id even when the target post doesn't exist (the report is
-      // stored against the unresolved target — moderation footprint).
-      expect(reply.reportId ?? reply.error ?? null).not.toBeNull();
-    }
-  });
-
-  it('bare /report → needsForm for itemId', async () => {
-    const r = await ws.userInput('/report');
-    expect(r.kind).toBe('needsForm');
-    expect(r.missing).toContain('itemId');
   });
 });
 

@@ -44,6 +44,15 @@ describe('--nearby', () => {
     expect(flag('--nearby-label=x').nearby, 'a label alone does not turn the radio on').toBe(false);
   });
 
+  it('carries a fixed data port from COMPANION_NEARBY_PORT or --nearby-port (the box opens exactly that one)', () => {
+    expect(parseNearbyFlag([], { COMPANION_NEARBY: 'publish', COMPANION_NEARBY_PORT: '45210' }).nearby.port).toBe(45210);
+    expect(flag('--nearby', '--nearby-port=45211').nearby.port).toBe(45211);
+    expect(flag('--nearby').nearby.port, 'no port named: an ephemeral one').toBeUndefined();
+    const bad = parseNearbyFlag([], { COMPANION_NEARBY: 'browse', COMPANION_NEARBY_PORT: 'eighty' });
+    expect(bad.nearby).toBe(false);
+    expect(bad.error).toMatch(/port/);
+  });
+
   it('REFUSES a value it does not understand instead of falling back to off', () => {
     const bad = flag('--nearby=shout');
     expect(bad.nearby).toBe(false);

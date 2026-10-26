@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { startJourneyRelay } from '../support/testRelay.js';
 import { signSpine } from '@onderling/core';
-import { reportEntryId } from '../../src/v2/reportModel.js';
 
 // Wave C tail A over a REAL relay (running on :8787) — governance/report propagation via the
 // production fan + peer router, over a genuine transport (not InternalTransport). This is the
@@ -56,16 +55,26 @@ describe('governance/report propagation over a REAL relay', () => {
 
   it('broadcastCircleReport A -> B ingests the report event over the relay', async () => {
     const A = await bootRealAgentNode('A');
-    const B = await bootRealAgentNode('B');
+    const aCidHolder = {};
+    const B = await bootRealAgentNode('B', {
+      verifyGovernanceBinding: async ({ author, ref }) => ref === A.pubKey && author === aCidHolder.pubKey,
+    });
     await connectAgentsOverRelay(A, B, { relayUrl: RELAY });
     await pairCircle(A, B);
     await warmMesh(A, B);
 
-    const event = { kind: 'report', event: 'report', reportId: 'r-relay', targetType: 'member', targetRef: 'x', reason: 'spam', by: 'A' };
-    const r = await A.agent.callSkill('pinboard', 'broadcastCircleReport', { groupId: 'peer-circle', event, msgId: reportEntryId(event) });
+    // a report is a SIGNED statement on the governance rail (report-file), signed with A's real per-circle key
+    const cid = await A.agent.circleIdentityFor('peer-circle');
+    aCidHolder.pubKey = cid.pubKey;
+    const event = signSpine(cid, {
+      kind: 'report-file', circleId: 'peer-circle', subject: 'r-relay',
+      payload: { targetType: 'member', targetRef: 'someone', reason: 'spam', by: A.pubKey, authorRef: A.pubKey, at: 1 },
+      parent: null,
+    });
+    const r = await A.agent.callSkill('pinboard', 'broadcastCircleReport', { groupId: 'peer-circle', event, msgId: `gov:${event.body.hash}` });
     expect(r?.sent).toBeGreaterThan(0);
 
-    const got = await until(() => B.chatEvents.some((e) => e?.type === 'report' && e?.payload?.reportId === 'r-relay'), { timeout: 8000 });
+    const got = await until(() => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.kind === 'report-file' && e?.payload?.body?.subject === 'r-relay'), { timeout: 8000 });
     expect(got, 'B ingested the report event over the relay').toBeTruthy();
     await teardown(A, B);
   });

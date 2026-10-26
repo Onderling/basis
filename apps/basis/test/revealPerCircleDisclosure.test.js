@@ -7,9 +7,8 @@
  * what Cato would actually SHARE in each circle — which is the real enforcement (per `contextId`), stored per
  * circle and gate-projected over the wire.
  *
- * DELIBERATELY NOT the viewer-side `Reveals`/`setGroupReveal`/`viewerNameOptIn` toggle: that is the VIEWER's
- * local "show me names" preference, not what the member disclosed (`packages/identity-resolver/src/Reveals.js`
- * says so outright), and an earlier three-device attempt "passed for the wrong reason" by asserting on it
+ * Not the viewer-side "show me names" toggle (deleted 2026-10-25): that was the VIEWER's local preference, not
+ * what the member disclosed, and an earlier three-device attempt "passed for the wrong reason" by asserting on it
  * (`remainingStoriesThreeDevice.test.js`). The carried name is the persona property `realName`, never
  * `displayName` (a local cache that never crosses the peer allowlist).
  *

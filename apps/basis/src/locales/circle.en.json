@@ -3865,18 +3865,6 @@
         "text": "Full",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
-    },
-    "on": {
-      "text": "🔓 Reveal turned on for {{peer}}. It works both ways: they must turn it on too.",
-      "doc": "Confirmation of /reveal on."
-    },
-    "off": {
-      "text": "🔒 Reveal turned off for {{peer}}.",
-      "doc": "Confirmation of /reveal off."
-    },
-    "someone": {
-      "text": "(someone)",
-      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {
@@ -6101,7 +6089,7 @@
       },
       "report": {
         "text": "Report",
-        "doc": "S1 — per-post action: report abuse (reportPost)."
+        "doc": "S1 — per-post action: report abuse (a signed report to the circle's admins)."
       },
       "mute": {
         "text": "Block",
@@ -6557,10 +6545,6 @@
     "keys": {
       "text": "Keys & backup",
       "doc": "S5 — key-management section heading."
-    },
-    "backup": {
-      "text": "Back up my keys",
-      "doc": "S5 — launch the encrypted-backup wizard."
     },
     "view_mnemonic": {
       "text": "View recovery phrase",
@@ -8451,60 +8435,6 @@
         "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
-    "backup": {
-      "confirm_passphrase": {
-        "text": "Confirm passphrase",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "building": {
-        "text": "Building backup…",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "passphrase_warning": {
-        "text": "Lose the passphrase and the backup is gone. There is no recovery. Write it down.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "download": {
-        "text": "Download",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "title": {
-        "text": "Encrypted backup",
-        "doc": "Mobile backup wizard heading."
-      },
-      "ready": {
-        "text": "Backup ready",
-        "doc": "Mobile backup wizard, the done step."
-      },
-      "intro": {
-        "text": "A snapshot of your own data, protected by a passphrase. The passphrase never leaves this device — without it the backup is useless to anyone, including you.",
-        "doc": "Backup wizard step 1 body."
-      },
-      "ready_title": {
-        "text": "✓ Backup ready",
-        "doc": "Backup wizard, the final screen."
-      },
-      "ready_intro": {
-        "text": "Download it and keep it somewhere safe — mail it to yourself, copy it to a USB stick, put it in a cloud you trust. It is encrypted, so where it sits matters less than whether you still have it.",
-        "doc": "Backup wizard, the final screen."
-      },
-      "passphrase_label": {
-        "text": "Passphrase",
-        "doc": "Backup wizard, both shells: the passphrase field and its step."
-      },
-      "passphrase_hint": {
-        "text": "At least 12 characters is wise — pick one you will remember.",
-        "doc": "Backup wizard, both shells: the passphrase placeholder."
-      },
-      "step_save": {
-        "text": "Save",
-        "doc": "Backup wizard, both shells: the second step."
-      },
-      "create_button": {
-        "text": "Create backup",
-        "doc": "Backup wizard, both shells: the button that builds the backup."
-      }
-    },
     "restore": {
       "phrase": {
         "text": "Recovery phrase",
@@ -8845,10 +8775,6 @@
       "markReturned": {
         "text": "Returned",
         "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
-      },
-      "reportPost": {
-        "text": "Report",
-        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Message",

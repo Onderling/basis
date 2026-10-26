@@ -1,7 +1,7 @@
 /**
  * Pinboard V1 — Phase 17 tests.
  *
- * Onboarding polish: getInviteQrPayload, gated redeemInviteWithGate.
+ * Onboarding polish: getInviteQrPayload.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -60,50 +60,3 @@ describe('Pinboard V1 Phase 17 — getInviteQrPayload', () => {
   });
 });
 
-// ── redeemInviteWithGate ─────────────────────────────────────────────────
-
-describe('Pinboard V1 Phase 17 — redeemInviteWithGate', () => {
-  it('rejects without privacy acceptance', async () => {
-    const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'redeemInviteWithGate', {
-      invite: { groupId: 'oosterpoort' },
-      rulesAccepted: true,
-      privacyAccepted: false,
-    });
-    expect(r).toEqual({ error: 'privacy-not-accepted' });
-  });
-
-  it('rejects without rules acceptance', async () => {
-    const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'redeemInviteWithGate', {
-      invite: { groupId: 'oosterpoort' },
-      privacyAccepted: true,
-      rulesAccepted: false,
-    });
-    expect(r).toEqual({ error: 'rules-not-accepted' });
-  });
-
-  it('accepts both gates → records audit item + returns ok', async () => {
-    const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'redeemInviteWithGate', {
-      invite: { groupId: 'oosterpoort' },
-      privacyAccepted: true,
-      rulesAccepted: true,
-    });
-    expect(r.ok).toBe(true);
-    expect(r.acceptanceId).toBeTruthy();
-
-    const item = await bundle.itemStore.getById(r.acceptanceId);
-    expect(item.type).toBe('rules-accept');
-    expect(item.source.gateVersion).toBe('phase-17');
-    expect(item.source.acceptedBy).toBe(ANNE);
-  });
-
-  it('rejects missing invite', async () => {
-    const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'redeemInviteWithGate', {
-      privacyAccepted: true, rulesAccepted: true,
-    });
-    expect(r).toEqual({ error: 'invite required' });
-  });
-});

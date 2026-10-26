@@ -44,11 +44,39 @@ export function makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: refIn(circleId) }),
     entryKind: GOVERNANCE_KIND,
     declaredKinds: GOVERNANCE_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? rosterBindingVerifier(callSkill),
+    // …and a REPORT statement lands only as its rule says (`reportLane.js`): a filed report's `by` is its author, a
+    // resolution's author an admin — checked here, at ingest, so a live fan and a catch-up batch are held to it alike
+    verifyBinding: withReportAdmission(verifyBinding ?? rosterBindingVerifier(callSkill), callSkill),
   });
 }
+
+/**
+ * The ONE fan every shell hands `bindCircleGovernance`: a just-appended governance or report statement to the circle,
+ * through pinboard's broadcast skills. The statement's hash is the message id, so a re-delivery dedups. `opts.to`
+ * narrows the fan — the report channel passes the report's readers (`reportReaders`).
+ *
+ * @param {(app: string, op: string, args: object) => Promise<*>} callSkill
+ */
+export function makeGovernanceBroadcast(callSkill) {
+  return (channel, circleId, statement, opts) => {
+    if (typeof callSkill !== 'function' || !statement?.body?.hash) return;
+    const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
+    const to = Array.isArray(opts?.to) ? opts.to : undefined;
+    Promise.resolve(callSkill('pinboard', op, { groupId: circleId, event: statement, msgId: `gov:${statement.body.hash}`, ts: Date.now(), ...(to ? { to } : {}) }))
+      .catch(() => { /* the fan is best-effort — catch-up reconciles */ });
+  };
+}
+
+/** The rail's key↔ref binding, then — for a report kind only — its admission rule. */
+function withReportAdmission(bind, callSkill) {
+  return (q) => {
+    if (!isReportStatementKind(q?.kind)) return bind(q);   // every other kind: the binding alone, unchanged
+    return Promise.resolve(bind(q)).then((ok) => (ok ? reportStatementAdmissible(q, { callSkill }) : false));
+  };
+}
 import { makeCircleReports } from './reportHost.js';
-import { REPORT_KIND, REPORT_EVENT, reportEntryId } from './reportModel.js';
+import { REPORT_FILE_KIND, REPORT_RESOLVE_KIND, isReportStatementKind, reportStatementAdmissible, reportReaders, reportEventOf } from './reportLane.js';
+import { REPORT_EVENT } from './reportModel.js';
 
 /**
  * The circle's membership as `{ref, role}` — the electorate every governance fold counts against.
@@ -138,12 +166,14 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     readGovernanceState: (circleId) => rail.readVerified(circleId),
   });
 
-  // §8 reporting — rides the same log (kind `report`, unchained: admin records, not votes);
-  // a member-target ban routes through the governance handle above (its removeMember class).
-  const readReportEvents = async (circleId) => eventLog
-    .query({})
-    .filter((e) => e && e.type === REPORT_KIND && e.circleId === circleId && e.payload)
-    .map((e) => e.payload);
+  // §8 reporting — SIGNED on this rail (`report-file` · `report-resolve`, `reportLane.js`): who filed a report and who
+  // closed it are facts the rail proves. A member-target ban routes through the governance handle above (its
+  // removeMember class).
+  const readReportEvents = async (circleId) => {
+    let bodies = [];
+    try { ({ bodies = [] } = await rail.readVerifiedBodies(circleId)); } catch { return []; }
+    return bodies.filter((b) => isReportStatementKind(b?.kind)).map(reportEventOf).filter(Boolean);
+  };
   // The circle's ADMIN refs — who a report may be shown to. Read from the same membership the governance
   // fold uses, so "admin" means one thing in this file.
   const adminRefsOf = async (circleId) => {
@@ -152,30 +182,26 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   };
   const iAmAdmin = async (circleId) => (await adminRefsOf(circleId)).includes(refIn(circleId));
 
-  // A report is fanned ONLY to the circle's admins (story 3.6). It used to go to every member, which put the
-  // reporter's identity and the free-text reason about the REPORTED person onto that person's own device —
-  // the `if (isAdmin)` in each shell was hiding it, not withholding it. `to` narrows the recipient set at the
-  // broadcast seam; an empty admin list means nobody but the local writer holds it, which is the safe end.
-  /** Who filed the report this event concerns — the REPORT event carries it directly; a RESOLVE event only
-   *  names the reportId, so we look the original up in the local log. */
+  /** Who filed the report this event concerns — a filing names it; a resolution is read through the report it closes. */
   const reporterOf = async (circleId, event) => {
     if (typeof event?.by === 'string' && event.event === REPORT_EVENT.REPORT) return event.by;
     if (typeof event?.reportId !== 'string') return null;
-    const events = await readReportEvents(circleId);
-    const original = events.find((e) => e?.event === REPORT_EVENT.REPORT && e.reportId === event.reportId);
+    const original = (await readReportEvents(circleId)).find((e) => e?.event === REPORT_EVENT.REPORT && e.reportId === event.reportId);
     return typeof original?.by === 'string' ? original.by : null;
   };
 
-  // Admins ∪ the REPORTER. Admins because the report is for them to act on; the reporter because otherwise
-  // narrowing the fan silently strands them — they would never learn their own report was actioned or
-  // dismissed, and it would sit "open" on their device forever. Everyone ELSE (in particular the person
-  // being reported) is excluded, which is the point (story 3.6).
+  // A report goes on the rail as a signed statement and is fanned to its READERS only — the circle's admins and the
+  // person who filed it (`reportReaders`, the same rule the catch-up serve applies). Everyone else, the reported
+  // person first, never receives it.
   const appendReportEvent = async (circleId, event) => {
-    const entry = eventLog.appendSilentEntry({ circleId, kind: REPORT_KIND, payload: event, id: reportEntryId(event) });
-    const reporter = await reporterOf(circleId, event);
-    const to = [...new Set([...(await adminRefsOf(circleId)), ...(reporter ? [reporter] : [])])];
-    fan('report', circleId, event, { to });
-    return entry;
+    const filing = event?.event === REPORT_EVENT.REPORT;
+    const res = await rail.append(circleId, filing
+      ? { kind: REPORT_FILE_KIND, subject: event.reportId, payload: { targetType: event.targetType, targetRef: event.targetRef ?? null, targetLabel: event.targetLabel ?? null, reason: event.reason ?? '', by: event.by, at: event.at ?? 0 } }
+      : { kind: REPORT_RESOLVE_KIND, subject: event.reportId, payload: { outcome: event.outcome ?? null, at: event.at ?? 0 } });
+    if (!res) return null;   // no per-circle signer for this circle — nothing lands unsigned
+    const to = await reportReaders({ circleId, reporter: await reporterOf(circleId, event) }, { callSkill });
+    fan('report', circleId, res.statement, { to });
+    return res.entry;
   };
   const reports = makeCircleReports({
     readReportEvents, appendReportEvent, governance, removeReported, newReportId: genId, localActorRef: refIn, now,

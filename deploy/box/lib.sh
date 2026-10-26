@@ -45,6 +45,54 @@ check_companion_nearby() {
   [ -f "$(role_file companion nearby.yml)" ] || die "COMPANION_NEARBY is set but $(role_file companion nearby.yml) is missing"
 }
 
+# The companion's radio data port: fixed, so the firewall knows what to open (box.conf COMPANION_NEARBY_PORT).
+nearby_port() { echo "${COMPANION_NEARBY_PORT:-45210}"; }
+
+# THE VAULT PASSPHRASE LIVES IN .env (BOX_VAULT_PASSPHRASE), outside every volume the box backs up: a snapshot that held
+# the sealed stores and the key that opens them would open everything. A box made before kept it as vault.passphrase in
+# the assistant's volume ($1, that volume's directory; empty when there is none): moved here once, the file deleted.
+# A box with neither gets a fresh one. Two that differ are left for the operator (the assistant refuses to boot on them).
+# Idempotent; one log line when it acts; the value is never printed. Called by install.sh (update.sh never writes .env).
+vault_passphrase_into_env() {
+  local vdir="${1:-}" env="$BOX_DIR/.env" f="" have="" old=""
+  [ -n "$vdir" ] && f="$vdir/vault.passphrase"
+  have="$(sed -n 's/^BOX_VAULT_PASSPHRASE=//p' "$env" 2>/dev/null | tail -1)"
+  [ -n "$f" ] && [ -f "$f" ] && old="$(tr -d '\n' < "$f")"
+  if [ -n "$have" ] && [ -n "$old" ] && [ "$have" != "$old" ]; then
+    log "vault passphrase: .env and the assistant's volume hold two different ones — both left; keep the one the vault was made with"
+    return 1
+  fi
+  if [ -z "$have" ]; then
+    local val="$old"
+    [ -n "$val" ] || val="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
+    touch "$env"; chmod 600 "$env"
+    printf 'BOX_VAULT_PASSPHRASE=%s\n' "$val" >> "$env"
+    if [ -n "$old" ]; then log "vault passphrase moved from the assistant's volume into .env"; else log "vault passphrase made in .env"; fi
+  fi
+  if [ -n "$old" ]; then rm -f "$f"; [ -n "$have" ] && log "vault passphrase: removed the copy in the assistant's volume (.env holds it)"; fi
+  return 0
+}
+
+# The home LAN's interface: the one the default route leaves by (LAN_IFACE overrides; set but empty means "none").
+lan_iface() {
+  if [ "${LAN_IFACE+set}" = set ]; then echo "$LAN_IFACE"; return 0; fi
+  ip route show default 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") { print $(i + 1); exit } }'
+  return 0
+}
+
+# The firewall rules the radio needs (one per line, ufw syntax): mDNS discovery on 5353/udp and the hello on the
+# fixed TCP data port, both bound to the LAN interface — never a bare `allow <port>`, never Tailscale's interface. The
+# router's NAT keeps the internet out regardless; this keeps every other interface shut too. Nothing when the radio is
+# off, the box runs no companion, or no LAN interface is known.
+nearby_firewall_rules() {
+  case "${COMPANION_NEARBY:-off}" in off|false|0|'') return 0 ;; esac
+  role_names | grep -qx companion || return 0
+  local iface; iface="$(lan_iface)"
+  case "$iface" in ''|tailscale*|lo) return 0 ;; esac
+  echo "allow in on $iface to any port 5353 proto udp"
+  echo "allow in on $iface to any port $(nearby_port) proto tcp"
+}
+
 # REPOS="basis=git@github.com:Onderling/basis.git#live feedback=…#live"
 repo_names() { for r in $REPOS; do echo "${r%%=*}"; done; }
 # every lookup ends with `return 0`: callers run under set -e inside $(…), and a non-matching last
@@ -78,7 +126,7 @@ compose_cmd() {
     *)
       # load_conf has refused a box with the relay or Caddy, or a missing overlay; this only composes
       if role_names | grep -qx companion; then
-        cmd=(env "COMPANION_NEARBY=$COMPANION_NEARBY" "${cmd[@]}" -f "$(role_file companion nearby.yml)")
+        cmd=(env "COMPANION_NEARBY=$COMPANION_NEARBY" "COMPANION_NEARBY_PORT=$(nearby_port)" "${cmd[@]}" -f "$(role_file companion nearby.yml)")
       fi
       ;;
   esac

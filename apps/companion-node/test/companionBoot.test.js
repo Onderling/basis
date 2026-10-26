@@ -18,7 +18,7 @@ describe('the boot banner', () => {
   it('names the gate as it is (on), and no early slice', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'companion-boot-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-    const child = spawn(process.execPath, [BOOT], { env: { PATH: process.env.PATH, COMPANION_NODE_CONFIG_DIR: dir, PORT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(process.execPath, [BOOT], { env: { PATH: process.env.PATH, COMPANION_NODE_CONFIG_DIR: dir, PORT: '0', BASIS_VAULT_PASSPHRASE: 'test-only-passphrase' }, stdio: ['ignore', 'pipe', 'pipe'] });
     cleanups.push(() => child.kill('SIGKILL'));
     let out = '';
     child.stdout.on('data', (b) => { out += String(b); });

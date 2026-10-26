@@ -62,7 +62,7 @@ describe('wireChat — byte-identity after routing through the shared deliver co
     const res = await h.ctrl.send({
       toPubKey: 'peer-1', threadId: 't1', body: 'hoi', subtype: 'chat-message',
     });
-    expect(res).toEqual({ ok: true, itemId: 'id-0' });
+    expect(res).toEqual({ ok: true, itemId: null });   // sent; nothing kept here
 
     const wire = h.oneWayCalls[0].env;
     // Outer transport frame — verbatim.
@@ -87,61 +87,16 @@ describe('wireChat — byte-identity after routing through the shared deliver co
     expect(data.nonce.length).toBeGreaterThan(0);
   });
 
-  it('send() persists the byte-identical chat-message item (+ actor)', async () => {
+  it('a chat turn is not stored on either side — its record is the contact thread the basis shells keep', async () => {
     const h = buildHarness();
     await h.ctrl.send({ toPubKey: 'peer-1', threadId: 't1', body: 'hoi', subtype: 'chat-message' });
-
-    expect(h.addItemsCalls).toHaveLength(1);
-    const { drafts, opts } = h.addItemsCalls[0];
-    expect(drafts).toHaveLength(1);
-    const item = drafts[0];
-    const wireData = h.oneWayCalls[0].env.parts[0].data;
-
-    // The persisted draft — verbatim pre-fold shape.
-    expect(item.type).toBe('chat-message');
-    expect(item.text).toBe('hoi');
-    expect(item.visibility).toBe('household');
-    expect(Object.keys(item.source)).toEqual([
-      'threadId', 'fromWebid', 'fromStableId', 'toWebid', 'toPubKey', 'sentAt', 'nonce',
-    ]);
-    expect(item.source).toEqual({
-      threadId:     't1',
-      fromWebid:    'urn:me',
-      fromStableId: 'me-stable',
-      toWebid:      null,
-      toPubKey:     'peer-1',
-      sentAt:       wireData.sentAt,   // wire + storage stay consistent
-      nonce:        wireData.nonce,
-    });
-    // Attribution actor unchanged.
-    expect(opts).toEqual({ actor: 'urn:me' });
-  });
-
-  it('dedup is one shared set: an echo of my own outbound nonce is deduped on receive', async () => {
-    const h = buildHarness();
-    await h.ctrl.send({ toPubKey: 'peer-1', threadId: 't1', body: 'hoi', subtype: 'chat-message' });
-    const myNonce = h.oneWayCalls[0].env.parts[0].data.nonce;
-    expect(h.items).toHaveLength(1);
-
-    // A relay echoes my own message back with the SAME nonce → deduped (no dup).
+    expect(h.oneWayCalls).toHaveLength(1);
+    expect(h.addItemsCalls).toHaveLength(0);
     await h.messageHandlers[0]({
       from: 'peer-pub',
-      parts: [{ type: 'DataPart', data: {
-        type: 'p2p-chat', subtype: 'chat-message', threadId: 't1',
-        body: 'hoi', fromWebid: 'urn:me', nonce: myNonce,
-      }}],
+      parts: [{ type: 'DataPart', data: { type: 'p2p-chat', subtype: 'chat-message', threadId: 't1', body: 'terug', fromWebid: 'urn:peer', nonce: 'n-in' } }],
     });
-    expect(h.items).toHaveLength(1);   // still 1 — shared seenNonces caught it
-
-    // A genuinely new inbound nonce still persists.
-    await h.messageHandlers[0]({
-      from: 'peer-pub',
-      parts: [{ type: 'DataPart', data: {
-        type: 'p2p-chat', subtype: 'chat-message', threadId: 't1',
-        body: 'echt nieuw', fromWebid: 'urn:peer', nonce: 'other-nonce',
-      }}],
-    });
-    expect(h.items).toHaveLength(2);
+    expect(h.addItemsCalls).toHaveLength(0);
   });
 
   it('non-chat subtypes stay send-only (wire sent, nothing persisted)', async () => {
@@ -167,14 +122,14 @@ describe('wireChat — byte-identity after routing through the shared deliver co
     expect(h.addItemsCalls).toHaveLength(0);
   });
 
-  it('carries caller extras onto the wire byte-for-byte (contact-add-request)', async () => {
+  it('carries caller extras onto the wire byte-for-byte (a broadcast post)', async () => {
     const h = buildHarness();
     await h.ctrl.send({
-      toPubKey: 'peer-1', subtype: 'contact-add-request',
+      toPubKey: 'peer-1', subtype: 'broadcast-post',
       extras: { handle: 'ada', trustOffer: 'bekend' },
     });
     const data = h.oneWayCalls[0].env.parts[0].data;
-    expect(data.subtype).toBe('contact-add-request');
+    expect(data.subtype).toBe('broadcast-post');
     expect(data.handle).toBe('ada');
     expect(data.trustOffer).toBe('bekend');
   });
@@ -187,7 +142,7 @@ describe('wireChat — host-injected hold-forward sender (Wave B: route DMs thro
     const h = buildHarness({ reliableSend });
 
     const res = await h.ctrl.send({ toPubKey: 'peer-1', threadId: 't1', body: 'hoi', subtype: 'chat-message' });
-    expect(res).toEqual({ ok: true, itemId: 'id-0' });
+    expect(res).toEqual({ ok: true, itemId: null });   // sent; nothing kept here
 
     // The reliable sender got the SAME wire the bare transport would have (byte-identical),
     // plus the hold-forward guarantee; the bare per-peer transport was NOT used.
@@ -198,18 +153,15 @@ describe('wireChat — host-injected hold-forward sender (Wave B: route DMs thro
     expect(data.subtype).toBe('chat-message');
     expect(data.body).toBe('hoi');
     expect(h.oneWayCalls).toHaveLength(0);              // did not fall back to transportFor
-    expect(h.addItemsCalls).toHaveLength(1);            // still persisted the outbound turn
   });
 
-  it('a HELD send (offline peer) still persists the turn and reports ok — the DM is not lost', async () => {
+  it('a HELD send (offline peer) reports ok — the DM is held, not lost', async () => {
     // hold-forward returns { held:true } rather than throwing when the peer is unreachable.
     const reliableSend = vi.fn(async () => ({ held: true, delivered: false, msgId: 'm2', pending: 1 }));
     const h = buildHarness({ reliableSend });
 
     const res = await h.ctrl.send({ toPubKey: 'peer-offline', threadId: 't1', body: 'later', subtype: 'chat-message' });
     expect(res.ok).toBe(true);                          // held counts as sent (flushes on reconnect)
-    expect(res.itemId).toBe('id-0');
-    expect(h.addItemsCalls).toHaveLength(1);            // the turn is durable locally
   });
 
   it('falls back to the bare per-peer transport when no reliableSend is injected (unchanged)', async () => {
@@ -220,32 +172,3 @@ describe('wireChat — host-injected hold-forward sender (Wave B: route DMs thro
   });
 });
 
-describe('the attachment fetch route answers only the post\'s audience', () => {
-  const post = { id: 'item-1', addedBy: 'urn:me', source: { attachments: [{ id: 'att-1', ref: 'r1', mime: 'image/jpeg', bytes: 3 }] } };
-  const ask = (h, from) => h.messageHandlers[0]({
-    from, parts: [{ type: 'DataPart', data: { type: 'p2p-chat', subtype: 'attachment-request', itemId: 'item-1', attId: 'att-1', fromWebid: from } }],
-  });
-  const responses = (h) => h.oneWayCalls.filter((c) => c.env.parts[0].data.subtype === 'attachment-response');
-  const support = (extra = {}) => ({
-    dataSource: { read: async () => new Uint8Array([1, 2, 3]), write: async () => {} },
-    attachmentSupport: { attachmentPath: () => 'p', readAttachmentBytesB64: async () => 'AQID', maxBytesPerAttachment: 250_000, ...extra },
-  });
-
-  it('without an audience check the author serves no one (fail closed)', async () => {
-    const h = buildHarness(support());
-    h.itemStore.getById.mockResolvedValue(post);
-    await ask(h, 'stranger');
-    expect(responses(h)).toEqual([]);
-  });
-
-  it('with one, a requester in the audience gets the bytes, anyone else nothing', async () => {
-    const mayServe = vi.fn(async (item, requester) => requester === 'member-pub');
-    const h = buildHarness(support({ mayServe }));
-    h.itemStore.getById.mockResolvedValue(post);
-    await ask(h, 'stranger');
-    expect(responses(h)).toEqual([]);
-    await ask(h, 'member-pub');
-    expect(responses(h).map((c) => c.toPubKey)).toEqual(['member-pub']);
-    expect(mayServe).toHaveBeenCalledWith(post, 'member-pub');
-  });
-});

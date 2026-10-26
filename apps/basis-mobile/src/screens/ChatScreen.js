@@ -64,7 +64,7 @@ import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { useTheme }          from './v2/themeContext.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
-import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
@@ -184,7 +184,6 @@ export default function ChatScreen({
   // The receiver path here routes through it; rehydrator + future catch-up paths
   // share the same instance so dedup state is unified.  Pre-ε.1 prop name
   // `circleChatDedup` no longer exists — App.js owns the inbox now.
-  circleChatInbox = null,
   chatStoredReceipt = null,   // the App-owned receipt sender — shared with the inbox (one policy, two paths)
   // Delivery honesty — the shared per-message map (App.js owns it); inbound receipts advance it here.
   deliveryStateMap = null,
@@ -871,7 +870,6 @@ export default function ChatScreen({
           }),
         };
       })(),
-      'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({
       ensureDmThread:    handleDmThreadOpen,

@@ -42,8 +42,6 @@ const KEYS = [
   'mem://neighbourhood/groups/G1/config.json',
   'mem://pinboard/items/01X/attachments/a.jpg',
   'mem://pinboard/threads/t1.json',
-  'mem://pinboard/reveals.json',
-  'mem://pinboard/lists/abc.json',
   'mem://pinboard/avatars/alice.png',
 ];
 

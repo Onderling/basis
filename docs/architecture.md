@@ -617,7 +617,7 @@ the honest tail is named below the table rather than dropped.
 | Tasks are correctly per-circle, and their store is **not** on the fan-out path | ✅ RESOLVED (wave 2) — the one-store collapse put the tasks store on the `ensureCircleSync` fan-out; a task now crosses A→B, proven + guarded by `appTaskFanTwoDevice` (one store per circle + per-type sync arrival) |
 | `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | ✅ RESOLVED (wave 2) — the circle-infra was renamed (`addCirclePeer`, `getCircleScope`, `ensureCircleSync`, …); the remaining `household` is a legitimate template/app name, not circle machinery |
 | Five **in-process agents** (host, household, tasks, pinboard, folio), each with its own key and vault, two with their own policy engine and trust registry | ❌ OPEN (found 2026-10-23, the one-agent fold is planned: `plans/live/PLAN-after-the-interface.md` §6c) — the Agent home's "one agent per person per process" is the rule; the five are the standalone-app past. Until the fold lands, every op is judged by whichever engine its app happens to carry |
-| The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ❌ OPEN (2026-10-23) — exactly the "filter applied to a shared pile" this section forbids; dissolves into the per-circle stores with the fold (§6c step 5) |
+| The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ◐ PARTLY — noticeboard POSTS live in their circle's own store and ride its lane: pinboard is handed the host's circles (`hostCircles`) and writes and reads posts there (`apps/pinboard/src/lib/routedStore.js`); the copy into the circle store and the bridge back are gone. Who answered a post is the poster's own and stays on the poster's device. The pile still holds the circle engine's other rows (membership codes and redemptions, rules and their acceptances, the circle-chat mirror, reports), each tagged by circle id — the shared pile this section forbids, for those rows |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
 still serve compositions that have no device log (test fixtures, the manual-pairing skills). Full dissolution
@@ -856,8 +856,8 @@ connected bot, a remote handler) build on.
 **One send waist (`deliver`).** Every message a circle emits — a chat line, a broadcast, a 1:1 DM — funnels
 through one primitive rather than the parallel send paths that used to exist. There is **one canonical chat
 `Envelope`** (`@onderling/item-store/chatEnvelope.js`) with declared, pure projections — `toEventLogItem`
-(the in-memory render event), `toWireEnvelope` (the peer fan-out shape), and `chatEnvelopeFromStoreItem` (the
-durable stored item) — so the three shapes that used to be hand-reshaped (and drift) are now views of one datum,
+(the in-memory render event) and `toWireEnvelope` (the peer fan-out shape) — circle chat keeps no store row, its
+record is the device log — so the shapes that used to be hand-reshaped (and drift) are now views of one datum,
 proven byte-identical to their old producers by round-trip tests. Over that envelope: **one circle-broadcast**
 (`broadcastToCircle`) fans to a circle's members, and **one addressed send** (`addressedDeliver.js`) folds the
 two former 1:1 DM paths (the ephemeral contact-thread channel and wireChat's persisted `chat.send`) into a

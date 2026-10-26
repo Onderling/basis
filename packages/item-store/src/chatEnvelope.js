@@ -2,19 +2,17 @@
  * @onderling/item-store — the ONE canonical circle chat Envelope + its
  * declared projections (the "one canonical envelope" collapse).
  *
- * A single circle chat message used to exist in THREE hand-maintained shapes
- * kept in sync by copy-paste reshapers — and that drift was the bug:
+ * A single circle chat message used to exist in hand-maintained shapes kept in
+ * sync by copy-paste reshapers — and that drift was the bug:
  *
  *   1. the in-memory EventLog render event
  *        `{ id, ts, app:'circle', type:'chat-message', actor, payload:{ circleId, text, kind, … } }`
- *      — built by hand in `kring-host/circleChatMessageEvent` (optimistic local append),
- *        `basis chatMessageInbox` (received append), and `basis circleChatRehydrate` (legacy insert).
+ *      — built by hand in `kring-host/circleChatMessageEvent` (optimistic local append) and the chat
+ *        rail's received append.
  *   2. the peer fan-out WIRE envelope
  *        `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, card? }`
  *      — built by hand in `pinboard broadcastCircleMessage`.
- *   3. the durable itemStore item's `source` (persisted by `pinboard broadcastCircleMessage`/`ingestCircleMessage`),
- *      later RESHAPED back to the wire/inbox shape by hand in `pinboard getMessagesSince`
- *      and `basis circleChatRehydrate.itemToEnvelope`.
+ *   (A third, the durable store item, is gone: circle chat's record is the device log, not a store row.)
  *
  * This module makes those shapes PROJECTIONS of one canonical Envelope so a
  * change lands in one place. Every projector is pure (no store, no I/O) and
@@ -35,79 +33,13 @@
  * Placement (CLAUDE.md invariant 5): this lives in `@onderling/item-store`
  * — the ONE substrate every producer/consumer of these shapes already
  * depends on (pinboard, basis, basis-mobile via basis, kring-host). The
- * projections are the item-store's own concern: `chatEnvelopeFromStoreItem`
- * is a `fromItem`, `toEventLogItem` is an item projection, and `toWireEnvelope`
- * is a pure function with no other dep. No new package, no Metro/EAS
+ * projections are the item-store's own concern: `toEventLogItem` is an item
+ * projection, and `toWireEnvelope` is a pure function with no other dep. No new package, no Metro/EAS
  * node_modules plumbing.
  */
 
 /** The circle chat message subtype/kind. */
 export const CIRCLE_CHAT_KIND = 'circle-chat-message';
-
-/**
- * `fromItem` — project a durable itemStore `circle-chat-message` item onto the
- * WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
- * consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, card? }`.
- *
- * This replaces the two hand-maintained reshapers that read a stored item's
- * `source` and re-emit the envelope — `pinboard getMessagesSince`'s `.map(...)`
- * and `basis circleChatRehydrate.itemToEnvelope`. They differ only in their
- * leniency toward malformed items, expressed here as one explicit flag rather
- * than as two silently-drifting copies:
- *
- *   - `lenient: true`  (getMessagesSince) — the caller has already filtered by
- *     `source.circleId === groupId` and finite `ts`, so missing `msgId`/`text`
- *     fall back (`msgId → item.id`, `text → ''`, `circleId → groupId`) and the
- *     projector never returns null.
- *   - `lenient: false` (rehydrator, default) — a strict projector: an item
- *     missing `msgId` / `circleId` / `text` yields `null` so the caller counts
- *     it as skipped.
- *
- * @param {{id?:string, text?:string, source?:object}} item
- * @param {{groupId?:string|null, lenient?:boolean}} [opts]
- * @returns {{subtype:string, circleId:string, msgId:string, ts:number, text:string, fromActor:(string|null), card?:object} | null}
- */
-export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = false } = {}) {
-  const src = item?.source && typeof item.source === 'object' ? item.source : null;
-  if (!src) return null;
-
-  if (lenient) {
-    const circleId = src.circleId ?? groupId;
-    const msgId    = src.msgId ?? item?.id;
-    const ts       = src.ts;
-    const text     = item?.text ?? '';
-    const fromActor = src.fromActor ?? src.fromWebid ?? null;
-    const card = isCardObject(src.card) ? src.card : null;
-    return {
-      subtype: CIRCLE_CHAT_KIND,
-      circleId,
-      msgId,
-      ts,
-      text,
-      fromActor,
-      ...(card ? { card } : {}),
-    };
-  }
-
-  // Strict: the rehydrator contract — skip items that can't form a valid envelope.
-  const msgId    = src.msgId;
-  const circleId = src.circleId;
-  const text     = item?.text;
-  const ts       = typeof src.ts === 'number' && Number.isFinite(src.ts) ? src.ts : Date.now();
-  if (typeof msgId    !== 'string' || !msgId)    return null;
-  if (typeof circleId !== 'string' || !circleId) return null;
-  if (typeof text     !== 'string' || !text)     return null;
-  const card = isCardObject(src.card) ? src.card : null;
-  return {
-    subtype: CIRCLE_CHAT_KIND,
-    circleId,
-    msgId,
-    ts,
-    text,
-    fromActor: src.fromActor ?? src.fromWebid ?? null,
-    ...(card ? { card } : {}),
-  };
-}
 
 /**
  * `toItem` (render item) — project the canonical fields onto the in-memory
@@ -117,10 +49,8 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
  *   - the optimistic local append (`kring-host circleChatMessageEvent`) — passes
  *     the LOCAL-ONLY presentation fields (buttons/scope/embeds/review/
  *     provenance/consent) and NO `senderDisplay`;
- *   - the received append (`basis chatMessageInbox`) — passes `senderDisplay`
- *     + an already-guarded `card`;
- *   - the rehydrate legacy append (`basis circleChatRehydrate`) — passes only
- *     `senderDisplay`.
+ *   - the received append (the chat rail) — passes `senderDisplay`
+ *     + an already-guarded `card`.
  *
  * The optional keys are appended in the SAME order and under the SAME
  * presence conditions the originals used, so every caller's event is

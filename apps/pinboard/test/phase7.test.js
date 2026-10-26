@@ -90,17 +90,12 @@ describe('Pinboard V1 — group governance wizard', () => {
     expect(fetched.rules.source.rules.conflictPolicy).toBe('vote');
   });
 
-  it('acceptGroupRules records an audit item; onboardingState reflects it', async () => {
+  it('acceptGroupRules writes no row: the signed statement on the membership spine is the one record (none here without rules or a rail)', async () => {
     const bundle = await buildAgent();
-
-    let state = await callSkill(bundle.agent, 'getOnboardingState');
-    expect(state.groupsAccepted).toEqual([]);
-
+    const before = (await bundle.itemStore.listOpen({})).length;
     const r = await callSkill(bundle.agent, 'acceptGroupRules', { groupId: 'oosterpoort' });
-    expect(r.acceptanceId).toBeTruthy();
-
-    state = await callSkill(bundle.agent, 'getOnboardingState');
-    expect(state.groupsAccepted).toContain('oosterpoort');
+    expect(r.ok).not.toBe(true);
+    expect((await bundle.itemStore.listOpen({})).length).toBe(before);
   });
 
   it('rejects missing args', async () => {
@@ -109,29 +104,6 @@ describe('Pinboard V1 — group governance wizard', () => {
     expect(await callSkill(bundle.agent, 'createGroupWithRules', { groupId: 'g', rules: {} })).toEqual({ error: 'name required' });
     expect(await callSkill(bundle.agent, 'getGroupRules',     {})).toEqual({ error: 'groupId required' });
     expect(await callSkill(bundle.agent, 'acceptGroupRules',  {})).toEqual({ error: 'groupId required' });
-  });
-});
-
-// ── getOnboardingState ────────────────────────────────────────────────────
-
-describe('Pinboard V1 — getOnboardingState', () => {
-  it('reports handle/displayName/groupsAccepted truthfully', async () => {
-    const bundle = await buildAgent();
-
-    let state = await callSkill(bundle.agent, 'getOnboardingState');
-    expect(state.handleSet).toBe(false);
-    expect(state.displayNameSet).toBe(false);
-    expect(state.groupsAccepted).toEqual([]);
-    expect(state.currentGroupId).toBe('oosterpoort');
-
-    await callSkill(bundle.agent, 'setMyHandle',      { handle: 'anne' });
-    await callSkill(bundle.agent, 'setMyDisplayName', { displayName: 'Anne' });
-    await callSkill(bundle.agent, 'acceptGroupRules', { groupId: 'oosterpoort' });
-
-    state = await callSkill(bundle.agent, 'getOnboardingState');
-    expect(state.handleSet).toBe(true);
-    expect(state.displayNameSet).toBe(true);
-    expect(state.groupsAccepted).toEqual(['oosterpoort']);
   });
 });
 

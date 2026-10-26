@@ -21,7 +21,7 @@ describe('circle scoping is declared on the op', () => {
     expect(silent, 'ops acting on an item without saying whether the active circle scopes them').toEqual([]);
   });
   it('the derived sets carry the ops the scope used to list by hand, plus their aliases', () => {
-    for (const op of ['postRequest', 'respondToItem', 'cancelRequest', 'markReturned', 'assignLend', 'reportPost', 'postAnnouncement']) expect(SCOPED_WRITE_OPS.has(op), op).toBe(true);
+    for (const op of ['postRequest', 'respondToItem', 'cancelRequest', 'markReturned', 'assignLend', 'postAnnouncement']) expect(SCOPED_WRITE_OPS.has(op), op).toBe(true);
     for (const op of ['listOpenRequests', 'listFeed', 'listMyRequests', 'getBulletin']) expect(SCOPED_LIST_OPS.has(op), op).toBe(true);
     expect(SCOPED_WRITE_OPS.has('leaveGroup'), 'an explicit false is not scoped').toBe(false);
   });

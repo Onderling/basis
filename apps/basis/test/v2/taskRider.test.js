@@ -51,7 +51,8 @@ async function device(ref, rosterAll, wire) {
     eventLog,
     circleIdentityFor: async () => cid,
     myRef: ref,
-    callSkill: async () => ({}),
+    // the folded roster, as `listGroupMembers` answers it: who is in, with their role
+    callSkill: async (app, op) => (app === 'pinboard' && op === 'listGroupMembers' ? { members: rosterAll.map((m) => ({ ...m })) } : {}),
     storeFor: (circleId) => stores.getStore(circleId),
     verifyBinding: async ({ author, ref: r }) => rosterAll.some((m) => m.circleAddress === author && m.webid === r),
   });
@@ -113,8 +114,6 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const wire = [];
     const ada = await device('webid:ada', rosterAll, wire);
     const bo  = await device('webid:bo',  rosterAll, wire);
-    ada.registry.registerType('membership-redemption', { type: 'object', properties: { type: { const: 'membership-redemption' } } });
-    bo.registry.registerType('membership-redemption', { type: 'object', properties: { type: { const: 'membership-redemption' } } });
 
     // ada holds a roster row and a task; a catch-up from ada serves the task, never the row.
     await ada.store.put({ id: 'row-ada', type: 'membership-redemption', source: { groupId: CIRCLE, redeemedBy: 'webid:ada', circleAddress: 'ada-in-circle' } }, { by: 'webid:ada', sync: false });
@@ -130,6 +129,42 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     await bo.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: stmt.statement });
     const boRow = await bo.store.get('row-ada');
     expect(boRow?.source?.circleAddress, 'bo\'s proven row survived a peer\'s snapshot of it').toBe('ada-as-bo-knows-it');
+  });
+
+  it("a circle's RULES HEAD never rides this lane either: not served, and refused when a peer snapshots one", async () => {
+    // The rules travel by the rules lane's signed rules-update, whose receiver checks the author is an admin; a member's
+    // own write of a rules row riding the store door would skip that check.
+    const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
+    const wire = [];
+    const ada = await device('webid:ada', rosterAll, wire);
+    const bo  = await device('webid:bo',  rosterAll, wire);
+    const rules = (v, who) => ({ id: 'rules-1', type: 'group-rules', text: 'kring', createdAt: new Date().toISOString(), createdBy: who, source: { groupId: CIRCLE, rules: { purpose: 'circle', admins: [who] }, version: v } });
+
+    await ada.store.put(rules(1, 'webid:ada'), { by: 'webid:ada', sync: false });
+    const served = (await ada.rail.catchUpStatements(CIRCLE)).map((s) => s.body?.payload?.item?.id ?? s.body?.subject);
+    expect(served, 'a rules head is not task-lane content').not.toContain('rules-1');
+
+    await ada.store.put(rules(1, 'webid:ada'), { by: 'webid:ada', sync: false });
+    await bo.store.put(rules(1, 'webid:ada'), { by: 'webid:bo', sync: false });
+    const stmt = await bo.rail.append(CIRCLE, { kind: 'snapshot', subject: 'rules-1', payload: { item: rules(7, 'webid:bo') } });
+    await ada.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: stmt.statement });
+    expect((await ada.store.get('rules-1'))?.source?.version, "a member's snapshot of the rules did not replace ada's head").toBe(1);
+  });
+
+  it('an ANNOUNCEMENT rides this lane but lands only from an admin: a member\'s is refused at the apply', async () => {
+    const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:bo', role: 'member' }];
+    const wire = [];
+    const ada = await device('webid:ada', rosterAll, wire);
+    const bo  = await device('webid:bo',  rosterAll, wire);
+    const note = (id, who) => ({ id, type: 'announcement', text: 'vergadering vanavond', body: 'vergadering vanavond', createdAt: new Date().toISOString(), createdBy: who, source: { groupId: CIRCLE, postedBy: who } });
+
+    const fromMember = await bo.rail.append(CIRCLE, { kind: 'snapshot', subject: 'a-bo', payload: { item: note('a-bo', 'webid:bo') } });
+    await ada.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: fromMember.statement });
+    expect(await ada.store.get('a-bo'), "a member's announcement did not land").toBeFalsy();
+
+    const fromAdmin = await ada.rail.append(CIRCLE, { kind: 'snapshot', subject: 'a-ada', payload: { item: note('a-ada', 'webid:ada') } });
+    await bo.receiver(null, { subtype: TASK_BROADCAST, circleId: CIRCLE, event: fromAdmin.statement });
+    expect((await bo.store.get('a-ada'))?.id, "the admin's announcement landed").toBe('a-ada');
   });
 
   it('the writer-computed claim cluster travels: a claim lands with claimSeq + confirmation; a later authoritative reassign supersedes it', async () => {

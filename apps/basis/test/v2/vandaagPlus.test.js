@@ -6,6 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { decodeGenericOpId } from '@onderling/app-manifest';
 import { PLUS_ACTS, plusActs, plusOp, plusFollowUp, plusEditFor, plusSaveOp, plusRemoveOp, plusShareOp, plusShareTargets, plusRead, plusReadWithModel, plusModelAsk, actRunsAtOnce } from '../../src/v2/vandaagPlus.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
+// N CALENDAR days from now at this clock time — never `now + N × 24h`, which on a DST night lands on the wrong day
+const daysFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
 
 describe('Vandaag — the "+"', () => {
   it('offers the own-scope attach entries the composed manifests declare — each with its fields', () => {
@@ -44,7 +46,7 @@ describe('Vandaag — the "+"', () => {
   it('a moment in words is read by the one bounded reader — and one it cannot read is said, not guessed', () => {
     const op = plusOp('calendar.calendar-event', { title: 'tandarts', when: 'morgen om 14:00' });
     const d = new Date(op.args.when);
-    const tomorrow = new Date(Date.now() + 86_400_000);
+    const tomorrow = daysFromNow(1);
     expect([d.getDate(), d.getHours(), d.getMinutes()]).toEqual([tomorrow.getDate(), 14, 0]);
     expect(plusOp('calendar.calendar-event', { title: 'x', when: 'ooit eens' })).toEqual({ error: 'circle.vandaag.plus_when_unread' });
   });

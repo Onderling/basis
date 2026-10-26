@@ -14,7 +14,7 @@
  * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
  */
 import { selfRefIn } from './selfRef.js';
-import { isRosterTrailItem } from '@onderling/circles';
+import { isLaneCarriedItem } from '@onderling/circles';
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
@@ -102,6 +102,22 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
    *  snapshot re-merges to the same result; a re-delivered remove re-deletes nothing. */
   /** The item types this node was handed a row of and does not hold — each said once. */
   const notHeldTypes = new Set();
+  /** Whether the folded roster (the projection every binding here reads) names this author an admin of the circle. */
+  async function authorIsAdmin(circleId, ref) {
+    if (typeof ref !== 'string' || !ref || typeof callSkill !== 'function') return false;
+    try {
+      const r = await callSkill('pinboard', 'listGroupMembers', { groupId: circleId });
+      return (Array.isArray(r?.members) ? r.members : []).some((m) => m && (m.webid ?? m.addr ?? m.ref) === ref && m.role === 'admin');
+    } catch { return false; }
+  }
+  const refusedAuthors = new Set();
+  function refusedOnce(circleId, ref) {
+    const key = `${circleId}\u0000${ref}`;
+    if (refusedAuthors.has(key)) return;
+    refusedAuthors.add(key);
+    console.warn(`[task-lane] refused an announcement in ${circleId}: its author ${String(ref).slice(0, 12)}… is not an admin there`);
+  }
+
   async function applyToHead(circleId, body) {
     const store = storeFor(circleId);
     if (!store) return;
@@ -111,11 +127,22 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       // on an own lane, only that lane's self's items (one lane never writes another self's into the shared own store)
       if (isOwn(circleId) && !ownBelongs(circleId, item)) return;
       // A roster row never lands through this lane: its addresses are proven facts patched in place,
-      // and a peer's snapshot of "the person's row" is that peer's view, not this device's. Refused
-      // here whatever served it (`rosterTrail.js` says why).
-      if (isRosterTrailItem(item)) return;
+      // and a peer's snapshot of "the person's row" is that peer's view, not this device's — nor does the circle's
+      // rules head, which its own lane carries past an admin check. Refused here whatever served it (`rosterTrail.js`).
+      if (isLaneCarriedItem(item)) return;
+      // An ANNOUNCEMENT is the store door's, but an admin's word: one whose author the folded roster does not name an
+      // admin is refused here, on the receiving device — the writer's own admin check binds only the writer's app.
+      if (item.type === 'announcement' && !(await authorIsAdmin(circleId, body.payload?.authorRef))) {
+        refusedOnce(circleId, body.payload?.authorRef);
+        return;
+      }
       // sync:false — an ingest never re-publishes (the echo loop); origin:true — the causal merge keeps
       // the writer's clock and runs the claim fold, exactly like the legacy mirror's inbound path.
+      // whether this device held the row before: a snapshot that is an UPDATE (a claim, an edit) is not a new arrival.
+      // A read then a put: two snapshots of one new row landing in the same tick may both read 'new' (one extra
+      // announcement at most, never a missed one).
+      let existed = false;
+      try { existed = !!(await store.get?.(item.id)); } catch { existed = false; }
       try { await store.put(item, { sync: false, origin: true }); }
       catch (err) {
         // a type this node does not hold (an extension it does not run): the row is not held, the statement stays on
@@ -129,7 +156,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
       }
       // A snapshot that LANDED (verified, merged) — the seam for anything that indexes what the store holds
       // (the noticeboard bridge into pinboard's index). Best-effort: an indexer must never fail the merge.
-      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item); } catch { /* indexed later by catch-up */ } }
+      if (typeof onItemApplied === 'function') { try { await onItemApplied(circleId, item, { fresh: !existed }); } catch { /* indexed later by catch-up */ } }
     } else if (body.kind === 'remove') {
       const id = body.payload?.id ?? body.subject;
       if (typeof id === 'string' && id) await store.delete(id, { sync: false });
@@ -154,7 +181,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     }
     let rows = [];
     try { rows = (await store.list()) ?? []; } catch { return stored; }
-    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isRosterTrailItem(it)
+    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id) && !isLaneCarriedItem(it)
       && (!isOwn(circleId) || ownBelongs(circleId, it)));
     if (uncovered.length === 0) return stored;
     let resolved = null;
@@ -287,6 +314,8 @@ export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {
   return {
     publishItem(item) {
       noDowngrade();
+      // a roster-trail row and a rules head travel by their own lanes' carriers, never as a lane snapshot (rosterTrail.js)
+      if (isLaneCarriedItem(item)) return undefined;
       if (emitter && item) return emitter.snapshot(circleId, item);
       return undefined;   // no lane → no fan (the write stays local)
     },

@@ -9,7 +9,7 @@ import { LANE_ACCEPTS } from '../../src/v2/laneBindings.js';
 import { rosterBindingVerifier, membershipBindingVerifier } from '../../src/v2/membershipRail.js';
 import { keyBindingVerifier } from '../../src/v2/keyRail.js';
 import { deviceSetBindingVerifier } from '../../src/v2/grantsRail.js';
-import { makeTaskRail } from '../../src/v2/taskRail.js';
+import { makeItemsRail } from '../../src/v2/itemsRail.js';
 import { makeChatRail } from '../../src/v2/chatRail.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 import { makeMembershipRail } from '../../src/v2/membershipRail.js';
@@ -53,7 +53,7 @@ describe('the rails DEFAULT to the verifier the table names (the runtime side of
   // Source-level: the default expression in each factory names one of the four verifier functions.
   const railSource = async (path) => (await import('node:fs')).readFileSync(new URL(path, import.meta.url), 'utf8');
   const cases = [
-    ['task-statement', '../../src/v2/taskRail.js', 'rosterBindingVerifier(callSkill)'],
+    ['items', '../../src/v2/itemsRail.js', 'rosterBindingVerifier(callSkill)'],
     ['chat-message', '../../src/v2/chatRail.js', 'rosterBindingVerifier(callSkill)'],
     ['governance', '../../src/v2/governanceAppWiring.js', 'rosterBindingVerifier(callSkill)'],
     ['membership', '../../src/v2/membershipRail.js', 'membershipBindingVerifier(callSkill'],
@@ -78,6 +78,6 @@ describe('the rails DEFAULT to the verifier the table names (the runtime side of
   });
 
   it('the rail factories exist (so the source needles above are not pinning dead code)', () => {
-    for (const f of [makeTaskRail, makeChatRail, makeGovernanceRail, makeMembershipRail, makeKeyRail]) expect(typeof f).toBe('function');
+    for (const f of [makeItemsRail, makeChatRail, makeGovernanceRail, makeMembershipRail, makeKeyRail]) expect(typeof f).toBe('function');
   });
 });

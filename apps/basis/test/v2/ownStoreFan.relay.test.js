@@ -10,12 +10,12 @@ import { VaultMemory } from '@onderling/vault';
 import { until } from '../support/pairRealAgents.js';
 import { bootAnnaTwoDevices, SEND } from '../support/annaTwoDevices.js';
 import { OWN_DEVICES_SCOPE } from '../../src/v2/grantsManifest.js';
-import { OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../src/v2/taskRail.js';
-import { TASK_LANE } from '../../src/v2/taskManifest.js';
+import { OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
+import { ITEMS_LANE } from '../../src/v2/itemsManifest.js';
 import { encodeGenericOpId } from '@onderling/app-manifest';
 
-// the task lane's entries on the own scope (the grants lane shares the scope's id; the rails differ by entry kind)
-const ownTaskEntries = (log) => log.query({}).filter((e) => e?.circleId === OWN_DEVICES_SCOPE && e?.type === TASK_LANE);
+// the items lane's entries on the own scope (the grants lane shares the scope's id; the rails differ by entry kind)
+const ownItemsEntries = (log) => log.query({}).filter((e) => e?.circleId === OWN_DEVICES_SCOPE && e?.type === ITEMS_LANE);
 
 const GROUP = 'anna-own-store';
 const appt = (title) => ({ type: 'calendar-event', title, startsAt: '2026-10-20T11:00:00.000Z', endsAt: '2026-10-20T12:00:00.000Z' });
@@ -31,7 +31,7 @@ describe('the own store between a person\'s devices', () => {
     const there = await until(async () => (await box.get(made.id)) ?? null, { timeout: 15_000, step: 200 });
     expect(there?.title, 'the always-on device holds it').toBe('tandarts-eigen');
     // on the always-on device's log the statement carries the item sealed, never in words
-    const onLog = JSON.stringify(ownTaskEntries(w.logs.A2));
+    const onLog = JSON.stringify(ownItemsEntries(w.logs.A2));
     expect(onLog).toContain(made.id);
     expect(onLog).not.toContain('tandarts-eigen');
     await new Promise((r) => setTimeout(r, 1500));
@@ -44,7 +44,7 @@ describe('the own store between a person\'s devices', () => {
     const box = await w.A2.agent.ownStore();
     const there = await until(async () => (await box.listByType('note')).find((n) => n.body === 'sleutel bij de buren') ?? null, { timeout: 15_000, step: 200 });
     expect(there, 'the always-on device holds the note').toBeTruthy();
-    expect(JSON.stringify(ownTaskEntries(w.logs.A2))).not.toContain('sleutel bij de buren');
+    expect(JSON.stringify(ownItemsEntries(w.logs.A2))).not.toContain('sleutel bij de buren');
     // no circle lane carries it: nothing on any log names it outside the own scope
     for (const log of [w.logs.A, w.logs.A2, w.logs.B]) {
       expect(log.query({}).filter((e) => e?.circleId && e.circleId !== OWN_DEVICES_SCOPE && JSON.stringify(e).includes(there.id))).toEqual([]);
@@ -56,9 +56,9 @@ describe('the own store between a person\'s devices', () => {
   it('a stranger asking for Anna\'s own store is served nothing', async () => {
     const beaGot = [];
     const prior = w.B._routerRef.fn;
-    w.B._routerRef.fn = (env) => { if (env?.payload?.subtype === OWN_TASK_CATCHUP_SUBTYPES.batch) beaGot.push(env.payload); return prior?.(env); };
-    await w.B.agent.sendPeerMessage(w.A.agent.circleAddressFor(GROUP), { subtype: OWN_TASK_CATCHUP_SUBTYPES.request, circleId: OWN_DEVICES_SCOPE, frontier: [], limit: 200 }, SEND);
-    await w.B.agent.sendPeerMessage(w.A.agent.circleAddressFor(GROUP), { subtype: 'circle-task-catchup-request', circleId: OWN_DEVICES_SCOPE, frontier: [], limit: 200 }, SEND);
+    w.B._routerRef.fn = (env) => { if (env?.payload?.subtype === OWN_ITEMS_CATCHUP_SUBTYPES.batch) beaGot.push(env.payload); return prior?.(env); };
+    await w.B.agent.sendPeerMessage(w.A.agent.circleAddressFor(GROUP), { subtype: OWN_ITEMS_CATCHUP_SUBTYPES.request, circleId: OWN_DEVICES_SCOPE, frontier: [], limit: 200 }, SEND);
+    await w.B.agent.sendPeerMessage(w.A.agent.circleAddressFor(GROUP), { subtype: 'circle-items-catchup-request', circleId: OWN_DEVICES_SCOPE, frontier: [], limit: 200 }, SEND);
     await new Promise((r) => setTimeout(r, 3000));
     w.B._routerRef.fn = prior;
     expect(beaGot).toEqual([]);
@@ -68,10 +68,10 @@ describe('the own store between a person\'s devices', () => {
     const box = await w.A2.agent.ownStore();
     const beaStore = await w.B.agent.ownStore();
     const planted = await beaStore.put(appt('van-bea'), { by: w.B.pubKey });
-    const entry = await until(async () => ownTaskEntries(w.logs.B).find((e) => e.payload?.body?.subject === planted.id) ?? null, { timeout: 5000, step: 100 });
+    const entry = await until(async () => ownItemsEntries(w.logs.B).find((e) => e.payload?.body?.subject === planted.id) ?? null, { timeout: 5000, step: 100 });
     expect(entry, 'Bea\'s own write is on her own lane (signed by her device)').toBeTruthy();
-    await w.B.agent.sendPeerMessage(w.A2.agent.circleAddressFor(GROUP), { subtype: TASK_BROADCAST, circleId: OWN_DEVICES_SCOPE, event: entry.payload, ts: Date.now() }, SEND);
-    expect((await w.A2.agent.taskRail.ingest(OWN_DEVICES_SCOPE, entry.payload)).ok, 'Bea\'s device is not in Anna\'s set').toBe(false);
+    await w.B.agent.sendPeerMessage(w.A2.agent.circleAddressFor(GROUP), { subtype: ITEMS_BROADCAST, circleId: OWN_DEVICES_SCOPE, event: entry.payload, ts: Date.now() }, SEND);
+    expect((await w.A2.agent.itemsRail.ingest(OWN_DEVICES_SCOPE, entry.payload)).ok, 'Bea\'s device is not in Anna\'s set').toBe(false);
     await new Promise((r) => setTimeout(r, 1500));
     expect(await box.get(planted.id)).toBe(null);
   });
@@ -83,14 +83,14 @@ describe('the own store between a person\'s devices', () => {
     const forged = signSpine(stranger, {
       kind: 'snapshot', circleId: OWN_DEVICES_SCOPE, subject: 'st-1', payload: { sealed: 'x', authorRef: w.A.pubKey }, parent: null, deps: [],
     });
-    expect((await w.A2.agent.taskRail.ingest(OWN_DEVICES_SCOPE, forged)).ok, 'a key outside the person\'s device set').toBe(false);
+    expect((await w.A2.agent.itemsRail.ingest(OWN_DEVICES_SCOPE, forged)).ok, 'a key outside the person\'s device set').toBe(false);
     // the person key: every device of the person holds it, a revoked one too — it never speaks on this scope
     const personKey = await AgentIdentity.fromSeed(Bootstrap.fromMnemonic(w.phrase).deriveAgentSeed('default'), new VaultMemory());
     expect(personKey.pubKey, 'the person key, from the phrase').toBe(w.A.pubKey);
     const personKeySigned = signSpine(personKey, {
       kind: 'snapshot', circleId: OWN_DEVICES_SCOPE, subject: 'pk-1', payload: { sealed: 'x', authorRef: w.A.pubKey }, parent: null, deps: [],
     });
-    expect((await w.A2.agent.taskRail.ingest(OWN_DEVICES_SCOPE, personKeySigned)).ok, 'the person key is refused on the scope').toBe(false);
+    expect((await w.A2.agent.itemsRail.ingest(OWN_DEVICES_SCOPE, personKeySigned)).ok, 'the person key is refused on the scope').toBe(false);
     expect(await box.get('st-1')).toBe(null);
     expect(await box.get('pk-1')).toBe(null);
   });
@@ -99,7 +99,7 @@ describe('the own store between a person\'s devices', () => {
     const [phone, box] = await Promise.all([w.A.agent.ownStore(), w.A2.agent.ownStore()]);
     // the always-on device misses the carry: it drops the live statement
     const prior = w.A2._routerRef.fn;
-    w.A2._routerRef.fn = (env) => (env?.payload?.subtype === TASK_BROADCAST && env.payload.circleId === OWN_DEVICES_SCOPE ? undefined : prior?.(env));
+    w.A2._routerRef.fn = (env) => (env?.payload?.subtype === ITEMS_BROADCAST && env.payload.circleId === OWN_DEVICES_SCOPE ? undefined : prior?.(env));
     const made = await phone.put(appt('terwijl-weg'), { by: w.A.pubKey });
     await new Promise((r) => setTimeout(r, 2000));
     expect(await box.get(made.id), 'missed live').toBe(null);

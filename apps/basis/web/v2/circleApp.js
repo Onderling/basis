@@ -756,7 +756,6 @@ import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
 import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
-import { normalizeHopMode } from '@onderling/kring-host/circleHop';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
 import { buildCircleFiles, circleFilesFromListFiles } from '../../src/v2/circleFolio.js';
 import { myThingsFromListFiles } from '../../src/v2/folioMyThings.js';
@@ -772,7 +771,6 @@ import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
 import { renderCircleAdvisor } from './circleAdvisor.js';
-import { renderCircleHop } from './circleHop.js';
 import { renderOfferingEditor } from './circleOfferingEditor.js';
 import { renderCircleFolioBrowser } from './circleFolio.js';
 import {
@@ -1471,7 +1469,7 @@ function circleOnJoined({ circleId, invite = null }) {
     recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
-    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: taskCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
+    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
   });
 }
 let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
@@ -1484,7 +1482,7 @@ let govShellRail = null;             // the governance rail for the RECEIVE side
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
 let memCatchUpShell = null;
 let keyCatchUpShell = null;          // pull-all key-lane catch-up (the group-key chain's offline half)          // the membership lane's catch-up (same mechanism, its own subtypes)
-let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
+let itemsCatchUpShell = null;         // the items lane's catch-up (serves stored entries + signed live heads)
 let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
@@ -2645,19 +2643,15 @@ function buildCircleBot(agent) {
     }
   }
 
-  // After /find returns, append (1) in-circle SKILL MATCHES for the query, and (2) a HOP PROMPT when the
-  // search came up short but the user has hop-eligible contacts + hop is on. Ported from classic main.js
-  // (appendFindExtras); the building blocks (findOfferingMatches / hopPrompt) are shared.
+  // After /find returns, append the in-circle SKILL MATCHES for the query (the shared buildFindExtras).
   async function appendFindExtras(reply) {
-    const { offeringMatches, hopCard } = await buildFindExtras({
-      query: reply?.payload?.query, groups: reply?.payload?.groups,
-      circleId: getActiveCircle(), callSkill: resolveSkill, t,
+    const { offeringMatches } = await buildFindExtras({
+      query: reply?.payload?.query, circleId: getActiveCircle(), callSkill: resolveSkill,
     });
     if (offeringMatches.length) {
       const lines = offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n');
       _circleRender?.botBubble(`${t('circle.offeringMatches.title')}\n${lines}`);
     }
-    if (hopCard) _circleRender?.botBubble(`${hopCard.title}\n${hopCard.body}`);
   }
 
   // run a bulk route ("/done all") over the most-recent listing's items; item-changed events fan out
@@ -4184,32 +4178,6 @@ async function showMyThings() {
       rerender();
     } catch { /* keep empty */ }
   }
-}
-
-// Hopping is a DEVICE-global stance (Pinboard getHopMode/setHopMode); it lives
-// under the Mij tab (personal settings). Chain-card data lands later.
-async function showHop() {
-  hideCircleTabBar(tabBarEl);
-  let hopMode = { global: false };
-  if (resolveSkill) {
-    try { hopMode = normalizeHopMode(await resolveSkill('getHopMode', {})); } catch { /* default */ }
-  }
-  const rerender = () => renderCircleHop(rootEl, {
-    hopMode,
-    t,
-    onToggleGlobal: async (v) => {
-      hopMode = { global: v };
-      rerender();
-      if (resolveSkill) {
-        try {
-          const r = await resolveSkill('setHopMode', { global: v });
-          if (r && !r.error) { hopMode = normalizeHopMode(r); rerender(); }
-        } catch { /* keep optimistic */ }
-      }
-    },
-    onBack: showMij,
-  });
-  rerender();
 }
 
 // α.3 — Screens tab.  Two sub-modes:
@@ -6708,7 +6676,6 @@ async function showAvailability() {
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
     onSave: async () => { await availabilityStore.update(working); showMyData({ group: 'connection' }); },
-    onHop: showHop,
   });
   rerender();
   showTabBar('mij');
@@ -9426,7 +9393,7 @@ async function boot() {
       govCatchUpShell     = circleLanes.catchUps.gov;
       memCatchUpShell     = circleLanes.catchUps.membership;
       keyCatchUpShell     = circleLanes.catchUps.key;
-      taskCatchUpShell    = circleLanes.catchUps.task;
+      itemsCatchUpShell    = circleLanes.catchUps.task;
       chatCatchUpShell    = circleLanes.catchUps.chat;
       podChatCatchUpShell = circleLanes.catchUps.podChat;
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
@@ -9576,7 +9543,7 @@ async function boot() {
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       refreshUnreadMyRefs();
-      // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
+      // A noticeboard post from another member LANDS in the circle store through the items lane (one carry);
       // the shell bridges it into pinboard's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
         // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
@@ -9685,7 +9652,7 @@ async function boot() {
           // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
           // address — the requestAll kick below walks the roster, still empty on an enrolling boot.
           contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-            taskCatchUpShell?.requestFrom(siblingAddress, circleId),
+            itemsCatchUpShell?.requestFrom(siblingAddress, circleId),
             chatCatchUpShell?.requestFrom(siblingAddress, circleId),
           ]),
         };
@@ -9701,7 +9668,7 @@ async function boot() {
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         agent.bootstrapFromStashedOffer();
-        taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        itemsCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The shipped contact, once: added through the scanned-card path if the card is set and the
         // person is not in the book yet.

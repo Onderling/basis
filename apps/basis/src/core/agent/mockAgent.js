@@ -106,28 +106,6 @@ export const mockHouseholdManifest = {
       },
     },
     /**
-     * `/addmember <name>` — household membership demo. follow-up:
-     * after adding a member, suggest sharing a folio folder with them
-     * (cross-app chain registered in followUps.js, but this op also
-     * declares an in-app follow-up — viewing the chore list — so we
-     * cover both cases in the demo).
-     */
-    {
-      id:    'addMember', verb: 'add',
-      params: [{ name: 'name', kind: 'string', required: true }],
-      surfaces: {
-        // Part C gate — "register X" / "add member X" → addMember{name}.
-        slash: { command: '/addmember',
-          match: { verbs: ['register', ['add', 'member'], 'registreer', 'naam', ['lid', 'toevoegen']], body: 'text-only', arg: 'name' } },
-        chat:  {
-          reply: 'text', hint: 'add a member to the household',
-          followUps: [
-            { opId: 'listOpenItems' },   // same-app follow-up
-          ],
-        },
-      },
-    },
-    /**
      * v0.7.cc — `/add-chore <label>` — add a new chore.  Mirrors the
      * native household app's `addItem`; in basis command-first
      * shape it's an explicit verb (the LLM-driven NL path lands in v0.8).
@@ -248,11 +226,6 @@ export function createMockHouseholdAgent(opts = {}) {
         polite:       true,
         established:  '2026-05-21',
       };
-    }
-    if (opId === 'addMember') {
-      const name = String(args?.name ?? '').trim();
-      if (!name) return { ok: false, error: 'name required' };
-      return { ok: true, message: `✓ Added member: ${name}`, memberName: name };
     }
     if (opId === 'getChoreSnapshot') {
       const id = args?.choreId;

@@ -32,7 +32,7 @@ describe('the own lane is per self', () => {
       origLog(...a);
     });
     relay = await startJourneyRelay({ log: true });
-    const phone = await bootRealAgentNode('phone', { taskLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() } });
+    const phone = await bootRealAgentNode('phone', { itemsLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() } });
     nodes.push(phone);
     await connectNodesOverRelay([phone], { relayUrl: relay.url });
     // every circle of this person is under Werk
@@ -54,7 +54,7 @@ describe('the own lane is per self', () => {
     const phrase = (await phone.agent.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'box', personas: [w] })).ok).toBe(true);
     await teardown(pre);
-    const box = await bootRealAgentNode('box', { taskLane: true, agentOpts: { ...vaults, enrollOfferStorage: storage } });
+    const box = await bootRealAgentNode('box', { itemsLane: true, agentOpts: { ...vaults, enrollOfferStorage: storage } });
     nodes.push(box);
     await box.agent.connectPeerTransport({ relayUrl: relay.url, onPeerMessage: (env) => box._routerRef.fn?.(env), awaitRelayReady: true });
     await box.agent.sa.relays.add(relay.url, { identity: box.agent.persona(w).chatId, awaitReady: true });

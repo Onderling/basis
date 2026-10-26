@@ -35,7 +35,6 @@ import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
 import { MemberMapCache }    from './lib/MemberMapCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
-import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
 import { createContactBook } from './lib/ContactBook.js';
 import { wireChat }          from './chat/wireChat.js';
 import { createRoutedStore } from './lib/routedStore.js';
@@ -328,13 +327,6 @@ export async function createNeighbourhoodAgent({
       inner:         itemBackend ?? null,
       localStore:    initialMap,
       onLocalChange: persist ? (m) => { lastLocalMap = m; persist.scheduleSave(m); } : undefined,
-      // per-device settings + the migration marker
-      // are local-only — they must never reach the pod (the pod is
-      // shared by other installs of the same user).
-      localOnlyPrefixes: [
-        'mem://pinboard/settings/devices/',
-        'mem://pinboard/settings/.migrated',
-      ],
       innerKeyMap: _podInnerKeyMap,
     });
     dataSource = cache;
@@ -493,7 +485,7 @@ export async function createNeighbourhoodAgent({
     /** Write the local cache to its persistence now, ahead of the debounce. No-op without a persist. */
     flushLocal: async () => { if (persist && lastLocalMap && typeof persist.flush === 'function') await persist.flush(lastLocalMap); },
     agent,
-    deviceId: id?.deviceId ?? null,    // Phase 33.1 — per-install id for device-scoped settings
+    deviceId: id?.deviceId ?? null,    // this install's id (the pod attach names the device by it)
     itemStore,
     members,
     offeringMatch,
@@ -514,9 +506,6 @@ export async function createNeighbourhoodAgent({
     expoPushSender,                 // S6.6 — relay.PushSender for Expo tokens (mobile-native), when expoPush supplied
     webPushPublicKey: webPush?.publicKey ?? null,
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
-    settings: cache                    // Phase 23.5 + 33 — split across shared + device blobs
-      ? await loadSettings({ dataSource: cache, deviceId: id?.deviceId ?? null })
-      : { ...DEFAULT_SETTINGS },
     contacts: cache                    // Phase 24.1 — 1:1 contact graph + lists
       ? createContactBook({ members, dataSource: cache })
       : null,
@@ -614,17 +603,6 @@ export async function createNeighbourhoodAgent({
       agent.enableSealedForwardFor(offeringMatchOpts.group);
     }
   } catch { /* SDK may surface "already enabled" or similar; non-fatal */ }
-
-  // Phase 28.1 (Pinboard V2, 2026-05-07): respect the persisted hop-mode
-  // setting on cold boot.  When the user previously turned on global
-  // hop-relay (settings.allowHopThrough === true), re-register the
-  // relay-forward skill at the configured policy.  Off requires no
-  // action — the skill only registers when explicitly enabled.
-  try {
-    if (bundle.settings?.allowHopThrough === true) {
-      agent.enableRelayForward({ policy: 'authenticated' });
-    }
-  } catch { /* non-fatal */ }
 
   // **Caller responsibility**: register peer pubkeys at the core.Agent
   // SecurityLayer (`agent.addPeer(addr, pubKey)`) BEFORE calling

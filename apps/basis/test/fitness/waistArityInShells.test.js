@@ -93,7 +93,7 @@ describe('the resolving waist is never handed an app origin, in a shell that hol
     });
   }
 
-  for (const shell of SHELLS.concat(['apps/basis-mobile/src/screens/v2/CircleHopScreen.js'])) {
+  for (const shell of SHELLS) {
     it(`${shell.split('/').pop()} never re-binds the resolver to the bare name callSkill`, () => {
       const offenders = resolverBoundAsCallSkill(read(shell));
       expect(offenders, `the resolving waist was bound as \`callSkill\` again:\n${offenders.join('\n')}`).toEqual([]);

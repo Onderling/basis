@@ -6,12 +6,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { makeSyncSelection, HOLD_EVERYTHING, parseKringenOff, serializeKringenOff, SYNC_SILO_PARAM_KEYS, SYNC_KRINGEN_OFF_PARAM_KEY, SYNC_FILE_BYTES_PARAM_KEY } from '../../src/v2/syncSelection.js';
 import { buildCircleLanes } from '../../src/v2/circleLanes.js';
 import { CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
-import { TASK_BROADCAST } from '../../src/v2/taskRail.js';
+import { ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
 
 const stmt = { body: { kind: 'chat', subject: 'm1', hash: 'h1' }, sig: 'sig' };
 const chatPayload = { subtype: CHAT_STATEMENT_BROADCAST, circleId: 'k1', event: stmt, msgId: 'm1', ts: 1 };
 const taskStmt = { body: { kind: 'snapshot', subject: 't1', hash: 'h2' }, sig: 'sig' };
-const taskPayload = { subtype: TASK_BROADCAST, circleId: 'k1', event: taskStmt, msgId: 'task:h2', ts: 1 };
+const taskPayload = { subtype: ITEMS_BROADCAST, circleId: 'k1', event: taskStmt, msgId: 'task:h2', ts: 1 };
 
 describe('the reader', () => {
   it('defaults: every silo held, every kring on, bytes in full — and junk reads as the default', () => {
@@ -53,7 +53,7 @@ describe('the receiver enforces it — the lane table', () => {
   });
   const agentWith = (values, carry = vi.fn(async () => ({ attempted: 1 }))) => ({
     siblingCarry: { carry },
-    chatRail: railStub(), taskRail: railStub(),
+    chatRail: railStub(), itemsRail: railStub(),
     sendPeerMessage: async () => ({}),
     getParamValue: (k) => values[k],
     carry,
@@ -69,8 +69,8 @@ describe('the receiver enforces it — the lane table', () => {
     expect(agent.carry.mock.calls[0][0]).toMatchObject({ subtype: CHAT_STATEMENT_BROADCAST, circleId: 'k1', event: stmt });
     expect(agent.carry.mock.calls[0][1]).toEqual({ from: 'addr:member-bea' });
     // tasks are still held on this device
-    await handlers[TASK_BROADCAST]('addr:member-bea', taskPayload);
-    expect(agent.taskRail.ingest).toHaveBeenCalledTimes(1);
+    await handlers[ITEMS_BROADCAST]('addr:member-bea', taskPayload);
+    expect(agent.itemsRail.ingest).toHaveBeenCalledTimes(1);
   });
   it('a silo off never carries what did NOT verify — a carrier is not an authority', async () => {
     const agent = agentWith({ [SYNC_SILO_PARAM_KEYS.chat]: false });
@@ -84,10 +84,10 @@ describe('the receiver enforces it — the lane table', () => {
     const agent = agentWith({ [SYNC_KRINGEN_OFF_PARAM_KEY]: 'k1' });
     const { handlers } = buildCircleLanes({ agent });
     await handlers[CHAT_STATEMENT_BROADCAST]('addr:box', chatPayload);
-    await handlers[TASK_BROADCAST]('addr:box', taskPayload);
+    await handlers[ITEMS_BROADCAST]('addr:box', taskPayload);
     await handlers[CHAT_STATEMENT_BROADCAST]('addr:box', { ...chatPayload, msgId: 'm2' });
     expect(agent.chatRail.ingest).not.toHaveBeenCalled();
-    expect(agent.taskRail.ingest).not.toHaveBeenCalled();
+    expect(agent.itemsRail.ingest).not.toHaveBeenCalled();
     expect(agent.carry).not.toHaveBeenCalled();
     expect(warn.mock.calls.filter(([m]) => /does not hold kring k1/.test(String(m)))).toHaveLength(1);
     warn.mockRestore();

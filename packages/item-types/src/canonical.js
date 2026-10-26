@@ -13,7 +13,7 @@ import { CHAT_THREAD_SCHEMA }       from './types/chat-thread.js';
 import { OFFER_SCHEMA }             from './types/offer.js';
 import { REQUEST_SCHEMA }           from './types/request.js';
 import { CLAIM_SCHEMA }             from './types/claim.js';
-import { CONTACT_SCHEMA }           from './types/contact.js';
+import { CONTACT_SCHEMA, CONTACT_FIELD_CLOCKS } from './types/contact.js';
 import { CALENDAR_EVENT_SCHEMA }    from './types/calendar-event.js';
 import { ANNOUNCEMENT_SCHEMA }      from './types/announcement.js';
 import { REVEAL_REQUEST_SCHEMA }    from './types/reveal-request.js';
@@ -110,10 +110,10 @@ export const CANONICAL_TYPES = Object.freeze({
   // carry or drop it; the appointment's `rsvp` is a read projection over these.
   'rsvp':               RSVP_SCHEMA,
   // A row of a circle's roster trail (2026-10-25): in the circle's own store, carried by the membership lane's
-  // statements and the announces — never by the generic store door (the task lane refuses it).
+  // statements and the announces — never by the generic store door (the items lane refuses it).
   'membership-redemption': MEMBERSHIP_REDEMPTION_SCHEMA,
   // A circle's rules head (2026-10-25): written by the creation, the join and the rules lane's apply — never by the
-  // generic store door (the task lane refuses it).
+  // generic store door (the items lane refuses it).
   'group-rules':        GROUP_RULES_SCHEMA,
   // The composable CONTAINERS (2026-09-01). They were registered privately by `circleLists.js` on a
   // registry of its own, which is what put lists in a SECOND store per circle — and the architecture is
@@ -135,6 +135,22 @@ export const CANONICAL_TYPES = Object.freeze({
  * 'supply-offer'})` routes to the `offer` schema. Adopters can drop
  * the legacy names on their own schedule.
  */
+/**
+ * The types that live ONLY in a person's own-devices scope: written by that person's devices, carried between them,
+ * never into a circle. A rule that trusts its writers to be one person (a writer-stamped clock) may hold only for
+ * these; `@onderling/item-store`'s resolution registry reads this list to refuse it elsewhere.
+ */
+export const OWN_SCOPE_TYPES = Object.freeze(['contact', 'contact-refile', 'device-link', 'membership-code', 'post-answers']);
+
+/**
+ * The canonical types that declare field-sets merging by their own clock (`field-clock`), by type name. The item
+ * store's default resolution registry reads this; a type with per-field rules declares them here and writes no merge
+ * code of its own.
+ */
+export const CANONICAL_FIELD_CLOCKS = Object.freeze({
+  contact: CONTACT_FIELD_CLOCKS,
+});
+
 export const LEGACY_ALIASES = Object.freeze({
   'offer':    ['supply-offer'],
   'request':  ['demand-offer'],

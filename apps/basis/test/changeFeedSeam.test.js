@@ -1,6 +1,6 @@
 /**
  * The change seam, crossed: two real nodes in one circle over the real transport. What one writes reaches the other's
- * composition as an item that LANDED (`onItemLanded`, fed by the task rail's one seam), and the writer's composition
+ * composition as an item that LANDED (`onItemLanded`, fed by the items rail's one seam), and the writer's composition
  * hears its own write WITH the item (`onCircleWrite`) — the two inputs of a host's change feed.
  */
 import { describe, it, expect, afterAll } from 'vitest';
@@ -16,8 +16,8 @@ describe('the change seam between two real nodes', () => {
     const wroteA = [];
     const landedB = [];
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true, agentOpts: { onCircleWrite: (circleId, item, removedId) => wroteA.push({ circleId, id: item?.id ?? null, removedId: removedId ?? null }) } }),
-      bootRealAgentNode('B', { taskLane: true, agentOpts: { onItemLanded: (circleId, item) => landedB.push({ circleId, id: item?.id, title: item?.title }) } }),
+      bootRealAgentNode('A', { itemsLane: true, agentOpts: { onCircleWrite: (circleId, item, removedId) => wroteA.push({ circleId, id: item?.id ?? null, removedId: removedId ?? null }) } }),
+      bootRealAgentNode('B', { itemsLane: true, agentOpts: { onItemLanded: (circleId, item) => landedB.push({ circleId, id: item?.id, title: item?.title }) } }),
     ]);
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Seam', handle: 'seam' });

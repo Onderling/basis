@@ -59,7 +59,7 @@ import {
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
 import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js';
+import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
 import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
@@ -78,10 +78,10 @@ const CATCHUP_REPLY_SUBTYPES = new Set([
   GOV_CATCHUP_BATCH,
   MEMBERSHIP_CATCHUP_SUBTYPES.batch,
   GRANTS_CATCHUP_SUBTYPES.batch,
-  TASK_CATCHUP_SUBTYPES.batch,
-  TASK_CATCHUP_SUBTYPES.offer,
-  OWN_TASK_CATCHUP_SUBTYPES.batch,
-  OWN_TASK_CATCHUP_SUBTYPES.offer,
+  ITEMS_CATCHUP_SUBTYPES.batch,
+  ITEMS_CATCHUP_SUBTYPES.offer,
+  OWN_ITEMS_CATCHUP_SUBTYPES.batch,
+  OWN_ITEMS_CATCHUP_SUBTYPES.offer,
   CHAT_CATCHUP_SUBTYPES.batch,
   CHAT_CATCHUP_SUBTYPES.offer,
   KEY_CATCHUP_SUBTYPES.batch,
@@ -416,11 +416,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // here; `dataSourceFor` hands it to the store at build time. Absent injection → the shared local backing.
   const circleMedia = new Map();          // circleId → cache-mode PseudoPod medium (DataSource-shaped)
   let householdService;   // built with `householdDataSource` below, for the same reason
-  // The task lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
+  // The items lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
-  let taskRail = null;
-  let taskEmit = null;
-  let ownStoreSync = null;   // the own scope's catch-up between the person's devices (built with the task lane)
+  let itemsRail = null;
+  let itemsEmit = null;
+  let ownStoreSync = null;   // the own scope's catch-up between the person's devices (built with the items lane)
   // The personal history mirror's state — assigned at the end of boot (the sync block); declared
   // here so the params dispatch (a live switch flip) can kick the reconciler.
   let historyMirror = null;
@@ -434,7 +434,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   let chatRail = null;
   let chatEmit = null;
   // The wired household ops (dissolved cores on the host). Everything else on the 'household'
-  // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
+  // app-origin (calendar_* passthrough, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
   const HOUSEHOLD_WIRED_OPS = new Set([
     'addItem', 'markComplete', 'removeItem', 'listOpenItems',
@@ -1195,8 +1195,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // verified, chained, stored on their rail, and never applied — and catch-up could not heal it,
       // because catch-up fetches what the rail LACKS and the rail had it (F-016, deterministic).
       // Idempotent by construction: a re-applied snapshot re-merges to the same result.
-      if (taskRail?.rebuildHead) {
-        try { await taskRail.rebuildHead(id); } catch { /* best-effort — never block opening a circle */ }
+      if (itemsRail?.rebuildHead) {
+        try { await itemsRail.rebuildHead(id); } catch { /* best-effort — never block opening a circle */ }
       }
       // Compose the peer seam BY POSTURE — avoid the double-carry. A POD-BACKED circle (a cache medium was
       // provisioned) carries content THROUGH THE POD (write-through on send + catch-up on open), so it must
@@ -1217,8 +1217,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         // the box's change feed — its event rows, its screens' nudge)
         const wrote = (item, removedId) => { try { opts.onCircleWrite?.(id, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(item); return r; },
-          publishItemRemoved: (rid, removed)  => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
+          publishItem:        (item)          => { const r = routeItemsMirror({ circleId: id, emitter: itemsEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(item); return r; },
+          publishItemRemoved: (rid, removed)  => { const r = routeItemsMirror({ circleId: id, emitter: itemsEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
         });
         reFanOwedChat(id);   // what a restart still owes this circle goes out again (idempotent)
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
@@ -1279,7 +1279,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // composition without a device log there is simply no peer carry. The check is hoisted ABOVE the
     // loop deliberately: the per-item `try` swallows errors (best-effort), so a throw inside it would
     // be silent.
-    if (!taskEmit) {
+    if (!itemsEmit) {
       if (opts.deviceLog) {
         console.warn(
           `[circle-sync] ${id}: skipping catch-up republish — a signed lane is required and no emitter `
@@ -1293,7 +1293,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // merges — idempotent) — except a roster row, which travels by its own proof-keeping carriers
       // and would otherwise overwrite the peer's proven addresses with this device's view of them.
       if (isRosterTrailItem(it)) continue;
-      try { if (it) taskEmit.snapshot(id, it); } catch { /* best-effort */ }
+      try { if (it) itemsEmit.snapshot(id, it); } catch { /* best-effort */ }
     }
   }
   // The owed RE-FAN — the durable outbox as a projection (no second store): at the first open of a
@@ -1847,9 +1847,9 @@ export async function createRealHouseholdAgent(opts = {}) {
      * is the convergence: "a request to a human IS a task."
      *
      * Wired as a PEER-FACING dispatcher op — same direct-register pattern as
-     * `addMember`/`resolveContact`; `from` is the A2A caller (requester A). It is NOT
+     * `resolveContact`; `from` is the A2A caller (requester A). It is NOT
      * on `manifest.js` (this is an agent-to-agent op, not a local chat/web surface —
-     * exactly like addMember), so it carries NO coverage-snapshot entry.
+     * exactly like resolveContact), so it carries NO coverage-snapshot entry.
      *
      * ARCHITECTURAL CHOICE — resolve the circle context at INVOCATION time inside the
      * handler, NOT by pre-projecting one skill per offering onto the AgentCard. A
@@ -1889,8 +1889,8 @@ export async function createRealHouseholdAgent(opts = {}) {
 
         // The recipient's task surface for THAT circle — the per-circle CircleItemStore
         // (the established accessor, as the household wired path uses). `recipient` is this
-        // device's local household member webid — the same local webid the addMember / seed
-        // / calendar host ops use, so the minted task's `forMember` is legible alongside them.
+        // device's local household member webid — the same local webid the seed / calendar
+        // host ops use, so the minted task's `forMember` is legible alongside them.
         const recipient = 'webid:local-demo-user';
         const taskStore = createTaskStore(householdService.stores.getStore(contextId), {});
 
@@ -1904,32 +1904,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
     }, { visibility: 'authenticated' });
   }
-
-  // v0.4 — household membership demo.  The real manifest declares
-  // `registerName` (writes a `contact` item); the legacy `/addmember`
-  // membership demo + the cross-app follow-up chain (followUps.js) still
-  // reference an `addMember` op, so keep a thin shim that records the member
-  // as a real contact item AND returns the `{memberName}` shape the demo +
-  // membership-redemption path expect.  (registerName is also wired above via
-  // the registry, reachable through the manifest's /register surface.)
-  hostAgent.register('addMember', async ({ parts, from }) => {
-    const args = parts?.[0]?.data ?? {};
-    const name = String(args.name ?? '').trim();
-    if (!name) {
-      return [DataPart({ ok: false, error: 'name required' })];
-    }
-    try {
-      await householdService.stores.getStore(homeCircleId).put(
-        { type: 'contact', text: name, addedBy: from ?? 'webid:local-demo-user' },
-        { by: from ?? 'webid:local-demo-user' },
-      );
-    } catch { /* defensive — the member reply doesn't depend on the write */ }
-    return [DataPart({
-      ok:         true,
-      message:    `✓ Added member: ${name}`,
-      memberName: name,
-    })];
-  });
 
   // v0.5 — snapshot factory for the J7 embed primitive. Consumed by
   // basis's /embed built-in.  Reads a real household item by id (or
@@ -2262,7 +2236,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
   // THE PERSON'S OWN STORE (the own-devices scope): ONE per node — what the shell hands in (sealed on its medium),
-  // else in memory — read by the calendar's own appointments and a host's planned work. It rides the task lane
+  // else in memory — read by the calendar's own appointments and a host's planned work. It rides the items lane
   // between the person's OWN devices only: signed by this device's delegation key, verified by the device-set
   // binding, sealed in flight to the person's seal-to-self key (the one every enrolled device derives — the at-rest
   // key is per device and would not open on a sibling). A device that cannot sign (not enrolled) keeps it local.
@@ -2291,10 +2265,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const ownLanes = () => [...personas.keys()].map(ownLaneOf);
   const ownSeal = recoverySealStrategy();
   function wireOwnLane() {
-    if (ownLaneWired || !ownStoreNow || !taskEmit) return;
+    if (ownLaneWired || !ownStoreNow || !itemsEmit) return;
     ownLaneWired = true;
     const valves = new Map();
-    const valveFor = (lane) => valves.get(lane) ?? valves.set(lane, routeTaskMirror({ circleId: lane, emitter: taskEmit })).get(lane);
+    const valveFor = (lane) => valves.get(lane) ?? valves.set(lane, routeItemsMirror({ circleId: lane, emitter: itemsEmit })).get(lane);
     // …and the composition hears what this node wrote there, as it hears a circle's writes (`opts.onCircleWrite`)
     const wrote = (item, removedId) => { try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
     wireStoreMirror(ownStoreNow, {
@@ -2303,7 +2277,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       publishItemRemoved: (rid, removed) => { const r = valveFor(ownLaneOf(selfOfOwnItem(removed))).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
     });
     // what landed for it before it was open (parked on the log) is applied now
-    for (const lane of ownLanes()) Promise.resolve(taskRail?.rebuildHead?.(lane)).catch(() => {});
+    for (const lane of ownLanes()) Promise.resolve(itemsRail?.rebuildHead?.(lane)).catch(() => {});
   }
   const getOwnStore = () => (ownStoreMade ??= (async () => {
     ownStoreNow = await (typeof opts.ownStore === 'function' ? opts.ownStore() : createOwnDevicesStore());
@@ -4787,13 +4761,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.
     membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
-    // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
-    // full-item snapshot, fanned via broadcastCircleTask; receivers verify at their rail and causally merge
+    // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's items lane as a signed
+    // full-item snapshot, fanned via broadcastCircleItems; receivers verify at their rail and causally merge
     // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type
     // valve in ensureCircleSync below). `storeFor` peeks — it never BUILDS a store, so an inbound statement
     // for a circle this device hasn't opened parks on the log instead of caching a store without its
     // pod medium; the head converges when the circle opens and catch-up runs.
-    taskRail = makeTaskRail({
+    itemsRail = makeItemsRail({
       eventLog: opts.deviceLog,
       circleIdentityFor,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
@@ -4821,29 +4795,29 @@ export async function createRealHouseholdAgent(opts = {}) {
         return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
       },
     });
-    taskEmit = makeTaskEmitter({
-      rail: taskRail,
+    itemsEmit = makeItemsEmitter({
+      rail: itemsRail,
       // Best-effort, but REPORTING: the fan's own contract is {sent, attempted, errors} and swallowing
       // it made a lost statement invisible (a claim fanned right after its task never reached the peer,
       // and nothing said so — 2026-08-20). Under-delivery and rejection both warn; catch-up reconciles
       // either way, but now the log says WHEN it will have to.
       // the person's own scope has no members to fan to: it reaches their other devices by the one carry, only
       fan: (circleId, statement) => (isOwnLane(circleId)
-        ? siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
-        : callSkill('pinboard', 'broadcastCircleTask', {
+        ? siblingCarry.carry({ subtype: ITEMS_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
+        : callSkill('pinboard', 'broadcastCircleItems', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
-        siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {});
+        siblingCarry.carry({ subtype: ITEMS_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {});
         if (r?.error || (r?.errors?.length ?? 0) > 0 || (r?.sent ?? 0) < (r?.attempted ?? 0)) {
-          console.warn(`[task-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
+          console.warn(`[items-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
             + ` hash=${statement.body.hash.slice(0, 8)}: sent=${r?.sent ?? 0}/${r?.attempted ?? 0}`
             + (r?.error ? ` error=${r.error}` : '')
             + ((r?.errors?.length ?? 0) > 0 ? ` errors=${JSON.stringify(r.errors).slice(0, 200)}` : ''));
         }
         return r;
       }, (err) => {
-        console.warn(`[task-lane] fan REJECTED for ${circleId} ${statement.body.kind}`
+        console.warn(`[items-lane] fan REJECTED for ${circleId} ${statement.body.kind}`
           + ` hash=${statement.body.hash.slice(0, 8)}:`, err?.message ?? err);
       })),
     });
@@ -4852,10 +4826,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // served to them only (a stranger asking gets nothing, sealed or not). The shells kick it on connect.
     {
       const replay = makeFrontierReplay({
-        rail: taskRail,
+        rail: itemsRail,
         sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-        subtypes: OWN_TASK_CATCHUP_SUBTYPES,
-        statementsFor: (circleId) => taskRail.catchUpStatements(circleId),
+        subtypes: OWN_ITEMS_CATCHUP_SUBTYPES,
+        statementsFor: (circleId) => itemsRail.catchUpStatements(circleId),
         // each own lane to that lane's self's devices only
         mayServe: async (fromPeerAddr, circleId) => isOwnLane(circleId) && (await siblingsFor({ circleId })).includes(fromPeerAddr),
       });
@@ -6027,7 +6001,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // /brief contributor — derived from the wired store (the dissolved app has no briefSummary core).
       if (opId === 'household_briefSummary') return householdBriefSummary(circleId, tr);
-      // Everything else on the 'household' app-origin (calendar_* passthrough, addMember, getChoreSnapshot,
+      // Everything else on the 'household' app-origin (calendar_* passthrough, getChoreSnapshot,
       // resolveContact, help, registerName) is a hostAgent skill — route it there unchanged.
       const parts = [DataPart(args ?? {})];
       const result = await chatAgent.invoke(hostAgent.address, opId, parts);
@@ -8197,7 +8171,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // notify-envelope, which writes its payload into this agent's local pseudo-pod at whatever `ref` it names
         // before anything checks it — the pod that holds this agent's endorsements (the catalogue's trust). Any
         // address that could say hello on the relay could rewrite them. Nothing current sends the shape (items ride
-        // the signed task lane), so it stops here, counted, and writes nothing. The adapter and the mirror stay in
+        // the signed items lane), so it stops here, counted, and writes nothing. The adapter and the mirror stay in
         // the tree (kept mechanisms); the wire to them is what is cut.
         if (env?.payload && typeof env.payload === 'object' && Object.prototype.hasOwnProperty.call(env.payload, '__ntfyEnv')) {
           inboundRefused['old-envelope'] = (inboundRefused['old-envelope'] ?? 0) + 1;
@@ -8602,9 +8576,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
     // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
     rosterSeed,
-    // The task lane's rail (same contract): the shells register circle-task-broadcast + its catch-up pair
+    // The items lane's rail (same contract): the shells register circle-items-broadcast + its catch-up pair
     // over this instance; its ingest also causally merges the snapshot into the circle's store head.
-    taskRail,
+    itemsRail,
     // The chat lane's rail + emitter: the shells register circle-chat-statement + the windowed catch-up
     // over the rail, and their SEND sites call chatEmit (append-signed-render-entry + fan) instead of
     // the legacy append-then-fan pair.

@@ -33,7 +33,7 @@ describe('an op is registered at the visibility its manifest declares', () => {
       }
       return original.apply(this, arguments);
     };
-    try { node = await bootRealAgentNode('visibility', { taskLane: true }); }
+    try { node = await bootRealAgentNode('visibility', { itemsLane: true }); }
     finally { SkillRegistry.prototype.register = original; }
   }, 60_000);
   afterAll(async () => { await teardown(node); });

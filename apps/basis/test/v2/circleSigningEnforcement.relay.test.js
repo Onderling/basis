@@ -113,22 +113,16 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
 
   /* ── The founder ─────────────────────────────────────────────────────────────────────────── */
 
-  it('THE FOUNDER: their own row proves no address at first — they never redeemed anything', async () => {
-    // The reason to check rather than assume. Enforcement is built on a proof captured at JOIN, and
-    // the circle's creator never joins: `deriveRoster` supplies founders separately, with no keys at
-    // all. The next two tests are what keeps that from being a hole — a joiner holds them proven from
-    // the redeem response, and their own row self-heals at the announce.
-    //
-    // ⚠ 2026-09-10: proving the founder AT CREATION was attempted and BACKED OUT. Recording their
-    // proven address from the waist's `createGroupV2` post-step stopped the membership spine emitting
-    // `join` and `rules-accept` entirely — the fold saw only `create`, so a joiner landed on the trail
-    // but their signed acceptance folded nowhere. Isolated to that change by disabling it; the likely
-    // mechanism is a reentrant `callSkill` into pinboard while a pinboard op is still in flight, which was
-    // not confirmed. Whoever tries again: start there, and watch these two tests plus
-    // `rulesAcceptance.journey.test.js`.
+  it('THE FOUNDER: their own row is proven from the creation — the creation statement carries the proof', async () => {
+    // Enforcement is built on a proof captured at JOIN, and the circle's creator never joins. The creation
+    // statement now carries the founder's per-circle address and its proof (computed in the waist BEFORE the
+    // create is invoked, so no call re-enters pinboard while the create is in flight: the 2026-09-10 attempt
+    // recorded it in a post-step and silenced the spine's join and rules-accept), and the roster folds it through
+    // the same proof gate as a joiner's. `rulesAcceptance.journey.test.js` is the watch on the spine.
     const own = rowFor(await readRoster(admin, CIRCLE_A), admin.pubKey);
     expect(own, 'the founder is on their own roster').toBeTruthy();
-    expect(own.circleAddressProof, 'and has proved nothing about their address yet').toBeFalsy();
+    expect(own.circleAddress).toBe(admin.agent.circleAddressFor(CIRCLE_A));
+    expect(typeof own.circleAddressProof, 'proven, not claimed').toBe('string');
   });
 
   it('THE FOUNDER: a joiner nonetheless holds them PROVEN — the redeem response carried it', async () => {

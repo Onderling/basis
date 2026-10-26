@@ -7,7 +7,7 @@
  * `confirmedBy`, display-field left-join, and key backfill from the trail.
  */
 import { describe, it, expect } from 'vitest';
-import { signSpine, AgentIdentity, deriveCircleAddress, signCircleLinkFromSeed } from '@onderling/core';
+import { signSpine, AgentIdentity, deriveCircleAddress, signCircleLinkFromSeed, Bootstrap } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { deriveRoster } from '../src/lib/deriveRoster.js';
 
@@ -36,7 +36,6 @@ describe('deriveRoster', () => {
     const roster = deriveRoster({
       redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB' })],
       founderWebids: ['A'],
-      memberMapForDisplay: [],   // the runtime-empty cache that used to blank the roster
     });
     expect(roster.map((m) => m.webid).sort()).toEqual(['A', 'B']);
   });
@@ -81,32 +80,30 @@ describe('deriveRoster', () => {
     expect(roster.map((m) => m.webid)).toEqual(['B']);
   });
 
-  it('left-joins the MemberMap for display fields but trail owns existence + keys', () => {
-    const roster = deriveRoster({
-      redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB' })],
-      memberMapForDisplay: [
-        { webid: 'B', displayName: 'Bea', handle: 'bea', tags: ['koor'] },
-        { webid: 'Z', displayName: 'Ghost' },   // in the cache but NOT the trail → excluded
-      ],
-    });
-    expect(roster.map((m) => m.webid)).toEqual(['B']);   // Z is not a member (not in trail)
-    const b = roster[0];
-    expect(b.displayName).toBe('Bea');
-    expect(b.handle).toBe('bea');
-    expect(b.tags).toEqual(['koor']);
-    expect(b.pubKey).toBe('pkB');   // trail key preserved through the join
+  it('a row is the trail\'s: nothing is joined in from outside the circle\'s record', () => {
+    const roster = deriveRoster({ redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB' })] });
+    expect(roster.map((m) => m.webid)).toEqual(['B']);
+    expect(roster[0].pubKey).toBe('pkB');
+    expect(roster[0].tags).toBeUndefined();
   });
 
-  it('backfills a missing trail key from the MemberMap (founder own keys)', () => {
-    const roster = deriveRoster({
-      redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB' })],
-      founderWebids: ['A'],
-      memberMapForDisplay: [{ webid: 'A', role: 'admin', circleAddress: 'addrA', sealingPublicKey: 'skA' }],
-    });
-    const a = roster.find((m) => m.webid === 'A');
-    expect(a.role).toBe('admin');
-    expect(a.circleAddress).toBe('addrA');   // filled from the display cache
-    expect(a.sealingPublicKey).toBe('skA');
+  it('the founder\'s per-circle address comes from their creation statement, through the same proof gate as a joiner\'s', () => {
+    const seed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('founder');
+    const addr = deriveCircleAddress(seed, 'g1');
+    const proof = signCircleLinkFromSeed(seed, 'g1', 'g1', addr);
+    const ok = deriveRoster({ founderWebids: ['A'], founderFacts: { A: { groupId: 'g1', circleAddress: addr, circleAddressProof: proof } } });
+    const a = ok.find((m) => m.webid === 'A');
+    expect([a.role, a.circleAddress]).toEqual(['admin', addr]);
+    expect(a.circleAddresses).toEqual([addr]);
+    // a proof for another circle, or none, projects no address
+    const otherProof = signCircleLinkFromSeed(seed, 'g1', 'g2', addr);
+    const bad = deriveRoster({ founderWebids: ['A'], founderFacts: { A: { groupId: 'g1', circleAddress: addr, circleAddressProof: otherProof } } });
+    expect(bad.find((m) => m.webid === 'A').circleAddress).toBeUndefined();
+  });
+
+  it('the founder\'s handle is the one their creation statement says, until they say another', () => {
+    const roster = deriveRoster({ founderWebids: ['A'], founderFacts: { A: { groupId: 'g1', handle: 'anna' } } });
+    expect(roster.find((m) => m.webid === 'A')?.handle).toBe('anna');
   });
 
   it('leaves an unknown key absent (undefined), never a null placeholder', () => {
@@ -370,20 +367,10 @@ describe('deriveRoster', () => {
       expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee');
     });
 
-    it('a handle the MemberMap holds NOW (a rename) still wins over the join-time one', async () => {
-      const joiner = await AgentIdentity.generate(new VaultMemory());
-      const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
-      const roster = deriveRoster({
-        redemptions: [], spineStatements: [join], foldAuthoritative: true,
-        memberMapForDisplay: [{ webid: 'NEW-MEMBER', handle: 'cee-renamed' }],
-      });
-      expect(roster.find((m) => m.webid === 'NEW-MEMBER')?.handle).toBe('cee-renamed');
-    });
-
-    it('a member\'s OWN later statement (`member-props`) is the authority for handle · displayName · avatarRef — it beats the cached rename (2026-09-21)', async () => {
+    it('a member\'s OWN later statement (`member-props`) is the authority for handle · displayName · avatarRef — it beats the join-time handle (2026-09-21)', async () => {
       // The one road for a name change: the member's self-signed `member-props` on the membership lane (the note
-      // `NOTE-member-props-on-the-membership-lane.md`). The MemberMap "cache" is where the retired side wire wrote;
-      // a value the fold holds from the member's own statement wins over it, and over the join-time handle.
+      // `NOTE-member-props-on-the-membership-lane.md`). A value the fold holds from the member's own statement wins
+      // over the join-time handle.
       const joiner = await AgentIdentity.generate(new VaultMemory());
       const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
       // the statement is self-subject: subject === the member's own ref (`authorRef`) — the fold's rule
@@ -391,7 +378,6 @@ describe('deriveRoster', () => {
         payload: { authorRef: 'NEW-MEMBER', handle: 'cee-now', displayName: 'Cee Now', avatarRef: 'media:av1' } }).body;
       const roster = deriveRoster({
         redemptions: [], spineStatements: [join, props], foldAuthoritative: true,
-        memberMapForDisplay: [{ webid: 'NEW-MEMBER', handle: 'cee-cached', displayName: 'Cached Cee' }],
       });
       const row = roster.find((m) => m.webid === 'NEW-MEMBER');
       expect(row?.handle).toBe('cee-now');
@@ -399,22 +385,17 @@ describe('deriveRoster', () => {
       expect(row?.avatarRef).toBe('media:av1');
     });
 
-    it('…and for the PERSONA PROPERTIES (step two, 2026-09-22): the map the member said on the lane beats the cached and the join-time one, whole', async () => {
+    it('…and for the PERSONA PROPERTIES (step two, 2026-09-22): the map the member said on the lane is the row\'s, whole', async () => {
       const joiner = await AgentIdentity.generate(new VaultMemory());
       const join = { ...signSpine(joiner, { kind: 'join', circleId: 'g1', subject: 'NEW-MEMBER', payload: { peerDisplay: 'cee' } }).body, author: 'NEW-MEMBER' };   // resolved: a self-signed join
       const props = signSpine(joiner, { kind: 'member-props', circleId: 'g1', subject: 'NEW-MEMBER', parent: join.hash,
         payload: { authorRef: 'NEW-MEMBER', personaProperties: { region: 'zuid' } } }).body;
       const roster = deriveRoster({
         redemptions: [], spineStatements: [join, props], foldAuthoritative: true,
-        memberMapForDisplay: [{ webid: 'NEW-MEMBER', personaProperties: { region: 'noord', profilePicture: { ref: 'media:old' } } }],
       });
       const row = roster.find((m) => m.webid === 'NEW-MEMBER');
       expect(row?.personaProperties, 'the withdrawn picture is gone — the map is replaced, not merged').toEqual({ region: 'zuid' });
       expect(row?.said?.personaProperties).toEqual({ region: 'zuid' });
-      // without a statement, the cache still shows (a contact from before the lane)
-      const before = deriveRoster({ redemptions: [], spineStatements: [join], foldAuthoritative: true,
-        memberMapForDisplay: [{ webid: 'NEW-MEMBER', personaProperties: { region: 'noord' } }] });
-      expect(before.find((m) => m.webid === 'NEW-MEMBER')?.personaProperties).toEqual({ region: 'noord' });
     });
   });
 
@@ -532,12 +513,11 @@ describe('W10 — a person\'s chosen handle reaches BOTH rosters (2026-08-29)', 
     expect(roster.find((m) => m.webid === 'A')?.role).toBe('admin');
   });
 
-  it('a display from the trail never overrides a handle the MemberMap already holds', () => {
+  it('the handle a member chose at join is their handle on the roster, until they say another', () => {
     const roster = deriveRoster({
       redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB', peerDisplay: 'old-handle' })],
-      memberMapForDisplay: [{ webid: 'B', handle: 'current-handle' }],
     });
-    expect(roster.find((m) => m.webid === 'B')?.handle).toBe('current-handle');
+    expect(roster.find((m) => m.webid === 'B')?.handle).toBe('old-handle');
   });
 });
 

@@ -89,6 +89,7 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
+import { resolve as resolveMember } from '@onderling/identity-resolver';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
 
@@ -120,7 +121,8 @@ import {
 } from '../lib/inviteCeiling.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
 import { geocode } from '../lib/geocode.js';
-import { resolve as resolveTargets, validateTarget, filterMuted } from '../lib/targetResolver.js';
+import { cellFor, distanceKm, snapToGrid, DISTANCE_PRESETS } from '../lib/geo.js';
+import { resolve as resolveTargets, validateTarget, filterByDistance, filterMuted } from '../lib/targetResolver.js';
 import {
   validateInboundAttachment,
   persistInboundAttachment,
@@ -310,7 +312,7 @@ async function _findLatestGroupRules(store, groupId) {
  * @param {string|null} [o.groupId]
  * @returns {Promise<Array<{webid: string, handle: string}>>}
  */
-async function collectCircleHandles({ store, groupId } = {}) {
+async function collectCircleHandles({ store, members, groupId } = {}) {
   const taken = [];
   if (store && typeof store.listOpen === 'function') {
     try {
@@ -323,6 +325,14 @@ async function collectCircleHandles({ store, groupId } = {}) {
         }
       }
     } catch { /* trail read is best-effort — the MemberMap pass still runs */ }
+  }
+  if (members && typeof members.list === 'function') {
+    try {
+      const list = await members.list();
+      for (const m of list ?? []) {
+        if (m?.webid && m.handle) taken.push({ webid: m.webid, handle: m.handle });
+      }
+    } catch { /* roster read is best-effort */ }
   }
   return taken;
 }
@@ -690,9 +700,12 @@ async function assignLendCore(scope, a, ctx) {
 }
 
 async function getHolidayModeCore(scope, a, ctx) {
-  // Holiday mode IS the coarse 'away' value of the person's `availability` property (their own profile).
-  const me = (await scope.selfProfile?.get?.(ctx.from).catch?.(() => null)) ?? null;
-  return { holidayMode: me?.availability === 'away' };
+  const { members } = scope;
+  if (!members) return { holidayMode: false };
+  const me = await members.resolveByWebid(ctx.from);
+  // Availability unification: holiday mode IS the coarse 'away' value of the
+  // unified `availability` property; the legacy flag is honoured for un-migrated entries.
+  return { holidayMode: me?.availability === 'away' || me?.holidayMode === true };
 }
 
 async function getGroupRulesCore(scope, a, ctx) {
@@ -1193,7 +1206,7 @@ export function buildPinboardScope(deps = {}) {
   const {
     store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfWebidFor = null, selfProfile = null,
+    selfWebidFor = null,
   } = deps;
   // This device's own key paired with the webid it speaks for, for reading back statements this same composition
   // wrote with the global identity (`author` a pubKey, `subject` a webid). Only where there is no per-circle
@@ -1211,7 +1224,7 @@ export function buildPinboardScope(deps = {}) {
   };
   return {
     selfSigner, localActorIn,
-    store, offeringMatch, notifier, members, controlAgent, selfProfile,
+    store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
 }
@@ -1257,9 +1270,6 @@ export function buildSkills({
   membershipRead,
   // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
   currentPersonKey = null,
-  // THE PERSON'S OWN PROFILE (handle, display name, availability, place) — lib/selfProfile.js; the host injects it over
-  // the persona record, so whoAmI, getMyProfile and the join read one record.
-  selfProfile = null,
   // THE RULES-UPDATE RIDER (host-injected): a rules-doc edit also appends + fans a signed
   // `rules-update` statement on the governance lane, so the new doc reaches every member
   // peer-to-peer (pod-free) and their stale-banner lights. Absent → store-local only, unchanged.
@@ -1323,11 +1333,9 @@ export function buildSkills({
   const scope = buildPinboardScope({
     store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfSigner, selfWebidFor, selfProfile,
+    selfSigner, selfWebidFor,
   });
   const localActorIn = scope.localActorIn;
-  /** The caller's own profile (empty when the caller is not one of this device's selves). */
-  const ownProfileOf = async (webid) => (await selfProfile?.get?.(webid).catch?.(() => null)) ?? {};
   // An op that names an ITEM, not a circle, arrives as the device's general self even when the item lives in a
   // persona's circle (the host's `actAs` reads the circle off the args). The device's own call acts on an item as the
   // self it is in the item's circle; a foreign caller stays who they are.
@@ -1556,6 +1564,9 @@ export function buildSkills({
         : (groupId ? [{ kind: 'group', groupId }] : []);
       const targets = rawTargets.filter(t => !validateTarget(t));
 
+      const maxDistanceKm = (typeof a.maxDistanceKm === 'number' && a.maxDistanceKm > 0)
+        ? a.maxDistanceKm : null;
+
       // Phase 52.7.2 cut-over — translate UI-vocab `intent` to
       // canonical {type, kind}. Bespoke intents (`report`, etc.)
       // pass through as `{type}` only.
@@ -1582,9 +1593,11 @@ export function buildSkills({
         text:           a.text,
         requiredSkills: a.requiredSkills ?? [],
         visibility:     'household',
-        // Phase 27 — store targets on the item so local UI can render them and receivers can re-check.
+        // Phase 27 — store targets + maxDistanceKm on the item so
+        // local UI can render them and receivers can re-check.
         source: {
           targets,
+          maxDistanceKm,
           ...(embeds.length > 0 ? { embeds } : {}),
           // Drivers #5 — an OPTIONAL explicit driver signature { text?, tags[] } the author attaches so
           // this post matches peers' private drivers on-device. Absent → the matcher falls back to the
@@ -1672,7 +1685,8 @@ export function buildSkills({
       }
 
       // ── Phase 27.3 sender-side filter ─────────────────────
-      // Resolve targets → recipient set. Drop muted.  The
+      // Resolve targets → recipient set. Drop muted. Drop out-of-
+      // range when maxDistanceKm + own location are set.  The
       // result drives both the group broadcast (when targets
       // include a 'group') AND the per-recipient direct fan-out
       // for non-group targets (Phase 27.4 wireup happens via chat
@@ -1685,11 +1699,14 @@ export function buildSkills({
         const r = await resolveTargets(targets.filter(t => t.kind !== 'group'),
           { members, contacts: bundle?.contacts, selfWebid: from });
         recipients = r.recipients;
+        if (maxDistanceKm) {
+          recipients = await filterByDistance(recipients, { members, selfWebid: from, maxDistanceKm });
+        }
         if (muted) recipients = await filterMuted(recipients, muted, members);
       }
 
-      // The broadcast target (group pubsub) carries the targets
-      // so receivers can re-validate. By default we
+      // The broadcast target (group pubsub) carries the targets +
+      // maxDistanceKm so receivers can re-validate. By default we
       // DON'T await broadcast results — posts go up immediately
       // and claims (if any) flow back via the substrate mirror +
       // the chat-based reply path (Phase 14).
@@ -1721,8 +1738,10 @@ export function buildSkills({
         dueAt:     item.dueAt,
         categoryId:  a.categoryId  ?? null,
         skillTags:   Array.isArray(a.skillTags) ? a.skillTags : [],
-        // Phase 27 — pass targets through so receivers can re-check.
+        // Phase 27 — pass targets + distance through so
+        // receivers can re-check (functional design § 4f).
         targets,
+        maxDistanceKm,
         // Phase 39 — attachment metadata + thumbnails (no
         // full bytes).  Recipients render the sealed thumbnails and
         // open the full sealed blob through their circle media gateway.
@@ -1802,6 +1821,7 @@ export function buildSkills({
               kind:          item.kind ?? null,
               dueAt:         item.dueAt ?? null,
               targets,
+              maxDistanceKm,
               categoryId:    a.categoryId   ?? null,
               skillTags:     Array.isArray(a.skillTags) ? a.skillTags : [],
               requiredSkills: a.requiredSkills ?? [],
@@ -2100,6 +2120,7 @@ export function buildSkills({
       const a = dataArgs(parts);
       const v = validateHandle(a.handle ?? '');
       if (!v.ok) return { error: 'invalid-handle', reason: v.reason };
+      if (!members) return { error: 'no-member-map' };
       // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
       // handles within a single circle). Reject if ANOTHER member of this circle
       // already holds the handle (case-folded, so `Jan`/`jan` collide). The
@@ -2109,7 +2130,7 @@ export function buildSkills({
       // SERIALISED per (circle, handle): the check and the write are separated by awaits, so two members
       // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
       return withHandleClaim(store, groupId, v.handle, async () => {
-        const taken = await collectCircleHandles({ store, groupId });
+        const taken = await collectCircleHandles({ store, members, groupId });
         // …and every FOLDED roster's handles (2026-09-21): a member's later `member-props` rename lives on the lane, not
         // in this device's cache, so the trail + cache alone would let two members claim one handle. The handle is the
         // person's, one across their circles (`member-props` goes to every circle they are in), so every circle counts.
@@ -2128,9 +2149,8 @@ export function buildSkills({
         if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
           return { error: 'invalid-handle', reason: 'handle-taken' };
         }
-        const updated = await selfProfile?.set?.(from, { handle: v.handle });
-        if (!updated) return { error: 'not-a-self-here' };
-        return { handle: v.handle, _sync: simulateSync() };
+        const updated = await members.addMember({ webid: from, handle: v.handle });
+        return { handle: v.handle, member: updated, _sync: simulateSync() };
       });
     }, {
       description: 'Set the calling actor\'s handle (lowercase, 3–32 chars).',
@@ -2166,8 +2186,10 @@ export function buildSkills({
     defineSkill('setHolidayMode', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.on !== 'boolean') return { error: 'on (bool) required' };
-      const updated = await selfProfile?.set?.(from, { availability: a.on ? 'away' : 'open' });
-      if (!updated) return { error: 'not-a-self-here' };
+      if (!members) return { error: 'no-member-map' };
+      const me = (await members.resolveByWebid(from)) ?? { webid: from };
+      const availability = a.on ? 'away' : 'open';
+      const updated = await members.addMember({ ...me, availability, holidayMode: a.on });
       return { holidayMode: updated.availability === 'away', _sync: simulateSync() };
     }, {
       description: 'Toggle the calling actor\'s holiday-mode flag (thin shim over the unified availability property; away == on).',
@@ -2228,9 +2250,9 @@ export function buildSkills({
       const a = dataArgs(parts);
       const name = typeof a.displayName === 'string' ? a.displayName.trim() : '';
       if (!name) return { error: 'displayName required' };
-      const updated = await selfProfile?.set?.(from, { displayName: name });
-      if (!updated) return { error: 'not-a-self-here' };
-      return { displayName: name, _sync: simulateSync() };
+      if (!members) return { error: 'no-member-map' };
+      const updated = await members.addMember({ webid: from, displayName: name });
+      return { displayName: name, member: updated, _sync: simulateSync() };
     }, {
       description: 'Set the calling actor\'s display name (shown as each release allows).',
       visibility:  'authenticated',
@@ -3146,7 +3168,7 @@ export function buildSkills({
      *   download (frontend serialises to .json or .zip).
      */
     defineSkill('exportMyData', async ({ from }) => {
-      const member = (await selfProfile?.get?.(from).catch?.(() => null)) ?? null;
+      const member = members ? await members.resolveByWebid(from) : null;
       const allOpen   = await store.listOpen({});
       const allAudit  = await store.auditLog?.({ actor: from }).catch(() => []) ?? [];
       const myItems   = allOpen.filter(i => i.addedBy === from);
@@ -3193,14 +3215,27 @@ export function buildSkills({
 
     /**
      * getMyProfile()
-     *   — the calling actor's own profile: their self's persona record (handle, display name, availability, place).
+     *   — returns the calling actor's MemberMap entry + a
+     *   `renderForCurrentGroup` block showing how viewers in this
+     *   group will see them by default (handle vs displayName).
      */
     defineSkill('getMyProfile', async ({ from }) => {
-      const p = await selfProfile?.get?.(from).catch?.(() => null);
-      if (!p) return { entry: null };
-      return { entry: { webid: from, handle: p.handle, displayName: p.displayName, availability: p.availability, holidayMode: p.availability === 'away', location: p.location } };
+      if (!members) return { error: 'no-member-map' };
+      const entry = await members.resolveByWebid(from);
+      if (!entry) return { entry: null };
+      // Project how *I* would appear to a viewer in this group by default
+      // (resolve() is viewer-agnostic for the default case).
+      let renderForCurrentGroup = null;
+      if (groupId) {
+        renderForCurrentGroup = await resolveMember({
+          memberMap:   members,
+          targetWebid: from,
+          groupId,
+        });
+      }
+      return { entry, renderForCurrentGroup };
     }, {
-      description: 'Return the calling actor\'s own profile (their self\'s persona record: handle, name, away, place).',
+      description: 'Return the calling actor\'s profile + how peers see them by default.',
       visibility:  'authenticated',
     }),
 
@@ -3896,17 +3931,18 @@ export function buildSkills({
       const a = dataArgs(parts);
       const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
         ? a.trustOffer : 'bekend';
-      const me = await ownProfileOf(from);
+      const me = members ? await members.resolveByWebid(from) : null;
       // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
       // no fallback to this agent's identity, which every self of the device shares and so would link them.
       const asPersona = !!localActor && from !== localActor;
       const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       const card = {
         webid:        from,
-        pubKey:       own?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
-        stableId:     own?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
+        pubKey:       own?.pubKey   ?? me?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     own?.stableId ?? me?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
+        avatarUrl:    me?.avatarUrl    ?? null,
         trustOffer,
         // 2026-05-27 — embed the caller's NKN peer address so the
         // scanner can DM the contact straight after add, without
@@ -4079,37 +4115,55 @@ export function buildSkills({
     }),
 
     /**
-     * setMyLocation({label})
-     *   — the person's coarse place, on their own profile (the persona record's `location` property). The geocoder's
-     *   grid cell is not kept: a label is all a person's place ever is.
+     * setMyLocation({cell, label?, source?})
+     *   — Phase 26.3.  Persists `{cell, label, source}` on the local
+     *   actor's MemberMap entry.  `source` is one of `'gps'`,
+     *   `'geocode'`, or `null`.  No validation of the cell shape —
+     *   the caller is trusted (`geo.js#cellFor` produces it).
      */
     defineSkill('setMyLocation', async ({ parts, from }) => {
       const a = dataArgs(parts);
-      // The person's place is the COARSE label only (a municipality-like name): no grid cell or coordinate is kept
-      const label = typeof a.label === 'string' ? a.label.trim() : '';
-      if (!label) return { error: 'label required' };
-      const updated = await selfProfile?.set?.(from, { location: label });
-      if (!updated) return { error: 'not-a-self-here' };
+      if (typeof a.cell !== 'string' || !a.cell) return { error: 'cell required' };
+      if (!members) return { error: 'no-member-map' };
+      const me = (await members.resolveByWebid(from)) ?? { webid: from };
+      const updated = await members.addMember({
+        ...me,
+        location: {
+          cell:   a.cell,
+          label:  typeof a.label  === 'string' ? a.label  : null,
+          source: a.source === 'gps' || a.source === 'geocode' ? a.source : null,
+        },
+      });
       return { location: updated.location };
     }, {
-      description: 'Set the calling actor\'s coarse place (a label, never a coordinate).',
+      description: 'Set the calling actor\'s coarse location {cell, label, source}.',
       visibility:  'authenticated',
     }),
 
+    /** clearMyLocation() — drop the location field. */
     defineSkill('clearMyLocation', async ({ from }) => {
-      const updated = await selfProfile?.set?.(from, { location: null });
-      if (!updated) return { error: 'not-a-self-here' };
-      return { location: null };
+      if (!members) return { error: 'no-member-map' };
+      const me = (await members.resolveByWebid(from)) ?? { webid: from };
+      const updated = await members.addMember({ ...me, location: null });
+      return { location: updated.location };
     }, {
-      description: 'Clear the calling actor\'s coarse place.',
+      description: 'Clear the calling actor\'s coarse location.',
       visibility:  'authenticated',
     }),
 
-    /** getMyLocation() — read the calling actor's coarse place (a label, or null). */
+    /** getMyLocation() — read the calling actor's location. */
     defineSkill('getMyLocation', async ({ from }) => {
-      return { location: (await ownProfileOf(from))?.location ?? null };
+      if (!members) return { location: null };
+      const me = await members.resolveByWebid(from);
+      return { location: me?.location ?? null };
     }, {
-      description: 'Read the calling actor\'s coarse place.',
+      description: 'Read the calling actor\'s coarse location.',
+      visibility:  'authenticated',
+    }),
+
+    /** distancePresets() — return the post-composer's distance presets (km). */
+    defineSkill('distancePresets', async () => ({ presets: [...DISTANCE_PRESETS] }), {
+      description: 'Return the distance presets used by the post composer.',
       visibility:  'authenticated',
     }),
 
@@ -4308,15 +4362,11 @@ export function buildSkills({
      *   not WebID vs URL).
      */
     defineSkill('whoAmI', async ({ from, agent }) => {
-      const me = await ownProfileOf(from);
-      // WHO this is: the host's own card for this device's general self (its chat identity), and for a persona the webid
-      // it speaks as. Never this pinboard agent's key: it stays in the process.
-      const asPersona = !!localActor && from !== localActor;
-      const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
+      const me = members ? await members.resolveByWebid(from) : null;
       return {
         webid:       from,
-        stableId:    own?.stableId ?? (asPersona || typeof selfCard === 'function' ? null : agent?.identity?.stableId ?? null),
-        pubKey:      own?.pubKey   ?? (asPersona || typeof selfCard === 'function' ? from : agent?.identity?.pubKey ?? null),
+        stableId:    me?.stableId ?? agent?.identity?.stableId ?? null,
+        pubKey:      me?.pubKey   ?? agent?.identity?.pubKey   ?? null,
         handle:      me?.handle      ?? null,
         displayName: me?.displayName ?? null,
       };

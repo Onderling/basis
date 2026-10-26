@@ -133,4 +133,3 @@ export { OFFERINGS_INHERIT_KEY } from './src/profileProperties.js';
 export { RESERVED_PROPERTY_KEYS, RESERVED_PROPERTY_PREFIXES, PERSON_SETTABLE_KEYS, isReservedPropertyKey } from './src/reservedProperties.js';
 export { FACTS_AT_KEY, profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt } from './src/profileFacts.js';
 export { MODEL_CONSENT_KEY, modelConsentFor, consentedJudge } from './src/modelConsent.js';
-export { HANDLE_KEY, isPresentedAttributeKey } from './src/personaHandle.js';

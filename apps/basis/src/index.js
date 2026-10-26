@@ -399,7 +399,7 @@ export {
 } from './v2/themePref.js';
 export { buildMijViewModel } from './v2/personaView.js';
 export { loadMijModel } from './v2/mijLoader.js';
-export { offeringKeyFor } from './v2/offeringKey.js';
+export { migrateRosterOfferings, offeringKeyFor, OFFERINGS_MIGRATION_KEY } from './core/offeringsMigration.js';
 export { runFind } from './find.js';
 export { EventLog, createEventLog, RETENTION_MS, RETENTION_DEFAULTS, makeAgentTrailEntry } from './eventLog.js';
 export { attachTestBuildLogMirror, TEST_BUILD_LOG_PREFIX } from './log/testBuildMirror.js';

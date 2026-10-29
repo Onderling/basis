@@ -5,6 +5,7 @@
  * dispatches the pinboard mutations behind the callbacks.
  */
 import { translatorOr } from '../../src/locales/translatorOr.js';
+import { fieldAfterLoad } from '../../src/v2/fieldAfterLoad.js';
 
 export function renderProfileBasics(container, {
   profile = {},
@@ -20,20 +21,17 @@ export function renderProfileBasics(container, {
   const tr = translatorOr(t, 'profileBasics.js');
   // A repaint keeps what the person typed: the editor paints at once and again when the profile arrives, and replacing
   // an edited field with the stored value wiped a name typed in between (Save then saw no change and sent nothing).
-  const typed = (cls) => {
-    const prev = container.querySelector(`.${cls}`);
-    return prev && prev.value !== prev.dataset.drawn ? prev.value : null;
-  };
-  const typedHandle = typed('cc-profile__handle');
-  const typedDisplay = typed('cc-profile__display');
+  const prevField = (cls) => container.querySelector(`.${cls}`);
+  const prevHandle = prevField('cc-profile__handle');
+  const prevDisplay = prevField('cc-profile__display');
   container.innerHTML = '';
   container.className = 'cc-profile';
 
   // ── identity (handle + display name) ────────────────────────────────────
   const idSection = section(tr('circle.profile.identity'));
 
-  const handle = labelledInput(tr('circle.profile.handle'), profile.handle ?? '', 'cc-profile__handle', typedHandle);
-  const display = labelledInput(tr('circle.profile.displayName'), profile.displayName ?? '', 'cc-profile__display', typedDisplay);
+  const handle = labelledInput(tr('circle.profile.handle'), profile.handle ?? '', 'cc-profile__handle', prevHandle);
+  const display = labelledInput(tr('circle.profile.displayName'), profile.displayName ?? '', 'cc-profile__display', prevDisplay);
   idSection.appendChild(handle.wrap);
   idSection.appendChild(display.wrap);
   const save = button(tr('circle.profile.save'), 'cc-profile__save', () => {
@@ -100,7 +98,7 @@ export function renderProfileBasics(container, {
     s.appendChild(h);
     return s;
   }
-  function labelledInput(labelText, value, cls, typedValue = null) {
+  function labelledInput(labelText, value, cls, prev = null) {
     const wrap = document.createElement('label');
     wrap.className = 'cc-profile__field';
     const span = document.createElement('span');
@@ -110,7 +108,7 @@ export function renderProfileBasics(container, {
     input.type = 'text';
     input.className = cls;
     input.dataset.drawn = value;   // what was painted: a value that differs from it is the person's own typing
-    input.value = typedValue ?? value;
+    input.value = fieldAfterLoad({ current: prev?.value ?? null, drawn: prev?.dataset?.drawn ?? null, loaded: value });
     wrap.appendChild(span);
     wrap.appendChild(input);
     return { wrap, input };

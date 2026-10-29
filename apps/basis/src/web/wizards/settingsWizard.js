@@ -218,7 +218,7 @@ function renderHolidayControl(doc, state, callSkill, rerender) {
   const toggle = doc.createElement('label');
   toggle.className = 'cc-settings-toggle';
   const box = doc.createElement('input');
-  box.type = 'checkbox';
+  box.type = 'checkbox';   // sets: op:setHolidayMode — your holiday
   box.checked = !!state.holiday;
   box.addEventListener('change', async () => {
     box.disabled = true;

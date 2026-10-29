@@ -1103,9 +1103,9 @@ async function respondToItemCore(scope, a, ctx) {
       toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
     } catch { /* not on the roster: no address, and no guess */ }
   }
-  // the global member map only for a post that names no circle — a circle post's poster is known by its roster
-  if (members && toWebid && !circleOfPost) {
-    const peer = await members.resolveByWebid(toWebid);
+  // the contact book only for a post that names no circle — a circle post's poster is known by its roster
+  if (toWebid && !circleOfPost) {
+    const peer = await bundle?.contacts?.get?.(toWebid);
     toStableId = peer?.stableId ?? null;
     if (!toPubKey) toPubKey = peer?.pubKey ?? null;
   }
@@ -1450,7 +1450,7 @@ export function buildSkills({
   const adoptContactPersonKey = async (webid, claimed, links) => {
     if (!bundle?.contacts || !claimed || !Number.isInteger(claimed.version) || claimed.version < 1 || typeof claimed.pubKey !== 'string' || !claimed.pubKey) return null;
     const claimedPin = (typeof claimed.linkKeyPub === 'string' && claimed.linkKeyPub) ? claimed.linkKeyPub : null;
-    const existing = (await members?.resolveByWebid?.(webid))?.personKey ?? null;
+    const existing = (await bundle.contacts.get?.(webid))?.personKey ?? null;
     let next = null;
     if (!existing) next = { version: claimed.version, pubKey: claimed.pubKey, ...(claimedPin ? { linkKeyPub: claimedPin } : {}) };
     else {
@@ -4180,22 +4180,6 @@ export function buildSkills({
       }
     }, {
       description: 'Change which persona a contact sees you as, and the level it discloses to them. The lens: the contact talks to the same you.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * forgetContact({webid}) — the HOST's own, never a peer's: a contact re-filed under a self this device does not
-     * hold leaves this self's book (its contact facets; the member row stays). The host calls it where the own-devices
-     * lane lands the old self's `contact-refile` row.
-     */
-    defineSkill('forgetContact', async ({ parts, from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      const a = dataArgs(parts);
-      try { return { contact: await bundle.contacts.forgetContact(a.webid) }; }
-      catch (err) { return { error: err?.message ?? String(err) }; }
-    }, {
-      description: "The host's own: drop a contact re-filed under a self this device does not hold (the member row stays).",
       visibility:  'authenticated',
     }),
 

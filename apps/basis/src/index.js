@@ -417,3 +417,4 @@ export {
 } from './localisation.js';
 // Shared locale blocks (`circle.*`, `consequence.*`, `role.*`) — both shells merge these so they can't drift.
 export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';
+export { fieldAfterLoad } from './v2/fieldAfterLoad.js';

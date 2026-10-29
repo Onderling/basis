@@ -485,7 +485,7 @@ function CompactToggle({ block, emit }) {
   const value = block.config?.compact === true;
   return (
     <View style={styles.compactRow} testID={`block-config-${block.id}-compact`}>
-      <Switch
+      <Switch /* sets: store:recipe — the circle's recipe block, fanned to its members */
         value={value}
         onValueChange={(v) => emit({ compact: !!v })}
         accessibilityLabel={t('circle.recipe.compact_label.label')}

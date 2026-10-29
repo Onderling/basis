@@ -95,6 +95,21 @@ describe('the lane table hands every landed chat and item statement to the carry
     expect(carry.mock.calls[0][1]).toEqual({ from: 'addr:member-bea' });
   });
 
+  it("the person's own lanes are held whatever the tasks switch says: a circle's items are not, their own rows are", async () => {
+    const ingested = [];
+    const agent = {
+      ...fakeAgent(vi.fn(async () => ({ attempted: 0 }))),
+      itemsRail: { ...fakeAgent(null).itemsRail, ingest: async (c) => { ingested.push(c); return { ok: true, existed: false }; }, verify: async () => ({ ok: true }) },
+      getParamValue: (k) => (k === 'sync.silo.tasks' ? false : undefined),
+    };
+    const { handlers } = buildCircleLanes({ agent });
+    const st = { body: { kind: 'snapshot', subject: 'r1', hash: 'h9' }, sig: 'sig' };
+    for (const circleId of ['k1', 'own-devices', 'own-devices:p-werk']) {
+      await handlers[ITEMS_BROADCAST]('addr:box', { subtype: ITEMS_BROADCAST, circleId, event: st, msgId: 'task:h9', ts: 1 });
+    }
+    expect(ingested, 'tasks off: a circle\'s items pass on, the own lanes land').toEqual(['own-devices', 'own-devices:p-werk']);
+  });
+
   it('a statement already held is NOT carried again (the rail said existed)', async () => {
     const carry = vi.fn();
     const agent = fakeAgent(carry);

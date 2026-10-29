@@ -200,7 +200,7 @@ export function renderCircleSettings(container, {
     const row = document.createElement('label');
     row.className = 'circle-settings__feature';
     const box = document.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: policy:features — the circle's feature, an admin's statement
     box.checked = !!policy?.features?.[f];
     box.dataset.feature = f;
     box.addEventListener('change', () => emit({ features: { [f]: box.checked } }));
@@ -219,7 +219,7 @@ export function renderCircleSettings(container, {
     const row = document.createElement('label');
     row.className = 'circle-settings__app';
     const box = document.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: policy:apps — the circle's apps, an admin's statement
     box.checked = enabledApps ? enabledApps.has(app) : true;   // unset → all composed
     box.dataset.app = app;
     box.addEventListener('change', () => {
@@ -486,7 +486,7 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
         const orow = document.createElement('label');
         orow.className = 'circle-settings__control-opt';
         const box = document.createElement('input');
-        box.type = 'checkbox';
+        box.type = 'checkbox';   // sets: policy:* — the control's declared policy field
         box.dataset.kind = r.kind;
         box.checked = r.on;
         box.disabled = !state.enabled;
@@ -527,7 +527,7 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
       const wrap = document.createElement('label');
       wrap.className = 'circle-settings__control-toggle';
       const box = document.createElement('input');
-      box.type = 'checkbox';
+      box.type = 'checkbox';   // sets: op:* — the control's declared op
       box.dataset.control = ctl.id;
       box.checked = !!(transport && ctl.stateKey && transport[ctl.stateKey]);
       box.disabled = !state.enabled;
@@ -546,7 +546,7 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
       const wrap = document.createElement('label');
       wrap.className = 'circle-settings__control-toggle';
       const box = document.createElement('input');
-      box.type = 'checkbox';
+      box.type = 'checkbox';   // sets: policy:* — the control's declared policy field
       box.dataset.field = ctl.policyField;
       box.checked = !!(policy && policy[ctl.policyField]);
       box.disabled = !state.enabled;
@@ -604,7 +604,7 @@ function renderSettingsSection(container, { forms, tr, emit }) {
       span.textContent = f.label + (f.required ? ' *' : '');
       let input;
       if (f.control === 'toggle') {
-        input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!f.value;
+        input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!f.value;   // sets: policy:settings — an app's declared circle setting
         input.addEventListener('change', () => emit({ settings: { [key]: input.checked } }));
       } else if (f.control === 'choice') {
         input = document.createElement('select');
@@ -654,7 +654,7 @@ function renderCapabilitiesSection(container, { matrix, tr, emit }) {
 
       const enWrap = document.createElement('label');
       const en = document.createElement('input');
-      en.type = 'checkbox'; en.checked = row.enabled; en.dataset.role = 'enabled';
+      en.type = 'checkbox'; en.checked = row.enabled; en.dataset.role = 'enabled';   // sets: policy:capabilities — a capability the circle allows
       en.addEventListener('change', () => emit({ capabilities: { [row.key]: { ...base(), enabled: en.checked } } }));
       const enSpan = document.createElement('span');
       enSpan.textContent = `${tr(`circle.settings.verb.${row.atom}`, { defaultValue: row.atom })} · ${row.noun}`;

@@ -11,3 +11,6 @@ services:
       COMPANION_NEARBY: "${COMPANION_NEARBY:-off}"
       # the radio's fixed data port, the one the box opens in its firewall (box.conf; lib.sh nearby_firewall_rules)
       COMPANION_NEARBY_PORT: "${COMPANION_NEARBY_PORT:-45210}"
+      # the room's interface: box.conf's LAN_IFACE when it names one (the firewall reads the same), else the companion
+      # takes the default route's. Its published address records are that interface's only — never a docker bridge's.
+      COMPANION_NEARBY_IFACE: "${LAN_IFACE:-}"

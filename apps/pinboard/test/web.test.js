@@ -185,6 +185,7 @@ describe('Pinboard V1 web UI — Phase 6 (profile)', () => {
 
     const profile = await callRest('getMyProfile', {});
     expect(profile.entry.handle).toBe('alice-test');
+    expect(profile.renderForCurrentGroup.render).toBe('@alice-test');
   });
 
   it('setMyHandle rejects invalid input over REST', async () => {

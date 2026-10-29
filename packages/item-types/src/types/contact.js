@@ -87,7 +87,9 @@ export const CONTACT_SCHEMA = {
   iri:         `${NAMESPACE}Contact`,
   description: 'A person the user knows. webid + displayName + optional key, trust, flags; a person admitted through a keyless door carries a channel and a role instead of a key.',
   type:        'object',
-  required:    [...BASE_REQUIRED, 'displayName'],
+  // no name required: a book row can be someone not named yet (a stranger hidden from Contacten; a key from a card);
+  // no webid either: a bot's user row is keyed by its channel and uid
+  required:    [...BASE_REQUIRED],
   properties: {
     ...BASE_PROPERTIES,
     type:        { const: 'contact' },

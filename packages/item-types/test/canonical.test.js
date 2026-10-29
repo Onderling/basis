@@ -51,7 +51,6 @@ describe('Canonical types — registration via default registry', () => {
       'circle',
       'claim',
       'contact',
-      'contact-refile',
       'device-link',
       'group-rules',
       'inbox-item',
@@ -107,7 +106,7 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'offer':             { body:        'ladder available, lend it to whoever needs it' },
     'request':           { body:        'looking to borrow a drill this weekend' },
     'claim':             { itemRef:     'pseudo-pod://x/y/z' },
-    'contact':           { displayName: 'Anne' },
+    'contact':           { webid: 'w:anne', displayName: 'Anne' },   // nothing of its own is required
     'calendar-event':    { title:       'Coffee', startsAt: NOW },
     'announcement':      { body:        'Heads up: code rotates Friday' },
     'reveal-request':    { requester:   'pk-a', target: 'pk-b' },
@@ -133,8 +132,6 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'membership-code':   { source: { groupId: 'g-1', code: 'abc-123' } },
     // Who answered one of my posts: which post.
     'post-answers':      { source: { itemId: 'i-1', responders: [] } },
-    // A contact that left one of the person's selves: which, and when (never where it went).
-    'contact-refile':    { webid: 'w:bea', left: true, at: 1 },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
     // A row of a circle's roster trail: which circle, who redeemed.
     'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },
@@ -142,6 +139,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'group-rules':       { source: { groupId: 'g-1', rules: { purpose: 'circle' }, version: 1 } },
   };
 
+  // a type whose own fields are all optional has no field-specific sweep
+  const NONE_OWN_REQUIRED = new Set(['contact']);
   for (const [name, extra] of Object.entries(MINIMAL)) {
     it(`'${name}' validates a minimal item`, () => {
       const result = validate(baseItem(name, extra));
@@ -158,7 +157,7 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
       expect(result.ok).toBe(false);
     });
 
-    it(`'${name}' fails when an item-specific required field is missing`, () => {
+    if (!NONE_OWN_REQUIRED.has(name)) it(`'${name}' fails when an item-specific required field is missing`, () => {
       // Drop one required type-specific field per type.
       const dropKey = Object.keys(extra)[0];
       const item = baseItem(name, extra);

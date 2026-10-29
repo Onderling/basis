@@ -226,6 +226,9 @@ export async function createNeighbourhoodAgent({
   currentPersonKey,
   // The person's own profile (host-injected over the persona record, see lib/selfProfile.js); absent → in memory.
   selfProfile = null,
+  // The contact book's home (host-injected): the own-devices store + which self a row is written as (lib/ContactBook.js).
+  contactStore = null,
+  contactSelfFor = null,
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
@@ -460,10 +463,13 @@ export async function createNeighbourhoodAgent({
   // for `agent.on('message', ...)` envelopes whose first DataPart
   // carries `type: 'pinboard-chat'`; stores them locally as
   // `kind: 'chat-message'` items linked by `source.threadId`.
+  // the person's contacts: `contact` rows on their own-devices store, one per (self, contact) — lib/ContactBook.js
+  const contacts = createContactBook({ store: contactStore, selfFor: contactSelfFor ?? (() => ({ id: 'default', writer: offeringMatchOpts.localActor ?? 'me' })) });
   const chat = wireChat({
     agent,
     itemStore,
     members,
+    contacts,
     muted,
     metrics,
     localActor:    offeringMatchOpts.localActor,
@@ -509,9 +515,7 @@ export async function createNeighbourhoodAgent({
     expoPushSender,                 // S6.6 — relay.PushSender for Expo tokens (mobile-native), when expoPush supplied
     webPushPublicKey: webPush?.publicKey ?? null,
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
-    contacts: cache                    // Phase 24.1 — 1:1 contact graph + lists
-      ? createContactBook({ members, dataSource: cache })
-      : null,
+    contacts,   // the person's contacts (above)
   };
 
   // track bulk-sync state on the bundle so the UI

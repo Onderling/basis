@@ -301,6 +301,14 @@ const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === '
 const circleWrite = { fn: null };
 const ownStoreOnDisk = { ref: null };
 const itemLanded = { fn: null };
+// A hidden mark set on another device of the person lands here (a contact row on the own-devices lane) and the log says
+// so, once per mark — the one way a walk (and a reader of this box's log) can see that "hidden on the phone" reached the box.
+const hiddenSaid = new Map();
+const hiddenLanded = (item) => {
+  if (item?.type !== 'contact' || !Number.isFinite(item.hiddenAt) || hiddenSaid.get(item.id) === item.hiddenAt) return;
+  hiddenSaid.set(item.id, item.hiddenAt);
+  walkLog({ kind: 'contact-hidden', contactId: String(item.webid).slice(0, 12), hidden: item.hidden === true });
+};
 // What a write is made for while a planned row runs (`{ intention: <row> }`), ambient across the row's awaits: the
 // stores stamp it on what the row writes, and no host's change feed hands such a write on.
 const writeOrigin = new AsyncLocalStorage();
@@ -309,7 +317,7 @@ const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
-  onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
+  onItemLanded: (circleId, item) => { hiddenLanded(item); return itemLanded.fn?.(circleId, item); },
   // a refused token, in the walk log (op · reason · grants folded · ms since boot; never the key or args) — L196's
   // "Token has been revoked" names itself here the next time it happens (the log is defined below; called after boot)
   onTokenDenied: (e) => walkLog({ kind: 'token-refused', ...e }),
@@ -846,11 +854,6 @@ if (relayUrl) {
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
-  // A hidden mark set on another device of the person lands here and the log says so — the one way a walk
-  // (and a reader of this box's log) can see that "hidden on the phone" reached the box.
-  agent.knownPeersSync?.onLanded?.(({ hiddenChanged }) => {
-    for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
-  });
   kick(agent.personKeySync, 'person-key', 2500);
   kick(agent.profileFactsSync, 'profile-facts', 2500);
   // the person's own store: what a sibling wrote while this box was off

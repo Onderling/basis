@@ -6868,6 +6868,10 @@
       "text": "Wie deze kring begon, kan niet verwijderd worden.",
       "doc": "Why Remove is greyed on the founder's row in the admin panel: the roster never evicts the person who started the circle (they can leave, or step back as admin)."
     },
+    "no_one_to_take_over": {
+      "text": "Je bent de enige in deze kring: er is niemand om het beheer van je over te nemen.",
+      "doc": "Why 'step back as admin' is greyed on the last admin's own row when nobody else is in the circle: the roster fold keeps a demotion from standing when no one could take over, so the control is not offered as available."
+    },
     "make_member": {
       "text": "Beheerdersrol intrekken",
       "doc": "The same control the other way: an admin becomes a member again. Neutral wording on purpose — it sits on your OWN row too, which is how someone steps back from running a circle."

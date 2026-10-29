@@ -83,6 +83,7 @@ describe('what the step-back will DO — the three answers, told apart', () => {
       confirmKey: ROLE_CONTROL_KEYS.confirm_handover,
       noticeKey:  ROLE_CONTROL_KEYS.notice_handed_over,
       consequence: 'handover',
+      disabled: false,
     });
   });
 
@@ -91,6 +92,14 @@ describe('what the step-back will DO — the three answers, told apart', () => {
     expect(c.consequence).toBe('no-one-else');
     expect(c.confirmKey).toBe(ROLE_CONTROL_KEYS.confirm_no_one_else);
     expect(c.noticeKey).toBe(ROLE_CONTROL_KEYS.notice_no_one_else);
+    // a control that would fail closed paints greyed, with the reason — never as available
+    expect(c.disabled, 'greyed: the fold keeps the demotion from standing').toBe(true);
+    expect(c.reasonKey).toBe(ROLE_CONTROL_KEYS.no_one_to_take_over);
+  });
+
+  it('a demotion that can stand is offered enabled', () => {
+    expect(roleControlFor({ members: [ann, bob], member: ann, myRef: 'w-ann' }).disabled).toBe(false);
+    expect(roleControlFor({ members: [ann, bob], member: bob, myRef: 'w-ann' }).disabled).toBe(false);
   });
 
   it('a promotion is never a handover, however few admins there are', () => {

@@ -188,6 +188,7 @@ import { useRelayQuestion } from './RelayQuestionModal.js';
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
 import { listsManifest } from '../../../../lists/manifest.js';
@@ -2572,6 +2573,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        pagesBook={screensBook}
         onPinEntry={(e) => { if (selected?.id) runScreenOp('screen-pin', { kind: 'bookmark', circleId: selected.id, appOrigin: e.appOrigin, opId: e.opId }); }}
         openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
@@ -3038,7 +3040,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, pagesBook = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -3272,8 +3274,9 @@ function CircleDetail({
     // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
     mediaWired: !!circleMedia,
     // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
-    blockTypes: (screenBlocks ?? []).map((b) => b?.type).filter(Boolean),
-  }), [manifestsByOrigin, circleAvailability, circleMedia, screenBlocks]);
+    // …and any of the person's pages' blocks that show this circle (a lists block for it)
+    blockTypes: [...(screenBlocks ?? []).map((b) => b?.type).filter(Boolean), ...blockTypesShowingCircle(pagesBook, circle?.id)],
+  }), [manifestsByOrigin, circleAvailability, circleMedia, screenBlocks, pagesBook, circle?.id]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   // A ref, not state: the assistant's lane reads it when a line's turn comes (`followUpClaim`), after the turn before it.
   const pendingFollowUpRef = useRef(null);

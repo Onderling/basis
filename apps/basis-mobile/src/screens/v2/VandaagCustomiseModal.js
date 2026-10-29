@@ -81,7 +81,7 @@ export default function VandaagCustomiseModal({ visible, model, onAct, onClose }
                           <Pressable key={String(o.value)} style={[styles.chip, on && styles.chipOn]} accessibilityRole="radio" accessibilityState={{ selected: on }}
                             onPress={() => onAct?.('config', { ...base, kind: c.kind, value: o.value })}
                             testID={`customise-${c.kind}-${b.blockId}-${o.value}`}>
-                            <Text style={[styles.chipText, on && styles.chipTextOn]}>{t(o.labelKey, o.params)}</Text>
+                            <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label ?? t(o.labelKey, o.params)}</Text>
                           </Pressable>
                         );
                       })}

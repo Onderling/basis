@@ -14,8 +14,11 @@ describe('the lists block on the phone', () => {
     expect(src).toMatch(/case 'lists':\s+body = renderLists\(/);
     expect(src).toMatch(/<PrimaryButton item=\{e\} noun="list-item"/);
   });
-  it("the circle's '+' is told which blocks are on the screen", () => {
-    expect(read('../src/screens/v2/CircleLauncherScreen.js')).toMatch(/blockTypes: \(screenBlocks \?\? \[\]\)\.map/);
+  it("the circle's '+' is told the screen's blocks and the person's pages' blocks for this circle", () => {
+    const src = read('../src/screens/v2/CircleLauncherScreen.js');
+    expect(src).toMatch(/blockTypes: \[\.\.\.\(screenBlocks \?\? \[\]\)\.map/);
+    expect(src).toMatch(/blockTypesShowingCircle\(pagesBook, circle\?\.id\)/);
+    expect(src).toMatch(/pagesBook=\{screensBook\}/);
   });
   it('the recipe palette is given the circle policy', () => {
     expect(read('../src/screens/v2/CircleRecipeEditorScreen.js')).toMatch(/blockTypesFor\('circle', \{ policy \}\)/);

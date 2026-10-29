@@ -2544,6 +2544,7 @@ export default function CircleLauncherScreen({
     return (
       <CircleRecipeEditorScreen
         book={recipeBook}
+        policy={selectedPolicy ?? undefined}
         mode={recipeEditorMode}
         editingRecipeId={recipeEditingId}
         // γ-next.recipe — broadcast cache → editor → γ.3 resolver.
@@ -3262,13 +3263,17 @@ function CircleDetail({
   const circleAvailability = useMemo(() => makeOpAvailability({
     catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null, capabilityMatrix: circleCapMatrix,
   }), [catalogue, manifestsByOrigin, policy, circleCapMatrix]);
+  // the open circle's screen blocks (materialized below); the "+" reads their types
+  const [screenBlocks, setScreenBlocks] = useState(null);
   const attachEntries = useMemo(() => attachEntriesFor({
     manifestsByOrigin,
     availability: circleAvailability,
     // An entry whose dispatch path is not wired is NOT painted (never offer what does not work): the
     // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
     mediaWired: !!circleMedia,
-  }), [manifestsByOrigin, circleAvailability, circleMedia]);
+    // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
+    blockTypes: (screenBlocks ?? []).map((b) => b?.type).filter(Boolean),
+  }), [manifestsByOrigin, circleAvailability, circleMedia, screenBlocks]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   // A ref, not state: the assistant's lane reads it when a line's turn comes (`followUpClaim`), after the turn before it.
   const pendingFollowUpRef = useRef(null);
@@ -3373,7 +3378,6 @@ function CircleDetail({
   // α.1e — materialized screen blocks for the active recipe.  null
   // until the load below resolves; [] when the book is empty.
   // D1 — `screenReloadTick` bumps after a quickActions tap to re-rank.
-  const [screenBlocks, setScreenBlocks] = useState(null);
   const [screenReloadTick, setScreenReloadTick] = useState(0);
   useEffect(() => {
     let alive = true;

@@ -9,27 +9,6 @@
     "busy":      { "text": "Working…", "doc": "Generic in-flight status text shown while a skill call is running." },
     "error":     { "text": "Error", "doc": "Generic error prefix shown before any API error message, e.g. 'Error: invalid-mnemonic'." }
   },
-  "welcome": {
-    "page_title":     { "text": "Pinboard — Welcome", "doc": "Browser tab title for /welcome.html." },
-    "hero_title":     { "text": "Welcome to Pinboard", "doc": "Hero heading on /welcome.html — first thing a brand-new user sees." },
-    "hero_intro":     { "text": "A neighbourhood pinboard that runs locally on your device. No feed, no ads, your data stays yours.", "doc": "Hero subtitle. Three-line value prop." },
-    "new_title":      { "text": "New account", "doc": "Title of the left-hand choice card on /welcome.html — link to /onboard.html." },
-    "new_body":       { "text": "I have an invite link or code and want to join a group for the first time.", "doc": "Description of the new-account choice." },
-    "restore_title":  { "text": "Restore an existing account", "doc": "Title of the right-hand choice card on /welcome.html — link to /restore.html." },
-    "restore_body":   { "text": "I have my recovery phrase (12 or 24 words) from another device. I want to use it here.", "doc": "Description of the restore-account choice." },
-    "footer_hint":    { "text": "No prior knowledge needed — the steps take a few minutes. You can switch devices later by re-using your recovery phrase.", "doc": "Reassurance footer at the bottom of /welcome.html." }
-  },
-  "privacy": {
-    "page_title":             { "text": "Pinboard — Privacy", "doc": "Browser tab title for /privacy.html." },
-    "heading":                { "text": "Privacy — what to know", "doc": "Main page heading on /privacy.html." },
-    "intro":                  { "text": "Pinboard is a research preview. The points below are never hidden — they apply to everyone who joins.", "doc": "Lead paragraph on /privacy.html." },
-    "data_location_heading":  { "text": "Where your data lives", "doc": "H3 above the data-location list on /privacy.html: which provider hosts what." },
-    "unset_value":            { "text": "— not configured —", "doc": "Placeholder shown next to a privacy-row label when no value is configured." },
-    "row_relay_operator":     { "text": "Relay operator", "doc": "Label for the relay operator row." },
-    "row_relay_url":          { "text": "Relay server", "doc": "Label for the relay server URL row." },
-    "row_pod_issuer":         { "text": "Pod provider", "doc": "Label for the pod provider (Solid OIDC issuer) row." },
-    "row_pod_root":           { "text": "Pod location", "doc": "Label for the pod root URL row." }
-  },
   "mine": {
     "page_title":     { "text": "Pinboard — My posts", "doc": "Browser tab title for /mine.html." },
     "heading":        { "text": "My posts", "doc": "Main page heading on /mine.html." },
@@ -51,17 +30,6 @@
     "signed_in_html":      { "text": "Signed in as <strong>{webid}</strong> — pod {podLabel}.", "doc": "Status line shown when signed in. Contains <strong> + two placeholders." },
     "not_signed_in":       { "text": "Not signed in to a pod. Pinboard is running locally.", "doc": "Status line shown when no pod is attached." },
     "signed_out":          { "text": "Signed out.", "doc": "Confirmation shown after a successful sign-out." }
-  },
-  "metrics": {
-    "page_title":   { "text": "Pinboard — Metrics", "doc": "Browser tab title for /metrics.html." },
-    "heading":      { "text": "Usage counters (local)", "doc": "Main heading on /metrics.html." },
-    "intro":        { "text": "Counters of actions this agent has seen in this process. In-memory — reset on restart. Supports the beta runbook § \"Operational metrics\".", "doc": "Lead paragraph on /metrics.html." },
-    "refresh":      { "text": "Refresh", "doc": "Refresh button on /metrics.html — triggers an immediate reload of counters." },
-    "empty":        { "text": "No counters yet — nothing has happened in this session.", "doc": "Empty-state shown when the metrics map is empty." },
-    "col_event":    { "text": "Event", "doc": "Header of the first column in the metrics grid." },
-    "col_count":    { "text": "Count", "doc": "Header of the second column — number of times the event fired." },
-    "col_last":     { "text": "Last", "doc": "Header of the third column — timestamp of the most recent firing." },
-    "snapshot_at":  { "text": "Snapshot: {ts}", "doc": "Footer line under the metrics grid. {ts} is a locale-formatted timestamp." }
   },
   "errors": {
     "groupId_required":     "Please choose a group.",
@@ -239,17 +207,6 @@
     "pod_attached":     { "text": "Pod is attached.", "doc": "Status under the signed-in line when the pod is fully attached." },
     "pod_not_attached": { "text": "Pod is not attached yet.", "doc": "Status under the signed-in line when sign-in succeeded but pod-attach hasn't completed." }
   },
-  "auth_callback": {
-    "heading":         { "text": "Completing pod sign-in", "doc": "Heading on AuthCallbackScreen." },
-    "busy":            { "text": "Finishing the OIDC flow…", "doc": "Body shown while sign-in is wrapping up." },
-    "uploading":       { "text": "Uploading local data to your pod…", "doc": "Body shown while bulk-sync is running." },
-    "done":            { "text": "Done.", "doc": "Body shown when bulk-sync finished cleanly." },
-    "error":           { "text": "Something went wrong during the first sync.", "doc": "Body shown when bulk-sync failed." },
-    "progress":        { "text": "{done} of {total} ({pct}%)", "doc": "Progress label under the bar. {done}, {total}, {pct} are integers." },
-    "go_feed":         { "text": "Go to pinboard", "doc": "CTA after sync completes." },
-    "skip":            { "text": "Skip and go to pinboard", "doc": "CTA before sync completes — lets the user dismiss the screen." },
-    "no_active_group": { "text": "No active bundle.", "doc": "Defensive empty state." }
-  },
   "onboard_join": {
     "heading":             { "text": "Joining group", "doc": "Heading on OnboardJoinScreen — receiver-side of the QR-scan flow." },
     "body":                { "text": "Group id:", "doc": "Body line on OnboardJoinScreen, followed by the groupId value." },
@@ -393,14 +350,9 @@
     "saving":                 { "text": "Saving…", "doc": "Generic in-flight label on mobile ProfileMineScreen submit buttons." },
     "holiday_label":          { "text": "Holiday mode", "doc": "Label next to the holiday-mode toggle on mobile ProfileMineScreen." },
     "holiday_hint":           { "text": "Temporarily hide your profile: neighbours won't see you as an available match and push notifications pause until you turn it off again.", "doc": "Hint under the holiday-mode toggle on ProfileMineScreen explaining what the toggle does." },
-    "holiday_on":             { "text": "On", "doc": "Holiday-mode toggle label when the flag is set." },
-    "holiday_off":            { "text": "Off", "doc": "Holiday-mode toggle label when the flag is unset." },
-    "location_heading":       { "text": "Location", "doc": "H2 above the location section on mobile ProfileMineScreen." },
     "location_unset":         { "text": "No location set.", "doc": "Body text when the user has not set a location." },
     "location_capture":       { "text": "Use my location", "doc": "CTA on mobile ProfileMineScreen that triggers GPS via expo-location." },
     "location_busy":          { "text": "Reading…", "doc": "CTA label while expo-location is in flight." },
-    "location_clear":         { "text": "Clear", "doc": "Ghost button on mobile ProfileMineScreen that drops the user's location." },
-    "recovery_heading":       { "text": "Recovery phrase", "doc": "H2 above the recovery section on mobile ProfileMineScreen." },
     "recovery_intro":         { "text": "Keep your recovery phrase somewhere safe. You'll need it to install Pinboard on another device.", "doc": "Body explanation under the recovery heading." },
     "recovery_close":         { "text": "Close", "doc": "Confirm-modal label on the recovery-reveal modal." },
     "recovery_unavailable":   { "text": "Recovery export not available in this build.", "doc": "Inline error when the recovery skill is missing or unwired." },
@@ -618,7 +570,6 @@
     "name_placeholder":     { "text": "e.g. Oosterpoort Skills", "doc": "Placeholder for the display-name input on mobile." },
     "purpose_label":        { "text": "What's the group for? (optional)", "doc": "Label for the purpose textarea on mobile CreateGroupScreen." },
     "purpose_placeholder":  { "text": "e.g. Neighbours in Oosterpoort who want to help each other.", "doc": "Placeholder for the purpose textarea on mobile." },
-    "submit":               { "text": "Create group", "doc": "Submit CTA on mobile CreateGroupScreen." },
     "creating":             { "text": "Creating…", "doc": "CTA label while createGroupV2 is in flight." },
 
     "group_id_label": { "text": "Group-id (internal; lowercase)", "doc": "Field label for the technical group-id input." },

@@ -58,8 +58,24 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     const { say } = await boot({ interpret });
     const out = (await say('hoe gaat het eigenlijk met de planten')).map((m) => m.text);   // past the gate: the model's
     expect(out).toContain('circle.bot.slow');
-    expect(out).toContain('circle.bot.model_down');
+    expect(out.join('\n')).toContain('circle.bot.model_slow');
     expect(out).not.toContain('circle.telegram.unknown');
+  });
+
+  it('a model that REFUSES is said as such ("the admin has been told"), never as a status or "try again in a moment"', async () => {
+    const interpret = async () => { throw Object.assign(new Error('ollama: 401 Unauthorized'), { status: 401 }); };
+    const { say } = await boot({ interpret });
+    const out = (await say('hoe gaat het eigenlijk met de planten')).map((m) => m.text).join('\n');
+    expect(out).toContain('circle.bot.model_refused');
+    expect(out).not.toContain('circle.bot.model_down');
+    expect(out).not.toContain('401');
+  });
+
+  it('a model that cannot be reached: the plain "not answering" line', async () => {
+    const interpret = async () => { throw new Error('fetch failed'); };
+    const { say } = await boot({ interpret });
+    const out = (await say('hoe gaat het eigenlijk met de planten')).map((m) => m.text).join('\n');
+    expect(out).toContain('circle.bot.model_down');
   });
 
   it('a reply\'s buttons obey the person\'s map: an op their role does not reach is never offered', async () => {

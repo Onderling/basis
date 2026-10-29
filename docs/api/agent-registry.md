@@ -1746,6 +1746,24 @@ pendingRevokesOf(entry)
 
 Every revoke still owed, as `[{node, key}]`.
 
+## `src/personaHandle.js`
+
+### `HANDLE_KEY`
+
+**Kind:** constant · **Import:** `HANDLE_KEY` from `'@onderling/agent-registry'`
+
+The profile key that holds the persona's handle.
+
+### `isPresentedAttributeKey`
+
+**Kind:** function · **Import:** `isPresentedAttributeKey` from `'@onderling/agent-registry'`
+
+```js
+isPresentedAttributeKey(key)
+```
+
+Is this key a persona attribute that statements present, so no release ever carries it?
+
 ## `src/profileFacts.js`
 
 ### `FACTS_AT_KEY`
@@ -1753,6 +1771,12 @@ Every revoke still owed, as `[{node, key}]`.
 **Kind:** constant · **Import:** `FACTS_AT_KEY` from `'@onderling/agent-registry'`
 
 When a profile's facts last changed (ms, as an own property) — the registry's own key, refused by the person-facing ops.
+
+### `FACTS_KEYS_KEY`
+
+**Kind:** constant · **Import:** `FACTS_KEYS_KEY` from `'@onderling/agent-registry'`
+
+When EACH fact last changed (`{ 'p:<key>' | 'd:<context>\u001f<key>': ms }`) — the registry's own key too.
 
 ### `profileFactsOf`
 
@@ -1785,6 +1809,44 @@ stamped with the facts' time. A machine key inside `facts` is ignored.
 
 - `entry` `object`
 - `facts` `{ properties?: object, disclosure?: object, factsAt: number }`
+
+### `stampChangedFacts`
+
+**Kind:** function · **Import:** `stampChangedFacts` from `'@onderling/agent-registry'`
+
+```js
+stampChangedFacts(before, after, at)
+```
+
+The per-key times after a change made HERE at `at`: every fact slot whose value differs between `before` and `after`
+(added, edited or removed) takes `at`; the others keep the time they had. A removed slot keeps its time (a tombstone).
+
+**Parameters**
+
+- `before` `object` — the entry before the change (`{}` for none)
+- `after` `object` — the entry after it
+- `at` `number`
+
+**Returns:** `Object<string, number>`
+
+### `mergeProfileFacts`
+
+**Kind:** function · **Import:** `mergeProfileFacts` from `'@onderling/agent-registry'`
+
+```js
+mergeProfileFacts(here, there)
+```
+
+Merge two copies of one profile's facts, per key: each slot from the side whose time for it is newer (a slot without
+a time counts at its copy's whole `factsAt`, which is how a copy from before the per-key times reads); on a tie the
+first argument's value stands. A slot the winner does not hold is absent from the result (its time stays).
+
+**Parameters**
+
+- `here` `{properties, disclosure, factsAt, keyTimes}`
+- `there` `{properties, disclosure, factsAt, keyTimes}`
+
+**Returns:** `{properties: object, disclosure: object, factsAt: number|null, keyTimes: Object<string, number>}`
 
 ### `factsDiffer`
 
@@ -2106,7 +2168,7 @@ The registry's marker namespace (`_inherit.offering`, …): every key under it i
 
 **Kind:** constant · **Import:** `PERSON_SETTABLE_KEYS` from `'@onderling/agent-registry'`
 
-The keys a person may set through the property ops although this package defines them (their picture, their word on a model).
+The keys a person may set through the property ops although this package defines them (their picture, their word on a model, their handle).
 
 ### `isReservedPropertyKey`
 

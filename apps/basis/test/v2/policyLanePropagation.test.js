@@ -70,7 +70,7 @@ describe('the circle policy on the governance lane — a later joiner catches it
   afterAll(async () => { await teardown(A, B, C); });
 
   it('the founder states it; a member who joins after takes it from the catch-up and holds p2', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { itemsLane: true }), bootRealAgentNode('B', { itemsLane: true })]);
     bus = await connectNodesOverBus([A, B]);
     wireMembershipReceiver(A);
     await createCircle(A, { groupId: CIRCLE, name: 'Verzegeld' });
@@ -96,7 +96,7 @@ describe('the circle policy on the governance lane — a later joiner catches it
   }, 120_000);
 
   it('after the audit window: from the preserved head alone, a new member still converges — and serves it onward', async () => {
-    C = await bootRealAgentNode('C', { taskLane: true });
+    C = await bootRealAgentNode('C', { itemsLane: true });
     const tx = new InternalTransport(bus, C.pubKey);
     await C.agent.sa.addSecureTransport('relay', tx);
     C._busTransport = tx;

@@ -149,9 +149,9 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     // B creates the circle; A JOINS (write-on-join records A's registry membership {handle, address} —
     // the fact that puts a HANDLE on A's offer). A is the person who will add a second device.
     [B, A] = await Promise.all([
-      bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
       bootRealAgentNode('A', {
-        taskLane: true,
+        itemsLane: true,
         agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() },
       }),
     ]);
@@ -270,8 +270,8 @@ describe('the enroll offer — the sibling is not there when the new device firs
 
   it('no seed back → the offer stays stashed and the report says so; the sibling back → the next consume completes and clears', async () => {
     [B, A] = await Promise.all([
-      bootRealAgentNode('B', { taskLane: true }),
-      bootRealAgentNode('A', { taskLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() } }),
+      bootRealAgentNode('B', { itemsLane: true }),
+      bootRealAgentNode('A', { itemsLane: true, agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() } }),
     ]);
     bus = await connectNodesOverBus([B, A]);
     for (const n of [B, A]) { wireMembershipReceiver(n); wireMembershipCatchUp(n); }

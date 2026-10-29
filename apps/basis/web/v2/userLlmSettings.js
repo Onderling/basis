@@ -97,7 +97,7 @@ export function renderUserLlmSettings(container, { current = {}, onSave, validat
       const row = document.createElement('label');
       row.className = 'cc-user-llm__field cc-user-llm__attest';
       const chk = document.createElement('input');
-      chk.type = 'checkbox'; chk.checked = !!cfg.attestation;
+      chk.type = 'checkbox'; chk.checked = !!cfg.attestation;   // sets: form — the assistant endpoint's attestation, saved with Save
       chk.addEventListener('change', () => { cfg.attestation = chk.checked; });
       const cap = document.createElement('span');
       cap.textContent = t('circle.userLlm.attestation');

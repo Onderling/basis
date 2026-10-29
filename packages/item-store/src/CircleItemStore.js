@@ -22,7 +22,7 @@
  *   await store.listByType('task');                            // the type index
  */
 import { ulid } from './ulid.js';
-import { causalWinner, reconcileClaim, applyClaimOverlay, claimClusterEqual } from './causalMerge.js';
+import { causalWinner, reconcileClaim, applyClaimOverlay, claimClusterEqual, mergeFieldClocks } from './causalMerge.js';
 import { defaultResolutionRegistry, RESOLUTION } from './resolutionPolicy.js';
 import { parseUntrustedJson } from '@onderling/core';
 
@@ -189,25 +189,34 @@ export class CircleItemStore {
         const overlay = this.#resolution.hasChannel(stored.type, RESOLUTION.CLAIM)
           ? reconcileClaim(existing, item)
           : null;
+        // The type's FIELD-CLOCK sets (declared on the type, read from the registry) merge by their own clocks
+        // whichever row wins the content merge: each set comes from the side whose clock is newer.
+        const clockSets = this.#resolution.hasChannel(stored.type, RESOLUTION.FIELD_CLOCK)
+          ? this.#resolution.fieldClocksOf(stored.type)
+          : null;
         if (keepLocalContent) {
           // Content stays local; but a CONTENDED claim may still have to change hands even though the content
-          // is older. Resolve just the claim cluster onto the local copy.
-          if (!overlay) return existing;                                   // no claim anywhere → drop stale inbound
-          const merged = applyClaimOverlay(existing, overlay);
-          if (claimClusterEqual(existing, merged)) return existing;        // local claim already won → no churn
+          // is older, and a field-clock set the inbound changed later still comes across. Resolve just those onto
+          // the local copy.
+          let merged = overlay ? applyClaimOverlay(existing, overlay) : existing;
+          if (overlay && claimClusterEqual(existing, merged)) merged = existing;   // local claim already won
+          if (clockSets) merged = mergeFieldClocks(merged, existing, item, clockSets);
+          if (merged === existing) return existing;                        // nothing of the inbound is newer → no churn
           await this.#source.write(this.#uri(id), JSON.stringify(merged));
           if (sync !== false) this.#emitWrite(merged);
           return merged;
         }
         // Content winner is the inbound item; overlay the WINNING claim (which may be the LOCAL one — first-come)
-        // onto it so a causally-newer content edit cannot drop an earlier claim.
-        if (overlay) {
-          const merged = applyClaimOverlay(stored, overlay);
+        // onto it so a causally-newer content edit cannot drop an earlier claim, and the newer side of each
+        // field-clock set (which may be the local one).
+        if (overlay || clockSets) {
+          let merged = overlay ? applyClaimOverlay(stored, overlay) : stored;
+          if (clockSets) merged = mergeFieldClocks(merged, existing, item, clockSets);
           await this.#source.write(this.#uri(id), JSON.stringify(merged));
           if (sync !== false) this.#emitWrite(merged);
           return merged;
         }
-        // no claim on either side → fall through to write the plain content winner (`stored`)
+        // no claim and no field-clock set → fall through to write the plain content winner (`stored`)
       }
     }
     await this.#source.write(this.#uri(id), JSON.stringify(stored));

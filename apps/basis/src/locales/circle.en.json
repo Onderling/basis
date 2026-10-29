@@ -1188,6 +1188,9 @@
       "text": "Nothing here.",
       "doc": "B/S3 list-with-filter screen empty state — distinct from screen.empty (the α.1c recipe-book-empty state); they collided under one key until 2026-07-03."
     },
+    "lists_off": {
+      "text": "Lists are switched off in this circle."
+    },
     "audience_scope": {
       "text": "Showing items shared with this circle.",
       "doc": "SP-5b Option A — non-dismissible caption under a list title when the list is audience-scoped (buildScreenModel.audienceScope set). Generic (no circle name): a visibility scope, not a user filter, so no clear/close control."
@@ -1263,6 +1266,12 @@
     "circles_title": {
       "text": "Circles",
       "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "control_circle": {
+      "text": "Circle"
+    },
+    "circle_pick": {
+      "text": "Pick a circle"
     },
     "labels_title": {
       "text": "Labels",
@@ -1673,6 +1682,9 @@
         "text": "Tasks",
         "doc": "α.4 — block palette label."
       },
+      "lists": {
+        "text": "Lists"
+      },
       "rules": {
         "text": "House rules",
         "doc": "α.1b — block palette label."
@@ -1734,6 +1746,9 @@
       "tasks": {
         "text": "Open tasks, yours or all of them.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "lists": {
+        "text": "One circle's lists, with what is still on them."
       },
       "rules": {
         "text": "The circle's house rules.",
@@ -2903,48 +2918,6 @@
       "doc": "Dismiss the advice card."
     }
   },
-  "hop": {
-    "title": {
-      "text": "Hopping",
-      "doc": "Heading of the hopping screen (board 7)."
-    },
-    "global_label": {
-      "text": "Let trusted contacts relay my requests one hop",
-      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
-    },
-    "explain": {
-      "text": "When you ask for something no one nearby has, a contact who allows it can pass your request one step further — to their contacts. Max one hop, and the relay is anonymized.",
-      "doc": "Explanation of how hopping works."
-    },
-    "ask_relay": {
-      "text": "Ask to relay",
-      "doc": "Button: ask the gate contact to relay the request one hop."
-    },
-    "over_limit": {
-      "text": "Too many hops — requests travel at most one step.",
-      "doc": "Shown when a chain exceeds max-one-hop."
-    },
-    "per_contact_title": {
-      "text": "Per contact",
-      "doc": "Board 7B section heading (P6.M6)."
-    },
-    "mode_always": {
-      "text": "Always",
-      "doc": "Per-contact mode: always relay (P6.M6)."
-    },
-    "mode_withOk": {
-      "text": "With my OK",
-      "doc": "Per-contact mode: relay with approval."
-    },
-    "mode_off": {
-      "text": "Off",
-      "doc": "Per-contact mode: never relay."
-    },
-    "default_label": {
-      "text": "Default",
-      "doc": "Chip shown when the per-contact mode falls through to the global stance."
-    }
-  },
   "offerings": {
     "editor_title": {
       "text": "Offering",
@@ -3161,28 +3134,6 @@
     "no_delivery_note": {
       "text": "{{name}} won't be notified you tried.",
       "doc": "Secondary line clarifying the non-event per board 5C (no \"tried to reach you\" leak)."
-    }
-  },
-  "hopPrompt": {
-    "title": {
-      "text": "Search further?",
-      "doc": "Board 7A auto-hop-prompt card heading (P6.6) when an in-circle skill search returns nothing."
-    },
-    "body": {
-      "text": "No one in your circles matches \"{{skill}}\". Want me to search via your {{count}} eligible contact(s)?",
-      "doc": "Card body with the user's query interpolated."
-    },
-    "body_anon": {
-      "text": "No one in your circles matches that. Want me to search via your {{count}} eligible contact(s)?",
-      "doc": "Anon body when the query string can't be safely echoed."
-    },
-    "accept": {
-      "text": "Yes, one step further",
-      "doc": "Primary CTA — triggers the hop-relay request."
-    },
-    "dismiss": {
-      "text": "Skip",
-      "doc": "Secondary CTA — records dismissal so we don't re-prompt the same query."
     }
   },
   "offeringMatches": {
@@ -6931,6 +6882,9 @@
     "founder_stays": {
       "text": "The person who started this circle can't be removed.",
       "doc": "Why Remove is greyed on the founder's row in the admin panel: the roster never evicts the person who started the circle (they can leave, or step back as admin)."
+    },
+    "no_one_to_take_over": {
+      "text": "You are the only one in this circle: there is nobody to take over running it."
     },
     "make_member": {
       "text": "Remove admin role",

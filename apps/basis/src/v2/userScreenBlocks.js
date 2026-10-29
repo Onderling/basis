@@ -112,6 +112,15 @@ async function materializeOneBlock({ block, activeCircleIds: pageCircleIds, host
       case 'noticeboard':
         return materializeNoticeboard(block, activeCircleIds, hostOps);
 
+      // one circle's lists: the circle the block names (`config.circleId`), else the page's one circle; that circle's
+      // policy decides whether lists are on (the same block the circle's own screen paints)
+      case 'lists': {
+        const cid = block?.config?.circleId ?? (activeCircleIds.length === 1 ? activeCircleIds[0] : null);
+        let policy;
+        if (cid && typeof hostOps.getPolicy === 'function') { try { policy = (await hostOps.getPolicy(cid)) ?? {}; } catch { policy = undefined; } }
+        return await _materializeCircleBlock({ block, circleId: cid, hostOps: { ...hostOps, policy } });
+      }
+
       // ONE block for any item type over the one cross-circle projection; a screen that still holds the older
       // `tasks` / `calendar` block is read as the items block it is (no second path to keep in step)
       case 'items':

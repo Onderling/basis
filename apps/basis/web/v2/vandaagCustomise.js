@@ -75,7 +75,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
             for (const o of c.options) {
               const lab = document.createElement('label');
               const cb = document.createElement('input');
-              cb.type = 'checkbox';
+              cb.type = 'checkbox';   // sets: op:screen-set-block-config — the block's config on your Vandaag
               cb.value = o.value;
               cb.checked = picked.has(o.value);
               cb.addEventListener('change', () => {
@@ -109,10 +109,16 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
           const sel = document.createElement('select');
           sel.dataset.control = c.kind;
           sel.setAttribute('aria-label', tr(c.titleKey));
+          // a choice with nothing chosen yet (a lists block before its circle is picked) says so first
+          if (c.value === null && c.pickKey) {
+            const none = document.createElement('option');
+            none.value = ''; none.textContent = tr(c.pickKey); none.selected = true; none.disabled = true;
+            sel.appendChild(none);
+          }
           for (const o of c.options) {
             const opt = document.createElement('option');
             opt.value = String(o.value);
-            opt.textContent = tr(o.labelKey, o.params);
+            opt.textContent = o.label ?? tr(o.labelKey, o.params);   // a circle is named by its own name
             if (o.value === c.value) opt.selected = true;
             sel.appendChild(opt);
           }

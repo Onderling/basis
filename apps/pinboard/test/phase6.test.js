@@ -83,30 +83,26 @@ describe('validateHandle — pure rules', () => {
 // ── setMyHandle / setMyDisplayName ────────────────────────────────────────
 
 describe('Pinboard V1 — setMyHandle / setMyDisplayName', () => {
-  it('setMyHandle validates + upserts into MemberMap', async () => {
+  it('setMyHandle validates + lands on the caller\'s own profile', async () => {
     const bundle = await buildAgent();
     const r = await callSkill(bundle.agent, 'setMyHandle', { handle: 'oosterpoort-bird-23' });
     expect(r.handle).toBe('oosterpoort-bird-23');
-    expect(r.member.handle).toBe('oosterpoort-bird-23');
-    const found = await bundle.members.resolveByWebid(ANNE);
-    expect(found.handle).toBe('oosterpoort-bird-23');
+    expect((await callSkill(bundle.agent, 'whoAmI')).handle).toBe('oosterpoort-bird-23');
   });
 
   it('setMyHandle rejects invalid input and does NOT mutate', async () => {
     const bundle = await buildAgent();
-    const before = await bundle.members.resolveByWebid(ANNE);
     const r = await callSkill(bundle.agent, 'setMyHandle', { handle: 'an' });
     expect(r.error).toBe('invalid-handle');
     expect(r.reason).toBe('too-short');
-    const after = await bundle.members.resolveByWebid(ANNE);
-    expect(after.handle).toBe(before.handle ?? null);
+    expect((await callSkill(bundle.agent, 'whoAmI')).handle).toBe(null);
   });
 
   it('setMyDisplayName upserts trimmed displayName', async () => {
     const bundle = await buildAgent();
     const r = await callSkill(bundle.agent, 'setMyDisplayName', { displayName: '  Anne van Dijk  ' });
     expect(r.displayName).toBe('Anne van Dijk');
-    expect(r.member.displayName).toBe('Anne van Dijk');
+    expect((await callSkill(bundle.agent, 'whoAmI')).displayName).toBe('Anne van Dijk');
   });
 
   it('setMyDisplayName rejects empty input', async () => {
@@ -119,7 +115,7 @@ describe('Pinboard V1 — setMyHandle / setMyDisplayName', () => {
 // ── Reveal flips ──────────────────────────────────────────────────────────
 
 describe('Pinboard V1 — getMyProfile', () => {
-  it('returns the calling actor entry + default render in current group', async () => {
+  it('returns the calling actor\'s own profile', async () => {
     const bundle = await buildAgent();
     await callSkill(bundle.agent, 'setMyHandle',      { handle: 'oosterpoort-bird-23' });
     await callSkill(bundle.agent, 'setMyDisplayName', { displayName: 'Anne van Dijk' });
@@ -127,9 +123,6 @@ describe('Pinboard V1 — getMyProfile', () => {
     const r = await callSkill(bundle.agent, 'getMyProfile');
     expect(r.entry.handle).toBe('oosterpoort-bird-23');
     expect(r.entry.displayName).toBe('Anne van Dijk');
-    // Default group view: handle wins (no reveal flipped).
-    expect(r.renderForCurrentGroup.render).toBe('@oosterpoort-bird-23');
-    expect(r.renderForCurrentGroup.isRevealed).toBe(false);
   });
 
   it('returns entry: null for unknown actor', async () => {

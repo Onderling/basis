@@ -107,11 +107,11 @@ export const ENTRY_KINDS = Object.freeze({
   // See `governanceWakes()`.
   governance:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true, CIRCLE_BINDING()),
   report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true, LOCAL_BINDING),
-  // The task lane's signed statements: the carrier of a store head (a full-item snapshot, a removal), verified
+  // The items lane's signed statements: the carrier of a store head (a full-item snapshot, a removal), verified
   // at the rail and merged into the circle's store. Plumbing — the head is what a screen reads and what a
   // conversation line would be derived from; the statement itself must never paint. Same retention as the
   // human task kind: the store row is the durable head, the statements age out and catch-up re-serves heads.
-  'task-statement':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
+  'items':  K(LANE.SYSTEM, false, RETAIN.CHAT, false, CIRCLE_BINDING()),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false, LOCAL_BINDING),
   // A planned occurrence that RAN (pending work): written once per occurrence id by the host that ran it — first
   // write wins, so a second host or a repeat never records a second run. Short: the row's own `lastRunAt` is the

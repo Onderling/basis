@@ -806,7 +806,7 @@ function appendRoleChecklist(wrap, doc, state, rerender) {
     const row = doc.createElement('label');
     row.className = 'cc-wizard-toggle';
     const cb = doc.createElement('input');
-    cb.type = 'checkbox';
+    cb.type = 'checkbox';   // sets: form — a role the new circle offers (the create wizard)
     cb.checked = selected.includes(tid);
     cb.dataset.role = tid;
     cb.addEventListener('change', () => {
@@ -836,7 +836,7 @@ function appendChatAdvice(wrap, doc, state, rerender) {
   const row = doc.createElement('label');
   row.className = 'cc-wizard-toggle';
   const cb = doc.createElement('input');
-  cb.type = 'checkbox';
+  cb.type = 'checkbox';   // sets: form — the new circle's chat (the create wizard)
   cb.checked = !!state.features?.chat;
   cb.addEventListener('change', () => {
     Object.assign(state, setChatEnabled(state, cb.checked));

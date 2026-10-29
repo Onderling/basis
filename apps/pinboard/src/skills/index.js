@@ -89,7 +89,6 @@ import { validatePinboardItem, intentToCanonicalDraft } from '../lib/canonicalAd
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
-import { resolve as resolveMember } from '@onderling/identity-resolver';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
 import { kindWakes, assigneesOf } from '@onderling/item-store';
 
@@ -120,10 +119,8 @@ import {
   INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
 } from '../lib/inviteCeiling.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
-import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
 import { geocode } from '../lib/geocode.js';
-import { cellFor, distanceKm, snapToGrid, DISTANCE_PRESETS } from '../lib/geo.js';
-import { resolve as resolveTargets, validateTarget, filterByDistance, filterMuted } from '../lib/targetResolver.js';
+import { resolve as resolveTargets, validateTarget, filterMuted } from '../lib/targetResolver.js';
 import {
   validateInboundAttachment,
   persistInboundAttachment,
@@ -313,7 +310,7 @@ async function _findLatestGroupRules(store, groupId) {
  * @param {string|null} [o.groupId]
  * @returns {Promise<Array<{webid: string, handle: string}>>}
  */
-async function collectCircleHandles({ store, members, groupId } = {}) {
+async function collectCircleHandles({ store, groupId } = {}) {
   const taken = [];
   if (store && typeof store.listOpen === 'function') {
     try {
@@ -326,14 +323,6 @@ async function collectCircleHandles({ store, members, groupId } = {}) {
         }
       }
     } catch { /* trail read is best-effort — the MemberMap pass still runs */ }
-  }
-  if (members && typeof members.list === 'function') {
-    try {
-      const list = await members.list();
-      for (const m of list ?? []) {
-        if (m?.webid && m.handle) taken.push({ webid: m.webid, handle: m.handle });
-      }
-    } catch { /* roster read is best-effort */ }
   }
   return taken;
 }
@@ -701,12 +690,9 @@ async function assignLendCore(scope, a, ctx) {
 }
 
 async function getHolidayModeCore(scope, a, ctx) {
-  const { members } = scope;
-  if (!members) return { holidayMode: false };
-  const me = await members.resolveByWebid(ctx.from);
-  // Availability unification: holiday mode IS the coarse 'away' value of the
-  // unified `availability` property; the legacy flag is honoured for un-migrated entries.
-  return { holidayMode: me?.availability === 'away' || me?.holidayMode === true };
+  // Holiday mode IS the coarse 'away' value of the person's `availability` property (their own profile).
+  const me = (await scope.selfProfile?.get?.(ctx.from).catch?.(() => null)) ?? null;
+  return { holidayMode: me?.availability === 'away' };
 }
 
 async function getGroupRulesCore(scope, a, ctx) {
@@ -761,20 +747,16 @@ async function listGroupMembersCore(scope, a, ctx) {
  * key on the row), and it holds nothing for a circle whose members this device
  * learned from the trail alone — which is exactly a JOINER's view of the admin
  * (`recordRemoteRedemption` records only the joiner's own row; the admin is known
- * only through `confirmedBy`). `deriveRoster` starts FROM the trail and left-joins
- * the MemberMap for display only. (plans/DESIGN-connectivity-phase1-membership.md,
- * Part A.)
+ * only through `confirmedBy`). `deriveRoster` starts FROM the trail and joins nothing in from outside it.
  *
  * @param {object} a
  * @param {{listOpen: Function}} a.store
  * @param {string} a.groupId
- * @param {Array<object>} [a.memberMapList]  `MemberMap.list()` — display left-join + legacy admins.
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
+export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
-  const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const forGroup = (redemptions ?? []).filter((i) => i?.source?.groupId === groupId);
@@ -808,6 +790,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   // founder — and a member's own rules write promoted them to admin two steps later.
   const founderWebids = new Set();
   const founderKinds = {};   // founder → 'function', from its own verified creation statement
+  const founderFacts = {};   // founder → what their creation statement says: their proven address, their handle
   {
     const admitters = new Set();
     const redeemers = new Set();
@@ -871,6 +854,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
         // a function profile that FOUNDS says so in its own signed creation: the founder is the circle's root
         // authority, so the claim grants nothing it could not take; the fold carries it as the founder's kind
         if (b.payload && typeof b.payload === 'object' && b.payload.kind === 'function') founderKinds[b.author] = 'function';
+        // …and what the founder said about themselves there: their per-circle address (proven like a joiner's;
+        // deriveRoster checks the proof before it projects) and the handle they go by
+        const p = b.payload && typeof b.payload === 'object' ? b.payload : {};
+        founderFacts[b.author] = {
+          groupId,
+          ...(typeof p.circleAddress === 'string' && typeof p.circleAddressProof === 'string' ? { circleAddress: p.circleAddress, circleAddressProof: p.circleAddressProof } : {}),
+          ...(typeof p.peerDisplay === 'string' && p.peerDisplay ? { handle: p.peerDisplay } : {}),
+        };
       }
     }
   };
@@ -1055,7 +1046,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     founderKinds,
-    memberMapForDisplay: list,
+    founderFacts,
     // Authoritative ONLY on the rail path: its statements carry verified per-circle-key bindings. The
     // legacy store path keeps the pre-rider semantics until pinboard dissolves.
     foldAuthoritative: typeof membershipRead === 'function',
@@ -1112,9 +1103,9 @@ async function respondToItemCore(scope, a, ctx) {
       toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
     } catch { /* not on the roster: no address, and no guess */ }
   }
-  // the global member map only for a post that names no circle — a circle post's poster is known by its roster
-  if (members && toWebid && !circleOfPost) {
-    const peer = await members.resolveByWebid(toWebid);
+  // the contact book only for a post that names no circle — a circle post's poster is known by its roster
+  if (toWebid && !circleOfPost) {
+    const peer = await bundle?.contacts?.get?.(toWebid);
     toStableId = peer?.stableId ?? null;
     if (!toPubKey) toPubKey = peer?.pubKey ?? null;
   }
@@ -1202,7 +1193,7 @@ export function buildPinboardScope(deps = {}) {
   const {
     store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfWebidFor = null,
+    selfWebidFor = null, selfProfile = null,
   } = deps;
   // This device's own key paired with the webid it speaks for, for reading back statements this same composition
   // wrote with the global identity (`author` a pubKey, `subject` a webid). Only where there is no per-circle
@@ -1220,7 +1211,7 @@ export function buildPinboardScope(deps = {}) {
   };
   return {
     selfSigner, localActorIn,
-    store, offeringMatch, notifier, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent, selfProfile,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
 }
@@ -1266,6 +1257,9 @@ export function buildSkills({
   membershipRead,
   // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
   currentPersonKey = null,
+  // THE PERSON'S OWN PROFILE (handle, display name, availability, place) — lib/selfProfile.js; the host injects it over
+  // the persona record, so whoAmI, getMyProfile and the join read one record.
+  selfProfile = null,
   // THE RULES-UPDATE RIDER (host-injected): a rules-doc edit also appends + fans a signed
   // `rules-update` statement on the governance lane, so the new doc reaches every member
   // peer-to-peer (pod-free) and their stale-banner lights. Absent → store-local only, unchanged.
@@ -1329,9 +1323,11 @@ export function buildSkills({
   const scope = buildPinboardScope({
     store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfSigner, selfWebidFor,
+    selfSigner, selfWebidFor, selfProfile,
   });
   const localActorIn = scope.localActorIn;
+  /** The caller's own profile (empty when the caller is not one of this device's selves). */
+  const ownProfileOf = async (webid) => (await selfProfile?.get?.(webid).catch?.(() => null)) ?? {};
   // An op that names an ITEM, not a circle, arrives as the device's general self even when the item lives in a
   // persona's circle (the host's `actAs` reads the circle off the args). The device's own call acts on an item as the
   // self it is in the item's circle; a foreign caller stays who they are.
@@ -1383,7 +1379,7 @@ export function buildSkills({
     memberStatus: async (gid, webid) => {
       let folded = null;
       const rows = await projectCircleRoster({
-        store: scope.store, groupId: gid, memberMapList: [], circleSignerFor: scope.circleSignerFor,
+        store: scope.store, groupId: gid, circleSignerFor: scope.circleSignerFor,
         membershipRead: scope.membershipRead, selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
       });
       if (!Array.isArray(rows)) return null;
@@ -1454,7 +1450,7 @@ export function buildSkills({
   const adoptContactPersonKey = async (webid, claimed, links) => {
     if (!bundle?.contacts || !claimed || !Number.isInteger(claimed.version) || claimed.version < 1 || typeof claimed.pubKey !== 'string' || !claimed.pubKey) return null;
     const claimedPin = (typeof claimed.linkKeyPub === 'string' && claimed.linkKeyPub) ? claimed.linkKeyPub : null;
-    const existing = (await members?.resolveByWebid?.(webid))?.personKey ?? null;
+    const existing = (await bundle.contacts.get?.(webid))?.personKey ?? null;
     let next = null;
     if (!existing) next = { version: claimed.version, pubKey: claimed.pubKey, ...(claimedPin ? { linkKeyPub: claimedPin } : {}) };
     else {
@@ -1507,8 +1503,7 @@ export function buildSkills({
     // without the self-binding the fold cannot tell they are the same person — which locked a
     // creator out of the circle they had just made.
     const rows = await projectCircleRoster({
-      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead, selfSigner,
+      store, groupId: circleId, circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
@@ -1521,8 +1516,7 @@ export function buildSkills({
   const circleRowOf = async (circleId, webid) => {
     if (!circleId || !webid) return null;
     const rows = await projectCircleRoster({
-      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead, selfSigner,
+      store, groupId: circleId, circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid) ?? null;
@@ -1562,9 +1556,6 @@ export function buildSkills({
         : (groupId ? [{ kind: 'group', groupId }] : []);
       const targets = rawTargets.filter(t => !validateTarget(t));
 
-      const maxDistanceKm = (typeof a.maxDistanceKm === 'number' && a.maxDistanceKm > 0)
-        ? a.maxDistanceKm : null;
-
       // Phase 52.7.2 cut-over — translate UI-vocab `intent` to
       // canonical {type, kind}. Bespoke intents (`report`, etc.)
       // pass through as `{type}` only.
@@ -1591,11 +1582,9 @@ export function buildSkills({
         text:           a.text,
         requiredSkills: a.requiredSkills ?? [],
         visibility:     'household',
-        // Phase 27 — store targets + maxDistanceKm on the item so
-        // local UI can render them and receivers can re-check.
+        // Phase 27 — store targets on the item so local UI can render them and receivers can re-check.
         source: {
           targets,
-          maxDistanceKm,
           ...(embeds.length > 0 ? { embeds } : {}),
           // Drivers #5 — an OPTIONAL explicit driver signature { text?, tags[] } the author attaches so
           // this post matches peers' private drivers on-device. Absent → the matcher falls back to the
@@ -1683,8 +1672,7 @@ export function buildSkills({
       }
 
       // ── Phase 27.3 sender-side filter ─────────────────────
-      // Resolve targets → recipient set. Drop muted. Drop out-of-
-      // range when maxDistanceKm + own location are set.  The
+      // Resolve targets → recipient set. Drop muted.  The
       // result drives both the group broadcast (when targets
       // include a 'group') AND the per-recipient direct fan-out
       // for non-group targets (Phase 27.4 wireup happens via chat
@@ -1697,14 +1685,11 @@ export function buildSkills({
         const r = await resolveTargets(targets.filter(t => t.kind !== 'group'),
           { members, contacts: bundle?.contacts, selfWebid: from });
         recipients = r.recipients;
-        if (maxDistanceKm) {
-          recipients = await filterByDistance(recipients, { members, selfWebid: from, maxDistanceKm });
-        }
         if (muted) recipients = await filterMuted(recipients, muted, members);
       }
 
-      // The broadcast target (group pubsub) carries the targets +
-      // maxDistanceKm so receivers can re-validate. By default we
+      // The broadcast target (group pubsub) carries the targets
+      // so receivers can re-validate. By default we
       // DON'T await broadcast results — posts go up immediately
       // and claims (if any) flow back via the substrate mirror +
       // the chat-based reply path (Phase 14).
@@ -1736,10 +1721,8 @@ export function buildSkills({
         dueAt:     item.dueAt,
         categoryId:  a.categoryId  ?? null,
         skillTags:   Array.isArray(a.skillTags) ? a.skillTags : [],
-        // Phase 27 — pass targets + distance through so
-        // receivers can re-check (functional design § 4f).
+        // Phase 27 — pass targets through so receivers can re-check.
         targets,
-        maxDistanceKm,
         // Phase 39 — attachment metadata + thumbnails (no
         // full bytes).  Recipients render the sealed thumbnails and
         // open the full sealed blob through their circle media gateway.
@@ -1819,7 +1802,6 @@ export function buildSkills({
               kind:          item.kind ?? null,
               dueAt:         item.dueAt ?? null,
               targets,
-              maxDistanceKm,
               categoryId:    a.categoryId   ?? null,
               skillTags:     Array.isArray(a.skillTags) ? a.skillTags : [],
               requiredSkills: a.requiredSkills ?? [],
@@ -2118,7 +2100,6 @@ export function buildSkills({
       const a = dataArgs(parts);
       const v = validateHandle(a.handle ?? '');
       if (!v.ok) return { error: 'invalid-handle', reason: v.reason };
-      if (!members) return { error: 'no-member-map' };
       // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
       // handles within a single circle). Reject if ANOTHER member of this circle
       // already holds the handle (case-folded, so `Jan`/`jan` collide). The
@@ -2128,7 +2109,7 @@ export function buildSkills({
       // SERIALISED per (circle, handle): the check and the write are separated by awaits, so two members
       // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
       return withHandleClaim(store, groupId, v.handle, async () => {
-        const taken = await collectCircleHandles({ store, members, groupId });
+        const taken = await collectCircleHandles({ store, groupId });
         // …and every FOLDED roster's handles (2026-09-21): a member's later `member-props` rename lives on the lane, not
         // in this device's cache, so the trail + cache alone would let two members claim one handle. The handle is the
         // person's, one across their circles (`member-props` goes to every circle they are in), so every circle counts.
@@ -2147,8 +2128,9 @@ export function buildSkills({
         if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
           return { error: 'invalid-handle', reason: 'handle-taken' };
         }
-        const updated = await members.addMember({ webid: from, handle: v.handle });
-        return { handle: v.handle, member: updated, _sync: simulateSync() };
+        const updated = await selfProfile?.set?.(from, { handle: v.handle });
+        if (!updated) return { error: 'not-a-self-here' };
+        return { handle: v.handle, _sync: simulateSync() };
       });
     }, {
       description: 'Set the calling actor\'s handle (lowercase, 3–32 chars).',
@@ -2184,10 +2166,8 @@ export function buildSkills({
     defineSkill('setHolidayMode', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.on !== 'boolean') return { error: 'on (bool) required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const availability = a.on ? 'away' : 'open';
-      const updated = await members.addMember({ ...me, availability, holidayMode: a.on });
+      const updated = await selfProfile?.set?.(from, { availability: a.on ? 'away' : 'open' });
+      if (!updated) return { error: 'not-a-self-here' };
       return { holidayMode: updated.availability === 'away', _sync: simulateSync() };
     }, {
       description: 'Toggle the calling actor\'s holiday-mode flag (thin shim over the unified availability property; away == on).',
@@ -2248,9 +2228,9 @@ export function buildSkills({
       const a = dataArgs(parts);
       const name = typeof a.displayName === 'string' ? a.displayName.trim() : '';
       if (!name) return { error: 'displayName required' };
-      if (!members) return { error: 'no-member-map' };
-      const updated = await members.addMember({ webid: from, displayName: name });
-      return { displayName: name, member: updated, _sync: simulateSync() };
+      const updated = await selfProfile?.set?.(from, { displayName: name });
+      if (!updated) return { error: 'not-a-self-here' };
+      return { displayName: name, _sync: simulateSync() };
     }, {
       description: 'Set the calling actor\'s display name (shown as each release allows).',
       visibility:  'authenticated',
@@ -3041,7 +3021,7 @@ export function buildSkills({
           // The SAME folded projection every other authority answer here reads, spine and all — so
           // "am I still in this circle" gets the same answer at this door as at every other.
           projectCircleRoster: ({ groupId: gid }) => projectCircleRoster({
-            store, groupId: gid, memberMapList: [], circleSignerFor, membershipRead, selfSigner,
+            store, groupId: gid, circleSignerFor, membershipRead, selfSigner,
           }),
         },
         { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
@@ -3166,7 +3146,7 @@ export function buildSkills({
      *   download (frontend serialises to .json or .zip).
      */
     defineSkill('exportMyData', async ({ from }) => {
-      const member = members ? await members.resolveByWebid(from) : null;
+      const member = (await selfProfile?.get?.(from).catch?.(() => null)) ?? null;
       const allOpen   = await store.listOpen({});
       const allAudit  = await store.auditLog?.({ actor: from }).catch(() => []) ?? [];
       const myItems   = allOpen.filter(i => i.addedBy === from);
@@ -3213,27 +3193,14 @@ export function buildSkills({
 
     /**
      * getMyProfile()
-     *   — returns the calling actor's MemberMap entry + a
-     *   `renderForCurrentGroup` block showing how viewers in this
-     *   group will see them by default (handle vs displayName).
+     *   — the calling actor's own profile: their self's persona record (handle, display name, availability, place).
      */
     defineSkill('getMyProfile', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const entry = await members.resolveByWebid(from);
-      if (!entry) return { entry: null };
-      // Project how *I* would appear to a viewer in this group by default
-      // (resolve() is viewer-agnostic for the default case).
-      let renderForCurrentGroup = null;
-      if (groupId) {
-        renderForCurrentGroup = await resolveMember({
-          memberMap:   members,
-          targetWebid: from,
-          groupId,
-        });
-      }
-      return { entry, renderForCurrentGroup };
+      const p = await selfProfile?.get?.(from).catch?.(() => null);
+      if (!p) return { entry: null };
+      return { entry: { webid: from, handle: p.handle, displayName: p.displayName, availability: p.availability, holidayMode: p.availability === 'away', location: p.location } };
     }, {
-      description: 'Return the calling actor\'s profile + how peers see them by default.',
+      description: 'Return the calling actor\'s own profile (their self\'s persona record: handle, name, away, place).',
       visibility:  'authenticated',
     }),
 
@@ -3463,14 +3430,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCircleTask({groupId, event, msgId, ts?})
-     *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
-     *   other member; receivers verify it at their task rail before it lands on their device log and
+     * broadcastCircleItems({groupId, event, msgId, ts?})
+     *   — the content re-root: fan a SIGNED item statement (a full-item snapshot, or a remove) to every
+     *   other member; receivers verify it at their items rail before it lands on their device log and
      *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
-     *   circle-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   circle-items-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
-    defineSkill('broadcastCircleTask', async ({ parts, from }) => {
+    defineSkill('broadcastCircleItems', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3478,13 +3445,13 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-task-broadcast', from,
+        circleId: _groupId, kind: 'circle-items-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'circle-task-fanout',
+        metric: 'circle-items-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:circle-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      description: 'Fan a signed item statement (full-item snapshot or remove) to every other member via subtype:circle-items-broadcast; receivers verify at their items rail and causally merge the head. Never wakes.',
       visibility:  'authenticated',
     }),
 
@@ -3929,18 +3896,17 @@ export function buildSkills({
       const a = dataArgs(parts);
       const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
         ? a.trustOffer : 'bekend';
-      const me = members ? await members.resolveByWebid(from) : null;
+      const me = await ownProfileOf(from);
       // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
       // no fallback to this agent's identity, which every self of the device shares and so would link them.
       const asPersona = !!localActor && from !== localActor;
       const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       const card = {
         webid:        from,
-        pubKey:       own?.pubKey   ?? me?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
-        stableId:     own?.stableId ?? me?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
+        pubKey:       own?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     own?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
-        avatarUrl:    me?.avatarUrl    ?? null,
         trustOffer,
         // 2026-05-27 — embed the caller's NKN peer address so the
         // scanner can DM the contact straight after add, without
@@ -4113,55 +4079,37 @@ export function buildSkills({
     }),
 
     /**
-     * setMyLocation({cell, label?, source?})
-     *   — Phase 26.3.  Persists `{cell, label, source}` on the local
-     *   actor's MemberMap entry.  `source` is one of `'gps'`,
-     *   `'geocode'`, or `null`.  No validation of the cell shape —
-     *   the caller is trusted (`geo.js#cellFor` produces it).
+     * setMyLocation({label})
+     *   — the person's coarse place, on their own profile (the persona record's `location` property). The geocoder's
+     *   grid cell is not kept: a label is all a person's place ever is.
      */
     defineSkill('setMyLocation', async ({ parts, from }) => {
       const a = dataArgs(parts);
-      if (typeof a.cell !== 'string' || !a.cell) return { error: 'cell required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({
-        ...me,
-        location: {
-          cell:   a.cell,
-          label:  typeof a.label  === 'string' ? a.label  : null,
-          source: a.source === 'gps' || a.source === 'geocode' ? a.source : null,
-        },
-      });
+      // The person's place is the COARSE label only (a municipality-like name): no grid cell or coordinate is kept
+      const label = typeof a.label === 'string' ? a.label.trim() : '';
+      if (!label) return { error: 'label required' };
+      const updated = await selfProfile?.set?.(from, { location: label });
+      if (!updated) return { error: 'not-a-self-here' };
       return { location: updated.location };
     }, {
-      description: 'Set the calling actor\'s coarse location {cell, label, source}.',
+      description: 'Set the calling actor\'s coarse place (a label, never a coordinate).',
       visibility:  'authenticated',
     }),
 
-    /** clearMyLocation() — drop the location field. */
     defineSkill('clearMyLocation', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, location: null });
-      return { location: updated.location };
+      const updated = await selfProfile?.set?.(from, { location: null });
+      if (!updated) return { error: 'not-a-self-here' };
+      return { location: null };
     }, {
-      description: 'Clear the calling actor\'s coarse location.',
+      description: 'Clear the calling actor\'s coarse place.',
       visibility:  'authenticated',
     }),
 
-    /** getMyLocation() — read the calling actor's location. */
+    /** getMyLocation() — read the calling actor's coarse place (a label, or null). */
     defineSkill('getMyLocation', async ({ from }) => {
-      if (!members) return { location: null };
-      const me = await members.resolveByWebid(from);
-      return { location: me?.location ?? null };
+      return { location: (await ownProfileOf(from))?.location ?? null };
     }, {
-      description: 'Read the calling actor\'s coarse location.',
-      visibility:  'authenticated',
-    }),
-
-    /** distancePresets() — return the post-composer's distance presets (km). */
-    defineSkill('distancePresets', async () => ({ presets: [...DISTANCE_PRESETS] }), {
-      description: 'Return the distance presets used by the post composer.',
+      description: 'Read the calling actor\'s coarse place.',
       visibility:  'authenticated',
     }),
 
@@ -4235,22 +4183,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * forgetContact({webid}) — the HOST's own, never a peer's: a contact re-filed under a self this device does not
-     * hold leaves this self's book (its contact facets; the member row stays). The host calls it where the own-devices
-     * lane lands the old self's `contact-refile` row.
-     */
-    defineSkill('forgetContact', async ({ parts, from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      const a = dataArgs(parts);
-      try { return { contact: await bundle.contacts.forgetContact(a.webid) }; }
-      catch (err) { return { error: err?.message ?? String(err) }; }
-    }, {
-      description: "The host's own: drop a contact re-filed under a self this device does not hold (the member row stays).",
-      visibility:  'authenticated',
-    }),
-
     /** setContactTags({webid, tags: string[]}) */
     defineSkill('setContactTags', async ({ parts }) => {
       const a = dataArgs(parts);
@@ -4312,98 +4244,6 @@ export function buildSkills({
     }),
 
     /**
-     * getHopMode()  — Phase 28.1.  Returns `{global}` reflecting
-     * whether hop-relay is enabled for any contact on this device.
-     * Mirror of `bundle.settings.allowHopThrough`.
-     */
-    defineSkill('getHopMode', async () => ({
-      global: bundle?.settings?.allowHopThrough === true,
-    }), {
-      description: 'Read whether global hop-relay is enabled.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * setHopMode({global})  — Phase 28.1.  Toggles
-     * `bundle.settings.allowHopThrough` AND wires
-     * `agent.enableRelayForward({policy: 'authenticated'})` when
-     * turning on (idempotent at the SDK level).  When turning off,
-     * policy is downgraded to `'never'` so the registered skill
-     * rejects any relay request.  Stays registered to avoid
-     * needing a restart; the policy gate is the actual switch.
-     */
-    defineSkill('setHopMode', async ({ parts, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.global !== 'boolean') return { error: 'global (bool) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      { allowHopThrough: a.global },
-      });
-      bundle.settings = next;
-
-      try {
-        if (a.global) {
-          agent.enableRelayForward({ policy: 'authenticated' });
-        } else if (agent?.config?.set) {
-          agent.config.set('policy.allowRelayFor', 'never');
-        }
-      } catch (err) {
-        return { error: `enableRelayForward failed: ${err?.message ?? err}` };
-      }
-      metrics?.record?.(a.global ? 'hop-mode-on' : 'hop-mode-off');
-      return { global: a.global };
-    }, {
-      description: 'Enable or disable global hop-relay; persists in settings + flips core policy.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getSettings()  — Phase 23.5.  Read-only snapshot of cadence /
-     * hop / broadcastable / defaultShareLocation settings.  Cached
-     * in `bundle.settings`; reload from cache via `_reload: true`.
-     */
-    defineSkill('getSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (a._reload && bundle?.cache) {
-        bundle.settings = await loadSettings({
-          dataSource: bundle.cache,
-          deviceId:   bundle?.deviceId ?? null,
-        });
-      }
-      return { settings: bundle?.settings ?? null };
-    }, {
-      description: 'Read the bundle\'s user-tunable settings (cadence + hop + broadcastable).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * updateSettings({patch})  — Phase 23.5.  Patch a subset of the
-     * settings; persists via the same CachingDataSource path that
-     * MemberMap uses, so a connected pod gets the update too.
-     * Returns the merged + saved settings.
-     */
-    defineSkill('updateSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!a.patch || typeof a.patch !== 'object') return { error: 'patch (object) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      a.patch,
-        scope:      a.scope === 'device' || a.scope === 'shared' ? a.scope : null,
-      });
-      bundle.settings = next;
-      metrics?.record?.('settings-updated');
-      return { settings: next };
-    }, {
-      description: 'Patch a subset of the bundle\'s settings; persists immediately.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * rotateMyAddress({ gracePeriodSeconds? })  — Pinboard V3 mobile
      * Phase 40.22 (2026-05-08).
      *
@@ -4452,11 +4292,15 @@ export function buildSkills({
      *   not WebID vs URL).
      */
     defineSkill('whoAmI', async ({ from, agent }) => {
-      const me = members ? await members.resolveByWebid(from) : null;
+      const me = await ownProfileOf(from);
+      // WHO this is: the host's own card for this device's general self (its chat identity), and for a persona the webid
+      // it speaks as. Never this pinboard agent's key: it stays in the process.
+      const asPersona = !!localActor && from !== localActor;
+      const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       return {
         webid:       from,
-        stableId:    me?.stableId ?? agent?.identity?.stableId ?? null,
-        pubKey:      me?.pubKey   ?? agent?.identity?.pubKey   ?? null,
+        stableId:    own?.stableId ?? (asPersona || typeof selfCard === 'function' ? null : agent?.identity?.stableId ?? null),
+        pubKey:      own?.pubKey   ?? (asPersona || typeof selfCard === 'function' ? from : agent?.identity?.pubKey ?? null),
         handle:      me?.handle      ?? null,
         displayName: me?.displayName ?? null,
       };

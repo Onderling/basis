@@ -9,8 +9,6 @@
     "circle.contacts.lens.saved",
     "circle.create_unavailable",
     "circle.governance.report_reason_prompt",
-    "circle.hop.ask_relay",
-    "circle.hop.over_limit",
     "circle.hostFrame.back",
     "circle.join.consent.blurb",
     "circle.join.consent.title",

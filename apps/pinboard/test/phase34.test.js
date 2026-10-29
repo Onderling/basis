@@ -15,9 +15,9 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 import { createNeighbourhoodAgent } from '../src/index.js';
 import { CachingDataSource } from '../src/lib/CachingDataSource.js';
-import {
-  SETTINGS_SHARED_PATH,
-} from '../src/lib/Settings.js';
+
+// a shared (pod-bound) blob and a device blob: any two paths, one inside the local-only prefixes
+const SETTINGS_SHARED_PATH = 'mem://pinboard/settings/shared.json';
 
 const ANNE = 'https://id.example/anne';
 
@@ -166,29 +166,5 @@ describe('Phase 34.3 — bulk-sync respects localOnlyPrefixes', () => {
     ].sort());
     expect(pushed).not.toContain(`mem://pinboard/settings/devices/${deviceId}.json`);
     expect(pushed).not.toContain('mem://pinboard/settings/.migrated-from-v2');
-  });
-});
-
-describe('Phase 34.1 — end-to-end through the bundle', () => {
-  it('pre-attach: post + settings; attach pod; both items + shared.json appear; device blob does not', async () => {
-    const bundle = await buildBundle();
-    expect(bundle.cache.hasInner).toBe(false);
-
-    // Offline writes via the public skill surface.
-    await callSkill(bundle.agent, 'updateSettings', {
-      patch: { allowHopThrough: true, broadcastable: false },
-    });
-    // Sanity: the shared + device blobs exist locally.
-    const devicePath = `mem://pinboard/settings/devices/${bundle.deviceId}.json`;
-    expect(await bundle.cache.read(SETTINGS_SHARED_PATH)).toBeTruthy();
-    expect(await bundle.cache.read(devicePath)).toBeTruthy();
-
-    const pod = makeStubPod();
-    await bundle.cache.attachInner(pod);
-
-    const podPaths = pod.writes.map(w => w.path);
-    expect(podPaths).toContain(SETTINGS_SHARED_PATH);
-    expect(podPaths).not.toContain(devicePath);
-    expect(podPaths.some(p => p.startsWith('mem://pinboard/settings/.migrated'))).toBe(false);
   });
 });

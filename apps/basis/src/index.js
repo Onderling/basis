@@ -238,11 +238,6 @@ export {
   isRecipientUnavailable, buildUnavailableNotice,
   createMessageQueue,
 } from './v2/reciprocity.js';
-// auto-hop-prompt when a skill search returns no in-circle hits.
-export {
-  shouldAutoSuggestHop, buildHopPromptCard,
-  rememberDismissed, hasDismissed,
-} from '@onderling/kring-host/hopPrompt';
 // skill-match source: rank circle members / agents / hop candidates
 // against a free-text question. Renderer is `buildOfferingMatches`.
 export { findOfferingMatches, tokenize as tokenizeOfferingQuery } from '@onderling/kring-host/findOfferingMatches';
@@ -349,11 +344,6 @@ export { buildTaskRows, taskItemToStreamRow, taskStatusOf } from './v2/taskRows.
 export {
   extendHolidayDays, setHolidayUntil, buildHolidayAutoReply,
 } from './v2/holidayShortcuts.js';
-// per-contact hop overrides.
-export {
-  normalizeContactHopMode, effectiveHopMode, buildContactHopList,
-  HOP_PER_CONTACT_MODES,
-} from './v2/contactHopOverrides.js';
 // Folio "My things" notes-list (private circle).
 export {
   itemOwner, isMyPrivateItem, buildMyThings, myThingsFromListFiles,
@@ -377,9 +367,6 @@ export { getCirclePolStatus, formatPolStatus, formatAttestedAt } from './v2/circ
 export {
   COMPLAINT_TYPES, ADVISOR_DEFAULTS, makeTooBusyEvent, computeAdvice,
 } from './v2/circleAdvisor.js';
-export {
-  MAX_HOPS, normalizeHopMode, buildHopChain, makeHopRelayRequest,
-} from '@onderling/kring-host/circleHop';
 export {
   OFFERING_AXES, DEFAULT_OFFERING, normalizeOffering, mergeOffering,
   MATCH_SOURCES, buildOfferingMatches,
@@ -412,7 +399,7 @@ export {
 } from './v2/themePref.js';
 export { buildMijViewModel } from './v2/personaView.js';
 export { loadMijModel } from './v2/mijLoader.js';
-export { migrateRosterOfferings, offeringKeyFor, OFFERINGS_MIGRATION_KEY } from './core/offeringsMigration.js';
+export { offeringKeyFor } from './v2/offeringKey.js';
 export { runFind } from './find.js';
 export { EventLog, createEventLog, RETENTION_MS, RETENTION_DEFAULTS, makeAgentTrailEntry } from './eventLog.js';
 export { attachTestBuildLogMirror, TEST_BUILD_LOG_PREFIX } from './log/testBuildMirror.js';
@@ -430,3 +417,4 @@ export {
 } from './localisation.js';
 // Shared locale blocks (`circle.*`, `consequence.*`, `role.*`) — both shells merge these so they can't drift.
 export { sharedCircleLocale, sharedConsequenceLocale, sharedRoleLocale, sharedHostLocale, sharedNounLocale, sharedLocale, mergeShared } from './locales/index.js';
+export { fieldAfterLoad } from './v2/fieldAfterLoad.js';

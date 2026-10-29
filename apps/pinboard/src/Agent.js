@@ -35,8 +35,8 @@ import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
 import { MemberMapCache }    from './lib/MemberMapCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
-import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
-import { createContactBook } from './lib/ContactBook.js';
+import { createContactBook, moveContactsFromMemberMap } from './lib/ContactBook.js';
+import { createMemorySelfProfile } from './lib/selfProfile.js';
 import { wireChat }          from './chat/wireChat.js';
 import { createRoutedStore } from './lib/routedStore.js';
 
@@ -224,6 +224,11 @@ export async function createNeighbourhoodAgent({
   membershipEmit,
   membershipRead,
   currentPersonKey,
+  // The person's own profile (host-injected over the persona record, see lib/selfProfile.js); absent → in memory.
+  selfProfile = null,
+  // The contact book's home (host-injected): the own-devices store + which self a row is written as (lib/ContactBook.js).
+  contactStore = null,
+  contactSelfFor = null,
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
@@ -328,13 +333,6 @@ export async function createNeighbourhoodAgent({
       inner:         itemBackend ?? null,
       localStore:    initialMap,
       onLocalChange: persist ? (m) => { lastLocalMap = m; persist.scheduleSave(m); } : undefined,
-      // per-device settings + the migration marker
-      // are local-only — they must never reach the pod (the pod is
-      // shared by other installs of the same user).
-      localOnlyPrefixes: [
-        'mem://pinboard/settings/devices/',
-        'mem://pinboard/settings/.migrated',
-      ],
       innerKeyMap: _podInnerKeyMap,
     });
     dataSource = cache;
@@ -465,10 +463,18 @@ export async function createNeighbourhoodAgent({
   // for `agent.on('message', ...)` envelopes whose first DataPart
   // carries `type: 'pinboard-chat'`; stores them locally as
   // `kind: 'chat-message'` items linked by `source.threadId`.
+  // the person's contacts: `contact` rows on their own-devices store, one per (self, contact) — lib/ContactBook.js
+  const contacts = createContactBook({ store: contactStore, selfFor: contactSelfFor ?? (() => ({ id: 'default', writer: offeringMatchOpts.localActor ?? 'me' })) });
+  // …and what the old book held (MemberMap contact entries) moves into it once, before anything reads it
+  try {
+    const { moved, kept } = await moveContactsFromMemberMap({ members, contacts });
+    if (moved || kept) console.info(`[contacts] moved ${moved} contact(s) from the old book into the own-devices book${kept ? `; ${kept} kept (a self not held here)` : ''}`);
+  } catch (err) { console.warn(`[contacts] the old book could not be moved: ${err?.message ?? err}`); }
   const chat = wireChat({
     agent,
     itemStore,
     members,
+    contacts,
     muted,
     metrics,
     localActor:    offeringMatchOpts.localActor,
@@ -493,7 +499,7 @@ export async function createNeighbourhoodAgent({
     /** Write the local cache to its persistence now, ahead of the debounce. No-op without a persist. */
     flushLocal: async () => { if (persist && lastLocalMap && typeof persist.flush === 'function') await persist.flush(lastLocalMap); },
     agent,
-    deviceId: id?.deviceId ?? null,    // Phase 33.1 — per-install id for device-scoped settings
+    deviceId: id?.deviceId ?? null,    // this install's id (the pod attach names the device by it)
     itemStore,
     members,
     offeringMatch,
@@ -514,12 +520,7 @@ export async function createNeighbourhoodAgent({
     expoPushSender,                 // S6.6 — relay.PushSender for Expo tokens (mobile-native), when expoPush supplied
     webPushPublicKey: webPush?.publicKey ?? null,
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
-    settings: cache                    // Phase 23.5 + 33 — split across shared + device blobs
-      ? await loadSettings({ dataSource: cache, deviceId: id?.deviceId ?? null })
-      : { ...DEFAULT_SETTINGS },
-    contacts: cache                    // Phase 24.1 — 1:1 contact graph + lists
-      ? createContactBook({ members, dataSource: cache })
-      : null,
+    contacts,   // the person's contacts (above)
   };
 
   // track bulk-sync state on the bundle so the UI
@@ -584,6 +585,7 @@ export async function createNeighbourhoodAgent({
       membershipEmit,  // the membership rider's device-log emitter (absent → the store-based spine path)
       membershipRead,  // the rider's verified statement reader for the roster fold
       currentPersonKey,
+      selfProfile: selfProfile ?? createMemorySelfProfile(),   // the person's own profile (handle, name, away, place)
       rulesUpdateEmit, // the rules-update rider's governance-lane emitter (absent → store-local only)
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).
@@ -614,17 +616,6 @@ export async function createNeighbourhoodAgent({
       agent.enableSealedForwardFor(offeringMatchOpts.group);
     }
   } catch { /* SDK may surface "already enabled" or similar; non-fatal */ }
-
-  // Phase 28.1 (Pinboard V2, 2026-05-07): respect the persisted hop-mode
-  // setting on cold boot.  When the user previously turned on global
-  // hop-relay (settings.allowHopThrough === true), re-register the
-  // relay-forward skill at the configured policy.  Off requires no
-  // action — the skill only registers when explicitly enabled.
-  try {
-    if (bundle.settings?.allowHopThrough === true) {
-      agent.enableRelayForward({ policy: 'authenticated' });
-    }
-  } catch { /* non-fatal */ }
 
   // **Caller responsibility**: register peer pubkeys at the core.Agent
   // SecurityLayer (`agent.addPeer(addr, pubKey)`) BEFORE calling

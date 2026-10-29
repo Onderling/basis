@@ -34,7 +34,6 @@ import {
   runBrief, createBriefCache,
   runFind,
   EventLog,
-  collectFollowUps,
   buildEmbed,
 } from '../src/index.js';
 import { createRealHouseholdAgent } from '../src/web/realAgent.js';
@@ -213,24 +212,9 @@ describe('J2 — Add task with details', () => {
 
 /* ─────────────── J3 — Anne is moving in (cross-app) ─────────────── */
 
-describe('J3 — Anne is moving in (cross-app follow-ups)', () => {
+describe('J3 — Anne is moving in (finding her by name)', () => {
   let ws;
   beforeEach(async () => { ws = await bootTestWorkspace(); });
-
-  it("addMember Anne returns success", async () => {
-    // Part G — addMember is a membership shim (no `/addmember` slash in the
-    // real manifest); dispatch the op directly.
-    const reply = await ws.callSkill('household', 'addMember', { name: 'Anne' });
-    expect(reply.ok).toBe(true);
-    expect(reply.memberName).toBe('Anne');
-  });
-
-  it("collectFollowUps suggests folio.shareFolder + pinboard.postRequest after addMember", () => {
-    const followUps = collectFollowUps('addMember', 'household', { ok: true }, ws.catalogue());
-    const apps = followUps.map((f) => f.appOrigin);
-    expect(apps).toContain('folio');
-    expect(apps).toContain('pinboard');
-  });
 
   it("resolveContact finds Anne by exact handle", async () => {
     const r = await ws.callSkill('household', 'resolveContact', { query: 'anne' });

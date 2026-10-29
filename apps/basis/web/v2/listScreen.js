@@ -101,7 +101,7 @@ function categoryBar(container, { categories, onToggle }) {
     const label = document.createElement('label');
     label.className = 'list-screen__category';
     const box = document.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: view — which categories the list shows
     box.checked = !!c.checked;
     box.dataset.category = c.id;
     box.addEventListener('change', () => { if (typeof onToggle === 'function') onToggle(c.id, box.checked); });

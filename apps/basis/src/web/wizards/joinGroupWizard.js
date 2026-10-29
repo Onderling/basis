@@ -221,7 +221,7 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
   const checkRow = doc.createElement('label');
   checkRow.className = 'cc-wizard-check';
   const check = doc.createElement('input');
-  check.type = 'checkbox';
+  check.type = 'checkbox';   // sets: form — the circle's rules accepted (the join waits for it)
   check.checked = state.rulesAccepted;
   check.addEventListener('change', () => {
     state.rulesAccepted = check.checked;
@@ -271,7 +271,7 @@ function renderConsentCaps(wrap, doc, state, rerender) {
     row.className = 'cc-wizard-consent-cap';
     row.dataset.cap = cap.key;
     const box = doc.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: form — a capability the join keeps or declines
     box.dataset.cap = cap.key;
     box.checked = !declined.has(cap.key);   // checked = take part; unchecked = opt out
     box.addEventListener('change', () => {
@@ -304,7 +304,7 @@ function renderPrivacyStep(container, doc, state, onNext, onBack, onCancel, rere
   const checkRow = doc.createElement('label');
   checkRow.className = 'cc-wizard-check';
   const check = doc.createElement('input');
-  check.type = 'checkbox';
+  check.type = 'checkbox';   // sets: form — the privacy notice accepted (the join waits for it)
   check.checked = state.privacyAccepted;
   check.addEventListener('change', () => {
     state.privacyAccepted = check.checked;
@@ -322,7 +322,7 @@ function renderPrivacyStep(container, doc, state, onNext, onBack, onCancel, rere
   const meshRow = doc.createElement('label');
   meshRow.className = 'cc-wizard-check';
   const meshBox = doc.createElement('input');
-  meshBox.type = 'checkbox';
+  meshBox.type = 'checkbox';   // sets: form — whether the join shares your card with the circle
   meshBox.checked = state.shareAddress;
   meshBox.addEventListener('change', () => {
     state.shareAddress = meshBox.checked;
@@ -485,7 +485,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     const offeringsRow = doc.createElement('label');
     offeringsRow.className = 'cc-wizard-check cc-wizard-offerings-default';
     const offeringsBox = doc.createElement('input');
-    offeringsBox.type = 'checkbox';
+    offeringsBox.type = 'checkbox';   // sets: form — whether the join shares your offerings
     offeringsBox.className = 'cc-wizard-offerings-default-box';
     offeringsBox.checked = state.shareOfferingsAtJoin;
     offeringsBox.addEventListener('change', () => {

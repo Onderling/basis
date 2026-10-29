@@ -82,7 +82,7 @@ export async function run({ relayUrl }) {
     check('the offer does carry the circle the new device must reach', (offer?.circles ?? 0) >= 1);
 
     // ── 3. THE GATE — the phrase is the authority ────────────────────────────────────────────────
-    const thief = await bootRealAgentNode('thief', { taskLane: true });
+    const thief = await bootRealAgentNode('thief', { itemsLane: true });
     spares.push(thief);
 
     const wrongEnroll = await call(thief, 'enrollDevice', { mnemonic: SOMEONE_ELSES, label: 'stolen' });
@@ -98,7 +98,7 @@ export async function run({ relayUrl }) {
       wrongRevoke?.ok === false, JSON.stringify(wrongRevoke)?.slice(0, 120));
 
     // ── 4. THE ACT — the right phrase does add a device ──────────────────────────────────────────
-    const laptop = await bootRealAgentNode('anne-laptop', { taskLane: true });
+    const laptop = await bootRealAgentNode('anne-laptop', { itemsLane: true });
     spares.push(laptop);
     const enrolled = await call(laptop, 'enrollDevice', { mnemonic: first.mnemonic, label: 'laptop' });
     check('THE RIGHT PHRASE ADDS THE DEVICE', enrolled?.ok === true,
@@ -116,7 +116,7 @@ export async function run({ relayUrl }) {
     const bramPhrase = (await call(bram, 'revealOwnerPhrase'))?.mnemonic;
     check('two people do not share a recovery phrase', !!bramPhrase && bramPhrase !== first.mnemonic);
 
-    const impostor = await bootRealAgentNode('impostor', { taskLane: true });
+    const impostor = await bootRealAgentNode('impostor', { itemsLane: true });
     spares.push(impostor);
     const asBram = await call(impostor, 'enrollDevice', { mnemonic: bramPhrase, label: 'other-account' });
     check('a device enrolled with ANOTHER person\'s phrase joins THAT account', asBram?.ok === true,

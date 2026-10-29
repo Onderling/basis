@@ -1188,6 +1188,10 @@
       "text": "Niets hier.",
       "doc": "B/S3 list-with-filter screen empty state — distinct from screen.empty (the α.1c recipe-book-empty state); they collided under one key until 2026-07-03."
     },
+    "lists_off": {
+      "text": "Lijsten staan uit in deze kring.",
+      "doc": "The lists block when the circle's lists feature is switched off (an admin's setting): one quiet line instead of the lists."
+    },
     "audience_scope": {
       "text": "Toont items die met deze kring zijn gedeeld.",
       "doc": "SP-5b Option A — non-dismissible caption under a list title when the list is audience-scoped (buildScreenModel.audienceScope set). Generic (no circle name): a visibility scope, not a user filter, so no clear/close control."
@@ -1263,6 +1267,14 @@
     "circles_title": {
       "text": "Kringen",
       "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "control_circle": {
+      "text": "Kring",
+      "doc": "Customise: which circle a lists block shows (one circle's lists)."
+    },
+    "circle_pick": {
+      "text": "Kies een kring",
+      "doc": "Customise: the lists block's circle choice before one is picked."
     },
     "labels_title": {
       "text": "Labels",
@@ -1673,6 +1685,10 @@
         "text": "Taken",
         "doc": "α.4 — block palette label."
       },
+      "lists": {
+        "text": "Lijsten",
+        "doc": "Block palette label: the circle's lists."
+      },
       "rules": {
         "text": "Huisregels",
         "doc": "α.1b — block palette label."
@@ -1734,6 +1750,10 @@
       "tasks": {
         "text": "Openstaande taken, die van jou of alle.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "lists": {
+        "text": "De lijsten van één kring, met wat er nog op staat.",
+        "doc": "One plain sentence: what the lists block shows (the circle's lists and their open entries)."
       },
       "rules": {
         "text": "De huisregels van de kring.",
@@ -2903,48 +2923,6 @@
       "doc": "Dismiss the advice card."
     }
   },
-  "hop": {
-    "title": {
-      "text": "Hoppen",
-      "doc": "Heading of the hopping screen (board 7)."
-    },
-    "global_label": {
-      "text": "Laat vertrouwde contacten mijn vraag één stap doorgeven",
-      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
-    },
-    "explain": {
-      "text": "Als je iets vraagt dat niemand dichtbij heeft, kan een contact die dat toestaat je vraag één stap verder doorgeven — aan hún contacten. Maximaal één hop, en de doorgifte is anoniem.",
-      "doc": "Explanation of how hopping works."
-    },
-    "ask_relay": {
-      "text": "Vraag om door te geven",
-      "doc": "Button: ask the gate contact to relay the request one hop."
-    },
-    "over_limit": {
-      "text": "Te veel hops — vragen reizen maximaal één stap.",
-      "doc": "Shown when a chain exceeds max-one-hop."
-    },
-    "per_contact_title": {
-      "text": "Per contact",
-      "doc": "Board 7B section (P6.M6)."
-    },
-    "mode_always": {
-      "text": "Altijd",
-      "doc": "Per-contact mode."
-    },
-    "mode_withOk": {
-      "text": "Met mijn OK",
-      "doc": "Per-contact mode."
-    },
-    "mode_off": {
-      "text": "Uit",
-      "doc": "Per-contact mode."
-    },
-    "default_label": {
-      "text": "Standaard",
-      "doc": "Chip for global-stance fallback."
-    }
-  },
   "offerings": {
     "editor_title": {
       "text": "Aanbod",
@@ -3161,28 +3139,6 @@
     "no_delivery_note": {
       "text": "{{name}} krijgt geen melding dat je iets probeerde.",
       "doc": "Board 5C non-event clarification."
-    }
-  },
-  "hopPrompt": {
-    "title": {
-      "text": "Verder zoeken?",
-      "doc": "Board 7A auto-hop-prompt card heading (P6.6)."
-    },
-    "body": {
-      "text": "Niemand in je kringen matcht \"{{skill}}\". Wil je verder zoeken via je {{count}} contact(en)?",
-      "doc": "Card body."
-    },
-    "body_anon": {
-      "text": "Niemand in je kringen matcht. Wil je verder zoeken via je {{count}} contact(en)?",
-      "doc": "Anon body."
-    },
-    "accept": {
-      "text": "Ja, één stap verder",
-      "doc": "Primary CTA."
-    },
-    "dismiss": {
-      "text": "Laat maar",
-      "doc": "Secondary CTA."
     }
   },
   "offeringMatches": {
@@ -6931,6 +6887,10 @@
     "founder_stays": {
       "text": "Wie deze kring begon, kan niet verwijderd worden.",
       "doc": "Why Remove is greyed on the founder's row in the admin panel: the roster never evicts the person who started the circle (they can leave, or step back as admin)."
+    },
+    "no_one_to_take_over": {
+      "text": "Je bent de enige in deze kring: er is niemand om het beheer van je over te nemen.",
+      "doc": "Why 'step back as admin' is greyed on the last admin's own row when nobody else is in the circle: the roster fold keeps a demotion from standing when no one could take over, so the control is not offered as available."
     },
     "make_member": {
       "text": "Beheerdersrol intrekken",

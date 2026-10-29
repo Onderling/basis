@@ -2,8 +2,8 @@
  * basis — cross-app follow-up registry (v0.4).
  *
  * Per-op follow-ups (`surfaces.chat.followUps`) live IN each
- * app's manifest.  Cross-app chains (`household.addMember` →
- * `folio.share`) live HERE — no single app owns them; basis's
+ * app's manifest.  Cross-app chains (`pinboard.postRequest` →
+ * `pinboard.listFeed`) live HERE — no single app owns them; basis's
  * runtime decides.
  *
  * The registry shape is intentionally simple:
@@ -43,29 +43,11 @@
 /**
  * Default cross-app chain registry.  Apps can extend this at runtime
  * via `addCrossAppChain` — but the curated set below covers the
- * common journeys (J3 'Anne is moving in').
+ * common journeys.
  *
  * @type {CrossAppChain[]}
  */
 export const DEFAULT_CROSS_APP_CHAINS = [
-  // J3 — after household.addMember, suggest sharing a folio folder
-  // with the new member.
-  {
-    trigger:    { appOrigin: 'household', opId: 'addMember' },
-    suggestion: {
-      appOrigin: 'folio', opId: 'shareFolder',
-      prefilledArgs: {},     // 'with' is filled by chat-shell from reply.memberName
-      label:         'Share folio folder',
-    },
-  },
-  // J3 — after household.addMember, also suggest adding a pinboard post.
-  {
-    trigger:    { appOrigin: 'household', opId: 'addMember' },
-    suggestion: {
-      appOrigin: 'pinboard', opId: 'postRequest',
-      label:         'Post intro on circle',
-    },
-  },
   // After pinboard.postRequest, suggest checking the feed for replies.
   {
     trigger:    { appOrigin: 'pinboard', opId: 'postRequest' },

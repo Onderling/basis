@@ -59,7 +59,7 @@ import {
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
 import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES, MEMBERSHIP_BROADCAST } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES, OWN_TASK_CATCHUP_SUBTYPES, TASK_BROADCAST } from '../../v2/taskRail.js';
+import { makeItemsRail, makeItemsEmitter, routeItemsMirror, ITEMS_CATCHUP_SUBTYPES, OWN_ITEMS_CATCHUP_SUBTYPES, ITEMS_BROADCAST } from '../../v2/itemsRail.js';
 import { makeFrontierReplay } from '../../v2/frontierReplay.js'; // the content re-root — item snapshots ride the device log
 import { healRestoreList } from '../../v2/restoreListHeal.js'; // a circle missed on the restore list is written at the next boot
 import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES, CHAT_STATEMENT_BROADCAST } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
@@ -78,10 +78,10 @@ const CATCHUP_REPLY_SUBTYPES = new Set([
   GOV_CATCHUP_BATCH,
   MEMBERSHIP_CATCHUP_SUBTYPES.batch,
   GRANTS_CATCHUP_SUBTYPES.batch,
-  TASK_CATCHUP_SUBTYPES.batch,
-  TASK_CATCHUP_SUBTYPES.offer,
-  OWN_TASK_CATCHUP_SUBTYPES.batch,
-  OWN_TASK_CATCHUP_SUBTYPES.offer,
+  ITEMS_CATCHUP_SUBTYPES.batch,
+  ITEMS_CATCHUP_SUBTYPES.offer,
+  OWN_ITEMS_CATCHUP_SUBTYPES.batch,
+  OWN_ITEMS_CATCHUP_SUBTYPES.offer,
   CHAT_CATCHUP_SUBTYPES.batch,
   CHAT_CATCHUP_SUBTYPES.offer,
   KEY_CATCHUP_SUBTYPES.batch,
@@ -137,6 +137,7 @@ import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
 import { createBrowserPinboardAgent } from '@onderling-app/pinboard/browser';
 import { assertPinboardHostBindings } from './pinboardHostBindings.js';
+import { createRegistrySelfProfile } from '../../v2/selfProfileOverRegistry.js';
 import { PINBOARD_OP_ALIAS } from '../../v2/pinboardOpAliases.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
 // agents — the read-only "your agents" surface (2026-07-09). buildAgentSkills
@@ -175,7 +176,7 @@ import {
   ownedNodesOf, setOwnedNode, addPendingRevokes, clearPendingRevoke, pendingRevokesOf,
   isRequestable,
   effectiveProperties,
-  profileFactsOf, withProfileFacts, factsDiffer, factsStamp, nextFactsAt, FACTS_AT_KEY,
+  profileFactsOf, withProfileFacts, factsDiffer, nextFactsAt, stampChangedFacts,
 } from '@onderling/agent-registry';
 // REQUESTABLE BRIDGE (host-wiring seam J6) — the recipient's per-circle task
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
@@ -416,11 +417,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // here; `dataSourceFor` hands it to the store at build time. Absent injection → the shared local backing.
   const circleMedia = new Map();          // circleId → cache-mode PseudoPod medium (DataSource-shaped)
   let householdService;   // built with `householdDataSource` below, for the same reason
-  // The task lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
+  // The items lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
-  let taskRail = null;
-  let taskEmit = null;
-  let ownStoreSync = null;   // the own scope's catch-up between the person's devices (built with the task lane)
+  let itemsRail = null;
+  let itemsEmit = null;
+  let ownStoreSync = null;   // the own scope's catch-up between the person's devices (built with the items lane)
   // The personal history mirror's state — assigned at the end of boot (the sync block); declared
   // here so the params dispatch (a live switch flip) can kick the reconciler.
   let historyMirror = null;
@@ -434,7 +435,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   let chatRail = null;
   let chatEmit = null;
   // The wired household ops (dissolved cores on the host). Everything else on the 'household'
-  // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
+  // app-origin (calendar_* passthrough, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
   const HOUSEHOLD_WIRED_OPS = new Set([
     'addItem', 'markComplete', 'removeItem', 'listOpenItems',
@@ -1195,8 +1196,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       // verified, chained, stored on their rail, and never applied — and catch-up could not heal it,
       // because catch-up fetches what the rail LACKS and the rail had it (F-016, deterministic).
       // Idempotent by construction: a re-applied snapshot re-merges to the same result.
-      if (taskRail?.rebuildHead) {
-        try { await taskRail.rebuildHead(id); } catch { /* best-effort — never block opening a circle */ }
+      if (itemsRail?.rebuildHead) {
+        try { await itemsRail.rebuildHead(id); } catch { /* best-effort — never block opening a circle */ }
       }
       // Compose the peer seam BY POSTURE — avoid the double-carry. A POD-BACKED circle (a cache medium was
       // provisioned) carries content THROUGH THE POD (write-through on send + catch-up on open), so it must
@@ -1217,8 +1218,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         // the box's change feed — its event rows, its screens' nudge)
         const wrote = (item, removedId) => { try { opts.onCircleWrite?.(id, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(item); return r; },
-          publishItemRemoved: (rid, removed)  => { const r = routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
+          publishItem:        (item)          => { const r = routeItemsMirror({ circleId: id, emitter: itemsEmit, requireSigned: !!opts.deviceLog }).publishItem(item); wrote(item); return r; },
+          publishItemRemoved: (rid, removed)  => { const r = routeItemsMirror({ circleId: id, emitter: itemsEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
         });
         reFanOwedChat(id);   // what a restart still owes this circle goes out again (idempotent)
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
@@ -1279,7 +1280,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // composition without a device log there is simply no peer carry. The check is hoisted ABOVE the
     // loop deliberately: the per-item `try` swallows errors (best-effort), so a throw inside it would
     // be silent.
-    if (!taskEmit) {
+    if (!itemsEmit) {
       if (opts.deviceLog) {
         console.warn(
           `[circle-sync] ${id}: skipping catch-up republish — a signed lane is required and no emitter `
@@ -1293,7 +1294,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // merges — idempotent) — except a roster row, which travels by its own proof-keeping carriers
       // and would otherwise overwrite the peer's proven addresses with this device's view of them.
       if (isRosterTrailItem(it)) continue;
-      try { if (it) taskEmit.snapshot(id, it); } catch { /* best-effort */ }
+      try { if (it) itemsEmit.snapshot(id, it); } catch { /* best-effort */ }
     }
   }
   // The owed RE-FAN — the durable outbox as a projection (no second store): at the first open of a
@@ -1406,6 +1407,20 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The registry handle, bridged OUT of the agents block for the host-skill ceremonies
   // (revokeDevice's tombstone write) — same outer-let idiom as its neighbours.
   let agentsRegistryRef = null;
+  // ONE WRITE AT A TIME PER PROFILE. A profile is written whole (lookup, change, register), so two writers of one profile
+  // at once lose one of them: a join's circle record went missing when a rename's write landed in between (the two-
+  // devices walk, 2026-10-26). Every read-modify-write of a profile takes its turn here; each reads what the one before
+  // it wrote. A failed write does not stop the next.
+  const profileTurns = new Map();
+  const profileTurn = (profileId, fn) => {
+    const key = typeof profileId === 'string' ? profileId : '';
+    const prev = profileTurns.get(key) ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(fn);
+    const settled = run.catch(() => {});
+    profileTurns.set(key, settled);
+    settled.then(() => { if (profileTurns.get(key) === settled) profileTurns.delete(key); });
+    return run;
+  };
   /** Whether THIS node runs a function profile (a household bot), from its own profile record — one read, every use. */
   const myProfileKind = async () => ((await agentsRegistryRef?.lookup?.('default').catch?.(() => null))?.kind === 'function' ? 'function' : 'person');
   // Patch the wrapped-key POINTER into an EXISTING circle-membership record. Set inside the block; a
@@ -1464,7 +1479,9 @@ export async function createRealHouseholdAgent(opts = {}) {
         let before = null;
         try { before = await agentsRegistry.lookup(entry.agentId); } catch { before = null; }
         if (!factsDiffer(before ?? {}, entry)) return rawRegister(entry);
-        const out = await rawRegister({ ...entry, properties: { ...(entry.properties ?? {}), [FACTS_AT_KEY]: factsStamp(nextFactsAt(profileFactsOf(before ?? {}).factsAt, Date.now())) } });
+        // stamped PER KEY: the facts that changed here take this time, the rest keep theirs (profileFacts.js)
+        const at = nextFactsAt(profileFactsOf(before ?? {}).factsAt, Date.now());
+        const out = await rawRegister(withProfileFacts(entry, { ...profileFactsOf(entry), factsAt: at, keyTimes: stampChangedFacts(before ?? {}, entry, at) }));
         try { profileFactsChanged?.(entry.agentId); } catch { /* the siblings ask on connect */ }
         return out;
       };
@@ -1494,13 +1511,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // FACET MERGE (the pure setter keeps handle/address). No-op if there is no record yet (nothing to
     // attach to) or the ref is absent. Only touches the OWN record; never carries a secret — `keyRef` is a
     // pod-URI pointer + posture, and every key still re-derives from the recovery phrase.
-    upsertCircleKeyRef = async (circleId, keyRef) => {
+    upsertCircleKeyRef = async (circleId, keyRef) => profileTurn('default', async () => {
       if (!circleId || !keyRef?.ref) return false;
       const cur = personas.has('default') ? await agentsRegistry.lookup('default') : null;
       if (!cur || !circleMembershipsOf(cur)[circleId]) return false;
       await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, { key: keyRef }) });
       return true;
-    };
+    });
 
     /* control ops — LIVE token binding (2026-07-09). hostAgent (the skills' home)
      * is the ISSUER: `issueCapabilityToken` signs with its identity and needs no other
@@ -1781,6 +1798,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         return releaseFromPolicy({ getProfile: (id) => byId[id] ?? null, profileId, defaultProfileId }, request, self?.disclosure ?? { perContext: {} }, contextId);
       },
     };
+    // each writer of a profile takes that profile's turn (see `profileTurn`)
+    for (const m of ['setProperty', 'setDriver', 'setCircleMembership', 'removeCircleMembership', 'setDisclosure']) {
+      const raw = agentsProfiles[m];
+      if (typeof raw === 'function') agentsProfiles[m] = (args) => profileTurn(args?.profileId, () => raw(args));
+    }
     for (const { id, handler, visibility } of buildAgentSkills({ registry: agentsRegistry, tokens: agentsTokens, versionStoreFor, catalogue: agentsCatalogue, profiles: agentsProfiles })) {
       hostAgent.register(id, handler, { visibility: TRUSTED_AGENT_OPS.has(id) ? 'trusted' : visibility });
     }
@@ -1847,9 +1869,9 @@ export async function createRealHouseholdAgent(opts = {}) {
      * is the convergence: "a request to a human IS a task."
      *
      * Wired as a PEER-FACING dispatcher op — same direct-register pattern as
-     * `addMember`/`resolveContact`; `from` is the A2A caller (requester A). It is NOT
+     * `resolveContact`; `from` is the A2A caller (requester A). It is NOT
      * on `manifest.js` (this is an agent-to-agent op, not a local chat/web surface —
-     * exactly like addMember), so it carries NO coverage-snapshot entry.
+     * exactly like resolveContact), so it carries NO coverage-snapshot entry.
      *
      * ARCHITECTURAL CHOICE — resolve the circle context at INVOCATION time inside the
      * handler, NOT by pre-projecting one skill per offering onto the AgentCard. A
@@ -1889,8 +1911,8 @@ export async function createRealHouseholdAgent(opts = {}) {
 
         // The recipient's task surface for THAT circle — the per-circle CircleItemStore
         // (the established accessor, as the household wired path uses). `recipient` is this
-        // device's local household member webid — the same local webid the addMember / seed
-        // / calendar host ops use, so the minted task's `forMember` is legible alongside them.
+        // device's local household member webid — the same local webid the seed / calendar
+        // host ops use, so the minted task's `forMember` is legible alongside them.
         const recipient = 'webid:local-demo-user';
         const taskStore = createTaskStore(householdService.stores.getStore(contextId), {});
 
@@ -1904,32 +1926,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
     }, { visibility: 'authenticated' });
   }
-
-  // v0.4 — household membership demo.  The real manifest declares
-  // `registerName` (writes a `contact` item); the legacy `/addmember`
-  // membership demo + the cross-app follow-up chain (followUps.js) still
-  // reference an `addMember` op, so keep a thin shim that records the member
-  // as a real contact item AND returns the `{memberName}` shape the demo +
-  // membership-redemption path expect.  (registerName is also wired above via
-  // the registry, reachable through the manifest's /register surface.)
-  hostAgent.register('addMember', async ({ parts, from }) => {
-    const args = parts?.[0]?.data ?? {};
-    const name = String(args.name ?? '').trim();
-    if (!name) {
-      return [DataPart({ ok: false, error: 'name required' })];
-    }
-    try {
-      await householdService.stores.getStore(homeCircleId).put(
-        { type: 'contact', text: name, addedBy: from ?? 'webid:local-demo-user' },
-        { by: from ?? 'webid:local-demo-user' },
-      );
-    } catch { /* defensive — the member reply doesn't depend on the write */ }
-    return [DataPart({
-      ok:         true,
-      message:    `✓ Added member: ${name}`,
-      memberName: name,
-    })];
-  });
 
   // v0.5 — snapshot factory for the J7 embed primitive. Consumed by
   // basis's /embed built-in.  Reads a real household item by id (or
@@ -2262,7 +2258,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
   });
   // THE PERSON'S OWN STORE (the own-devices scope): ONE per node — what the shell hands in (sealed on its medium),
-  // else in memory — read by the calendar's own appointments and a host's planned work. It rides the task lane
+  // else in memory — read by the calendar's own appointments and a host's planned work. It rides the items lane
   // between the person's OWN devices only: signed by this device's delegation key, verified by the device-set
   // binding, sealed in flight to the person's seal-to-self key (the one every enrolled device derives — the at-rest
   // key is per device and would not open on a sibling). A device that cannot sign (not enrolled) keeps it local.
@@ -2291,10 +2287,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   const ownLanes = () => [...personas.keys()].map(ownLaneOf);
   const ownSeal = recoverySealStrategy();
   function wireOwnLane() {
-    if (ownLaneWired || !ownStoreNow || !taskEmit) return;
+    if (ownLaneWired || !ownStoreNow || !itemsEmit) return;
     ownLaneWired = true;
     const valves = new Map();
-    const valveFor = (lane) => valves.get(lane) ?? valves.set(lane, routeTaskMirror({ circleId: lane, emitter: taskEmit })).get(lane);
+    const valveFor = (lane) => valves.get(lane) ?? valves.set(lane, routeItemsMirror({ circleId: lane, emitter: itemsEmit })).get(lane);
     // …and the composition hears what this node wrote there, as it hears a circle's writes (`opts.onCircleWrite`)
     const wrote = (item, removedId) => { try { opts.onCircleWrite?.(OWN_DEVICES_SCOPE, item ?? null, removedId); } catch { /* a listener never breaks a write */ } };
     wireStoreMirror(ownStoreNow, {
@@ -2303,7 +2299,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       publishItemRemoved: (rid, removed) => { const r = valveFor(ownLaneOf(selfOfOwnItem(removed))).publishItemRemoved(rid, removed); wrote(null, rid); return r; },
     });
     // what landed for it before it was open (parked on the log) is applied now
-    for (const lane of ownLanes()) Promise.resolve(taskRail?.rebuildHead?.(lane)).catch(() => {});
+    for (const lane of ownLanes()) Promise.resolve(itemsRail?.rebuildHead?.(lane)).catch(() => {});
   }
   const getOwnStore = () => (ownStoreMade ??= (async () => {
     ownStoreNow = await (typeof opts.ownStore === 'function' ? opts.ownStore() : createOwnDevicesStore());
@@ -2630,95 +2626,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // WHOSE CONTACT A ROW IS: the self it is filed under (`persona` on the row; none or the general persona's id = the
   // general persona). A self's book — its rows and the key bindings of their addresses — rides only that self's lane.
   const selfOfContactRow = (c) => (typeof c?.persona === 'string' && c.persona && c.persona !== primaryId && c.persona !== 'default' ? c.persona : null);
-  // A contact that LEFT a self here (re-filed under another): one own-store row, written AS the self it left, so that
-  // self's own-devices lane carries it to that self's devices only and catches them up. It says the webid and when,
-  // never the self it went to: the self that gained it learns that from the contact, on its own lane.
-  async function noteContactLeft(pid, webid, at) {
-    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
-    if (!by) throw new Error(`no self ${pid} on this device`);
-    const st = await getOwnStore();
-    return st.put({ type: 'contact-refile', id: `contact-refile:${by}:${webid}`, webid, left: true, at }, { by });
-  }
-  // The newest LEFT mark this self holds for a webid (its time), or null — read by the book's sibling-arrival gate.
-  async function contactLeftAt(pid, webid) {
-    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
-    if (!by || typeof webid !== 'string') return null;
-    try {
-      const rows = ((await (await getOwnStore()).listByType?.('contact-refile')) ?? []).filter((r) => r?.webid === webid && r?.createdBy === by && Number.isFinite(r?.at));
-      return rows.length ? Math.max(...rows.map((r) => r.at)) : null;
-    } catch { return null; }
-  }
-  // …and when the contact is filed (back) under that self, its left mark goes: the person chose it again, so a newer
-  // row of it must be let in.
-  async function clearContactLeft(pid, webid) {
-    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
-    if (!by || typeof webid !== 'string') return;
-    try { await (await getOwnStore()).delete(`contact-refile:${by}:${webid}`); } catch { /* none held */ }
-  }
-  // …and where one LANDS from a device of the person: the contact leaves this self's book here, only while this device
-  // still files it under that self and its own filing is older than the move (so arrival order does not matter). Its
-  // member row stays (a circle may still need the name).
-  async function applyContactLeft(scope, row) {
-    const self = selfOfOwnLane(scope);
-    if (self === null || typeof row?.webid !== 'string' || !Number.isFinite(row?.at)) return;
-    const pid = scope === OWN_DEVICES_SCOPE || self === primaryId ? null : self;
-    const mine = (await rawContacts()).find((c) => c?.webid === row.webid);
-    if (!mine || (selfOfContactRow(mine) ?? null) !== pid) return;
-    const myAt = Number.isFinite(mine.personaAt) ? mine.personaAt : -Infinity;
-    if (row.at > myAt) {
-      // never swallowed: a refusal is said, and the next landing of the row (a catch-up) tries again
-      const r = await rawPinboard('forgetContact', { webid: row.webid });
-      if (r?.error) console.warn(`[contacts] a contact that left this self stays in the book here (${String(row.webid).slice(0, 16)}…): ${r.error}`);
-    }
-  }
   const knownPeersSyncs = new Map();   // personaId → that persona's sync
   const makeKnownPeersSync = (pid) => {
     const rt = pid ? personas.get(pid) : null;
     if (pid && !rt?.chatId?.pubKey) return null;
     const mine = (c) => (selfOfContactRow(c) ?? null) === (pid ?? null);
-    const book = async () => (await rawContacts()).filter(mine);
     return createKnownPeersSync({
       siblings: pid ? () => personaSiblings(pid) : ownDeviceSiblings,
       selfPubKey: pid ? rt.chatId.pubKey : chatId.pubKey,
       // reached in a circle of THIS self's, as it (a persona's book never travels through the general persona's circles)
       sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, pid ?? null),
       snapshot: async () => {
+        // a self's bindings: its own contacts' keys; the general persona's also every binding no other self's contact
+        // owns (greetings of strangers, siblings) — never a persona's contacts' keys. The contact ROWS ride the own lane.
         const all = await rawContacts();
-        const ownBook = all.filter(mine);
+        const ownAddrs = new Set(all.filter(mine).map((c) => c?.webid).filter(Boolean));
         const others = new Set(all.filter((c) => !mine(c)).map((c) => c?.webid).filter(Boolean));
         const bindings = sa.agent.security?.peerBindings?.() ?? [];
-        // a self's book carries its own contacts' bindings; the general persona's also every binding no other self's
-        // contact owns (greetings of strangers, siblings) — never a persona's contacts' keys
-        const ownAddrs = new Set(ownBook.map((c) => c?.webid).filter(Boolean));
         const peers = pid ? bindings.filter((b) => ownAddrs.has(b?.address)) : bindings.filter((b) => !others.has(b?.address));
-        return { peers, contacts: ownBook };
+        return { peers };
       },
       learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
-      contacts: {
-        has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
-        // a landed row is filed under THIS self (the sibling set it came from says whose it is), whatever the row says —
-        // the general persona's lane files it under 'default' (an explicit undefined dropped the row's own 'default', and
-        // with it the person's choice of whom the contact talks to)
-        // DENY WINS BY TIME: a sibling's row of a contact that LEFT this self (a newer left mark than the row's own filing)
-        // is refused — a late catch-up from a device that has not heard of the move yet would otherwise bring it back
-        add: async (contact) => {
-          const leftAt = await contactLeftAt(pid ?? null, contact?.webid);
-          if (leftAt != null && leftAt > (Number.isFinite(contact?.personaAt) ? contact.personaAt : -Infinity)) {
-            console.info(`[contacts] a sibling's row for a contact that left this self was refused (${String(contact?.webid).slice(0, 16)}…)`);
-            return { refused: 'left-this-self' };
-          }
-          return rawPinboard('addContact', { ...contact, persona: pid ?? 'default' });
-        },
-        get: async (webid) => (await book()).find((c) => c?.webid === webid) ?? null,
-        // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-        setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
-        // …and a newer change of what the contact sees of the person (L125), by the same rule
-        setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawPinboard('setContactPersona', {
-          webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
-        }),
-        // …and a newer identity link to a household bot (or its undoing), by the same rule
-        setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
-      },
       onLanded: () => savePeerBindings(),
     });
   };
@@ -2730,7 +2658,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   const knownPeersSync = routeKnownPeersBySender({
     general: generalKnownPeers,
     others: () => [...personas.keys()].filter((pid) => pid !== primaryId && pid !== 'default').map(personaKnownPeers).filter(Boolean),
-    forContact: (c) => { const pid = selfOfContactRow(c); return pid ? (personas.has(pid) ? personaKnownPeers(pid) : null) : generalKnownPeers; },
     onRefused: (reason, from) => console.warn(`[known-peers] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
   });
   // A PROFILE'S FACTS, between the devices holding that self (profileFactsSync.js): per self, its siblings, sent as it.
@@ -2743,13 +2670,13 @@ export async function createRealHouseholdAgent(opts = {}) {
       siblings: general ? ownDeviceSiblings : () => personaSiblings(pid),
       sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, general ? null : pid),
       current: async () => { const e = await agentsRegistryRef?.lookup?.(pid); return e ? profileFactsOf(e) : null; },
-      store: async (facts) => {
+      store: (facts) => profileTurn(pid, async () => {
         const cur = await agentsRegistryRef?.lookup?.(pid);
         if (!cur) return false;
         factsLanding.add(pid);
         try { await agentsRegistryRef.register(withProfileFacts(cur, facts)); } finally { factsLanding.delete(pid); }
         return true;
-      },
+      }),
       onRefused: (reason, from) => console.warn(`[profile-facts] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
     });
     profileFactsSyncs.set(pid, s);
@@ -3914,12 +3841,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   /* Revokes OWED to a node (a contact deleted while the node was away): kept on the node's record in the person's own
    * registry (sealed, carried, restored with it), told at the next connect and whenever the node answers again. */
   const ownProfile = async () => { try { return await agentsRegistryRef?.lookup?.('default'); } catch { return null; } };
-  const writeOwnProperties = async (fn) => {
+  const writeOwnProperties = (fn) => profileTurn('default', async () => {
     const cur = await ownProfile();
     if (!cur || !agentsRegistryRef?.register) return false;
     await agentsRegistryRef.register({ ...cur, properties: fn(cur.properties ?? {}) });
     return true;
-  };
+  });
   let retrying = null;
   /** Tell the nodes what they are owed (one node, or all); a node that answers clears its debt. */
   function retryPendingRevokes(onlyNode = null) {
@@ -4787,13 +4714,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `rosterFold.superseded` to this and the rail drops those entries. A property on the reader, so nothing
     // between here and the fold has to learn a new name.
     membershipRead.compact = async (circleId, hashes) => { try { return membershipRail.compact(circleId, hashes); } catch { return 0; } };
-    // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
-    // full-item snapshot, fanned via broadcastCircleTask; receivers verify at their rail and causally merge
+    // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's items lane as a signed
+    // full-item snapshot, fanned via broadcastCircleItems; receivers verify at their rail and causally merge
     // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type
     // valve in ensureCircleSync below). `storeFor` peeks — it never BUILDS a store, so an inbound statement
     // for a circle this device hasn't opened parks on the log instead of caching a store without its
     // pod medium; the head converges when the circle opens and catch-up runs.
-    taskRail = makeTaskRail({
+    itemsRail = makeItemsRail({
       eventLog: opts.deviceLog,
       circleIdentityFor,
       myRef: circleSelfRef,   // in a persona's circle, the persona — beside its per-circle key
@@ -4814,36 +4741,32 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item, landing = {}) => {
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
-        if (isOwnLane(circleId) && item?.type === 'contact-refile') {
-          try { await applyContactLeft(circleId, item); } catch (err) { console.warn(`[contacts] a contact that left this self could not leave the book here: ${err?.message ?? err}`); }
-          return undefined;
-        }
         return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
       },
     });
-    taskEmit = makeTaskEmitter({
-      rail: taskRail,
+    itemsEmit = makeItemsEmitter({
+      rail: itemsRail,
       // Best-effort, but REPORTING: the fan's own contract is {sent, attempted, errors} and swallowing
       // it made a lost statement invisible (a claim fanned right after its task never reached the peer,
       // and nothing said so — 2026-08-20). Under-delivery and rejection both warn; catch-up reconciles
       // either way, but now the log says WHEN it will have to.
       // the person's own scope has no members to fan to: it reaches their other devices by the one carry, only
       fan: (circleId, statement) => (isOwnLane(circleId)
-        ? siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
-        : callSkill('pinboard', 'broadcastCircleTask', {
+        ? siblingCarry.carry({ subtype: ITEMS_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {})
+        : callSkill('pinboard', 'broadcastCircleItems', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).then((r) => {
         // my own write reaches my other devices by the one carry — after the member fan, never instead of it
-        siblingCarry.carry({ subtype: TASK_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {});
+        siblingCarry.carry({ subtype: ITEMS_BROADCAST, circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now() }).catch(() => {});
         if (r?.error || (r?.errors?.length ?? 0) > 0 || (r?.sent ?? 0) < (r?.attempted ?? 0)) {
-          console.warn(`[task-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
+          console.warn(`[items-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
             + ` hash=${statement.body.hash.slice(0, 8)}: sent=${r?.sent ?? 0}/${r?.attempted ?? 0}`
             + (r?.error ? ` error=${r.error}` : '')
             + ((r?.errors?.length ?? 0) > 0 ? ` errors=${JSON.stringify(r.errors).slice(0, 200)}` : ''));
         }
         return r;
       }, (err) => {
-        console.warn(`[task-lane] fan REJECTED for ${circleId} ${statement.body.kind}`
+        console.warn(`[items-lane] fan REJECTED for ${circleId} ${statement.body.kind}`
           + ` hash=${statement.body.hash.slice(0, 8)}:`, err?.message ?? err);
       })),
     });
@@ -4852,10 +4775,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // served to them only (a stranger asking gets nothing, sealed or not). The shells kick it on connect.
     {
       const replay = makeFrontierReplay({
-        rail: taskRail,
+        rail: itemsRail,
         sendToPeer: (to, payload, o) => sendToSibling(to, payload, o),
-        subtypes: OWN_TASK_CATCHUP_SUBTYPES,
-        statementsFor: (circleId) => taskRail.catchUpStatements(circleId),
+        subtypes: OWN_ITEMS_CATCHUP_SUBTYPES,
+        statementsFor: (circleId) => itemsRail.catchUpStatements(circleId),
         // each own lane to that lane's self's devices only
         mayServe: async (fromPeerAddr, circleId) => isOwnLane(circleId) && (await siblingsFor({ circleId })).includes(fromPeerAddr),
       });
@@ -4869,6 +4792,17 @@ export async function createRealHouseholdAgent(opts = {}) {
             }
           }
           return { requested };
+        },
+        /** A NEW DEVICE of mine at `address`: hand it every own lane it is a sibling on (served as to an empty
+         *  frontier, through the same serve gate a request passes). The moment a new sibling exists, as for the bindings. */
+        async pushTo(address) {
+          let served = 0;
+          for (const lane of ownLanes()) {
+            if (!(await siblingsFor({ circleId: lane }).catch(() => [])).includes(address)) continue;
+            await replay.onRequest(address, { subtype: OWN_ITEMS_CATCHUP_SUBTYPES.request, circleId: lane, frontier: [] });
+            served += 1;
+          }
+          return { served };
         },
       };
     }
@@ -5044,6 +4978,25 @@ export async function createRealHouseholdAgent(opts = {}) {
     // In a persona's circle both are the persona's: its per-circle key (`circleIdentityFor` routes through `personaOf`)
     // and its webid as the ref the roster verifies.
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: circleSelf(circleId).webid ?? chatId.pubKey }),
+    // The person's OWN profile (handle, display name, availability, place) is the persona record of the caller's self:
+    // the general persona's for this device's own webid, a persona's for that persona's webid, nothing for anyone else.
+    // the contact book's home: the own-devices store, a row written as the self it is filed under
+    contactStore: () => getOwnStore(),
+    contactSelfFor: (persona) => {
+      if (!persona || persona === 'default' || persona === primaryId) return { id: 'default', writer: chatId.pubKey };
+      const w = personas.get(persona)?.chatId?.pubKey;
+      return w ? { id: persona, writer: w } : null;
+    },
+    selfProfile: createRegistrySelfProfile({
+      registry: () => agentsRegistryRef,
+      turn: profileTurn,
+      profileIdOf: (webid) => {
+        if (typeof webid !== 'string' || !webid) return null;
+        if (webid === chatId.pubKey) return primaryId;
+        for (const [id, rt] of personas) if (rt?.chatId?.pubKey === webid) return id;
+        return null;
+      },
+    }),
     // ...and pinboard's local/foreign line in that circle is the persona (its `localActorIn`) — the host's own calls
     // about it arrive AS the persona (`pinboardActAs`).
     selfWebidFor: (circleId) => circleSelf(circleId).webid,
@@ -6027,7 +5980,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       // /brief contributor — derived from the wired store (the dissolved app has no briefSummary core).
       if (opId === 'household_briefSummary') return householdBriefSummary(circleId, tr);
-      // Everything else on the 'household' app-origin (calendar_* passthrough, addMember, getChoreSnapshot,
+      // Everything else on the 'household' app-origin (calendar_* passthrough, getChoreSnapshot,
       // resolveContact, help, registerName) is a hostAgent skill — route it there unchanged.
       const parts = [DataPart(args ?? {})];
       const result = await chatAgent.invoke(hostAgent.address, opId, parts);
@@ -6397,6 +6350,21 @@ export async function createRealHouseholdAgent(opts = {}) {
           realArgs = { ...realArgs, circleAddress: circleAddressFor(realArgs.groupId) };
         } catch { /* address derivation is additive — never block the redeem/create */ }
       }
+      // A founder proves their address in the creation statement, as a joiner proves theirs on the trail.
+      if (realOpId === 'createGroupV2' && typeof realArgs.circleAddress === 'string' && realArgs.circleAddress && !realArgs.circleAddressProof) {
+        try {
+          const proof = signCircleLinkFromSeed(deviceSeedFor(realArgs.groupId), realArgs.groupId, realArgs.groupId, realArgs.circleAddress);
+          if (proof) realArgs = { ...realArgs, circleAddressProof: proof };
+        } catch { /* unproven: the founder's row shows no address, as before the statement carried it */ }
+      }
+      // …and says their handle there, as a joiner does with the handle they join under: the founder never joins,
+      // so without it the founder is nameless on every other member's roster.
+      if (realOpId === 'createGroupV2' && !realArgs.peerDisplay) {
+        try {
+          const h = (await rawPinboard('whoAmI', {}))?.handle;
+          if (typeof h === 'string' && h.trim()) realArgs = { ...realArgs, peerDisplay: h.trim() };
+        } catch { /* a nameless founder, as before */ }
+      }
       // A FUNCTION PROFILE that FOUNDS says so in its own signed creation statement: the founder is the circle's
       // root authority, so the claim grants nothing it could not take. A person's create carries nothing.
       if (realOpId === 'createGroupV2' && realArgs.profileKind == null) {
@@ -6424,11 +6392,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         };
       }
       let rawReply = null;   // the pinboard reply before shaping — the own-devices fan below reads the contact row
-      // the row as it was filed BEFORE a lens change, so a move between selves can be told to the old self's devices
-      let contactBefore = null;
-      if (realOpId === 'setContactPersona' && typeof realArgs?.webid === 'string') {
-        try { contactBefore = (await rawContacts()).find((c) => c?.webid === realArgs.webid) ?? null; } catch { contactBefore = null; }
-      }
       const runPinboard = async () => {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(pinboardAgent.address, realOpId, parts, pinboardActAs(realArgs));
@@ -6448,29 +6411,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runPinboard);
       const out = await runPinboard();
       rosterReads.afterWrite(realOpId);
-      // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
-      // is a contact on the person's other devices too. Best-effort and after success.
-      if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
-        // added here again under a self that it once left: that self's left mark goes
-        clearContactLeft(selfOfContactRow(rawReply.contact) ?? null, rawReply.contact.webid).catch(() => {});
-        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
-      }
-      // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
-      // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
-      // way everywhere.
-      // …and what a contact sees of the person (L125), by the same carry: changed here, changed on every device.
-      if ((realOpId === 'setContactHidden' || realOpId === 'setContactPersona') && rawReply?.contact) {
-        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
-      }
-      // A contact RE-FILED under another self: the row rides the new self's lane (above); the OLD self's devices hear it
-      // left from a row on the own store, written as the old self — webid and when only, never which self it went to.
-      if (realOpId === 'setContactPersona' && rawReply?.contact && contactBefore
-          && (selfOfContactRow(contactBefore) ?? null) !== (selfOfContactRow(rawReply.contact) ?? null)) {
-        noteContactLeft(selfOfContactRow(contactBefore) ?? null, rawReply.contact.webid, rawReply.contact.personaAt ?? Date.now())
-          .catch((err) => console.warn(`[contacts] the old self's devices will not hear the contact left: ${err?.message ?? err}`));
-        // filed under its new self: a left mark that self held from an earlier move goes
-        clearContactLeft(selfOfContactRow(rawReply.contact) ?? null, rawReply.contact.webid).catch(() => {});
-      }
+      // A contact added, hidden or re-filed HERE reaches the person's other devices as its own-store row on the self's
+      // own-devices lane (lib/ContactBook.js): no carry of its own here.
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
       // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how
       // a contact learns it — one per circle, only where the row differs (the diff gate), a failing circle retried
@@ -8182,7 +8124,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // notify-envelope, which writes its payload into this agent's local pseudo-pod at whatever `ref` it names
         // before anything checks it — the pod that holds this agent's endorsements (the catalogue's trust). Any
         // address that could say hello on the relay could rewrite them. Nothing current sends the shape (items ride
-        // the signed task lane), so it stops here, counted, and writes nothing. The adapter and the mirror stay in
+        // the signed items lane), so it stops here, counted, and writes nothing. The adapter and the mirror stay in
         // the tree (kept mechanisms); the wire to them is what is cut.
         if (env?.payload && typeof env.payload === 'object' && Object.prototype.hasOwnProperty.call(env.payload, '__ntfyEnv')) {
           inboundRefused['old-envelope'] = (inboundRefused['old-envelope'] ?? 0) + 1;
@@ -8587,9 +8529,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
     // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
     rosterSeed,
-    // The task lane's rail (same contract): the shells register circle-task-broadcast + its catch-up pair
+    // The items lane's rail (same contract): the shells register circle-items-broadcast + its catch-up pair
     // over this instance; its ingest also causally merges the snapshot into the circle's store head.
-    taskRail,
+    itemsRail,
     // The chat lane's rail + emitter: the shells register circle-chat-statement + the windowed catch-up
     // over the rail, and their SEND sites call chatEmit (append-signed-render-entry + fan) instead of
     // the legacy append-then-fan pair.

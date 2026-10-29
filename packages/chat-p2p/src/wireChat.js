@@ -75,7 +75,7 @@ function freshNonce() {
  * @param {string | null} args.localStableId   my stableId (from agent.identity.stableId)
  */
 export function wireChat({
-  agent, itemStore, members, muted, metrics, localActor, localStableId,
+  agent, itemStore, members, contacts = null, muted, metrics, localActor, localStableId,
   // Connectivity Phase 2 / Wave B — host-injected hold-forward sender (basis's
   // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`). When wired, a 1:1 DM to a
   // briefly-offline peer is HELD locally and flushed on reconnect (the offline-ladder
@@ -216,8 +216,10 @@ export function wireChat({
       let isContact = false;
       let matchesSkills = false;
       try {
-        const sender = await members?.resolveByWebid(data.fromWebid);
-        isContact = sender?.relation === 'contact';
+        // the contact book when the host gives one (a book row IS a contact); else the member map's relation
+        isContact = typeof contacts?.get === 'function'
+          ? !!(await contacts.get(data.fromWebid))
+          : (await members?.resolveByWebid(data.fromWebid))?.relation === 'contact';
       } catch {}
       try {
         const post = {

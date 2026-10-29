@@ -22,7 +22,7 @@
  * bodies through `parentHash`/`deps`), serve the rest oldest-first up to `limit`. A frontier hash this
  * device PRUNED (entries age out; the store row is the durable head) marks nothing — the receiver may be
  * re-sent statements it already has, and its idempotent ingest drops them. `statementsFor` lets a lane
- * extend the serve set (the task lane adds sign-only snapshots of live heads whose entries aged out).
+ * extend the serve set (the items lane adds sign-only snapshots of live heads whose entries aged out).
  *
  * Paging: a batch tail with `more:true` makes the receiver re-request with its ADVANCED frontier — but
  * only when the previous round actually landed something new (the no-progress guard, so two peers that

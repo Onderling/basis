@@ -9,27 +9,6 @@
     "busy":      { "text": "Bezig…", "doc": "Generic in-flight status text shown while a skill call is running." },
     "error":     { "text": "Fout", "doc": "Generic error prefix shown before any API error message, e.g. 'Fout: invalid-mnemonic'." }
   },
-  "welcome": {
-    "page_title":     { "text": "Prikbord — Welkom", "doc": "Browser tab title for /welcome.html." },
-    "hero_title":     { "text": "Welkom bij Prikbord", "doc": "Hero heading on /welcome.html — first thing a brand-new user sees." },
-    "hero_intro":     { "text": "Een buurt-prikbord dat lokaal op jouw apparaat draait. Geen feed, geen reclame, jouw data blijft van jou.", "doc": "Hero subtitle. Three-line value prop." },
-    "new_title":      { "text": "Nieuwe account", "doc": "Title of the left-hand choice card on /welcome.html — link to /onboard.html." },
-    "new_body":       { "text": "Ik heb een uitnodigings-link of -code en wil voor het eerst lid worden van een groep.", "doc": "Description of the new-account choice." },
-    "restore_title":  { "text": "Bestaande account herstellen", "doc": "Title of the right-hand choice card on /welcome.html — link to /restore.html." },
-    "restore_body":   { "text": "Ik heb mijn herstelzin (12 of 24 woorden) van een ander apparaat. Ik wil hem hier opnieuw gebruiken.", "doc": "Description of the restore-account choice." },
-    "footer_hint":    { "text": "Geen voorkennis nodig — je doorloopt de stappen in een paar minuten. Je kunt later van apparaat wisselen door je herstelzin opnieuw te gebruiken.", "doc": "Reassurance footer at the bottom of /welcome.html." }
-  },
-  "privacy": {
-    "page_title":             { "text": "Prikbord — Privacy", "doc": "Browser tab title for /privacy.html." },
-    "heading":                { "text": "Privacy — wat je moet weten", "doc": "Main page heading on /privacy.html. (Renamed from 'title' 2026-05-07 to match the page-pattern convention.)" },
-    "intro":                  { "text": "Prikbord is een onderzoeks-preview. Onderstaande punten zijn nooit verstopt; ze gelden voor iedereen die meedoet.", "doc": "Lead paragraph on /privacy.html. Sets the 'this is a research preview' framing." },
-    "data_location_heading":  { "text": "Waar je data staat", "doc": "H3 above the data-location list on /privacy.html: which provider hosts what." },
-    "unset_value":            { "text": "— niet ingesteld —", "doc": "Placeholder shown next to a privacy-row label when no value is configured (e.g. no pod attached)." },
-    "row_relay_operator":     { "text": "Relay-operator", "doc": "Label for the relay operator row in the data-location list." },
-    "row_relay_url":          { "text": "Relay-server", "doc": "Label for the relay server URL row." },
-    "row_pod_issuer":         { "text": "Pod-aanbieder", "doc": "Label for the pod provider (Solid OIDC issuer) row." },
-    "row_pod_root":           { "text": "Pod-locatie", "doc": "Label for the pod root URL row." }
-  },
   "mine": {
     "page_title":     { "text": "Prikbord — Mijn posts", "doc": "Browser tab title for /mine.html." },
     "heading":        { "text": "Mijn posts", "doc": "Main page heading on /mine.html." },
@@ -51,17 +30,6 @@
     "signed_in_html":      { "text": "Aangemeld als <strong>{webid}</strong> — pod {podLabel}.", "doc": "Status line shown when signed in. Contains <strong> tag and two placeholders: {webid} (URL) and {podLabel} (status word from pod_attached / pod_not_attached). Preserve all." },
     "not_signed_in":       { "text": "Niet aangemeld bij een pod. Prikbord draait lokaal.", "doc": "Status line shown when no pod is attached." },
     "signed_out":          { "text": "Afgemeld.", "doc": "Confirmation shown after a successful sign-out." }
-  },
-  "metrics": {
-    "page_title":   { "text": "Prikbord — Metrics", "doc": "Browser tab title for /metrics.html." },
-    "heading":      { "text": "Gebruiks-tellers (lokaal)", "doc": "Main heading on /metrics.html. 'Gebruiks-tellers' = usage counters." },
-    "intro":        { "text": "Tellers van acties die deze agent in dit proces heeft gezien. In-memory — opnieuw nul bij herstart. Faciliteert beta-runbook § \"Operational metrics\".", "doc": "Lead paragraph on /metrics.html. Mentions the beta runbook and the in-memory nature of counters." },
-    "refresh":      { "text": "Vernieuw", "doc": "Refresh button on /metrics.html — triggers an immediate reload of counters." },
-    "empty":        { "text": "Nog geen tellers — er is nog niets gebeurd in deze sessie.", "doc": "Empty-state shown when the metrics map is empty (fresh process, no skill calls yet)." },
-    "col_event":    { "text": "Event", "doc": "Header of the first column in the metrics grid. The technical name of the counted event." },
-    "col_count":    { "text": "Aantal", "doc": "Header of the second column — number of times the event fired." },
-    "col_last":     { "text": "Laatste", "doc": "Header of the third column — timestamp of the most recent firing." },
-    "snapshot_at":  { "text": "Snapshot: {ts}", "doc": "Footer line under the metrics grid. {ts} is a locale-formatted timestamp." }
   },
   "errors": {
     "groupId_required":     "Kies eerst een groep.",
@@ -239,17 +207,6 @@
     "pod_attached":     { "text": "Pod is gekoppeld.", "doc": "Status under the signed-in line when the pod is fully attached." },
     "pod_not_attached": { "text": "Pod is nog niet gekoppeld.", "doc": "Status under the signed-in line when sign-in succeeded but pod-attach hasn't completed." }
   },
-  "auth_callback": {
-    "heading":         { "text": "Pod-aanmelding voltooien", "doc": "Heading on AuthCallbackScreen." },
-    "busy":            { "text": "Bezig met afronden van de OIDC-flow…", "doc": "Body shown while sign-in is wrapping up." },
-    "uploading":       { "text": "Lokale data wordt geüpload naar je pod…", "doc": "Body shown while bulk-sync is running." },
-    "done":            { "text": "Klaar.", "doc": "Body shown when bulk-sync finished cleanly." },
-    "error":           { "text": "Er ging iets mis tijdens de eerste sync.", "doc": "Body shown when bulk-sync failed." },
-    "progress":        { "text": "{done} van {total} ({pct}%)", "doc": "Progress label under the bar." },
-    "go_feed":         { "text": "Naar Prikbord", "doc": "CTA after sync completes." },
-    "skip":            { "text": "Sluit en ga naar Prikbord", "doc": "CTA before sync completes." },
-    "no_active_group": { "text": "Geen actieve bundle.", "doc": "Defensive empty state." }
-  },
   "onboard_join": {
     "heading":             { "text": "Aansluiten bij groep", "doc": "Heading on OnboardJoinScreen — receiver-side of the QR-scan flow." },
     "body":                { "text": "Groep-id:", "doc": "Body line on OnboardJoinScreen, followed by the groupId value." },
@@ -393,14 +350,9 @@
     "saving":                 { "text": "Opslaan…", "doc": "Generic in-flight label on mobile ProfileMineScreen submit buttons." },
     "holiday_label":          { "text": "Vakantie-modus", "doc": "Label next to the holiday-mode toggle on mobile ProfileMineScreen." },
     "holiday_hint":           { "text": "Verberg je profiel tijdelijk: buren zien je niet als beschikbare match en push-meldingen pauzeren tot je het weer uitzet.", "doc": "Hint under the holiday-mode toggle on ProfileMineScreen explaining what the toggle does." },
-    "holiday_on":             { "text": "Aan", "doc": "Holiday-mode toggle label when the flag is set." },
-    "holiday_off":            { "text": "Uit", "doc": "Holiday-mode toggle label when the flag is unset." },
-    "location_heading":       { "text": "Locatie", "doc": "H2 above the location section on mobile ProfileMineScreen." },
     "location_unset":         { "text": "Geen locatie ingesteld.", "doc": "Body text when the user has not set a location." },
     "location_capture":       { "text": "Locatie ophalen", "doc": "CTA on mobile ProfileMineScreen that triggers GPS via expo-location." },
     "location_busy":          { "text": "Ophalen…", "doc": "CTA label while expo-location is in flight." },
-    "location_clear":         { "text": "Wissen", "doc": "Ghost button on mobile ProfileMineScreen that drops the user's location." },
-    "recovery_heading":       { "text": "Herstelzin", "doc": "H2 above the recovery section on mobile ProfileMineScreen." },
     "recovery_intro":         { "text": "Bewaar je herstelzin op een veilige plek. Je hebt hem nodig om Prikbord op een ander toestel te installeren.", "doc": "Body explanation under the recovery heading." },
     "recovery_close":         { "text": "Sluiten", "doc": "Confirm-modal label on the recovery-reveal modal." },
     "recovery_unavailable":   { "text": "Recovery-export niet beschikbaar in deze build.", "doc": "Inline error when the recovery skill is missing or unwired." },
@@ -618,7 +570,6 @@
     "name_placeholder":     { "text": "bv. Oosterpoort Skills", "doc": "Placeholder for the display-name input on mobile." },
     "purpose_label":        { "text": "Waar is de groep voor? (optioneel)", "doc": "Label for the purpose textarea on mobile." },
     "purpose_placeholder":  { "text": "bv. Buurtgenoten in Oosterpoort die elkaar willen helpen.", "doc": "Placeholder for the purpose textarea on mobile." },
-    "submit":               { "text": "Maak groep", "doc": "Submit CTA on mobile CreateGroupScreen." },
     "creating":             { "text": "Maken…", "doc": "CTA label while createGroupV2 is in flight." },
 
     "group_id_label": { "text": "Group-id (intern; lowercase)", "doc": "Field label for the technical group-id input. Lowercase only — used in pod paths." },
@@ -746,57 +697,25 @@
     "heading":                { "text": "Instellingen", "doc": "Main page heading on /settings.html." },
     "intro":                  { "text": "Prikbord bewaart je instellingen op twee plekken: dingen die <em>op dit apparaat</em> horen (zoals hoe vaak je telefoon ververst) blijven lokaal; <em>mijn voorkeuren</em> reizen via je pod mee naar al je apparaten.", "doc": "Lead paragraph explaining the device/shared split. Contains <em> tags — keep them so the emphasis is preserved." },
 
-    "section_device_title":   { "text": "Op dit apparaat", "doc": "Section heading for device-scoped settings (V2.5 Phase 33). Stays local to this install." },
-    "badge_device":           { "text": "apparaat", "doc": "Small badge next to the device-section heading. Single word; should signal 'this device only'." },
-    "section_device_hint":    { "text": "Deze instellingen horen bij dít apparaat. Op je telefoon en je laptop kunnen ze verschillen.", "doc": "Subtitle under the device-section heading. Reassures the user the values can differ across their installs." },
 
-    "section_shared_title":   { "text": "Mijn voorkeuren", "doc": "Section heading for shared / pod-portable settings (V2.5 Phase 33). Travels with the user." },
-    "badge_shared":           { "text": "synct met al je apparaten", "doc": "Small badge next to the shared-section heading. Should signal 'syncs across devices'." },
-    "section_shared_hint":    { "text": "Deze voorkeuren horen bij jou — niet bij dit apparaat. Als je inlogt op je pod, reizen ze automatisch mee naar je andere apparaten.", "doc": "Subtitle under the shared-section heading. Tells the user pod-sign-in is what enables cross-device sync." },
     "section_privacy_title":  { "text": "Privacy & identiteit", "doc": "Heading of the privacy-and-identity settings section (#243, 2026-05-24)." },
     "section_privacy_hint":   { "text": "Lokale beheers-acties: gedempte contacten weer aanzetten, en je netwerk-adres roteren (handig na een lek of als je even rust wilt van een specifieke contactketen).", "doc": "Subtitle under the privacy-and-identity section heading." },
     "muted_label":            { "text": "Gedempte contacten", "doc": "Row label for the local muted-peers list on the privacy-and-identity section." },
     "muted_hint":             { "text": "Posts en chat van deze peers worden lokaal verborgen. Demping is alleen op dit account zichtbaar — de peers weten het niet.", "doc": "Hint under the muted-contacts row." },
     "muted_empty":            { "text": "Geen gedempte contacten.", "doc": "Empty-state line shown when listMutedPeers returns zero entries." },
 
-    "poll_interval_label":    { "text": "Hoe vaak het prikbord ververst", "doc": "Label for the polling-interval select. Device-scoped." },
-    "poll_interval_hint":     { "text": "Lager = sneller nieuwe posts zien; hoger = zuiniger met data en accu.", "doc": "Hint under the polling-interval label. Trade-off summary: faster vs. battery." },
-    "poll_2s":                { "text": "elke 2 sec (live)", "doc": "Polling option: 2 seconds. The '(live)' annotation marks it as the always-on default." },
-    "poll_10s":               { "text": "elke 10 sec", "doc": "Polling option: 10 seconds." },
-    "poll_1m":                { "text": "elke minuut", "doc": "Polling option: 1 minute." },
-    "poll_5m":                { "text": "elke 5 min", "doc": "Polling option: 5 minutes (mobile-friendly)." },
 
-    "hop_label":              { "text": "Hop-relay (globaal)", "doc": "Label for the global hop-relay toggle. Device-scoped because it's a per-machine routing decision." },
-    "hop_hint":               { "text": "Mag mijn apparaat berichten doorrelay'en voor andere mensen? Standaard <em>uit</em>: dan doet niemand dat via jou. Per-contact-instelling staat op de contacten-pagina.", "doc": "Hint under the hop-relay toggle. Default-off explanation + cross-link to /contacts.html. Contains <em> tags." },
-    "toggle_on":              { "text": "Aan", "doc": "Generic 'on' label next to a toggle. Reused across multiple toggles on /settings.html." },
 
-    "online_window_heading":  { "text": "Online-window (mobiel)", "doc": "Sub-heading inside the device section for the mobile-only online-window controls." },
-    "online_window_hint":     { "text": "Op telefoon (V3): hoe vaak en hoe lang mag mijn agent zich tijdelijk verbinden met de relay? Op desktop genegeerd — daar is de agent altijd online.", "doc": "Hint paragraph under the online-window heading. Mobile-only feature description." },
-    "online_every_label":     { "text": "Window-frequentie", "doc": "Label for the online-window 'every X minutes' field. Device-scoped." },
-    "online_every_hint":      { "text": "Eens per X minuten verbinden. Leeg = altijd verbonden (V2 desktop default).", "doc": "Hint under the window-frequency input. Explains empty-means-always." },
-    "online_duration_label":  { "text": "Window-duur", "doc": "Label for the online-window 'duration in seconds' field. Device-scoped." },
-    "online_duration_hint":   { "text": "Aantal seconden online per window.", "doc": "Hint under the window-duration input." },
-    "online_empty_placeholder":{ "text": "leeg", "doc": "Placeholder text in the online-window number inputs when no value is set. Should signal 'optional / unset'." },
 
-    "broadcastable_label":    { "text": "Auto-aanbod-match", "doc": "Label for the broadcastable toggle. Shared-scoped." },
-    "broadcastable_hint":     { "text": "Mag een onbekend contact mij een aanbod-suggestie sturen die door mijn agent gefilterd wordt? Bij een match krijg je een melding; geen match = stilte.", "doc": "Hint under the auto-offer-match toggle. Explains the filtering + match-only-notification semantics." },
 
-    "default_share_location_label": { "text": "Standaard locatie delen met nieuwe contacten?", "doc": "Label for the default-share-location toggle. Shared-scoped." },
-    "default_share_location_hint":  { "text": "Bepaalt of <code>shareLocation</code> default aan staat als je iemand toevoegt. Per-contact altijd handmatig aan/uit te zetten.", "doc": "Hint under the default-share-location toggle. Contains <code> tag for the field name." },
 
-    "feedback_saving":        { "text": "Opslaan…", "doc": "Inline feedback text shown while a settings save is in flight." },
-    "feedback_saved":         { "text": "Opgeslagen.", "doc": "Inline feedback text shown after a successful settings save." },
 
-    "shared_heading":         { "text": "Gedeeld (alle toestellen)", "doc": "Mobile section heading for the cross-device portion of settings (Pinboard V3 mobile)." },
-    "device_heading":         { "text": "Dit toestel", "doc": "Mobile section heading for the per-device portion (Pinboard V3 mobile)." },
     "privacy_heading":        { "text": "Privacy & meldingen", "doc": "Mobile section heading on SettingsScreen (Pinboard V3 mobile)." },
     "handle":                 { "text": "Handle", "doc": "Label for the user handle row on mobile SettingsScreen." },
     "display_name":           { "text": "Naam", "doc": "Label for the displayName row on mobile SettingsScreen." },
     "location":               { "text": "Locatie", "doc": "Label for the location row on mobile SettingsScreen." },
     "location_unset":         { "text": "—", "doc": "Empty marker when no location is set on mobile SettingsScreen." },
     "edit_profile":           { "text": "Bewerk profiel", "doc": "CTA on mobile SettingsScreen — navigates to ProfileMine." },
-    "poll_interval":          { "text": "Pollinterval (ms)", "doc": "Label for the pollIntervalMs input on mobile SettingsScreen." },
-    "poll_hint":              { "text": "Tussen {min}-{max} ms. Mobiel-default: {def} ms (batterijbewust).", "doc": "Inline hint under the poll-interval input on mobile." },
     "save":                   { "text": "Opslaan", "doc": "Submit button on mobile SettingsScreen." },
     "saving":                 { "text": "Opslaan…", "doc": "Submit button label while in flight on mobile." },
     "push_link":              { "text": "Meldingen", "doc": "Link to PushScreen from mobile SettingsScreen." },
@@ -821,19 +740,7 @@
     "rotate_done":            { "text": "Geroteerd. Nieuw adres: {pk}", "doc": "Success line after rotation." },
     "confirm_rotate_title":   { "text": "Roteer netwerk-adres?", "doc": "ConfirmModal title before rotation." },
     "confirm_rotate_body":    { "text": "Je publieke sleutel wordt vervangen. Berichten van peers die de rotatie nog niet kennen worden 7 dagen lang met je oude sleutel ontsleuteld (genade-periode). Dit is een privacy-maatregel — niet ongedaan te maken.", "doc": "ConfirmModal body before rotation." },
-    "confirm_rotate_yes":     { "text": "Roteer", "doc": "Destructive confirm label." },
-    "broadcastable":          { "text": "Anderen mogen me aanbod-suggesties sturen", "doc": "Shared toggle." },
-    "broadcastable_hint":     { "text": "Aan = je krijgt voorgestelde matches uit de bredere connectielijst (groepen + contacten + hops). Uit = stilte.", "doc": "Hint under the broadcastable toggle." },
-    "default_share_location": { "text": "Locatie standaard delen met nieuwe contacten", "doc": "Shared toggle." },
-    "default_share_location_hint": { "text": "Per-contact altijd handmatig aan/uit te zetten.", "doc": "Hint under the default-share-location toggle." },
-    "online_window_heading":  { "text": "Online-venster (achtergrond)", "doc": "Sub-section heading." },
-    "online_window_hint":     { "text": "Hoe vaak en hoe lang verbindt je telefoon op de achtergrond? Leeg = altijd via push.", "doc": "Hint above the online-window inputs." },
-    "every_minutes":          { "text": "elke X min", "doc": "Sub-label for the everyMinutes input." },
-    "duration_sec":           { "text": "duur (sec)", "doc": "Sub-label for the durationSec input." },
-    "hop_label":              { "text": "Sta hop-relay door mijn toestel toe", "doc": "Toggle on mobile SettingsScreen." },
-    "hop_hint":               { "text": "Mag mijn toestel berichten voor anderen doorgeven? Default uit (zuinig met batterij).", "doc": "Hint under the hop toggle." },
-    "error_every":            { "text": "Frequentie moet ≥ 1 minuut zijn.", "doc": "Inline error for invalid everyMinutes." },
-    "error_duration":         { "text": "Duur moet ≥ 5 seconden zijn.", "doc": "Inline error for invalid durationSec." }
+    "confirm_rotate_yes":     { "text": "Roteer", "doc": "Destructive confirm label." }
   },
   "restore": {
     "page_title":           { "text": "Account herstellen op dit apparaat", "doc": "Browser tab title + main page heading on /restore.html — the recovery-from-mnemonic flow." },

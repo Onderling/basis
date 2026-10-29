@@ -3,7 +3,7 @@
  *
  * Keyed by the own-devices scope (the scope the grants lane already rides between a person's enrolled devices), so
  * that when it fans it reaches exactly those devices — a person's phone and web app, a bot and its companion — without
- * a rename or a move. It rides the task lane under that scope, fanned by the sibling carry only (a person's enrolled
+ * a rename or a move. It rides the items lane under that scope, fanned by the sibling carry only (a person's enrolled
  * devices; there is no roster) and caught up from siblings; a household bot has no siblings, so there it stays local.
  * On a household bot it holds the bot's own rows and the rows of the people it is the device for (a Telegram-only
  * person has no device of their own). Sealed at rest like every content store on the box.

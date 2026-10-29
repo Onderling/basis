@@ -10,8 +10,9 @@ import { attachEntriesFor } from '../../src/v2/attachEntries.js';
 describe('offered features', () => {
   it('the settings toggles leave out features with no built surface', () => {
     const f = offeredFeatures();
-    for (const gone of ['lists', 'notes', 'calendar']) expect(f).not.toContain(gone);
-    for (const kept of ['chat', 'noticeboard', 'tasks', 'houseRules', 'memberDirectory']) expect(f).toContain(kept);
+    for (const gone of ['notes', 'calendar']) expect(f).not.toContain(gone);
+    // lists have a surface again: the circle screen's lists block
+    for (const kept of ['chat', 'noticeboard', 'tasks', 'lists', 'houseRules', 'memberDirectory']) expect(f).toContain(kept);
   });
 
   it("the '+' leaves out an entry whose op requires a feature with no surface", () => {
@@ -22,5 +23,13 @@ describe('offered features', () => {
     const ids = attachEntriesFor({ manifestsByOrigin: { x: manifest } }).map((e) => e.opId);
     expect(ids).toContain('addTask');
     expect(ids).not.toContain('createList');
+  });
+
+  it("the '+' offers making a list only where the circle's screen carries the lists block", () => {
+    const manifest = { operations: [
+      { id: 'createList', requires: ['lists'], surfaces: { attach: { label: 'circle.attach.new_list', group: 'create' } } },
+    ] };
+    expect(attachEntriesFor({ manifestsByOrigin: { x: manifest }, blockTypes: ['tasks'] }).map((e) => e.opId)).toEqual([]);
+    expect(attachEntriesFor({ manifestsByOrigin: { x: manifest }, blockTypes: ['tasks', 'lists'] }).map((e) => e.opId)).toEqual(['createList']);
   });
 });

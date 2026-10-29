@@ -398,7 +398,7 @@ import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPend
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
-  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe,
+  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe, blockTypesOnScreen,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
@@ -6960,15 +6960,19 @@ function showCircle(id, circle, policy) {
   // The menu as it stands NOW: rebuilt when the availability lands and again when the sealed-media path resolves —
   // built once, before media resolved, it left the file entry out of the "+" for good while the composer had the
   // media pipeline all along (no photo could be attached in a circle).
+  // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
+  let circleBlockTypesNow = [];
   const circleAttachEntriesNow = () => attachEntriesFor({
     manifestsByOrigin: circleManifestsByOrigin ?? {},
     availability: circleAvailabilityNow,
     mediaWired: !!circleMedia,
+    blockTypes: circleBlockTypesNow,
   });
   (async () => {
     try {
       const av = await circleOpAvailability(id);
       circleAvailabilityNow = av;
+      try { circleBlockTypesNow = blockTypesOnScreen(await recipeStore.get(id), DEFAULT_SCREEN_RECIPE); } catch { circleBlockTypesNow = []; }
       // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard
@@ -8091,9 +8095,11 @@ function showRecipeEditor(circleId) {
   // wires the per-block modal automatically.
   let incomingRecipe = null;
 
+  let circlePolicy;   // the circle's policy: the palette offers a feature's block only where that feature is on
   const refresh = async () => {
     try { book = await recipeStore.get(circleId); }
     catch { book = { recipes: [], activeId: null }; }
+    try { circlePolicy = (await policyStore.get(circleId)) ?? {}; } catch { circlePolicy = {}; }
     if (mode === 'recipe' && !book.recipes.some((r) => r.id === editingRecipeId)) {
       mode = 'book'; editingRecipeId = null;
     }
@@ -8123,7 +8129,7 @@ function showRecipeEditor(circleId) {
 
   const rerender = () => {
     renderRecipeEditor(rootEl, {
-      book, mode, editingRecipeId, t,
+      book, mode, editingRecipeId, t, policy: circlePolicy,
       // γ-next.recipe — broadcast cache → editor → γ.3 resolver.  The
       // resolver is opt-in; when `incomingRecipe` is null the editor
       // renders untouched.  Applied / discarded both clear the cache.

@@ -222,7 +222,7 @@ function makeInput(field, doc) {
     }
     case 'boolean': {
       const i = doc.createElement('input');
-      i.type = 'checkbox';
+      i.type = 'checkbox';   // sets: form — a boolean argument of the op this form submits
       return i;
     }
     case 'enum': {

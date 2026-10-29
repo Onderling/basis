@@ -62,6 +62,7 @@ export function renderRecipeEditor(container, {
   mode = 'book',
   editingRecipeId = null,
   t,
+  policy,   // the circle's policy: a feature's block is offered only where that feature is on (absent: every block)
   onOpenRecipe, onBackToBook, onBack,
   onAddRecipe, onRenameRecipe, onRemoveRecipe, onSetActive,
   onAddBlock, onRemoveBlock, onMoveBlock, onUpdateBlock,
@@ -79,7 +80,7 @@ export function renderRecipeEditor(container, {
 
   if (mode === 'recipe') {
     renderRecipeMode(container, {
-      book, recipeId: editingRecipeId, tr,
+      book, recipeId: editingRecipeId, tr, policy,
       onBackToBook, onAddBlock, onRemoveBlock, onMoveBlock, onUpdateBlock,
     });
   } else {
@@ -320,7 +321,7 @@ function renderRecipeRow(recipe, {
 /* ─────────────────────────────────────────────────────────────────────── */
 
 function renderRecipeMode(container, {
-  book, recipeId, tr,
+  book, recipeId, tr, policy,
   onBackToBook, onAddBlock, onRemoveBlock, onMoveBlock, onUpdateBlock,
 }) {
   const recipe = book.recipes.find((r) => r.id === recipeId);
@@ -372,7 +373,7 @@ function renderRecipeMode(container, {
   palette.appendChild(paletteTitle);
 
   // a circle's editor offers the circle's blocks only (the block table says where each may live)
-  const sortedTypes = blockTypesFor('circle');
+  const sortedTypes = blockTypesFor('circle', { policy });
   for (const type of sortedTypes) {
     const meta = BLOCK_DESCRIPTORS[type];
     const btn = document.createElement('button');
@@ -531,7 +532,7 @@ function renderCompactToggle(block, { tr, emit }) {
   const row = document.createElement('label');
   row.className = 'circle-recipe-editor__compact-row';
   const cb = document.createElement('input');
-  cb.type = 'checkbox';
+  cb.type = 'checkbox';   // sets: store:recipe — the circle's recipe block, fanned to its members
   cb.className = 'circle-recipe-editor__compact-checkbox';
   cb.checked = block.config?.compact === true;
   cb.addEventListener('change', () => emit({ compact: cb.checked }));

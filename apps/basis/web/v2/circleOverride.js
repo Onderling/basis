@@ -176,7 +176,7 @@ function toggleRow({ cls, key, checked, label, onToggle }) {
   const row = document.createElement('label');
   row.className = cls;
   const box = document.createElement('input');
-  box.type = 'checkbox';
+  box.type = 'checkbox';   // sets: store:member-override — your own override for this circle, saved on Save
   box.checked = checked;
   box.dataset.key = key;
   box.addEventListener('change', () => onToggle(box.checked));

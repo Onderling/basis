@@ -188,7 +188,7 @@ describe('renderRecipeEditor · α.1d.1 — RECIPE mode', () => {
       editingRecipeId: r.id, t, onAddBlock,
     });
     const buttons = el.querySelectorAll('.circle-recipe-editor__palette-btn');
-    expect(buttons.length).toBe(8);  // 8 BLOCK_TYPES (α.4 added 'tasks'; D1 added 'quickActions')
+    expect(buttons.length).toBe(9);  // the circle's 9 block types (tasks, quickActions, then lists added)
     buttons[0].click();   // first in registry order = quickActions (order 0)
     expect(onAddBlock).toHaveBeenCalledWith(r.id, 'quickActions');
   });

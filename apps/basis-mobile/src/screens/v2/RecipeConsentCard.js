@@ -88,7 +88,7 @@ export default function RecipeConsentCard({ model, visible, onAgree, onDecline }
                 {optItems.map((item) => (
                   <View key={item.key} style={styles.optRow} testID={`recipe-consent-opt-${item.key}`}>
                     <Text style={styles.optLabel}>{capLabel(item)}</Text>
-                    <Switch
+                    <Switch /* sets: form — a capability this consent keeps or declines */
                       trackColor={{ true: theme.color.accent, false: theme.color.trackOff }}
                       thumbColor={theme.color.white}
                       value={checked[item.key] ?? !item.optedOut}

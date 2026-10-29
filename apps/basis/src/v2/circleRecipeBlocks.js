@@ -30,6 +30,7 @@
  */
 
 import { BLOCK_TYPES } from './circleRecipe.js';
+import { isFeatureEnabled } from './circlePolicy.js';
 import { circleRows, stampSenderLabels } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { enabledFeatures } from './circlePolicy.js';
@@ -70,6 +71,7 @@ export async function materializeBlock({ block, circleId, hostOps = {} } = {}) {
       case 'noticeboard':  return await materializeNoticeboard(block, circleId, hostOps);
       case 'calendar':       return await materializeAgenda(block, hostOps);
       case 'tasks':        return await materializeTasks(block, circleId, hostOps);
+      case 'lists':        return await materializeLists(block, circleId, hostOps);
       case 'rules':        return await materializeRules(block, circleId, hostOps);
       default:             return errorOut(block.id, block.type, 'unhandled type');
     }
@@ -276,6 +278,31 @@ async function materializeTasks(block, circleId, { callSkill, myWebid, fetchImpl
     // α.5c — surface the compact flag so the renderer can tighten rows.
     config: { compact: block.config?.compact === true },
   };
+}
+
+/**
+ * The lists block — the circle's lists, each with its open entries, read through the lists' own ops (`listLists`, then
+ * `listEntries` per list). Caps to `limit` lists. A failing read is an empty block, never an error page.
+ */
+async function materializeLists(block, circleId, { callSkill, policy } = {}) {
+  const limit = clampInt(block.config?.limit, 1, 20, 5);
+  const empty = { blockId: block.id, type: 'lists', status: 'empty', content: { lists: [] }, config: { compact: block.config?.compact === true } };
+  // the feature is the circle's policy (an admin's statement): off, the block still on the screen says so, quietly
+  if (policy !== undefined && !isFeatureEnabled(policy, 'lists')) return { ...empty, content: { lists: [], off: true } };
+  if (typeof callSkill !== 'function' || !circleId) return empty;
+  const res = await callSkill('lists', 'listLists', { circleId });
+  const found = res?.ok !== false && Array.isArray(res?.items) ? res.items.slice(0, limit) : [];
+  if (!found.length) return empty;
+  const lists = await Promise.all(found.map(async (l) => {
+    const r = await callSkill('lists', 'listEntries', { circleId, list: l.id }).catch(() => null);
+    const entries = (r?.ok !== false && Array.isArray(r?.items) ? r.items : []).map((e) => ({
+      id: e.id, label: e.label ?? '', done: e.done === true,
+      // an open entry's one act: ticked off, through the lists' own op (the same act /list-done takes)
+      ...(e.done === true ? {} : { primary: { kind: 'op', app: 'lists', opId: 'markListItemDone', args: { circleId, item: e.id, list: l.id }, labelKey: 'circle.vandaag.act_done' } }),
+    }));
+    return { id: l.id, title: r?.title ?? l.label ?? l.id, entries };
+  }));
+  return { ...empty, status: 'ok', content: { lists } };
 }
 
 function assigneeMatches(task, myWebid) {

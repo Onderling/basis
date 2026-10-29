@@ -2626,95 +2626,27 @@ export async function createRealHouseholdAgent(opts = {}) {
   // WHOSE CONTACT A ROW IS: the self it is filed under (`persona` on the row; none or the general persona's id = the
   // general persona). A self's book — its rows and the key bindings of their addresses — rides only that self's lane.
   const selfOfContactRow = (c) => (typeof c?.persona === 'string' && c.persona && c.persona !== primaryId && c.persona !== 'default' ? c.persona : null);
-  // A contact that LEFT a self here (re-filed under another): one own-store row, written AS the self it left, so that
-  // self's own-devices lane carries it to that self's devices only and catches them up. It says the webid and when,
-  // never the self it went to: the self that gained it learns that from the contact, on its own lane.
-  async function noteContactLeft(pid, webid, at) {
-    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
-    if (!by) throw new Error(`no self ${pid} on this device`);
-    const st = await getOwnStore();
-    return st.put({ type: 'contact-refile', id: `contact-refile:${by}:${webid}`, webid, left: true, at }, { by });
-  }
-  // The newest LEFT mark this self holds for a webid (its time), or null — read by the book's sibling-arrival gate.
-  async function contactLeftAt(pid, webid) {
-    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
-    if (!by || typeof webid !== 'string') return null;
-    try {
-      const rows = ((await (await getOwnStore()).listByType?.('contact-refile')) ?? []).filter((r) => r?.webid === webid && r?.createdBy === by && Number.isFinite(r?.at));
-      return rows.length ? Math.max(...rows.map((r) => r.at)) : null;
-    } catch { return null; }
-  }
-  // …and when the contact is filed (back) under that self, its left mark goes: the person chose it again, so a newer
-  // row of it must be let in.
-  async function clearContactLeft(pid, webid) {
-    const by = pid ? personas.get(pid)?.chatId?.pubKey : chatId.pubKey;
-    if (!by || typeof webid !== 'string') return;
-    try { await (await getOwnStore()).delete(`contact-refile:${by}:${webid}`); } catch { /* none held */ }
-  }
-  // …and where one LANDS from a device of the person: the contact leaves this self's book here, only while this device
-  // still files it under that self and its own filing is older than the move (so arrival order does not matter). Its
-  // member row stays (a circle may still need the name).
-  async function applyContactLeft(scope, row) {
-    const self = selfOfOwnLane(scope);
-    if (self === null || typeof row?.webid !== 'string' || !Number.isFinite(row?.at)) return;
-    const pid = scope === OWN_DEVICES_SCOPE || self === primaryId ? null : self;
-    const mine = (await rawContacts()).find((c) => c?.webid === row.webid);
-    if (!mine || (selfOfContactRow(mine) ?? null) !== pid) return;
-    const myAt = Number.isFinite(mine.personaAt) ? mine.personaAt : -Infinity;
-    if (row.at > myAt) {
-      // never swallowed: a refusal is said, and the next landing of the row (a catch-up) tries again
-      const r = await rawPinboard('forgetContact', { webid: row.webid });
-      if (r?.error) console.warn(`[contacts] a contact that left this self stays in the book here (${String(row.webid).slice(0, 16)}…): ${r.error}`);
-    }
-  }
   const knownPeersSyncs = new Map();   // personaId → that persona's sync
   const makeKnownPeersSync = (pid) => {
     const rt = pid ? personas.get(pid) : null;
     if (pid && !rt?.chatId?.pubKey) return null;
     const mine = (c) => (selfOfContactRow(c) ?? null) === (pid ?? null);
-    const book = async () => (await rawContacts()).filter(mine);
     return createKnownPeersSync({
       siblings: pid ? () => personaSiblings(pid) : ownDeviceSiblings,
       selfPubKey: pid ? rt.chatId.pubKey : chatId.pubKey,
       // reached in a circle of THIS self's, as it (a persona's book never travels through the general persona's circles)
       sendToPeer: (to, payload, o) => sendToSibling(to, payload, o, pid ?? null),
       snapshot: async () => {
+        // a self's bindings: its own contacts' keys; the general persona's also every binding no other self's contact
+        // owns (greetings of strangers, siblings) — never a persona's contacts' keys. The contact ROWS ride the own lane.
         const all = await rawContacts();
-        const ownBook = all.filter(mine);
+        const ownAddrs = new Set(all.filter(mine).map((c) => c?.webid).filter(Boolean));
         const others = new Set(all.filter((c) => !mine(c)).map((c) => c?.webid).filter(Boolean));
         const bindings = sa.agent.security?.peerBindings?.() ?? [];
-        // a self's book carries its own contacts' bindings; the general persona's also every binding no other self's
-        // contact owns (greetings of strangers, siblings) — never a persona's contacts' keys
-        const ownAddrs = new Set(ownBook.map((c) => c?.webid).filter(Boolean));
         const peers = pid ? bindings.filter((b) => ownAddrs.has(b?.address)) : bindings.filter((b) => !others.has(b?.address));
-        return { peers, contacts: ownBook };
+        return { peers };
       },
       learnPeerKey: (address, pubKey) => sa.agent.security.learnPeerKey(address, pubKey),
-      contacts: {
-        has: async (webid) => (await rawContacts()).some((c) => c?.webid === webid),
-        // a landed row is filed under THIS self (the sibling set it came from says whose it is), whatever the row says —
-        // the general persona's lane files it under 'default' (an explicit undefined dropped the row's own 'default', and
-        // with it the person's choice of whom the contact talks to)
-        // DENY WINS BY TIME: a sibling's row of a contact that LEFT this self (a newer left mark than the row's own filing)
-        // is refused — a late catch-up from a device that has not heard of the move yet would otherwise bring it back
-        add: async (contact) => {
-          const leftAt = await contactLeftAt(pid ?? null, contact?.webid);
-          if (leftAt != null && leftAt > (Number.isFinite(contact?.personaAt) ? contact.personaAt : -Infinity)) {
-            console.info(`[contacts] a sibling's row for a contact that left this self was refused (${String(contact?.webid).slice(0, 16)}…)`);
-            return { refused: 'left-this-self' };
-          }
-          return rawPinboard('addContact', { ...contact, persona: pid ?? 'default' });
-        },
-        get: async (webid) => (await book()).find((c) => c?.webid === webid) ?? null,
-        // a sibling's newer hidden mark lands with ITS time, so every device orders the changes the same way
-        setHidden: (webid, hidden, hiddenAt, { deletedAt } = {}) => rawPinboard('setContactHidden', { webid, hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }),
-        // …and a newer change of what the contact sees of the person (L125), by the same rule
-        setPersona: (webid, persona, { revealPreset = null, personaAt } = {}) => rawPinboard('setContactPersona', {
-          webid, persona, ...(revealPreset ? { revealPreset } : {}), personaAt,
-        }),
-        // …and a newer identity link to a household bot (or its undoing), by the same rule
-        setLinked: (webid, linkedRow, linkedAt) => rawPinboard('addContact', { webid, linkedRow, linkedAt }),
-      },
       onLanded: () => savePeerBindings(),
     });
   };
@@ -2726,7 +2658,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   const knownPeersSync = routeKnownPeersBySender({
     general: generalKnownPeers,
     others: () => [...personas.keys()].filter((pid) => pid !== primaryId && pid !== 'default').map(personaKnownPeers).filter(Boolean),
-    forContact: (c) => { const pid = selfOfContactRow(c); return pid ? (personas.has(pid) ? personaKnownPeers(pid) : null) : generalKnownPeers; },
     onRefused: (reason, from) => console.warn(`[known-peers] refused a landing from ${String(from).slice(0, 12)}… (${reason})`),
   });
   // A PROFILE'S FACTS, between the devices holding that self (profileFactsSync.js): per self, its siblings, sent as it.
@@ -4810,10 +4741,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE seam for what landed: the noticeboard's index, and the composition's change feed (`opts.onItemLanded`)
       onItemApplied: async (circleId, item, landing = {}) => {
         try { await opts.onItemLanded?.(circleId, item); } catch { /* a listener never fails the merge */ }
-        if (isOwnLane(circleId) && item?.type === 'contact-refile') {
-          try { await applyContactLeft(circleId, item); } catch (err) { console.warn(`[contacts] a contact that left this self could not leave the book here: ${err?.message ?? err}`); }
-          return undefined;
-        }
         return typeof _noticeboardLanded === 'function' ? _noticeboardLanded(circleId, item, landing) : undefined;
       },
     });
@@ -4865,6 +4792,17 @@ export async function createRealHouseholdAgent(opts = {}) {
             }
           }
           return { requested };
+        },
+        /** A NEW DEVICE of mine at `address`: hand it every own lane it is a sibling on (served as to an empty
+         *  frontier, through the same serve gate a request passes). The moment a new sibling exists, as for the bindings. */
+        async pushTo(address) {
+          let served = 0;
+          for (const lane of ownLanes()) {
+            if (!(await siblingsFor({ circleId: lane }).catch(() => [])).includes(address)) continue;
+            await replay.onRequest(address, { subtype: OWN_ITEMS_CATCHUP_SUBTYPES.request, circleId: lane, frontier: [] });
+            served += 1;
+          }
+          return { served };
         },
       };
     }
@@ -5042,6 +4980,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: circleSelf(circleId).webid ?? chatId.pubKey }),
     // The person's OWN profile (handle, display name, availability, place) is the persona record of the caller's self:
     // the general persona's for this device's own webid, a persona's for that persona's webid, nothing for anyone else.
+    // the contact book's home: the own-devices store, a row written as the self it is filed under
+    contactStore: () => getOwnStore(),
+    contactSelfFor: (persona) => {
+      if (!persona || persona === 'default' || persona === primaryId) return { id: 'default', writer: chatId.pubKey };
+      const w = personas.get(persona)?.chatId?.pubKey;
+      return w ? { id: persona, writer: w } : null;
+    },
     selfProfile: createRegistrySelfProfile({
       registry: () => agentsRegistryRef,
       turn: profileTurn,
@@ -6447,11 +6392,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         };
       }
       let rawReply = null;   // the pinboard reply before shaping — the own-devices fan below reads the contact row
-      // the row as it was filed BEFORE a lens change, so a move between selves can be told to the old self's devices
-      let contactBefore = null;
-      if (realOpId === 'setContactPersona' && typeof realArgs?.webid === 'string') {
-        try { contactBefore = (await rawContacts()).find((c) => c?.webid === realArgs.webid) ?? null; } catch { contactBefore = null; }
-      }
       const runPinboard = async () => {
         const parts = [DataPart(realArgs)];
         const result = await chatAgent.invoke(pinboardAgent.address, realOpId, parts, pinboardActAs(realArgs));
@@ -6471,29 +6411,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (isRosterRead(realOpId)) return rosterReads.read(realOpId, realArgs, runPinboard);
       const out = await runPinboard();
       rosterReads.afterWrite(realOpId);
-      // A contact added HERE — by scan, by the assistant, by any interface: every one passes this seam —
-      // is a contact on the person's other devices too. Best-effort and after success.
-      if ((realOpId === 'addContact' || realOpId === 'addContactFromQr') && rawReply?.contact) {
-        // added here again under a self that it once left: that self's left mark goes
-        clearContactLeft(selfOfContactRow(rawReply.contact) ?? null, rawReply.contact.webid).catch(() => {});
-        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
-      }
-      // Hidden HERE is hidden on every device of the person (Frits, 2026-09-19) — carried at the tap, not at the
-      // next catch-up. The landing side keeps the newer mark, so a hide and a show that cross resolve the same
-      // way everywhere.
-      // …and what a contact sees of the person (L125), by the same carry: changed here, changed on every device.
-      if ((realOpId === 'setContactHidden' || realOpId === 'setContactPersona') && rawReply?.contact) {
-        knownPeersSync.fanContact(rawReply.contact).catch(() => {});
-      }
-      // A contact RE-FILED under another self: the row rides the new self's lane (above); the OLD self's devices hear it
-      // left from a row on the own store, written as the old self — webid and when only, never which self it went to.
-      if (realOpId === 'setContactPersona' && rawReply?.contact && contactBefore
-          && (selfOfContactRow(contactBefore) ?? null) !== (selfOfContactRow(rawReply.contact) ?? null)) {
-        noteContactLeft(selfOfContactRow(contactBefore) ?? null, rawReply.contact.webid, rawReply.contact.personaAt ?? Date.now())
-          .catch((err) => console.warn(`[contacts] the old self's devices will not hear the contact left: ${err?.message ?? err}`));
-        // filed under its new self: a left mark that self held from an earlier move goes
-        clearContactLeft(selfOfContactRow(rawReply.contact) ?? null, rawReply.contact.webid).catch(() => {});
-      }
+      // A contact added, hidden or re-filed HERE reaches the person's other devices as its own-store row on the self's
+      // own-devices lane (lib/ContactBook.js): no carry of its own here.
       // WHAT I SAY ABOUT MYSELF goes to every roster I am on (2026-09-21): a handle or display name set under Mij
       // is a `member-props` statement on the membership lane of every circle — pair circles included, which is how
       // a contact learns it — one per circle, only where the row differs (the diff gate), a failing circle retried

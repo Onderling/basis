@@ -163,8 +163,16 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
               // Next to the role it changes. Present only where the shared decision offers it, which
               // is to an admin and nobody else.
               const control = roleControlFor({ members, member: m, myRef: myWebid });
+              // a change that cannot stand (the last admin, alone) is greyed with the reason, never painted as available
               return control ? (
-                <Pressable style={styles.secondary} onPress={() => setRole(m, control)} testID={`admin-role-${m.webid}`}>
+                <Pressable
+                  style={[styles.secondary, control.disabled ? { opacity: 0.45 } : null]}
+                  disabled={control.disabled}
+                  accessibilityState={{ disabled: control.disabled }}
+                  accessibilityHint={control.reasonKey ? t(control.reasonKey) : undefined}
+                  onPress={() => setRole(m, control)}
+                  testID={`admin-role-${m.webid}`}
+                >
                   <Text style={styles.secondaryText}>{t(control.labelKey)}</Text>
                 </Pressable>
               ) : null;

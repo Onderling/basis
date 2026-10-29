@@ -43,7 +43,7 @@ function settingRow(row, { t, onSet }) {
   const { kind, options, unit } = row.control;
   if (kind === 'switch') {
     control = document.createElement('input');
-    control.type = 'checkbox';
+    control.type = 'checkbox';   // sets: param:* — the row's key in the parameter register
     control.checked = row.value === true;
     control.addEventListener('change', () => commit(control.checked));
   } else if (kind === 'choice') {

@@ -150,12 +150,23 @@ fi
 # ── 4. repos at the release branch ──
 # shellcheck disable=SC1090
 . "$BOX_DIR/box.conf"
+# The checkouts belong to the box user, so git runs AS the box user whenever this runs as root (update.sh runs as that
+# user too): run as root over a checkout another user owns, git refuses it as "dubious ownership". A fresh clone is made
+# as the box user from the start. Self-contained here: a piped install has no lib.sh until the first clone exists.
+refresh_repo() {   # dir url branch user
+  local d=$1 url=$2 br=$3 user=$4
+  local as=()
+  if [ "$(id -u)" = 0 ] && [ -n "$user" ] && id "$user" >/dev/null 2>&1; then
+    as=(sudo -u "$user")
+    mkdir -p "$(dirname "$d")" && chown "$user:$user" "$(dirname "$d")" 2>/dev/null || true
+  fi
+  if [ ! -d "$d/.git" ]; then "${as[@]}" git clone -q --branch "$br" "$url" "$d" || return 1; fi
+  "${as[@]}" git -C "$d" fetch -q origin "$br" --tags || return 1
+  "${as[@]}" git -C "$d" checkout -q -f "origin/$br"
+}
 for r in $REPOS; do
   name="${r%%=*}"; rest="${r#*=}"; url="${rest%%#*}"; br="${rest#*#}"
-  d="$BOX_DIR/repos/$name"
-  if [ ! -d "$d/.git" ]; then git clone -q --branch "$br" "$url" "$d"; fi
-  git -C "$d" fetch -q origin "$br" --tags
-  git -C "$d" checkout -q -f "origin/$br"
+  refresh_repo "$BOX_DIR/repos/$name" "$url" "$br" "$BOX_USER" || { echo "install: could not refresh $name" >&2; exit 1; }
 done
 if [ "$SKIP_SYSTEM" != 1 ]; then
   chown -R "$BOX_USER:$BOX_USER" "$BOX_DIR"

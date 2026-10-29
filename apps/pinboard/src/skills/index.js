@@ -3946,9 +3946,6 @@ export function buildSkills({
       if (!bundle?.contacts) return { error: 'no-contacts' };
       const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
       if (!card?.webid) return { error: 'malformed-card' };
-      if (typeof console !== 'undefined') {
-        console.log('[pinboard/addContactFromQr] card.peerAddr=' + (card.peerAddr ? (card.peerAddr.slice(0,16)+'…') : 'NONE') + ' for webid=' + String(card.webid).slice(0, 32));
-      }
       const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
         ? card.trustOffer : 'bekend';
       const m = await bundle.contacts.addContact({

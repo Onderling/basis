@@ -47,7 +47,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -74,6 +74,7 @@ import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
 import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
+import { createBoxAlert } from '../src/v2/boxAlert.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { createScreenNudge } from '../src/v2/screenNudge.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
@@ -1490,6 +1491,9 @@ if (tgToken || inboxDoor.bridge) {
       modelWatch.ref = createModelWatch({
         listModels: built.listModels, model: built.model, fallback: built.fallbackModel, t,
         tellAdmin,
+        // the key, checked by using it; a refusal goes to the box's alert chat (the admin's chat when it has none)
+        probe: built.probe, secretName: 'PRIVATEMODE_API_KEY',
+        alertBox: createBoxAlert({ token: process.env.BOX_ALERT_TG_TOKEN, chat: process.env.BOX_ALERT_TG_CHAT, name: hostname() }),
         log: walkLog,
       });
       hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });

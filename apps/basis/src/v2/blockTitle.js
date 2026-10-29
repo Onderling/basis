@@ -11,7 +11,7 @@
 import { nounHeading } from './nounNames.js';
 
 /** The block kinds with a declared name (`circle.recipe.block.<type>`). */
-const NAMED = new Set(['quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text',
+const NAMED = new Set(['quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'lists', 'rules', 'photo', 'text',
   'circlesUnread', 'identityLine', 'agents', 'notes', 'onboarding', 'awaiting']);
 
 /** What the empty line says, by kind (the others: "nothing yet"). */
@@ -42,6 +42,8 @@ export function blockOpensWhole(block) {
 
 /** The one quiet line an empty block shows. */
 export function blockEmptyLine(block, t) {
+  // a lists block whose feature the circle switched off: one quiet line, not nothing
+  if (block?.type === 'lists' && block?.content?.off === true) return t('circle.screen.lists_off');
   const key = EMPTY_KEY[block?.type] ?? (block?.type === 'items' ? EMPTY_KEY_BY_NOUN[block?.content?.noun] : null) ?? 'circle.screen.block_empty';
   return t(key, { title: blockTitle(block, t) });
 }

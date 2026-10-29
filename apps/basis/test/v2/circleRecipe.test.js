@@ -19,14 +19,15 @@ describe('circleRecipe · α.1a — single Recipe', () => {
   it('exposes the v2 §2 block palette in editor order', () => {
     // α.4 added 'tasks' between agenda and rules.
     // D1 (§5A) prepended 'quickActions' as the top "Veel-gebruikt" rail.
+    // the circle's lists after its tasks (a list is the circle's own)
     // a circle's editor offers exactly the circle's blocks, in that order
     expect(blockTypesFor('circle')).toEqual([
-      'quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text',
+      'quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'lists', 'rules', 'photo', 'text',
     ]);
   });
 
   it('the one block table: every type says where it lives, with a label and one plain sentence', () => {
-    expect(blockTypesFor('mij')).toEqual(['noticeboard', 'calendar', 'tasks', 'photo', 'text', 'circlesUnread', 'identityLine', 'agents', 'awaiting', 'notes', 'onboarding']);
+    expect(blockTypesFor('mij')).toEqual(['noticeboard', 'calendar', 'tasks', 'lists', 'photo', 'text', 'circlesUnread', 'identityLine', 'agents', 'awaiting', 'notes', 'onboarding']);
     for (const t of BLOCK_TYPES) {
       const d = BLOCK_DESCRIPTORS[t];
       expect(d.labelKey).toBe(`circle.recipe.block.${t}`);

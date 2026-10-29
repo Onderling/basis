@@ -126,6 +126,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'noticeboard':  body = renderNoticeboard(block, styles); break;
     case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
     case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction); break;
+    case 'lists':        body = renderLists(block, styles, onAction); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
       if (block.content?.noun === 'task') body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles, onAction);
@@ -435,6 +436,28 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
 }
 
 /** Rows of any item type across circles: the presenter's label, and which circle it is in. */
+// The circle's lists: each list's name, then its open entries, each a card with its one act (tick it off). Web twin:
+// circleScreen.js `renderLists`.
+function renderLists(block, styles, onAction = null) {
+  return (
+    <View>
+      <Text style={styles.blockTitle}>{t(block.titleKey ?? 'circle.recipe.block.lists')}</Text>
+      {(block.content?.lists ?? []).map((l) => (
+        <View key={l.id} testID={`list-${l.id}`}>
+          <Text style={styles.agendaLabel}>{l.title ?? ''}</Text>
+          {(l.entries ?? []).length === 0 ? <Text style={styles.agendaLabel}>{t('circle.screen.list_empty')}</Text> : null}
+          {(l.entries ?? []).map((e) => (
+            <View key={e.id} style={styles.agendaRow} testID={`list-entry-${e.id}`}>
+              <Text style={styles.agendaLabel}>{e.label ?? ''}</Text>
+              <PrimaryButton item={e} noun="list-item" onAction={onAction} styles={styles} />
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function renderItems(block, styles, onAction = null) {
   const items = block.content?.items ?? [];
   return (

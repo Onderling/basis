@@ -34,6 +34,7 @@
  */
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
 import { sealedKeyValue } from './localStoreSeal.js';
+import { isFeatureEnabled } from './circlePolicy.js';
 
 /**
  * THE BLOCK TABLE — every block a page can hold, ONE place: its palette order, label, the one plain sentence that says
@@ -59,6 +60,10 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   calendar:      { order: 3,  emoji: '📅', places: BOTH,       noun: 'calendar-event',       config: () => ({ limit: 5, horizonDays: 14, compact: false }) },
   // `scope`: 'assigned-to-me' (mine) or 'all' (every open task across the active circles)
   tasks:         { order: 4,  emoji: '✅', places: BOTH,       noun: 'task',       config: () => ({ scope: 'assigned-to-me', limit: 10, compact: false }) },
+  // the circle's lists (`apps/lists`), each with its open entries; `limit` caps how many lists show
+  // `feature`: the circle feature this block shows (its policy); the palette offers the block only where it is on.
+  // One circle's lists: on its own screen that circle; on a person's page the circle its config names (`circleId`)
+  lists:         { order: 4.5, emoji: '📝', places: BOTH, noun: 'list', feature: 'lists', config: () => ({ limit: 5, circleId: null, compact: false }) },
   rules:         { order: 5,  emoji: '📜', places: ['circle'], config: () => ({}) },
   photo:         { order: 6,  emoji: '🖼️', places: BOTH,       config: () => ({ src: '', caption: '' }) },
   text:          { order: 7,  emoji: '✏️', places: BOTH,       config: () => ({ text: '' }) },
@@ -81,9 +86,13 @@ for (const [type, d] of Object.entries(BLOCK_DESCRIPTORS)) {
 /** Every block type, in palette order. */
 export const BLOCK_TYPES = Object.freeze(Object.keys(BLOCK_DESCRIPTORS).sort((a, b) => BLOCK_DESCRIPTORS[a].order - BLOCK_DESCRIPTORS[b].order));
 
-/** The block types an editor of `place` ('circle' | 'mij') offers, in palette order. */
-export function blockTypesFor(place) {
-  return BLOCK_TYPES.filter((t) => BLOCK_DESCRIPTORS[t].places.includes(place));
+/**
+ * The block types an editor of `place` ('circle' | 'mij') offers, in palette order. With the circle's `policy`, a block
+ * that shows a feature (`feature`) is offered only where that feature is on.
+ */
+export function blockTypesFor(place, { policy } = {}) {
+  return BLOCK_TYPES.filter((t) => BLOCK_DESCRIPTORS[t].places.includes(place)
+    && (policy === undefined || !BLOCK_DESCRIPTORS[t].feature || isFeatureEnabled(policy, BLOCK_DESCRIPTORS[t].feature)));
 }
 
 /** Empty recipe book — what an un-customised circle shows for screen-mode. */
@@ -214,6 +223,12 @@ export function setActiveRecipe(book, recipeId) {
 }
 
 /** Resolve the active Recipe (or null when the book is empty). */
+/** The block types on a circle's screen: its active recipe's, else the shell's default screen's (what the "+" asks). */
+export function blockTypesOnScreen(book, fallbackRecipe = null) {
+  const r = getActiveRecipe(book) ?? fallbackRecipe;
+  return (Array.isArray(r?.blocks) ? r.blocks : []).map((b) => b?.type).filter((x) => typeof x === 'string');
+}
+
 export function getActiveRecipe(book) {
   const cur = normalizeRecipeBook(book);
   if (!cur.activeId) return null;

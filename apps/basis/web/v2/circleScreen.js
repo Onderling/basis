@@ -164,6 +164,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'noticeboard':  renderNoticeboard(section, block, tr);  break;
     case 'calendar':       renderAgenda(section, block, tr, highlightRef, onAction);       break;
     case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction); break;
+    case 'lists':        renderLists(section, block, tr, onAction); break;
     // ONE block for any item type across circles: chores and appointments in their own painters, any other type a list
     case 'items':
       if (block.content?.noun === 'task') renderTasks(section, block, tr, onEmbedOpen, highlightRef, onAction);
@@ -413,6 +414,41 @@ function renderAgenda(section, block, tr, highlightRef, onAction) {
     for (const ev of g.items) list.appendChild(rowOf(ev));
     det.appendChild(list);
     section.appendChild(det);
+  }
+}
+
+/** The circle's lists: each list's name, then its open entries, each a card with its one act (tick it off). */
+function renderLists(section, block, tr, onAction) {
+  const title = document.createElement('h3');
+  title.className = 'circle-screen__block-title';
+  title.textContent = tr(block.titleKey ?? 'circle.recipe.block.lists');
+  section.appendChild(title);
+  for (const l of block.content?.lists ?? []) {
+    const head = document.createElement('h4');
+    head.className = 'circle-screen__list-title';
+    head.dataset.listId = l.id ?? '';
+    head.textContent = l.title ?? '';
+    section.appendChild(head);
+    const ul = document.createElement('ul');
+    ul.className = 'circle-screen__list-entries';
+    if (!(l.entries ?? []).length) {
+      const li = document.createElement('li');
+      li.className = 'circle-screen__list-empty';
+      li.textContent = tr('circle.screen.list_empty');
+      ul.appendChild(li);
+    }
+    for (const e of l.entries ?? []) {
+      const li = document.createElement('li');
+      li.className = 'circle-screen__list-entry';
+      li.dataset.entryId = e.id ?? '';
+      const text = document.createElement('span');
+      text.className = 'circle-screen__list-text';
+      text.textContent = e.label ?? '';
+      li.appendChild(text);
+      primaryButton(li, e, 'list-item', tr, onAction);
+      ul.appendChild(li);
+    }
+    section.appendChild(ul);
   }
 }
 

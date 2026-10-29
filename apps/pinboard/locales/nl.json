@@ -9,27 +9,6 @@
     "busy":      { "text": "Bezig…", "doc": "Generic in-flight status text shown while a skill call is running." },
     "error":     { "text": "Fout", "doc": "Generic error prefix shown before any API error message, e.g. 'Fout: invalid-mnemonic'." }
   },
-  "welcome": {
-    "page_title":     { "text": "Prikbord — Welkom", "doc": "Browser tab title for /welcome.html." },
-    "hero_title":     { "text": "Welkom bij Prikbord", "doc": "Hero heading on /welcome.html — first thing a brand-new user sees." },
-    "hero_intro":     { "text": "Een buurt-prikbord dat lokaal op jouw apparaat draait. Geen feed, geen reclame, jouw data blijft van jou.", "doc": "Hero subtitle. Three-line value prop." },
-    "new_title":      { "text": "Nieuwe account", "doc": "Title of the left-hand choice card on /welcome.html — link to /onboard.html." },
-    "new_body":       { "text": "Ik heb een uitnodigings-link of -code en wil voor het eerst lid worden van een groep.", "doc": "Description of the new-account choice." },
-    "restore_title":  { "text": "Bestaande account herstellen", "doc": "Title of the right-hand choice card on /welcome.html — link to /restore.html." },
-    "restore_body":   { "text": "Ik heb mijn herstelzin (12 of 24 woorden) van een ander apparaat. Ik wil hem hier opnieuw gebruiken.", "doc": "Description of the restore-account choice." },
-    "footer_hint":    { "text": "Geen voorkennis nodig — je doorloopt de stappen in een paar minuten. Je kunt later van apparaat wisselen door je herstelzin opnieuw te gebruiken.", "doc": "Reassurance footer at the bottom of /welcome.html." }
-  },
-  "privacy": {
-    "page_title":             { "text": "Prikbord — Privacy", "doc": "Browser tab title for /privacy.html." },
-    "heading":                { "text": "Privacy — wat je moet weten", "doc": "Main page heading on /privacy.html. (Renamed from 'title' 2026-05-07 to match the page-pattern convention.)" },
-    "intro":                  { "text": "Prikbord is een onderzoeks-preview. Onderstaande punten zijn nooit verstopt; ze gelden voor iedereen die meedoet.", "doc": "Lead paragraph on /privacy.html. Sets the 'this is a research preview' framing." },
-    "data_location_heading":  { "text": "Waar je data staat", "doc": "H3 above the data-location list on /privacy.html: which provider hosts what." },
-    "unset_value":            { "text": "— niet ingesteld —", "doc": "Placeholder shown next to a privacy-row label when no value is configured (e.g. no pod attached)." },
-    "row_relay_operator":     { "text": "Relay-operator", "doc": "Label for the relay operator row in the data-location list." },
-    "row_relay_url":          { "text": "Relay-server", "doc": "Label for the relay server URL row." },
-    "row_pod_issuer":         { "text": "Pod-aanbieder", "doc": "Label for the pod provider (Solid OIDC issuer) row." },
-    "row_pod_root":           { "text": "Pod-locatie", "doc": "Label for the pod root URL row." }
-  },
   "mine": {
     "page_title":     { "text": "Prikbord — Mijn posts", "doc": "Browser tab title for /mine.html." },
     "heading":        { "text": "Mijn posts", "doc": "Main page heading on /mine.html." },
@@ -51,17 +30,6 @@
     "signed_in_html":      { "text": "Aangemeld als <strong>{webid}</strong> — pod {podLabel}.", "doc": "Status line shown when signed in. Contains <strong> tag and two placeholders: {webid} (URL) and {podLabel} (status word from pod_attached / pod_not_attached). Preserve all." },
     "not_signed_in":       { "text": "Niet aangemeld bij een pod. Prikbord draait lokaal.", "doc": "Status line shown when no pod is attached." },
     "signed_out":          { "text": "Afgemeld.", "doc": "Confirmation shown after a successful sign-out." }
-  },
-  "metrics": {
-    "page_title":   { "text": "Prikbord — Metrics", "doc": "Browser tab title for /metrics.html." },
-    "heading":      { "text": "Gebruiks-tellers (lokaal)", "doc": "Main heading on /metrics.html. 'Gebruiks-tellers' = usage counters." },
-    "intro":        { "text": "Tellers van acties die deze agent in dit proces heeft gezien. In-memory — opnieuw nul bij herstart. Faciliteert beta-runbook § \"Operational metrics\".", "doc": "Lead paragraph on /metrics.html. Mentions the beta runbook and the in-memory nature of counters." },
-    "refresh":      { "text": "Vernieuw", "doc": "Refresh button on /metrics.html — triggers an immediate reload of counters." },
-    "empty":        { "text": "Nog geen tellers — er is nog niets gebeurd in deze sessie.", "doc": "Empty-state shown when the metrics map is empty (fresh process, no skill calls yet)." },
-    "col_event":    { "text": "Event", "doc": "Header of the first column in the metrics grid. The technical name of the counted event." },
-    "col_count":    { "text": "Aantal", "doc": "Header of the second column — number of times the event fired." },
-    "col_last":     { "text": "Laatste", "doc": "Header of the third column — timestamp of the most recent firing." },
-    "snapshot_at":  { "text": "Snapshot: {ts}", "doc": "Footer line under the metrics grid. {ts} is a locale-formatted timestamp." }
   },
   "errors": {
     "groupId_required":     "Kies eerst een groep.",
@@ -239,17 +207,6 @@
     "pod_attached":     { "text": "Pod is gekoppeld.", "doc": "Status under the signed-in line when the pod is fully attached." },
     "pod_not_attached": { "text": "Pod is nog niet gekoppeld.", "doc": "Status under the signed-in line when sign-in succeeded but pod-attach hasn't completed." }
   },
-  "auth_callback": {
-    "heading":         { "text": "Pod-aanmelding voltooien", "doc": "Heading on AuthCallbackScreen." },
-    "busy":            { "text": "Bezig met afronden van de OIDC-flow…", "doc": "Body shown while sign-in is wrapping up." },
-    "uploading":       { "text": "Lokale data wordt geüpload naar je pod…", "doc": "Body shown while bulk-sync is running." },
-    "done":            { "text": "Klaar.", "doc": "Body shown when bulk-sync finished cleanly." },
-    "error":           { "text": "Er ging iets mis tijdens de eerste sync.", "doc": "Body shown when bulk-sync failed." },
-    "progress":        { "text": "{done} van {total} ({pct}%)", "doc": "Progress label under the bar." },
-    "go_feed":         { "text": "Naar Prikbord", "doc": "CTA after sync completes." },
-    "skip":            { "text": "Sluit en ga naar Prikbord", "doc": "CTA before sync completes." },
-    "no_active_group": { "text": "Geen actieve bundle.", "doc": "Defensive empty state." }
-  },
   "onboard_join": {
     "heading":             { "text": "Aansluiten bij groep", "doc": "Heading on OnboardJoinScreen — receiver-side of the QR-scan flow." },
     "body":                { "text": "Groep-id:", "doc": "Body line on OnboardJoinScreen, followed by the groupId value." },
@@ -393,14 +350,9 @@
     "saving":                 { "text": "Opslaan…", "doc": "Generic in-flight label on mobile ProfileMineScreen submit buttons." },
     "holiday_label":          { "text": "Vakantie-modus", "doc": "Label next to the holiday-mode toggle on mobile ProfileMineScreen." },
     "holiday_hint":           { "text": "Verberg je profiel tijdelijk: buren zien je niet als beschikbare match en push-meldingen pauzeren tot je het weer uitzet.", "doc": "Hint under the holiday-mode toggle on ProfileMineScreen explaining what the toggle does." },
-    "holiday_on":             { "text": "Aan", "doc": "Holiday-mode toggle label when the flag is set." },
-    "holiday_off":            { "text": "Uit", "doc": "Holiday-mode toggle label when the flag is unset." },
-    "location_heading":       { "text": "Locatie", "doc": "H2 above the location section on mobile ProfileMineScreen." },
     "location_unset":         { "text": "Geen locatie ingesteld.", "doc": "Body text when the user has not set a location." },
     "location_capture":       { "text": "Locatie ophalen", "doc": "CTA on mobile ProfileMineScreen that triggers GPS via expo-location." },
     "location_busy":          { "text": "Ophalen…", "doc": "CTA label while expo-location is in flight." },
-    "location_clear":         { "text": "Wissen", "doc": "Ghost button on mobile ProfileMineScreen that drops the user's location." },
-    "recovery_heading":       { "text": "Herstelzin", "doc": "H2 above the recovery section on mobile ProfileMineScreen." },
     "recovery_intro":         { "text": "Bewaar je herstelzin op een veilige plek. Je hebt hem nodig om Prikbord op een ander toestel te installeren.", "doc": "Body explanation under the recovery heading." },
     "recovery_close":         { "text": "Sluiten", "doc": "Confirm-modal label on the recovery-reveal modal." },
     "recovery_unavailable":   { "text": "Recovery-export niet beschikbaar in deze build.", "doc": "Inline error when the recovery skill is missing or unwired." },
@@ -618,7 +570,6 @@
     "name_placeholder":     { "text": "bv. Oosterpoort Skills", "doc": "Placeholder for the display-name input on mobile." },
     "purpose_label":        { "text": "Waar is de groep voor? (optioneel)", "doc": "Label for the purpose textarea on mobile." },
     "purpose_placeholder":  { "text": "bv. Buurtgenoten in Oosterpoort die elkaar willen helpen.", "doc": "Placeholder for the purpose textarea on mobile." },
-    "submit":               { "text": "Maak groep", "doc": "Submit CTA on mobile CreateGroupScreen." },
     "creating":             { "text": "Maken…", "doc": "CTA label while createGroupV2 is in flight." },
 
     "group_id_label": { "text": "Group-id (intern; lowercase)", "doc": "Field label for the technical group-id input. Lowercase only — used in pod paths." },

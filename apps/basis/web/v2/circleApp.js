@@ -5756,7 +5756,7 @@ async function showReceivePersonas() {
     const row = document.createElement('label');
     row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
     const box = document.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: form — a persona this device receives
     box.dataset.personaId = p.id;
     box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); });
     const name = document.createElement('span');
@@ -5911,7 +5911,7 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
           const label = document.createElement('label');
           label.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
           const box = document.createElement('input');
-          box.type = 'checkbox';
+          box.type = 'checkbox';   // sets: form — a persona the enrolled device holds
           box.checked = row.checked;
           box.dataset.personaId = row.id;
           box.addEventListener('change', () => {

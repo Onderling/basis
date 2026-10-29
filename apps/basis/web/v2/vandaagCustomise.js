@@ -75,7 +75,7 @@ export function renderVandaagCustomise(container, { model, t, onAct, onClose } =
             for (const o of c.options) {
               const lab = document.createElement('label');
               const cb = document.createElement('input');
-              cb.type = 'checkbox';
+              cb.type = 'checkbox';   // sets: op:screen-set-block-config — the block's config on your Vandaag
               cb.value = o.value;
               cb.checked = picked.has(o.value);
               cb.addEventListener('change', () => {

@@ -418,7 +418,7 @@ export function renderCircleNearby(container, {
     const label = document.createElement('label');
     label.className = `circle-nearby__allow circle-nearby__allow--${key}`;
     const box = document.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: local:basis.nearbyAllows — what Nearby lets this device answer
     box.checked = !!live;
     box.dataset.allow = key;
     box.addEventListener('change', () => {

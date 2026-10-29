@@ -64,7 +64,7 @@ export function renderGuidedSetup(container, { template, state, t, onAnswer, onC
         const lbl = document.createElement('label');
         lbl.className = 'cc-guided__opt';
         const box = document.createElement('input');
-        box.type = 'checkbox';
+        box.type = 'checkbox';   // sets: form — an answer the guided setup turns into the circle's settings draft
         box.dataset.value = opt.value;
         const span = document.createElement('span');
         span.textContent = opt.label ?? opt.value;

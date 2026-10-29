@@ -181,7 +181,10 @@ export function buildCircleLanes({
   const selection = typeof agent.getParamValue === 'function' ? makeSyncSelection({ getParamValue: agent.getParamValue }) : HOLD_EVERYTHING;
   const refusedKringSaid = new Set();
   const refusedCarrySaid = new Set();   // (reason, address) pairs already said — the log names a fact once
+  // the person's OWN lanes (their contact book, devices, codes) are not a silo a device declines: always held
+  const isOwnLaneId = (circleId) => circleId === OWN_DEVICES_SCOPE || String(circleId).startsWith(`${OWN_DEVICES_SCOPE}:`);
   const holdsFor = (silo) => (circleId) => {
+    if (isOwnLaneId(circleId)) return true;
     if (!selection.kringOn(circleId)) {
       if (!refusedKringSaid.has(circleId)) { refusedKringSaid.add(circleId); console.warn(`[sync] this device does not hold kring ${String(circleId).slice(0, 12)}… — what a sibling still carries for it is refused on landing`); }
       return null;

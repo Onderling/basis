@@ -139,7 +139,9 @@ export function renderCircleAdminPanel(container, {
         setRole.dataset.role = control.role;
         setRole.dataset.consequence = control.consequence;
         setRole.textContent = tr(control.labelKey);
-        setRole.addEventListener('click', () => { if (typeof onSetRole === 'function') onSetRole(m, control); });
+        // a change that cannot stand (the last admin, alone) is greyed with the reason, never painted as available
+        if (control.disabled) { setRole.disabled = true; if (control.reasonKey) setRole.title = tr(control.reasonKey); }
+        setRole.addEventListener('click', () => { if (!control.disabled && typeof onSetRole === 'function') onSetRole(m, control); });
         li.appendChild(setRole);
       }
       // What the row's action IS for this viewer (one shared decision): an admin removes; a member's own row is LEAVING;

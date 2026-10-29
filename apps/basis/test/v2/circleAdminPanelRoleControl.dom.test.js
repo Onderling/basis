@@ -77,6 +77,21 @@ describe('circle admin panel — the role control appears for an admin, and only
   });
 });
 
+describe('circle admin panel — a step-back that cannot stand is greyed', () => {
+  it('the last admin alone in the circle sees it greyed, with the reason, and a click dispatches nothing', async () => {
+    const rawCallSkill = vi.fn(async () => ({ ok: true }));
+    const { onSetRole, present } = wire(rawCallSkill);
+    const el = renderCircleAdminPanel(mount(), { t, members: [ann], viewerWebid: 'w-ann', onSetRole });
+    const btn = controlIn(rowsOf(el)[0]);
+    expect(btn.disabled, 'painted greyed, not as available').toBe(true);
+    expect(btn.title).toBe('circle.admin.no_one_to_take_over');
+    btn.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(present).not.toHaveBeenCalled();
+    expect(rawCallSkill).not.toHaveBeenCalled();
+  });
+});
+
 describe('circle admin panel — the control dispatches setMemberRole', () => {
   it('promotes the row that was clicked, with the op’s exact args', async () => {
     const rawCallSkill = vi.fn(async () => ({ ok: true }));
@@ -142,15 +157,10 @@ describe('circle admin panel — the last admin is told the circle changes hands
     expect(shown[0].message).toBe('circle.admin.role_confirm.demote');
   });
 
-  it('the last admin ALONE is told it cannot take effect, not that it hands over', async () => {
-    const rawCallSkill = vi.fn(async () => ({ ok: true }));
-    const { onSetRole, shown } = wire(rawCallSkill);
-    const el = renderCircleAdminPanel(mount(), { t, members: [ann], viewerWebid: 'w-ann', onSetRole });
-
+  it('the last admin ALONE is not offered a hand-over: the control is greyed, with why (below)', () => {
+    const el = renderCircleAdminPanel(mount(), { t, members: [ann], viewerWebid: 'w-ann' });
     expect(controlIn(rowsOf(el)[0]).dataset.consequence).toBe('no-one-else');
-    controlIn(rowsOf(el)[0]).click();
-    await vi.waitFor(() => expect(shown).toHaveLength(1));
-    expect(shown[0].message).toBe('circle.admin.role_confirm.no_one_else');
+    expect(controlIn(rowsOf(el)[0]).disabled).toBe(true);
   });
 
   it('a promotion is confirmed too — the op declares one gate for both directions', async () => {

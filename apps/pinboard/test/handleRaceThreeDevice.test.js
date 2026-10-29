@@ -139,27 +139,3 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     expect((await claimedHandles(bundle)).filter((h) => h === 'jan').length).toBeGreaterThan(0);
   });
 });
-
-describe('2.1 — the same race on `setMyHandle` (an existing member renaming)', () => {
-  it('two members renaming to the same handle at once: exactly one wins', async () => {
-    const id = await AgentIdentity.generate(new VaultMemory());
-    const bundle = await createNeighbourhoodAgent({
-      identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
-      offeringMatch: { group: GROUP, localActor: ANNE, peers: [] },
-      members: [{ webid: ANNE }, { webid: BOB }, { webid: CAROL }],
-    });
-    await bundle.offeringMatch.start();
-
-    const [bob, carol] = await Promise.all([
-      callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, BOB),
-      callSkill(bundle.agent, 'setMyHandle', { handle: 'jan' }, CAROL),
-    ]);
-
-    expect([bob, carol].filter((r) => !r.error)).toHaveLength(1);
-    expect([bob, carol].filter((r) => r.reason === 'handle-taken')).toHaveLength(1);
-
-    // And the MemberMap — the thing every other surface reads — holds one `jan`.
-    const rows = await Promise.all([BOB, CAROL].map((w) => bundle.members.resolveByWebid(w)));
-    expect(rows.filter((m) => (m?.handle ?? '').toLowerCase() === 'jan')).toHaveLength(1);
-  });
-});

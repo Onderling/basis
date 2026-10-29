@@ -1,5 +1,17 @@
 # Changelog — @onderling-app/pinboard
 
+## [Unreleased] — the contact book is own-devices rows (2026-10-29)
+
+- The contact book is `contact` rows on the host's own-devices store, one per (self, contact), id `<selfId>:<webid>`,
+  written as the self the contact is filed under, so each rides that self's own-devices lane only. Re-filing a contact
+  under another self deletes the old self's row and writes the new self's. The host injects the store and the self
+  mapping (`contactStore`, `contactSelfFor`); standalone the book is in memory.
+- `forgetContact` (the host's own op) is deleted with the `contact-refile` row it answered.
+- `contacts.get(webid)` is the single-contact read (wireChat's isContact, the person-key adoption, a poster lookup).
+- Contacts held in the old book (MemberMap entries marked as contacts) are moved into the new book once, at boot,
+  as the self they are filed under — on a box, the household bot's admitted people stay admitted. The move goes in the
+  release after next.
+
 ## [Unreleased] — the membership code is the admin's own (2026-10-25)
 
 - With a host own store (`hostCircles.ownStore`), a circle's invite code (`membership-code`, now a dictionary type)

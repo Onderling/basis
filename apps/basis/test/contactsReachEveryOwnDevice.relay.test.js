@@ -27,9 +27,12 @@ import { startJourneyRelay } from './support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, bindCircleAddresses, until, teardown,
 } from './support/pairRealAgents.js';
+import { EventLog } from '../src/eventLog.js';
 import { stashEnrollOffer, consumeEnrollOffer } from '../src/v2/enrollOffer.js';
 
 const CIRCLE = 'thuis-circle';
+// a device log, as every shell hands one: the own-devices rows (the contact book) ride its items lane
+const log = () => new EventLog({ initial: [], muted: [] });
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
 const textsAt = (node) => node.received.map((m) => m?.payload?.text).filter(Boolean);
 const memStorage = () => {
@@ -44,7 +47,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
     relay = await startJourneyRelay();
     relayUrl = relay.url;
     [phone, bea] = await Promise.all([
-      bootRealAgentNode('phone', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() } }),
+      bootRealAgentNode('phone', { agentOpts: { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), deviceLog: log() } }),
       bootRealAgentNode('bea'),
     ]);
     await connectNodesOverRelay([phone, bea], { relayUrl });
@@ -81,7 +84,7 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
     expect(typeof phrase).toBe('string');
     expect((await pre.agent.callSkill('household', 'enrollDevice', { mnemonic: phrase, label: 'box' })).ok).toBe(true);
     await teardown(pre);
-    box = await bootRealAgentNode('box', { agentOpts: vaults });
+    box = await bootRealAgentNode('box', { agentOpts: { ...vaults, deviceLog: log() } });
     expect(box.pubKey, 'the box is the same person').toBe(phone.pubKey);
     // The relay maps the profile address to ONE socket: the box's registration takes it from the phone.
     // Awaited, because the next lines send — boot leaves it non-blocking on purpose.
@@ -124,9 +127,12 @@ describe('a contact who greeted the phone is known to the enrolled box', () => {
       `the box did not accept a contact who greeted the phone — the box holds Bea's key: ${knowsBea(box)}; `
       + `the PHONE got it: ${textsAt(phone).includes('ben je er nog?')} — the greeting stayed with the device instead of the person`).toBe(true);
     expect(knowsBea(box), 'the box holds Bea, learned from its sibling, not from a greeting of its own').toBe(true);
-    // …and the contact book followed: Bea is a contact on the box, by the name the phone gave her.
-    const contacts = await box.agent.callSkill('pinboard', 'listContacts', {});
-    const beaOnBox = (contacts?.items ?? []).find((c) => c.webid === bea.pubKey);
+    // …and the contact book followed (its rows ride the own-devices lane, beside the key): Bea is a contact on the box,
+    // by the name the phone gave her.
+    const beaOnBox = await until(async () => {
+      const contacts = await box.agent.callSkill('pinboard', 'listContacts', {});
+      return (contacts?.items ?? []).find((c) => c.webid === bea.pubKey && c.label === 'Bea') ?? null;
+    }, { timeout: 20_000, step: 200 });
     expect(beaOnBox?.label, 'the contact book did not follow the key to the box').toBe('Bea');
   }, 180_000);
 

@@ -19,6 +19,8 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { bookRowsOf } from '../src/v2/contactsSource.js';
 import { pairCircleIdFor } from '../src/v2/pairCircleId.js';
 import { DEFAULT_PERSONA, personaOfContact } from '../src/v2/contactPersona.js';
+import { boxStores } from '../src/v2/boxStorage.js';
+import { createOwnDevicesStore } from '../src/v2/ownDevicesStore.js';
 
 const THEM = 'webid-of-someone-added-before-personas';
 
@@ -30,7 +32,10 @@ describe('the persona backfill at boot', () => {
     dir = await mkdtemp(path.join(tmpdir(), 'persona-backfill-'));
     const pass = randomBytes(32).toString('base64url');
     await writeFile(path.join(dir, 'vault.passphrase'), pass, { mode: 0o600 });
+    // the contact book is own-devices rows: on disk the way the box keeps them
+    const stores = boxStores(dir);
     const boot = () => createRealHouseholdAgent({
+      ownStore: async () => createOwnDevicesStore({ dataSource: await stores.ownDevicesSource() }),
       ownerRootVault: new VaultNodeFs(path.join(dir, 'vault.json'), pass),
       chatVault: new VaultNodeFs(path.join(dir, 'chat-vault.json'), pass),
       pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') },

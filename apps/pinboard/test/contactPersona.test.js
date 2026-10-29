@@ -17,14 +17,14 @@ beforeEach(() => {
   members = new MemberMap();
   // The book persists through a dataSource; a memory stub is enough — what is under test is the FIELD's
   // survival through `MemberMap.#normalise`, not storage.
-  book = createContactBook({ members, dataSource: { read: async () => null, write: async () => {} } });
+  book = createContactBook();
 });
 
 describe('the persona a contact was added through', () => {
   it('survives the member map — a field the whitelist does not name is dropped in silence', async () => {
     const row = await book.addContact({ webid: 'w1', persona: 'buurt' });
     expect(row.persona, 'stored, not swallowed').toBe('buurt');
-    expect((await members.resolveByWebid('w1')).persona).toBe('buurt');
+    expect((await book.get('w1')).persona).toBe('buurt');
   });
 
   it('is ABSENT when nothing chose one — never invented', async () => {
@@ -53,7 +53,7 @@ describe('changing what a contact sees, later (L125)', () => {
     await book.addContact({ webid: 'w5', persona: 'default' });
     const row = await book.setPersona('w5', 'buurt', { revealPreset: 'handle', personaAt: 1000 });
     expect(row).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 1000 });
-    expect(await members.resolveByWebid('w5')).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 1000 });
+    expect(await book.get('w5')).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 1000 });
   });
 
   it('keeps the level already recorded when the change names none', async () => {

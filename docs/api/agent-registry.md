@@ -590,6 +590,18 @@ matchable be TRUE while disclosed is FALSE.
 - `key` `string`
 - `[choice]` `{ enabled?: boolean, rung?: string|null, matchable?: boolean, requestable?: boolean }`
 
+### `forgetDisclosureKey`
+
+**Kind:** function · **Import:** `forgetDisclosureKey` from `'@onderling/agent-registry'`
+
+```js
+forgetDisclosureKey(policy, key)
+```
+
+Forget one property's disclosure in EVERY context: what a removed property leaves behind would otherwise be a
+release with nothing under it, which comes back the day a property of the same key does. Returns a NEW policy; a
+context left empty goes too.
+
 ### `getDisclosure`
 
 **Kind:** function · **Import:** `getDisclosure` from `'@onderling/agent-registry'`
@@ -1964,6 +1976,16 @@ setOwn(properties, key, value)
 ```
 
 Flip a property to OWN (re-scope, no migration). Returns a NEW frozen properties map.
+
+### `removeOwn`
+
+**Kind:** function · **Import:** `removeOwn` from `'@onderling/agent-registry'`
+
+```js
+removeOwn(properties, key)
+```
+
+Take a property off the profile (a removed driver): a NEW frozen map without `key`; an absent key changes nothing.
 
 ### `setInherit`
 

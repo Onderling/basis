@@ -601,6 +601,27 @@ export async function setProfileDriver(store, args = {}) {
 }
 
 /**
+ * removeProfileDriver — take a personal driver off a profile (an offering, an interest, a goal). Only a DRIVER
+ * goes this way: the collaborator refuses any other key, so this op cannot clear a coarse property or a reserved
+ * record. Degrades (ok:false) if unwired / missing id or key.
+ */
+export async function removeProfileDriver(store, args = {}) {
+  const s = asStore(store);
+  const id = typeof args?.id === 'string' ? args.id.trim() : '';
+  const key = typeof args?.key === 'string' ? args.key.trim() : '';
+  if (typeof s.profiles?.removeDriver !== 'function' || !id || !key) {
+    return { ok: false, reason: !id ? 'id-required' : (!key ? 'key-required' : 'profiles-unavailable') };
+  }
+  try {
+    const r = await s.profiles.removeDriver({ profileId: id, key });
+    if (r && r.ok === false) return { ok: false, reason: r.reason ?? 'refused', id, key };
+    return { ok: true, id, key };
+  } catch (err) {
+    return { ok: false, reason: 'remove-failed', detail: err?.message ?? String(err) };
+  }
+}
+
+/**
  * setProfileCircleMembership — record a per-circle MEMBERSHIP on a profile (registry restore-data): the
  * `{ handle, address, proof?, relays?, key? }` record a restored device needs so it knows its circles + the
  * handle it used there. Merge + validation live in the `profiles` collaborator (the pure setter preserves the
@@ -745,6 +766,7 @@ export const AGENT_CORES = Object.freeze({
   getProfileProperties,
   setProfileDriver,
   getProfileDrivers,
+  removeProfileDriver,
   setProfileCircleMembership,
   removeProfileCircleMembership,
   setProfileDisclosure,

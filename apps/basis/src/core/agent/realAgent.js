@@ -162,11 +162,11 @@ import {
   createCatalogueSource,
   createCommunitySubscriptions,
   createProfile as registryCreateProfile,
-  setOwn,
+  setOwn, removeOwn,
   isReservedPropertyKey,
-  setDisclosure as setDisclosurePolicy,
+  setDisclosure as setDisclosurePolicy, forgetDisclosureKey,
   releasedValues as releaseFromPolicy,
-  createDriver,
+  createDriver, isDriverValue,
   driversFromProperties,
   effectiveDrivers,
   setCircleMembership as registrySetCircleMembership,
@@ -1717,6 +1717,22 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (!cur) throw new Error(`setDriver: no such profile ${profileId}`);
         const driver = createDriver({ kind, text, tags, categoryId });
         await agentsRegistry.register({ ...cur, properties: setOwn(cur.properties ?? {}, key, driver) });
+        return { ok: true };
+      },
+      // …and taken off again: only a key whose OWN value is a driver — a coarse property, an inherit pointer or a
+      // reserved record never goes this way. Its release in every circle goes with it, in the same write: a released
+      // key with nothing under it would come back the day a driver of that key does.
+      removeDriver: async ({ profileId, key }) => {
+        if (isReservedPropertyKey(key)) return { ok: false, reason: 'reserved-key' };
+        const cur = await agentsRegistry.lookup(profileId);
+        if (!cur) throw new Error(`removeDriver: no such profile ${profileId}`);
+        const entry = cur.properties?.[key];
+        if (!(entry?.mode === 'own' && isDriverValue(entry.value))) return { ok: false, reason: 'not-a-driver' };
+        await agentsRegistry.register({
+          ...cur,
+          properties: removeOwn(cur.properties ?? {}, key),
+          ...(cur.disclosure ? { disclosure: forgetDisclosureKey(cur.disclosure, key) } : {}),
+        });
         return { ok: true };
       },
       // Drivers are stored like every property — mode-wrapped (`{ mode: 'own', value }`, or an inherit

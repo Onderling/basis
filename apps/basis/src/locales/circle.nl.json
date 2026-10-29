@@ -7137,32 +7137,6 @@
       "text": "Waar je mee bezig bent of naar streeft. Blijft privé op dit apparaat; alleen gebruikt om items op te merken die aansluiten.",
       "doc": "drivers#5 — eerlijke framing: drijfveren blijven on-device, sturen matching."
     },
-    "driverkind": {
-      "hobby": {
-        "text": "Hobby",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "goal": {
-        "text": "Doel",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "desire": {
-        "text": "Wens",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "motivation": {
-        "text": "Motivatie",
-        "doc": "drivers#5 — soort drijfveer."
-      },
-      "driver": {
-        "text": "Drijfveer",
-        "doc": "drivers#5 — algemene soort drijfveer."
-      },
-      "interest": {
-        "text": "Interesse",
-        "doc": "interesses→drijfveren fold-in (audit §4/Q6) — soort drijfveer: waar je mee bezig bent (geleerd uit wat je opmerkte)."
-      }
-    },
     "driver_label_ph": {
       "text": "label (bijv. zeilen)",
       "doc": "drivers#5 — placeholder: het label van de drijfveer."
@@ -7480,11 +7454,11 @@
       "doc": "mij#personas — eigenschap zonder waarde op de algemene persona."
     },
     "offerings_label": {
-      "text": "Aanbod & drijfveren",
-      "doc": "mij#personas — rij-label voor de chips met vaardigheden/drijfveren."
+      "text": "Aanbod",
+      "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ aanbod of drijfveer",
+      "text": "+ aanbod",
       "doc": "mij#personas — gestippelde toevoeg-knop (potentiële-actie-grammatica)."
     },
     "offering_text_ph": {
@@ -7646,6 +7620,30 @@
     "awaiting_shared": {
       "text": "Met je gedeeld: {{count}}",
       "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
+    },
+    "interests_label": {
+      "text": "Interesses",
+      "doc": "Mij → the person's interests: one driver whose tags say what they like (matched on the device, released per circle)."
+    },
+    "goals_label": {
+      "text": "Doelen",
+      "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
+    },
+    "goal_add": {
+      "text": "+ doel",
+      "doc": "Mij → Goals: opens the form to add a goal."
+    },
+    "goal_text_ph": {
+      "text": "wat wil je bereiken, in een zin",
+      "doc": "Mij → Goals: the phrase field placeholder."
+    },
+    "interest_add_ph": {
+      "text": "een interesse, bv. tuinieren",
+      "doc": "Mij → Interests: the field to add one interest (a tag)."
+    },
+    "driver_remove": {
+      "text": "Haal {{what}} weg",
+      "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
     }
   },
   "attach": {

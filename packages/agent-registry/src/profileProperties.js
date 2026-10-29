@@ -99,6 +99,13 @@ export function setOwn(properties, key, value) {
   return normaliseProperties({ ...(properties || {}), [key]: { mode: 'own', value } });
 }
 
+/** Take a property off the profile (a removed driver): a NEW frozen map without `key`; an absent key changes nothing. */
+export function removeOwn(properties, key) {
+  const rest = { ...(properties || {}) };
+  delete rest[key];
+  return normaliseProperties(rest);
+}
+
 /** Flip a property to INHERIT (`from` optional → the default profile). Returns a NEW frozen map. */
 export function setInherit(properties, key, from) {
   return normaliseProperties({ ...(properties || {}), [key]: inherit(from) });

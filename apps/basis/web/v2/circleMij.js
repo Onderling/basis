@@ -13,12 +13,14 @@
  *
  * Pure render — the host (`circleApp.js`) owns the op calls:
  *   onSetProperty(key, value)                        → setProfileProperty (default profile)
- *   onAddOffering({text, tags})                         → setProfileDriver   (kind 'offering')
+ *   onSaveDriver(section, {text, tags})                 → the shared saveDriver (setProfileDriver / removeProfileDriver)
+ *   onRemoveDriver(key)                                 → the shared removeDriver (removeProfileDriver)
  *   onCreatePersona(name, { takeOfferings })         → createProfile (newPersonaArgs)
  *   onToggleDisclosure(circleId, key, on, personaId) → setProfileDisclosure
  *   onShareToCircle(circleId, personaId)             → push the release to the roster
  */
 
+import { driverSections, interestTagsAfter } from '../../src/v2/driversSection.js';
 import { translatorOr } from '../../src/locales/translatorOr.js';
 import { shareOutcome, mediaRefusedHere } from '../../src/v2/shareOutcome.js';
 
@@ -51,7 +53,8 @@ export function renderMij(container, {
   t,
   lang = 'nl',
   onSetProperty,
-  onAddOffering,
+  onSaveDriver,
+  onRemoveDriver,
   onCreatePersona,
   onToggleDisclosure,
   onShareToCircle,
@@ -73,7 +76,7 @@ export function renderMij(container, {
     return container;
   }
 
-  container.appendChild(renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture, lang }));
+  container.appendChild(renderGeneral(tr, model, { onSetProperty, onSaveDriver, onRemoveDriver, onSetPicture, resolvePicture, currentPicture, lang }));
   container.appendChild(renderPersonas(tr, model, { onCreatePersona }));
   container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle, canCarryMedia }));
   return container;
@@ -83,7 +86,7 @@ export function renderMij(container, {
 // `lang` is threaded in rather than closed over: this is a module-level function, not nested inside
 // `renderMij`, so the `lang` it used to read resolved to NOTHING and the coarse-category chip threw a
 // ReferenceError — taking the persona screen down for anyone whose offering carries a category.
-function renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture, lang = 'nl' }) {
+function renderGeneral(tr, model, { onSetProperty, onSaveDriver, onRemoveDriver, onSetPicture, resolvePicture, currentPicture, lang = 'nl' }) {
   const sec = section(tr, 'circle.mij.general_eyebrow', 'circle.mij.general_tagline');
   const panel = el('div', 'cc-mij__panel');
 
@@ -176,53 +179,87 @@ function renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, 
     panel.appendChild(row);
   }
 
-  // Offerings & drivers — chips (bold text · mono tags · "≈ categorie" badge).
-  const offeringsRow = el('div', 'cc-mij__row cc-mij__row--offerings');
-  offeringsRow.appendChild(el('span', 'cc-mij__key', tr('circle.mij.offerings_label')));
-  const chips = el('div', 'cc-mij__chips');
-  for (const d of (model.general?.drivers || [])) {
-    const chip = el('span', 'cc-mij__chip');
-    chip.appendChild(el('b', 'cc-mij__chip-text', d.text || d.tags.join(', ')));
-    for (const tg of d.tags) chip.appendChild(el('span', 'cc-mij__chip-tag', tg));
-    // "≈ categorie" — the coarse rung this item coarsens to under disclosure:
-    // for offerings the taxonomy category (user-picked or derived, via the
-    // read-model); other driver kinds show their kind label.
-    const coarse = d.categoryId
-      ? ((d.categoryLabel && (d.categoryLabel[lang] || d.categoryLabel.nl)) || d.categoryId)
-      : tr(`circle.aboutme.driverkind.${d.kind}`, { defaultValue: d.kind });
-    chip.appendChild(el('span', 'cc-mij__chip-badge', tr('circle.mij.approx', { category: coarse })));
-    chips.appendChild(chip);
-  }
-  offeringsRow.appendChild(chips);
-  offeringsRow.appendChild(el('span', 'cc-mij__ladder', ladderHint(tr, ['all', 'none'])));
-  panel.appendChild(offeringsRow);
+  // The drivers, in three sections (shared `driverSections`): Offerings · Interests · Goals. Each chip can be taken off
+  // again; release per circle is the Circles section below, by key, like every property.
+  for (const ds of driverSections(model.general?.drivers || [])) {
+    const row = el('div', `cc-mij__row cc-mij__row--drivers cc-mij__row--${ds.id}`);
+    row.dataset.section = ds.id;
+    row.appendChild(el('span', 'cc-mij__key', tr(ds.labelKey)));
+    const chips = el('div', 'cc-mij__chips');
+    const removeButton = (what, onClick) => {
+      const x = el('button', 'cc-mij__chip-remove', '×');
+      x.type = 'button';
+      x.setAttribute('aria-label', tr('circle.mij.driver_remove', { what }));
+      x.addEventListener('click', onClick);
+      return x;
+    };
+    if (ds.id === 'interests') {
+      for (const tg of ds.tags) {
+        const chip = el('span', 'cc-mij__chip cc-mij__chip--tag');
+        chip.appendChild(el('b', 'cc-mij__chip-text', tg));
+        if (typeof onSaveDriver === 'function') {
+          chip.appendChild(removeButton(tg, () => onSaveDriver('interests', { tags: interestTagsAfter(ds.tags, { remove: tg }) })));
+        }
+        chips.appendChild(chip);
+      }
+    } else {
+      for (const d of ds.rows) {
+        const chip = el('span', 'cc-mij__chip');
+        chip.appendChild(el('b', 'cc-mij__chip-text', d.text || d.tags.join(', ')));
+        for (const tg of d.tags) chip.appendChild(el('span', 'cc-mij__chip-tag', tg));
+        // "≈ categorie" — the coarse rung this item coarsens to under disclosure (offerings: the taxonomy category)
+        if (d.categoryId) {
+          const coarse = (d.categoryLabel && (d.categoryLabel[lang] || d.categoryLabel.nl)) || d.categoryId;
+          chip.appendChild(el('span', 'cc-mij__chip-badge', tr('circle.mij.approx', { category: coarse })));
+        }
+        if (typeof onRemoveDriver === 'function') chip.appendChild(removeButton(d.text || d.key, () => onRemoveDriver(d.key)));
+        chips.appendChild(chip);
+      }
+    }
+    row.appendChild(chips);
+    row.appendChild(el('span', 'cc-mij__ladder', ladderHint(tr, ['all', 'none'])));
+    panel.appendChild(row);
+    if (typeof onSaveDriver !== 'function') continue;
 
-  if (typeof onAddOffering === 'function') {
-    const add = el('button', 'cc-mij__add', tr('circle.mij.offering_add'));
+    if (ds.id === 'interests') {
+      // one interest at a time: a tag, added to the one interests driver
+      const form = el('div', 'cc-mij__form cc-mij__form--interests');
+      const tag = el('input', 'cc-mij__input');
+      tag.type = 'text';
+      tag.placeholder = tr('circle.mij.interest_add_ph');
+      const save = el('button', 'cc-btn cc-btn--primary', tr('circle.mij.offering_save'));
+      save.type = 'button';
+      save.addEventListener('click', () => {
+        const v = tag.value.trim();
+        if (v) onSaveDriver('interests', { tags: interestTagsAfter(ds.tags, { add: v }) });
+      });
+      form.append(tag, save);
+      panel.appendChild(form);
+      continue;
+    }
+    const add = el('button', `cc-mij__add cc-mij__add--${ds.id}`, tr(ds.id === 'goals' ? 'circle.mij.goal_add' : 'circle.mij.offering_add'));
     add.type = 'button';
     add.addEventListener('click', () => {
-      const open = panel.querySelector('.cc-mij__form');
+      const open = panel.querySelector(`.cc-mij__form--${ds.id}`);
       if (open) { open.remove(); return; }
-      const form = el('div', 'cc-mij__form');
+      const form = el('div', `cc-mij__form cc-mij__form--${ds.id}`);
       const text = el('input', 'cc-mij__input');
       text.type = 'text';
-      text.placeholder = tr('circle.mij.offering_text_ph');
+      text.placeholder = tr(ds.id === 'goals' ? 'circle.mij.goal_text_ph' : 'circle.mij.offering_text_ph');
       const tags = el('input', 'cc-mij__input');
       tags.type = 'text';
       tags.placeholder = tr('circle.mij.offering_tags_ph');
       const save = el('button', 'cc-btn cc-btn--primary', tr('circle.mij.offering_save'));
       save.type = 'button';
       save.addEventListener('click', () => {
-        const textV = text.value.trim();
-        const tagsV = tags.value.trim();
-        if (!textV && !tagsV) return;              // nothing to match on
-        onAddOffering({ text: textV, tags: tagsV });
+        if (!text.value.trim() && !tags.value.trim()) return;   // nothing to match on
+        onSaveDriver(ds.id, { text: text.value.trim(), tags: tags.value.trim() });
       });
       const cancel = el('button', 'cc-btn cc-btn--ghost', tr('circle.mij.offering_cancel'));
       cancel.type = 'button';
       cancel.addEventListener('click', () => form.remove());
       form.append(text, tags, save, cancel);
-      panel.appendChild(form);
+      add.after(form);
       text.focus();
     });
     panel.appendChild(add);

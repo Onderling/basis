@@ -218,7 +218,7 @@ export function renderCircleMyData(container, {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'cc-profile__week-toggle cc-switch';
-        btn.setAttribute('role', 'switch');
+        btn.setAttribute('role', 'switch');   // sets: store:person-clock — your own week overview
         btn.setAttribute('aria-checked', weekOverview.on ? 'true' : 'false');
         btn.dataset.on = weekOverview.on ? 'true' : 'false';
         btn.disabled = weekOverview.on === null;
@@ -254,7 +254,7 @@ export function renderCircleMyData(container, {
           const toggle = document.createElement('button');
           toggle.type = 'button';
           toggle.className = 'cc-mydata__notif-toggle cc-switch';
-          toggle.setAttribute('role', 'switch');
+          toggle.setAttribute('role', 'switch');   // sets: device:web-push — this browser's push subscription
           toggle.setAttribute('aria-checked', n.subscribed ? 'true' : 'false');
           toggle.textContent = n.subscribed ? tr('circle.mydata.notif_disable') : tr('circle.mydata.notif_enable');
           toggle.addEventListener('click', () => onToggleNotifications());
@@ -369,7 +369,7 @@ export function renderCircleMyData(container, {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'cc-mydata__address-sharing-toggle cc-switch';
-        btn.setAttribute('role', 'switch');
+        btn.setAttribute('role', 'switch');   // sets: param:privacy.shareNknAddress — your global address
         btn.setAttribute('aria-checked', shareNknAddress ? 'true' : 'false');
         btn.textContent = tr(shareNknAddress
           ? 'circle.mydata.address_sharing_toggle_on'
@@ -455,7 +455,7 @@ export function renderCircleMyData(container, {
           row.className = `cc-mydata__sync-row ${cls}`;
           row.style.cssText = 'display:flex;align-items:center;gap:.5rem;padding:.2rem 0;';
           const box = document.createElement('input');
-          box.type = 'checkbox'; box.checked = !!checked;
+          box.type = 'checkbox'; box.checked = !!checked;   // sets: param:sync.* — what this device keeps (a silo, or a kring)
           box.addEventListener('change', () => onChange(box.checked));
           row.appendChild(box);
           const txt = document.createElement('span'); txt.textContent = label;
@@ -789,7 +789,7 @@ export function renderCircleMyData(container, {
               const line = document.createElement('label');
               line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
               const cb = document.createElement('input');
-              cb.type = 'checkbox';
+              cb.type = 'checkbox';   // sets: form — what the companion may do for you
               cb.value = ch.id;
               cb.className = 'cc-mydata__companion-family';
               const txt = document.createElement('span');
@@ -902,7 +902,7 @@ export function renderCircleMyData(container, {
             const line = document.createElement('label');
             line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
             const cb = document.createElement('input');
-            cb.type = 'checkbox';
+            cb.type = 'checkbox';   // sets: form — what the connection is offered
             cb.value = idOf(it);
             const txt = document.createElement('span');
             txt.textContent = labelOf(it);

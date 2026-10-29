@@ -1,7 +1,6 @@
 /**
- * knownPeersSync — the pure half: the wire, the sibling gate, and the two landing rules
- * (a binding is established and never replaced; a contact is added and never overwritten).
- * The relay walk (`contactsReachEveryOwnDevice.relay.test.js`) proves it crossing a real socket.
+ * knownPeersSync — the pure half: the wire, the sibling gate, and the landing rule (a binding is established and never
+ * replaced). The contact rows ride the own-devices lane and merge there (item-store's `fieldClockMerge.test.js`).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -12,7 +11,7 @@ const ME = 'me-pubkey';
 const SIBLING = 'my-tablet-circle-address';
 const STRANGER = 'someone-else';
 
-function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book = new Map() } = {}) {
+function rig({ siblings = [SIBLING], known = { peers: [] } } = {}) {
   const sent = [];
   const bindings = new Map();
   const landed = [];
@@ -27,120 +26,47 @@ function rig({ siblings = [SIBLING], known = { peers: [], contacts: [] }, book =
       if (held === undefined) { bindings.set(address, pubKey); return 'established'; }
       return held === pubKey ? 'unchanged' : 'refused';
     },
-    contacts: {
-      has: async (webid) => book.has(webid),
-      add: async (c) => { book.set(c.webid, c); },
-      get: async (webid) => book.get(webid) ?? null,
-      setHidden: async (webid, hidden, hiddenAt, { deletedAt } = {}) => { book.set(webid, { ...book.get(webid), hidden, hiddenAt, ...(Number.isFinite(deletedAt) ? { deletedAt } : {}) }); },
-      setPersona: async (webid, persona, { revealPreset = null, personaAt } = {}) => {
-        book.set(webid, { ...book.get(webid), persona, ...(revealPreset ? { revealPreset } : {}), personaAt });
-      },
-      setLinked: async (webid, linkedRow, linkedAt) => { book.set(webid, { ...book.get(webid), linkedRow, linkedAt }); },
-      forget: async (webid) => { book.delete(webid); },
-    },
     onLanded: (s) => landed.push(s),
     onRefused: (reason, from) => refused.push({ reason, from }),
   });
-  return { sync, sent, bindings, book, landed, refused };
+  return { sync, sent, bindings, landed, refused };
 }
 
 describe('the wire', () => {
-  it('the hidden mark and its time are contact fields that cross', () => {
-    const w = knownPeersToWire({ contacts: [{ webid: 'w', hidden: true, hiddenAt: 5, secret: 'no' }] });
-    expect(w.contacts[0]).toEqual({ webid: 'w', hidden: true, hiddenAt: 5 });
-  });
-
-  it('carries bindings and the contact fields another device needs, and drops what is malformed', () => {
+  it('carries bindings only, and drops what is malformed', () => {
     const wire = knownPeersToWire({
-      peers: [{ address: 'a', pubKey: 'k' }, { address: '', pubKey: 'k' }, null, { address: 'b' }],
-      contacts: [{ webid: 'w', displayName: 'Bea', pubKey: 'k', secretNote: 'never' }, { displayName: 'no webid' }],
+      peers: [{ address: 'a', pubKey: 'k', extra: 'never' }, { address: 'no-key' }],
+      contacts: [{ webid: 'w', displayName: 'Bea' }],
     });
-    expect(wire.peers).toEqual([{ address: 'a', pubKey: 'k' }]);
-    expect(wire.contacts).toEqual([{ webid: 'w', displayName: 'Bea', pubKey: 'k' }]);
+    expect(wire).toEqual({ peers: [{ address: 'a', pubKey: 'k' }] });
   });
   it('is null when nothing survives — a device with nothing to say sends nothing', () => {
-    expect(knownPeersToWire({ peers: [{ address: 'x' }], contacts: [] })).toBeNull();
-    expect(knownPeersToWire(null)).toBeNull();
+    expect(knownPeersToWire({ peers: [{ address: 'x' }], contacts: [{ webid: 'w' }] })).toBeNull();
   });
 });
 
 describe('landing', () => {
   it('establishes a binding it lacks and never replaces one it holds', async () => {
     const r = rig();
-    r.bindings.set('held', 'the-real-key');
+    r.bindings.set('held', 'old-key');
     await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST,
-      peers: [{ address: 'new', pubKey: 'k1' }, { address: 'held', pubKey: 'an-impostor-key' }],
-      contacts: [],
+      subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: 'new', pubKey: 'nk' }, { address: 'held', pubKey: 'other' }],
     });
-    expect(r.bindings.get('new')).toBe('k1');
-    expect(r.bindings.get('held'), 'a sibling cannot overrule a key this device holds').toBe('the-real-key');
-    expect(r.landed).toEqual([{ from: SIBLING, established: 1, contactsAdded: 0, hiddenChanged: [] }]);
+    expect(r.bindings.get('new')).toBe('nk');
+    expect(r.bindings.get('held')).toBe('old-key');
+    expect(r.landed).toEqual([{ from: SIBLING, established: 1 }]);
   });
-  it('adds a contact it lacks and leaves one it has untouched', async () => {
-    const r = rig();
-    r.book.set('w-old', { webid: 'w-old', displayName: 'my edit' });
-    await r.sync.handlers[KNOWN_PEERS_CATCHUP_SUBTYPES.batch](SIBLING, {
-      subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.batch,
-      peers: [],
-      contacts: [{ webid: 'w-new', displayName: 'Bea' }, { webid: 'w-old', displayName: 'their edit' }],
-    });
-    expect(r.book.get('w-new')).toEqual({ webid: 'w-new', displayName: 'Bea' });
-    expect(r.book.get('w-old').displayName, 'each device\'s own edits stand').toBe('my edit');
-    expect(r.landed[0]).toMatchObject({ established: 0, contactsAdded: 1 });
-  });
-  it('a HIDDEN mark crosses, and the newer change wins — on every device of the person (L106, 2026-09-19)', async () => {
-    // Frits: "if I want to delete a contact from my GUI, that must be the case for all devices." The row stays
-    // add-if-absent for everything else; `hidden` + `hiddenAt` are the one field-pair a sibling may CHANGE on a
-    // row this device holds — when its change is newer. Older news never un-hides what this device hid later.
-    const r = rig();
-    // What landed is observable — a shell repaints its roster from it, the box writes its log from it.
-    const landed = []; r.sync.onLanded((s) => landed.push(s.hiddenChanged));
-    r.book.set('w', { webid: 'w', displayName: 'Wilfred', hidden: false, hiddenAt: 1000 });
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w', displayName: 'their edit', hidden: true, hiddenAt: 2000 }],
-    });
-    expect(r.book.get('w').hidden, 'the phone hid Wilfred; the laptop follows').toBe(true);
-    expect(landed.at(-1)).toEqual([{ webid: 'w', hidden: true }]);
-    expect(r.book.get('w').hiddenAt).toBe(2000);
-    expect(r.book.get('w').displayName, 'only the mark crossed — the rest of the row is still this device\'s').toBe('Wilfred');
-    // Older news: a sibling that still thinks Wilfred is shown (its mark from 1500) does not un-hide him.
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w', hidden: false, hiddenAt: 1500 }],
-    });
-    expect(r.book.get('w').hidden).toBe(true);
-    // Newer news un-hides.
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w', hidden: false, hiddenAt: 3000 }],
-    });
-    expect(r.book.get('w').hidden).toBe(false);
-    // A row this device does not hold lands whole, mark included.
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w2', displayName: 'Bea', hidden: true, hiddenAt: 10 }],
-    });
-    expect(r.book.get('w2')).toMatchObject({ webid: 'w2', hidden: true, hiddenAt: 10 });
-    expect(landed.at(-1), 'a row that arrives hidden is a change the listener hears').toEqual([{ webid: 'w2', hidden: true }]);
-    expect(landed[1], 'older news changed nothing, and said so').toEqual([]);
-  });
-
   it('never learns itself from a sibling', async () => {
     const r = rig();
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](ME, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: ME, pubKey: ME }], contacts: [{ webid: ME }],
-    });
+    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: ME, pubKey: ME }] });
     expect(r.bindings.size).toBe(0);
-    expect(r.book.size).toBe(0);
   });
 });
 
 describe('the gate', () => {
   it('admits a proven sibling; refuses everyone else — the profile address included — naming the reason', async () => {
     const r = rig();
-    const wire = { subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: 'p', pubKey: 'k' }], contacts: [] };
+    const wire = { subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: 'p', pubKey: 'k' }] };
     await r.sync.handlers[KNOWN_PEERS_BROADCAST](STRANGER, wire);
     expect(r.bindings.size, 'a stranger\'s "who I know" binds nothing').toBe(0);
     expect(r.refused).toEqual([{ reason: 'not-a-sibling', from: STRANGER }]);
@@ -157,7 +83,7 @@ describe('the gate', () => {
     expect(r.refused).toEqual([{ reason: 'malformed', from: SIBLING }]);
   });
   it('answers a sibling\'s request with everything, and a stranger\'s with nothing', async () => {
-    const known = { peers: [{ address: 'p', pubKey: 'k' }], contacts: [{ webid: 'w', displayName: 'Bea' }] };
+    const known = { peers: [{ address: 'p', pubKey: 'k' }] };
     const r = rig({ known });
     await r.sync.handlers[KNOWN_PEERS_CATCHUP_SUBTYPES.request](STRANGER, { subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.request });
     expect(r.sent).toEqual([]);
@@ -171,16 +97,15 @@ describe('carrying', () => {
     const r = rig({ siblings: ['t1', 't2'] });
     expect(await r.sync.fanPeer({ address: 'bea', pubKey: 'bea' })).toEqual({ attempted: 2 });
     expect(r.sent.map((s) => s.to)).toEqual(['t1', 't2']);
-    expect(r.sent[0].payload).toEqual({ subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: 'bea', pubKey: 'bea' }], contacts: [] });
+    expect(r.sent[0].payload).toEqual({ subtype: KNOWN_PEERS_BROADCAST, peers: [{ address: 'bea', pubKey: 'bea' }] });
     expect(await r.sync.fanPeer({ address: 'bea', pubKey: 'bea' })).toEqual({ attempted: 0, deduped: true });
   });
-  it('fans an added contact, and hands a new sibling the whole snapshot', async () => {
-    const known = { peers: [{ address: 'p', pubKey: 'k' }], contacts: [{ webid: 'w', displayName: 'Bea' }] };
+  it('hands a new sibling the whole snapshot, and has no contact fan', async () => {
+    const known = { peers: [{ address: 'p', pubKey: 'k' }] };
     const r = rig({ known });
-    await r.sync.fanContact({ webid: 'w2', displayName: 'Cas', avatarUrl: null });
-    expect(r.sent[0]).toEqual({ to: SIBLING, payload: { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'w2', displayName: 'Cas' }] } });
+    expect(r.sync.fanContact).toBeUndefined();
     expect(await r.sync.pushTo('fresh-device')).toEqual({ sent: true });
-    expect(r.sent[1]).toEqual({ to: 'fresh-device', payload: { subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.batch, ...known } });
+    expect(r.sent[0]).toEqual({ to: 'fresh-device', payload: { subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.batch, ...known } });
   });
   it('asks every sibling on catch-up, and says how many', async () => {
     const r = rig({ siblings: ['t1', 't2', 't3'] });
@@ -194,69 +119,3 @@ describe('carrying', () => {
     expect(await r.sync.pushTo('x')).toEqual({ sent: false, reason: 'nothing-known' });
   });
 });
-
-describe('what a contact sees of you follows the person (L125)', () => {
-  it('the persona, its level and WHEN cross the wire — a contact added on the phone arrives with its lens', () => {
-    const w = knownPeersToWire({ contacts: [{ webid: 'w', persona: 'buurt', revealPreset: 'handle', personaAt: 7 }] });
-    expect(w.contacts[0]).toEqual({ webid: 'w', persona: 'buurt', revealPreset: 'handle', personaAt: 7 });
-  });
-
-  it('on a row this device holds, the NEWER change wins; older news leaves it, and the rest of the row stays mine', async () => {
-    const r = rig();
-    r.book.set('w', { webid: 'w', displayName: 'Wilfred', persona: 'default', revealPreset: 'profile', personaAt: 1000 });
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w', displayName: 'their edit', persona: 'buurt', revealPreset: 'handle', personaAt: 2000 }],
-    });
-    expect(r.book.get('w')).toMatchObject({ persona: 'buurt', revealPreset: 'handle', personaAt: 2000, displayName: 'Wilfred' });
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w', persona: 'default', personaAt: 1500 }],
-    });
-    expect(r.book.get('w').persona, 'older news never undoes a later choice').toBe('buurt');
-  });
-});
-
-describe('a deletion follows the person too (L114)', () => {
-  it('the deletion\'s time rides with the newer hidden mark, so every device can say "verwijderd"', async () => {
-    const r = rig();
-    r.book.set('w', { webid: 'w', hidden: false, hiddenAt: 1000 });
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [],
-      contacts: [{ webid: 'w', hidden: true, hiddenAt: 2000, deletedAt: 2000 }],
-    });
-    expect(r.book.get('w')).toMatchObject({ hidden: true, hiddenAt: 2000, deletedAt: 2000 });
-  });
-});
-
-describe('the identity link follows the person', () => {
-  it('a bot linked on one device is linked on a device that already held it as a contact; the newer change wins', async () => {
-    const r = rig();
-    // the tablet already had the bot as a plain contact (added by its card)
-    r.book.set('bot', { webid: 'bot', displayName: 'Huisbot' });
-    expect(knownPeersToWire({ contacts: [{ webid: 'bot', linkedRow: 'telegram:9', linkedAt: 2000 }] }).contacts[0]).toMatchObject({ linkedRow: 'telegram:9', linkedAt: 2000 });
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, {
-      subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'bot', linkedRow: 'telegram:9', linkedAt: 2000 }],
-    });
-    expect(r.book.get('bot')).toMatchObject({ displayName: 'Huisbot', linkedRow: 'telegram:9', linkedAt: 2000 });
-    // older news (an unlink from before the link) leaves it; a newer unlink clears it
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'bot', linkedRow: null, linkedAt: 1500 }] });
-    expect(r.book.get('bot').linkedRow).toBe('telegram:9');
-    await r.sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [{ webid: 'bot', linkedRow: null, linkedAt: 3000 }] });
-    expect(r.book.get('bot').linkedRow).toBeNull();
-  });
-});
-
-describe('book-sync carries no re-file marks (the old self\'s own-store row does)', () => {
-  it('a wire naming a re-filed contact forgets nothing here, and a catch-up answer names none', async () => {
-    const book = new Map([['w:bea', { webid: 'w:bea', persona: 'default', personaAt: 100 }]]);
-    const { sync } = rig({ book });
-    await sync.handlers[KNOWN_PEERS_BROADCAST](SIBLING, { subtype: KNOWN_PEERS_BROADCAST, peers: [], contacts: [], refiled: [{ webid: 'w:bea', refiledAt: 200 }] });
-    expect(book.has('w:bea')).toBe(true);
-    const { sync: s2, sent } = rig({ known: { peers: [], contacts: [{ webid: 'w:cor', persona: 'default' }], refiled: [{ webid: 'w:bea', refiledAt: 200 }] } });
-    await s2.handlers[KNOWN_PEERS_CATCHUP_SUBTYPES.request](SIBLING, { subtype: KNOWN_PEERS_CATCHUP_SUBTYPES.request });
-    expect(sent[0]?.payload?.refiled).toBeUndefined();
-    expect(typeof s2.fanRefiled).toBe('undefined');
-  });
-});
-

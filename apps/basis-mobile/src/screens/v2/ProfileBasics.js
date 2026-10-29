@@ -4,10 +4,11 @@
  * door leads; Mij itself is the declared screen (name, readings, devices) and lists no section by hand. Loads
  * getMyProfile and dispatches the pinboard mutations through the injected `callSkill`.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
+import { fieldAfterLoad } from '@onderling-app/basis';
 
 export default function ProfileBasics({ callSkill }) {
   const theme = useTheme();
@@ -18,6 +19,7 @@ export default function ProfileBasics({ callSkill }) {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [handle, setHandle] = useState('');
   const [display, setDisplay] = useState('');
+  const drawnRef = useRef({ handle: '', displayName: '' });   // the values the last load put in the fields
   const [geoQuery, setGeoQuery] = useState('');
   const [geoResult, setGeoResult] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -27,8 +29,12 @@ export default function ProfileBasics({ callSkill }) {
     const prof = await callSkill('pinboard', 'getMyProfile', {}).catch(() => null);
     const entry = prof?.entry ?? {};
     setProfile(entry);
-    setHandle(entry.handle ?? '');
-    setDisplay(entry.displayName ?? '');
+    // a load keeps what the person typed: a field still showing the last loaded value takes the new one, an edited one
+    // stays (a name typed while the profile was loading was wiped, and Save then sent nothing)
+    const drawn = drawnRef.current;
+    setHandle((cur) => fieldAfterLoad({ current: cur, drawn: drawn.handle, loaded: entry.handle ?? '' }));
+    setDisplay((cur) => fieldAfterLoad({ current: cur, drawn: drawn.displayName, loaded: entry.displayName ?? '' }));
+    drawnRef.current = { handle: entry.handle ?? '', displayName: entry.displayName ?? '' };
     if (prof) setProfileLoaded(true);
   }, [callSkill]);
 

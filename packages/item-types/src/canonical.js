@@ -29,7 +29,6 @@ import { INTENTION_SCHEMA }         from './types/intention.js';
 import { DEVICE_LINK_SCHEMA }       from './types/deviceLink.js';
 import { MEMBERSHIP_CODE_SCHEMA }   from './types/membershipCode.js';
 import { POST_ANSWERS_SCHEMA }      from './types/postAnswers.js';
-import { CONTACT_REFILE_SCHEMA }    from './types/contactRefile.js';
 import { RSVP_SCHEMA }              from './types/rsvp.js';
 import { MEMBERSHIP_REDEMPTION_SCHEMA } from './types/membershipRedemption.js';
 import { GROUP_RULES_SCHEMA }       from './types/groupRules.js';
@@ -105,7 +104,6 @@ export const CANONICAL_TYPES = Object.freeze({
   'device-link':        DEVICE_LINK_SCHEMA,
   'membership-code':    MEMBERSHIP_CODE_SCHEMA,
   'post-answers':       POST_ANSWERS_SCHEMA,
-  'contact-refile':     CONTACT_REFILE_SCHEMA,
   // One person's answer to one appointment (2026-10-20): its own item, so no whole-item write of the appointment can
   // carry or drop it; the appointment's `rsvp` is a read projection over these.
   'rsvp':               RSVP_SCHEMA,
@@ -140,7 +138,7 @@ export const CANONICAL_TYPES = Object.freeze({
  * never into a circle. A rule that trusts its writers to be one person (a writer-stamped clock) may hold only for
  * these; `@onderling/item-store`'s resolution registry reads this list to refuse it elsewhere.
  */
-export const OWN_SCOPE_TYPES = Object.freeze(['contact', 'contact-refile', 'device-link', 'membership-code', 'post-answers']);
+export const OWN_SCOPE_TYPES = Object.freeze(['contact', 'device-link', 'membership-code', 'post-answers']);
 
 /**
  * The canonical types that declare field-sets merging by their own clock (`field-clock`), by type name. The item

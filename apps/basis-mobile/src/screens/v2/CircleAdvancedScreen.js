@@ -81,7 +81,7 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
               <Text style={styles.label}>{t(row.labelKey)}</Text>
               <View style={styles.controls}>
                 {row.control.kind === 'switch' ? (
-                  <Switch value={row.value === true} onValueChange={(v) => setParam(row, v)} testID={`settings-param-${row.key}`} />
+                  <Switch /* sets: param:* — the row's key in the parameter register */ value={row.value === true} onValueChange={(v) => setParam(row, v)} testID={`settings-param-${row.key}`} />
                 ) : row.control.kind === 'choice' ? (
                   <View style={styles.chips}>
                     {row.control.options.map((o) => (

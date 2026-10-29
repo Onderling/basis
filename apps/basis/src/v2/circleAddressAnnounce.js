@@ -460,7 +460,7 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
         }
       }
       // A DEVICE OF MINE just appeared (the enrolled boot announcing itself): it knows nobody yet —
-      // hand it everyone this device knows, bindings and contacts, at the address it just proved.
+      // hand it everyone this device knows (the bindings, and the own-devices rows), at the address it just proved.
       // This is the moment a new sibling exists, and the only one both facts are in hand.
       const me = agent?.identity?.chat?.pubKey ?? null;
       const ownHere = (() => { try { return agent?.circleAddressFor?.(circleId) ?? null; } catch { return null; } })();
@@ -477,6 +477,9 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, 
         if (!me || one.memberWebid !== me || one.circleAddress === ownHere) continue;
         try { await agent?.knownPeersSync?.pushTo?.(one.circleAddress); }
         catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine who I know', err?.message ?? err); }
+        // …and my own-devices rows (the contact book among them), on each own lane it holds
+        try { await agent?.ownStoreSync?.pushTo?.(one.circleAddress); }
+        catch (err) { logger?.warn?.('[circle-address] could not hand a new device of mine my own-devices rows', err?.message ?? err); }
         try {
           const r = await agent?.callSkill?.('pinboard', 'broadcastCircleAddresses', { groupId: circleId, announcements: [one] });
           if (r && !r.error) introduced += 1;

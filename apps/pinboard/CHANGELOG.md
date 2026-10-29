@@ -8,7 +8,8 @@
   mapping (`contactStore`, `contactSelfFor`); standalone the book is in memory.
 - `forgetContact` (the host's own op) is deleted with the `contact-refile` row it answered.
 - `contacts.get(webid)` is the single-contact read (wireChat's isContact, the person-key adoption, a poster lookup).
-- **Release note:** contacts held in the old book do not carry over; a device's contact book starts empty.
+- **Release note:** contacts held in the old book do not carry over; a device's contact book starts empty, and
+  admitted household users must redeem a new code once.
 
 ## [Unreleased] — the membership code is the admin's own (2026-10-25)
 

@@ -1268,6 +1268,14 @@
       "text": "Kringen",
       "doc": "A block filter: which of the page's circles this block shows."
     },
+    "control_circle": {
+      "text": "Kring",
+      "doc": "Customise: which circle a lists block shows (one circle's lists)."
+    },
+    "circle_pick": {
+      "text": "Kies een kring",
+      "doc": "Customise: the lists block's circle choice before one is picked."
+    },
     "labels_title": {
       "text": "Labels",
       "doc": "A block filter on a type that carries labels: only rows with one of these (comma-separated)."
@@ -1744,7 +1752,7 @@
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       },
       "lists": {
-        "text": "De lijsten van deze kring, met wat er nog op staat.",
+        "text": "De lijsten van één kring, met wat er nog op staat.",
         "doc": "One plain sentence: what the lists block shows (the circle's lists and their open entries)."
       },
       "rules": {

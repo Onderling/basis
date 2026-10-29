@@ -405,7 +405,7 @@ import {
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
 // The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
 // this shell to change the book).
-import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
+import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
@@ -6972,7 +6972,8 @@ function showCircle(id, circle, policy) {
     try {
       const av = await circleOpAvailability(id);
       circleAvailabilityNow = av;
-      try { circleBlockTypesNow = blockTypesOnScreen(await recipeStore.get(id), DEFAULT_SCREEN_RECIPE); } catch { circleBlockTypesNow = []; }
+      // the circle's own screen's blocks, and any of the person's pages' blocks that show this circle (a lists block)
+      try { circleBlockTypesNow = [...blockTypesOnScreen(await recipeStore.get(id), DEFAULT_SCREEN_RECIPE), ...blockTypesShowingCircle(await userScreenStore.get(), id)]; } catch { circleBlockTypesNow = []; }
       // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard

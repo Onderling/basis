@@ -61,8 +61,9 @@ export const BLOCK_DESCRIPTORS = Object.freeze({
   // `scope`: 'assigned-to-me' (mine) or 'all' (every open task across the active circles)
   tasks:         { order: 4,  emoji: '✅', places: BOTH,       noun: 'task',       config: () => ({ scope: 'assigned-to-me', limit: 10, compact: false }) },
   // the circle's lists (`apps/lists`), each with its open entries; `limit` caps how many lists show
-  // `feature`: the circle feature this block shows (its policy); the palette offers the block only where it is on
-  lists:         { order: 4.5, emoji: '📝', places: ['circle'], noun: 'list', feature: 'lists', config: () => ({ limit: 5, compact: false }) },
+  // `feature`: the circle feature this block shows (its policy); the palette offers the block only where it is on.
+  // One circle's lists: on its own screen that circle; on a person's page the circle its config names (`circleId`)
+  lists:         { order: 4.5, emoji: '📝', places: BOTH, noun: 'list', feature: 'lists', config: () => ({ limit: 5, circleId: null, compact: false }) },
   rules:         { order: 5,  emoji: '📜', places: ['circle'], config: () => ({}) },
   photo:         { order: 6,  emoji: '🖼️', places: BOTH,       config: () => ({ src: '', caption: '' }) },
   text:          { order: 7,  emoji: '✏️', places: BOTH,       config: () => ({ text: '' }) },

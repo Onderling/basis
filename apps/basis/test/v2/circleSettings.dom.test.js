@@ -18,7 +18,7 @@ describe('renderCircleSettings', () => {
     const el = mount();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t });
     expect(el.querySelectorAll('.circle-settings__feature input[type=checkbox]')).toHaveLength(offeredFeatures().length);
-    expect(offeredFeatures()).toHaveLength(5);   // chat · noticeboard · tasks · houseRules · memberDirectory
+    expect(offeredFeatures()).toHaveLength(6);   // chat · noticeboard · tasks · lists (its block) · houseRules · memberDirectory
     expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(SETTINGS_ENUM_AXES.length);
     // every axis is rendered, in axis order — `pod` in view, the others inside the closed
     // "Geavanceerd" fold (alphaSurface.js ADVANCED_SETTINGS), so the DOM order is pod first

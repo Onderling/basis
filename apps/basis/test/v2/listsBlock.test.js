@@ -8,10 +8,22 @@ import { BLOCK_DESCRIPTORS, blockTypesFor } from '../../src/v2/circleRecipe.js';
 import { blockEmptyLine } from '../../src/v2/blockTitle.js';
 
 describe('the lists block', () => {
-  it('is a circle block (never on the person\'s own pages), listing the list noun', () => {
+  it('lives on the circle screen and on the person\'s pages (one circle\'s lists), listing the list noun', () => {
     expect(blockTypesFor('circle')).toContain('lists');
-    expect(blockTypesFor('mij')).not.toContain('lists');
+    expect(blockTypesFor('mij')).toContain('lists');
     expect(BLOCK_DESCRIPTORS.lists.noun).toBe('list');
+    expect(BLOCK_DESCRIPTORS.lists.config()).toMatchObject({ circleId: null });
+  });
+
+  it('on a person\'s page it shows the circle its config names, with that circle\'s policy', async () => {
+    const { materializeScreen } = await import('../../src/v2/userScreenBlocks.js');
+    const callSkill = vi.fn(async (app, op, args) => (op === 'listLists' ? { ok: true, items: [{ id: 'l1', label: 'Boodschappen' }] } : { ok: true, title: 'Boodschappen', items: [] }));
+    const getPolicy = vi.fn(async (cid) => ({ features: { lists: cid === 'thuis' } }));
+    const screen = { id: 'p1', blocks: [{ id: 'b1', type: 'lists', config: { circleId: 'thuis' } }, { id: 'b2', type: 'lists', config: { circleId: 'werk' } }] };
+    const [thuis, werk] = await materializeScreen({ screen, hostOps: { callSkill, getPolicy, circles: [{ id: 'thuis' }, { id: 'werk' }] } });
+    expect(thuis.content.lists.map((l) => l.title)).toEqual(['Boodschappen']);
+    expect(callSkill).toHaveBeenCalledWith('lists', 'listLists', { circleId: 'thuis' });
+    expect(werk.content.off, "werk has lists off: the block says so").toBe(true);
   });
 
   it('shows each list with its open entries, through listLists and listEntries', async () => {
@@ -48,5 +60,12 @@ describe('the lists block', () => {
     expect(off.content.off).toBe(true);
     expect(callSkill).not.toHaveBeenCalled();
     expect(blockEmptyLine(off, (k) => k)).toBe('circle.screen.lists_off');
+  });
+
+  it("the '+' counts a lists block for this circle on any of the person's pages", async () => {
+    const { blockTypesShowingCircle } = await import('../../src/v2/userScreens.js');
+    const book = { screens: [{ id: 'p1', blocks: [{ type: 'lists', config: { circleId: 'thuis' } }, { type: 'notes', config: {} }] }, { id: 'p2', blocks: [] }] };
+    expect(blockTypesShowingCircle(book, 'thuis')).toEqual(['lists']);
+    expect(blockTypesShowingCircle(book, 'werk')).toEqual([]);
   });
 });

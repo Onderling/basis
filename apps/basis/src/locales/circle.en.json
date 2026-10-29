@@ -1267,6 +1267,12 @@
       "text": "Circles",
       "doc": "A block filter: which of the page's circles this block shows."
     },
+    "control_circle": {
+      "text": "Circle"
+    },
+    "circle_pick": {
+      "text": "Pick a circle"
+    },
     "labels_title": {
       "text": "Labels",
       "doc": "A block filter on a type that carries labels: only rows with one of these (comma-separated)."
@@ -1742,7 +1748,7 @@
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
       },
       "lists": {
-        "text": "This circle's lists, with what is still on them."
+        "text": "One circle's lists, with what is still on them."
       },
       "rules": {
         "text": "The circle's house rules.",

@@ -80,6 +80,7 @@ export const CONTROL_TITLES = Object.freeze({
   circleIds:   'circle.vandaag.circles_title',
   labels:      'circle.vandaag.labels_title',
   withinDays:  'circle.vandaag.control_within',
+  circleId:    'circle.vandaag.control_circle',
 });
 /** The blocks that show circles' contents, so may narrow to some of the page's circles. */
 const CIRCLE_AWARE = new Set(['noticeboard', 'calendar', 'tasks', 'notes', 'circlesUnread']);
@@ -112,6 +113,8 @@ export function customiseModel(book, { circles = [] } = {}) {
       const controls = [];
       if (b.type === 'calendar') controls.push({ kind: 'horizonDays', value: cfg.horizonDays ?? 14, options: HORIZON_PRESETS });
       if (b.type === 'tasks') controls.push({ kind: 'scope', value: cfg.scope ?? 'assigned-to-me', options: SCOPE_OPTIONS });
+      // the lists block shows ONE circle's lists: which circle
+      if (b.type === 'lists') controls.push({ kind: 'circleId', value: cfg.circleId ?? null, options: pageCircles, pickKey: 'circle.vandaag.circle_pick' });
       if ('limit' in cfg) controls.push({ kind: 'limit', value: cfg.limit, options: LIMIT_PRESETS.map((n) => ({ value: n, labelKey: 'circle.vandaag.limit_n', params: { n } })) });
       // the filters (Frits: "filters like labels and (relative) dates"): the block's own circles, its labels on a type
       // that carries them, a relative date on the types listed by their moment

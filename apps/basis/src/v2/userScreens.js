@@ -191,6 +191,22 @@ export function setActiveScreen(book, screenId) {
   return { ...cur, activeId: screenId };
 }
 
+/**
+ * The block types on ANY of the person's pages that show this one circle (a block scoped to it by `config.circleId`,
+ * the lists block's way) — so a feature whose surface is such a block (lists) counts as shown for that circle.
+ * @param {object} book  the person's page book
+ * @param {string} circleId
+ * @returns {string[]}
+ */
+export function blockTypesShowingCircle(book, circleId) {
+  if (!circleId) return [];
+  const out = new Set();
+  for (const page of (Array.isArray(book?.screens) ? book.screens : [])) {
+    for (const b of (Array.isArray(page?.blocks) ? page.blocks : [])) if (b?.config?.circleId === circleId && typeof b.type === 'string') out.add(b.type);
+  }
+  return [...out];
+}
+
 export function getActiveScreen(book) {
   const cur = normalizeScreenBook(book);
   if (!cur.activeId) return null;

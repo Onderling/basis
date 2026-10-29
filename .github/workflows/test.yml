@@ -261,6 +261,10 @@ jobs:
           - { label: household,         dir: apps/household,             args: '' }
           - { label: calendar,          dir: apps/calendar,              args: '' }
           - { label: agents,            dir: apps/agents,                args: '' }
+          # The companion node was never in this matrix either (found 2026-10-29): its gate and its stranger test —
+          # every skill refuses an unknown key — never ran in CI. Its one skipped file needs a Community Solid Server
+          # (CSS_URL + client credentials); its nearby tests use a loopback discovery, so they need no LAN.
+          - { label: companion-node,    dir: apps/companion-node,        args: '' }
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

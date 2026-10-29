@@ -104,7 +104,6 @@ export { audienceFromItem, audienceMatches, audienceMatchesAny } from './audienc
 // hand-maintained chat shapes so a change lands once. See `chatEnvelope.js`.
 export {
   CIRCLE_CHAT_KIND,
-  chatEnvelopeFromStoreItem,
   toEventLogItem,
   fromEventLogItem,
   toWireEnvelope,

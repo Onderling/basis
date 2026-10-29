@@ -33,9 +33,9 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
 
   it('the acceptance is on the record everywhere · the acceptance-less join lands nowhere', async () => {
     [A, B, X] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }),
-      bootRealAgentNode('B', { taskLane: true }),
-      bootRealAgentNode('X', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
+      bootRealAgentNode('X', { itemsLane: true }),
     ]);
     await connectNodesOverBus([A, B, X]);
     for (const n of [A, B, X]) wireMembershipReceiver(n);
@@ -112,8 +112,9 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
     // A (a founder — never carried a join acceptance) re-accepts the current version through the OP.
     // The statement is A's own signed `rules-accept` on the membership spine; the fan carries it.
     const accepted = await A.agent.callSkill('pinboard', 'acceptGroupRules', { groupId: C });
-    expect(accepted.acceptanceId, 'the V1 audit item (the onboarding contract)').toBeTruthy();
-    expect(accepted.rulesAccepted, 'the spine half emitted').toBe('2');
+    // the signed statement is the one record of the act (no audit row beside it)
+    expect(accepted.ok, JSON.stringify(accepted)).toBe(true);
+    expect(accepted.rulesAccepted, 'the statement was emitted').toBe('2');
 
     await new Promise((r) => setTimeout(r, 600));   // let the fan land
 

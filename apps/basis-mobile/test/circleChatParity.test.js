@@ -5,10 +5,9 @@ import { dirname, join } from 'node:path';
 
 // Circle-chat receive/fan parity fitness — pins two fixes so the drift cannot recur:
 //
-// 1. ONE inbox. The circle-chat inbox is the App.js singleton (validation, dedup, ingest mirror,
-//    resolveRef, receipts). ChatScreen once built a private fallback twin when the prop was missing —
-//    no resolveRef, no receipts, a SECOND dedup domain that could double-render against catch-up.
-//    Nothing ever reached it; it is deleted, and this test fails if a screen grows an inbox again.
+// 1. NO inbox. Live chat arrives only as signed statements at the chat rail, and the device log is the
+//    record; the legacy chat inbox and its one-time history migration are retired (lint-retired-modules
+//    holds them retired), so no shell constructs one.
 //
 // 2. The card fan is a WEB ≡ MOBILE agreement. Both shells call the SAME shared fan helper; web
 //    threads the message's `card` embed through and mobile silently dropped it, so a message with a card
@@ -23,12 +22,9 @@ const launcher   = read('../src/screens/v2/CircleLauncherScreen.js');
 const appJs      = read('../App.js');
 const webShell   = read('../../basis/web/v2/circleApp.js');
 
-describe('circle chat — one inbox, card-fan parity (web ≡ mobile)', () => {
-  it('no screen constructs its own chat inbox — the App.js singleton is the only one', () => {
-    expect(chatScreen).not.toMatch(/createChatMessageInbox\s*\(/);
-    expect(launcher).not.toMatch(/createChatMessageInbox\s*\(/);
-    const appCalls = appJs.match(/createChatMessageInbox\s*\(/g) ?? [];
-    expect(appCalls).toHaveLength(1);                       // the singleton, and nothing else
+describe('circle chat — no inbox, card-fan parity (web ≡ mobile)', () => {
+  it('no shell constructs a chat inbox — live chat lands at the chat rail only', () => {
+    for (const src of [chatScreen, launcher, appJs, webShell]) expect(src).not.toMatch(/createChatMessageInbox\s*\(/);
   });
 
   it('the legacy plain-envelope receive is GONE — live chat arrives only as signed statements', () => {
@@ -40,13 +36,6 @@ describe('circle chat — one inbox, card-fan parity (web ≡ mobile)', () => {
     // CHAT_STATEMENT_BROADCAST, and holds both shells to spreading it.
     expect(chatScreen).toMatch(/buildCircleLanes/);
     expect(chatScreen).toMatch(/\.\.\.lanes\.handlers/);
-  });
-
-  it('the App singleton carries the full receive config (resolveRef + receipts + self-author)', () => {
-    const singleton = appJs.slice(appJs.indexOf('createChatMessageInbox('));
-    for (const key of ['resolveRef', 'onStored', 'isSelfAuthored']) {
-      expect(singleton).toContain(key);
-    }
   });
 
   it('BOTH shells thread `card` through the shared circle fan helper', () => {

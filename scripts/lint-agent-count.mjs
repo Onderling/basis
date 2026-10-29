@@ -10,6 +10,10 @@
  *
  * Red when an adoption or a construction appears that the baseline does not name, and when the baseline names one
  * that is gone (shrink the baseline in the same change, so it stays exact).
+ *
+ * What it does not see: a factory that composes skills onto an agent it is handed (the tasks factory, given the host,
+ * builds none — its name still counts here) and the agents a bot registry spins up per bound chat (`new Agent` in
+ * BotAgentRegistry, outside this file): those are a bot's own key, `public` on the host's registry.
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,7 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = 'apps/basis/src/core/agent/realAgent.js';
 
 /** The in-process agents adopted today. Only ever remove from this list. */
-export const ADOPTED_BASELINE = ['hostAgent', 'tasksCircle.agent', 'pinboardAgent.bundle.agent'];
+export const ADOPTED_BASELINE = ['hostAgent', 'pinboardAgent.bundle.agent'];
 /** How many constructions of each kind build them today. Only ever lower these. */
 export const CONSTRUCTION_BASELINE = { 'new Agent({': 1, 'createBrowser…Agent(': 3, 'new InternalTransport(bus': 1 };
 

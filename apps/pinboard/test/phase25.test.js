@@ -7,7 +7,6 @@
  *   25.4  rotateMyGroupCode (admin-only); getCurrentMembershipCode
  *         (admin always; member only when peer-distributable);
  *         redeemMembershipCode (current OR within 24h grace)
- *   25.7  getMyMembershipStatus reports active vs evicted
  */
 
 import { describe, it, expect } from 'vitest';
@@ -193,9 +192,8 @@ describe('Pinboard V2 Phase 25.4 — redeemMembershipCode', () => {
     // redeem gate accepted any row inside its expiry plus a day. So rotating did not remove anybody, and
     // an admin who rotated after a code leaked had done nothing for 24 hours.
     //
-    // Rotation is an act of removal. An already-redeemed MEMBERSHIP keeps its own generous grace
-    // (`MEMBERSHIP_GRACE_MS`), so nobody already inside is evicted by this — the two questions no longer
-    // share a constant.
+    // Rotation is an act of removal — of the CODE. It removes no member: a membership has no expiry (a
+    // trail row's `expiresAt` is the invite's lifetime), so nobody already inside is evicted by this.
     const bundle = await buildBundle();
     const r1 = await callSkill(bundle.agent, 'createGroupV2', {
       groupId: GROUP, name: 'X', rules: RULES,
@@ -214,30 +212,6 @@ describe('Pinboard V2 Phase 25.4 — redeemMembershipCode', () => {
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
       { rulesAccepted: '1', groupId: GROUP, code: rotated.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
-  });
-});
-
-/* ── 25.7 getMyMembershipStatus ────────────────────────────── */
-
-describe('Pinboard V2 Phase 25.7 — getMyMembershipStatus', () => {
-  it('returns redeemed: false before any redemption', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'createGroupV2', {
-      groupId: GROUP, name: 'X', rules: RULES,
-    });
-    const r = await callSkill(bundle.agent, 'getMyMembershipStatus', { groupId: GROUP }, BOB);
-    expect(r).toEqual({ redeemed: false });
-  });
-
-  it('returns isActive: true after a fresh redemption', async () => {
-    const bundle = await buildBundle();
-    const c = (await callSkill(bundle.agent, 'createGroupV2', {
-      groupId: GROUP, name: 'X', rules: RULES,
-    })).code;
-    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: c }, BOB);
-    const r = await callSkill(bundle.agent, 'getMyMembershipStatus', { groupId: GROUP }, BOB);
-    expect(r.redeemed).toBe(true);
-    expect(r.isActive).toBe(true);
   });
 });
 

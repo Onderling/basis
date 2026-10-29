@@ -68,6 +68,8 @@ export class BotAgentRegistry {
   #revoked = new Set();
   /** Resolves once the persisted revocation set has loaded; already-resolved without persistence. */
   #ready = Promise.resolve();
+  /** The key that issued this registry's tokens before its agent took over (a re-issue's only valid signer). */
+  #retiredIssuer = null;
   /** Optional appender port: called after every revoke with the revoked token (see constructor). */
   #onRevoked = null;
 
@@ -87,7 +89,7 @@ export class BotAgentRegistry {
    *   the id to its grants lane, so unbinding a bot here refuses its token at the owner's other
    *   devices' doors too — not only at this one until TTL.
    */
-  constructor({ bus, tasksAgent, dataSource, circleId, onRevoked = null }) {
+  constructor({ bus, tasksAgent, dataSource, circleId, onRevoked = null, retiredIssuer = null }) {
     if (!bus) throw new TypeError('BotAgentRegistry: bus required');
     // The engine is what ENFORCES the tokens this registry issues (verify + revocation); a registry
     // whose agent has no gate would mint authority nothing checks. It is not wired here — see `isRevoked`.
@@ -99,6 +101,7 @@ export class BotAgentRegistry {
     this.#dataSource = dataSource ?? null;
     this.#circleId     = circleId     ?? null;
     this.#onRevoked   = typeof onRevoked === 'function' ? onRevoked : null;
+    this.#retiredIssuer = typeof retiredIssuer === 'string' && retiredIssuer ? retiredIssuer : null;
     // The revocation set is issuer-side TRUTH, so it hydrates with the registry: without this a
     // restart forgot every revoke while the token itself stayed signed and unexpired — the same
     // defect the grant managers in core had, fixed the same way. Best-effort: no persistence, no load.
@@ -144,8 +147,14 @@ export class BotAgentRegistry {
    * Adopt a bot this registry spun up on the tasks agent's bus, both ways (`adoptInProcessPeer`): the tasks layer learns
    * the key the registry minted, the bot learns the tasks agent's. Refused unless both are on this bus — never widened.
    */
-  #adoptBot(agent, identity) {
+  async #adoptBot(agent, identity) {
     const tasks = this.#tasksAgent;
+    // The bot's key is `public` on the engine that judges it: its token's `bot.*` scope is all it reaches there. Left
+    // unknown it would default to `authenticated` and reach every op of that tier token-less — on a host that is
+    // every authenticated op of every app it carries. So no registry to say it in means no adoption, never a skip.
+    const registry = tasks.policyEngine?.trustRegistry;
+    if (typeof registry?.setTier !== 'function') throw new Error('BotAgentRegistry: the engine has no trust registry to hold the bot at public; not adopted');
+    await registry.setTier(identity.pubKey, 'public');
     const theirs = tasks.security.adoptInProcessPeer(tasks.transport, agent.transport, identity);
     const ours = agent.security.adoptInProcessPeer(agent.transport, tasks.transport, tasks.identity);
     if (theirs === 'refused' || ours === 'refused') throw new Error('BotAgentRegistry: the bot could not be adopted on the tasks bus');
@@ -207,7 +216,7 @@ export class BotAgentRegistry {
     //    two agents in one process proves nothing). The tasks layer hears only what its bus adopted, so this is also what
     //    admits the key this registry just minted. Bot does not need to be tier-elevated — default 'authenticated' is fine
     //    for `bot.*` skills' `requires-token` policy (the token is what authorises them).
-    this.#adoptBot(agent, identity);
+    await this.#adoptBot(agent, identity);
 
     // 3. Issue the token. Tasks agent issues; bot holds.
     //    follow-up A — scope to `bot.*` instead of wildcard so
@@ -299,18 +308,18 @@ export class BotAgentRegistry {
    * Skips entries whose token has already expired (the admin will need
    * to re-issue) and tears down their persistent rows.
    *
-   * @returns {Promise<{restored: number, expired: number, failed: number}>}
+   * @returns {Promise<{restored: number, expired: number, failed: number, dropped: number, reissued: number}>}
    */
   async restoreAll() {
-    if (!this.persisting) return { restored: 0, expired: 0, failed: 0 };
+    if (!this.persisting) return { restored: 0, expired: 0, failed: 0, dropped: 0, reissued: 0 };
     const root = `mem://tasks/circles/${this.#circleId}/botAgents/`;
     let listing = [];
     try {
       const r = await this.#dataSource.list?.(root);
       listing = Array.isArray(r) ? r : (r?.items ?? []);
-    } catch { return { restored: 0, expired: 0, failed: 0 }; }
+    } catch { return { restored: 0, expired: 0, failed: 0, dropped: 0, reissued: 0 }; }
 
-    const out = { restored: 0, expired: 0, failed: 0 };
+    const out = { restored: 0, expired: 0, failed: 0, dropped: 0, reissued: 0 };
     for (const item of listing) {
       const uri = typeof item === 'string' ? item : item?.uri ?? item?.path;
       if (!uri || !uri.endsWith('.json')) continue;
@@ -342,32 +351,49 @@ export class BotAgentRegistry {
           label: `Bot(${binding.chatId.slice(0, 8)}→${binding.webid})`,
         });
         await agent.start();
-        this.#adoptBot(agent, identity);
+        await this.#adoptBot(agent, identity);
 
-        // with persisted tasks-agent identity (Circle.js writes
-        // the agent vault to `mem://tasks/circles/<circleId>/agent/
-        // identity-vault.json` on first boot and restores from it
-        // afterwards), the token's `agentId` matches the current
-        // tasks agent's pubKey across restarts; the auto-rotate
-        // branch from follow-up B is gone. Defensive fallback
-        // remains: if the snapshot was generated before (or
-        // the user wiped the agent vault but kept the bot vaults),
-        // re-issue rather than fail.
-        if (token?.agentId !== this.#tasksAgent.pubKey) {
+        // The stored record is only as good as its token. A token this agent signed must verify under this agent's
+        // key; one a RETIRED issuer signed (the key this registry's agent replaced) is re-issued only when it verifies
+        // under that key and says what the record says — the bot's own key, the person it acts as, the bot scope.
+        // Anything else (a record edited at rest, an unverifiable token, no retired key to check against) is dropped
+        // and counted, never re-signed: the record is sealed at rest but not signed, and an older copy could stand in.
+        const parsed = (() => { try { return CapabilityToken.fromJSON(token); } catch { return null; } })();
+        const saysTheRecord = (t) => t && t.subject === identity.pubKey && t.skill === 'bot.*'
+          && t.constraints?.actingAs === binding.webid && t.constraints?.scope === 'bot';
+        const ours = this.#tasksAgent.pubKey;
+        const verifiedUnder = (key) => { try { return parsed.issuer === key && CapabilityToken.verify(parsed, key) === true; } catch { return false; } };
+        if (!saysTheRecord(parsed) || !(verifiedUnder(ours) || (this.#retiredIssuer && parsed.agentId === this.#retiredIssuer && verifiedUnder(this.#retiredIssuer)))) {
+          try { await agent.stop(); } catch { /* noop */ }
+          try { await this.#dataSource.delete(uri); } catch { /* noop */ }
+          out.dropped++;
+          continue;
+        }
+        if (parsed.agentId !== ours) {
           for (const k of (await vault.list()).filter((k) => k.startsWith('token:'))) {
             await vault.delete(k);
           }
-          const remainingMs = Math.max(60_000, binding.expiresAt - Date.now());
+          // never longer than the token it replaces, never longer than a fresh one — with a second's margin, as `issue`
+          // counts from its own now; a binding with no time left is expired, not stretched
+          const until = Math.min(parsed.expiresAt ?? Infinity, Date.now() + DEFAULT_TTL_DAYS * MS_PER_DAY);
+          const expiresIn = until - Date.now() - 1_000;
+          if (expiresIn <= 0) {
+            try { await agent.stop(); } catch { /* noop */ }
+            try { await this.#dataSource.delete(uri); } catch { /* noop */ }
+            out.expired++;
+            continue;
+          }
           const fresh = await this.#tasksAgent.issueCapabilityToken({
             subject:    identity.pubKey,
             skill:      'bot.*',
-            expiresIn:  remainingMs,
+            expiresIn,
             constraints: { actingAs: binding.webid, scope: 'bot' },
           });
           await tokenRegistry.store(fresh);
           binding.tokenId   = fresh.id;
           binding.issuedAt  = fresh.issuedAt;
           binding.expiresAt = fresh.expiresAt;
+          out.reissued++;
           if (this.persisting) {
             try {
               await this.#dataSource.write(uri, JSON.stringify({

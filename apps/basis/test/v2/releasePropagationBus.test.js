@@ -31,9 +31,9 @@ import { shareDisclosureToCircle, createDisclosureShareMemo } from '../../src/co
 
 const X = 'circle-x-release-bus';
 const Y = 'circle-y-release-bus';
-// `taskLane: true` gives each node its DEVICE LOG — without one the factory builds no membership rail, so
+// `itemsLane: true` gives each node its DEVICE LOG — without one the factory builds no membership rail, so
 // nothing can be said on the lane at all (the release included). The shells always have one.
-const NO_FALLBACK = { taskLane: true, agentOpts: { allowAddressFallback: false } };
+const NO_FALLBACK = { itemsLane: true, agentOpts: { allowAddressFallback: false } };
 const rowFor = (roster, webid) => roster.find((m) => m?.webid === webid) ?? null;
 
 async function settle(node, group) {

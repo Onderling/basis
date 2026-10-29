@@ -19,7 +19,7 @@
 import { Agent, AgentIdentity, InternalBus, InternalTransport, MemorySource } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { CircleItemStore, createTaskStore } from '@onderling/item-store';
-import { MemberMap, Reveals, buildIdentitySkills }    from '@onderling/identity-resolver';
+import { MemberMap, buildIdentitySkills }    from '@onderling/identity-resolver';
 import { OfferingMatch }                                 from '@onderling/offering-match';
 
 import { buildSkills } from './skills/index.js';
@@ -33,15 +33,12 @@ import { pickPersist }       from './lib/persistPicker.js';
 import { sealedPersist }    from '@onderling/local-store';   // content is sealed on the way to disk, plaintext in the cache
 import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
-import { createProfile }     from './lib/InterestProfile.js';
 import { MemberMapCache }    from './lib/MemberMapCache.js';
-import { RevealsCache }      from './lib/RevealsCache.js';
-import { InterestProfileCache } from './lib/InterestProfileCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
-import { loadSettings, DEFAULT_SETTINGS } from './lib/Settings.js';
-import { createContactBook } from './lib/ContactBook.js';
+import { createContactBook, moveContactsFromMemberMap } from './lib/ContactBook.js';
+import { createMemorySelfProfile } from './lib/selfProfile.js';
 import { wireChat }          from './chat/wireChat.js';
-import { EvictionRoster }    from './lib/EvictionRoster.js';
+import { createRoutedStore } from './lib/routedStore.js';
 
 /**
  * @param {object} args
@@ -75,12 +72,6 @@ import { EvictionRoster }    from './lib/EvictionRoster.js';
  *   reminder via `notifier.scheduleBefore` and `markReturned` cancels
  *   it.  Without a notifier, lend posts still work — they just don't
  *   produce a reminder.  See Pinboard V1 Phase 3.
- * @param {import('@onderling/identity-resolver').Reveals} [args.reveals]
- *   Optional reveal store (per-group + per-peer "show real name"
- *   flags).  When supplied, list-shaped skills hydrate each item's
- *   author into a `{handle, displayName?, isRevealed, render}` block
- *   via `identity-resolver.resolve()`.  Without it, lists return raw
- *   items (legacy shape preserved for back-compat).
  * @param {object} [args.identity]                        pre-built AgentIdentity (tests / shared-cluster setups)
  * @param {object} [args.transport]                       transport for `core.Agent` (default: InternalTransport over a fresh InternalBus)
  * @param {string} [args.label='NeighbourhoodAgent']
@@ -90,7 +81,6 @@ import { EvictionRoster }    from './lib/EvictionRoster.js';
  *   members:    MemberMap,
  *   offeringMatch: OfferingMatch,
  *   notifier:   object | null,
- *   reveals:    Reveals | null,
  *   muted:      Set<string>,   // the shell's block set when one was given
  * }>}
  */
@@ -125,8 +115,12 @@ export async function createNeighbourhoodAgent({
   /** This device's content-seal strategy — what makes the persisted copy unreadable without the key.
    *  Omit for the previous, plaintext behaviour. */
   contentSeal =  null,
+  /**
+   * The push registry's own medium (`{read, write}`): device-local, sealed by the shell, never synced and never in a
+   * backup that leaves the device — a subscription lets its holder wake the device. Absent → in memory only.
+   */
+  pushStore =    null,
   notifier:      providedNotifier,
-  reveals:       providedReveals,
   mutedSet:      providedMutedSet,
   /**
    * Pinboard V1 Phase 18 (2026-05-06): in-process usage counter.  When
@@ -230,6 +224,11 @@ export async function createNeighbourhoodAgent({
   membershipEmit,
   membershipRead,
   currentPersonKey,
+  // The person's own profile (host-injected over the persona record, see lib/selfProfile.js); absent → in memory.
+  selfProfile = null,
+  // The contact book's home (host-injected): the own-devices store + which self a row is written as (lib/ContactBook.js).
+  contactStore = null,
+  contactSelfFor = null,
   // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
   // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
   rulesUpdateEmit,
@@ -240,6 +239,10 @@ export async function createNeighbourhoodAgent({
   // The identity this device's own card and requests name, `() => ({ pubKey, stableId })` (host-injected; absent → this
   // agent's own).
   selfCard = null,
+  // The host's circles — `{ storeFor(circleId), circlesOf(actor|null), writerIn(circleId, actor) }`. Given, a POST lives
+  // in its circle's own store (the one the circle syncs) and only what is not a post stays in this agent's pile.
+  // Absent → everything in the pile (a standalone pinboard).
+  hostCircles = null,
   // "a post matches what I offer" — the host's local closure over the drivers of the self it is in that circle
   // (`(circleId, post) => Promise<boolean>`); reachable by no op and no wire. Absent = no offering match.
   matchesMine = null,
@@ -330,13 +333,6 @@ export async function createNeighbourhoodAgent({
       inner:         itemBackend ?? null,
       localStore:    initialMap,
       onLocalChange: persist ? (m) => { lastLocalMap = m; persist.scheduleSave(m); } : undefined,
-      // per-device settings + the migration marker
-      // are local-only — they must never reach the pod (the pod is
-      // shared by other installs of the same user).
-      localOnlyPrefixes: [
-        'mem://pinboard/settings/devices/',
-        'mem://pinboard/settings/.migrated',
-      ],
       innerKeyMap: _podInnerKeyMap,
     });
     dataSource = cache;
@@ -351,7 +347,8 @@ export async function createNeighbourhoodAgent({
   // audit + inbound-sync). Pinboard passes NO rolePolicy — parity with the old
   // `new ItemStore({...})` which took none here (the facade defaults to allow).
   const circleStore = new CircleItemStore({ dataSource, rootContainer: 'mem://neighbourhood/' });
-  const itemStore = createTaskStore(circleStore);
+  const pile = createTaskStore(circleStore);
+  const itemStore = hostCircles ? createRoutedStore({ pile, hostCircles, homeCircle: offeringMatchOpts?.group ?? null }) : pile;
   // Member roster: pod-config-backed (Phase 4.1 contract) when `pod` is
   // supplied; hand-built array otherwise. The two paths are mutually
   // exclusive — using both is almost always a bug.
@@ -432,32 +429,15 @@ export async function createNeighbourhoodAgent({
   // reads it (ingest filtering).  The empty default is for running headless,
   // where there is no shell and so nobody is blocked.
   const muted = providedMutedSet ?? new Set();
-  // Phase 14 fix (2026-05-06): when the caller doesn't supply a
-  // Reveals store, mint a default in-memory one so `requestReveal`
-  // (the bilateral "Connectie accepteren" button) works out of the
-  // box.  Without this every chat would error
-  // `chat-or-reveals-not-wired` on the first reveal attempt.
-  // Phase 29.1 (V2, 2026-05-07): when a CachingDataSource is wired,
-  // load any persisted Reveals snapshot from the cache + attach
-  // write-through.  Pod-sync rides the same path as MemberMap.
-  let reveals;
-  let revealsDetach = null;
-  if (providedReveals) {
-    reveals = providedReveals;
-  } else if (cache) {
-    reveals = await RevealsCache.load({ dataSource: cache });
-    revealsDetach = RevealsCache.attach({ reveals, dataSource: cache });
-  } else {
-    reveals = new Reveals();
-  }
   const metrics = providedMetrics ?? new UsageMetrics();
 
-  // Phase 29.3 (V2, 2026-05-07): PushRegistry hydrates from cache + write-through.
+  // The push registry hydrates from its own device-local store + writes through to it; never the cache (which can
+  // reach a pod).
   let pushRegistry;
   let pushRegistryDetach = null;
-  if (cache) {
-    pushRegistry = await PushRegistryCache.load({ dataSource: cache });
-    pushRegistryDetach = PushRegistryCache.attach({ registry: pushRegistry, dataSource: cache });
+  if (pushStore?.read && pushStore?.write) {
+    pushRegistry = await PushRegistryCache.load({ dataSource: pushStore });
+    pushRegistryDetach = PushRegistryCache.attach({ registry: pushRegistry, dataSource: pushStore });
   } else {
     pushRegistry = new PushRegistry();
   }
@@ -478,29 +458,27 @@ export async function createNeighbourhoodAgent({
     expoPushSender = new ExpoPushSender(expoPush === true ? {} : expoPush);
   }
 
-  // Pinboard Phase 35 (2026-05-06): build the eviction roster
-  // BEFORE wiring chat (chat consumes it) and BEFORE skills register
-  // (so the bundle exposes it).  Hydrate from any existing
-  // `membership-redemption` items, then attach so future redemptions
-  // mutate the roster live.
-  const evictionRoster = new EvictionRoster();
-  await evictionRoster.hydrateFrom(itemStore);
-  const evictionRosterDetach = evictionRoster.attach({ itemStore });
-
   // Pinboard V1 Phase 14 (2026-05-06): wire peer-chat handler BEFORE
   // skills register, so `chat` is in scope for buildSkills.  Listens
   // for `agent.on('message', ...)` envelopes whose first DataPart
   // carries `type: 'pinboard-chat'`; stores them locally as
   // `kind: 'chat-message'` items linked by `source.threadId`.
+  // the person's contacts: `contact` rows on their own-devices store, one per (self, contact) — lib/ContactBook.js
+  const contacts = createContactBook({ store: contactStore, selfFor: contactSelfFor ?? (() => ({ id: 'default', writer: offeringMatchOpts.localActor ?? 'me' })) });
+  // …and what the old book held (MemberMap contact entries) moves into it once, before anything reads it
+  try {
+    const { moved, kept } = await moveContactsFromMemberMap({ members, contacts });
+    if (moved || kept) console.info(`[contacts] moved ${moved} contact(s) from the old book into the own-devices book${kept ? `; ${kept} kept (a self not held here)` : ''}`);
+  } catch (err) { console.warn(`[contacts] the old book could not be moved: ${err?.message ?? err}`); }
   const chat = wireChat({
     agent,
     itemStore,
     members,
+    contacts,
     muted,
     metrics,
     localActor:    offeringMatchOpts.localActor,
     localStableId: id?.stableId ?? null,
-    evictionRoster,                  // Phase 35 — drop broadcast-posts from evicted members
     dataSource:    cache,            // Phase 39 — read/write attachment bytes from the cache
     // Wave B — route 1:1 peer DMs (reveal-request / contact-add / peer chat) through the SAME
     // host-injected hold-forward sender the circle chat fan-out uses, so a DM to a briefly-offline
@@ -521,14 +499,11 @@ export async function createNeighbourhoodAgent({
     /** Write the local cache to its persistence now, ahead of the debounce. No-op without a persist. */
     flushLocal: async () => { if (persist && lastLocalMap && typeof persist.flush === 'function') await persist.flush(lastLocalMap); },
     agent,
-    deviceId: id?.deviceId ?? null,    // Phase 33.1 — per-install id for device-scoped settings
-    evictionRoster,                    // Phase 35 — auto-evict filter for stale memberships
-    evictionRosterDetach,              // call on shutdown to detach the item-added listener
+    deviceId: id?.deviceId ?? null,    // this install's id (the pod attach names the device by it)
     itemStore,
     members,
     offeringMatch,
     notifier: providedNotifier ?? null,
-    reveals,
     muted,
     cache,
     _podCtx: cache ? podCtx : null,   // Phase 2.4 — filled by attachPod
@@ -544,29 +519,9 @@ export async function createNeighbourhoodAgent({
     pushSender,                     // Phase 21 — relay.PushSender (WebPushSender by default when webPush keys supplied)
     expoPushSender,                 // S6.6 — relay.PushSender for Expo tokens (mobile-native), when expoPush supplied
     webPushPublicKey: webPush?.publicKey ?? null,
-    interestProfile:       cache    // Phase 22 + 29.2 — TF-IDF profile (loaded + write-through when cache present)
-      ? await InterestProfileCache.load({ dataSource: cache })
-      : createProfile(),
-    interestProfileDetach: null,    // populated below when cache wires
     memberMapDetach,                   // call on shutdown to stop persisting member mutations
-    revealsDetach,                     // Phase 29.1 — call on shutdown to stop persisting reveals
-    settings: cache                    // Phase 23.5 + 33 — split across shared + device blobs
-      ? await loadSettings({ dataSource: cache, deviceId: id?.deviceId ?? null })
-      : { ...DEFAULT_SETTINGS },
-    contacts: cache                    // Phase 24.1 — 1:1 contact graph + lists
-      ? createContactBook({ members, dataSource: cache })
-      : null,
+    contacts,   // the person's contacts (above)
   };
-
-  // Phase 29.2 — wire the InterestProfile write-through after the
-  // bundle (and therefore `bundle.interestProfile`) exists.
-  if (cache) {
-    const ipDetach = InterestProfileCache.attach({
-      profile: bundle.interestProfile, dataSource: cache,
-    });
-    bundle.interestProfileDetach = ipDetach.detach;
-    bundle.interestProfileFlushNow = ipDetach.flushNow;
-  }
 
   // track bulk-sync state on the bundle so the UI
   // can poll it via the `getBulkSyncStatus` skill.  Phase: 'idle'
@@ -615,7 +570,6 @@ export async function createNeighbourhoodAgent({
       store:    itemStore,
       offeringMatch,
       notifier: providedNotifier,
-      reveals,
       members,
       controlAgent,   // household sealed-pod membership hooks (no-op when absent)
       muted,
@@ -631,6 +585,7 @@ export async function createNeighbourhoodAgent({
       membershipEmit,  // the membership rider's device-log emitter (absent → the store-based spine path)
       membershipRead,  // the rider's verified statement reader for the roster fold
       currentPersonKey,
+      selfProfile: selfProfile ?? createMemorySelfProfile(),   // the person's own profile (handle, name, away, place)
       rulesUpdateEmit, // the rules-update rider's governance-lane emitter (absent → store-local only)
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).
@@ -661,17 +616,6 @@ export async function createNeighbourhoodAgent({
       agent.enableSealedForwardFor(offeringMatchOpts.group);
     }
   } catch { /* SDK may surface "already enabled" or similar; non-fatal */ }
-
-  // Phase 28.1 (Pinboard V2, 2026-05-07): respect the persisted hop-mode
-  // setting on cold boot.  When the user previously turned on global
-  // hop-relay (settings.allowHopThrough === true), re-register the
-  // relay-forward skill at the configured policy.  Off requires no
-  // action — the skill only registers when explicitly enabled.
-  try {
-    if (bundle.settings?.allowHopThrough === true) {
-      agent.enableRelayForward({ policy: 'authenticated' });
-    }
-  } catch { /* non-fatal */ }
 
   // **Caller responsibility**: register peer pubkeys at the core.Agent
   // SecurityLayer (`agent.addPeer(addr, pubKey)`) BEFORE calling

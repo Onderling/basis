@@ -3,7 +3,8 @@
  * before must not open an empty one — an empty store is a device that no longer knows its circles (walked: with the
  * other member online, `listMyCircles`, the roster and the posts all came back EMPTY). Anne and Bob share a circle with
  * a post and a roster; Anne's store is written under the OLD name (what the build before wrote), then she boots the new
- * build: her circle, roster and posts are there. A reboot onto a store with no old one beside it stays empty (control:
+ * build: her circle, roster and posts are there (the posts from the circle's own store, durable on the device as on
+ * both shells). A reboot onto a store with no old one beside it stays empty (control:
  * the move moves only what was there).
  */
 import { describe, it, expect } from 'vitest';
@@ -13,6 +14,7 @@ import path from 'node:path';
 import { VaultMemory } from '@onderling/vault';
 import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { EventLog } from '../src/eventLog.js';
+import { lazyOwnStore } from '../src/v2/ownDevicesStore.js';
 import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, readRoster, until, teardown } from './support/pairRealAgents.js';
 
@@ -32,7 +34,11 @@ async function scenario({ second, first = `${OLD}-items.json` }) {
   const dir = mkdtempSync(path.join(tmpdir(), 'pinboard-store-'));
   const kept = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory(), registryBackend: createMemoryBackend() };
   const boot = async (file) => {
-    const n = await bootRealAgentNode('anne', { agentOpts: { ...kept, deviceLog: new EventLog({ initial: [], muted: [] }), pinboardPersistDb: { path: path.join(dir, file) } } });
+    const n = await bootRealAgentNode('anne', { agentOpts: { ...kept, deviceLog: new EventLog({ initial: [], muted: [] }), pinboardPersistDb: { path: path.join(dir, file) },
+      // the circle store is durable on a device, as both shells keep it: a post lives there, not in pinboard's store
+      householdPersistDb: { path: path.join(dir, 'household-items.json') },
+      // …and the person's own store, durable as every shell keeps it (the admin's invite code lives there)
+      ownStore: lazyOwnStore({ path: path.join(dir, 'own-devices.json') }) } });
     await connectNodesOverRelay([n], { relayUrl: relay.url });
     return n;
   };
@@ -65,7 +71,11 @@ describe('the renamed pinboard store', () => {
   }, 180_000);
   it('nothing under the old name: the new store starts empty (the move invents nothing)', async () => {
     const { before, after } = await scenario({ first: 'elsewhere-items.json', second: 'pinboard-items.json' });
+    // The circle, its roster and its posts live in the circle's own store, which this move never touches — so they are
+    // the same after it, from there, not from a store under another name (what is left in pinboard's own store goes in
+    // the fold's last step, and this test with it).
     expect(before.circles).toContain(G);
-    expect(after.circles).toEqual([]);
+    expect(after.circles).toContain(G);
+    expect(after.roster).toEqual(before.roster);
   }, 180_000);
 });

@@ -1188,6 +1188,10 @@
       "text": "Niets hier.",
       "doc": "B/S3 list-with-filter screen empty state — distinct from screen.empty (the α.1c recipe-book-empty state); they collided under one key until 2026-07-03."
     },
+    "lists_off": {
+      "text": "Lijsten staan uit in deze kring.",
+      "doc": "The lists block when the circle's lists feature is switched off (an admin's setting): one quiet line instead of the lists."
+    },
     "audience_scope": {
       "text": "Toont items die met deze kring zijn gedeeld.",
       "doc": "SP-5b Option A — non-dismissible caption under a list title when the list is audience-scoped (buildScreenModel.audienceScope set). Generic (no circle name): a visibility scope, not a user filter, so no clear/close control."
@@ -1263,6 +1267,14 @@
     "circles_title": {
       "text": "Kringen",
       "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "control_circle": {
+      "text": "Kring",
+      "doc": "Customise: which circle a lists block shows (one circle's lists)."
+    },
+    "circle_pick": {
+      "text": "Kies een kring",
+      "doc": "Customise: the lists block's circle choice before one is picked."
     },
     "labels_title": {
       "text": "Labels",
@@ -1673,6 +1685,10 @@
         "text": "Taken",
         "doc": "α.4 — block palette label."
       },
+      "lists": {
+        "text": "Lijsten",
+        "doc": "Block palette label: the circle's lists."
+      },
       "rules": {
         "text": "Huisregels",
         "doc": "α.1b — block palette label."
@@ -1734,6 +1750,10 @@
       "tasks": {
         "text": "Openstaande taken, die van jou of alle.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "lists": {
+        "text": "De lijsten van één kring, met wat er nog op staat.",
+        "doc": "One plain sentence: what the lists block shows (the circle's lists and their open entries)."
       },
       "rules": {
         "text": "De huisregels van de kring.",
@@ -2903,48 +2923,6 @@
       "doc": "Dismiss the advice card."
     }
   },
-  "hop": {
-    "title": {
-      "text": "Hoppen",
-      "doc": "Heading of the hopping screen (board 7)."
-    },
-    "global_label": {
-      "text": "Laat vertrouwde contacten mijn vraag één stap doorgeven",
-      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
-    },
-    "explain": {
-      "text": "Als je iets vraagt dat niemand dichtbij heeft, kan een contact die dat toestaat je vraag één stap verder doorgeven — aan hún contacten. Maximaal één hop, en de doorgifte is anoniem.",
-      "doc": "Explanation of how hopping works."
-    },
-    "ask_relay": {
-      "text": "Vraag om door te geven",
-      "doc": "Button: ask the gate contact to relay the request one hop."
-    },
-    "over_limit": {
-      "text": "Te veel hops — vragen reizen maximaal één stap.",
-      "doc": "Shown when a chain exceeds max-one-hop."
-    },
-    "per_contact_title": {
-      "text": "Per contact",
-      "doc": "Board 7B section (P6.M6)."
-    },
-    "mode_always": {
-      "text": "Altijd",
-      "doc": "Per-contact mode."
-    },
-    "mode_withOk": {
-      "text": "Met mijn OK",
-      "doc": "Per-contact mode."
-    },
-    "mode_off": {
-      "text": "Uit",
-      "doc": "Per-contact mode."
-    },
-    "default_label": {
-      "text": "Standaard",
-      "doc": "Chip for global-stance fallback."
-    }
-  },
   "offerings": {
     "editor_title": {
       "text": "Aanbod",
@@ -3161,28 +3139,6 @@
     "no_delivery_note": {
       "text": "{{name}} krijgt geen melding dat je iets probeerde.",
       "doc": "Board 5C non-event clarification."
-    }
-  },
-  "hopPrompt": {
-    "title": {
-      "text": "Verder zoeken?",
-      "doc": "Board 7A auto-hop-prompt card heading (P6.6)."
-    },
-    "body": {
-      "text": "Niemand in je kringen matcht \"{{skill}}\". Wil je verder zoeken via je {{count}} contact(en)?",
-      "doc": "Card body."
-    },
-    "body_anon": {
-      "text": "Niemand in je kringen matcht. Wil je verder zoeken via je {{count}} contact(en)?",
-      "doc": "Anon body."
-    },
-    "accept": {
-      "text": "Ja, één stap verder",
-      "doc": "Primary CTA."
-    },
-    "dismiss": {
-      "text": "Laat maar",
-      "doc": "Secondary CTA."
     }
   },
   "offeringMatches": {
@@ -3865,18 +3821,6 @@
         "text": "Volledig",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
-    },
-    "on": {
-      "text": "🔓 Je laat je naam zien aan {{peer}}. Dat werkt van twee kanten: de ander moet het ook aanzetten.",
-      "doc": "Confirmation of /reveal on."
-    },
-    "off": {
-      "text": "🔒 Je laat je naam niet meer zien aan {{peer}}.",
-      "doc": "Confirmation of /reveal off."
-    },
-    "someone": {
-      "text": "(iemand)",
-      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {
@@ -5579,7 +5523,19 @@
     "stepup_replaced": "Dat verzoek is vervangen door een nieuwer; daar is niets mee gedaan.",
     "stepup_what_op": "{{op}} doen ({{arg}})",
     "model_not_served": "Let op: het taalmodel {{model}} wordt niet meer aangeboden door de aanbieder. Ik gebruik nu {{using}}.",
-    "model_over_limit": "Let op: het account bij de aanbieder van het taalmodel heeft zijn maandlimiet bereikt. Tot dat is opgelost, antwoord ik alleen op opdrachten en knoppen.",
+    "model_refused": "De assistent kan nu niet antwoorden: de aanbieder van het taalmodel weigert (een sleutel- of limietprobleem). De beheerder is gewaarschuwd.",
+    "model_slow": "De assistent is nu te traag om op tijd te antwoorden. Probeer het zo nog eens.",
+    "model_trouble_start": "Let op: de assistent beantwoordt geen vrije vragen meer. Oorzaak: {{cause}}. Opdrachten en knoppen werken nog. Ik zeg het je elk uur zolang het duurt, en als het weer werkt.",
+    "model_trouble_ongoing": "De assistent beantwoordt nog steeds geen vrije vragen ({{minutes}} minuten nu). Oorzaak: {{cause}}.",
+    "model_trouble_recovered": "De assistent antwoordt weer, na {{minutes}} minuten.",
+    "model_cause_key": "de sleutel bij de aanbieder van het taalmodel werkt niet meer",
+    "model_cause_limit": "het account bij de aanbieder heeft een limiet of saldo bereikt",
+    "model_cause_refused": "de aanbieder weigert de vragen",
+    "model_cause_slow": "de aanbieder antwoordt te traag",
+    "model_cause_unreachable": "de aanbieder is niet bereikbaar",
+    "secret_check_failed": "Let op: de sleutel {{secret}} werkt niet meer: de aanbieder van het taalmodel weigert (status {{status}}). Vrije vragen krijgen geen antwoord tot de beheerder de sleutel vervangt; opdrachten en knoppen werken.",
+    "secret_check_limit": "Let op: de aanbieder van het taalmodel weigert: limiet of saldo (status {{status}}). Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
+    "secret_check_refused": "Let op: de aanbieder van het taalmodel weigert (status {{status}}). Vrije vragen krijgen geen antwoord tot dat is opgelost; opdrachten en knoppen werken.",
     "stepup_export_key_replaces": "Er is al een sleutel: bestanden die daarmee zijn verzegeld, gaan alleen open met het oude wachtwoord.",
     "export_key_too_short": "Het wachtwoord moet minstens {{n}} tekens hebben. Niets gevraagd, niets veranderd.",
     "export_key_none": "Er staat nog geen exportsleutel op de box.",
@@ -6101,7 +6057,7 @@
       },
       "report": {
         "text": "Rapporteren",
-        "doc": "S1 — per-post action: report abuse (reportPost)."
+        "doc": "S1 — per-post action: report abuse (a signed report to the circle's admins)."
       },
       "mute": {
         "text": "Blokkeren",
@@ -6266,10 +6222,6 @@
       "text": "Beschikbaarheid →",
       "doc": "S2 — open the availability/quiet-hours screen."
     },
-    "mydata": {
-      "text": "Mijn gegevens →",
-      "doc": "S5 — open the data-location/privacy/usage screen."
-    },
     "sharedWithMe": {
       "text": "Met mij gedeeld →",
       "doc": "Nav label (Mij sub-screen) opening the personal, cross-circle inbox of sealed copies peers shared privately to this device."
@@ -6401,10 +6353,6 @@
     "agent_bot": {
       "text": "bot: {{label}}, aan jou gekoppeld",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
-    },
-    "mydata_more": {
-      "text": "Meer",
-      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
     },
     "edit": {
       "text": "Aanpassen",
@@ -6565,10 +6513,6 @@
     "keys": {
       "text": "Sleutels & back-up",
       "doc": "S5 — key-management section heading."
-    },
-    "backup": {
-      "text": "Back-up van mijn sleutels",
-      "doc": "S5 — launch the encrypted-backup wizard."
     },
     "view_mnemonic": {
       "text": "Herstelzin tonen",
@@ -6955,6 +6899,10 @@
     "founder_stays": {
       "text": "Wie deze kring begon, kan niet verwijderd worden.",
       "doc": "Why Remove is greyed on the founder's row in the admin panel: the roster never evicts the person who started the circle (they can leave, or step back as admin)."
+    },
+    "no_one_to_take_over": {
+      "text": "Je bent de enige in deze kring: er is niemand om het beheer van je over te nemen.",
+      "doc": "Why 'step back as admin' is greyed on the last admin's own row when nobody else is in the circle: the roster fold keeps a demotion from standing when no one could take over, so the control is not offered as available."
     },
     "make_member": {
       "text": "Beheerdersrol intrekken",
@@ -8457,60 +8405,6 @@
         "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
-    "backup": {
-      "confirm_passphrase": {
-        "text": "Herhaal het wachtwoord",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "building": {
-        "text": "Back-up maken…",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "passphrase_warning": {
-        "text": "Raak je het wachtwoord kwijt, dan is de back-up weg. Er is geen herstel. Schrijf het op.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "download": {
-        "text": "Downloaden",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "title": {
-        "text": "Versleutelde back-up",
-        "doc": "Mobile backup wizard heading."
-      },
-      "ready": {
-        "text": "Back-up klaar",
-        "doc": "Mobile backup wizard, the done step."
-      },
-      "intro": {
-        "text": "Een momentopname van je eigen gegevens, beveiligd met een wachtwoordzin. Die zin verlaat dit apparaat nooit — zonder de zin heeft niemand iets aan de back-up, jij ook niet.",
-        "doc": "Backup wizard step 1 body."
-      },
-      "ready_title": {
-        "text": "✓ Back-up klaar",
-        "doc": "Backup wizard, the final screen."
-      },
-      "ready_intro": {
-        "text": "Download hem en bewaar hem ergens veilig — mail hem naar jezelf, zet hem op een usb-stick, of in een cloud die je vertrouwt. Hij is versleuteld, dus waar hij staat maakt minder uit dan of je hem nog hebt.",
-        "doc": "Backup wizard, the final screen."
-      },
-      "passphrase_label": {
-        "text": "Wachtzin",
-        "doc": "Backup wizard, both shells: the passphrase field and its step."
-      },
-      "passphrase_hint": {
-        "text": "Minstens 12 tekens is verstandig — kies er een die je onthoudt.",
-        "doc": "Backup wizard, both shells: the passphrase placeholder."
-      },
-      "step_save": {
-        "text": "Opslaan",
-        "doc": "Backup wizard, both shells: the second step."
-      },
-      "create_button": {
-        "text": "Back-up maken",
-        "doc": "Backup wizard, both shells: the button that builds the backup."
-      }
-    },
     "restore": {
       "phrase": {
         "text": "Herstelzin",
@@ -8851,10 +8745,6 @@
       "markReturned": {
         "text": "Teruggebracht",
         "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
-      },
-      "reportPost": {
-        "text": "Melden",
-        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Bericht sturen",
@@ -10156,7 +10046,8 @@
     "per_circle": "Per kring",
     "no_circles": "Je zit nog in geen enkele kring.",
     "connection": "Verbinding",
-    "my_data": "Mijn gegevens"
+    "my_data": "Mijn gegevens",
+    "devices_keys": "Apparaten & sleutels"
   },
   "feedback": {
     "plus": {

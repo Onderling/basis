@@ -74,6 +74,9 @@ export const SEAMS = Object.freeze([
   // Feedback about the app: the op opens the feedback contact's thread through the shell, prefilled; a shell without the
   // seam answers "not possible here" to /feedback, the "+" and the Instellingen door alike.
   { id: 'feedback-door', pattern: /openFeedback:/, shells: ['web', 'mobile'], why: 'feedback about the app opens the thread to Onderling, prefilled, on every person\'s shell' },
+  // Mij's device and agent rows (and the device offer) open the settings group where devices live; the old My data
+  // page is no longer that place, so a shell that kept opening it would show a page without them.
+  { id: 'settings-group-for-action', pattern: /settingsGroupForAction\(/, shells: ['web', 'mobile'], why: 'a tap on a device or agent row on Mij opens Apparaten & sleutels, on every person\'s shell' },
   { id: 'person-node-store', pattern: /\.\.\.PERSON_NODE_STORE_OPTS/, shells: ['web', 'mobile'], why: 'a person\'s app sees the appointments of the circles they are in' },
   // Read-then-act in a circle's chat: the engine looks at a read the model picked and acts on it. The box's runner
   // composes its own look; web and mobile compose the shared one over their gated call (found missing 2026-09-29).
@@ -108,6 +111,7 @@ export const SEAMS = Object.freeze([
   // timer the foreground cadence. The box keeps its own clock (`host-tick`).
   { id: 'person-clock', pattern: /createPersonClock\(/, shells: ['web', 'mobile'], why: 'a person\'s own planned rows (their week overview) run on their phone and in their browser while the app is open' },
   { id: 'own-devices-store', pattern: /createOwnDevicesStore\(|lazyOwnStore\(/, shells: ['web', 'mobile', 'box'], why: 'a host\'s own planned work (and that of the people it is the device for) is durable, sealed, and no circle\'s' },
+  { id: 'device-push-store', pattern: /pinboardPushPersistDb:/, shells: ['web', 'mobile', 'box'], why: 'push subscriptions survive a restart on the device\'s own sealed store, never in the pinboard store a pod can reach' },
   { id: 'intention-runner', pattern: /createIntentionRunner\(/, shells: ['box'], why: 'what is planned runs once, as its person, through the door' },
   // A change that concerns others (a new, moved or cancelled appointment; a chore given) is told to them by the door
   // that hosts the bot, at once; a person's device writes first to nobody.

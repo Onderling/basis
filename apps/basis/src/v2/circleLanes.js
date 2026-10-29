@@ -26,10 +26,12 @@
  */
 
 import { makeGovernanceCatchUp } from './governanceCatchUp.js';
+import { makeCircleReportPeerHandler } from './circleLogReceiver.js';
+import { narrowReportStatements } from './reportLane.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { makeSyncSelection, HOLD_EVERYTHING } from './syncSelection.js';
 import { GRANTS_BROADCAST } from './grantsRail.js';
-import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from './taskRail.js';
+import { makeItemsPeerHandler, ITEMS_BROADCAST, ITEMS_CATCHUP_SUBTYPES } from './itemsRail.js';
 import { OWN_DEVICES_SCOPE } from './grantsManifest.js';
 import { makeFrontierReplay } from './frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from './chatRail.js';
@@ -54,7 +56,7 @@ export function carryLandedStatement({ carry, subtype, circleId, statement, from
  * Build the lane half of a shell's peer-router table.
  *
  * @param {object} a
- * @param {object} a.agent  the basis agent — its rails (`chatRail`, `taskRail`, `keyRail`,
+ * @param {object} a.agent  the basis agent — its rails (`chatRail`, `itemsRail`, `keyRail`,
  *   `membershipRail`), its ready-made receivers (`grantsPeerHandler`, `grantsCatchUp`, `rosterSeed`,
  *   `contactTurnHandler`, `knownPeersSync`) and `rosterReads`. A rail this agent does not have yields no entry.
  * @param {(addr: string, payload: object, opts?: object) => any} [a.sendToPeer]
@@ -110,6 +112,9 @@ export function buildCircleLanes({
     sendToPeer: send,
     ...aim,
     onChange: govChange,
+    // A report statement is served only to its readers — the circle's admins and the person who filed it
+    // (`reportLane.js`, the same rule the report fan applies). The reported member never learns one exists.
+    narrowServe: (statements, who) => narrowReportStatements(statements, who, { callSkill: (...a) => agent.callSkill(...a) }),
     // The durable-head serve: a member offline past the lane's audit window still receives the
     // preserved, originally-signed rules-update statement — the final setting never deletes.
     ...(typeof extraGovStatementsFor === 'function' ? { extraStatementsFor: extraGovStatementsFor } : {}),
@@ -135,12 +140,12 @@ export function buildCircleLanes({
 
   // Content lanes never pull all of it. Tasks replay from the receiver's frontier, paging as needed,
   // and the serve set includes signed snapshots of live heads whose entries have aged out of the lane.
-  const task = agent.taskRail ? makeFrontierReplay({
-    rail: agent.taskRail,
+  const task = agent.itemsRail ? makeFrontierReplay({
+    rail: agent.itemsRail,
     sendToPeer: send,
     ...aim,
-    subtypes: TASK_CATCHUP_SUBTYPES,
-    statementsFor: (circleId) => agent.taskRail.catchUpStatements(circleId),
+    subtypes: ITEMS_CATCHUP_SUBTYPES,
+    statementsFor: (circleId) => agent.itemsRail.catchUpStatements(circleId),
     // the person's own scope is never served on a circle's catch-up: it has its own, between their devices only
     mayServe: (fromPeerAddr, circleId) => circleId !== OWN_DEVICES_SCOPE,
   }) : null;
@@ -176,7 +181,10 @@ export function buildCircleLanes({
   const selection = typeof agent.getParamValue === 'function' ? makeSyncSelection({ getParamValue: agent.getParamValue }) : HOLD_EVERYTHING;
   const refusedKringSaid = new Set();
   const refusedCarrySaid = new Set();   // (reason, address) pairs already said — the log names a fact once
+  // the person's OWN lanes (their contact book, devices, codes) are not a silo a device declines: always held
+  const isOwnLaneId = (circleId) => circleId === OWN_DEVICES_SCOPE || String(circleId).startsWith(`${OWN_DEVICES_SCOPE}:`);
   const holdsFor = (silo) => (circleId) => {
+    if (isOwnLaneId(circleId)) return true;
     if (!selection.kringOn(circleId)) {
       if (!refusedKringSaid.has(circleId)) { refusedKringSaid.add(circleId); console.warn(`[sync] this device does not hold kring ${String(circleId).slice(0, 12)}… — what a sibling still carries for it is refused on landing`); }
       return null;
@@ -251,13 +259,13 @@ export function buildCircleLanes({
     // the circle's truth (keys, membership) is not a silo — but a kring this device declines is refused whole
     ...(keyStatementHandler ? { [KEY_STATEMENT_BROADCAST]: unlessKringOff(keyStatementHandler) } : {}),
     ...catchUpEntries(key),
-    ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({
-      rail: agent.taskRail,
+    ...(agent.itemsRail ? { [ITEMS_BROADCAST]: makeItemsPeerHandler({
+      rail: agent.itemsRail,
       holds: holdsFor('tasks'),
       onPassed: (circleId, statement, fromPeerAddr) =>
-        carryLandedStatement({ carry, subtype: TASK_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
+        carryLandedStatement({ carry, subtype: ITEMS_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
       onLanded: (circleId, statement, fromPeerAddr) =>
-        carryLandedStatement({ carry, subtype: TASK_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
+        carryLandedStatement({ carry, subtype: ITEMS_BROADCAST, circleId, statement, fromPeerAddr, msgId: `task:${statement?.body?.hash ?? ''}` }),
     }) } : {}),
     ...catchUpEntries(task),
     // …and the person's own scope, asked of and served to their own devices only
@@ -271,6 +279,8 @@ export function buildCircleLanes({
       })),
     } : {}),
     ...catchUpEntries(membership),
+    // a report or its resolution, signed on the governance rail — every shell receives it here, the box included
+    ...(govRail ? { 'circle-report-broadcast': makeCircleReportPeerHandler({ rail: govRail, onChange: govChange }) } : {}),
     ...catchUpEntries(gov),
     // The personal lanes. A connection belongs to the PERSON, so a grant or revoke made on one of
     // their devices has to bind at every other device's door; the roster seed answers a freshly
@@ -327,7 +337,7 @@ export function buildCircleLanes({
 
 /**
  * The lanes a device pulls for ONE circle right after it joins: its authority (membership, governance, keys) AND its
- * content (the task lane carries every list, chore and appointment; the chat lane the conversation). Without the
+ * content (the items lane carries every list, chore and appointment; the chat lane the conversation). Without the
  * content lanes a fresh joiner saw the circle empty until its next boot.
  */
 export const JOIN_PULL_LANES = Object.freeze(['membership', 'gov', 'key', 'task', 'chat']);

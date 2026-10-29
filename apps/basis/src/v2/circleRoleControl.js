@@ -64,6 +64,7 @@ export const ROLE_CONTROL_KEYS = Object.freeze({
   notice_handed_over:  'circle.admin.role_notice.handed_over',
   notice_no_one_else:  'circle.admin.role_notice.no_one_else',
   founder_stays:       'circle.admin.founder_stays',
+  no_one_to_take_over: 'circle.admin.no_one_to_take_over',
 });
 
 /** The roster row's identity, in the order the roster shapes carry it (same reading as `caretakerNotice`). */
@@ -79,6 +80,8 @@ const rows = (members) => (Array.isArray(members) ? members.filter((m) => m && t
  * @property {string}           confirmKey   what the confirm says will happen
  * @property {string}           noticeKey    what the panel says afterwards
  * @property {'plain'|'handover'|'no-one-else'} consequence
+ * @property {boolean}          disabled     greyed: the change cannot stand (the last admin, alone)
+ * @property {string}           [reasonKey]  why it is greyed
  */
 
 /**
@@ -110,6 +113,7 @@ export function roleControlFor({ members, member, myRef } = {}) {
       confirmKey: ROLE_CONTROL_KEYS.confirm_promote,
       noticeKey:  ROLE_CONTROL_KEYS.notice_promoted,
       consequence: 'plain',
+      disabled: false,
     };
   }
 
@@ -134,6 +138,10 @@ export function roleControlFor({ members, member, myRef } = {}) {
     confirmKey: CONFIRM[consequence],
     noticeKey:  NOTICE[consequence],
     consequence,
+    // the last admin alone in the circle: the fold keeps the demotion from standing, so the control paints greyed with
+    // the reason — a control that would fail closed is never painted as available
+    disabled: consequence === 'no-one-else',
+    ...(consequence === 'no-one-else' ? { reasonKey: ROLE_CONTROL_KEYS.no_one_to_take_over } : {}),
   };
 }
 

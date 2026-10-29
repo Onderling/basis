@@ -22,7 +22,7 @@
  *
  * The governance FOLD ignores this kind (it branches on propose/vote/resolve): a rules-update is
  * a carried fact, not a decision. Retention is the lane's (audit window) — the applied store item
- * is the durable head, exactly the task-lane relationship.
+ * is the durable head, exactly the items-lane relationship.
  */
 
 /**

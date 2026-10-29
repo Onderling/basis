@@ -859,7 +859,7 @@ Derive a driver signature FROM an item. An item that carries an explicit `driver
 **Kind:** function · **Import:** `matchProfileDrivers` from `'@onderling/agent-registry'`
 
 ```js
-matchProfileDrivers({ properties, item, judge, minShared = 1 } = {})
+matchProfileDrivers({ properties, item, judge, modelConsent = false, minShared = 1 } = {})
 ```
 
 Convenience bridge: match an item against the DRIVER properties held on a profile's property map
@@ -909,7 +909,7 @@ matcher's device; they are not surfaced anywhere (the de-identification model).
 **Kind:** function · **Import:** `matchProfilesMatchable` from `'@onderling/agent-registry'`
 
 ```js
-matchProfilesMatchable({ properties, candidateMatchable, judge, minShared = 1 } = {})
+matchProfilesMatchable({ properties, candidateMatchable, judge, modelConsent = false, minShared = 1 } = {})
 ```
 
 PROFILE↔PROFILE matchable-aware match: score MY private drivers against a CANDIDATE's MATCHABLE
@@ -997,13 +997,16 @@ map (as stored on the profile) OR an array of driver values.
 **Kind:** function · **Import:** `matchDriversSemantic` from `'@onderling/agent-registry'`
 
 ```js
-async matchDriversSemantic({ drivers, signature, judge, minShared = 1 } = {})
+async matchDriversSemantic({ drivers, signature, judge: offered, modelConsent = false, minShared = 1 } = {})
 ```
 
 SEMANTIC on-device match: the deterministic matches PLUS, when an LLM `judge` is wired, the drivers
 that DON'T share tags but the judge rules resonant (catching the synonyms tag-overlap misses). The
 judge runs locally/privatemode/companion — the drivers still never leave a trusted environment.
 Every judge match carries the judge's own reason, so the explainability invariant holds.
+
+The judge runs only under the persona's yes (`modelConsent: true`, from `modelConsentFor`): a judge handed in
+without it is ignored, so no caller reaches a model on someone's drivers they did not agree to.
 
 `judge({ driver, signature })` resolves `{ match:boolean, reason?:string }`. A judge that throws (or
 a missing judge) simply yields no semantic additions — the deterministic layer always stands.
@@ -1032,8 +1035,7 @@ its coarse rung (categoryId under disclosure) lives in `offeringsTaxonomy.js`, n
 `interest` (interests→drivers fold-in, NOTE-skills-properties-audit 4) is likewise a
 driver-kind open item — what someone ENGAGES WITH / cares about — carried as tags on the
 `{ kind, text, tags[] }` shape (no taxonomy / coarse rung: interests are FREE drivers, matched
-on-device by tag overlap). It folds the bespoke learned Layer-2 interest signal
-(pinboard InterestProfile top terms) into one disclosure-controlled property on the profile graph.
+on-device by tag overlap). A person writes them; nothing learns them behind their back.
 
 Legacy `skill` (the pre-rename name for the human "I can do X" DATA — see
 NOTE-offering-rename-inventory.md) is READ-ACCEPTED and normalized to `offering`; new writes use
@@ -1587,6 +1589,43 @@ profilePictureDescriptor()
 
 The descriptor for the canonical `profilePicture` property (media-typed).
 
+## `src/modelConsent.js`
+
+### `MODEL_CONSENT_KEY`
+
+**Kind:** constant · **Import:** `MODEL_CONSENT_KEY` from `'@onderling/agent-registry'`
+
+The profile property that holds a persona's word (true · false) on a model judging its drivers.
+
+### `modelConsentFor`
+
+**Kind:** function · **Import:** `modelConsentFor` from `'@onderling/agent-registry'`
+
+```js
+modelConsentFor(getProfile, personaId, { defaultProfileId = null, modelConfigured = false } = {})
+```
+
+Whether a model may judge this persona's drivers: its own word, else the default persona's, else — nothing said
+anywhere — whether the person configured a model on this device.
+
+**Parameters**
+
+- `getProfile` `(id: string) => object|null`
+- `personaId` `string`
+- `[opts]` `{ defaultProfileId?: string|null, modelConfigured?: boolean }`
+
+**Returns:** `boolean`
+
+### `consentedJudge`
+
+**Kind:** function · **Import:** `consentedJudge` from `'@onderling/agent-registry'`
+
+```js
+consentedJudge(judge, consent)
+```
+
+The one gate on the judge seam: the judge is handed on only under a yes (`true`, nothing else).
+
 ## `src/offeringsTaxonomy.js`
 
 ### `OFFERINGS_TAXONOMY`
@@ -1719,6 +1758,24 @@ pendingRevokesOf(entry)
 
 Every revoke still owed, as `[{node, key}]`.
 
+## `src/personaHandle.js`
+
+### `HANDLE_KEY`
+
+**Kind:** constant · **Import:** `HANDLE_KEY` from `'@onderling/agent-registry'`
+
+The profile key that holds the persona's handle.
+
+### `isPresentedAttributeKey`
+
+**Kind:** function · **Import:** `isPresentedAttributeKey` from `'@onderling/agent-registry'`
+
+```js
+isPresentedAttributeKey(key)
+```
+
+Is this key a persona attribute that statements present, so no release ever carries it?
+
 ## `src/profileFacts.js`
 
 ### `FACTS_AT_KEY`
@@ -1726,6 +1783,12 @@ Every revoke still owed, as `[{node, key}]`.
 **Kind:** constant · **Import:** `FACTS_AT_KEY` from `'@onderling/agent-registry'`
 
 When a profile's facts last changed (ms, as an own property) — the registry's own key, refused by the person-facing ops.
+
+### `FACTS_KEYS_KEY`
+
+**Kind:** constant · **Import:** `FACTS_KEYS_KEY` from `'@onderling/agent-registry'`
+
+When EACH fact last changed (`{ 'p:<key>' | 'd:<context>\u001f<key>': ms }`) — the registry's own key too.
 
 ### `profileFactsOf`
 
@@ -1758,6 +1821,44 @@ stamped with the facts' time. A machine key inside `facts` is ignored.
 
 - `entry` `object`
 - `facts` `{ properties?: object, disclosure?: object, factsAt: number }`
+
+### `stampChangedFacts`
+
+**Kind:** function · **Import:** `stampChangedFacts` from `'@onderling/agent-registry'`
+
+```js
+stampChangedFacts(before, after, at)
+```
+
+The per-key times after a change made HERE at `at`: every fact slot whose value differs between `before` and `after`
+(added, edited or removed) takes `at`; the others keep the time they had. A removed slot keeps its time (a tombstone).
+
+**Parameters**
+
+- `before` `object` — the entry before the change (`{}` for none)
+- `after` `object` — the entry after it
+- `at` `number`
+
+**Returns:** `Object<string, number>`
+
+### `mergeProfileFacts`
+
+**Kind:** function · **Import:** `mergeProfileFacts` from `'@onderling/agent-registry'`
+
+```js
+mergeProfileFacts(here, there)
+```
+
+Merge two copies of one profile's facts, per key: each slot from the side whose time for it is newer (a slot without
+a time counts at its copy's whole `factsAt`, which is how a copy from before the per-key times reads); on a tie the
+first argument's value stands. A slot the winner does not hold is absent from the result (its time stays).
+
+**Parameters**
+
+- `here` `{properties, disclosure, factsAt, keyTimes}`
+- `there` `{properties, disclosure, factsAt, keyTimes}`
+
+**Returns:** `{properties: object, disclosure: object, factsAt: number|null, keyTimes: Object<string, number>}`
 
 ### `factsDiffer`
 
@@ -2089,7 +2190,7 @@ The registry's marker namespace (`_inherit.offering`, …): every key under it i
 
 **Kind:** constant · **Import:** `PERSON_SETTABLE_KEYS` from `'@onderling/agent-registry'`
 
-The keys a person may set through the property ops although this package defines them (their own media ref).
+The keys a person may set through the property ops although this package defines them (their picture, their word on a model, their handle).
 
 ### `isReservedPropertyKey`
 

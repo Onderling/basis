@@ -20,6 +20,19 @@
  * fan-out core injects `toWireRefEnvelope` rather than depending on item-store).
  */
 
+// The per-row chains, per store: a row's patches run one after the other (see `recordCircleAddress`).
+const rowChains = new WeakMap();
+function oneAtATimeFor(store, key, fn) {
+  let chains = rowChains.get(store);
+  if (!chains) { chains = new Map(); rowChains.set(store, chains); }
+  const prev = chains.get(key) ?? Promise.resolve();
+  const run = prev.then(fn, fn);
+  const settled = run.catch(() => {});
+  chains.set(key, settled);
+  settled.then(() => { if (chains.get(key) === settled) chains.delete(key); });
+  return run;
+}
+
 /**
  * Record a member's PROVEN per-circle address (the receive half of address
  * announcing).
@@ -87,128 +100,135 @@ export async function recordCircleAddress(
   const releasedProps = (proven.personaProperties && typeof proven.personaProperties === 'object'
     && !Array.isArray(proven.personaProperties)) ? proven.personaProperties : null;
 
-  let all = [];
-  try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
-  const forGroup = (all ?? []).filter((i) => i?.source?.groupId === a.groupId);
+  // ONE PATCH AT A TIME PER CIRCLE: what follows reads the trail and writes a row's source built from that read, so two
+  // announcements landing together would each write back what the other had not yet written, and one patch would be
+  // lost. Not per member: a peer join's row names the joiner AND the admin who admitted them, and each one's
+  // announcement patches it (their own address; the admin's address and commitment mirrored on it). Chained per circle,
+  // each reads the last.
+  return oneAtATimeFor(store, a.groupId, async () => {
+    let all = [];
+    try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
+    const forGroup = (all ?? []).filter((i) => i?.source?.groupId === a.groupId);
 
-  let patched = 0;
-  let unchanged = 0;
-  // THE PRIMARY CONTACT ADDRESS IS THE MEMBER'S CHOICE (2026-09-17, sync-policy §12). A newly proven address
-  // never EVICTS one already on the row — both belong to the member (a second device, a restored profile) and
-  // delivery + sender authorization keep accepting the whole set — and it never DISPLACES the primary either:
-  // until then the last device to announce (every boot re-announces) took the primary slot, so enrolling a
-  // box made the box the primary the moment it booted. Now the primary slot changes hands only when the
-  // announcement says so (`primary: true` — the member tapped "make this my primary contact address" on that
-  // device) or when the row has no proven primary yet (the address that joined). A plain announce ADDS its
-  // address behind the primary, in announce order. Only pairs carrying their proof survive — an address that
-  // cannot be re-proven downstream never enters the set (deny-by-default, the same rule `deriveRoster` applies).
-  const choosePrimary = a.primary === true;
-  const orderSet = (pairs, first) => {
-    const kept = [];
-    const seen = new Set([first]);
-    for (const p of pairs) {
-      if (!p || typeof p.address !== 'string' || !p.address) continue;
-      if (typeof p.proof !== 'string' || !p.proof) continue;
-      if (seen.has(p.address)) continue;
-      seen.add(p.address);
-      kept.push({ address: p.address, proof: p.proof });
+    let patched = 0;
+    let unchanged = 0;
+    // THE PRIMARY CONTACT ADDRESS IS THE MEMBER'S CHOICE (2026-09-17, sync-policy §12). A newly proven address
+    // never EVICTS one already on the row — both belong to the member (a second device, a restored profile) and
+    // delivery + sender authorization keep accepting the whole set — and it never DISPLACES the primary either:
+    // until then the last device to announce (every boot re-announces) took the primary slot, so enrolling a
+    // box made the box the primary the moment it booted. Now the primary slot changes hands only when the
+    // announcement says so (`primary: true` — the member tapped "make this my primary contact address" on that
+    // device) or when the row has no proven primary yet (the address that joined). A plain announce ADDS its
+    // address behind the primary, in announce order. Only pairs carrying their proof survive — an address that
+    // cannot be re-proven downstream never enters the set (deny-by-default, the same rule `deriveRoster` applies).
+    const choosePrimary = a.primary === true;
+    const orderSet = (pairs, first) => {
+      const kept = [];
+      const seen = new Set([first]);
+      for (const p of pairs) {
+        if (!p || typeof p.address !== 'string' || !p.address) continue;
+        if (typeof p.proof !== 'string' || !p.proof) continue;
+        if (seen.has(p.address)) continue;
+        seen.add(p.address);
+        kept.push({ address: p.address, proof: p.proof });
+      }
+      return kept;
+    };
+    /** The next `{ primary, primaryProof, rest }` for a row holding `{ primary, primaryProof, rest }` — or null when nothing moves. */
+    const placeAddress = (curPrimary, curPrimaryProof, curRest) => {
+      const have = [{ address: curPrimary, proof: curPrimaryProof }, ...(Array.isArray(curRest) ? curRest : [])];
+      const known = have.some((p) => p?.address === proven.circleAddress && p?.proof === proven.circleAddressProof);
+      if (choosePrimary || !curPrimary) {
+        if (curPrimary === proven.circleAddress && curPrimaryProof === proven.circleAddressProof) return null;
+        return { primary: proven.circleAddress, primaryProof: proven.circleAddressProof, rest: orderSet(have, proven.circleAddress) };
+      }
+      if (known) return null;
+      return { primary: curPrimary, primaryProof: curPrimaryProof, rest: [...orderSet(have, curPrimary), { address: proven.circleAddress, proof: proven.circleAddressProof }] };
+    };
+    for (const it of forGroup) {
+      const src = it.source ?? {};
+      let next = null;
+      if (src.redeemedBy === webid) {
+        // Unchanged only when NEITHER the address NOR the release moved — an announcement that
+        // carries a NEW release for an already-known address must still patch the row, or a
+        // released name would never land on a device that already had the address.
+        const releaseChanged = !!releasedProps
+          && JSON.stringify(src.personaProperties ?? null) !== JSON.stringify(releasedProps);
+        const commitmentNew = !!proven.ceremonyCommitment && !src.ceremonyCommitment;
+        const placed = placeAddress(src.circleAddress, src.circleAddressProof, src.circleAddresses);
+        if (!placed && !releaseChanged && !commitmentNew) { unchanged += 1; continue; }
+        const kept = placed ? placed.rest : orderSet([...(Array.isArray(src.circleAddresses) ? src.circleAddresses : [])], src.circleAddress);
+        next = {
+          circleAddress:      placed ? placed.primary : src.circleAddress,
+          circleAddressProof: placed ? placed.primaryProof : src.circleAddressProof,
+          // THE CEREMONY COMMITMENT: who may retire this member's addresses — their owner root, at a
+          // ceremony (core `ceremonyCommitment.js`). Declared and circle-key-signed in the announcement,
+          // verified before this point. First-write-wins: a member's root does not change.
+          ...((!src.ceremonyCommitment && proven.ceremonyCommitment) ? { ceremonyCommitment: proven.ceremonyCommitment } : {}),
+          // …the previously proven addresses SURVIVE beside the new primary (the set — task above).
+          ...((kept.length || src.circleAddresses) ? { circleAddresses: kept } : {}),
+          // A row learned from an intro carries no key at all; without one
+          // `bindCircleAddressKeys` skips the address it was just given. webid IS the member's
+          // signing address in a basis circle (the same fact the ladder's webid rung relies on).
+          ...(src.signingPublicKey ? {} : { signingPublicKey: webid }),
+          // …and the member's release, when the announcement carried one — completing the roster
+          // projection so a released name reaches this device. Absent → the row's release is left
+          // exactly as it was (an announcement without a release never ERASES one).
+          ...(releasedProps ? { personaProperties: releasedProps } : {}),
+        };
+      } else if (src.confirmedBy === webid && src.channel === 'peer') {
+        const placed = placeAddress(src.confirmedByCircleAddress, src.confirmedByCircleAddressProof, src.confirmedByCircleAddresses);
+        const mirrorCommitmentNew = !!proven.ceremonyCommitment && !src.confirmedByCeremonyCommitment;
+        if (!placed && !mirrorCommitmentNew) { unchanged += 1; continue; }
+        const kept = placed ? placed.rest : orderSet([...(Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : [])], src.confirmedByCircleAddress);
+        next = {
+          confirmedByCircleAddress:      placed ? placed.primary : src.confirmedByCircleAddress,
+          confirmedByCircleAddressProof: placed ? placed.primaryProof : src.confirmedByCircleAddressProof,
+          ...((!src.confirmedByCeremonyCommitment && proven.ceremonyCommitment) ? { confirmedByCeremonyCommitment: proven.ceremonyCommitment } : {}),
+          ...((kept.length || src.confirmedByCircleAddresses) ? { confirmedByCircleAddresses: kept } : {}),
+        };
+      }
+      if (!next) continue;
+      try {
+        await store.update(it.id, { source: { ...src, ...next } }, { actor: from });
+        patched += 1;
+      } catch { /* one unwritable row must not cost the others their update */ }
     }
-    return kept;
-  };
-  /** The next `{ primary, primaryProof, rest }` for a row holding `{ primary, primaryProof, rest }` — or null when nothing moves. */
-  const placeAddress = (curPrimary, curPrimaryProof, curRest) => {
-    const have = [{ address: curPrimary, proof: curPrimaryProof }, ...(Array.isArray(curRest) ? curRest : [])];
-    const known = have.some((p) => p?.address === proven.circleAddress && p?.proof === proven.circleAddressProof);
-    if (choosePrimary || !curPrimary) {
-      if (curPrimary === proven.circleAddress && curPrimaryProof === proven.circleAddressProof) return null;
-      return { primary: proven.circleAddress, primaryProof: proven.circleAddressProof, rest: orderSet(have, proven.circleAddress) };
-    }
-    if (known) return null;
-    return { primary: curPrimary, primaryProof: curPrimaryProof, rest: [...orderSet(have, curPrimary), { address: proven.circleAddress, proof: proven.circleAddressProof }] };
-  };
-  for (const it of forGroup) {
-    const src = it.source ?? {};
-    let next = null;
-    if (src.redeemedBy === webid) {
-      // Unchanged only when NEITHER the address NOR the release moved — an announcement that
-      // carries a NEW release for an already-known address must still patch the row, or a
-      // released name would never land on a device that already had the address.
-      const releaseChanged = !!releasedProps
-        && JSON.stringify(src.personaProperties ?? null) !== JSON.stringify(releasedProps);
-      const commitmentNew = !!proven.ceremonyCommitment && !src.ceremonyCommitment;
-      const placed = placeAddress(src.circleAddress, src.circleAddressProof, src.circleAddresses);
-      if (!placed && !releaseChanged && !commitmentNew) { unchanged += 1; continue; }
-      const kept = placed ? placed.rest : orderSet([...(Array.isArray(src.circleAddresses) ? src.circleAddresses : [])], src.circleAddress);
-      next = {
-        circleAddress:      placed ? placed.primary : src.circleAddress,
-        circleAddressProof: placed ? placed.primaryProof : src.circleAddressProof,
-        // THE CEREMONY COMMITMENT: who may retire this member's addresses — their owner root, at a
-        // ceremony (core `ceremonyCommitment.js`). Declared and circle-key-signed in the announcement,
-        // verified before this point. First-write-wins: a member's root does not change.
-        ...((!src.ceremonyCommitment && proven.ceremonyCommitment) ? { ceremonyCommitment: proven.ceremonyCommitment } : {}),
-        // …the previously proven addresses SURVIVE beside the new primary (the set — task above).
-        ...((kept.length || src.circleAddresses) ? { circleAddresses: kept } : {}),
-        // A row learned from an intro carries no key at all; without one
-        // `bindCircleAddressKeys` skips the address it was just given. webid IS the member's
-        // signing address in a basis circle (the same fact the ladder's webid rung relies on).
-        ...(src.signingPublicKey ? {} : { signingPublicKey: webid }),
-        // …and the member's release, when the announcement carried one — completing the roster
-        // projection so a released name reaches this device. Absent → the row's release is left
-        // exactly as it was (an announcement without a release never ERASES one).
-        ...(releasedProps ? { personaProperties: releasedProps } : {}),
-      };
-    } else if (src.confirmedBy === webid && src.channel === 'peer') {
-      const placed = placeAddress(src.confirmedByCircleAddress, src.confirmedByCircleAddressProof, src.confirmedByCircleAddresses);
-      const mirrorCommitmentNew = !!proven.ceremonyCommitment && !src.confirmedByCeremonyCommitment;
-      if (!placed && !mirrorCommitmentNew) { unchanged += 1; continue; }
-      const kept = placed ? placed.rest : orderSet([...(Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : [])], src.confirmedByCircleAddress);
-      next = {
-        confirmedByCircleAddress:      placed ? placed.primary : src.confirmedByCircleAddress,
-        confirmedByCircleAddressProof: placed ? placed.primaryProof : src.confirmedByCircleAddressProof,
-        ...((!src.confirmedByCeremonyCommitment && proven.ceremonyCommitment) ? { confirmedByCeremonyCommitment: proven.ceremonyCommitment } : {}),
-        ...((kept.length || src.confirmedByCircleAddresses) ? { confirmedByCircleAddresses: kept } : {}),
-      };
-    }
-    if (!next) continue;
-    try {
-      await store.update(it.id, { source: { ...src, ...next } }, { actor: from });
-      patched += 1;
-    } catch { /* one unwritable row must not cost the others their update */ }
-  }
 
-  let created = 0;
-  if (patched === 0 && unchanged === 0) {
-    // Nobody by this webid on the trail yet. Only the LOCAL carrier may introduce them — see the
-    // "whose row" note above; a remote self-announce from a non-member is refused outright.
-    if (!isLocalCall) return { ok: false, reason: 'not-a-member' };
-    const [item] = await store.addItems([{
-      type:       'membership-redemption',
-      text:       `${webid} announced a per-circle address for ${a.groupId}`,
-      source:     {
-        groupId:            a.groupId,
-        redeemedBy:         webid,
-        signingPublicKey:   webid,
-        circleAddress:      proven.circleAddress,
-        circleAddressProof: proven.circleAddressProof,
-        ...(proven.ceremonyCommitment ? { ceremonyCommitment: proven.ceremonyCommitment } : {}),
-        channel:            'announce',
-        announcedAt:        Date.now(),
-        ...(releasedProps ? { personaProperties: releasedProps } : {}),
-      },
-      visibility: 'household',
-    }], { actor: from });
-    created = item ? 1 : 0;
-  }
+    let created = 0;
+    if (patched === 0 && unchanged === 0) {
+      // Nobody by this webid on the trail yet. Only the LOCAL carrier may introduce them — see the
+      // "whose row" note above; a remote self-announce from a non-member is refused outright.
+      if (!isLocalCall) return { ok: false, reason: 'not-a-member' };
+      const [item] = await store.addItems([{
+        type:       'membership-redemption',
+        text:       `${webid} announced a per-circle address for ${a.groupId}`,
+        source:     {
+          groupId:            a.groupId,
+          redeemedBy:         webid,
+          signingPublicKey:   webid,
+          circleAddress:      proven.circleAddress,
+          circleAddressProof: proven.circleAddressProof,
+          ...(proven.ceremonyCommitment ? { ceremonyCommitment: proven.ceremonyCommitment } : {}),
+          channel:            'announce',
+          announcedAt:        Date.now(),
+          ...(releasedProps ? { personaProperties: releasedProps } : {}),
+        },
+        visibility: 'household',
+      }], { actor: from });
+      created = item ? 1 : 0;
+    }
 
-  return {
-    ok: true,
-    groupId:       a.groupId,
-    memberWebid:   webid,
-    circleAddress: proven.circleAddress,
-    patched, created,
-    unchanged: patched === 0 && created === 0,
-    _sync: simulateSync(),
-  };
+    return {
+      ok: true,
+      groupId:       a.groupId,
+      memberWebid:   webid,
+      circleAddress: proven.circleAddress,
+      patched, created,
+      unchanged: patched === 0 && created === 0,
+      _sync: simulateSync(),
+    };
+  });
 }
 
 /**

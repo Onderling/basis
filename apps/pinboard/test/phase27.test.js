@@ -21,10 +21,8 @@ import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   resolve as resolveTargets,
   validateTarget,
-  filterByDistance,
   filterMuted,
 } from '../src/lib/targetResolver.js';
-import { cellFor } from '../src/lib/geo.js';
 
 const ANNE = 'https://id.example/anne';
 const BOB  = 'https://id.example/bob';
@@ -83,11 +81,11 @@ async function buildPair({ bobBlocks, bobOffers = null } = {}) {
 /* ── 27.2 targetResolver ──────────────────────────────────── */
 
 describe('Pinboard V2 Phase 27.2 — targetResolver', () => {
-  it('validateTarget accepts all four kinds and rejects others', () => {
+  it('validateTarget accepts the three kinds and rejects others', () => {
     expect(validateTarget({ kind: 'group',    groupId: 'g' })).toBeNull();
     expect(validateTarget({ kind: 'contacts', minTrust: 'bekend' })).toBeNull();
     expect(validateTarget({ kind: 'tag',      tag: 'koor' })).toBeNull();
-    expect(validateTarget({ kind: 'list',     listId: '01HX' })).toBeNull();
+    expect(validateTarget({ kind: 'list',     listId: '01HX' }), 'contact lists are gone').toBeTruthy();
     expect(validateTarget({ kind: 'whatever' })).toBeTruthy();
     expect(validateTarget({ kind: 'group' })).toBeTruthy();   // missing groupId
   });
@@ -124,39 +122,6 @@ describe('Pinboard V2 Phase 27.2 — targetResolver', () => {
     expect(r.recipients.has(CARL)).toBe(false);
   });
 
-  it('resolve(list) returns hand-picked members', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'addContact', { webid: BOB });
-    const list = (await callSkill(bundle.agent, 'createContactList', { name: 'Vrienden' })).list;
-    await callSkill(bundle.agent, 'addToContactList', { listId: list.listId, webid: BOB });
-    const r = await resolveTargets([{ kind: 'list', listId: list.listId }],
-      { members: bundle.members, contacts: bundle.contacts, selfWebid: ANNE });
-    expect(r.recipients.has(BOB)).toBe(true);
-  });
-
-  it('filterByDistance drops out-of-range; keeps unknowns', async () => {
-    const bundle = await buildBundle();
-    await callSkill(bundle.agent, 'setMyLocation', {
-      cell: cellFor({ lat: 52.37, lng: 4.90 }), label: 'Amsterdam', source: 'geocode',
-    });
-    await bundle.members.addMember({
-      webid: BOB,
-      location: { cell: cellFor({ lat: 52.40, lng: 4.95 }), label: 'NL', source: 'geocode' },
-    });
-    await bundle.members.addMember({
-      webid: CARL,
-      location: { cell: cellFor({ lat: 53.22, lng: 6.57 }), label: 'Groningen', source: 'geocode' },
-    });
-    await bundle.members.addMember({ webid: DANI });   // no location → keep
-    const set = new Set([BOB, CARL, DANI]);
-    const r = await filterByDistance(set, {
-      members: bundle.members, selfWebid: ANNE, maxDistanceKm: 10,
-    });
-    expect(r.has(BOB)).toBe(true);
-    expect(r.has(CARL)).toBe(false);    // ~150 km away
-    expect(r.has(DANI)).toBe(true);     // unknown location → kept
-  });
-
   it('filterMuted drops muted webids + stableIds', async () => {
     const bundle = await buildBundle();
     await bundle.members.addMember({ webid: BOB, stableId: 'sb-bob' });
@@ -182,10 +147,9 @@ describe('Pinboard V2 Phase 27.1 — postRequest with targets', () => {
     });
     const item = await bundle.itemStore.getById(r.requestId);
     expect(item.source.targets).toEqual([{ kind: 'group', groupId: 'oosterpoort' }]);
-    expect(item.source.maxDistanceKm).toBeNull();
   });
 
-  it('explicit targets + maxDistanceKm persist on the item', async () => {
+  it('explicit targets persist on the item; a distance is not kept', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'postRequest', {
       text: 'paint', kind: 'ask',
@@ -197,7 +161,7 @@ describe('Pinboard V2 Phase 27.1 — postRequest with targets', () => {
     });
     const item = await bundle.itemStore.getById(r.requestId);
     expect(item.source.targets).toHaveLength(2);
-    expect(item.source.maxDistanceKm).toBe(5);
+    expect(item.source.maxDistanceKm).toBeUndefined();
   });
 
   it('invalid targets are filtered out before storage', async () => {

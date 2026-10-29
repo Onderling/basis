@@ -282,12 +282,53 @@ dnsSdType(serviceType)
 Strip the leading underscore our constant carries, because the library adds its own.
 Exported for the test that pins this against `SERVICE_TYPE`.
 
+### `srvHost`
+
+**Kind:** function · **Import:** `srvHost` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+srvHost(hostname)
+```
+
+The SRV record's target: this host's name in the `.local` domain. Left to the library, the target is the bare
+`os.hostname()` (`surface-go.`), and every resolver — Android's NSD on the phone included — then asks UNICAST DNS
+for a name only multicast DNS answers, finds nothing, and the service is listed but never resolved (found on the
+household tablet, 2026-10-25: an empty room with the companion announcing correctly). A name that already ends in
+`.local` (a laptop that reports it that way) is kept as it is.
+
+### `defaultRouteInterface`
+
+**Kind:** function · **Import:** `defaultRouteInterface` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+defaultRouteInterface(routeTable)
+```
+
+The interface the default route leaves by, from the kernel's route table (`/proc/net/route`'s text): the home LAN's,
+the same rule the box's firewall uses (`lan_iface`). Null when there is no default route or no table.
+
+**Parameters**
+
+- `routeTable` `string`
+
+**Returns:** `string|null`
+
+### `lanAddressesOf`
+
+**Kind:** function · **Import:** `lanAddressesOf` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+lanAddressesOf(interfaces, name)
+```
+
+The addresses an interface holds, in the shape `os.networkInterfaces()` reports them.
+
 ### `createDnsSdDiscovery`
 
 **Kind:** function · **Import:** `createDnsSdDiscovery` from `'@onderling/transports/mdns-dnssd'`
 
 ```js
-createDnsSdDiscovery({ bonjour = null } = {})
+createDnsSdDiscovery({ bonjour = null, hostname = () => os.hostname(), // which interface is the room (the operator's override, else the default route's), and the host's interfaces (tests) lanInterface = () => process.env.COMPANION_NEARBY_IFACE || defaultRouteInterface(readRouteTable()), interfaces = () => os.networkInterfaces(), } = {})
 ```
 
 Build the DNS-SD seam.
@@ -296,6 +337,9 @@ Build the DNS-SD seam.
 
 - `[opts]` `object`
 - `[opts.bonjour]` `object` — inject an instance (tests); otherwise one is created lazily and shared
+- `[opts.hostname]` `() => string` — this host's name (tests); the OS's otherwise
+- `[opts.lanInterface]` `() => (string|null)` — the room's interface (COMPANION_NEARBY_IFACE, else the default route's)
+- `[opts.interfaces]` `() => object` — the host's interfaces (tests); `os.networkInterfaces()` otherwise
 
 **Returns:** `{advertise:Function, browse:Function, destroy:Function}`
 
@@ -339,7 +383,7 @@ the hello handshake and the peer maps are all genuinely exercised.
 **Kind:** function · **Import:** `createMdnsNodeBackend` from `'@onderling/transports/mdns-node'`
 
 ```js
-createMdnsNodeBackend({ discovery, host = undefined } = {})
+createMdnsNodeBackend({ discovery, host = undefined, port = 0, maxInbound = 8 } = {})
 ```
 
 Build the Node backend.
@@ -349,6 +393,8 @@ Build the Node backend.
 - `deps` `object`
 - `deps.discovery` `{advertise:Function, browse:Function}` — the DNS-SD seam (see the header)
 - `[deps.host]` `string` — interface to bind (default: all)
+- `[deps.port]` `number` — the TCP port to listen on (default 0: an ephemeral one). A host behind a firewall passes a fixed one, so the rule it opens is known.
+- `[deps.maxInbound]` `number` — how many inbound sockets it holds at once (default 8): a device on the LAN that opens sockets and never says hello cannot exhaust it.
 
 **Returns:** `{native: object, emitter: object}` — pass straight into `new MdnsTransport({...})`
 

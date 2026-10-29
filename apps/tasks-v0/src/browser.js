@@ -178,6 +178,14 @@ export async function createBrowserMultiCircleTasksAgent({
   // see `skills/actor.js`). A shell that invokes these skills from its own agent passes that agent's key.
   // Absent ⇒ this tasks agent's own key, which no other peer can invoke as.
   hostKey = null,
+  // The HOST AGENT to carry the tasks skills (basis: one agent per person). Given, the tasks engine IS that agent —
+  // its key signs every task grant and bot token, its engine judges every call — and `identityVault` is only the
+  // grant managers' durable store. The host composes this bundle's `isRevoked` and `isOnRecord` into its engine.
+  // Absent ⇒ a tasks agent of its own, keyed from `identityVault`, as before.
+  agent: hostAgent = null,
+  // The key that signed this device's bot tokens before the host took them over — a binding's stored token is
+  // re-signed only when it verifies under this key (BotAgentRegistry.restoreAll).
+  retiredBotIssuer = null,
 }) {
   if (!bus) throw new TypeError('createBrowserMultiCircleTasksAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserMultiCircleTasksAgent: identityVault required');
@@ -185,7 +193,7 @@ export async function createBrowserMultiCircleTasksAgent({
     throw new TypeError('createBrowserMultiCircleTasksAgent: primaryCircleConfig.circleId required');
   }
 
-  const identity = await (async () => {
+  const identity = hostAgent ? hostAgent.identity : await (async () => {
     if (await identityVault.has('agent-privkey')) {
       return AgentIdentity.restore(identityVault);
     }
@@ -200,8 +208,9 @@ export async function createBrowserMultiCircleTasksAgent({
     : buildBundle();
 
   const { meshAgent } = await buildMeshAgent({
+    agent: hostAgent ?? undefined,
     identity,
-    transport: new InternalTransport(bus, identity.pubKey),
+    transport: hostAgent ? undefined : new InternalTransport(bus, identity.pubKey),   // a host brings its own
     localStoreBundle,
     label,
     // The agent's revocation truth: every circle in the map, asked at verify time. The engine takes
@@ -223,6 +232,7 @@ export async function createBrowserMultiCircleTasksAgent({
     circleStoreFor,
     onTaskGrantsRevoked,
     onBotTokenRevoked,
+    retiredBotIssuer,
     hostKey,
   });
   const primaryCircleState = primaryBundle._circleState;
@@ -253,6 +263,7 @@ export async function createBrowserMultiCircleTasksAgent({
       circleStoreFor,
       onTaskGrantsRevoked,
       onBotTokenRevoked,
+      retiredBotIssuer,
       hostKey,
     });
     const cs = spawned._circleState;
@@ -288,7 +299,28 @@ export async function createBrowserMultiCircleTasksAgent({
     meshAgent.skills.register(def);
   }
 
-  await meshAgent.start();
+  if (!hostAgent) await meshAgent.start();   // a host agent is its owner's to start and stop
+
+  // The tasks side's revocation truth and its record of what it issued, for a host to compose into its engine: every
+  // LOADED circle's task grants and bot bindings. A circle that is not loaded answers nothing — so a token it issued
+  // is not on record, and an allow-list refuses it until the circle loads.
+  const isRevoked = async (tokenId) => {
+    for (const cs of circlesMap.values()) {
+      if (await cs?.taskGrantManager?.isRevoked(tokenId)) return true;
+      if (await cs?.botAgentRegistry?.isRevoked(tokenId)) return true;
+    }
+    return false;
+  };
+  const isOnRecord = (token) => {
+    const id = token?.id;
+    if (typeof id !== 'string' || !id) return false;
+    for (const cs of circlesMap.values()) {
+      const task = token?.constraints?.task;
+      if (typeof task === 'string' && (cs?.taskGrantManager?.tokensForTask(task) ?? []).some((t) => t?.id === id)) return true;
+      if (token?.constraints?.scope === 'bot' && (cs?.botAgentRegistry?.list() ?? []).some((b) => b.tokenId === id)) return true;
+    }
+    return false;
+  };
 
   return {
     agent:   meshAgent,
@@ -296,6 +328,8 @@ export async function createBrowserMultiCircleTasksAgent({
     circlesMap,
     ensureCircle,
     primaryCircleState,
-    close:   () => meshAgent.close?.(),
+    isRevoked,
+    isOnRecord,
+    close:   () => (hostAgent ? undefined : meshAgent.close?.()),
   };
 }

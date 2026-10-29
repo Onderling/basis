@@ -2,8 +2,7 @@
  * Verification — circle chat SEND fans through the unified secure-agent reliable path
  * (basis injects `sa.peer.sendTo(..., {guarantee:'hold-forward'})` as `reliableSend`;
  * `broadcastCircleMessage` uses it), and RECORDS through B's REAL receive path — the
- * harness now wires the real `circleChatReceiver → chatMessageInbox` (eventLog +
- * ingestCircleMessage), no stand-in. Plus offline hold-forward for chat.
+ * signed statement at the chat rail onto the device log, no stand-in. Plus offline hold-forward for chat.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 

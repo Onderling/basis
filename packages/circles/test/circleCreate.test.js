@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { createGroupWithRules, createGroupV2, redeemInviteWithGate } from '../src/circleCreate.js';
+import { createGroupWithRules, createGroupV2 } from '../src/circleCreate.js';
 
 const fakeStore = () => {
   const items = [];
@@ -88,28 +88,3 @@ describe('createGroupV2 — zero-key self-create writer (§8c slice-a lift)', ()
   });
 });
 
-describe('redeemInviteWithGate — zero-key join rules-gate (§8c slice-a lift)', () => {
-  it('persists a rules-accept record when privacy + rules are accepted', async () => {
-    const store = fakeStore();
-    const r = await redeemInviteWithGate(
-      { store },
-      { a: { invite: { groupId: 'g1' }, privacyAccepted: true, rulesAccepted: true }, from: 'webid:bob' },
-    );
-    expect(r).toMatchObject({ ok: true, groupId: 'g1' });
-    expect(r.acceptanceId).toBeTruthy();
-    expect(store.items).toHaveLength(1);
-    expect(store.items[0]).toMatchObject({
-      type: 'rules-accept', source: { groupId: 'g1', acceptedBy: 'webid:bob', gateVersion: 'phase-17' },
-      _actor: 'webid:bob',
-    });
-  });
-
-  it('refuses without invite / privacy / rules acceptance (honest error, no write)', async () => {
-    const store = fakeStore();
-    expect(await redeemInviteWithGate({ store }, { a: {} })).toEqual({ error: 'invite required' });
-    expect(await redeemInviteWithGate({ store }, { a: { invite: { groupId: 'g' }, privacyAccepted: false, rulesAccepted: true } })).toEqual({ error: 'privacy-not-accepted' });
-    expect(await redeemInviteWithGate({ store }, { a: { invite: { groupId: 'g' }, privacyAccepted: true, rulesAccepted: false } })).toEqual({ error: 'rules-not-accepted' });
-    expect(await redeemInviteWithGate({ store }, { a: { invite: {}, privacyAccepted: true, rulesAccepted: true } })).toEqual({ error: 'invite missing groupId' });
-    expect(store.items).toHaveLength(0);
-  });
-});

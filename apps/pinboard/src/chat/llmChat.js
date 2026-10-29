@@ -143,10 +143,8 @@ const PINBOARD_OP_ALIAS = {
 const SHELL_ONLY_OPS = new Set([
   'startDm',                    // basis [DM] button → ensureDmThread
   'getCurrentGroup',            // synthesized in realAgent (single-circle /groups)
-  'restoreFromMnemonicWizard',  // customRenderer
   'conflictDisputeWizard',      // customRenderer
   'postAudienceWizard',         // customRenderer
-  'encryptedBackupWizard',      // customRenderer
   'createGroupWizard',          // customRenderer
   'joinGroupWizard',            // customRenderer
 ]);

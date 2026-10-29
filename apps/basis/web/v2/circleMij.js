@@ -318,7 +318,7 @@ function renderPersonas(tr, model, { onCreatePersona }) {
       // what you offer — also as this persona? Unticked: a work persona must not silently 'offer' your gardening
       const offerRow = el('label', 'cc-mij__new-offerings');
       const offer = el('input', 'cc-mij__new-offerings-tick');
-      offer.type = 'checkbox';
+      offer.type = 'checkbox';   // sets: form:createProfile — the new persona takes your offerings
       offer.checked = false;
       const offerText = el('span', null, '');
       const wordOffer = () => { offerText.textContent = tr('circle.mij.new_persona_offerings', { name: name.value.trim() || tr('circle.mij.new_persona_offerings_unnamed') }); };

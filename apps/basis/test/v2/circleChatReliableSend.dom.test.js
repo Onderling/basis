@@ -1,14 +1,11 @@
 // @vitest-environment happy-dom
 //
-// Verification (happy-dom) — the circle composer dispatches the unified send op,
-// and an inbound `circle-chat-message` wire envelope (the conforming shape the
-// reliable-path fan-out now emits, carrying top-level `text`) renders into the
-// circle bubble list. Uses the real renderers/substrate — no invented UI.
+// Verification (happy-dom) — the circle composer dispatches the unified send op (the signed statement).
+// Uses the real renderers/substrate — no invented UI.
 import { describe, it, expect, vi } from 'vitest';
 
 import { renderCircleView } from '../../web/v2/circleView.js';
 import { buildCircleStream } from '../../src/v2/circleStream.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 
 const t = (key) => key;
@@ -50,40 +47,5 @@ describe('circle chat · composer dispatches the unified send op', () => {
     expect([app, op]).toEqual(['pinboard', 'broadcastCircleChatStatement']);
     expect(args).toMatchObject({ groupId: 'g1', event: { sig: 's1' } });   // the statement rides, not plain text
     expect(typeof args.msgId).toBe('string');
-  });
-});
-
-describe('circle chat · inbound reliable-path envelope renders into the circle list', () => {
-  it('ingests a conforming circle-chat-message (top-level text) and renders a bubble', async () => {
-    const events = [];
-    const inbox = createChatMessageInbox({
-      eventLog: { append: (e) => events.push(e) },
-      logger:   { warn() {}, info() {}, debug() {} },
-    });
-
-    // The exact wire shape the reliable fan-out now emits (text, not body).
-    const wire = {
-      type: 'p2p-chat', subtype: 'circle-chat-message',
-      circleId: 'g1', msgId: 'm-in-1', ts: Date.now(),
-      text: 'hallo vanaf een peer', fromActor: 'Pieter', fromWebid: 'Pieter',
-    };
-    const r = await inbox.ingestChatMessage(wire, { source: 'receiver', fromPeerAddr: 'peer-addr' });
-    expect(r.result).toBe('inserted');
-
-    // A `body`-only envelope (the OLD chat.send shape) is rejected — proving the
-    // reliable-path `text` envelope is what this receiver requires.
-    const bad = await inbox.ingestChatMessage(
-      { type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'g1', msgId: 'm-bad', ts: Date.now(), body: 'oops' },
-      { source: 'receiver', fromPeerAddr: 'peer-addr' },
-    );
-    expect(bad.result).toBe('rejected');
-
-    // The appended event flows through the real stream builder + renderer into a bubble.
-    const rows = buildCircleStream({ events, circles: [circle], circleId: 'g1' });
-    const el = mount();
-    renderCircleView(el, { circle, rows, t });
-    const bubbles = el.querySelectorAll('.circle-view__bubble');
-    expect(bubbles).toHaveLength(1);
-    expect(bubbles[0].querySelector('.circle-view__bubble-text').textContent).toBe('hallo vanaf een peer');
   });
 });

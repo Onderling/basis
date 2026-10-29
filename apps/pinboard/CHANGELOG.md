@@ -1,5 +1,52 @@
 # Changelog — @onderling-app/pinboard
 
+## [Unreleased] — the contact book is own-devices rows (2026-10-29)
+
+- The contact book is `contact` rows on the host's own-devices store, one per (self, contact), id `<selfId>:<webid>`,
+  written as the self the contact is filed under, so each rides that self's own-devices lane only. Re-filing a contact
+  under another self deletes the old self's row and writes the new self's. The host injects the store and the self
+  mapping (`contactStore`, `contactSelfFor`); standalone the book is in memory.
+- `forgetContact` (the host's own op) is deleted with the `contact-refile` row it answered.
+- `contacts.get(webid)` is the single-contact read (wireChat's isContact, the person-key adoption, a poster lookup).
+- Contacts held in the old book (MemberMap entries marked as contacts) are moved into the new book once, at boot,
+  as the self they are filed under — on a box, the household bot's admitted people stay admitted. The move goes in the
+  release after next.
+
+## [Unreleased] — the membership code is the admin's own (2026-10-25)
+
+- With a host own store (`hostCircles.ownStore`), a circle's invite code (`membership-code`, now a dictionary type)
+  lives there, written as the self the admin is in that circle, so it rides that self's own-devices lane only. It is
+  no longer in the pile and never in a circle's store; the trail names it by its id only.
+- Who answered my post (`post-answers`, now a dictionary type) lives on the same own store, written as the self I am
+  in the post's circle, and is folded back into the post on my own reads. It is no longer in the pile.
+
+## [Unreleased] — the export-only encrypted backup is gone (2026-10-25)
+
+- `encryptedBackup` / `encryptedBackupWizard` and the "Back up my keys" button (web and phone) are deleted. It sealed
+  the person's own posts and member row, not their keys, into a file nothing could restore. **Release note:** the way
+  to keep and restore what is yours is the recovery phrase and the recovery file (Mijn gegevens).
+
+## [Unreleased] — the noticeboard listing lists posts only (2026-10-25)
+
+- `listOpenRequests` with no `type` or `intent` returns the canonical post types only. Before, it returned every open
+  row of the circle: the rules head, the trail and the admin's membership-code row with its code. Asked for one `type`
+  it answers that type; a secret type (`membership-code`, `post-answers`) is never listed, whatever is asked.
+
+## [Unreleased] — push subscriptions on the device, the interest profile gone (2026-10-25)
+
+- Push subscriptions live on the device's own sealed push store (`pushStore`), never in pinboard's cache and never on
+  a pod. **Release note:** a person who had notifications on must switch them off and on once; the old subscription
+  is not carried over.
+- The Layer-2 interest profile is deleted (`getInterestProfile`, `resetInterestProfile`, the profile cache, and
+  basis's one-time interests migration). It learned from every answered post and nothing read it.
+  `scorePostRelevance` answers from the person's own offerings only.
+- The viewer-side Reveals are deleted: the `setPeerReveal` op and its `/reveal` slash, `setGroupReveal`,
+  `requestReveal`, `getMyReveals`, RevealsCache, item hydration (`addedByDisplay` and siblings) and the roster's
+  `viewerNameOptIn`. Nothing read them. A name is disclosed by the persona/disclosure release only.
+- A contact re-filed under another self no longer leaves a record in the book (`listRefiledContacts` and
+  `refiled.json` are gone). The host writes one `contact-refile` row to the own-devices store, as the self the
+  contact left; that self's devices drop it from their book where the row lands.
+
 ## [Unreleased] — attachments are canonical `media` items (2026-07-10)
 
 Media Phase 1 anti-drift tail: pinboard's inline-bytes attachments now

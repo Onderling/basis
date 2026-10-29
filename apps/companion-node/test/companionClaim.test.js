@@ -42,7 +42,7 @@ function configDir() {
   return dir;
 }
 async function node(dir) {
-  const host = await startCompanionNode({ configDir: dir, management: true });
+  const host = await startCompanionNode({ configDir: dir, vaultPassphrase: 'test-only-passphrase', management: true });
   cleanups.push(() => host.stop());
   return host;
 }

@@ -63,7 +63,7 @@ describe('4.1 — a DM to an offline peer is held, flushed once, and never leaks
     const res = await ctrl.send({ toPubKey: 'cato', threadId: 't1', body: 'hoi Cato', subtype: 'chat-message' });
 
     expect(res.ok).toBe(true);              // held counts as sent — the sender is not told it failed
-    expect(addItems).toHaveBeenCalled();    // and the turn is durable locally straight away
+    expect(addItems).not.toHaveBeenCalled();   // nothing kept here: the turn's record is the contact thread
     expect(b.inbox.cato).toEqual([]);       // nothing delivered yet
     expect(b.inbox.bram).toEqual([]);       // the third party is never addressed
   });

@@ -39,6 +39,9 @@ const ALLOWED = Object.freeze({
   'apps/basis/src/v2/ownDevicesStore.js':
     'The own-devices store — a person\'s (or a bot\'s) OWN typed items, keyed by the own-devices scope the grants lane '
     + 'rides: it reaches only their own devices, never a circle\'s members. A different scope, not a second store for a circle.',
+  'apps/pinboard/src/lib/ContactBook.js':
+    'The contact book\'s standalone default — an in-memory own-devices store for pinboard with no host (tests). A host '
+    + 'passes its own store (`contactStore`) and this branch is not taken; not a circle\'s store.',
   'apps/basis/src/v2/contactDmStore.js':
     'The contact DM store — `getStore(\'dm\')`, a 1:1 thread, not a circle. A different scope, not a '
     + 'second store for the same one. Shared web≡mobile so the two shells cannot each build their own.',

@@ -52,14 +52,18 @@ describe('Canonical types — registration via default registry', () => {
       'claim',
       'contact',
       'device-link',
+      'group-rules',
       'inbox-item',
       'intention',
       'list',
       'list-item',
       'media',
+      'membership-code',
+      'membership-redemption',
       'neighbourhood-job',
       'note',
       'offer',
+      'post-answers',
       'removed-entry',
       'removed-list',
       'request',
@@ -102,7 +106,7 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'offer':             { body:        'ladder available, lend it to whoever needs it' },
     'request':           { body:        'looking to borrow a drill this weekend' },
     'claim':             { itemRef:     'pseudo-pod://x/y/z' },
-    'contact':           { displayName: 'Anne' },
+    'contact':           { webid: 'w:anne', displayName: 'Anne' },   // nothing of its own is required
     'calendar-event':    { title:       'Coffee', startsAt: NOW },
     'announcement':      { body:        'Heads up: code rotates Friday' },
     'reveal-request':    { requester:   'pk-a', target: 'pk-b' },
@@ -124,9 +128,19 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'intention':         { op: 'weekOverview', trigger: { every: 'week', on: 'sun', at: '18:00' }, actsAs: 'telegram:1' },
     // A device of the person, own-devices scope only: its default wire id and its internal id.
     'device-link':       { wireId: 'd-0123', internalId: 'i-0123' },
+    // A circle's invite code, the admin's own: which circle, which code.
+    'membership-code':   { source: { groupId: 'g-1', code: 'abc-123' } },
+    // Who answered one of my posts: which post.
+    'post-answers':      { source: { itemId: 'i-1', responders: [] } },
     'rsvp':              { event: 'e-1', by: 'webid:bob', response: 'accepted', at: 1 },
+    // A row of a circle's roster trail: which circle, who redeemed.
+    'membership-redemption': { source: { groupId: 'g-1', redeemedBy: 'pk-bram' } },
+    // A circle's rules head: which circle.
+    'group-rules':       { source: { groupId: 'g-1', rules: { purpose: 'circle' }, version: 1 } },
   };
 
+  // a type whose own fields are all optional has no field-specific sweep
+  const NONE_OWN_REQUIRED = new Set(['contact']);
   for (const [name, extra] of Object.entries(MINIMAL)) {
     it(`'${name}' validates a minimal item`, () => {
       const result = validate(baseItem(name, extra));
@@ -143,7 +157,7 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
       expect(result.ok).toBe(false);
     });
 
-    it(`'${name}' fails when an item-specific required field is missing`, () => {
+    if (!NONE_OWN_REQUIRED.has(name)) it(`'${name}' fails when an item-specific required field is missing`, () => {
       // Drop one required type-specific field per type.
       const dropKey = Object.keys(extra)[0];
       const item = baseItem(name, extra);

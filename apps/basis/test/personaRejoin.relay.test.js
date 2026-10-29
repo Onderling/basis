@@ -47,7 +47,9 @@ describe('a restored device rejoins a persona\'s circle as the persona', () => {
     const ownerRootVault = new VaultMemory();
     // what a shell keeps on its disk across the restart: the vaults, the registry, the circle stores and the device log
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-rejoin-'));
-    const vaults = { ownerRootVault, rootKeyStore: new RootKeyStoreVault({ vault: ownerRootVault }), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') } };
+    const vaults = { ownerRootVault, rootKeyStore: new RootKeyStoreVault({ vault: ownerRootVault }), chatVault: new VaultMemory(), registryBackend: createMemoryBackend(), pinboardPersistDb: { path: path.join(dir, 'pinboard-state.json') },
+      // the circles' own stores are durable on a device, as on every shell: the roster trail lives there
+      householdPersistDb: { path: path.join(dir, 'household-state.json') } };
     const d2Log = log();
     const storage = memStorage();
     const pre = await bootRealAgentNode('d2-pre', { agentOpts: { ...vaults } });

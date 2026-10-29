@@ -42,6 +42,7 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
     throw new Error('createCircleStores: a shared core.DataSource (read/write/delete/list) is required');
   }
   const stores = new Map();   // circleId → CircleItemStore (created lazily, cached)
+  const locals = new Map();   // circleId → its store on the shared local backing, for a circle on its own medium
   const rootFor = (circleId) => `${rootPrefix}${circleId}/`;
 
   return {
@@ -64,6 +65,49 @@ export function createCircleStores({ dataSource, registry, resolution, rootPrefi
       return store;
     },
     has: (circleId) => stores.has(circleId),
+    /** The circles whose store is open on this device (each opened by a `getStore`), in the order they were opened. */
+    ids: () => [...stores.keys()],
+    /**
+     * The circles that hold rows on the shared local backing — open or not. A circle is opened by its sync's wiring,
+     * which a join or a boot does in its own order, so after a restart a circle can hold rows here before anything
+     * opens it. A circle on its own backing (`dataSourceFor`) is listed once it is open.
+     */
+    async heldIds() {
+      const held = new Set(stores.keys());
+      for (const k of (await dataSource.list(rootPrefix)) ?? []) {
+        const id = k.slice(rootPrefix.length).split('/')[0];
+        if (id) held.add(id);
+      }
+      return [...held];
+    },
+    /**
+     * ONE circle's store on the SHARED LOCAL backing, whatever medium the circle itself runs on — for rows that are
+     * this device's own view and must never sit on a medium other devices write too (a pod-backed circle's pod is
+     * shared by every member's device). Cached; no hook (nothing written here is carried by the store's sync).
+     */
+    localStore(circleId) {
+      if (typeof circleId !== 'string' || !circleId) throw new Error('createCircleStores.localStore: a non-empty circleId is required');
+      const open = stores.get(circleId);
+      const ownBacking = typeof dataSourceFor === 'function' && dataSourceFor(circleId);
+      if (open && !ownBacking) return open;   // a shared-backing circle: its store IS on the local backing
+      let local = locals.get(circleId);
+      if (!local) {
+        local = new CircleItemStore({ dataSource, rootContainer: rootFor(circleId), registry, resolution, originOf });
+        locals.set(circleId, local);
+      }
+      return local;
+    },
+    /**
+     * A reader for ONE circle's rows that opens nothing: the open store when there is one, else a store over its rows
+     * on the backing, not cached and with no hook — for a read, never for a write (a write goes through `getStore`).
+     */
+    peek(circleId) {
+      if (typeof circleId !== 'string' || !circleId) throw new Error('createCircleStores.peek: a non-empty circleId is required');
+      const open = stores.get(circleId);
+      if (open) return open;
+      const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
+      return new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry, resolution, originOf });
+    },
     /**
      * Forget ONE circle on this device: its rows go from the backing it lives on and its cached store with them. The
      * rows are deleted at the DataSource, beneath the store, so no removal hook fires — this is a device letting go

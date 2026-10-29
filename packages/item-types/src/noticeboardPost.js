@@ -79,10 +79,8 @@ export function isNoticeboardPost(item) {
     if (src.rules != null) return false;                          // group-rules
     if (typeof src.code === 'string' && src.code) return false;   // membership-code
     if (src.redeemedBy != null) return false;                     // membership-redemption
-    // circle-chat-message — the only pinboard item keyed by a message id (pinboard's
-    // `broadcastCircleMessage` local mirror + `ingestCircleMessage` receive mirror are
-    // the only writers of `source.msgId`; the other circle broadcasts put theirs on the
-    // wire `extras`, never on a stored item).
+    // circle-chat-message — the only item shape keyed by a message id. Circle chat keeps no store row any
+    // more (its record is the device log), so none should be stored; a row with a msgId is still never a post.
     if (typeof src.msgId === 'string' && src.msgId) return false;
     // a 1:1 chat turn (a reply to a post travels as one) — chat-p2p keys it by its wire nonce and the
     // thread it answers; it is a conversation, never a post, and it showed on the replier's own board

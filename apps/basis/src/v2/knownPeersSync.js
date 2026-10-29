@@ -8,9 +8,11 @@
  * later and the contact writes again, the box refuses them as a stranger. Silently. The contact
  * book has the same shape one layer up: a card scanned on the phone is a contact on the phone.
  *
- * The greeting is between sockets; that cannot change. But its RESULT — "this key is Bea", "Bea is
- * a contact" — is a fact about the person, and this carries it to every device of theirs. Two kinds
- * ride the same wire: the security layer's bindings (address → key) and the contact book's rows.
+ * The greeting is between sockets; that cannot change. But its RESULT — "this key is Bea" — is a fact
+ * about the person, and this carries it to every device of theirs: the security layer's bindings
+ * (address → key). The contact book's rows do NOT ride here: they are `contact` rows on the person's
+ * own-devices store, carried by that self's own-devices lane and merged there (their field-sets by
+ * their own times).
  *
  * Deliberately the SAME shape as the contact-turn fan and the grants catch-up: a sibling is reached
  * at its proven per-circle address (`siblingDeviceAddresses`), over hold-forward, and a landed
@@ -18,19 +20,17 @@
  * owner's own proven device addresses, both of which are proofs of key-holding the security layer
  * has already checked. Three moments carry it:
  *
- *   • LIVE — a greeting lands or a contact is added on one device: that one row goes to the others.
+ *   • LIVE — a greeting lands on one device: that one binding goes to the others.
  *   • A NEW SIBLING — a device of mine just announced its per-circle address: it gets everything.
  *   • CATCH-UP — on connect, a device asks its siblings for everything (an offline stretch longer
  *     than the hold is reconciled here; any one complete answer suffices).
  *
  * On landing, a binding is filed through `learnPeerKey`: ESTABLISH if absent, never replace — a
  * sibling's word can introduce a key, not overrule one this device holds (a key change arrives as a
- * rotation proof, on its own path). A contact is ADDED if absent and otherwise left alone: each
- * device's own edits stand, and "the same contact, edited on two devices" is a merge question this
- * does not answer (recorded as open).
+ * rotation proof, on its own path).
  *
  * Pure — no DOM, no RN, no transport import. Web, mobile and the headless device share it; the agent
- * injects its sends, its sibling lookup, its security layer and its contact book.
+ * injects its sends, its sibling lookup and its security layer.
  */
 
 /** A row learned live on one device, carried to the others. */
@@ -43,29 +43,6 @@ export const KNOWN_PEERS_CATCHUP_SUBTYPES = Object.freeze({
   batch:   'device-known-peers-batch',
 });
 
-/** The contact fields that cross: what another device needs to hold the same person. Never a blob. */
-const CONTACT_FIELDS = ['webid', 'pubKey', 'handle', 'displayName', 'name', 'avatarUrl', 'trustLevel', 'tags', 'peerAddr', 'points',
-  // a node's: where its agenda links are served
-  'serves',
-  // a card that says it is a bot (display only)
-  'bot',
-  // the identity link: on a person's row for a household bot, the row their identity is linked to there (every device
-  // of theirs then speaks to it as them, and a device revoke reaches it); on a bot's row for a person, their root
-  // (and WHEN the link last changed: the third field-set a sibling may change on a row this device holds, newer wins)
-  'linkedRow', 'linkedRoot', 'linkedAt',
-  'shareLocation', 'allowHopThrough', 'allowAutomatching',
-  // the hidden mark and WHEN it last changed — the one field-pair a sibling may change on a row this device holds (L106)
-  'hidden', 'hiddenAt',
-  // what this contact sees of you — the persona, its level, and WHEN they last changed (L125): the second field-set a
-  // sibling may change on a row this device holds, by the same newer-wins rule
-  'persona', 'revealPreset', 'personaAt',
-  // …and WHEN the contact was deleted (L114): a delete is a hide that also left the pair circle, and its time rides
-  // with the hidden mark so every device's marker can say "verwijderd"
-  'deletedAt',
-  // …and, for a person a hosting bot admitted through a keyless door, the door and the role it gave them: without
-  // them the row lands on a sibling as a nameless keyless contact nobody can place
-  'channel', 'role'];
-
 function bindingToWire(b) {
   if (!b || typeof b !== 'object') return null;
   if (typeof b.address !== 'string' || !b.address) return null;
@@ -73,33 +50,15 @@ function bindingToWire(b) {
   return { address: b.address, pubKey: b.pubKey };
 }
 
-function contactToWire(c) {
-  if (!c || typeof c !== 'object' || typeof c.webid !== 'string' || !c.webid) return null;
-  const out = {};
-  for (const k of CONTACT_FIELDS) if (c[k] !== undefined && c[k] !== null) out[k] = c[k];
-  return out;
-}
-
 /**
  * Project what a device knows onto the wire. Malformed rows are dropped, not carried.
- * @param {{peers?: Array<{address: string, pubKey: string}>, contacts?: object[]}} known
- * @returns {{peers: Array<{address: string, pubKey: string}>, contacts: object[]}|null}  null when nothing survives
+ * @param {{peers?: Array<{address: string, pubKey: string}>}} known
+ * @returns {{peers: Array<{address: string, pubKey: string}>}|null}  null when nothing survives
  */
 export function knownPeersToWire(known) {
   const peers = (Array.isArray(known?.peers) ? known.peers : []).map(bindingToWire).filter(Boolean);
-  const contacts = (Array.isArray(known?.contacts) ? known.contacts : []).map(contactToWire).filter(Boolean);
-  const refiled = (Array.isArray(known?.refiled) ? known.refiled : []).map(refiledToWire).filter(Boolean);
-  if (peers.length === 0 && contacts.length === 0 && refiled.length === 0) return null;
-  return { peers, contacts, ...(refiled.length ? { refiled } : {}) };
-}
-
-/**
- * A contact RE-FILED away from this lane's self (its filing persona changed on a device of the person): the webid and
- * WHEN — never the self it went to, so the old self's devices learn it left without learning where.
- */
-function refiledToWire(r) {
-  if (!r || typeof r !== 'object' || typeof r.webid !== 'string' || !r.webid || !Number.isFinite(r.refiledAt)) return null;
-  return { webid: r.webid, refiledAt: r.refiledAt };
+  if (peers.length === 0) return null;
+  return { peers };
 }
 
 /**
@@ -107,22 +66,17 @@ function refiledToWire(r) {
  * @param {() => Promise<string[]>} a.siblings   the owner's own proven device addresses (`siblingDeviceAddresses`)
  * @param {string} a.selfPubKey                  the profile's chat pubKey
  * @param {(to: string, payload: object) => Promise<any>} a.sendToPeer   hold-forward, like every own-devices fan
- * @param {() => Promise<{peers: object[], contacts: object[]}>} a.snapshot   everything this device knows, for a new sibling or a catch-up
+ * @param {() => Promise<{peers: object[]}>} a.snapshot   every binding this device knows, for a new sibling or a catch-up
  * @param {(address: string, pubKey: string) => 'established'|'unchanged'|'refused'} a.learnPeerKey   the security layer's establish-never-replace setter
- * @param {{ has: (webid: string) => Promise<boolean>, add: (contact: object) => Promise<any>, get?: (webid: string) => Promise<object|null>, setHidden?: (webid: string, hidden: boolean, hiddenAt: number) => Promise<any>, setPersona?: (webid: string, persona: string, opts: {revealPreset?: string|null, personaAt: number}) => Promise<any>, setLinked?: (webid: string, linkedRow: string|null, linkedAt: number) => Promise<any> }} a.contacts
- *   the contact book, raw (not through the waist — a landed row must not fan back out). `get` + `setHidden` let a
- *   sibling's NEWER hidden mark land on a row this device holds — the one change a sibling may make to it (L106).
- *   `forget` drops a contact re-filed under another self from THIS self's book (its contact facets; the member row stays).
- * @param {(summary: {from: string, established: number, contactsAdded: number}) => void} [a.onLanded]   observability seam
+ * @param {(summary: {from: string, established: number}) => void} [a.onLanded]   observability seam
  * @param {(reason: string, fromAddr: string) => void} [a.onRefused]   observability seam
  */
-export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapshot, learnPeerKey, contacts, onLanded = null, onRefused = null } = {}) {
+export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapshot, learnPeerKey, onLanded = null, onRefused = null } = {}) {
   if (typeof siblings !== 'function') throw new Error('knownPeersSync: a `siblings` lookup is required');
   if (typeof selfPubKey !== 'string' || !selfPubKey) throw new Error('knownPeersSync: selfPubKey required');
   if (typeof sendToPeer !== 'function') throw new Error('knownPeersSync: `sendToPeer` is required');
   if (typeof snapshot !== 'function') throw new Error('knownPeersSync: `snapshot` is required');
   if (typeof learnPeerKey !== 'function') throw new Error('knownPeersSync: `learnPeerKey` is required');
-  if (!contacts || typeof contacts.has !== 'function' || typeof contacts.add !== 'function') throw new Error('knownPeersSync: a `contacts` book {has, add} is required');
 
   const refuse = (reason, fromAddr) => { try { onRefused?.(reason, fromAddr); } catch { /* observability never throws */ } };
   const warn = (msg) => { if (typeof console !== 'undefined') console.warn(`[own-devices] ${msg}`); };
@@ -138,67 +92,17 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
     return addrs.includes(fromAddr);
   }
 
-  /** File a landed wire on this device. Establish, never replace; add, never overwrite. */
+  /** File a landed wire on this device. Establish, never replace. */
   async function land(fromAddr, wire) {
     let established = 0;
     for (const b of wire.peers) {
       if (b.address === selfPubKey || b.pubKey === selfPubKey) continue;   // a device never learns itself from a sibling
       try { if (learnPeerKey(b.address, b.pubKey) === 'established') established += 1; } catch { /* one bad row never blocks the rest */ }
     }
-    let contactsAdded = 0;
-    const hiddenChanged = [];   // rows whose hidden mark a sibling's newer change set here: {webid, hidden}
-    for (const c of wire.contacts) {
-      if (c.webid === selfPubKey) continue;
-      try {
-        if (await contacts.has(c.webid)) {
-          // Held here: the row is this device's, except the HIDDEN mark, where the person's newest choice on any
-          // of their devices wins (Frits, 2026-09-19: hidden on one device is hidden on all). Older news never
-          // un-hides what this device hid later; equal times leave this device's mark.
-          const mine = typeof contacts.get === 'function' ? await contacts.get(c.webid) : null;
-          if (typeof c.hidden === 'boolean' && Number.isFinite(c.hiddenAt) && typeof contacts.get === 'function' && typeof contacts.setHidden === 'function') {
-            const myAt = Number.isFinite(mine?.hiddenAt) ? mine.hiddenAt : -Infinity;
-            if (c.hiddenAt > myAt) {
-              await contacts.setHidden(c.webid, c.hidden, c.hiddenAt, Number.isFinite(c.deletedAt) ? { deletedAt: c.deletedAt } : undefined);   // the newer change, with its time
-              if (mine?.hidden !== c.hidden) hiddenChanged.push({ webid: c.webid, hidden: c.hidden });
-            }
-          }
-          // The lens, by the same rule: the person's newest choice of what this contact sees wins on every device.
-          // Only the ROW moves here — the release on the pair circle was said by the device that made the change.
-          if (typeof c.persona === 'string' && c.persona && Number.isFinite(c.personaAt) && typeof contacts.get === 'function' && typeof contacts.setPersona === 'function') {
-            const myAt = Number.isFinite(mine?.personaAt) ? mine.personaAt : -Infinity;
-            if (c.personaAt > myAt) {
-              await contacts.setPersona(c.webid, c.persona, { revealPreset: c.revealPreset ?? null, personaAt: c.personaAt });
-            }
-          }
-          // …and the identity link, by the same rule: linked (or unlinked) to a household bot on one device, on every one
-          if (Number.isFinite(c.linkedAt) && typeof contacts.get === 'function' && typeof contacts.setLinked === 'function') {
-            const myAt = Number.isFinite(mine?.linkedAt) ? mine.linkedAt : -Infinity;
-            if (c.linkedAt > myAt) await contacts.setLinked(c.webid, typeof c.linkedRow === 'string' && c.linkedRow ? c.linkedRow : null, c.linkedAt);
-          }
-          continue;
-        }
-        await contacts.add(c);
-        contactsAdded += 1;
-        if (c.hidden === true) hiddenChanged.push({ webid: c.webid, hidden: true });   // a row that arrives hidden is a change too
-      } catch (err) { warn(`a contact from my own device could not be added: ${err?.message ?? err}`); }
-    }
-    // A contact re-filed under another self on a device of the person: it leaves THIS self's book — only when this
-    // device still files it here, and only if the move is newer than this device's own last filing (so arrival order
-    // between the old self's mark and the new self's row does not matter). Its member row stays (circle display data).
-    const forgotten = [];
-    for (const r of (Array.isArray(wire.refiled) ? wire.refiled : [])) {
-      if (typeof contacts.get !== 'function' || typeof contacts.forget !== 'function') break;
-      try {
-        const mine = await contacts.get(r.webid);
-        if (!mine) continue;
-        const myAt = Number.isFinite(mine.personaAt) ? mine.personaAt : -Infinity;
-        if (r.refiledAt > myAt) { await contacts.forget(r.webid); forgotten.push(r.webid); }
-      } catch (err) { warn(`a re-filed contact could not leave this book: ${err?.message ?? err}`); }
-    }
-    const summary = { from: fromAddr, established, contactsAdded, hiddenChanged, ...(forgotten.length ? { forgotten } : {}) };
+    const summary = { from: fromAddr, established };
     try { onLanded?.(summary); } catch { /* observability never throws */ }
     for (const fn of landedListeners) { try { fn(summary); } catch { /* observability never throws */ } }
-    return { established, contactsAdded, hiddenChanged };
+    return { established };
   }
   const landedListeners = new Set();
 
@@ -234,20 +138,6 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
       const key = `p:${wire.peers[0].address}:${wire.peers[0].pubKey}`;
       if (carried.has(key)) return { attempted: 0, deduped: true };
       carried.add(key);
-      return fanWire(wire);
-    },
-
-    /** LIVE: a contact of THIS self was re-filed under another self here — tell this self's devices it left (webid only). */
-    async fanRefiled({ webid, refiledAt } = {}) {
-      const wire = knownPeersToWire({ refiled: [{ webid, refiledAt }] });
-      if (!wire) return { attempted: 0 };
-      return fanWire(wire);
-    },
-
-    /** LIVE: a contact was added here, or its hidden mark changed — carry the row to the other devices. */
-    async fanContact(contact) {
-      const wire = knownPeersToWire({ contacts: [contact] });
-      if (!wire) return { attempted: 0 };
       return fanWire(wire);
     },
 
@@ -298,18 +188,17 @@ export function createKnownPeersSync({ siblings, selfPubKey, sendToPeer, snapsho
 }
 
 /**
- * ONE LANE, A CONTACT BOOK PER SELF. A device holds several selves; each has its own contacts and its own siblings (the
- * devices holding that self). Each self has its own sync; this router hands a landing to the self whose PROVEN SIBLING SET
- * the sender is in — the self is bound by who sent it, never by anything the payload says — and refuses a sender that is
- * no self's sibling. Live carries go out through the self they belong to.
+ * ONE LANE, THE BINDINGS PER SELF. A device holds several selves; each has its own contacts' bindings and its own siblings
+ * (the devices holding that self). Each self has its own sync; this router hands a landing to the self whose PROVEN
+ * SIBLING SET the sender is in — the self is bound by who sent it, never by anything the payload says — and refuses a
+ * sender that is no self's sibling.
  * @param {object} a
  * @param {ReturnType<typeof createKnownPeersSync>} a.general  the general persona's sync (the one today's callers know)
  * @param {() => Array<ReturnType<typeof createKnownPeersSync>>} a.others  every other held self's sync
- * @param {(contact: object) => (ReturnType<typeof createKnownPeersSync>|null)} a.forContact  the sync a contact's row rides
  * @param {(reason: string, from: string) => void} [a.onRefused]
  */
-export function routeKnownPeersBySender({ general, others, forContact, onRefused = null } = {}) {
-  if (!general || typeof others !== 'function' || typeof forContact !== 'function') throw new Error('routeKnownPeersBySender: `general`, `others` and `forContact` are required');
+export function routeKnownPeersBySender({ general, others, onRefused = null } = {}) {
+  if (!general || typeof others !== 'function') throw new Error('routeKnownPeersBySender: `general` and `others` are required');
   const all = () => [general, ...(others() ?? []).filter(Boolean)];
   const owner = async (fromAddr) => { for (const s of all()) { try { if (await s.admits(fromAddr)) return s; } catch { /* next self */ } } return null; };
   const route = (subtype) => async (fromAddr, payload) => {
@@ -324,11 +213,7 @@ export function routeKnownPeersBySender({ general, others, forContact, onRefused
     onLanded: (fn) => { const offs = all().map((s) => s.onLanded(fn)); return () => offs.forEach((off) => off?.()); },
     /** A binding a greeting taught this device: the general persona's lane, as before. */
     fanPeer: (binding) => general.fanPeer(binding),
-    /** A contact re-filed away from the self `before` was filed under: that OLD self's lane hears it left (webid only). */
-    fanRefiled: (before, { webid, refiledAt } = {}) => { const s = forContact(before); return s ? s.fanRefiled({ webid, refiledAt }) : Promise.resolve({ attempted: 0, skipped: 'no-self' }); },
-    /** A contact's row rides the lane of the self it is filed under — never another self's. */
-    fanContact: (contact) => { const s = forContact(contact); return s ? s.fanContact(contact) : Promise.resolve({ attempted: 0, skipped: 'no-self' }); },
-    /** A new sibling at `address`: the self whose sibling it is hands it that self's book. */
+    /** A new sibling at `address`: the self whose sibling it is hands it that self's bindings. */
     pushTo: async (address) => { const s = await owner(address); return s ? s.pushTo(address) : { sent: false, reason: 'not-a-sibling' }; },
     async requestFromSiblings() {
       let requested = 0;

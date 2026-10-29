@@ -16,7 +16,7 @@
  * Pure. The shells paint what this returns and dispatch `{appOrigin, opId}` through the waist.
  */
 import { renderAttachments } from '@onderling/app-manifest';
-import { featureHasSurface } from './circleTabs.js';
+import { featureHasSurface, BLOCK_SURFACED } from './circleTabs.js';
 
 /**
  * @param {object} a
@@ -30,9 +30,11 @@ import { featureHasSurface } from './circleTabs.js';
  *   only entries declared for it (`surfaces.attach.scopes`, default circle). An `own` entry is offered only when its
  *   add lands in the own store with no circle named: a noun's generic add (the own route answers a DECLARED atom only,
  *   and the projection requires `add` to be declared) or an op that says `own`.
+ * @param {string[]} [a.blockTypes]  the block types on this circle's screen: a feature whose surface is a block (lists)
+ *   is offered in the "+" only where that block is on the screen
  * @returns {Array<{opId:string, appOrigin:string, label:string, params?:Array, itemType?:string, group?:string, via?:string, scopes:string[], fields?:Array}>}
  */
-export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, mediaWired = false, scope = 'circle' } = {}) {
+export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, mediaWired = false, scope = 'circle', blockTypes = [] } = {}) {
   const out = [];
   for (const [appOrigin, manifest] of Object.entries(manifestsByOrigin ?? {})) {
     if (!manifest || !Array.isArray(manifest.operations)) continue;
@@ -40,7 +42,7 @@ export function attachEntriesFor({ manifestsByOrigin = {}, availability = null, 
       // never offer what doesn't work: an op that needs a feature with no surface (making a list, with nothing that
       // shows lists) is left out of the "+"
       const op = manifest.operations.find((o) => o?.id === entry.opId);
-      if ((op?.requires ?? []).some((f) => !featureHasSurface(f))) continue;
+      if ((op?.requires ?? []).some((f) => !featureHasSurface(f) || (BLOCK_SURFACED.has(f) && !(blockTypes ?? []).includes(f)))) continue;
       // The dispatch address, carried: an op id alone is not one, since two apps may declare the same
       // id. The shells used to know it only because the menu came from a single manifest.
       out.push({ ...entry, appOrigin });

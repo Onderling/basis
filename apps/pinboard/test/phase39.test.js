@@ -11,17 +11,14 @@
  * Verifies:
  *   - Attachments lib: `validateInboundAttachment` accepts the sealed pointer +
  *     REFUSES inline plaintext; `toBroadcastShape` carries the sealed line, no
- *     local `ref` / `dataB64`; helpers (attachmentPath / freshAttachmentId / caps).
+ *     local `ref` / `dataB64`; helpers (freshAttachmentId / caps).
  *   - 39.2: postRequest stores the sealed pointer on `source.attachments`; the
  *           record + broadcast carry NO plaintext bytes / `data:image` thumbnail.
  *   - 39.3: the substrate mirror copies the sealed pointer into mirrored items
  *           (no local `ref`).
  *   - 39.4: the removed plaintext byte-serving path — postRequest REFUSES inline
- *           plaintext; requestAttachment still rejects an unknown item.
- *   - 39.5: sendChatMessage requires body-or-attachment, and REFUSES an inline
- *           plaintext attachment (accepts a sealed pointer).
+ *           plaintext (the fetch skill itself is deleted).
  *   - Privacy invariant: no plaintext bytes / `data:image` thumbnail crosses the wire.
- *   - Phase 35 interaction: an evicted author's attachment-bearing post is dropped.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -31,14 +28,12 @@ import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   validateInboundAttachment,
   toBroadcastShape,
-  attachmentPath,
   freshAttachmentId,
   MAX_NOTICEBOARD_BYTES_PER_ATT,
   MAX_CHAT_BYTES_PER_ATT,
   MAX_ATTACHMENTS_PER_POST,
 } from '../src/lib/Attachments.js';
 import { attachSubstrateMirror } from '../src/substrateMirror.js';
-import { EVICTION_GRACE_MS } from '../src/lib/EvictionRoster.js';
 import { makeSealCircle, makeSealedImageAttachment, TINY_PNG_B64 } from './helpers/sealedAttachment.js';
 
 const ANNE = 'https://id.example/anne';
@@ -99,13 +94,6 @@ describe('Phase 39 — Attachments lib (sealed)', () => {
     expect(out[0]).not.toHaveProperty('dataB64');
     expect(out[0]).not.toHaveProperty('thumbnail');
     expect(out[0].source.type).toBe('blob');
-  });
-
-  it('attachmentPath includes the right extension per mime', () => {
-    expect(attachmentPath('item-1', 'att-1', 'image/jpeg')).toMatch(/\.jpg$/);
-    expect(attachmentPath('item-1', 'att-1', 'image/png')).toMatch(/\.png$/);
-    expect(attachmentPath('item-1', 'att-1', 'image/webp')).toMatch(/\.webp$/);
-    expect(() => attachmentPath('item-1', 'att-1', 'image/gif')).toThrow();
   });
 
   it('freshAttachmentId is unique', () => {
@@ -169,7 +157,6 @@ describe('Phase 39.3 — substrate mirror copies the sealed pointer', () => {
     const mirror = await attachSubstrateMirror(bundle, {
       group:          'oosterpoort',
       peers:          [],
-      evictionRoster: bundle.evictionRoster,
     });
 
     await mirror.backfillFrom('pubkey-bob-stub', [{
@@ -202,56 +189,5 @@ describe('Phase 39.4 — plaintext byte-serving path removed', () => {
     expect(r.error).toBe('attachment-plaintext-refused');
   });
 
-  it('requestAttachment still rejects an unknown item', async () => {
-    const bundle = await buildBundle();
-    expect(await callSkill(bundle.agent, 'requestAttachment', { itemId: 'nope', attId: 'x' }))
-      .toEqual({ error: 'item-not-found' });
-  });
 });
 
-describe('Phase 39.5 — sendChatMessage with a sealed attachment', () => {
-  it('rejects empty body + no attachment', async () => {
-    const bundle = await buildBundle();
-    const r = await callSkill(bundle.agent, 'sendChatMessage', { threadId: 't1', toWebid: BOB });
-    expect(r.error).toBe('body-or-attachment-required');
-  });
-
-  it('REFUSES an inline-plaintext chat attachment', async () => {
-    const bundle = await buildBundle();
-    const r = await callSkill(bundle.agent, 'sendChatMessage', {
-      threadId: 't1', toWebid: BOB, attachment: makePlaintextAttachment(),
-    });
-    expect(r.error).toBe('attachment-plaintext-refused');
-  });
-});
-
-describe('Phase 35 + 39 interaction — evicted authors still drop attachments', () => {
-  it('evicted member with attachment: nothing lands locally', async () => {
-    const { att } = await makeSealedImageAttachment(makeSealCircle(), { createdBy: BOB });
-    const bundle = await buildBundle();
-    const past = Date.now() - EVICTION_GRACE_MS - 60_000;
-    bundle.evictionRoster.applyRedemption({
-      type: 'membership-redemption',
-      source: { redeemedBy: BOB, expiresAt: past },
-    });
-
-    const mirror = await attachSubstrateMirror(bundle, {
-      group:          'oosterpoort',
-      peers:          [],
-      evictionRoster: bundle.evictionRoster,
-    });
-
-    await mirror.backfillFrom('pubkey-bob-stub', [{
-      id:           'evicted-with-pic',
-      addedBy:      BOB,
-      type:         'request',
-      text:         'evicted post',
-      requiredSkills: [],
-      source: { attachments: [att] },
-    }]);
-
-    const open = await bundle.itemStore.listOpen();
-    expect(open.some(i => i?.source?.requestId === 'evicted-with-pic')).toBe(false);
-    await mirror.stop();
-  });
-});

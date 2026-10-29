@@ -90,17 +90,27 @@ export async function createBrowserPinboardAgent({
   membershipEmit,
   membershipRead,
   currentPersonKey = null,
+  // The person's own profile (handle, display name, availability, place) — host-injected over the persona record
+  // (lib/selfProfile.js); absent → held in memory.
+  selfProfile = null,
+  // The contact book's home (host-injected): the own-devices store, and which self a row filed under a persona is
+  // written as (lib/ContactBook.js). Absent → an in-memory book of one self.
+  contactStore = null,
+  contactSelfFor = null,
   // The rules-update rider: a rules-doc edit also fans a signed statement on the governance lane
   // (absent → store-local only, the pre-propagation behaviour).
   rulesUpdateEmit,
   selfWebidFor = null,
   selfCard = null,      // whom this device's own card and requests name — absent → this agent's own identity
+  hostCircles = null,    // the host's circles: given, a post lives in its circle's own store (lib/routedStore.js)
   matchesMine = null,   // the host's "a post matches what I offer" (a local closure) — see createNeighbourhoodAgent
   mutedSet,
   // This device's content-seal strategy: the member map (the contact book, every roster row, the name a
   // person shows) and the posts persist under it. Absent → the persisted copy is written in the clear,
   // which is what happened until 2026-09-18 — the host handed it in and this factory dropped it here.
   contentSeal = null,
+  // The push registry's own device-local medium (`{read, write}`) — never the persisted store above.
+  pushStore = null,
 }) {
   if (!bus)           throw new TypeError('createBrowserPinboardAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserPinboardAgent: identityVault required');
@@ -135,12 +145,17 @@ export async function createBrowserPinboardAgent({
     membershipEmit,        // the membership rider's device-log emitter (absent → store-based, unchanged)
     membershipRead,        // the rider's verified reader for the roster fold
     currentPersonKey,      // the person key announced on a join/create (absent → none announced)
+    selfProfile,           // the person's own profile over the persona record (absent → in memory)
+    contactStore,          // the contact book's rows: the own-devices store (absent → in memory)
+    contactSelfFor,        // which self a contact row is written as
     mutedSet,              // the SHELL's block set — this app reads it, never writes it
     rulesUpdateEmit,       // the rules-update rider's governance-lane emitter (absent → store-local only)
     selfWebidFor,          // who this device is per circle (its persona) — absent → the default throughout
     selfCard,              // whom this device's own card and requests name — absent → this agent's own identity
+    hostCircles,
     matchesMine,
     contentSeal,           // the persisted store is sealed under this device's content key
+    pushStore,             // push subscriptions: device-local, never synced
   });
 
   return {

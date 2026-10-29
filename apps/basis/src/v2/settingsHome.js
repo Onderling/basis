@@ -37,3 +37,13 @@ export function settingsGroupFor(manifest, groupId) {
 export function settingsSectionIds(manifest) {
   return new Set(settingsHomeFor(manifest).groups.flatMap((g) => g.sections.map((s) => s.id)));
 }
+
+/**
+ * The settings group an action from Mij opens: a device row, an agent row and a device offer ("open my data") all land
+ * on Apparaten & sleutels, where devices, agents and the enrol live. Null for an action no group answers.
+ * @param {{kind?: string}|null} action
+ * @returns {string|null}
+ */
+export function settingsGroupForAction(action) {
+  return action?.kind === 'open-my-data' || action?.kind === 'open-mydata' ? 'devices-keys' : null;
+}

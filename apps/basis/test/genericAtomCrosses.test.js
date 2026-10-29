@@ -12,7 +12,7 @@ describe('a generic circle note', () => {
   let A; let B;
   afterAll(async () => { await teardown(A, B); });
   it('crosses to the other member with no other op first', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { itemsLane: true }), bootRealAgentNode('B', { itemsLane: true })]);
     await connectAgentsOverBus(A, B);
     const shell = B._routerRef.fn;
     B._routerRef.fn = (env) => { try { if (B.agent.householdSync.handleInbound(env?.from, env?.payload)) return; } catch { /* */ } return shell?.(env); };

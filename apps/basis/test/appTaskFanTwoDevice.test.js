@@ -79,12 +79,12 @@ describe('a task created on one device reaches another device\'s TASKS store (th
   afterAll(async () => { await teardown(A, B); });
 
   it('crosses a task from A to B\'s tasks store — guards the tasks store being mirrored out with nothing writing the inbound back', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { itemsLane: true }), bootRealAgentNode('B', { itemsLane: true })]);
     await connectAgentsOverBus(A, B);
     // Reinstall the production inbound routing on B so fanned envelopes drive B's stores.
     wireInboundLikeShell(B);
 
-    // A REAL join, not a hand-wired peer. The item now crosses on the signed task lane, and the lane
+    // A REAL join, not a hand-wired peer. The item now crosses on the signed items lane, and the lane
     // verifies the sender's key↔ref binding against the circle roster — so a `addCirclePeer` stand-in
     // (which records a transport peer but no membership) is refused, correctly. Pairing for real is
     // what gives B a roster to verify A against.

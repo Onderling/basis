@@ -27,9 +27,12 @@ const GROUP = 'oosterpoort';
 const RULES = { purpose: 'circle', admins: [ADMIN], houseRules: ['wees aardig'] };
 
 // Real per-circle addresses + the join-link proof for BOB (the key behind BOB_ADDR signs the
-// challenge bound to GROUP). ADMIN presents their own (create-path, no proof needed).
+// challenge bound to GROUP). ADMIN presents their own on the create, with the same kind of proof: the creation
+// statement carries it, and the roster folds it through the same gate as a joiner's.
 const _bobSeed   = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('bob');
-const ADMIN_ADDR = 'circle-addr-admin-oosterpoort';
+const _adminSeed = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('admin');
+const ADMIN_ADDR = deriveCircleAddress(_adminSeed, GROUP);
+const ADMIN_PROOF = signCircleLinkFromSeed(_adminSeed, GROUP, GROUP, ADMIN_ADDR);
 const BOB_ADDR   = deriveCircleAddress(_bobSeed, GROUP);
 const BOB_PROOF  = signCircleLinkFromSeed(_bobSeed, GROUP, GROUP, BOB_ADDR);
 
@@ -77,7 +80,7 @@ describe('redeem → capture joiner per-circle address', () => {
   it('listGroupMembers surfaces per-circle addresses for admin + joiner', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2',
-      { groupId: GROUP, name: 'X', rules: RULES, circleAddress: ADMIN_ADDR });
+      { groupId: GROUP, name: 'X', rules: RULES, circleAddress: ADMIN_ADDR, circleAddressProof: ADMIN_PROOF });
     await callSkill(bundle.agent, 'redeemMembershipCode',
       { rulesAccepted: '1', groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 

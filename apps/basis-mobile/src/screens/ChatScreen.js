@@ -64,7 +64,7 @@ import { stashEnrollOffer }   from '../../../basis/src/v2/enrollOffer.js';
 import { useTheme }          from './v2/themeContext.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
-import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { consumeEnrollOffer, consumeCircleEntry } from '../../../basis/src/v2/enrollOffer.js';
@@ -184,7 +184,6 @@ export default function ChatScreen({
   // The receiver path here routes through it; rehydrator + future catch-up paths
   // share the same instance so dedup state is unified.  Pre-ε.1 prop name
   // `circleChatDedup` no longer exists — App.js owns the inbox now.
-  circleChatInbox = null,
   chatStoredReceipt = null,   // the App-owned receipt sender — shared with the inbox (one policy, two paths)
   // Delivery honesty — the shared per-message map (App.js owns it); inbound receipts advance it here.
   deliveryStateMap = null,
@@ -451,7 +450,7 @@ export default function ChatScreen({
   // array honest.
   const buildPeerWiring = useCallback(({ bundle, agent, callSkill, contactChannel, pendingPeerRedeems, sharedWithMeStore }) => {
     const sendPeer = (addr, payload, opts) => agent.sendPeerMessage(addr, payload, opts);
-    // A noticeboard post from another member LANDS in the circle store through the task lane (one carry,
+    // A noticeboard post from another member LANDS in the circle store through the items lane (one carry,
     // web parity); the shell bridges it into pinboard's index + the notification through the same handler.
     agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
       // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
@@ -734,7 +733,7 @@ export default function ChatScreen({
           },
         });
         const { gov: govCatchUp, membership: memCatchUp, key: keyCatchUp,
-                task: taskCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
+                task: itemsCatchUp, chat: chatCatchUp, podChat: podChatCatchUp } = lanes.catchUps;
         // Hand the bundle the catch-ups, so a join made from any screen pulls the circle's lanes (`onCircleJoined`).
         try { if (bundle) bundle.laneCatchUps = lanes.catchUps; } catch { /* a bundle without the slot */ }
         const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
@@ -794,7 +793,7 @@ export default function ChatScreen({
             // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
             // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
             contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-              taskCatchUp?.requestFrom(siblingAddress, circleId),
+              itemsCatchUp?.requestFrom(siblingAddress, circleId),
               chatCatchUp?.requestFrom(siblingAddress, circleId),
             ]),
           };
@@ -819,9 +818,9 @@ export default function ChatScreen({
             .then((r) => { if (r.seeded) console.log('[seeded-contact] added', String(r.webid).slice(0, 12) + '…'); })
             .catch(() => { /* an install without it is not an error state */ });
         }
-        if (taskCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
+        if (itemsCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
           globalThis.__onderlingTaskCatchUpKicked = true;
-          setTimeout(() => { taskCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
+          setTimeout(() => { itemsCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
         }
         // Pod-only circles never fan — read their statement rows back on the same kick.
         if (podChatCatchUp && !globalThis.__onderlingPodChatCatchUpKicked) {
@@ -871,7 +870,6 @@ export default function ChatScreen({
           }),
         };
       })(),
-      'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({
       ensureDmThread:    handleDmThreadOpen,

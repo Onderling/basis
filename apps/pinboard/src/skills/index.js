@@ -28,12 +28,6 @@
  *     the item.
  *   - blocking a person lives in the shell's own set (one set for the
  *     whole device); this app only READS it, through `scope.muted`.
- *   - `reportPost({itemId, reason})` — appends a `kind: 'report'`
- *     item referencing the original.
- *   - `listOpenRequests` / `listMyRequests` outputs hydrate each item's
- *     author into a `display: {handle, displayName?, isRevealed, render}`
- *     block when a `Reveals` store is wired.  Legacy callers without
- *     a reveals store get the raw item shape unchanged.
  *
  * B★ B3 (2026-07-05) — the op-having skills that fit the pure-core shape are
  * now expressed as module-level `coreFn(scope, args, ctx)` functions wrapped by
@@ -66,12 +60,15 @@ import {
 import { wireSkill } from '@onderling/sdk';
 import { pinboardManifest } from '../../manifest.js';
 import { sealingPublicKeyFromNetworkKey as deriveSealingKeyFromAddress } from '@onderling/pod-client';   // one sealing key family: the join grant wraps to the proven address's image
-import { resolve as resolveMember } from '@onderling/identity-resolver';
-import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
+import { validateCanonical, isNoticeboardPost, isNoticeboardPostType } from '@onderling/item-types';
+
+// Rows no listing hands out, whatever it is asked for: the admin's invite code (the code itself is in it) and the poster's
+// record of who answered. Each is read where it is used (the invite and redeem paths; the poster's own reads).
+const SECRET_ROW_TYPES = Object.freeze(['membership-code', 'post-answers']);
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
-import { itemTreeFor, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
+import { itemTreeFor, toWireRefEnvelope } from '@onderling/item-store';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 // The circle storage postures — one vocabulary, in the package that owns the persisted shape.
 import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
@@ -81,7 +78,7 @@ import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriReq
 import {
   createCircleFanOut, recordCircleAddress, fanCircleAddresses,
   listCircleRoster, listCircleMembers,
-  createGroupWithRules, createGroupV2, redeemInviteWithGate,
+  createGroupWithRules, createGroupV2,
   redeemMembershipCode as redeemMembershipCodeCore,
   verifyMembershipCodeForPeer as verifyMembershipCodeForPeerCore,
   leaveGroup as leaveGroupCore,
@@ -121,20 +118,15 @@ import {
   circleInviteCeiling, clampInviteMaxRedemptions, inviteMaxRedemptionsOf, redeemersOfCode,
   INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
 } from '../lib/inviteCeiling.js';
-import { encryptBackup, decryptBackup } from '../lib/encryptedBackup.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
-import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
 import { geocode } from '../lib/geocode.js';
-import { cellFor, distanceKm, snapToGrid, DISTANCE_PRESETS } from '../lib/geo.js';
-import { resolve as resolveTargets, validateTarget, filterByDistance, filterMuted } from '../lib/targetResolver.js';
+import { resolve as resolveTargets, validateTarget, filterMuted } from '../lib/targetResolver.js';
 import {
   validateInboundAttachment,
   persistInboundAttachment,
-  readAttachmentBytesB64,
   toBroadcastShape,
   MAX_ATTACHMENTS_PER_POST,
 } from '../lib/Attachments.js';
-import { update as updateInterest, score as scoreInterest, combinedRelevance } from '../lib/InterestProfile.js';
 import { encodeContactCard, decodeContactCard } from '../lib/contactCard.js';
 
 /**
@@ -318,7 +310,7 @@ async function _findLatestGroupRules(store, groupId) {
  * @param {string|null} [o.groupId]
  * @returns {Promise<Array<{webid: string, handle: string}>>}
  */
-async function collectCircleHandles({ store, members, groupId } = {}) {
+async function collectCircleHandles({ store, groupId } = {}) {
   const taken = [];
   if (store && typeof store.listOpen === 'function') {
     try {
@@ -332,25 +324,8 @@ async function collectCircleHandles({ store, members, groupId } = {}) {
       }
     } catch { /* trail read is best-effort — the MemberMap pass still runs */ }
   }
-  if (members && typeof members.list === 'function') {
-    try {
-      const list = await members.list();
-      for (const m of list ?? []) {
-        if (m?.webid && m.handle) taken.push({ webid: m.webid, handle: m.handle });
-      }
-    } catch { /* roster read is best-effort */ }
-  }
   return taken;
 }
-
-/**
- * How long an already-redeemed MEMBERSHIP stays "active" past its code's expiry.
- *
- * Generous on purpose: this answers *is this person still one of us*, and letting someone's standing
- * lapse over a clock difference would evict a real member. Nobody gets IN through this.
- */
-// Parameter register (#36) — membership-standing grace past expiry (scope:device, kind:internal).
-const MEMBERSHIP_GRACE_MS = param({ key: 'pinboard.membershipGraceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
 
 /**
  * How much clock difference a REDEEM tolerates past a code's expiry.
@@ -411,7 +386,7 @@ async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebi
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const redeemers = redeemersOfCode({
-    redemptions, groupId, codeId: codeItem?.id ?? null, code: codeItem?.source?.code ?? null,
+    redemptions, groupId, codeId: codeItem?.id ?? null,
   });
   const already = requesterWebid ? redeemers.get(requesterWebid) ?? null : null;
   if (already) {
@@ -458,62 +433,11 @@ async function _findLatestActiveCode(store, groupId) {
 }
 
 /**
- * Hydrate a single item's `addedBy` (and any present `completedBy`,
- * `assignee`) into a `display` block via `identity-resolver.resolve()`.
- * No-op if `members` or `reveals` is missing — returns the raw item.
- *
- * **Substrate candidate (rule of two — first consumer):** when a
- * second app renders item-store items with handle/displayName-on-reveal
- * UX, promote `hydrateItem` / `hydrateItems` into
- * `@onderling/identity-resolver` itself (additive — likely a new
- * `hydrate(items, { memberMap, reveals, groupId })` helper).
- * Tracked in `Project Files/Substrates/substrate-candidates.md`.
- */
-async function hydrateItem(item, { members, reveals, viewerWebid, groupId }) {
-  if (!members || !reveals) return item;
-  const out = { ...item };
-  if (item.addedBy) {
-    const d = await resolveMember({
-      memberMap:   members,
-      reveals,
-      targetWebid: item.addedBy,
-      groupId,
-    });
-    if (d) out.addedByDisplay = d;
-  }
-  if (item.completedBy) {
-    const d = await resolveMember({
-      memberMap:   members,
-      reveals,
-      targetWebid: item.completedBy,
-      groupId,
-    });
-    if (d) out.completedByDisplay = d;
-  }
-  if (item.assignee) {
-    const d = await resolveMember({
-      memberMap:   members,
-      reveals,
-      targetWebid: item.assignee,
-      groupId,
-    });
-    if (d) out.assigneeDisplay = d;
-  }
-  return out;
-}
-
-async function hydrateItems(items, ctx) {
-  if (!ctx.members || !ctx.reveals) return items;
-  return Promise.all(items.map((it) => hydrateItem(it, ctx)));
-}
-
-/**
  * @param {object} args
  * @param {import('@onderling/item-store').ItemStore} args.store
  * @param {import('@onderling/offering-match').OfferingMatch} args.offeringMatch
  * @param {object} [args.notifier]                            optional Notifier (lend reminders)
- * @param {object} [args.reveals]                             optional Reveals (author hydration)
- * @param {object} [args.members]                             optional MemberMap (author hydration)
+ * @param {object} [args.members]                             optional MemberMap
  * @param {Set<string>} [args.muted]                          per-viewer mute set (local only)
  * @param {string} [args.localActor]                          this member's webid (used as recipient for lend reminders)
  * @returns {Array<object>} array of `defineSkill` definitions
@@ -611,7 +535,6 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * (`held:true`), which counts as a successful send — NOT a failure.
  *
  * The envelope is the conforming `circle-chat-message` wire shape the existing receiver
- * (basis peerRouter → `makeCircleChatPeerHandler` → chatMessageInbox → `ingestCircleMessage`)
  * validates and renders — carrying a top-level `text` (the chat.send path emitted `body`,
  * which that receiver rejects), `circleId`, `msgId`, `ts`, `fromActor`. Dedup stays on
  * `msgId` at the receiver; ordering + persistence + catch-up are unchanged.
@@ -704,32 +627,10 @@ async function _fanOutViaReliableSend({
   return { sent, attempted: targets.size + unresolved.length, errors, outcomes };
 }
 
-/**
- * Shared inbound-peer filter for BOTH ingest paths (circle chat + circle post),
- * so eviction + mute can't drift between them (E1 drift-guard). Returns a
- * rejection verdict (`{evicted:true}` | `{muted:true}`) or `null` (let through).
- *
- * @param {object} a
- * @param {{isEvicted:(webid:string)=>boolean}|null} [a.evictionRoster]
- * @param {Set<string>|null} [a.muted]              per-viewer local mute set
- * @param {string|null} [a.evictWebid]              author webid tested against eviction
- * @param {Array<string|null|undefined>} [a.muteKeys]  candidate mute keys (stableId/actor/webid)
- * @returns {{evicted:true}|{muted:true}|null}
- */
-function _peerIngestVerdict({ evictionRoster, muted, evictWebid, muteKeys } = {}) {
-  if (evictionRoster && evictWebid && evictionRoster.isEvicted(evictWebid)) return { evicted: true };
-  if (muted) {
-    for (const k of muteKeys ?? []) {
-      if (k && muted.has(k)) return { muted: true };
-    }
-  }
-  return null;
-}
-
 // ── B★ B3 pure cores: (scope, a, ctx) → result ───────────────────────────────
 //
 // `scope`  the resolved per-bundle dep bag (what `buildSkills` closes over):
-//          `{ store, members, reveals, notifier, muted, metrics, groupId,
+//          `{ store, members, notifier, muted, metrics, groupId,
 //             chat, bundle, controlAgent, offeringMatch, localActor, … }`.
 // `a`      the decoded args object (wireSkill's decodeArgs; identical to the old
 //          `dataArgs(parts)` for the single-DataPart wire convention).
@@ -742,11 +643,10 @@ function _peerIngestVerdict({ evictionRoster, muted, evictWebid, muteKeys } = {}
 // no test pins for these skills.
 
 async function listMyRequestsCore(scope, a, ctx) {
-  const { store, members, reveals, groupId } = scope;
+  const { store } = scope;
   const open = await store.listOpen();
   const mine = open.filter((i) => i.addedBy === ctx.from);
-  const items = await hydrateItems(mine, { members, reveals, viewerWebid: ctx.from, groupId });
-  return { items: decorateWithLastSync(items), _sync: simulateSync() };
+  return { items: decorateWithLastSync(mine), _sync: simulateSync() };
 }
 
 async function cancelRequestCore(scope, a, ctx) {
@@ -790,12 +690,9 @@ async function assignLendCore(scope, a, ctx) {
 }
 
 async function getHolidayModeCore(scope, a, ctx) {
-  const { members } = scope;
-  if (!members) return { holidayMode: false };
-  const me = await members.resolveByWebid(ctx.from);
-  // Availability unification: holiday mode IS the coarse 'away' value of the
-  // unified `availability` property; the legacy flag is honoured for un-migrated entries.
-  return { holidayMode: me?.availability === 'away' || me?.holidayMode === true };
+  // Holiday mode IS the coarse 'away' value of the person's `availability` property (their own profile).
+  const me = (await scope.selfProfile?.get?.(ctx.from).catch?.(() => null)) ?? null;
+  return { holidayMode: me?.availability === 'away' };
 }
 
 async function getGroupRulesCore(scope, a, ctx) {
@@ -818,10 +715,10 @@ async function getGroupRulesCore(scope, a, ctx) {
 async function listGroupMembersCore(scope, a, ctx) {
   // Thin wrapper: the full roster-read logic — the foreign-caller ALLOWLIST gate AND the
   // local-viewer release read — lives in `@onderling/circles` (`listCircleMembers`). Pinboard
-  // injects the store, the MemberMap, the viewer's reveal store, the per-circle membership
+  // injects the store, the MemberMap, the per-circle membership
   // projection, the shared exit helpers, and the foreign-caller + allowlist gate helpers,
   // and passes the parsed args + carrier context.
-  const { store, members, reveals, groupId, localActor, circleSignerFor, membershipRead } = scope;
+  const { store, members, groupId, localActor, circleSignerFor, membershipRead } = scope;
   // Thread the circle-scoped signer resolver into the projection so it can verify THIS device's own
   // circle-key↔ref binding when folding spine statements (see projectCircleRoster). `spineless`
   // (the rails' binding verifiers) folds TRAIL + display only — verifying a statement must never
@@ -833,7 +730,7 @@ async function listGroupMembersCore(scope, a, ctx) {
     : projectCircleRoster;
   return listCircleMembers(
     {
-      store, members, reveals, projectCircleRoster: project, readCircleExits, isExited,
+      store, members, projectCircleRoster: project, readCircleExits, isExited,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
     { a, from: ctx?.from ?? null, localActor: scope.localActorIn ? scope.localActorIn(a?.groupId ?? groupId) : localActor, groupId },
@@ -845,26 +742,21 @@ async function listGroupMembersCore(scope, a, ctx) {
  * (`listGroupMembers`) and the circle FAN-OUT (`broadcastToCircle`).
  *
  * B1 fix (C2) — proof-derived membership: a circle's members are a PROJECTION of the
- * durable, signed `membership-redemption` trail (the same source EvictionRoster
- * reduces), NOT `MemberMap.list()`. The MemberMap is a lossy, GLOBAL display cache:
- * it holds every member of every circle this device ever admitted (with no circle
+ * durable, signed `membership-redemption` trail, NOT `MemberMap.list()`. The MemberMap is a
+ * lossy, GLOBAL display cache: it holds every member of every circle this device ever admitted (with no circle
  * key on the row), and it holds nothing for a circle whose members this device
  * learned from the trail alone — which is exactly a JOINER's view of the admin
  * (`recordRemoteRedemption` records only the joiner's own row; the admin is known
- * only through `confirmedBy`). `deriveRoster` starts FROM the trail and left-joins
- * the MemberMap for display only. (plans/DESIGN-connectivity-phase1-membership.md,
- * Part A.)
+ * only through `confirmedBy`). `deriveRoster` starts FROM the trail and joins nothing in from outside it.
  *
  * @param {object} a
  * @param {{listOpen: Function}} a.store
  * @param {string} a.groupId
- * @param {Array<object>} [a.memberMapList]  `MemberMap.list()` — display left-join + legacy admins.
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
+export async function projectCircleRoster({ store, groupId, circleSignerFor, membershipRead, selfSigner = null, skipSpine = false, observeFold = null } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
-  const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const forGroup = (redemptions ?? []).filter((i) => i?.source?.groupId === groupId);
@@ -898,6 +790,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   // founder — and a member's own rules write promoted them to admin two steps later.
   const founderWebids = new Set();
   const founderKinds = {};   // founder → 'function', from its own verified creation statement
+  const founderFacts = {};   // founder → what their creation statement says: their proven address, their handle
   {
     const admitters = new Set();
     const redeemers = new Set();
@@ -961,6 +854,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
         // a function profile that FOUNDS says so in its own signed creation: the founder is the circle's root
         // authority, so the claim grants nothing it could not take; the fold carries it as the founder's kind
         if (b.payload && typeof b.payload === 'object' && b.payload.kind === 'function') founderKinds[b.author] = 'function';
+        // …and what the founder said about themselves there: their per-circle address (proven like a joiner's;
+        // deriveRoster checks the proof before it projects) and the handle they go by
+        const p = b.payload && typeof b.payload === 'object' ? b.payload : {};
+        founderFacts[b.author] = {
+          groupId,
+          ...(typeof p.circleAddress === 'string' && typeof p.circleAddressProof === 'string' ? { circleAddress: p.circleAddress, circleAddressProof: p.circleAddressProof } : {}),
+          ...(typeof p.peerDisplay === 'string' && p.peerDisplay ? { handle: p.peerDisplay } : {}),
+        };
       }
     }
   };
@@ -1145,7 +1046,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     founderKinds,
-    memberMapForDisplay: list,
+    founderFacts,
     // Authoritative ONLY on the rail path: its statements carry verified per-circle-key bindings. The
     // legacy store path keeps the pre-rider semantics until pinboard dissolves.
     foldAuthoritative: typeof membershipRead === 'function',
@@ -1190,8 +1091,21 @@ async function respondToItemCore(scope, a, ctx) {
   let toPubKey = post.source?.fromPubKey ?? null;
   let toWebid  = post.source?.from ?? post.addedBy ?? null;
   let toStableId = null;
-  if (members && toWebid) {
-    const peer = await members.resolveByWebid(toWebid);
+  // A post read from its circle's own store names its poster by webid only (no carrier stamped a sender key on it):
+  // the poster's key is on the circle's roster, which is where a co-member's address is known.
+  const circleOfPost = post.source?.groupId
+    ?? (Array.isArray(post.source?.targets) ? post.source.targets.find((t) => t?.kind === 'group' && typeof t.groupId === 'string')?.groupId : null)
+    ?? null;
+  if (!toPubKey && toWebid && circleOfPost) {
+    try {
+      const roster = (await listGroupMembersCore(scope, { groupId: circleOfPost }, { from: ctx.from }))?.members ?? [];
+      const row = roster.find((m) => m && m.webid === toWebid);
+      toPubKey = row?.pubKey ?? row?.circleAddress ?? null;
+    } catch { /* not on the roster: no address, and no guess */ }
+  }
+  // the contact book only for a post that names no circle — a circle post's poster is known by its roster
+  if (toWebid && !circleOfPost) {
+    const peer = await bundle?.contacts?.get?.(toWebid);
     toStableId = peer?.stableId ?? null;
     if (!toPubKey) toPubKey = peer?.pubKey ?? null;
   }
@@ -1214,12 +1128,6 @@ async function respondToItemCore(scope, a, ctx) {
     subtype:  'chat-message',
   });
   if (!r.ok) return { error: r.reason };
-
-  // Phase 22: feed the post body into my Layer-2 interest profile —
-  // responding is the canonical "I care about this" signal.
-  if (bundle?.interestProfile && typeof post.text === 'string') {
-    try { updateInterest(bundle.interestProfile, post.text); } catch {}
-  }
 
   // `toPubKey` names the poster so the shell can open (and persist into) the contact thread the
   // reply starts — the answer to a post is a 1:1 conversation with its author.
@@ -1283,9 +1191,9 @@ export const PINBOARD_CORES = Object.freeze({
  */
 export function buildPinboardScope(deps = {}) {
   const {
-    store, offeringMatch, notifier, reveals, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfWebidFor = null,
+    selfWebidFor = null, selfProfile = null,
   } = deps;
   // This device's own key paired with the webid it speaks for, for reading back statements this same composition
   // wrote with the global identity (`author` a pubKey, `subject` a webid). Only where there is no per-circle
@@ -1303,7 +1211,7 @@ export function buildPinboardScope(deps = {}) {
   };
   return {
     selfSigner, localActorIn,
-    store, offeringMatch, notifier, reveals, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent, selfProfile,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
 }
@@ -1322,7 +1230,6 @@ export function buildSkills({
   store,
   offeringMatch,
   notifier,
-  reveals,
   members,
   // Household sealed-pod control-agent (optional). When present, membership events drive pod
   // ACL + group-key grant/revoke: redeem → addMember (seal the group key to the joiner's sealing
@@ -1350,6 +1257,9 @@ export function buildSkills({
   membershipRead,
   // The person key this device announces on a join or create (host-injected `() => {version, pubKey} | null`).
   currentPersonKey = null,
+  // THE PERSON'S OWN PROFILE (handle, display name, availability, place) — lib/selfProfile.js; the host injects it over
+  // the persona record, so whoAmI, getMyProfile and the join read one record.
+  selfProfile = null,
   // THE RULES-UPDATE RIDER (host-injected): a rules-doc edit also appends + fans a signed
   // `rules-update` statement on the governance lane, so the new doc reaches every member
   // peer-to-peer (pod-free) and their stale-banner lights. Absent → store-local only, unchanged.
@@ -1395,13 +1305,8 @@ export function buildSkills({
     return _buildScopedSkills({ getBundle, dataLocationConfig });
   }
 
-  // Request ids being ingested RIGHT NOW (`ingestRemotePost`). The stored-row check there reads the
-  // store and then writes, and two landings of the same post can interleave between the two — this
-  // makes the claim before the await, so only the first writes. Per skills instance, like the store.
-  const _ingestInFlight = new Set();
-
   // OfferingMatch's #group is private; Agent.js passes the configured
-  // groupId through here so list-shaped skills can scope reveal lookups.
+  // groupId through here as the bundle's default circle.
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
 
   // B★ B3 — the per-bundle dep bag every skill closes over, packaged as the
@@ -1416,11 +1321,13 @@ export function buildSkills({
   const selfSigner = (typeof circleSignerFor !== 'function' && bundle?.agent?.identity?.pubKey && localActor)
     ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null;
   const scope = buildPinboardScope({
-    store, offeringMatch, notifier, reveals, members, controlAgent,
+    store, offeringMatch, notifier, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
-    selfSigner, selfWebidFor,
+    selfSigner, selfWebidFor, selfProfile,
   });
   const localActorIn = scope.localActorIn;
+  /** The caller's own profile (empty when the caller is not one of this device's selves). */
+  const ownProfileOf = async (webid) => (await selfProfile?.get?.(webid).catch?.(() => null)) ?? {};
   // An op that names an ITEM, not a circle, arrives as the device's general self even when the item lives in a
   // persona's circle (the host's `actAs` reads the circle off the args). The device's own call acts on an item as the
   // self it is in the item's circle; a foreign caller stays who they are.
@@ -1472,7 +1379,7 @@ export function buildSkills({
     memberStatus: async (gid, webid) => {
       let folded = null;
       const rows = await projectCircleRoster({
-        store: scope.store, groupId: gid, memberMapList: [], circleSignerFor: scope.circleSignerFor,
+        store: scope.store, groupId: gid, circleSignerFor: scope.circleSignerFor,
         membershipRead: scope.membershipRead, selfSigner: scope.selfSigner ?? null, observeFold: (f) => { folded = f; },
       });
       if (!Array.isArray(rows)) return null;
@@ -1543,7 +1450,7 @@ export function buildSkills({
   const adoptContactPersonKey = async (webid, claimed, links) => {
     if (!bundle?.contacts || !claimed || !Number.isInteger(claimed.version) || claimed.version < 1 || typeof claimed.pubKey !== 'string' || !claimed.pubKey) return null;
     const claimedPin = (typeof claimed.linkKeyPub === 'string' && claimed.linkKeyPub) ? claimed.linkKeyPub : null;
-    const existing = (await members?.resolveByWebid?.(webid))?.personKey ?? null;
+    const existing = (await bundle.contacts.get?.(webid))?.personKey ?? null;
     let next = null;
     if (!existing) next = { version: claimed.version, pubKey: claimed.pubKey, ...(claimedPin ? { linkKeyPub: claimedPin } : {}) };
     else {
@@ -1596,8 +1503,7 @@ export function buildSkills({
     // without the self-binding the fold cannot tell they are the same person — which locked a
     // creator out of the circle they had just made.
     const rows = await projectCircleRoster({
-      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead, selfSigner,
+      store, groupId: circleId, circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
@@ -1610,8 +1516,7 @@ export function buildSkills({
   const circleRowOf = async (circleId, webid) => {
     if (!circleId || !webid) return null;
     const rows = await projectCircleRoster({
-      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead, selfSigner,
+      store, groupId: circleId, circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid) ?? null;
@@ -1651,9 +1556,6 @@ export function buildSkills({
         : (groupId ? [{ kind: 'group', groupId }] : []);
       const targets = rawTargets.filter(t => !validateTarget(t));
 
-      const maxDistanceKm = (typeof a.maxDistanceKm === 'number' && a.maxDistanceKm > 0)
-        ? a.maxDistanceKm : null;
-
       // Phase 52.7.2 cut-over — translate UI-vocab `intent` to
       // canonical {type, kind}. Bespoke intents (`report`, etc.)
       // pass through as `{type}` only.
@@ -1680,11 +1582,9 @@ export function buildSkills({
         text:           a.text,
         requiredSkills: a.requiredSkills ?? [],
         visibility:     'household',
-        // Phase 27 — store targets + maxDistanceKm on the item so
-        // local UI can render them and receivers can re-check.
+        // Phase 27 — store targets on the item so local UI can render them and receivers can re-check.
         source: {
           targets,
-          maxDistanceKm,
           ...(embeds.length > 0 ? { embeds } : {}),
           // Drivers #5 — an OPTIONAL explicit driver signature { text?, tags[] } the author attaches so
           // this post matches peers' private drivers on-device. Absent → the matcher falls back to the
@@ -1772,8 +1672,7 @@ export function buildSkills({
       }
 
       // ── Phase 27.3 sender-side filter ─────────────────────
-      // Resolve targets → recipient set. Drop muted. Drop out-of-
-      // range when maxDistanceKm + own location are set.  The
+      // Resolve targets → recipient set. Drop muted.  The
       // result drives both the group broadcast (when targets
       // include a 'group') AND the per-recipient direct fan-out
       // for non-group targets (Phase 27.4 wireup happens via chat
@@ -1786,14 +1685,11 @@ export function buildSkills({
         const r = await resolveTargets(targets.filter(t => t.kind !== 'group'),
           { members, contacts: bundle?.contacts, selfWebid: from });
         recipients = r.recipients;
-        if (maxDistanceKm) {
-          recipients = await filterByDistance(recipients, { members, selfWebid: from, maxDistanceKm });
-        }
         if (muted) recipients = await filterMuted(recipients, muted, members);
       }
 
-      // The broadcast target (group pubsub) carries the targets +
-      // maxDistanceKm so receivers can re-validate. By default we
+      // The broadcast target (group pubsub) carries the targets
+      // so receivers can re-validate. By default we
       // DON'T await broadcast results — posts go up immediately
       // and claims (if any) flow back via the substrate mirror +
       // the chat-based reply path (Phase 14).
@@ -1825,13 +1721,11 @@ export function buildSkills({
         dueAt:     item.dueAt,
         categoryId:  a.categoryId  ?? null,
         skillTags:   Array.isArray(a.skillTags) ? a.skillTags : [],
-        // Phase 27 — pass targets + distance through so
-        // receivers can re-check (functional design § 4f).
+        // Phase 27 — pass targets through so receivers can re-check.
         targets,
-        maxDistanceKm,
         // Phase 39 — attachment metadata + thumbnails (no
-        // full bytes).  Recipients render the thumbnails and
-        // request the full bytes on demand via `requestAttachment`.
+        // full bytes).  Recipients render the sealed thumbnails and
+        // open the full sealed blob through their circle media gateway.
         attachments: toBroadcastShape(persistedAttachments),
         // A4 (2026-05-14) — cross-pod refs travel with the broadcast.
         ...(embeds.length > 0 ? { embeds } : {}),
@@ -1908,7 +1802,6 @@ export function buildSkills({
               kind:          item.kind ?? null,
               dueAt:         item.dueAt ?? null,
               targets,
-              maxDistanceKm,
               categoryId:    a.categoryId   ?? null,
               skillTags:     Array.isArray(a.skillTags) ? a.skillTags : [],
               requiredSkills: a.requiredSkills ?? [],
@@ -2023,8 +1916,12 @@ export function buildSkills({
     // (ask/offer/lend), so wireSkill would throw. Kept hand-written.
     defineSkill('listOpenRequests', async ({ parts, from }) => {
       const a = dataArgs(parts);
+      // A secret row is never listed, whatever is asked: the admin's invite code, who answered my post.
+      if (typeof a.type === 'string' && SECRET_ROW_TYPES.includes(a.type)) return { items: [], _sync: simulateSync() };
       const filter = {};
       if (a.skill) filter.requiredSkill = a.skill;
+      // asked for one type (the roster seed reads the trail this way), that type
+      if (typeof a.type === 'string' && a.type && !a.intent) filter.type = a.type;
       let kindPostFilter = null;
       if (a.intent) {
         const canon = intentToCanonicalDraft(a.intent);
@@ -2037,14 +1934,15 @@ export function buildSkills({
           kindPostFilter = canon.kind;
         }
       }
-      const open = await store.listOpen(filter);
+      const open = (await store.listOpen(filter)).filter((it) => !SECRET_ROW_TYPES.includes(it?.type))
+        // no type asked: the noticeboard's posts only — never a circle's rules head, trail or other bookkeeping
+        .filter((it) => filter.type || isNoticeboardPostType(it));
       const matched = kindPostFilter
         ? open.filter((it) => it.kind === kindPostFilter)
         : open;
-      const items = await hydrateItems(matched, { members, reveals, viewerWebid: from, groupId });
-      return { items: decorateWithLastSync(items), _sync: simulateSync() };
+      return { items: decorateWithLastSync(matched), _sync: simulateSync() };
     }, {
-      description: 'List open requests; optional `skill` + `intent` filters.',
+      description: 'List open posts; optional `skill` + `intent` filters, or one `type`.',
       visibility:  'authenticated',
     }),
 
@@ -2113,8 +2011,7 @@ export function buildSkills({
     // ── Pinboard V1 Phase 3 (2026-05-06) additions ────────────────────────────
     //
     // **Substrate candidate (rule of two — first consumer):** the
-    // moderation skill set below (`reportPost`, plus the deferred
-    // `removeMember`, `leaveGroup`,
+    // moderation skill set below (the deferred `removeMember`, `leaveGroup`,
     // `setMemberRole`, `requestProofRefresh`) is generic to any
     // closed-group SDK app.  When the second app (likely `apps/household`,
     // `apps/archive`, or `apps/tasks-v0`) needs these, extract into
@@ -2188,34 +2085,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * reportPost({itemId, reason?})  — append a `kind: 'report'` item.
-     */
-    // B★ B3 NOT wired (conflict a): phase3.test.js pins
-    // `reportPost({})` → `{error:'itemId required'}` as a RETURNED value, but the
-    // op declares itemId required so wireSkill would THROW instead. Kept hand-written.
-    defineSkill('reportPost', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) {
-        return { error: 'itemId required' };
-      }
-      const [report] = await store.addItems(
-        [{
-          type:        'report',
-          text:        a.reason ? `Report on ${a.itemId}: ${a.reason}` : `Report on ${a.itemId}`,
-          // Tag the report with its circle (per-circle moderation; `listReports` scopes on it).
-          source:      { reportTarget: a.itemId, reason: a.reason ?? null, ...(a.groupId ? { groupId: a.groupId } : {}) },
-          visibility:  'household',
-        }],
-        { actor: from },
-      );
-      metrics?.record?.('report-post');
-      return { reportId: report.id, _sync: simulateSync() };
-    }, {
-      description: 'File a report on another item; visible to admins of the group.',
-      visibility:  'authenticated',
-    }),
-
 
     // ── Pinboard V1 Phase 6 (2026-05-06) — handle / displayName / reveal ─────
 
@@ -2231,7 +2100,6 @@ export function buildSkills({
       const a = dataArgs(parts);
       const v = validateHandle(a.handle ?? '');
       if (!v.ok) return { error: 'invalid-handle', reason: v.reason };
-      if (!members) return { error: 'no-member-map' };
       // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
       // handles within a single circle). Reject if ANOTHER member of this circle
       // already holds the handle (case-folded, so `Jan`/`jan` collide). The
@@ -2241,7 +2109,7 @@ export function buildSkills({
       // SERIALISED per (circle, handle): the check and the write are separated by awaits, so two members
       // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
       return withHandleClaim(store, groupId, v.handle, async () => {
-        const taken = await collectCircleHandles({ store, members, groupId });
+        const taken = await collectCircleHandles({ store, groupId });
         // …and every FOLDED roster's handles (2026-09-21): a member's later `member-props` rename lives on the lane, not
         // in this device's cache, so the trail + cache alone would let two members claim one handle. The handle is the
         // person's, one across their circles (`member-props` goes to every circle they are in), so every circle counts.
@@ -2260,8 +2128,9 @@ export function buildSkills({
         if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
           return { error: 'invalid-handle', reason: 'handle-taken' };
         }
-        const updated = await members.addMember({ webid: from, handle: v.handle });
-        return { handle: v.handle, member: updated, _sync: simulateSync() };
+        const updated = await selfProfile?.set?.(from, { handle: v.handle });
+        if (!updated) return { error: 'not-a-self-here' };
+        return { handle: v.handle, _sync: simulateSync() };
       });
     }, {
       description: 'Set the calling actor\'s handle (lowercase, 3–32 chars).',
@@ -2297,10 +2166,8 @@ export function buildSkills({
     defineSkill('setHolidayMode', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.on !== 'boolean') return { error: 'on (bool) required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const availability = a.on ? 'away' : 'open';
-      const updated = await members.addMember({ ...me, availability, holidayMode: a.on });
+      const updated = await selfProfile?.set?.(from, { availability: a.on ? 'away' : 'open' });
+      if (!updated) return { error: 'not-a-self-here' };
       return { holidayMode: updated.availability === 'away', _sync: simulateSync() };
     }, {
       description: 'Toggle the calling actor\'s holiday-mode flag (thin shim over the unified availability property; away == on).',
@@ -2354,80 +2221,23 @@ export function buildSkills({
     /**
      * setMyDisplayName({displayName})  — opt-in real / chosen name.
      *
-     * Visible only to peers / groups where the viewer has flipped a
-     * Reveals flag; defaults to invisible.
+     * What a peer sees of it is the persona / disclosure release (the
+     * contact's revealPreset, the circle's personaProperties).
      */
     defineSkill('setMyDisplayName', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const name = typeof a.displayName === 'string' ? a.displayName.trim() : '';
       if (!name) return { error: 'displayName required' };
-      if (!members) return { error: 'no-member-map' };
-      const updated = await members.addMember({ webid: from, displayName: name });
-      return { displayName: name, member: updated, _sync: simulateSync() };
+      const updated = await selfProfile?.set?.(from, { displayName: name });
+      if (!updated) return { error: 'not-a-self-here' };
+      return { displayName: name, _sync: simulateSync() };
     }, {
-      description: 'Set the calling actor\'s display name (revealed to peers who opted in).',
+      description: 'Set the calling actor\'s display name (shown as each release allows).',
       visibility:  'authenticated',
     }),
 
-    /**
-     * setPeerReveal({peerWebid, showDisplayName?: bool=true})
-     *   — local-only viewer choice; flips Reveals so this viewer
-     *   sees `displayName` for the named peer.
-     *
-     * No mutual-consent enforcement: each side controls its own view
-     * (per the Phase 6 design — symmetric, no auto-reveal).  Apps
-     * that want a "shall we both reveal?" handshake compose this
-     * skill on top of `chat-agent`'s MessagingBridge.
-     */
-    // B★ B3 NOT wired (conflict c): the op declares params `peer`/`action`
-    // (the chat-shell vocab the realAgent adapter translates), but the skill's
-    // real args are `peerWebid`/`showDisplayName` — wireSkill would validate the
-    // wrong param names (and throw on required `peer`). Kept hand-written.
-    defineSkill('setPeerReveal', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.peerWebid !== 'string' || !a.peerWebid) {
-        return { error: 'peerWebid required' };
-      }
-      if (!reveals) return { error: 'no-reveals' };
-      const show = a.showDisplayName ?? true;
-      reveals.setPeerReveal(a.peerWebid, !!show);
-      return { peerWebid: a.peerWebid, showDisplayName: !!show, _sync: simulateSync() };
-    }, {
-      description: 'Locally flip "show real name" for a single peer.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * getMyReveals()  — enumerate "what have I revealed so far?"
-     *   Pairs with `setPeerReveal` / `setGroupReveal` for management UI.
-     */
-    defineSkill('getMyReveals', async () => {
-      if (!reveals) return { error: 'no-reveals' };
-      return reveals.list();
-    }, {
-      description: 'List the calling viewer\'s current per-group + per-peer reveal flags.',
-      visibility:  'authenticated',
-    }),
 
-    /**
-     * setGroupReveal({groupId, showDisplayName?: bool=true})
-     *   — local-only viewer choice; flips Reveals so this viewer
-     *   sees `displayName` for every member of the group (peer-level
-     *   overrides still win when set).
-     */
-    defineSkill('setGroupReveal', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) {
-        return { error: 'groupId required' };
-      }
-      if (!reveals) return { error: 'no-reveals' };
-      const show = a.showDisplayName ?? true;
-      reveals.setGroupReveal(a.groupId, !!show);
-      return { groupId: a.groupId, showDisplayName: !!show, _sync: simulateSync() };
-    }, {
-      description: 'Locally flip "show real name" for an entire group.',
-      visibility:  'authenticated',
-    }),
 
     // ── Pinboard V1 Phase 7 (2026-05-06) — onboarding ───────────────────────
 
@@ -2565,9 +2375,9 @@ export function buildSkills({
      *   It used to say it marked the previous one stale, and it did not: it only added a newer row, and
      *   the redeem gate accepted any row inside its own expiry plus a day. So rotating a code did not
      *   remove anybody — the old code kept admitting strangers for up to 24 hours (walked 2026-07-29,
-     *   S6/J-A8). Rotation is an act of REMOVAL, and it now behaves like one; an already-redeemed
-     *   membership keeps its own generous grace (`MEMBERSHIP_GRACE_MS`), so nobody already inside is
-     *   evicted by this.
+     *   S6/J-A8). Rotation is an act of REMOVAL, and it now behaves like one; it removes no MEMBER: a
+     *   membership has no expiry (a trail row's `expiresAt` is the invite's lifetime), so nobody already inside
+     *   is evicted by this.
      */
     defineSkill('rotateMyGroupCode', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -2755,9 +2565,7 @@ export function buildSkills({
      *   After the peer-bridge receives a successful
      *   verifyMembershipCodeForPeer reply from the admin, the joiner
      *   calls this skill locally to write its OWN
-     *   `membership-redemption` audit record.  Without this mirror,
-     *   `getMyMembershipStatus()` on the joiner side would return
-     *   `redeemed: false` since it reads local items.
+     *   `membership-redemption` row: the joiner's own roster reads its local trail.
      *
      *   `codeId` is the admin-side item-id (the joiner has no matching
      *   `membership-code` item locally — that's the whole point of
@@ -2796,7 +2604,7 @@ export function buildSkills({
         text:       `${from} (peer-confirmed) for ${a.groupId}`,
         source:     {
           groupId:     a.groupId,
-          code:        a.code,
+          // the code is an admin's secret and this row lives in the circle's store: it names the code by id only
           codeId:      a.codeId ?? null,
           redeemedBy:  from,
           redeemedAt:  Date.now(),
@@ -3075,48 +2883,6 @@ export function buildSkills({
     }),
 
     /**
-     * getMyMembershipStatus({groupId})
-     *   — Phase 25.7.  Reports the calling actor's most recent
-     *   `membership-redemption` for the group, plus whether it's
-     *   still valid.  Members who never redeemed return
-     *   `{redeemed: false}`.  Members whose latest redemption has
-     *   expired (past the rotation window + 24h grace) return
-     *   `{redeemed: true, validUntil, isActive: false}` — the
-     *   "auto-evicted" state.  Active members return `isActive: true`.
-     *
-     *   Eviction is enforced where it actually matters:
-     *   `redeemMembershipCode` rejects expired codes; the relay-side
-     *   proof check (V1 Phase 2) rejects messages signed by stale
-     *   proofs.  This skill is purely informational so the UI can
-     *   surface "Je code is verlopen — vraag de admin / leden om
-     *   de nieuwe."
-     */
-    defineSkill('getMyMembershipStatus', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      const all = await store.listOpen({ type: 'membership-redemption' });
-      const mine = all.filter(i =>
-        i.source?.groupId === a.groupId && i.source?.redeemedBy === from,
-      );
-      if (mine.length === 0) return { redeemed: false };
-      mine.sort((p, q) => (q.source.redeemedAt ?? 0) - (p.source.redeemedAt ?? 0));
-      const latest = mine[0];
-      const now = Date.now();
-      const validUntil = latest.source.expiresAt ?? 0;
-      // Standing, not admission — the generous grace belongs here and only here.
-      const isActive = now <= validUntil + MEMBERSHIP_GRACE_MS;
-      return {
-        redeemed:  true,
-        isActive,
-        validUntil,
-        redemptionId: latest.id,
-      };
-    }, {
-      description: 'Report whether the calling actor\'s membership-code redemption is still valid.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * listMyCircles()
      *   — 2026-05-24 cross-instance fan-out support.
      *
@@ -3255,7 +3021,7 @@ export function buildSkills({
           // The SAME folded projection every other authority answer here reads, spine and all — so
           // "am I still in this circle" gets the same answer at this door as at every other.
           projectCircleRoster: ({ groupId: gid }) => projectCircleRoster({
-            store, groupId: gid, memberMapList: [], circleSignerFor, membershipRead, selfSigner,
+            store, groupId: gid, circleSignerFor, membershipRead, selfSigner,
           }),
         },
         { a: dataArgs(parts), from, localActor: localActorIn(dataArgs(parts).groupId) },
@@ -3265,104 +3031,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-
-    /**
-     * ingestRemotePost({payload, fromPubKey})
-     *   — 2026-05-24 cross-instance fan-out (chat-layer bridge).
-     *
-     *   Called by basis when an NKN envelope of `subtype:
-     *   'circle-post'` arrives.  Mirrors substrateMirror.mirror()'s
-     *   logic — dedupe by `payload.requestId`, eviction-filter by
-     *   `payload.from`, draft + addItems with the same shape pinboard's
-     *   substrate-mirror produces.  This way local UI surfaces the
-     *   remote post identically to a substrate-mirror-delivered post.
-     *
-     *   Reuses the existing broadcast payload shape (Phase 52.7.2 —
-     *   `{requestId, text, from, type, kind, ...}`) so a future
-     *   substrate-multi-transport slice can drop this bridge without
-     *   schema changes.
-     *
-     *   Returns: { ok: true, itemId } | { deduped: true } | { evicted: true }
-     *            | { muted: true } | { error }.
-     */
-    defineSkill('ingestRemotePost', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const payload = a.payload;
-      const fromPubKey = typeof a.fromPubKey === 'string' ? a.fromPubKey : null;
-      // 2026-05-24 — separate NKN address tracking.  fromPubKey is
-      // the sender's substrate chat-agent identity (not NKN-routable
-      // in the browser bundle); fromPeerAddr is the actual transport
-      // address [Help with] uses to send DMs back to the post author.
-      const fromPeerAddr = typeof a.fromPeerAddr === 'string' ? a.fromPeerAddr : null;
-      if (!payload || typeof payload !== 'object') return { error: 'payload required' };
-      const requestId = payload.requestId;
-      if (typeof requestId !== 'string' || !requestId) return { error: 'payload.requestId required' };
-      // Eviction + mute filter — shared with ingestCircleMessage so the two ingest
-      // paths can't drift (E1 drift-guard via _peerIngestVerdict). NB circle-posts
-      // previously honoured eviction but NOT mute — this closes that gap: a muted
-      // member's posts are dropped too, matching the circle-chat path.
-      const verdict = _peerIngestVerdict({
-        evictionRoster: bundle?.evictionRoster ?? null,
-        muted,
-        evictWebid: payload.from ?? null,
-        muteKeys: [payload.fromStableId, payload.from, payload.fromActor],
-      });
-      if (verdict) return verdict;
-      // Dedupe — same O(N) check as substrate-mirror, PLUS the in-flight set below it.
-      //
-      // The list read and the write are not one step, so two ingests of the same post that overlap
-      // both read a store without it and both write: one post, two rows, ULIDs one apart. That became
-      // reachable when the post carry moved onto the circle store (2026-08-30) and the landed snapshot
-      // could arrive twice in a beat — a re-push on circle-open lands the same row again. Seen on the
-      // web board, which showed every post twice while the phone showed each once.
-      //
-      // Claiming the id before the await closes it: within this agent, whoever gets there first writes,
-      // and the loser is `deduped` exactly as if the row had already been on disk.
-      if (_ingestInFlight.has(requestId)) return { deduped: true };
-      _ingestInFlight.add(requestId);
-      try {
-      const open = await store.listOpen();
-      if (open.some(i => i?.source?.requestId === requestId)) return { deduped: true };
-
-      const type = typeof payload.type === 'string' && payload.type
-        ? payload.type
-        : 'request';
-      const draft = {
-        type,
-        ...(typeof payload.kind === 'string' && payload.kind ? { kind: payload.kind } : {}),
-        text:           payload.text ?? '(broadcast)',
-        requiredSkills: payload.requiredSkills ?? [],
-        visibility:     'household',
-        source: {
-          requestId,
-          broadcast:    true,
-          from:         payload.from ?? null,
-          fromPubKey,
-          // 2026-05-24 — wire-level NKN address for back-channel DM
-          // delivery ('s [Help with] routes via this).
-          ...(fromPeerAddr ? { fromPeerAddr } : {}),
-          claimsTopic:  payload.claimsTopic ?? null,
-          categoryId:   payload.categoryId ?? null,
-          skillTags:    Array.isArray(payload.skillTags) ? payload.skillTags : [],
-          attachments:  Array.isArray(payload.attachments) ? payload.attachments : [],
-          ...(Array.isArray(payload.embeds) && payload.embeds.length > 0
-            ? { embeds: payload.embeds }
-            : {}),
-          ...(Array.isArray(payload.targets) && payload.targets.length > 0
-            ? { targets: payload.targets }
-            : {}),
-        },
-      };
-      if (typeof payload.dueAt === 'number') draft.dueAt = payload.dueAt;
-      const [item] = await store.addItems([draft], {
-        actor: payload.from ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'broadcast'),
-      });
-      return { ok: true, itemId: item.id, _sync: simulateSync() };
-      } finally { _ingestInFlight.delete(requestId); }
-    }, {
-      description: 'Ingest a remote post envelope into the local feed (mirrors substrate-mirror logic).',
-      visibility:  'authenticated',
-    }),
 
     /**
      * getGroupRules({groupId})
@@ -3375,56 +3043,19 @@ export function buildSkills({
 
     /**
      * acceptGroupRules({groupId})
-     *   — the calling actor read + accepted the circle's CURRENT rules. TWO records of the one act:
-     *   the V1 audit item (kind: 'rules-accept', what getOnboardingState reads) as always, PLUS —
-     *   when the circle currently has HUMAN rules and the membership rail is wired — the member's own
-     *   signed `rules-accept` statement on the membership spine, which supersedes the version on their
-     *   signed join on EVERY device (the re-accept half of the rules-acceptance decision, 2026-08-20).
-     *   The spine half is best-effort by the legacy contract: no rules doc / no rail still returns the
-     *   audit id; `rulesAccepted` rides the result only when the statement was emitted.
+     *   — the calling actor read + accepted the circle's CURRENT rules: the member's own signed `rules-accept`
+     *   statement on the membership spine, which supersedes the version on their signed join on EVERY device (the
+     *   re-accept half of the rules-acceptance decision, 2026-08-20). The statement is the one record of the act;
+     *   `rulesAccepted` rides the result when it was emitted, and the core's refusal (no human rules, no rail) is said.
      */
     defineSkill('acceptGroupRules', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      const [item] = await store.addItems(
-        [{
-          type:       'rules-accept',
-          text:       `Accepted rules of ${a.groupId}`,
-          source:     { groupId: a.groupId, acceptedBy: from, acceptedAt: Date.now() },
-          visibility: 'household',
-        }],
-        { actor: from },
-      );
       const spine = await acceptGroupRulesCore({ store, emitSpine }, { a, from });
-      return {
-        acceptanceId: item.id,
-        ...(spine?.ok ? { rulesAccepted: spine.rulesAccepted } : {}),
-        _sync: simulateSync(),
-      };
+      if (!spine?.ok) return { error: spine?.error ?? 'not-accepted', _sync: simulateSync() };
+      return { ok: true, rulesAccepted: spine.rulesAccepted, _sync: simulateSync() };
     }, {
-      description: 'Accept the circle\'s current rules: the V1 audit item + (when rules-gated) the member\'s signed rules-accept on the membership spine.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getOnboardingState()
-     *   — light status report the first-run UI uses to decide which
-     *   step to show next.
-     */
-    defineSkill('getOnboardingState', async ({ from }) => {
-      const me = members ? await members.resolveByWebid(from) : null;
-      const acceptances = await store.listOpen({ type: 'rules-accept' });
-      const accepted = acceptances
-        .filter(i => i.source?.acceptedBy === from)
-        .map(i => i.source?.groupId);
-      return {
-        handleSet:        !!me?.handle,
-        displayNameSet:   !!me?.displayName,
-        groupsAccepted:   accepted,
-        currentGroupId:   groupId,
-      };
-    }, {
-      description: 'Light status report driving the first-run wizard.',
+      description: 'Accept the circle\'s current rules: the member\'s signed rules-accept on the membership spine.',
       visibility:  'authenticated',
     }),
 
@@ -3508,28 +3139,6 @@ export function buildSkills({
     }),
 
     /**
-     * encryptedBackup({passphrase})
-     *   — produces a passphrase-protected snapshot.  Replaces the
-     *   plaintext `exportMyData` for testers / public users.
-     */
-    defineSkill('encryptedBackup', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.passphrase !== 'string' || a.passphrase.length === 0) {
-        return { error: 'passphrase required' };
-      }
-      const member  = members ? await members.resolveByWebid(from) : null;
-      const all     = await store.listOpen({});
-      const myItems = all.filter(i => i.addedBy === from);
-      const data    = { webid: from, member, items: myItems, exportedAt: Date.now() };
-      const blob    = await encryptBackup({ data, passphrase: a.passphrase });
-      metrics?.record?.('backup-created');
-      return { blob, _sync: simulateSync() };
-    }, {
-      description: 'Passphrase-encrypted snapshot of my data; the passphrase never leaves the device.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * exportMyData()
      *   — POJO snapshot of everything the agent knows about the
      *   calling actor: MemberMap entry, items they authored, and
@@ -3537,7 +3146,7 @@ export function buildSkills({
      *   download (frontend serialises to .json or .zip).
      */
     defineSkill('exportMyData', async ({ from }) => {
-      const member = members ? await members.resolveByWebid(from) : null;
+      const member = (await selfProfile?.get?.(from).catch?.(() => null)) ?? null;
       const allOpen   = await store.listOpen({});
       const allAudit  = await store.auditLog?.({ actor: from }).catch(() => []) ?? [];
       const myItems   = allOpen.filter(i => i.addedBy === from);
@@ -3584,128 +3193,18 @@ export function buildSkills({
 
     /**
      * getMyProfile()
-     *   — returns the calling actor's MemberMap entry + a
-     *   `renderForCurrentGroup` block showing how viewers in this
-     *   group will see them by default (handle vs displayName).
+     *   — the calling actor's own profile: their self's persona record (handle, display name, availability, place).
      */
     defineSkill('getMyProfile', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const entry = await members.resolveByWebid(from);
-      if (!entry) return { entry: null };
-      // Project how *I* would appear to a viewer-in-this-group who has
-      // not flipped any reveal flag.  This composes resolve() with a
-      // synthesised viewer = anyone-but-me.  (resolve() is viewer-
-      // agnostic for the default case, so this works without a real
-      // separate Reveals.)
-      let renderForCurrentGroup = null;
-      if (groupId) {
-        renderForCurrentGroup = await resolveMember({
-          memberMap:   members,
-          targetWebid: from,
-          groupId,
-        });
-      }
-      return { entry, renderForCurrentGroup };
+      const p = await selfProfile?.get?.(from).catch?.(() => null);
+      if (!p) return { entry: null };
+      return { entry: { webid: from, handle: p.handle, displayName: p.displayName, availability: p.availability, holidayMode: p.availability === 'away', location: p.location } };
     }, {
-      description: 'Return the calling actor\'s profile + how peers see them by default.',
+      description: 'Return the calling actor\'s own profile (their self\'s persona record: handle, name, away, place).',
       visibility:  'authenticated',
     }),
 
-    // ── Pinboard V1 Phase 14 (2026-05-06) — peer chat + reply + reveal ──────
-
-    /**
-     * sendChatMessage({toStableId? | toWebid? | toPubKey?, threadId, body})
-     *   — peer-to-peer chat over `agent.transport.sendOneWay`.  At
-     *   least one recipient identifier is required; stableId
-     *   preferred, webid back-compat, pubKey for test fixtures.
-     */
-    defineSkill('sendChatMessage', async ({ parts }) => {
-      if (!chat) return { error: 'chat-not-wired' };
-      const a = dataArgs(parts);
-      if (typeof a.threadId !== 'string' || !a.threadId) return { error: 'threadId required' };
-      // Phase 39 — body OR attachment is required (or both).
-      const hasBody       = typeof a.body === 'string' && a.body.length > 0;
-      const hasAttachment = a.attachment && typeof a.attachment === 'object';
-      if (!hasBody && !hasAttachment) return { error: 'body-or-attachment-required' };
-
-      // Validate attachment shape if provided — SEALED-only (the inline
-      // plaintext `dataB64` path is refused; the caller seals via the circle
-      // media gateway and passes an opaque `media` pointer).
-      if (hasAttachment) {
-        const err = validateInboundAttachment(a.attachment);
-        if (err) return { error: err };
-      }
-
-      const r = await chat.send({
-        toStableId: a.toStableId,
-        toWebid:    a.toWebid,
-        toPubKey:   a.toPubKey,
-        threadId:   a.threadId,
-        body:       a.body ?? '',
-        subtype:    'chat-message',
-        extras:     hasAttachment ? { attachment: a.attachment } : undefined,
-      });
-      return r.ok ? { ok: true, itemId: r.itemId, _sync: simulateSync() } : { error: r.reason };
-    }, {
-      description: 'Send a 1-on-1 chat message (with optional inline image attachment) to a peer.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getChatThread({threadId})
-     *   — return all chat-message items for `threadId`, oldest-first.
-     */
-    defineSkill('getChatThread', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.threadId !== 'string' || !a.threadId) return { error: 'threadId required' };
-      const all = await store.listOpen({ type: 'chat-message' });
-      const messages = all
-        .filter(i => i.source?.threadId === a.threadId)
-        .sort((p, q) => (p.source?.sentAt ?? p.addedAt ?? 0) - (q.source?.sentAt ?? q.addedAt ?? 0));
-      const decorated = messages.map((m) => ({
-        ...m,
-        _lastSync: m.source?.sentAt ?? m.addedAt ?? Date.now(),
-      }));
-      return { messages: decorated, _sync: simulateSync() };
-    }, {
-      description: 'Return all chat-messages for a thread, oldest-first.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listChatThreads()
-     *   — distinct threadIds I'm a participant in, with the most
-     *   recent message + the counterparty's stableId / webid.
-     */
-    defineSkill('listChatThreads', async ({ from }) => {
-      const all = await store.listOpen({ type: 'chat-message' });
-      /** @type {Map<string, object>} */
-      const byThread = new Map();
-      for (const m of all) {
-        const t = m.source?.threadId;
-        if (!t) continue;
-        const cur = byThread.get(t);
-        const ts  = m.source?.sentAt ?? m.addedAt ?? 0;
-        if (!cur || ts > cur.lastSentAt) {
-          byThread.set(t, {
-            threadId:    t,
-            lastBody:    m.text,
-            lastSentAt:  ts,
-            lastFrom:    m.source?.fromWebid ?? m.addedBy,
-            counterparty: m.source?.fromWebid === from
-              ? (m.source?.toWebid ?? null)
-              : (m.source?.fromWebid ?? null),
-          });
-        }
-      }
-      const threads = [...byThread.values()]
-        .sort((a, b) => b.lastSentAt - a.lastSentAt)
-        .map((t) => ({ ...t, _lastSync: t.lastSentAt ?? Date.now() }));
-      return { threads, _sync: simulateSync() };
-    }, {
-      description: 'List my chat threads, most-recently-active first.',
-      visibility:  'authenticated',
-    }),
+    // ── Pinboard V1 Phase 14 (2026-05-06) — peer chat + reply ───────────────
 
     /**
      * respondToItem({itemId, body})
@@ -3719,38 +3218,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * requestReveal({peerStableId? | peerWebid?, threadId})
-     *   — bilateral reveal handshake.  Flips the local Reveals
-     *   record for the peer + sends a `reveal-request` chat envelope
-     *   to the peer so their UI can offer to reciprocate.
-     */
-    defineSkill('requestReveal', async ({ parts, from }) => {
-      if (!chat || !reveals) return { error: 'chat-or-reveals-not-wired' };
-      const a = dataArgs(parts);
-      if (typeof a.threadId !== 'string' || !a.threadId) return { error: 'threadId required' };
-
-      const peerStableId = a.peerStableId ?? null;
-      const peerWebid    = a.peerWebid    ?? null;
-
-      // Flip locally.
-      if (peerStableId) reveals.setPeerReveal(peerStableId, true);
-      else if (peerWebid) reveals.setPeerReveal(peerWebid, true);
-      else return { error: 'peerStableId or peerWebid required' };
-
-      // Send hint to the peer.
-      const r = await chat.send({
-        toStableId: peerStableId,
-        toWebid:    peerWebid,
-        threadId:   a.threadId,
-        body:       null,
-        subtype:    'reveal-request',
-      });
-      return r.ok ? { ok: true } : { error: r.reason };
-    }, {
-      description: 'Bilateral reveal: flip local Reveals + send a hint to the peer to reciprocate.',
-      visibility:  'authenticated',
-    }),
 
     // ── Pinboard V1 Phase 16 (2026-05-06) — group ops admin polish ──────────
 
@@ -3963,14 +3430,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastCircleTask({groupId, event, msgId, ts?})
-     *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
-     *   other member; receivers verify it at their task rail before it lands on their device log and
+     * broadcastCircleItems({groupId, event, msgId, ts?})
+     *   — the content re-root: fan a SIGNED item statement (a full-item snapshot, or a remove) to every
+     *   other member; receivers verify it at their items rail before it lands on their device log and
      *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
-     *   circle-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   circle-items-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
-    defineSkill('broadcastCircleTask', async ({ parts, from }) => {
+    defineSkill('broadcastCircleItems', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3978,13 +3445,13 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'circle-task-broadcast', from,
+        circleId: _groupId, kind: 'circle-items-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'circle-task-fanout',
+        metric: 'circle-items-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:circle-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      description: 'Fan a signed item statement (full-item snapshot or remove) to every other member via subtype:circle-items-broadcast; receivers verify at their items rail and causally merge the head. Never wakes.',
       visibility:  'authenticated',
     }),
 
@@ -4052,111 +3519,6 @@ export function buildSkills({
       );
     }, {
       description: 'Fan proven per-circle ADDRESS announcements to a circle (subtype:circle-address-announce); receivers verify each proof themselves and record it. Pass `to` to narrow the fan. Never wakes a device.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listCircleChats({groupId?, sinceTs?, limit?})
-     *   — list stored circle chat-message items, ordered
-     *   oldest → newest (chat reading order).  Defaults: all circles,
-     *   no time bound, capped at 200 most recent.  Hosts (basis
-     *   web + mobile) call this at boot to rehydrate eventLog so the
-     *   CONVERSATION tab shows historical chats after a reload.
-     */
-    defineSkill('listCircleChats', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const limit = Math.max(1, Math.min(1000,
-        typeof a.limit === 'number' && Number.isFinite(a.limit) ? a.limit : 200,
-      ));
-      const open = await store.listOpen({ type: 'circle-chat-message' });
-      let filtered = open;
-      if (typeof a.groupId === 'string' && a.groupId) {
-        filtered = filtered.filter((i) => i?.source?.circleId === a.groupId);
-      }
-      if (typeof a.sinceTs === 'number' && Number.isFinite(a.sinceTs)) {
-        const cutoff = a.sinceTs;
-        filtered = filtered.filter((i) => (i?.source?.ts ?? 0) > cutoff);
-      }
-      // Chat order: oldest at top, newest at bottom.  Slice tail when
-      // over the limit so callers always get the freshest N entries.
-      const sorted = filtered.slice().sort(
-        (a, b) => (a?.source?.ts ?? 0) - (b?.source?.ts ?? 0),
-      );
-      const trimmed = sorted.length > limit ? sorted.slice(sorted.length - limit) : sorted;
-      return { items: trimmed };
-    }, {
-      description: 'List stored circle chat-message items for boot-time eventLog rehydration.  Filters: groupId, sinceTs (exclusive), limit (default 200, max 1000).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * ingestCircleMessage({payload, fromPubKey, fromPeerAddr})
-     *   — receive-side mirror for an inbound circle chat
-     *   envelope.  Sibling of `ingestRemotePost` for the circle-post
-     *   path: dedupe + eviction + mute filtering + addItems.  Hosts
-     *   (basis web + mobile) call this from their circle-chat
-     *   peer-router handler instead of writing to eventLog directly.
-     *
-     *   Returns: { ok: true, itemId } | { deduped: true } |
-     *            { evicted: true } | { muted: true } | { error }.
-     */
-    defineSkill('ingestCircleMessage', async ({ parts }) => {
-      const a = dataArgs(parts);
-      const payload = a.payload;
-      const fromPubKey = typeof a.fromPubKey === 'string' ? a.fromPubKey : null;
-      const fromPeerAddr = typeof a.fromPeerAddr === 'string' ? a.fromPeerAddr : null;
-      if (!payload || typeof payload !== 'object') return { error: 'payload required' };
-
-      const circleId = payload.circleId;
-      const msgId    = payload.msgId;
-      const text     = payload.text;
-      const ts       = typeof payload.ts === 'number' && Number.isFinite(payload.ts) ? payload.ts : Date.now();
-      if (typeof circleId !== 'string' || !circleId) return { error: 'circleId required' };
-      if (typeof msgId    !== 'string' || !msgId)    return { error: 'msgId required' };
-      if (typeof text     !== 'string' || !text)     return { error: 'text required' };
-
-      // Eviction + mute filter — shared with ingestRemotePost so the two ingest
-      // paths can't drift (E1 drift-guard via _peerIngestVerdict).
-      const verdict = _peerIngestVerdict({
-        evictionRoster: bundle?.evictionRoster ?? null,
-        muted,
-        evictWebid: payload.fromActor ?? payload.fromWebid ?? null,
-        muteKeys: [payload.fromStableId, payload.fromActor, payload.fromWebid],
-      });
-      if (verdict) return verdict;
-
-      // Dedupe by msgId — O(N) over open circle-chat items.
-      const open = await store.listOpen({ type: 'circle-chat-message' });
-      if (open.some((i) => i?.source?.msgId === msgId)) return { deduped: true };
-
-      // The embed CARD riding the envelope — a photo, an appointment, a shared item, a file.
-      // Shape-guarded only (pinboard stays incurious about which variants exist; the SENDER's
-      // per-variant whitelist is the boundary that decides what may travel). Persisted so this
-      // peer's rehydrate + catch-up serves keep the card.
-      const card = (payload.card && typeof payload.card === 'object' && !Array.isArray(payload.card))
-        ? payload.card : null;
-
-      const [item] = await store.addItems([{
-        type:       'circle-chat-message',
-        text,
-        visibility: 'household',
-        source: {
-          circleId,
-          msgId,
-          ts,
-          fromActor: payload.fromActor ?? null,
-          fromWebid: payload.fromWebid ?? null,
-          fromPubKey,
-          ...(fromPeerAddr ? { fromPeerAddr } : {}),
-          ...(card ? { card } : {}),
-        },
-      }], {
-        actor: payload.fromActor ?? payload.fromWebid ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'remote'),
-      });
-      metrics?.record?.('circle-chat-ingest');
-      return { ok: true, itemId: item.id };
-    }, {
-      description: 'Ingest an inbound circle chat-message envelope into the local itemStore (mute + eviction filtered, dedupes on msgId).',
       visibility:  'authenticated',
     }),
 
@@ -4534,18 +3896,17 @@ export function buildSkills({
       const a = dataArgs(parts);
       const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
         ? a.trustOffer : 'bekend';
-      const me = members ? await members.resolveByWebid(from) : null;
+      const me = await ownProfileOf(from);
       // A card asked AS a persona (the host's `actAs`, `from` is not this device's own webid) is that persona's alone:
       // no fallback to this agent's identity, which every self of the device shares and so would link them.
       const asPersona = !!localActor && from !== localActor;
       const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       const card = {
         webid:        from,
-        pubKey:       own?.pubKey   ?? me?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
-        stableId:     own?.stableId ?? me?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
+        pubKey:       own?.pubKey   ?? (asPersona ? from : agent?.identity?.pubKey ?? null),
+        stableId:     own?.stableId ?? (asPersona ? null : agent?.identity?.stableId ?? null),
         handle:       me?.handle       ?? null,
         displayName:  me?.displayName  ?? null,
-        avatarUrl:    me?.avatarUrl    ?? null,
         trustOffer,
         // 2026-05-27 — embed the caller's NKN peer address so the
         // scanner can DM the contact straight after add, without
@@ -4575,8 +3936,7 @@ export function buildSkills({
      *   Parse a `onderling-contact://` payload and add the contact
      *   to the local ContactBook.  Honours the `trustOffer` from
      *   the QR (defaults to 'bekend' if missing).  Asymmetric —
-     *   adding a contact here does *not* notify them; that's
-     *   Phase 24.6's contact-add-request envelope.
+     *   adding a contact here does *not* notify them.
      */
     defineSkill('addContactFromQr', async ({ parts }) => {
       const a = dataArgs(parts);
@@ -4586,9 +3946,6 @@ export function buildSkills({
       if (!bundle?.contacts) return { error: 'no-contacts' };
       const card = decodeContactCard(a.payload.slice('onderling-contact://'.length));
       if (!card?.webid) return { error: 'malformed-card' };
-      if (typeof console !== 'undefined') {
-        console.log('[pinboard/addContactFromQr] card.peerAddr=' + (card.peerAddr ? (card.peerAddr.slice(0,16)+'…') : 'NONE') + ' for webid=' + String(card.webid).slice(0, 32));
-      }
       const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
         ? card.trustOffer : 'bekend';
       const m = await bundle.contacts.addContact({
@@ -4624,137 +3981,6 @@ export function buildSkills({
       return { contact: m, ...(pk ? { personKey: pk } : {}) };
     }, {
       description: 'Add a contact from a onderling-contact:// QR/URL payload. `persona` records which of your personas they were added through — what they see of you.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * requestContactAdd({toWebid | toStableId | toPubKey, trustOffer?})
-     *   — Phase 24.6.  Send a `contact-add-request` envelope to the
-     *   peer.  Payload includes the calling actor's WebID / pubKey /
-     *   handle / avatar so the receiver's UI can render an
-     *   "Anna wants to add you as a contact" prompt without a
-     *   pre-existing MemberMap entry.  Asymmetric — adding the
-     *   contact locally is the caller's separate decision.
-     */
-    defineSkill('requestContactAdd', async ({ parts, from, agent }) => {
-      if (!chat) return { error: 'chat-not-wired' };
-      const a = dataArgs(parts);
-      const trustOffer = (a.trustOffer === 'vertrouwd' || a.trustOffer === 'bekend')
-        ? a.trustOffer : 'bekend';
-      const me = members ? await members.resolveByWebid(from) : null;
-      const r = await chat.send({
-        toWebid:    a.toWebid,
-        toStableId: a.toStableId,
-        toPubKey:   a.toPubKey,
-        subtype:    'contact-add-request',
-        extras: {
-          handle:      me?.handle      ?? null,
-          displayName: me?.displayName ?? null,
-          avatarUrl:   me?.avatarUrl   ?? null,
-          trustOffer,
-        },
-      });
-      if (r.ok) metrics?.record?.('contact-request-sent');
-      return r.ok ? { ok: true } : { error: r.reason };
-    }, {
-      description: 'Send a contact-add-request envelope; receiver decides asymmetrically.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * acceptContactRequest({requestId})
-     *   — Phase 24.6.  Mark the contact-request item complete and
-     *   add the requester to the local ContactBook at the offered
-     *   trust level.
-     */
-    defineSkill('acceptContactRequest', async ({ parts, from }) => {
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      const a = dataArgs(parts);
-      if (typeof a.requestId !== 'string' || !a.requestId) return { error: 'requestId required' };
-      const item = await store.getById(a.requestId);
-      if (!item || item.type !== 'contact-request') return { error: 'not-found' };
-      const card = item.source ?? {};
-      const trustLevel = card.trustOffer === 'vertrouwd' || card.trustOffer === 'bekend'
-        ? card.trustOffer : 'bekend';
-      const m = await bundle.contacts.addContact({
-        webid:       card.fromWebid,
-        pubKey:      card.fromPubKey ?? null,
-        stableId:    card.fromStableId ?? null,
-        handle:      card.handle      ?? null,
-        displayName: card.displayName ?? null,
-        avatarUrl:   card.avatarUrl   ?? null,
-        trustLevel,
-      });
-      // Close the request item so the UI prompt clears.
-      try { await store.markComplete([{ id: a.requestId }], { actor: from }); } catch {}
-      metrics?.record?.('contact-request-accepted');
-      return { ok: true, contact: m };
-    }, {
-      description: 'Accept an incoming contact-add request; adds the requester at their offered trust level.',
-      visibility:  'authenticated',
-    }),
-
-    /** declineContactRequest({requestId}) — closes the prompt; does NOT add. */
-    defineSkill('declineContactRequest', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.requestId !== 'string' || !a.requestId) return { error: 'requestId required' };
-      const item = await store.getById(a.requestId);
-      if (!item || item.type !== 'contact-request') return { error: 'not-found' };
-      try { await store.markComplete([{ id: a.requestId }], { actor: from }); } catch {}
-      metrics?.record?.('contact-request-declined');
-      return { ok: true };
-    }, {
-      description: 'Decline an incoming contact-add request (closes the prompt).',
-      visibility:  'authenticated',
-    }),
-
-    /** listContactRequests() — open `kind: 'contact-request'` items. */
-    defineSkill('listContactRequests', async () => {
-      const open = await store.listOpen({ type: 'contact-request' });
-      return { requests: open };
-    }, {
-      description: 'List open contact-add requests addressed to me.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * redeemInviteWithGate({invite, privacyAccepted, rulesAccepted})
-     *   — Phase-17 onboarding-gated invite redeem.  BOTH flags MUST
-     *   be `true` (user explicitly tapped Akkoord on privacy notice +
-     *   group rules); rejects otherwise.  Records the acceptance as
-     *   a `kind: 'rules-accept'` audit item; the actual GroupManager
-     *   redemption is `redeemInvite` (existing) called by the UI
-     *   after this gate clears.
-     */
-    defineSkill('redeemInviteWithGate', async ({ parts, from }) => {
-      // Thin wrapper: the join rules-gate lives in `@onderling/circles` (`redeemInviteWithGate`, §8c slice-a).
-      return redeemInviteWithGate({ store }, { a: dataArgs(parts), from });
-    }, {
-      description: 'Phase 17 gated redeem — verify privacy + rules acceptance before downstream redeem.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * listReports({groupId?})
-     *   — admin-only.  Returns all `kind: 'report'` items for the
-     *   group, oldest first so admins see the queue in arrival order.
-     */
-    defineSkill('listReports', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (members) {
-        // The folded head, like every other authority question here, refusing when it has no answer.
-        const isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
-          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
-        if (!isAdmin) return { error: 'admin-only' };
-      }
-      const all = await store.listOpen({ type: 'report' });
-      // Per-circle scoping: keep reports tagged for THIS group, plus untagged legacy
-      // reports (visible to all admins — they predate per-circle tagging).
-      const scoped = all.filter((r) => { const g = r?.source?.groupId; return g == null || g === _groupId; });
-      return { reports: scoped.sort((p, q) => (p.addedAt ?? 0) - (q.addedAt ?? 0)) };
-    }, {
-      description: 'Admin-only: list the open reports for a group.',
       visibility:  'authenticated',
     }),
 
@@ -4813,111 +4039,6 @@ export function buildSkills({
     }),
 
     /**
-     * listEvictedMembers()
-     *   — Phase 35 (2026-05-06). Returns the webids whose
-     *   most-recent membership-redemption has expired (past
-     *   `expiresAt + GRACE_MS`).  Posts from these members are
-     *   silently dropped on the receive side; the UI uses this
-     *   skill to render a banner on /group.html.
-     */
-    defineSkill('listEvictedMembers', async () => ({
-      evicted: bundle?.evictionRoster?.listEvicted() ?? [],
-    }), {
-      description: 'List webids whose membership has expired past the grace window.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getAttachmentDataUrl({itemId, attId}) — Phase 39.
-     *   Read the locally-cached bytes for an attachment and return
-     *   a `data:<mime>;base64,...` URL the browser can drop straight
-     *   into an <img> tag.  Returns `{error: 'no-bytes'}` when the
-     *   bytes aren't on this machine yet (caller should call
-     *   `requestAttachment` first and re-poll).
-     */
-    defineSkill('getAttachmentDataUrl', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) return { error: 'itemId required' };
-      if (typeof a.attId  !== 'string' || !a.attId)  return { error: 'attId required' };
-      if (!bundle?.cache) return { error: 'no-cache' };
-
-      const item = await store.getById(a.itemId);
-      if (!item) return { error: 'item-not-found' };
-      const attachments = Array.isArray(item.source?.attachments) ? item.source.attachments : [];
-      const att = attachments.find(x => x?.id === a.attId);
-      if (!att) return { error: 'attachment-not-found' };
-      if (!att.ref) return { error: 'no-bytes' };
-
-      const dataB64 = await readAttachmentBytesB64({ dataSource: bundle.cache, ref: att.ref })
-        .catch(() => null);
-      if (!dataB64) return { error: 'no-bytes' };
-      return { ok: true, dataUrl: `data:${att.mime};base64,${dataB64}` };
-    }, {
-      description: 'Return a data: URL for a locally-cached attachment.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * requestAttachment({itemId, attId}) — Phase 39.
-     *   Fetch the full bytes for an attachment that we currently
-     *   only have a thumbnail for.  Looks up the item's
-     *   `source.fromPubKey` (the original author), sends a
-     *   `subtype: 'attachment-request'` chat envelope, and returns
-     *   immediately.  When the response lands, `wireChat` writes
-     *   the bytes locally + patches the item with the local `ref`
-     *   AND emits `agent.on('pinboard:attachment-fetched', ...)`.
-     *   The UI listens for that event to refresh.
-     *
-     *   Returns `{ok: true}` when the request was dispatched; does
-     *   NOT block on the response.  When the bytes are already
-     *   local (we authored the post, or already fetched), returns
-     *   `{ok: true, ref}` immediately.
-     */
-    defineSkill('requestAttachment', async ({ parts, from, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) return { error: 'itemId required' };
-      if (typeof a.attId  !== 'string' || !a.attId)  return { error: 'attId required' };
-
-      const item = await store.getById(a.itemId);
-      if (!item) return { error: 'item-not-found' };
-      const attachments = Array.isArray(item.source?.attachments) ? item.source.attachments : [];
-      const att = attachments.find(x => x?.id === a.attId);
-      if (!att) return { error: 'attachment-not-found' };
-      if (att.ref) return { ok: true, ref: att.ref };  // already local
-
-      const fromPubKey = item.source?.fromPubKey;
-      if (!fromPubKey) return { error: 'no-author-pubkey' };
-      if (typeof agent?.transportFor !== 'function') return { error: 'no-transport' };
-
-      try {
-        // Per-peer routing — `agent.transport` is the primary slot
-        // (InternalTransport on mobile, self-loop only).  Without
-        // this, the attachment-request envelope never reaches the
-        // remote post author.
-        const t = await agent.transportFor(fromPubKey);
-        await t.sendOneWay(fromPubKey, {
-          type:  'message',
-          parts: [{ type: 'DataPart', data: {
-            type:         'pinboard-chat',
-            subtype:      'attachment-request',
-            itemId:       a.itemId,
-            attId:        a.attId,
-            fromWebid:    bundle?.agent?.identity ? from : null,
-            fromStableId: (typeof selfCard === 'function' ? selfCard()?.stableId : null) ?? bundle?.agent?.identity?.stableId ?? null,
-            sentAt:       Date.now(),
-          }}],
-        });
-      } catch (err) {
-        return { error: `transport: ${err?.message ?? err}` };
-      }
-      metrics?.record?.('attachment-requested');
-      return { ok: true, pending: true };
-    }, {
-      description: 'Request the full bytes for an attachment from its original author.',
-      visibility:  'authenticated',
-    }),
-
-    /**
      * getBulkSyncStatus()
      *   — Phase 34 (2026-05-06). Reports the latest snapshot
      *   of the cache's bulk-sync state during attachInner.  Phases:
@@ -4955,55 +4076,37 @@ export function buildSkills({
     }),
 
     /**
-     * setMyLocation({cell, label?, source?})
-     *   — Phase 26.3.  Persists `{cell, label, source}` on the local
-     *   actor's MemberMap entry.  `source` is one of `'gps'`,
-     *   `'geocode'`, or `null`.  No validation of the cell shape —
-     *   the caller is trusted (`geo.js#cellFor` produces it).
+     * setMyLocation({label})
+     *   — the person's coarse place, on their own profile (the persona record's `location` property). The geocoder's
+     *   grid cell is not kept: a label is all a person's place ever is.
      */
     defineSkill('setMyLocation', async ({ parts, from }) => {
       const a = dataArgs(parts);
-      if (typeof a.cell !== 'string' || !a.cell) return { error: 'cell required' };
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({
-        ...me,
-        location: {
-          cell:   a.cell,
-          label:  typeof a.label  === 'string' ? a.label  : null,
-          source: a.source === 'gps' || a.source === 'geocode' ? a.source : null,
-        },
-      });
+      // The person's place is the COARSE label only (a municipality-like name): no grid cell or coordinate is kept
+      const label = typeof a.label === 'string' ? a.label.trim() : '';
+      if (!label) return { error: 'label required' };
+      const updated = await selfProfile?.set?.(from, { location: label });
+      if (!updated) return { error: 'not-a-self-here' };
       return { location: updated.location };
     }, {
-      description: 'Set the calling actor\'s coarse location {cell, label, source}.',
+      description: 'Set the calling actor\'s coarse place (a label, never a coordinate).',
       visibility:  'authenticated',
     }),
 
-    /** clearMyLocation() — drop the location field. */
     defineSkill('clearMyLocation', async ({ from }) => {
-      if (!members) return { error: 'no-member-map' };
-      const me = (await members.resolveByWebid(from)) ?? { webid: from };
-      const updated = await members.addMember({ ...me, location: null });
-      return { location: updated.location };
+      const updated = await selfProfile?.set?.(from, { location: null });
+      if (!updated) return { error: 'not-a-self-here' };
+      return { location: null };
     }, {
-      description: 'Clear the calling actor\'s coarse location.',
+      description: 'Clear the calling actor\'s coarse place.',
       visibility:  'authenticated',
     }),
 
-    /** getMyLocation() — read the calling actor's location. */
+    /** getMyLocation() — read the calling actor's coarse place (a label, or null). */
     defineSkill('getMyLocation', async ({ from }) => {
-      if (!members) return { location: null };
-      const me = await members.resolveByWebid(from);
-      return { location: me?.location ?? null };
+      return { location: (await ownProfileOf(from))?.location ?? null };
     }, {
-      description: 'Read the calling actor\'s coarse location.',
-      visibility:  'authenticated',
-    }),
-
-    /** distancePresets() — return the post-composer's distance presets (km). */
-    defineSkill('distancePresets', async () => ({ presets: [...DISTANCE_PRESETS] }), {
-      description: 'Return the distance presets used by the post composer.',
+      description: 'Read the calling actor\'s coarse place.',
       visibility:  'authenticated',
     }),
 
@@ -5013,8 +4116,7 @@ export function buildSkills({
      * addContact({webid, pubKey?, handle?, displayName?, trustLevel?, tags?, ...})
      *   — upsert a contact in the calling actor's ContactBook.
      *   Sets `relation: 'contact'` on the MemberMap entry.
-     *   Asymmetric: doesn't notify the contact themselves
-     *   (Phase 24.6 wires the contact-add-request envelope).
+     *   Asymmetric: doesn't notify the contact themselves.
      */
     wire('addContact', {
       description: 'Add or update a 1:1 contact.',
@@ -5078,30 +4180,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /**
-     * forgetContact({webid}) / listRefiledContacts() — the HOST's own, never a peer's: a contact re-filed under a self
-     * this device does not hold leaves this self's book (its contact facets; the member row stays), and the book's
-     * record of where its contacts were filed before a move is what the own-devices lane tells the old self's devices.
-     */
-    defineSkill('forgetContact', async ({ parts, from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      const a = dataArgs(parts);
-      try { return { contact: await bundle.contacts.forgetContact(a.webid) }; }
-      catch (err) { return { error: err?.message ?? String(err) }; }
-    }, {
-      description: "The host's own: drop a contact re-filed under a self this device does not hold (the member row stays).",
-      visibility:  'authenticated',
-    }),
-    defineSkill('listRefiledContacts', async ({ from }) => {
-      if (!from || from !== localActor) return { error: 'not-yours' };
-      if (!bundle?.contacts?.listRefiled) return { refiled: [] };
-      return { refiled: await bundle.contacts.listRefiled() };
-    }, {
-      description: "The host's own: the contacts re-filed under another persona here (webid, where they were filed, when).",
-      visibility:  'authenticated',
-    }),
-
     /** setContactTags({webid, tags: string[]}) */
     defineSkill('setContactTags', async ({ parts }) => {
       const a = dataArgs(parts);
@@ -5162,184 +4240,6 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    // ── Lists ──────────────────────────────────────────────────
-
-    defineSkill('createContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      if (typeof a.name !== 'string' || !a.name.trim()) return { error: 'name required' };
-      const list = await bundle.contacts.createList(a.name);
-      return { list };
-    }, {
-      description: 'Create a new contact list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('deleteContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      if (!a.listId) return { error: 'listId required' };
-      await bundle.contacts.deleteList(a.listId);
-      return { ok: true };
-    }, {
-      description: 'Delete a contact list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('renameContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      try {
-        const list = await bundle.contacts.renameList(a.listId, a.name);
-        return { list };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Rename a contact list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('addToContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      try {
-        const list = await bundle.contacts.addToList(a.listId, a.webid);
-        return { list };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Add a contact (by webid) to a list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('removeFromContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { error: 'no-contacts' };
-      try {
-        const list = await bundle.contacts.removeFromList(a.listId, a.webid);
-        return { list };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
-    }, {
-      description: 'Remove a contact from a list.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('listContactLists', async () => {
-      if (!bundle?.contacts) return { lists: [] };
-      const lists = await bundle.contacts.listLists();
-      return { lists };
-    }, {
-      description: 'List all contact lists.',
-      visibility:  'authenticated',
-    }),
-
-    defineSkill('getContactList', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!bundle?.contacts) return { list: null };
-      if (!a.listId) return { error: 'listId required' };
-      const list = await bundle.contacts.getList(a.listId);
-      return { list };
-    }, {
-      description: 'Read one contact list by listId.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getHopMode()  — Phase 28.1.  Returns `{global}` reflecting
-     * whether hop-relay is enabled for any contact on this device.
-     * Mirror of `bundle.settings.allowHopThrough`.
-     */
-    defineSkill('getHopMode', async () => ({
-      global: bundle?.settings?.allowHopThrough === true,
-    }), {
-      description: 'Read whether global hop-relay is enabled.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * setHopMode({global})  — Phase 28.1.  Toggles
-     * `bundle.settings.allowHopThrough` AND wires
-     * `agent.enableRelayForward({policy: 'authenticated'})` when
-     * turning on (idempotent at the SDK level).  When turning off,
-     * policy is downgraded to `'never'` so the registered skill
-     * rejects any relay request.  Stays registered to avoid
-     * needing a restart; the policy gate is the actual switch.
-     */
-    defineSkill('setHopMode', async ({ parts, agent }) => {
-      const a = dataArgs(parts);
-      if (typeof a.global !== 'boolean') return { error: 'global (bool) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      { allowHopThrough: a.global },
-      });
-      bundle.settings = next;
-
-      try {
-        if (a.global) {
-          agent.enableRelayForward({ policy: 'authenticated' });
-        } else if (agent?.config?.set) {
-          agent.config.set('policy.allowRelayFor', 'never');
-        }
-      } catch (err) {
-        return { error: `enableRelayForward failed: ${err?.message ?? err}` };
-      }
-      metrics?.record?.(a.global ? 'hop-mode-on' : 'hop-mode-off');
-      return { global: a.global };
-    }, {
-      description: 'Enable or disable global hop-relay; persists in settings + flips core policy.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getSettings()  — Phase 23.5.  Read-only snapshot of cadence /
-     * hop / broadcastable / defaultShareLocation settings.  Cached
-     * in `bundle.settings`; reload from cache via `_reload: true`.
-     */
-    defineSkill('getSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (a._reload && bundle?.cache) {
-        bundle.settings = await loadSettings({
-          dataSource: bundle.cache,
-          deviceId:   bundle?.deviceId ?? null,
-        });
-      }
-      return { settings: bundle?.settings ?? null };
-    }, {
-      description: 'Read the bundle\'s user-tunable settings (cadence + hop + broadcastable).',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * updateSettings({patch})  — Phase 23.5.  Patch a subset of the
-     * settings; persists via the same CachingDataSource path that
-     * MemberMap uses, so a connected pod gets the update too.
-     * Returns the merged + saved settings.
-     */
-    defineSkill('updateSettings', async ({ parts }) => {
-      const a = dataArgs(parts);
-      if (!a.patch || typeof a.patch !== 'object') return { error: 'patch (object) required' };
-      if (!bundle?.cache) return { error: 'no-cache (was cache: false?)' };
-      const next = await updateSettingsLib({
-        dataSource: bundle.cache,
-        deviceId:   bundle?.deviceId ?? null,
-        patch:      a.patch,
-        scope:      a.scope === 'device' || a.scope === 'shared' ? a.scope : null,
-      });
-      bundle.settings = next;
-      metrics?.record?.('settings-updated');
-      return { settings: next };
-    }, {
-      description: 'Patch a subset of the bundle\'s settings; persists immediately.',
-      visibility:  'authenticated',
-    }),
-
     /**
      * rotateMyAddress({ gracePeriodSeconds? })  — Pinboard V3 mobile
      * Phase 40.22 (2026-05-08).
@@ -5389,11 +4289,15 @@ export function buildSkills({
      *   not WebID vs URL).
      */
     defineSkill('whoAmI', async ({ from, agent }) => {
-      const me = members ? await members.resolveByWebid(from) : null;
+      const me = await ownProfileOf(from);
+      // WHO this is: the host's own card for this device's general self (its chat identity), and for a persona the webid
+      // it speaks as. Never this pinboard agent's key: it stays in the process.
+      const asPersona = !!localActor && from !== localActor;
+      const own = !asPersona && typeof selfCard === 'function' ? selfCard() : null;
       return {
         webid:       from,
-        stableId:    me?.stableId ?? agent?.identity?.stableId ?? null,
-        pubKey:      me?.pubKey   ?? agent?.identity?.pubKey   ?? null,
+        stableId:    own?.stableId ?? (asPersona || typeof selfCard === 'function' ? null : agent?.identity?.stableId ?? null),
+        pubKey:      own?.pubKey   ?? (asPersona || typeof selfCard === 'function' ? from : agent?.identity?.pubKey ?? null),
         handle:      me?.handle      ?? null,
         displayName: me?.displayName ?? null,
       };
@@ -5515,13 +4419,12 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
-    /* ── Phase 22: Layer-2 personal interest matching ──────────── */
+    /* ── Post relevance ──────────────────────────────────────────── */
 
     /**
      * scorePostRelevance({ text, categoryId?, tags?, circleId? })
-     *   — Combines Layer 1 (does it meet what I offer: the host's `matchesMine` over the drivers of the self I am in
-     *   that circle) with Layer 2 (TF-IDF over the user's response history).  Returns `{matched, ...}` with
-     *   `via: 'offering'|'interest'` when matched, plus the raw `layer2Score` for inspection.
+     *   — Does the post meet what I offer: the host's `matchesMine` over the drivers of the self I am in that circle.
+     *   Returns `{matched, via: 'offering'}` on a match, `{matched: false, reason}` otherwise.
      */
     defineSkill('scorePostRelevance', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -5534,49 +4437,9 @@ export function buildSkills({
       const mine = typeof bundle?.matchesMine === 'function'
         ? await bundle.matchesMine(a.circleId ?? null, { text: a.text, categoryId: a.categoryId ?? null, skillTags: Array.isArray(a.tags) ? a.tags : [] }).catch(() => false)
         : false;
-      const layer1 = mine ? { matched: true, via: 'offering' } : { matched: false, reason: 'no-offering-match' };
-      const layer2 = bundle?.interestProfile
-        ? scoreInterest(bundle.interestProfile, a.text)
-        : 0;
-      const combined = combinedRelevance(layer1, layer2, a.threshold ?? 0.15);
-      return { ...combined, layer1, layer2 };
+      return mine ? { matched: true, via: 'offering' } : { matched: false, reason: 'no-offering-match' };
     }, {
-      description: 'Layer-1 + Layer-2 relevance score for a post body.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * getInterestProfile()
-     *   — Read-only snapshot of the bundle's Layer-2 profile.  Used
-     *   by /interests.html for inspection + a "reset" button.
-     */
-    defineSkill('getInterestProfile', async () => {
-      const p = bundle?.interestProfile ?? { docFrequency: {}, totalDocs: 0, centroidTerm: {} };
-      const top = Object.entries(p.centroidTerm ?? {})
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 30)
-        .map(([term, weight]) => ({ term, weight }));
-      return { totalDocs: p.totalDocs, topTerms: top };
-    }, {
-      description: 'Read-only snapshot of the Layer-2 interest profile.',
-      visibility:  'authenticated',
-    }),
-
-    /**
-     * resetInterestProfile()
-     *   — Wipe the profile.  Useful for users who want to start over.
-     */
-    defineSkill('resetInterestProfile', async () => {
-      if (bundle?.interestProfile) {
-        bundle.interestProfile.docFrequency = {};
-        bundle.interestProfile.centroidTerm = {};
-        bundle.interestProfile.totalDocs    = 0;
-        bundle.interestProfile.centroidNorm = null;
-      }
-      metrics?.record?.('interest-profile-reset');
-      return { ok: true };
-    }, {
-      description: 'Reset the Layer-2 interest profile.',
+      description: 'Does a post body meet what I offer (my drivers in that circle).',
       visibility:  'authenticated',
     }),
 
@@ -5610,7 +4473,6 @@ const _SENTINEL_BUNDLE = Object.freeze({
   store:      null,
   offeringMatch: null,
   notifier:   null,
-  reveals:    null,
   members:    null,
   muted:      new Set(),
   localActor: null,

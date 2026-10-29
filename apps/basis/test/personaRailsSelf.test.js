@@ -113,17 +113,13 @@ describe('never across selves: the circle-less noticeboard post', () => {
       st.groupId = gid; st.name = gid; st.purpose = 't'; st.persona = persona;
       expect((await createSubmit({ state: st, callSkill: (a, o, x) => agent.callSkill(a, o, x) })).result).toBeTruthy();
     }
-    const lines = [];
-    const orig = console.info;
-    console.info = (...a) => { lines.push(a.join(' ')); return orig.apply(console, a); };
-    try {
-      await agent.callSkill('pinboard', 'postRequest', { text: 'wie leent me een ladder', kind: 'request' });
-      for (let i = 0; i < 30 && !lines.some((l) => l.includes('noticeboard') && l.includes('circle store')); i++) await new Promise((r) => setTimeout(r, 100));
-    } finally { console.info = orig; }
-    const fanned = lines.filter((l) => l.includes('noticeboard') && l.includes('circle store'));
-    // it lands in the default's own noticeboard circle (pinboard's bundle group) — the default's, by construction
-    expect(fanned.length, 'it fanned somewhere').toBeGreaterThan(0);
-    expect(fanned.some((l) => l.includes(Y)), 'never to the persona\'s').toBe(false);
+    const made = await agent.callSkill('pinboard', 'postRequest', { text: 'wie leent me een ladder', kind: 'request' });
+    const postId = made?.itemId ?? made?.id ?? made?.item?.id;
+    expect(postId, JSON.stringify(made)).toBeTruthy();
+    const holds = async (cid) => !!(await agent.circleStoreFor(cid).get(postId).catch(() => null));
+    // it lands in the default's circles (its own, and pinboard's home group) — the default's, by construction
+    expect((await holds('circle-of-mine')) || (await holds('cc-default-circle')), 'it is in a default circle').toBe(true);
+    expect(await holds(Y), 'never in the persona\'s').toBe(false);
     await agent.shutdown?.();
   }, 60_000);
 });

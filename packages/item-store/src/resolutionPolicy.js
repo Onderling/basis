@@ -14,6 +14,15 @@
  *   • content — LWW-register: the latest edit survives (posts, notes, task text). The conservative DEFAULT.
  *   • claim   — first-wins / immutable-once-set: first grab wins permanently (task assignee). Reconciled by
  *               `causalMerge.reconcileClaim` over the exported `CLAIM_FIELDS` cluster.
+ *   • field-clock — a declared FIELD-SET merges by its own clock field (the set's `*At` time): the side whose
+ *               clock is newer supplies the whole set, whichever row won the content merge. For rows that
+ *               different devices change in different parts (a contact's hidden mark, its persona). Declared on
+ *               the TYPE (`@onderling/item-types` CANONICAL_FIELD_CLOCKS), read here; merged by
+ *               `causalMerge.mergeFieldClocks`. Fields outside every set stay content-LWW. The clock is
+ *               WRITER-STAMPED (a device's own time), which is safe only when every writer is one person's own
+ *               device: so it is refused for any type not in the dictionary's OWN_SCOPE_TYPES. The spine refuses
+ *               wall clocks for the same reason (a revote supersedes by ancestry); a circle-shared type that needs
+ *               a per-field merge gets a causal (ancestry) version of this, never a wall clock.
  *   • spine   — deny-wins meet-semilattice (membership / authority). Selected by ITEM-TYPE, NOT by this
  *               (type,field) table, and merged on a SEPARATE path (`@onderling/core` rosterFold / spine
  *               appender) — it never reaches `CircleItemStore.put`'s content/claim funnel. It appears here
@@ -36,9 +45,10 @@
  */
 
 import { CLAIM_FIELDS } from './causalMerge.js';
+import { CANONICAL_FIELD_CLOCKS, OWN_SCOPE_TYPES } from '@onderling/item-types';
 
 /** The resolution policies, under their CRDT-system names. */
-export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine' });
+export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine', FIELD_CLOCK: 'field-clock' });
 
 /** The delivery-reliability tiers — a policy IMPLIES a transport guarantee, so they are declared together. */
 export const DELIVERY = Object.freeze({
@@ -49,6 +59,7 @@ export const DELIVERY = Object.freeze({
 
 const DELIVERY_FOR = Object.freeze({
   [RESOLUTION.CONTENT]: DELIVERY.BEST_EFFORT,
+  [RESOLUTION.FIELD_CLOCK]: DELIVERY.BEST_EFFORT,   // a set heals on the next merge, like content
   [RESOLUTION.CLAIM]:   DELIVERY.AT_LEAST_ONCE,
   [RESOLUTION.SPINE]:   DELIVERY.RELIABLE,
 });
@@ -68,7 +79,7 @@ export function deliveryForResolution(resolution) {
  */
 export const DEFAULT_RESOLUTION = RESOLUTION.CONTENT;
 
-const isResolution = (p) => p === RESOLUTION.CONTENT || p === RESOLUTION.CLAIM || p === RESOLUTION.SPINE;
+const isResolution = (p) => p === RESOLUTION.CONTENT || p === RESOLUTION.CLAIM || p === RESOLUTION.SPINE || p === RESOLUTION.FIELD_CLOCK;
 
 /**
  * A mutable (item-type, field) → resolution registry with `resolutionOf` / `deliveryOf` accessors (mirrors
@@ -78,6 +89,13 @@ const isResolution = (p) => p === RESOLUTION.CONTENT || p === RESOLUTION.CLAIM |
  */
 export function createResolutionRegistry() {
   const table = new Map();   // itemType -> Map(field -> resolution)
+  const clockSets = new Map();   // itemType -> [{ clock, fields }] (the field-clock sets, in declaration order)
+
+  const put = (itemType, field, resolution) => {
+    let m = table.get(itemType);
+    if (!m) { m = new Map(); table.set(itemType, m); }
+    m.set(field, resolution);
+  };
 
   const api = {
     /** Declare `(itemType, field) → resolution`. Last declaration wins; returns `this` for chaining. */
@@ -99,10 +117,39 @@ export function createResolutionRegistry() {
           + `field, or use content/spine.`,
         );
       }
-      let m = table.get(itemType);
-      if (!m) { m = new Map(); table.set(itemType, m); }
-      m.set(field, resolution);
+      // A field-clock field means nothing without the clock that orders it: declare the set, not the field.
+      if (resolution === RESOLUTION.FIELD_CLOCK) {
+        throw new Error(`resolutionRegistry.declare: (${itemType}, ${field}) — a field-clock is declared as a set with its clock, through declareFieldClock(itemType, clock, fields)`);
+      }
+      put(itemType, field, resolution);
       return api;
+    },
+
+    /**
+     * Declare a FIELD-SET of `itemType` that merges by its own clock field `clock` (a number: the time the set last
+     * changed). The clock and every field of the set resolve `field-clock`. A field belongs to one set at most.
+     */
+    declareFieldClock(itemType, clock, fields = []) {
+      if (typeof itemType !== 'string' || !itemType) throw new Error('resolutionRegistry.declareFieldClock: itemType (string) required');
+      if (typeof clock !== 'string' || !clock) throw new Error('resolutionRegistry.declareFieldClock: clock (string) required');
+      if (!OWN_SCOPE_TYPES.includes(itemType)) {
+        throw new Error(`resolutionRegistry.declareFieldClock: "${itemType}" is not an own-devices type — a writer-stamped clock is safe only among one person's own devices (OWN_SCOPE_TYPES)`);
+      }
+      const list = Array.isArray(fields) ? fields.filter((f) => typeof f === 'string' && f) : [];
+      const sets = clockSets.get(itemType) ?? [];
+      const taken = new Set(sets.flatMap((s) => [s.clock, ...s.fields]));
+      for (const f of [clock, ...list]) {
+        if (taken.has(f)) throw new Error(`resolutionRegistry.declareFieldClock: (${itemType}, ${f}) is already in a field-clock set`);
+      }
+      sets.push(Object.freeze({ clock, fields: Object.freeze([...list]) }));
+      clockSets.set(itemType, sets);
+      for (const f of [clock, ...list]) put(itemType, f, RESOLUTION.FIELD_CLOCK);
+      return api;
+    },
+
+    /** The field-clock sets declared for `itemType` (`[{ clock, fields }]`, a copy; empty when none). */
+    fieldClocksOf(itemType) {
+      return (clockSets.get(itemType) ?? []).map((s) => ({ clock: s.clock, fields: [...s.fields] }));
     },
 
     /** The declared resolution for `(itemType, field)`, or the conservative content default. */
@@ -136,13 +183,18 @@ export function createResolutionRegistry() {
 }
 
 /**
- * The built-in SAFE DEFAULT registry — the "code default per type". Behaviour-preserving: task's whole
- * claim cluster (`CLAIM_FIELDS`) resolves `claim` (first-wins), everything else falls to the content default.
+ * The built-in SAFE DEFAULT registry — the "code default per type": task's whole claim cluster (`CLAIM_FIELDS`)
+ * resolves `claim` (first-wins), the canonical types' declared field-clock sets resolve `field-clock`, and
+ * everything else falls to the content default.
  * Reuses `causalMerge`'s `CLAIM_FIELDS` so there is no second definition of what the claim cluster is.
  */
 export function defaultResolutionRegistry() {
   const r = createResolutionRegistry();
   for (const f of CLAIM_FIELDS) r.declare('task', f, RESOLUTION.CLAIM);
+  // the field-clock sets the canonical types declare (the type is where a per-field rule is stated)
+  for (const [type, sets] of Object.entries(CANONICAL_FIELD_CLOCKS)) {
+    for (const s of sets) r.declareFieldClock(type, s.clock, s.fields);
+  }
   return r;
 }
 

@@ -4,8 +4,7 @@ import { isExited } from './circleExits.js';
 
 /**
  * deriveRoster — project a circle's membership FROM the durable, signed
- * redemption trail (the source of truth), left-joining the MemberMap for
- * optional DISPLAY fields only.
+ * redemption trail (the source of truth), with nothing joined in from outside it.
  *
  * Connectivity Phase 1, Part A (plans/DESIGN-connectivity-phase1-membership.md).
  * Fixes B1: `listGroupMembers` used to compute `MemberMap.list() ∩ trail`, and
@@ -28,14 +27,12 @@ import { isExited } from './circleExits.js';
  *                     sees the founder). Mirrors `listGroupRoster` (index.js).
  *
  * Founders never "redeem" their own circle, so the creator(s) are supplied
- * separately via `founderWebids` — derived durably from the circle's
- * `group-rules` author, plus (back-compat) any admin-role MemberMap entry. Their
- * role is forced to `admin`.
+ * separately via `founderWebids` — derived from the trail's admission structure
+ * and the creation statement. Their role is forced to `admin`, and their per-circle
+ * address comes from that same statement (`founderFacts`), proof-checked here.
  *
- * The MemberMap is LEFT-JOINED for display fields (handle, displayName, avatar,
- * tags, …) and to backfill keys the trail happens to lack for a given row — it
- * is NEVER consulted for member EXISTENCE. Membership no longer depends on the
- * cache landing.
+ * Nothing outside the circle's record is joined in: no display cache, no contact
+ * book. A row is the trail, the spine, and what the member said about themselves.
  *
  * B4 (2026-08-02) — EXITS are part of the projection, per circle. A `group-removal` or
  * `group-leave` for THIS circle drops the member from THIS circle's roster and nothing else: the
@@ -46,7 +43,9 @@ import { isExited } from './circleExits.js';
  * @param {object} o
  * @param {Array<object>} [o.redemptions]         `membership-redemption` items for ONE group.
  * @param {Array<string>} [o.founderWebids]       webids to force role `admin` (creator + admins).
- * @param {Array<object>} [o.memberMapForDisplay] `MemberMap.list()` — display fields only.
+ * @param {Object<string, {groupId:string, circleAddress?:string, circleAddressProof?:string, handle?:string}>} [o.founderFacts]
+ *   founder → what their own creation statement says: their per-circle address (verified here, like a joiner's) and
+ *   the handle they go by.
  * @param {Map<string, number>} [o.exits]         webid → latest exit ts (`collectCircleExits`).
  * @param {Array<object>} [o.spineStatements]     VERIFIED spine statement bodies (join/leave/evict/role) for
  *   THIS circle. When present, they are folded DENY-WINS on top of the trail-derived head — the spine may only
@@ -61,7 +60,10 @@ export function deriveRoster({
   founderWebids = [],
   // founder → 'function', from its own verified creation statement; the fold carries it as the founder's kind
   founderKinds = {},
-  memberMapForDisplay = [],
+  // founder → { groupId, circleAddress?, circleAddressProof?, handle? } — what their own verified creation statement
+  // says: the founder's instance of the member address statement (a founder never redeems, so no trail row carries
+  // it), and the handle they go by there
+  founderFacts = {},
   exits = null,
   spineStatements = [],
   // After the fold, its full result — the host uses `folded.superseded` to compact the lane (L121). Optional.
@@ -80,13 +82,6 @@ export function deriveRoster({
   // rules gate below; `null` (no rules item / legacy caller) leaves joins ungated.
   rulesVersion = null,
 } = {}) {
-  const displayByWebid = new Map();
-  for (const m of memberMapForDisplay ?? []) {
-    if (m && typeof m === 'object' && typeof m.webid === 'string' && m.webid) {
-      displayByWebid.set(m.webid, m);
-    }
-  }
-
   /** webid → derived record, built FROM the trail. */
   const kindProven = new Set();   // the rows the fold proved a function profile: only they carry `provenKind`
   const roster = new Map();
@@ -203,7 +198,16 @@ export function deriveRoster({
   }
 
   // Founder(s) — the circle creator + any admin-role member; never redeem.
-  for (const w of founderWebids ?? []) upsert(w, 'admin', {});
+  for (const w of founderWebids ?? []) {
+    // the founder's per-circle address, from their creation statement, through the same proof gate a joiner's passes
+    const fa = founderFacts?.[w];
+    const proven = !!fa?.circleAddress && verifyCircleLink({ groupId: fa.groupId, address: fa.circleAddress, proof: fa.circleAddressProof });
+    upsert(w, 'admin', {
+      ...(proven ? { circleAddress: fa.circleAddress, circleAddressProof: fa.circleAddressProof } : {}),
+      ...(typeof fa?.handle === 'string' && fa.handle ? { handle: fa.handle } : {}),
+    });
+    if (proven) addProvenAddress(w, fa.groupId, fa.circleAddress, fa.circleAddressProof);
+  }
 
   // B4 — the wall-clock exit drop. LEGACY PATH ONLY: with verified spine statements present the causal
   // fold below is AUTHORITATIVE and the wall-clock comparison retires (two skewed devices must agree on
@@ -366,25 +370,16 @@ export function deriveRoster({
   // `personKey: { version, pubKey }`. Absent until the person's first announcement in this circle.
   const personKeys = foldPersonKeys(spineStatements);
 
-  // LEFT-JOIN the MemberMap for display fields; the trail wins on existence + keys.
-  // Spread disp first, then the derived record: rec only carries keys it actually
-  // has a value for, so a trail-captured key overrides the display cache while an
-  // absent trail key falls back to the cache's value (or stays absent).
+  // Every row is what the circle's own record says: the trail, the spine, and what the member SAID about themselves.
+  // No display cache is joined in: a name in this device's contact book is a label in the book, never a roster fact.
   const out = [];
   for (const rec of roster.values()) {
-    const disp = displayByWebid.get(rec.webid) ?? {};
-    // Trail keys override the display cache — EXCEPT the display fields themselves. The trail now
-    // carries the handle a person chose AT JOIN (`peerDisplay`); the MemberMap carries the handle they
-    // have NOW (renames land there). A person who renamed must not be shown their join-time name, so
-    // for `handle` / `displayName` a present cache value wins and the trail is the fallback.
-    // …and what the member SAID about themselves on the lane (`member-props`, 2026-09-21) wins over both: the one
-    // road for a name change is the member's own signed statement, folded on every device; the cache is where the
-    // retired side wire used to write, and the join-time handle is the fallback of fallbacks.
+    // The trail carries the handle a person chose AT JOIN (`peerDisplay`); what the member SAID about themselves on
+    // the lane (`member-props`) supersedes it — the one road for a name change is the member's own signed statement,
+    // folded on every device.
     const said = saidByWebid[rec.webid] ?? {};
     const merged = {
-      ...disp, ...rec,
-      ...(typeof disp.handle === 'string' && disp.handle ? { handle: disp.handle } : {}),
-      ...(typeof disp.displayName === 'string' && disp.displayName ? { displayName: disp.displayName } : {}),
+      ...rec,
       ...(typeof said.handle === 'string' && said.handle ? { handle: said.handle } : {}),
       ...(typeof said.displayName === 'string' && said.displayName ? { displayName: said.displayName } : {}),
       ...(typeof said.avatarRef === 'string' && said.avatarRef ? { avatarRef: said.avatarRef } : {}),

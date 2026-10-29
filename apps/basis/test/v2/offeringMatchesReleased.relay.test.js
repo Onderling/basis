@@ -20,7 +20,7 @@ afterAll(async () => { await teardown(A, B); await relay?.stop?.(); });
 
 it("the asker's matcher finds a member for what they released — and never for what they did not", async () => {
   relay = await startJourneyRelay();
-  [A, B] = await Promise.all([bootRealAgentNode('asker', { taskLane: true }), bootRealAgentNode('offerer', { taskLane: true })]);
+  [A, B] = await Promise.all([bootRealAgentNode('asker', { itemsLane: true }), bootRealAgentNode('offerer', { itemsLane: true })]);
   await connectNodesOverRelay([A, B], { relayUrl: relay.url });
   await createCircle(A, { groupId: G, name: 'Straat' });
   await bindCircleAddresses([A], G); await bindCircleAddressKeysFor({ agent: A.agent, circleId: G });

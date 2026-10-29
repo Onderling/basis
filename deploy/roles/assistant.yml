@@ -35,6 +35,12 @@ services:
       # Conversation turns in the walk log: off (default) · redacted (a fixture-collecting week) · full (tests only).
       ONDERLING_WALK_LOG_TURNS: "${ONDERLING_WALK_LOG_TURNS:-off}"
       PRIVATEMODE_API_KEY: "${PRIVATEMODE_API_KEY:-}"
+      # The box's alert chat (the updater's, from the same .env): the device says there when its model key is refused.
+      # Unset → the household admin's chat.
+      BOX_ALERT_TG_TOKEN: "${BOX_ALERT_TG_TOKEN:-}"
+      BOX_ALERT_TG_CHAT: "${BOX_ALERT_TG_CHAT:-}"
+      # the vault key, from the box's .env (never a file in this role's backed-up volume); absent → the runner refuses
+      BASIS_VAULT_PASSPHRASE: "${BOX_VAULT_PASSPHRASE:-}"
       # the model, when the operator picks one (the code's default otherwise)
       PRIVATEMODE_MODEL: "${PRIVATEMODE_MODEL:-}"
       ASSISTANT_LANG: "${ASSISTANT_LANG:-nl}"

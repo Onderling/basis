@@ -1,27 +1,11 @@
 /**
- * What the circle fans when a noticeboard item is WRITTEN — derived from the item, never from the op.
- *
- * A request, an offer and an announcement are different ops in pinboard, and for a long time only the first
- * of them reached anyone: the fan hung off `postRequest` by name, so an announcement was stored locally
- * and went nowhere (the walk's "a noticeboard post reaches nobody but its author"). The data plane's rule
- * is the other way round — "whatever the store holds is what syncs" — so the fan reads the ITEM the
- * store just accepted: a canonical noticeboard type, written here (not received), tagged with a circle.
- * The next post kind rides the same door without anyone listing it.
+ * The shape a landed noticeboard post is announced in (the notification and the driver match read it): derived from
+ * the stored item, whatever kind of post it is.
  */
-import { isNoticeboardPostType } from '@onderling/item-types';
-import { itemCircleId } from './circleScope.js';
-
-/** Should this freshly-stored item go to the circle's other members? */
-export function shouldFanNoticeboardItem(item) {
-  if (!item || typeof item !== 'object' || typeof item.id !== 'string' || !item.id) return false;
-  if (item.source?.broadcast === true) return false;        // it ARRIVED here — fanning it again is an echo
-  return isNoticeboardPostType(item);                       // a canonical POST type; system rows and bespoke rows (a report) stay local
-}
 
 /**
- * The `circle-post` payload the receiver's `ingestRemotePost` expects, built from the stored item.
- * `requestId` is the item's own id: the receiver dedupes on it and the reply of `postRequest` already
- * hands the same id back to the author, so one post has one id everywhere.
+ * The announcement's payload, built from the stored item. `requestId` is the item's own id, the same id the
+ * reply of `postRequest` hands its author, so one post has one id everywhere.
  */
 export function noticeboardFanPayload(item, { from, groupId = null } = {}) {
   const src = item.source ?? {};
@@ -42,9 +26,4 @@ export function noticeboardFanPayload(item, { from, groupId = null } = {}) {
     attachments:    Array.isArray(src.attachments) ? src.attachments : (Array.isArray(item.attachments) ? item.attachments : []),
     ...(Array.isArray(src.embeds) && src.embeds.length > 0 ? { embeds: src.embeds } : {}),
   };
-}
-
-/** The circle an item names, if any (targets / groupId hints). */
-export function noticeboardItemCircle(item) {
-  return itemCircleId(item ?? {}) ?? null;
 }

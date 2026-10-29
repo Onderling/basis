@@ -19,13 +19,14 @@ const role = readFileSync(path.join(REPO, 'deploy/roles/assistant.yml'), 'utf8')
 // Read by the runner, not passed by the role — on purpose.
 const NOT_PASSED = {
   ONDERLING_WALK_SHAPES: 'testing only: the unrouted frames\' key names in the walk log — never set by a release role (walkShapesTestingOnly)',
-  BASIS_VAULT_PASSPHRASE: 'generated once beside the vault on the data volume; never in the .env',
   PRIVATEMODE_MODEL: 'optional override of the default model; the default is what a box runs',
   ONDERLING_TELEGRAM_API_ROOT: 'a Bot API server of its own (self-hosted, or a test fake); a box talks to Telegram itself',
 };
 // Passed by the role, read elsewhere than the runner.
 const READ_ELSEWHERE = {
   PRIVATEMODE_API_KEY: 'packages/llm-client/src/providers/privatemode.js',
+  // the box's vault key, from its .env (never a file on the backed-up volume); the runner hands process.env to this
+  BASIS_VAULT_PASSPHRASE: 'apps/basis/src/v2/boxVaultPassphrase.js',
 };
 
 const readByRunner = new Set([...runner.matchAll(/process\.env\.([A-Z_]+)/g)].map((m) => m[1]));

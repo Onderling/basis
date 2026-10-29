@@ -25,6 +25,8 @@ import { listsGateRules } from '../../src/v2/circleGate.js';
 import { initLocalisation, t } from '../../src/localisation.js';
 import { withAssistantOps } from '../../src/v2/assistantOps.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
+// N CALENDAR days from now at this clock time — never `now + N × 24h`, which on a DST night lands on the wrong day
+const daysFromNow = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d; };
 
 /** A day as the household reads it: "vr 9 okt" (and its time, for an appointment). */
 const dayWords = (d) => new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }).format(d);
@@ -128,7 +130,7 @@ describe('the household bot says one line per op family', () => {
     await say('nieuwe taak: lamp vervangen');
     // said so that it reads right wherever the reply lands (a circle door posts it for everyone): "opgepakt", not "van jou"
     expect(await say('ik doe de lamp')).toEqual(["Klusje 'lamp vervangen' is opgepakt."]);
-    const tomorrow = new Date(Date.now() + 86_400_000);
+    const tomorrow = daysFromNow(1);
     expect(await say('nieuwe taak voor mij: ramen lappen, morgen')).toEqual([`Klusje 'ramen lappen' is opgepakt, ${dayWords(tomorrow)}.`]);
     // the model moves a chore to someone, by the name the person said
     script.set('geef de ramen aan Bob', [{ id: 'reassignTask', args: { id: 'ramen', newAssignee: 'Bob' } }]);
@@ -143,7 +145,7 @@ describe('the household bot says one line per op family', () => {
   });
 
   it('appointments: the day and time in the household\'s words', async () => {
-    const tomorrow = new Date(Date.now() + 86_400_000);
+    const tomorrow = daysFromNow(1);
     const when = `${dayWords(tomorrow)} 10:00`;
     expect(await say('tandarts morgen om 10 uur')).toEqual([`Afspraak 'tandarts' staat op ${when}.`]);
     script.set('ik kom naar de tandarts', [{ id: 'rsvpAccept', args: { id: 'tandarts' } }]);

@@ -37,6 +37,7 @@ export default function CircleRecipeEditorScreen({
   book = { recipes: [], activeId: null },
   mode = 'book',
   editingRecipeId = null,
+  policy,   // the circle's policy: a feature's block is offered only where that feature is on (absent: every block)
   onBack,
   onOpenRecipe, onBackToBook,
   onAddRecipe, onRenameRecipe, onRemoveRecipe, onSetActive,
@@ -128,6 +129,7 @@ export default function CircleRecipeEditorScreen({
       <>
         <RecipeMode
           book={book}
+          policy={policy}
           recipeId={editingRecipeId}
           onBackToBook={onBackToBook}
           onAddBlock={onAddBlock}
@@ -295,7 +297,7 @@ function RecipeRow({ recipe, isActive, onOpenRecipe, onRenameRecipe, onRemoveRec
 /* RECIPE mode                                                            */
 /* ─────────────────────────────────────────────────────────────────────── */
 
-function RecipeMode({ book, recipeId, onBackToBook, onAddBlock, onRemoveBlock, onMoveBlock, onUpdateBlock }) {
+function RecipeMode({ book, policy, recipeId, onBackToBook, onAddBlock, onRemoveBlock, onMoveBlock, onUpdateBlock }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const recipe = book.recipes.find((r) => r.id === recipeId);
@@ -309,7 +311,7 @@ function RecipeMode({ book, recipeId, onBackToBook, onAddBlock, onRemoveBlock, o
   }
 
   // a circle's editor offers the circle's blocks only (the block table says where each may live)
-  const sortedTypes = blockTypesFor('circle');
+  const sortedTypes = blockTypesFor('circle', { policy });
 
   return (
     <View style={styles.page} testID="circle-recipe-editor-recipe">
@@ -485,7 +487,7 @@ function CompactToggle({ block, emit }) {
   const value = block.config?.compact === true;
   return (
     <View style={styles.compactRow} testID={`block-config-${block.id}-compact`}>
-      <Switch
+      <Switch /* sets: store:recipe — the circle's recipe block, fanned to its members */
         value={value}
         onValueChange={(v) => emit({ compact: !!v })}
         accessibilityLabel={t('circle.recipe.compact_label.label')}

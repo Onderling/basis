@@ -19,7 +19,7 @@
  *
  * Env:
  *   ONDERLING_RELAY_URL      the relay to dial. Absent → local-only (no wire; useful for a first boot)
- *   BASIS_VAULT_PASSPHRASE   the vault key; absent → one is generated once beside the vault
+ *   BASIS_VAULT_PASSPHRASE   the vault key, REQUIRED (on a box: BOX_VAULT_PASSPHRASE in its .env); never a file in the data dir
  *   TG_BOT_TOKEN             optional — also answer on Telegram (from the environment only; empty = no Telegram)
  *   TG_ALLOWED_CHAT_IDS      Telegram ids let in without a code (a bootstrap); everyone else needs an admin's code
  *   ONDERLING_PROFILE_KIND   `function` on a household bot's own node: its profile is the bot's, its inbox a door
@@ -47,7 +47,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, rmSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -74,6 +74,7 @@ import { composeCircleRunner } from '../src/telegram/circleRunner.js';
 import { joinCircleFromInvite } from '../src/v2/circleInvite.js';
 import { leaveCircleLocally } from '../src/v2/circleMembershipHygiene.js';
 import { createModelWatch, MODEL_WATCH_EVERY_MS } from '../src/v2/modelWatch.js';
+import { createBoxAlert } from '../src/v2/boxAlert.js';
 import { createExportKeyFile } from '../src/v2/exportKeyFile.js';
 import { createScreenNudge } from '../src/v2/screenNudge.js';
 import { HOUSEHOLD_BOT_STORE_OPTS } from '../src/v2/householdBotStore.js';
@@ -122,6 +123,7 @@ import { ASSISTANT_APPS_PARAM_KEY } from '../src/v2/assistantApps.js';
 import { EventLog } from '../src/eventLog.js';
 import { fileKeyValueStorage } from '../src/v2/eventLogPersistence.js';
 import { boxStores } from '../src/v2/boxStorage.js';
+import { resolveVaultPassphrase } from '../src/v2/boxVaultPassphrase.js';
 import { retentionFromDays } from '../src/v2/retentionPref.js';
 import { stashEnrollOffer, consumeEnrollOffer, consumeCircleEntry } from '../src/v2/enrollOffer.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../src/v2/circleSecurityPriming.js';
@@ -132,6 +134,7 @@ import { createNodeFsBackend } from '@onderling/pseudo-pod/node';
 import { createContactThreadChannel } from '../src/v2/contactThreadChannel.js';
 import { createContactDmStore } from '../src/v2/contactDmStore.js';
 import { makeHandleThreadedChat } from '../src/core/handlers/threadedChat.js';
+import { makeCircleGovernancePeerHandler } from '../src/v2/circleLogReceiver.js';
 import { shareDisclosureToCircle } from '../src/core/handlers/personaPropsUpdate.js';
 import { makeCircleAddressAnnouncePeerHandler, announceOwnCircleAddress, propagateCircleAddressesAfterJoin } from '../src/v2/circleAddressAnnounce.js';
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../src/core/handlers/groupRedeem.js';
@@ -181,12 +184,16 @@ const linkedTurn = { verify: null };
 
 /** The vault key: the environment if set, else one generated once beside the vault — the machine that
  *  runs unattended holds it, which is the same trust as the disk the vault itself is on. */
-function vaultPassphrase() {
-  if (process.env.BASIS_VAULT_PASSPHRASE) return process.env.BASIS_VAULT_PASSPHRASE;
-  const f = path.join(dataDir, 'vault.passphrase');
-  if (!existsSync(f)) writeFileSync(f, randomBytes(32).toString('base64url'), { mode: 0o600 });
-  return readFileSync(f, 'utf8').trim();
+// The vault passphrase comes from the environment, never a file in the backed-up data directory (boxVaultPassphrase.js).
+// Resolved once, before any vault opens: a misconfigured box stops here, before it writes anything.
+let vaultPass = null;
+try {
+  vaultPass = resolveVaultPassphrase({ env: process.env, dataDir, log: (l) => console.warn(l) });
+} catch (err) {
+  console.error(`[device-runner] ${err?.message ?? err}`);
+  process.exit(1);
 }
+function vaultPassphrase() { return vaultPass; }
 
 /** The prompt-cache secret, made once beside the vault: the model provider derives each person's own cache salt from it,
  *  so the household's calls reuse their prompt's head without anyone sharing a cache with anyone else. */
@@ -216,6 +223,7 @@ const contentPaths = {
   tasks:     path.join(dataDir, 'tasks-items.json'),
   settings:  path.join(dataDir, 'settings.json'),
   outbox:    path.join(dataDir, 'outbox.json'),
+  push:      path.join(dataDir, 'push-device.json'),   // push subscriptions: this device's own, never synced
 };
 // The stores that are not item stores — the device log, the contact DM state, the circle policy — sealed at rest
 // like the item stores, composed once in `boxStores` (the at-rest test uses the same function).
@@ -253,6 +261,7 @@ const offerStash = fileKeyValueStorage(path.join(dataDir, 'enroll-offer.json'));
     'cc-own-devices': stores.paths.ownDevices,
     'cc-outbox-state': contentPaths.outbox,
     'cc-outbox-cache': contentPaths.outbox,
+    'cc-push-device': contentPaths.push,
     'cc-settings-state': contentPaths.settings,
     'cc-settings-cache': contentPaths.settings,
     'cc-pinboard-state': contentPaths.pinboard,
@@ -293,6 +302,14 @@ const botInstall = String(process.env.ONDERLING_PROFILE_KIND ?? '').trim() === '
 const circleWrite = { fn: null };
 const ownStoreOnDisk = { ref: null };
 const itemLanded = { fn: null };
+// A hidden mark set on another device of the person lands here (a contact row on the own-devices lane) and the log says
+// so, once per mark — the one way a walk (and a reader of this box's log) can see that "hidden on the phone" reached the box.
+const hiddenSaid = new Map();
+const hiddenLanded = (item) => {
+  if (item?.type !== 'contact' || !Number.isFinite(item.hiddenAt) || hiddenSaid.get(item.id) === item.hiddenAt) return;
+  hiddenSaid.set(item.id, item.hiddenAt);
+  walkLog({ kind: 'contact-hidden', contactId: String(item.webid).slice(0, 12), hidden: item.hidden === true });
+};
 // What a write is made for while a planned row runs (`{ intention: <row> }`), ambient across the row's awaits: the
 // stores stamp it on what the row writes, and no host's change feed hands such a write on.
 const writeOrigin = new AsyncLocalStorage();
@@ -301,7 +318,7 @@ const agent = await createRealHouseholdAgent({
   // …and its door holds the bot's map at the gate: an op off the map is refused, an admin's op needs the admin.
   // an item it holds changed — its own write, or one that landed from a member: the change feed (bound below)
   onCircleWrite: (circleId, item, removedId) => circleWrite.fn?.(circleId, item, removedId),
-  onItemLanded: (circleId, item) => itemLanded.fn?.(circleId, item),
+  onItemLanded: (circleId, item) => { hiddenLanded(item); return itemLanded.fn?.(circleId, item); },
   // a refused token, in the walk log (op · reason · grants folded · ms since boot; never the key or args) — L196's
   // "Token has been revoked" names itself here the next time it happens (the log is defined below; called after boot)
   onTokenDenied: (e) => walkLog({ kind: 'token-refused', ...e }),
@@ -322,6 +339,7 @@ const agent = await createRealHouseholdAgent({
   tasksPersistDb:     { path: contentPaths.tasks },
   settingsPersistDb:  { path: contentPaths.settings },
   outboxPersistDb:    { path: contentPaths.outbox },
+  pinboardPushPersistDb: { path: contentPaths.push },
   deviceLog,
   deviceLogIo: stores.deviceLogIo,
   // The lists' default table (and basis's) speak through this translator: a reply to Telegram is a sentence,
@@ -538,6 +556,15 @@ if (relayUrl) {
     writePolicy: (cid, policy) => circlePolicyStore.update(cid, policy),
     adminsOf: adminsOfViaSkill(callSkill),
   });
+  // A landed governance statement may be a rules-update or a policy-update: fold it into this device's heads — the
+  // same reaction for a catch-up batch and a live statement.
+  const govChanged = (cid) => {
+    if (!govRail) return;
+    applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
+    circlePolicyLane.apply(cid, govRail)
+      .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
+      .catch(() => {});
+  };
   const lanes = buildCircleLanes({
     agent,
     govRail,
@@ -548,13 +575,7 @@ if (relayUrl) {
       ...await circlePolicyLane.preserved(cid),
     ],
     on: {
-      govChange: (cid) => {
-        if (!govRail) return;
-        applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {});
-        circlePolicyLane.apply(cid, govRail)
-          .then((r) => { if (r?.applied) walkLog({ kind: 'policy-applied', circleId: cid, version: r.version }); })
-          .catch(() => {});
-      },
+      govChange: (cid) => govChanged(cid),
       // Nothing here asks a person whether to accept a big catch-up: there is no person at this
       // machine, and what it is catching up on is its owner's own circles. Allowing is therefore the
       // honest default rather than a silent refusal that would leave this device permanently behind —
@@ -682,6 +703,11 @@ if (relayUrl) {
   const router = makePeerRouter({
     handlers: {
       ...lanes.handlers,
+      // A live governance statement — a vote, a proposal, a rules or policy update — verified at this device's rail, as
+      // web and mobile register theirs (the catch-up alone would leave an online box behind until its next reconnect)
+      ...(govRail ? { 'circle-governance-broadcast': makeCircleGovernancePeerHandler({
+        eventLog: deviceLog, rail: govRail, onLanded: lanes.landedCarrier?.governance, onChange: govChanged,
+      }) } : {}),
       [contactChannel.subtypes.in]:  contactChannel.replyHandler(landTurn),
       [contactChannel.subtypes.out]: contactChannel.messageHandler(landMessage),
       // A join request — for the box, a contact joining the pair circle it founded: admit, promote to co-admin
@@ -829,11 +855,6 @@ if (relayUrl) {
   kick(lanes.catchUps.membership, 'membership', 2500);
   kick(agent.grantsCatchUp, 'grants', 2500);
   kick(agent.knownPeersSync, 'known-peers', 2500);
-  // A hidden mark set on another device of the person lands here and the log says so — the one way a walk
-  // (and a reader of this box's log) can see that "hidden on the phone" reached the box.
-  agent.knownPeersSync?.onLanded?.(({ hiddenChanged }) => {
-    for (const c of hiddenChanged ?? []) walkLog({ kind: 'contact-hidden', contactId: String(c.webid).slice(0, 12), hidden: c.hidden });
-  });
   kick(agent.personKeySync, 'person-key', 2500);
   kick(agent.profileFactsSync, 'profile-facts', 2500);
   // the person's own store: what a sibling wrote while this box was off
@@ -1470,6 +1491,9 @@ if (tgToken || inboxDoor.bridge) {
       modelWatch.ref = createModelWatch({
         listModels: built.listModels, model: built.model, fallback: built.fallbackModel, t,
         tellAdmin,
+        // the key, checked by using it; a refusal goes to the box's alert chat (the admin's chat when it has none)
+        probe: built.probe, secretName: 'PRIVATEMODE_API_KEY',
+        alertBox: createBoxAlert({ token: process.env.BOX_ALERT_TG_TOKEN, chat: process.env.BOX_ALERT_TG_CHAT, name: hostname() }),
         log: walkLog,
       });
       hostTick.add('model-watch', { every: MODEL_WATCH_EVERY_MS, run: () => modelWatch.ref.check() });

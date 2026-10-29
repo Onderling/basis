@@ -66,8 +66,8 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
 
   it('an admin edit reaches the member live: their local head advances and their OWN stale banner lights', async () => {
     [A, B] = await Promise.all([
-      bootRealAgentNode('A', { taskLane: true }),
-      bootRealAgentNode('B', { taskLane: true }),
+      bootRealAgentNode('A', { itemsLane: true }),
+      bootRealAgentNode('B', { itemsLane: true }),
     ]);
     bus = await connectNodesOverBus([A, B]);
     for (const n of [A, B]) wireMembershipReceiver(n);
@@ -166,7 +166,7 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
 
     // C joins the circle NOW (a device with no doc — the shape of a member returning from a wipe
     // or a fresh enrollment long after the change).
-    C = await bootRealAgentNode('C', { taskLane: true });
+    C = await bootRealAgentNode('C', { itemsLane: true });
     const tx = new InternalTransport(bus, C.pubKey);   // join C onto the SAME bus
     await C.agent.sa.addSecureTransport('relay', tx);
     C._busTransport = tx;

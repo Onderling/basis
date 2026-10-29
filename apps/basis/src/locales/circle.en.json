@@ -1188,6 +1188,9 @@
       "text": "Nothing here.",
       "doc": "B/S3 list-with-filter screen empty state — distinct from screen.empty (the α.1c recipe-book-empty state); they collided under one key until 2026-07-03."
     },
+    "lists_off": {
+      "text": "Lists are switched off in this circle."
+    },
     "audience_scope": {
       "text": "Showing items shared with this circle.",
       "doc": "SP-5b Option A — non-dismissible caption under a list title when the list is audience-scoped (buildScreenModel.audienceScope set). Generic (no circle name): a visibility scope, not a user filter, so no clear/close control."
@@ -1263,6 +1266,12 @@
     "circles_title": {
       "text": "Circles",
       "doc": "A block filter: which of the page's circles this block shows."
+    },
+    "control_circle": {
+      "text": "Circle"
+    },
+    "circle_pick": {
+      "text": "Pick a circle"
     },
     "labels_title": {
       "text": "Labels",
@@ -1673,6 +1682,9 @@
         "text": "Tasks",
         "doc": "α.4 — block palette label."
       },
+      "lists": {
+        "text": "Lists"
+      },
       "rules": {
         "text": "House rules",
         "doc": "α.1b — block palette label."
@@ -1734,6 +1746,9 @@
       "tasks": {
         "text": "Open tasks, yours or all of them.",
         "doc": "One plain sentence: what this block shows (the block table's description; the customise sheet and a later model read it)."
+      },
+      "lists": {
+        "text": "One circle's lists, with what is still on them."
       },
       "rules": {
         "text": "The circle's house rules.",
@@ -2903,48 +2918,6 @@
       "doc": "Dismiss the advice card."
     }
   },
-  "hop": {
-    "title": {
-      "text": "Hopping",
-      "doc": "Heading of the hopping screen (board 7)."
-    },
-    "global_label": {
-      "text": "Let trusted contacts relay my requests one hop",
-      "doc": "Global hop-mode toggle (Pinboard allowHopThrough)."
-    },
-    "explain": {
-      "text": "When you ask for something no one nearby has, a contact who allows it can pass your request one step further — to their contacts. Max one hop, and the relay is anonymized.",
-      "doc": "Explanation of how hopping works."
-    },
-    "ask_relay": {
-      "text": "Ask to relay",
-      "doc": "Button: ask the gate contact to relay the request one hop."
-    },
-    "over_limit": {
-      "text": "Too many hops — requests travel at most one step.",
-      "doc": "Shown when a chain exceeds max-one-hop."
-    },
-    "per_contact_title": {
-      "text": "Per contact",
-      "doc": "Board 7B section heading (P6.M6)."
-    },
-    "mode_always": {
-      "text": "Always",
-      "doc": "Per-contact mode: always relay (P6.M6)."
-    },
-    "mode_withOk": {
-      "text": "With my OK",
-      "doc": "Per-contact mode: relay with approval."
-    },
-    "mode_off": {
-      "text": "Off",
-      "doc": "Per-contact mode: never relay."
-    },
-    "default_label": {
-      "text": "Default",
-      "doc": "Chip shown when the per-contact mode falls through to the global stance."
-    }
-  },
   "offerings": {
     "editor_title": {
       "text": "Offering",
@@ -3161,28 +3134,6 @@
     "no_delivery_note": {
       "text": "{{name}} won't be notified you tried.",
       "doc": "Secondary line clarifying the non-event per board 5C (no \"tried to reach you\" leak)."
-    }
-  },
-  "hopPrompt": {
-    "title": {
-      "text": "Search further?",
-      "doc": "Board 7A auto-hop-prompt card heading (P6.6) when an in-circle skill search returns nothing."
-    },
-    "body": {
-      "text": "No one in your circles matches \"{{skill}}\". Want me to search via your {{count}} eligible contact(s)?",
-      "doc": "Card body with the user's query interpolated."
-    },
-    "body_anon": {
-      "text": "No one in your circles matches that. Want me to search via your {{count}} eligible contact(s)?",
-      "doc": "Anon body when the query string can't be safely echoed."
-    },
-    "accept": {
-      "text": "Yes, one step further",
-      "doc": "Primary CTA — triggers the hop-relay request."
-    },
-    "dismiss": {
-      "text": "Skip",
-      "doc": "Secondary CTA — records dismissal so we don't re-prompt the same query."
     }
   },
   "offeringMatches": {
@@ -3865,18 +3816,6 @@
         "text": "Full",
         "doc": "Reveal amount preset — the most you have chosen to share (may include the real name)."
       }
-    },
-    "on": {
-      "text": "🔓 Reveal turned on for {{peer}}. It works both ways: they must turn it on too.",
-      "doc": "Confirmation of /reveal on."
-    },
-    "off": {
-      "text": "🔒 Reveal turned off for {{peer}}.",
-      "doc": "Confirmation of /reveal off."
-    },
-    "someone": {
-      "text": "(someone)",
-      "doc": "Stands in for the person in the /reveal confirmation when none was named."
     }
   },
   "podMigration": {
@@ -5579,7 +5518,19 @@
     "stepup_replaced": "That request was replaced by a newer one; nothing was done with it.",
     "stepup_what_op": "do {{op}} ({{arg}})",
     "model_not_served": "Note: the language model {{model}} is no longer offered by the provider. I now use {{using}}.",
-    "model_over_limit": "Note: the language model provider's account has reached its monthly limit. Until that is sorted, I answer commands and buttons only.",
+    "model_refused": "The assistant cannot answer right now: the language model provider refuses (a key or limit problem). The admin has been told.",
+    "model_slow": "The assistant is too slow to answer in time right now. Please try again in a moment.",
+    "model_trouble_start": "Note: the assistant no longer answers free-text questions. Cause: {{cause}}. Commands and buttons still work. I will tell you every hour while it lasts, and when it works again.",
+    "model_trouble_ongoing": "The assistant still answers no free-text questions ({{minutes}} minutes now). Cause: {{cause}}.",
+    "model_trouble_recovered": "The assistant answers again, after {{minutes}} minutes.",
+    "model_cause_key": "the key at the language model provider no longer works",
+    "model_cause_limit": "the provider account has reached a limit or run out of credit",
+    "model_cause_refused": "the provider refuses the questions",
+    "model_cause_slow": "the provider answers too slowly",
+    "model_cause_unreachable": "the provider cannot be reached",
+    "secret_check_failed": "Note: the key {{secret}} no longer works: the language model provider refuses it (status {{status}}). Free-text questions get no answer until the operator replaces the key; commands and buttons still work.",
+    "secret_check_limit": "Note: the language model provider refuses: a limit or credit (status {{status}}). Free-text questions get no answer until that is sorted; commands and buttons still work.",
+    "secret_check_refused": "Note: the language model provider refuses (status {{status}}). Free-text questions get no answer until that is sorted; commands and buttons still work.",
     "stepup_export_key_replaces": "A key is set already: files sealed with it open only with the old passphrase.",
     "export_key_too_short": "The passphrase needs at least {{n}} characters. Nothing asked, nothing changed.",
     "export_key_none": "No export key is set on the box yet.",
@@ -6101,7 +6052,7 @@
       },
       "report": {
         "text": "Report",
-        "doc": "S1 — per-post action: report abuse (reportPost)."
+        "doc": "S1 — per-post action: report abuse (a signed report to the circle's admins)."
       },
       "mute": {
         "text": "Block",
@@ -6266,10 +6217,6 @@
       "text": "Availability →",
       "doc": "S2 — open the availability/quiet-hours screen."
     },
-    "mydata": {
-      "text": "My data →",
-      "doc": "S5 — open the data-location/privacy/usage screen."
-    },
     "sharedWithMe": {
       "text": "Shared with me →",
       "doc": "Nav label (Mij sub-screen) opening the personal, cross-circle inbox of sealed copies peers shared privately to this device."
@@ -6401,10 +6348,6 @@
     "agent_bot": {
       "text": "bot: {{label}}, linked to you",
       "doc": "Mij → 'My devices and helpers': one row per device, companion or linked bot (read-only; a tap opens My data)."
-    },
-    "mydata_more": {
-      "text": "More",
-      "doc": "My data → the doors that used to sit on Mij: availability, connection points, shared with me, blocked."
     },
     "edit": {
       "text": "Edit",
@@ -6565,10 +6508,6 @@
     "keys": {
       "text": "Keys & backup",
       "doc": "S5 — key-management section heading."
-    },
-    "backup": {
-      "text": "Back up my keys",
-      "doc": "S5 — launch the encrypted-backup wizard."
     },
     "view_mnemonic": {
       "text": "View recovery phrase",
@@ -6955,6 +6894,9 @@
     "founder_stays": {
       "text": "The person who started this circle can't be removed.",
       "doc": "Why Remove is greyed on the founder's row in the admin panel: the roster never evicts the person who started the circle (they can leave, or step back as admin)."
+    },
+    "no_one_to_take_over": {
+      "text": "You are the only one in this circle: there is nobody to take over running it."
     },
     "make_member": {
       "text": "Remove admin role",
@@ -8457,60 +8399,6 @@
         "doc": "Phone wizard: keyed 2026-10-22 when the guard learned the kit props."
       }
     },
-    "backup": {
-      "confirm_passphrase": {
-        "text": "Confirm passphrase",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "building": {
-        "text": "Building backup…",
-        "doc": "Phone wizard (src/rn) — keyed 2026-10-22 when the hard-coded-strings guard was widened to src/rn."
-      },
-      "passphrase_warning": {
-        "text": "Lose the passphrase and the backup is gone. There is no recovery. Write it down.",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "download": {
-        "text": "Download",
-        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
-      },
-      "title": {
-        "text": "Encrypted backup",
-        "doc": "Mobile backup wizard heading."
-      },
-      "ready": {
-        "text": "Backup ready",
-        "doc": "Mobile backup wizard, the done step."
-      },
-      "intro": {
-        "text": "A snapshot of your own data, protected by a passphrase. The passphrase never leaves this device — without it the backup is useless to anyone, including you.",
-        "doc": "Backup wizard step 1 body."
-      },
-      "ready_title": {
-        "text": "✓ Backup ready",
-        "doc": "Backup wizard, the final screen."
-      },
-      "ready_intro": {
-        "text": "Download it and keep it somewhere safe — mail it to yourself, copy it to a USB stick, put it in a cloud you trust. It is encrypted, so where it sits matters less than whether you still have it.",
-        "doc": "Backup wizard, the final screen."
-      },
-      "passphrase_label": {
-        "text": "Passphrase",
-        "doc": "Backup wizard, both shells: the passphrase field and its step."
-      },
-      "passphrase_hint": {
-        "text": "At least 12 characters is wise — pick one you will remember.",
-        "doc": "Backup wizard, both shells: the passphrase placeholder."
-      },
-      "step_save": {
-        "text": "Save",
-        "doc": "Backup wizard, both shells: the second step."
-      },
-      "create_button": {
-        "text": "Create backup",
-        "doc": "Backup wizard, both shells: the button that builds the backup."
-      }
-    },
     "restore": {
       "phrase": {
         "text": "Recovery phrase",
@@ -8851,10 +8739,6 @@
       "markReturned": {
         "text": "Returned",
         "doc": "Row-action button for pinboard:markReturned, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
-      },
-      "reportPost": {
-        "text": "Report",
-        "doc": "Row-action button for pinboard:reportPost, painted on an item card and in the assistant's reply (keyed 2026-09-15; copy: Frits to read)."
       },
       "startDm": {
         "text": "Message",
@@ -10156,7 +10040,8 @@
     "per_circle": "Per circle",
     "no_circles": "You are not in any circle yet.",
     "connection": "Connection",
-    "my_data": "My data"
+    "my_data": "My data",
+    "devices_keys": "Devices & keys"
   },
   "feedback": {
     "plus": {

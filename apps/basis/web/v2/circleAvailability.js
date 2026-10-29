@@ -10,7 +10,7 @@
 
 import { translatorOr } from '../../src/locales/translatorOr.js';
 
-export function renderCircleAvailability(container, { availability, t, onChange, onBack, onSave, onHop } = {}) {
+export function renderCircleAvailability(container, { availability, t, onChange, onBack, onSave } = {}) {
   const tr = translatorOr(t, 'circleAvailability.js');
   const emit = (patch) => { if (typeof onChange === 'function') onChange(patch); };
   const a = availability || {};
@@ -76,16 +76,6 @@ export function renderCircleAvailability(container, { availability, t, onChange,
   save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
   container.appendChild(save);
 
-  // Mij tab also surfaces the device-global Hopping stance.
-  if (typeof onHop === 'function') {
-    const hop = document.createElement('button');
-    hop.type = 'button';
-    hop.className = 'circle-availability__hop';
-    hop.textContent = tr('circle.hop.title');
-    hop.addEventListener('click', () => onHop());
-    container.appendChild(hop);
-  }
-
   return container;
 }
 
@@ -103,7 +93,7 @@ function toggle({ field, checked, label, onToggle }) {
   const row = document.createElement('label');
   row.className = 'circle-availability__toggle';
   const box = document.createElement('input');
-  box.type = 'checkbox';
+  box.type = 'checkbox';   // sets: store:availability — your availability, saved on Save
   box.checked = checked;
   box.dataset.field = field;
   box.addEventListener('change', () => onToggle(box.checked));

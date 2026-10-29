@@ -22,8 +22,8 @@ const join = (node, uri) => joinCircleFromInvite({
 describe('the household circle and the bound invite', () => {
   it('first invite makes the circle (the bot its admin); Bob joins with his; Eve with Bob\'s does not', async () => {
     const [bot, bob, eve] = await Promise.all([
-      bootRealAgentNode('bot', { taskLane: true, agentOpts: { ...HOUSEHOLD_BOT_STORE_OPTS } }),
-      bootRealAgentNode('bob', { taskLane: true }), bootRealAgentNode('eve', { taskLane: true }),
+      bootRealAgentNode('bot', { itemsLane: true, agentOpts: { ...HOUSEHOLD_BOT_STORE_OPTS } }),
+      bootRealAgentNode('bob', { itemsLane: true }), bootRealAgentNode('eve', { itemsLane: true }),
     ]);
     nodes.push(bot, bob, eve);
     await connectNodesOverBus([bot, bob, eve]);

@@ -11,6 +11,7 @@
 //
 // Pure deterministic core + an optional async judge-aware wrapper. web ≡ mobile.
 
+import { consentedJudge } from './modelConsent.js';
 import { normalizeTags, driversFromProperties, isDriverValue } from './drivers.js';
 
 /**
@@ -73,11 +74,12 @@ function driverTags(driver) {
  * @param {number} [a.minShared=1]
  * @returns {Promise<Array<object>>}
  */
-export function matchProfileDrivers({ properties, item, judge, minShared = 1 } = {}) {
+export function matchProfileDrivers({ properties, item, judge, modelConsent = false, minShared = 1 } = {}) {
   return matchDriversSemantic({
     drivers: driversFromProperties(properties),
     signature: itemSignature(item),
     judge,
+    modelConsent,
     minShared,
   });
 }
@@ -132,11 +134,12 @@ export function matchableSignature(matchableValues) {
  * @param {number} [a.minShared=1]
  * @returns {Promise<Array<object>>}
  */
-export function matchProfilesMatchable({ properties, candidateMatchable, judge, minShared = 1 } = {}) {
+export function matchProfilesMatchable({ properties, candidateMatchable, judge, modelConsent = false, minShared = 1 } = {}) {
   return matchDriversSemantic({
     drivers: driversFromProperties(properties),
     signature: matchableSignature(candidateMatchable),
     judge,
+    modelConsent,
     minShared,
   });
 }
@@ -217,6 +220,9 @@ export function matchDrivers({ drivers, signature, minShared = 1 } = {}) {
  * judge runs locally/privatemode/companion — the drivers still never leave a trusted environment.
  * Every judge match carries the judge's own reason, so the explainability invariant holds.
  *
+ * The judge runs only under the persona's yes (`modelConsent: true`, from `modelConsentFor`): a judge handed in
+ * without it is ignored, so no caller reaches a model on someone's drivers they did not agree to.
+ *
  * `judge({ driver, signature })` resolves `{ match:boolean, reason?:string }`. A judge that throws (or
  * a missing judge) simply yields no semantic additions — the deterministic layer always stands.
  *
@@ -227,7 +233,8 @@ export function matchDrivers({ drivers, signature, minShared = 1 } = {}) {
  * @param {number} [a.minShared=1]
  * @returns {Promise<Array<{key:string|null, kind:string, score:number, sharedTags:string[], reason:object}>>}
  */
-export async function matchDriversSemantic({ drivers, signature, judge, minShared = 1 } = {}) {
+export async function matchDriversSemantic({ drivers, signature, judge: offered, modelConsent = false, minShared = 1 } = {}) {
+  const judge = consentedJudge(offered, modelConsent);
   const sig = deriveSignature(signature);
   const isArray = Array.isArray(drivers);
   // One pass over a uniform [key, driver] list (arrays keyed by index → null in output, like matchDrivers).

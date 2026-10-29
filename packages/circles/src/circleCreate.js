@@ -18,9 +18,18 @@ import { personKeyAnnouncement } from '@onderling/core';
  * @returns {Promise<{rulesId, groupId, _sync}|{error:string}>}
  */
 /** The creator's FIRST person key rides the `create`, as a joiner's rides the join (Frits 2026-09-16, option A). */
-const createPayload = (currentPersonKey) => {
+const createPayload = (currentPersonKey, a = {}) => {
   const k = personKeyAnnouncement(typeof currentPersonKey === 'function' ? currentPersonKey() : null);
-  return k ? { personKey: k } : {};
+  return {
+    ...(k ? { personKey: k } : {}),
+    // The founder's per-circle address and its proof: the founder never redeems, so no trail row carries it, and
+    // without it the founder's own row reaches no roster. Receivers fold it through the same proof gate as a
+    // joiner's address. This is the founder's instance of the member address statement.
+    ...(typeof a.circleAddress === 'string' && a.circleAddress && typeof a.circleAddressProof === 'string' && a.circleAddressProof
+      ? { circleAddress: a.circleAddress, circleAddressProof: a.circleAddressProof } : {}),
+    // …and the handle the founder goes by there, self-asserted like the handle a joiner joins under
+    ...(typeof a.peerDisplay === 'string' && a.peerDisplay.trim() ? { peerDisplay: a.peerDisplay.trim() } : {}),
+  };
 };
 
 export async function createGroupWithRules({ store, simulateSync, emitSpine = null, currentPersonKey = null }, { a, from } = {}) {
@@ -49,33 +58,10 @@ export async function createGroupWithRules({ store, simulateSync, emitSpine = nu
   // corroborates the author, or where it has no trail for the circle at all — which is exactly the
   // brand-new case. Best-effort, like every other spine hook here: the circle still exists without it.
   if (typeof emitSpine === 'function') {
-    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: { ...createPayload(currentPersonKey), ...(a.profileKind === 'function' ? { kind: 'function' } : {}) }, actor: from }); }
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: { ...createPayload(currentPersonKey, a), ...(a.profileKind === 'function' ? { kind: 'function' } : {}) }, actor: from }); }
     catch { /* the typed item is written; the statement can be re-derived by a later ceremony */ }
   }
   return { rulesId: item.id, groupId: a.groupId, _sync: simulateSync() };
-}
-
-/**
- * redeemInviteWithGate({store}, {a, from})
- *   — Phase 17 join gate: verify privacy + rules acceptance, then persist a `rules-accept` record BEFORE the
- *   downstream redeem runs. `a` is `{invite, privacyAccepted, rulesAccepted}`; `from` is the accepting caller.
- *   Zero-key (the acceptance record is a plain typed item).
- *
- * @returns {Promise<{ok:true, groupId, acceptanceId}|{error:string}>}
- */
-export async function redeemInviteWithGate({ store }, { a, from } = {}) {
-  if (!a?.invite) return { error: 'invite required' };
-  if (a.privacyAccepted !== true) return { error: 'privacy-not-accepted' };
-  if (a.rulesAccepted   !== true) return { error: 'rules-not-accepted' };
-  const groupId = a.invite?.groupId;
-  if (!groupId) return { error: 'invite missing groupId' };
-  const [item] = await store.addItems([{
-    type:       'rules-accept',
-    text:       `Accepted rules of ${groupId}`,
-    source:     { groupId, acceptedBy: from, acceptedAt: Date.now(), gateVersion: 'phase-17' },
-    visibility: 'household',
-  }], { actor: from });
-  return { ok: true, groupId, acceptanceId: item.id };
 }
 
 /**
@@ -176,7 +162,7 @@ export async function createGroupV2({
   // `createGroupWithRules`: a receiver folds it as foundership only where its own trail corroborates
   // the author, or where it has no trail for the circle at all.
   if (typeof emitSpine === 'function') {
-    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: { ...createPayload(currentPersonKey), ...(a.profileKind === 'function' ? { kind: 'function' } : {}) }, actor: from }); }
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: { ...createPayload(currentPersonKey, a), ...(a.profileKind === 'function' ? { kind: 'function' } : {}) }, actor: from }); }
     catch { /* best-effort, like every spine hook here */ }
   }
   return {

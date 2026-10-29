@@ -2,7 +2,7 @@
  * Pinboard V1 — Phase 16 tests.
  *
  * Group ops admin polish: listGroupMembers, postAnnouncement,
- * editGroupRules, removeMember, listReports.  Each gated on the
+ * editGroupRules, removeMember.  Each gated on the
  * `role` field in MemberMap (admin / coordinator pass; other roles
  * get `error: 'admin-only'`).
  */
@@ -216,41 +216,3 @@ describe('Pinboard V1 Phase 16 — removeMember', () => {
   });
 });
 
-// ── listReports ──────────────────────────────────────────────────────────
-
-describe('Pinboard V1 Phase 16 — listReports', () => {
-  it('admin sees reports oldest-first', async () => {
-    const bundle = await buildCircle();
-    // Member posts a report (allowed for everyone — this skill is from Phase 3).
-    await callSkill(bundle.agent, 'postRequest',
-      { text: 'spam-y post', kind: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const open = await bundle.itemStore.listOpen({});
-    const post = open.find(i => i.text === 'spam-y post');
-    await callSkill(bundle.agent, 'reportPost', { itemId: post.id, reason: 'spam' });
-
-    const r = await callSkill(bundle.agent, 'listReports');
-    expect(r.reports.length).toBeGreaterThanOrEqual(1);
-    expect(r.reports[0].type).toBe('report');
-  });
-
-  it('scopes reports to their circle (a tagged report only shows in its group)', async () => {
-    const bundle = await buildCircle();
-    // Reports are admin-only per circle, so Anne has to actually be an admin of the two circles
-    // this scopes across — which now means the circles have to exist and name her.
-    await admit(bundle, 'circle-a', [BOB]);
-    await admit(bundle, 'circle-b', [CARLA]);
-    await callSkill(bundle.agent, 'postRequest', { text: 'p-a', kind: 'ask', expectClaims: 0, timeoutMs: 1 });
-    const post = (await bundle.itemStore.listOpen({})).find((i) => i.text === 'p-a');
-    await callSkill(bundle.agent, 'reportPost', { itemId: post.id, reason: 'spam', groupId: 'circle-a' });
-
-    const a = await callSkill(bundle.agent, 'listReports', { groupId: 'circle-a' });
-    expect(a.reports.some((r) => r.source?.groupId === 'circle-a')).toBe(true);
-    const b = await callSkill(bundle.agent, 'listReports', { groupId: 'circle-b' });
-    expect(b.reports.some((r) => r.source?.groupId === 'circle-a')).toBe(false);   // not in another circle
-  });
-
-  it('a member of the circle gets admin-only', async () => {
-    const bundle = await buildCircle();
-    expect(await callSkill(bundle.agent, 'listReports', {}, BOB)).toEqual({ error: 'admin-only' });
-  });
-});

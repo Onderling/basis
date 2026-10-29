@@ -150,12 +150,23 @@ fi
 # ── 4. repos at the release branch ──
 # shellcheck disable=SC1090
 . "$BOX_DIR/box.conf"
+# The checkouts belong to the box user, so git runs AS the box user whenever this runs as root (update.sh runs as that
+# user too): run as root over a checkout another user owns, git refuses it as "dubious ownership". A fresh clone is made
+# as the box user from the start. Self-contained here: a piped install has no lib.sh until the first clone exists.
+refresh_repo() {   # dir url branch user
+  local d=$1 url=$2 br=$3 user=$4
+  local as=()
+  if [ "$(id -u)" = 0 ] && [ -n "$user" ] && id "$user" >/dev/null 2>&1; then
+    as=(sudo -u "$user")
+    mkdir -p "$(dirname "$d")" && chown "$user:$user" "$(dirname "$d")" 2>/dev/null || true
+  fi
+  if [ ! -d "$d/.git" ]; then "${as[@]}" git clone -q --branch "$br" "$url" "$d" || return 1; fi
+  "${as[@]}" git -C "$d" fetch -q origin "$br" --tags || return 1
+  "${as[@]}" git -C "$d" checkout -q -f "origin/$br"
+}
 for r in $REPOS; do
   name="${r%%=*}"; rest="${r#*=}"; url="${rest%%#*}"; br="${rest#*#}"
-  d="$BOX_DIR/repos/$name"
-  if [ ! -d "$d/.git" ]; then git clone -q --branch "$br" "$url" "$d"; fi
-  git -C "$d" fetch -q origin "$br" --tags
-  git -C "$d" checkout -q -f "origin/$br"
+  refresh_repo "$BOX_DIR/repos/$name" "$url" "$br" "$BOX_USER" || { echo "install: could not refresh $name" >&2; exit 1; }
 done
 if [ "$SKIP_SYSTEM" != 1 ]; then
   chown -R "$BOX_USER:$BOX_USER" "$BOX_DIR"
@@ -172,6 +183,34 @@ if [ "$SKIP_SYSTEM" != 1 ]; then
   systemctl daemon-reload
   systemctl enable --now onderling-box.timer
 fi
+
+# ── 5b. the companion's radio in the firewall (a personal box with COMPANION_NEARBY set) ──
+# Applied here, as root and at install only: the updater runs as the box user and never touches the firewall. The
+# rules come from lib.sh, from the box.conf just loaded: mDNS and the radio's data port, bound to the LAN interface.
+# A box that turns the radio on later gets its two rules by hand (`lib.sh nearby_firewall_rules` prints them).
+if [ "$SKIP_SYSTEM" != 1 ] && command -v ufw >/dev/null; then
+  (
+    # shellcheck source=lib.sh
+    . "$RUNNER/lib.sh"
+    while read -r rule; do
+      # shellcheck disable=SC2086
+      ufw $rule >/dev/null
+    done < <(nearby_firewall_rules)
+  )
+fi
+
+# ── 5c. the vault passphrase in .env, outside every backed-up volume ──
+# A box made before kept it in the assistant's volume (vault.passphrase): moved into .env here, once (re-running install.sh
+# is how an existing box takes it; update.sh never writes .env). A new box gets a fresh one. Two that differ stop here.
+(
+  # shellcheck source=lib.sh
+  . "$RUNNER/lib.sh"
+  vdir=""
+  if [ "$SKIP_SYSTEM" != 1 ] && command -v "$DOCKER" >/dev/null; then
+    vdir="$("$DOCKER" volume inspect -f '{{.Mountpoint}}' "${COMPOSE_PROJECT}_assistant-data" 2>/dev/null || true)"
+  fi
+  vault_passphrase_into_env "$vdir"
+) || { echo "install: the vault passphrase needs a decision first (see box.log)" >&2; exit 1; }
 
 # ── 6. first bring-up + health ──
 echo "bringing the stack up (first build takes a few minutes)…"

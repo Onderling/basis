@@ -16,7 +16,7 @@ afterAll(() => teardown(nodes));
 
 describe('a task on a list, and the tasks engine', () => {
   it('a task added to Klusjes is listed, claimed and completed by the tasks engine', async () => {
-    const node = await bootRealAgentNode('bot', { taskLane: true, agentOpts: { tasksCircleId: 'household' } });
+    const node = await bootRealAgentNode('bot', { itemsLane: true, agentOpts: { tasksCircleId: 'household' } });
     nodes.push(node);
     const call = (a, o, x) => node.agent.callSkill(a, o, x);
     await ensureHouseholdLists({ callSkill: call, t: (k) => ({ 'circle.lists.template.chores': 'Klusjes' }[k] ?? k.split('.').pop()) });

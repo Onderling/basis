@@ -63,9 +63,8 @@ describe('isNoticeboardPost — hides system items', () => {
     expect(isNoticeboardPost({ type: 'post', text: 'Anne needs help moving', source: { targets: [{ kind: 'group', groupId: 'miep' }] } })).toBe(true);
   });
 
-  // A circle CHAT line is mirrored into the same itemStore so the conversation survives a
-  // reload (pinboard `broadcastCircleMessage` / `ingestCircleMessage`). It is not a noticeboard
-  // post — but it was rendered as one, with a "Withdraw" action when it was yours.
+  // A circle CHAT line once had a store copy beside the posts (circle chat's record is the device log now).
+  // It is not a noticeboard post — but it was rendered as one, with a "Withdraw" action when it was yours.
   describe('circle chat lines are not noticeboard posts', () => {
     const chatItem = (over = {}) => ({
       type: 'circle-chat-message',

@@ -1,0 +1,17 @@
+/**
+ * Inside basis the pinboard agent is a sub-agent, and its own key stays in the process. Two host injections keep it
+ * there: `selfCard` (whom the default card and this device's own requests name — the chat identity) and
+ * `circleSignerFor` (who signs a circle's statements — the per-circle key). Without either, pinboard falls back to its
+ * own key, which then goes out on cards and statements. A third keeps the person's own profile in one place:
+ * `selfProfile` (the persona record of the caller's self); without it pinboard would hold a second copy in memory.
+ * So the composition refuses to build it without all three, and says which is missing, at construction rather than
+ * at first use.
+ */
+export function assertPinboardHostBindings(opts = {}) {
+  const missing = ['selfCard', 'circleSignerFor'].filter((k) => typeof opts?.[k] !== 'function');
+  if (typeof opts?.selfProfile?.get !== 'function' || typeof opts?.selfProfile?.set !== 'function') missing.push('selfProfile');
+  if (missing.length) {
+    throw new Error(`pinboard in basis needs ${missing.join(' and ')}: without it, the pinboard agent's own key would name this device`);
+  }
+  return opts;
+}

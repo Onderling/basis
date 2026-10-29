@@ -17,6 +17,7 @@ import { mijScreenBlocks } from '../../../../basis/src/v2/mijScreen.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE, HEADER_AVATAR, HEADER_AVATAR_CLEARANCE } from './fab.js';
 import CircleScreenView from './CircleScreenView.js';
+import { settingsGroupForAction } from '../../../../basis/src/v2/settingsHome.js';
 
 /**
  * @param {object} p
@@ -24,7 +25,7 @@ import CircleScreenView from './CircleScreenView.js';
  * @param {object} [p.sources]   what the blocks read beside the waist: `{ eventLog, circles, seenAt, myRefs,
  *   availabilityStore, relays: () => rows, deviceId: () => id, selfIn: (circleId) => webid }`
  */
-export default function CircleProfileScreen({ callSkill, sources = {}, onMyData, onSettings = null, onSharedWithMe = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
+export default function CircleProfileScreen({ callSkill, sources = {}, onSettings = null, onSettingsGroup = null, onSharedWithMe = null, onEditMe, onAdvanced, onMeAction, onOpenCircle = null, onOpenProposals = null }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar: the title and scrolled content drew under it
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
@@ -57,7 +58,7 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
 
   const onBlockAction = (a) => {
     if (a?.kind === 'edit-me') onEditMe?.();
-    else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') onMyData?.();
+    else if (settingsGroupForAction(a)) onSettingsGroup?.(settingsGroupForAction(a));   // devices, agents, the offer
     // "wat wacht op jou": a chip opens where the thing lives
     else if (a?.kind === 'open-proposals' && a.circleId) onOpenProposals?.(a.circleId);
     else if (a?.kind === 'open-circle' && a.circleId) onOpenCircle?.(a.circleId);
@@ -86,9 +87,6 @@ export default function CircleProfileScreen({ callSkill, sources = {}, onMyData,
         </View>
       ) : null}
 
-      {typeof onMyData === 'function' && (
-        <Pressable style={styles.secondary} onPress={onMyData} testID="profile-mydata"><Text style={styles.secondaryText}>{t('circle.profile.mydata')}</Text></Pressable>
-      )}
       {typeof onAdvanced === 'function' && (
         <Pressable style={styles.secondary} onPress={onAdvanced} testID="profile-advanced"><Text style={styles.secondaryText}>{t('circle.advanced.title')}</Text></Pressable>
       )}

@@ -11,8 +11,11 @@ import { settingsHomeFor } from '../../../../basis/src/v2/settingsHome.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { useTheme } from './themeContext.js';
 import { FAB_CLEARANCE } from './fab.js';
+import { versionLine } from '../../../../basis/src/v2/versionLine.js';
+import Constants from 'expo-constants';
 
 export default function SettingsHomeScreen({ onBack, onOpenGroup, onOpenPerCircle, onOpenDoor }) {
+  const styles = useStyles();
   const { groups, perCircle, doors } = settingsHomeFor(basisManifest);
   return (
     <Page title={t('circle.settings_home.title')} onBack={onBack} testID="settings-home">
@@ -24,6 +27,8 @@ export default function SettingsHomeScreen({ onBack, onOpenGroup, onOpenPerCircl
       {typeof onOpenDoor === 'function'
         ? doors.map((d) => <Door key={d.id} label={t(d.labelKey)} onPress={() => onOpenDoor(d)} testID={`settings-door-${d.id}`} />)
         : null}
+      {/* the version this build was made from (its tree's exact clean tag, through the build; none → dev) — web's line */}
+      <Text style={styles.fact} testID="settings-version">{versionLine(Constants.expoConfig?.extra?.appVersion ?? null, t)}</Text>
     </Page>
   );
 }

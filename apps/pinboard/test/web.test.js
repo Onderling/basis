@@ -176,19 +176,6 @@ describe('Pinboard V1 web UI — Phase 5 (intent tabs + moderation)', () => {
     expect(offers.items.every(i => i.type === 'offer' && i.kind === 'give')).toBe(true);
   });
 
-  it('reportPost via REST creates a type:"report" item', async () => {
-    const post = await callRest('postRequest', {
-      text: 'something problematic',
-      intent: 'ask',
-      expectClaims: 0,
-      timeoutMs: 1,
-    });
-    const r = await callRest('reportPost', { itemId: post.requestId, reason: 'irrelevant' });
-    expect(r.reportId).toBeTruthy();
-
-    const reports = await callRest('listOpenRequests', { intent: 'report' });
-    expect(reports.items.some(it => it.id === r.reportId)).toBe(true);
-  });
 });
 
 describe('Pinboard V1 web UI — Phase 6 (profile)', () => {
@@ -198,7 +185,6 @@ describe('Pinboard V1 web UI — Phase 6 (profile)', () => {
 
     const profile = await callRest('getMyProfile', {});
     expect(profile.entry.handle).toBe('alice-test');
-    expect(profile.renderForCurrentGroup.render).toBe('@alice-test');
   });
 
   it('setMyHandle rejects invalid input over REST', async () => {

@@ -202,7 +202,7 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
 
 **Four rules of planned work, learned by walking the code before building the next steps (2026-10-07).**
 - **One hook for everything that reacts to a change.** A snapshot that arrived from a peer passes
-  `onItemApplied(circleId, item)` in the task rail, and nothing else sees a landed row; the host's own circle writes
+  `onItemApplied(circleId, item)` in the items rail, and nothing else sees a landed row; the host's own circle writes
   pass the store's publish. The host's change feed (`src/v2/changeFeed.js`) joins the two and hands each change, with
   the item as the host last saw it and as it is now, to its consumers: the screens' nudge and the event triggers of
   planned work — the announcements are such rows (`announceRows.js`), so a member's change in their app is announced
@@ -229,7 +229,7 @@ The Sunday week overview is such a row (`/overzicht aan` writes it, `sendWeekOve
 - **The own-devices store is the store of the scope "a person and their devices", and it syncs by the sibling carry.**
   A person's devices already behave as a circle of devices: a proven sibling set, one carry for a device's own writes
   to its siblings, sibling-gated catch-up (the grants lane), and a circle founded on one device followed by the
-  others. The own-devices store rides the task lane under its own scope, between the person's devices only: signed by
+  others. The own-devices store rides the items lane under its own scope, between the person's devices only: signed by
   the device's delegation key and verified by the device-set binding (never the person key, which a revoked device
   holds too), sealed in flight to the person's seal-to-self key, fanned by the sibling carry alone (there is no
   roster), and caught up from siblings, served to siblings only. A device that cannot sign or seal keeps it local. A
@@ -550,7 +550,7 @@ One row in that store is not synced like the others, on purpose: the roster's **
 `membership-redemption` item a circle's membership is projected from). Its addresses enter the projection
 only proven, it is patched in place by the announce receive path, and it reaches other devices by carriers
 that keep that trust — the join statements on the membership lane, the announces, the roster seed between
-a person's own devices. The task lane, which carries a store's rows as causally merged snapshots, neither
+a person's own devices. The items lane, which carries a store's rows as causally merged snapshots, neither
 serves nor applies a roster row (`packages/circles/src/rosterTrail.js`): two devices of one person each
 hold "the person's row" with a different primary address, and a snapshot of one replacing the other is how
 a device came to refuse everything its sibling signed (2026-09-13).
@@ -588,12 +588,22 @@ itself.
 
 The mirror machinery has not vanished, and knowing why avoids a wrong conclusion when you read the code:
 `wireStoreMirror` is still *wired*, but for production what flows through it is the rail's own publish valve
-(`routeTaskMirror` is deliberately mirror-SHAPED so the wrapper is unchanged). So the mirror is the plumbing
+(`routeItemsMirror` is deliberately mirror-SHAPED so the wrapper is unchanged). So the mirror is the plumbing
 *shape*, not the path. Its full dissolution needs a device log in every composition, and is parked as hygiene
 rather than pretended done.
 
 **The rule survives the change, and is what matters:** there is ONE fan-out path per circle. A type that
 reaches a peer some other way is a second implementation of sync and will drift from this one.
+
+**A plugin's noun rides the items lane.** The content lane is called the **items lane** (`itemsRail.js`, lane
+kind `items`) because it carries every row a circle's store holds, not one type. A plugin brings no sync code: a
+noun its manifest declares with a schema joins the node's type registry when the catalogue composes it
+(`registerDeclaredTypes`, under the plugin's origin, never shadowing a name already there). From then on its rows
+are rows of the circle's one store like any other, and the store's publish puts them on the items lane, which has no
+list of types. A receiving device that runs the plugin merges the row into its store. A device that does not run it
+does not hold the row: the signed statement stays on its log, and the head picks it up when the plugin is installed
+there (a rebuild re-applies what the log holds). `extensionNounSync.test.js` walks this with the example plants
+plugin.
 
 **Two axes, declared.** How an item *reaches* peers and how concurrent writes *reconcile* are separate, declared
 choices — **delivery** and **resolution**. Delivery is the live fan-out above plus the companions for what it
@@ -617,7 +627,7 @@ the honest tail is named below the table rather than dropped.
 | Tasks are correctly per-circle, and their store is **not** on the fan-out path | ✅ RESOLVED (wave 2) — the one-store collapse put the tasks store on the `ensureCircleSync` fan-out; a task now crosses A→B, proven + guarded by `appTaskFanTwoDevice` (one store per circle + per-type sync arrival) |
 | `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | ✅ RESOLVED (wave 2) — the circle-infra was renamed (`addCirclePeer`, `getCircleScope`, `ensureCircleSync`, …); the remaining `household` is a legitimate template/app name, not circle machinery |
 | Five **in-process agents** (host, household, tasks, pinboard, folio), each with its own key and vault, two with their own policy engine and trust registry | ❌ OPEN (found 2026-10-23, the one-agent fold is planned: `plans/live/PLAN-after-the-interface.md` §6c) — the Agent home's "one agent per person per process" is the rule; the five are the standalone-app past. Until the fold lands, every op is judged by whichever engine its app happens to carry |
-| The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ❌ OPEN (2026-10-23) — exactly the "filter applied to a shared pile" this section forbids; dissolves into the per-circle stores with the fold (§6c step 5) |
+| The circle engine (`apps/pinboard`) keeps a **second physical store**, one pile for every circle tagged by circle id | ◐ PARTLY — noticeboard POSTS live in their circle's own store and ride its lane: pinboard is handed the host's circles (`hostCircles`) and writes and reads posts there (`apps/pinboard/src/lib/routedStore.js`); the copy into the circle store and the bridge back are gone. Who answered a post is the poster's own and stays on the poster's device. The pile still holds the circle engine's other rows (membership codes and redemptions, rules and their acceptances, the circle-chat mirror, reports), each tagged by circle id — the shared pile this section forbids, for those rows |
 
 **The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
 still serve compositions that have no device log (test fixtures, the manual-pairing skills). Full dissolution
@@ -856,8 +866,8 @@ connected bot, a remote handler) build on.
 **One send waist (`deliver`).** Every message a circle emits — a chat line, a broadcast, a 1:1 DM — funnels
 through one primitive rather than the parallel send paths that used to exist. There is **one canonical chat
 `Envelope`** (`@onderling/item-store/chatEnvelope.js`) with declared, pure projections — `toEventLogItem`
-(the in-memory render event), `toWireEnvelope` (the peer fan-out shape), and `chatEnvelopeFromStoreItem` (the
-durable stored item) — so the three shapes that used to be hand-reshaped (and drift) are now views of one datum,
+(the in-memory render event) and `toWireEnvelope` (the peer fan-out shape) — circle chat keeps no store row, its
+record is the device log — so the shapes that used to be hand-reshaped (and drift) are now views of one datum,
 proven byte-identical to their old producers by round-trip tests. Over that envelope: **one circle-broadcast**
 (`broadcastToCircle`) fans to a circle's members, and **one addressed send** (`addressedDeliver.js`) folds the
 two former 1:1 DM paths (the ephemeral contact-thread channel and wireChat's persisted `chat.send`) into a
@@ -989,9 +999,10 @@ pretending to carry. Offline **hold-and-forward** exists today as a send *guaran
 *dedicated* hold-and-forward port is forward work.
 
 **Two unrelated "hop"s — don't conflate them.** The **transport-hop** above (the `hop` rung) is peer-as-relay
-*routing*: forwarding a payload through an intermediary peer to reach a target. The **social match-hop**
-(`@onderling/kring-host` `circleHop.js`) is *discovery*: relaying a skill query one degree further through a
-contact who allows it — it never appears in this reachability ladder.
+*routing*: forwarding a payload through an intermediary peer to reach a target. A **social match-hop** —
+relaying a skill query one degree further through a contact who allows it — would be *discovery* and would never
+appear in this reachability ladder. None is built: the inert stance toggle and hop-prompt that stood for it were
+removed, and relaying for others is to be designed as a rung with its tier policy and sender binding.
 
 Transport details: [project overview → Reachability](../README.md#reachability--transports).
 
@@ -1008,7 +1019,10 @@ and bad actors, weakest concern to strongest:
   conflict; eventual connectivity converges. The merge is a **declared resolution policy** per
   `(item-type, field)`, receiver-enforced so a sender cannot pick a weaker one: **content** (last-writer-wins —
   posts, notes, task text) · **claim** (first-wins / immutable-once-set — a task's assignee, a reservation) ·
-  **spine** (deny-wins — membership, roles, keys; enforced by the L3 hash-chain below). (Rich collaborative
+  **field-clock** (a declared field-set merges by its own `*At` clock, whichever row won — a contact's hidden
+  mark on one device and its persona on another both survive; declared on the type, `CANONICAL_FIELD_CLOCKS` in
+  `@onderling/item-types`) · **spine** (deny-wins — membership, roles, keys; enforced by the L3 hash-chain
+  below). (Rich collaborative
   content-merge — sequences, text — lands later with folio versioning.)
 - **L2 · forgery** — every event is signed by the author's **per-circle key** + proof-of-membership, so
   non-members can't inject and members can't forge each other's events.

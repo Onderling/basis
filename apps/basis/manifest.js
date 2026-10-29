@@ -12,8 +12,9 @@
 export const basisManifest = {
   app:        'basis',
   // The network hosts this app's code reaches: the sign-in issuers it offers as presets (reached when
-  // the person picks one). The person's own pod and relay are endpoints they configure, not fixed hosts.
-  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org'],
+  // the person picks one), and Telegram's bot API for a box's alert chat (only when the box's operator set
+  // one). The person's own pod and relay are endpoints they configure, not fixed hosts.
+  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org', 'api.telegram.org'],
   itemTypes:  ['chat-thread', 'chat-message'],
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).
@@ -1165,22 +1166,14 @@ export const basisManifest = {
   ],
 
   /**
-   * Nav-chrome (My data) — the doors at the top of My data: the views Me gave up when it became one declared screen
-   * (2026-10-15). Views no op backs, so `nav` rows (strict validation refuses one that names an op). Both shells paint
-   * them from this declaration (`myDataActionsFor`), each `to` mapped to the view it opens there.
-   */
-  myDataActions: [
-    { id: 'log-report',        labelKey: 'circle.profile.logReport',        target: { kind: 'nav', to: 'logReport' } },
-  ],
-
-  /**
    * The person's settings, behind the gear on Mij ("Instellingen"): groups of sections, then the circles' own settings.
    * Both shells paint the home and each group from this declaration (`settingsHomeFor`), one painter per section id;
    * no shell lists a section by hand. A section lives in exactly one place: once declared here it is gone from the old
    * My data page. Kinds say how a row behaves, so it looks like what it is:
    *   door    — opens another screen (text + →)            switch  — on or off (a real switch)
    *   control — a picker or a small form (theme, language)  fact    — plain text, nothing to do
-   * `custody: true` marks a section painted behind the custody guard (keys, devices, sign-in) on both shells.
+   * `custody: true` marks a section of the owner's keys, devices or sign-in: its painter reaches only `private` ops, and
+   * only through the waist (the fitness test reads both shells). A step-up before it paints is a later design.
    * The last row is a door to a chooser of the person's circles; each opens that circle's own settings.
    */
   settingsGroups: [
@@ -1208,6 +1201,17 @@ export const basisManifest = {
       ],
     },
     {
+      id: 'devices-keys', labelKey: 'circle.settings_home.devices_keys',
+      sections: [
+        { id: 'devices',        kind: 'control', custody: true },
+        { id: 'agents',         kind: 'control' },
+        { id: 'connections',    kind: 'control' },
+        { id: 'connection-add', kind: 'control' },
+        { id: 'keys',           kind: 'control', custody: true },
+        { id: 'storage',        kind: 'control', custody: true },
+      ],
+    },
+    {
       id: 'my-data', labelKey: 'circle.settings_home.my_data',
       sections: [
         { id: 'history-mirror',  kind: 'control' },
@@ -1215,6 +1219,7 @@ export const basisManifest = {
         { id: 'privacy',         kind: 'fact'    },
         { id: 'usage',           kind: 'fact'    },
         { id: 'frequent',        kind: 'control' },
+        { id: 'log-report',      kind: 'door', target: { kind: 'nav', to: 'logReport' } },
       ],
     },
     { id: 'per-circle', kind: 'door', labelKey: 'circle.settings_home.per_circle', target: { kind: 'nav', to: 'circleSettingsChooser' } },

@@ -13,37 +13,17 @@
  */
 
 import { buildMijViewModel } from './personaView.js';
-import { migrateRosterOfferings } from '../core/offeringsMigration.js';
-import { migrateAvailability } from '../core/availabilityMigration.js';
-import { migrateLocation } from '../core/locationMigration.js';
-import { migrateInterests } from '../core/interestsMigration.js';
 
-export { offeringKeyFor } from '../core/offeringsMigration.js';
+export { offeringKeyFor } from './offeringKey.js';
 
 /**
  * @param {object} args
  * @param {(origin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {string} [args.personaId]      the opened profile row (kept even when listAgents degrades)
  * @param {Array<{id: string, name?: string, charter?: object}>} [args.circles]
- * @param {string} [args.activeCircleId] when given, phase-D roster-skills migration
- *                                       runs first (free after the first time — marker)
  * @returns {Promise<object>} the buildMijViewModel result
  */
-export async function loadMijModel({ callSkill, personaId, circles = [], activeCircleId } = {}) {
-  if (activeCircleId) {
-    try { await migrateRosterOfferings({ callSkill, circleId: activeCircleId }); } catch { /* non-fatal */ }
-    // availability unification — one-time, marker-guarded seed of the unified
-    // `availability` property from the most-restrictive legacy signal (holidayMode /
-    // per-skill availability). Reads the active circle's pinboard context; global once seeded.
-    try { await migrateAvailability({ callSkill }); } catch { /* non-fatal */ }
-    // location fold-in (audit §4) — one-time, marker-guarded seed of the person-level
-    // `location` property from the bespoke pinboard `profile.location` coarse geo field.
-    try { await migrateLocation({ callSkill }); } catch { /* non-fatal */ }
-    // interests fold-in (audit 4) — one-time, marker-guarded seed of an `interest`-kind
-    // driver from the bespoke learned Layer-2 interest signal (pinboard getInterestProfile terms).
-    try { await migrateInterests({ callSkill }); } catch { /* non-fatal */ }
-  }
-
+export async function loadMijModel({ callSkill, personaId, circles = [] } = {}) {
   // Every profile-role registry entry is a persona; the opened row + the
   // default profile are included even when the list op degrades.
   let rows = [];

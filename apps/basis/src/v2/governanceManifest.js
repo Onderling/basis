@@ -33,6 +33,11 @@ export const governanceManifest = Object.freeze({
     // a following device catch it up like the roster — it replaced the settings-save broadcast, which never did.
     { id: 'governance.policyUpdate', description: 'An admin states the circle\'s policy (the whole policy + version travel to every member and are caught up by joiners; receiver-verified admin authority).', writes: { scope: 'circle' }, appends: [{ lane: GOVERNANCE_LANE, kind: 'policy-update' }] },
     { id: 'governance.rulesUpdate', description: 'An admin replaces the circle\'s rules document (the new doc + version travel to every member peer-to-peer; receiver-verified admin authority).', writes: { scope: 'circle' }, appends: [{ lane: GOVERNANCE_LANE, kind: 'rules-update' }] },
+    // A REPORT and its resolution ride it too (2026-10-25), signed — but they are not the circle's: they reach only the
+    // circle's admins and the person who filed, in the fan and in the catch-up serve alike (`reportLane.js`), and a
+    // resolution lands only from an admin. The governance fold ignores both kinds.
+    { id: 'governance.reportFile',    description: 'File a report (a post, a message or a member, with a reason) for the circle\'s admins.', writes: { scope: 'circle' }, appends: [{ lane: GOVERNANCE_LANE, kind: 'report-file' }] },
+    { id: 'governance.reportResolve', description: 'An admin closes a report (dismissed or actioned).', writes: { scope: 'circle' }, appends: [{ lane: GOVERNANCE_LANE, kind: 'report-resolve' }] },
   ],
 });
 

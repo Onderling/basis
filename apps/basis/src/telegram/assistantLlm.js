@@ -95,6 +95,10 @@ export async function buildAssistantLlm({
       llm: new LlmClient({ provider, ...(typeof meter === 'function' ? { meter, model: primary?.model ?? undefined } : {}) }), model: primary?.model ?? null, fallbackModel,
       // the provider's own list of served models, when it has one (a box watches its model against it)
       listModels: typeof primary?.listModels === 'function' ? () => primary.listModels() : null,
+      // the key, used once: one one-token completion on the primary (a models list needs no key; this does)
+      probe: typeof primary?.invoke === 'function'
+        ? () => primary.invoke({ system: 'Reply with one character.', messages: [{ role: 'user', content: '.' }], options: { maxTokens: 1 } })
+        : null,
     };
   } catch (err) {
     warn(`device-runner: the confidential LLM route did not load (${err?.message ?? err}) — Telegram answers without a model; the device runs on.`);

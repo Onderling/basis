@@ -5,7 +5,7 @@
  * persona's included, to the general persona's devices (one device's contact book linked the selves).
  *
  * Production here: the real factory, the real relay, the enrol with personas and the offer's consume, the create
- * wizard founding Y as W, the real known-peers lane (live carry and catch-up).
+ * wizard founding Y as W, the real own-devices lane per self (live carry and catch-up).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
@@ -83,8 +83,9 @@ describe("a persona's contact book, per self", () => {
     // …and one under the general self, which reaches every general device as before
     const friend = 'w:friend-of-anna';
     expect((await phone.agent.callSkill('pinboard', 'addContact', { webid: friend, displayName: 'Vriendin', persona: 'default' }))?.ok).not.toBe(false);
-    // the live carry, then each device's catch-up (the connect-time ask), so nothing rests on timing
-    for (const n of [box, laptop]) await n.agent.knownPeersSync.requestFromSiblings();
+    // the live carry (the own-devices lane of the self each row is written as), then each device's catch-up, so nothing
+    // rests on timing
+    for (const n of [box, laptop]) await n.agent.ownStoreSync?.requestFromSiblings?.();
 
     const onLaptop = await until(async () => (await contactsOf(laptop)).find((c) => c.webid === webid) ?? null, { timeout: 30_000, step: 300 });
     expect(onLaptop, 'the laptop — W\'s device — has W\'s contact').toBeTruthy();
@@ -99,21 +100,31 @@ describe("a persona's contact book, per self", () => {
   it("a general contact RE-FILED under W leaves the box (general only) and is filed under W on the laptop; nothing names W to the box", async () => {
     const friend = 'w:neighbour-of-anna';
     expect((await phone.agent.callSkill('pinboard', 'addContact', { webid: friend, displayName: 'Buur', persona: 'default' }))?.ok).not.toBe(false);
-    for (const n of [box, laptop]) await n.agent.knownPeersSync.requestFromSiblings();
+    for (const n of [box, laptop]) await n.agent.ownStoreSync?.requestFromSiblings?.();
     for (const n of [box, laptop]) expect(await until(async () => ((await contactsOf(n)).some((c) => c.webid === friend) ? true : null), { timeout: 30_000, step: 300 }), 'a general contact on every general device first').toBe(true);
     const boxSaw = [];
     const prior = box._routerRef.fn;
     box._routerRef.fn = (env) => { try { boxSaw.push(JSON.stringify(env?.payload ?? {})); } catch { /* observe only */ } return prior?.(env); };
     expect((await phone.agent.callSkill('pinboard', 'setContactPersona', { webid: friend, persona: w }))?.contact?.persona, 'the phone files the friend under W now').toBe(w);
-    // the live mark, then each device's catch-up (the refiled list rides the old self's snapshot), so nothing rests on timing
+    // the general self's row is deleted (the delete rides the general self's lane) and W's row written (W's lane); then
+    // each device's catch-up, so nothing rests on timing
     await new Promise((r) => setTimeout(r, 1000));
-    for (const n of [box, laptop]) await n.agent.knownPeersSync.requestFromSiblings();
+    for (const n of [box, laptop]) await n.agent.ownStoreSync?.requestFromSiblings?.();
     const gone = await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? null : true), { timeout: 30_000, step: 300 });
     expect(gone, "the box — the general persona's device only — no longer has the friend as a contact").toBe(true);
     const onLaptop = await until(async () => { const c = (await contactsOf(laptop)).find((x) => x.webid === friend); return c?.persona === w ? c : null; }, { timeout: 30_000, step: 300 });
-    expect(onLaptop, "the laptop holds W: the friend is filed under W there").toBeTruthy();
+    expect(onLaptop, 'the laptop holds W: the friend is filed under W there').toBeTruthy();
+    const laptopRows = ((await (await laptop.agent.ownStore()).list?.()) ?? []).filter((r) => r?.type === 'contact' && r.webid === friend);
+    expect(laptopRows.map((r) => r.id), "one row on the laptop, W's").toEqual([`${w}:${friend}`]);
     box._routerRef.fn = prior;
     expect(boxSaw.some((p) => p.includes(w)), 'nothing the box received names W').toBe(false);
+    const boxRows = ((await (await box.agent.ownStore()).list?.()) ?? []).filter((r) => r?.webid === friend);
+    expect(boxRows, 'the box holds no row of the friend at all').toEqual([]);
+    // …filed BACK under the general self on the phone: a new general row, which reaches the box once more
+    expect((await phone.agent.callSkill('pinboard', 'setContactPersona', { webid: friend, persona: 'default' }))?.contact?.persona).toBe('default');
+    await box.agent.ownStoreSync?.requestFromSiblings?.();
+    const back = await until(async () => ((await contactsOf(box)).some((c) => c.webid === friend) ? true : null), { timeout: 30_000, step: 300 });
+    expect(back, 'filed back under the general self, the friend is on the box again').toBe(true);
   }, 120_000);
 
   it("a W contact's turn reaches the laptop and never the box; a general contact's reaches both", async () => {

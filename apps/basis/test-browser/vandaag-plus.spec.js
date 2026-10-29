@@ -6,6 +6,7 @@
  *   PEER_TEST_PORT=5273 npx playwright test --project=no-relay test-browser/vandaag-plus.spec.js
  */
 import { test, expect } from '@playwright/test';
+import { createCircleViaWizard } from './helpers.js';
 
 test.setTimeout(90_000);
 
@@ -139,6 +140,10 @@ test('the free line: its button reads it, as Enter does', async ({ page }) => {
 test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circle', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
+  // a circle of its own to bookmark from (a fresh profile has no tile: the help bot is a contact, not a circle)
+  await createCircleViaWizard(page, 'Vastgezet Kring');
+  await page.goto('/');
+  await expect(page.locator('.circle-vandaag__head')).toBeVisible({ timeout: 20_000 });
   // pin an own act from the sheet (☆ → ★), and it shows under Vastgezet
   await page.locator('.cc-fab').click();
   await page.locator('.circle-vandaag-plus__pin[data-act="household.note"]').click();
@@ -150,7 +155,7 @@ test('Vastgezet: a pinned own act is one tap; a pinned circle op OPENS its circl
   await page.locator('.circle-vandaag-plus__close').click();
   // a circle's attach entry pinned to the "+" opens THAT circle (a bookmark never runs the op from the sheet)
   await page.locator('[data-tab="circles"]').first().click();
-  await page.locator('.circle-tile').first().click();
+  await page.locator('.circle-tile', { hasText: 'Vastgezet Kring' }).first().click();
   await page.locator('.circle-view__attach').first().click();
   await page.locator('.circle-view__attach-pin').first().click();
   // the floating "+" lives where the tab bar lives (not inside a circle): back out, and open the bookmark from Vandaag

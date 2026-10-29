@@ -189,7 +189,7 @@ import { renderPersonaSwitcher } from './personaSwitcher.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import { renderSettingsHome, renderCircleSettingsChooser } from './circleSettingsHome.js';
-import { settingsGroupFor } from '../../src/v2/settingsHome.js';
+import { settingsGroupFor, settingsGroupForAction } from '../../src/v2/settingsHome.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
@@ -203,9 +203,8 @@ import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 import {
   applyChatFilter, chatFilterChips, normalizeChatFilter, localStorageChatFilterIo,
 } from '../../src/v2/chatFilter.js';
-// key management: reuse the existing encrypted-backup + restore wizards
+// key management: reuse the existing restore wizard
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
-import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
 import { renderRecoveryExportWizard, renderRecoveryImportWizard } from '../../src/web/wizards/recoveryFileWizard.js';
 // OBJ-2 membership — reuse the classic join wizard renderer in v2 via the same overlay adapter.
@@ -230,7 +229,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle, circleCarriesMedia } from '../../src/v2/profileMediaReseal.js';
-import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
+import { bindCircleGovernance, makeGovernanceRail, makeGovernanceBroadcast, openPolicyProposals, policyProposalNote, policyProposalForAdmin, policyChangeText } from '../../src/v2/governanceAppWiring.js';
 // The lane table both shells (and a headless device) build from one place.
 import { buildCircleLanes, pullCircleLanes } from '../../src/v2/circleLanes.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
@@ -249,10 +248,9 @@ import { renderShareMyContact } from './shareMyContact.js';
 import { seedContactCard } from '../../src/v2/seededContact.js';
 import { backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
-import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
+import { foldGovernance } from '../../src/v2/governanceLog.js';
 import { noticeWants } from '../../src/v2/noticeSettings.js';
-import { reportEntryId } from '../../src/v2/reportModel.js';
-import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
@@ -391,9 +389,6 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
 import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
-import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/circleChatRehydrate.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
 import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
@@ -404,14 +399,14 @@ import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPend
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
-  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe,
+  createCircleRecipeStore, localStorageRecipeIo, localCircleRecipeStore, getActiveRecipe, blockTypesOnScreen,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
 } from '../../src/v2/circleRecipe.js';
 import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
 // The person's own pages (Vandaag): read here, edited only through the screen ops (no book function is called from
 // this shell to change the book).
-import { localUserScreenStore, getActiveScreen } from '../../src/v2/userScreens.js';
+import { localUserScreenStore, getActiveScreen, blockTypesShowingCircle } from '../../src/v2/userScreens.js';
 import { ensureVandaagBook, expandedPage, customiseModel, customiseOp } from '../../src/v2/vandaag.js';
 import { startTabFor, LAST_TAB_STORAGE_KEY, START_SCREEN_CHOICES } from '../../src/v2/startScreen.js';
 import { renderVandaagCustomise } from './vandaagCustomise.js';
@@ -762,7 +757,6 @@ import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
 import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
-import { normalizeHopMode } from '@onderling/kring-host/circleHop';
 import { mergeOffering, normalizeOffering, offeringsMatchingEnabled } from '@onderling/kring-host/circleOfferings';
 import { buildCircleFiles, circleFilesFromListFiles } from '../../src/v2/circleFolio.js';
 import { myThingsFromListFiles } from '../../src/v2/folioMyThings.js';
@@ -778,7 +772,6 @@ import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
 import { renderCircleAdvisor } from './circleAdvisor.js';
-import { renderCircleHop } from './circleHop.js';
 import { renderOfferingEditor } from './circleOfferingEditor.js';
 import { renderCircleFolioBrowser } from './circleFolio.js';
 import {
@@ -1477,7 +1470,7 @@ function circleOnJoined({ circleId, invite = null }) {
     recordPoints: ({ invite: inv, circleId: cid }) => recordJoinedCirclePoints({ store: getConnectionPoints(), invite: inv, circleId: cid }),
     // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
     registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
-    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: taskCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
+    pullLanes: (cid) => pullCircleLanes({ membership: memCatchUpShell, gov: govCatchUpShell, key: keyCatchUpShell, task: itemsCatchUpShell, chat: chatCatchUpShell }, cid, { callSkill: rawCallSkill }),
   });
 }
 let circlePairRoster = null;     // the pair roster for contacts (L105) — composed with the contact channel
@@ -1490,7 +1483,7 @@ let govShellRail = null;             // the governance rail for the RECEIVE side
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
 let memCatchUpShell = null;
 let keyCatchUpShell = null;          // pull-all key-lane catch-up (the group-key chain's offline half)          // the membership lane's catch-up (same mechanism, its own subtypes)
-let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
+let itemsCatchUpShell = null;         // the items lane's catch-up (serves stored entries + signed live heads)
 let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
@@ -2651,19 +2644,15 @@ function buildCircleBot(agent) {
     }
   }
 
-  // After /find returns, append (1) in-circle SKILL MATCHES for the query, and (2) a HOP PROMPT when the
-  // search came up short but the user has hop-eligible contacts + hop is on. Ported from classic main.js
-  // (appendFindExtras); the building blocks (findOfferingMatches / hopPrompt) are shared.
+  // After /find returns, append the in-circle SKILL MATCHES for the query (the shared buildFindExtras).
   async function appendFindExtras(reply) {
-    const { offeringMatches, hopCard } = await buildFindExtras({
-      query: reply?.payload?.query, groups: reply?.payload?.groups,
-      circleId: getActiveCircle(), callSkill: resolveSkill, t,
+    const { offeringMatches } = await buildFindExtras({
+      query: reply?.payload?.query, circleId: getActiveCircle(), callSkill: resolveSkill,
     });
     if (offeringMatches.length) {
       const lines = offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n');
       _circleRender?.botBubble(`${t('circle.offeringMatches.title')}\n${lines}`);
     }
-    if (hopCard) _circleRender?.botBubble(`${hopCard.title}\n${hopCard.body}`);
   }
 
   // run a bulk route ("/done all") over the most-recent listing's items; item-changed events fan out
@@ -4192,32 +4181,6 @@ async function showMyThings() {
   }
 }
 
-// Hopping is a DEVICE-global stance (Pinboard getHopMode/setHopMode); it lives
-// under the Mij tab (personal settings). Chain-card data lands later.
-async function showHop() {
-  hideCircleTabBar(tabBarEl);
-  let hopMode = { global: false };
-  if (resolveSkill) {
-    try { hopMode = normalizeHopMode(await resolveSkill('getHopMode', {})); } catch { /* default */ }
-  }
-  const rerender = () => renderCircleHop(rootEl, {
-    hopMode,
-    t,
-    onToggleGlobal: async (v) => {
-      hopMode = { global: v };
-      rerender();
-      if (resolveSkill) {
-        try {
-          const r = await resolveSkill('setHopMode', { global: v });
-          if (r && !r.error) { hopMode = normalizeHopMode(r); rerender(); }
-        } catch { /* keep optimistic */ }
-      }
-    },
-    onBack: showMij,
-  });
-  rerender();
-}
-
 // α.3 — Screens tab.  Two sub-modes:
 //   - 'picker' (default): list of the user's screens with CRUD affordances
 //   - 'view':              render the materialized active screen as blocks
@@ -4583,12 +4546,11 @@ async function showMij() {
     t, blocks, profilePage,
     onBlockAction: (a) => {
       if (a?.kind === 'edit-me') openAboutMePanel('default');
-      else if (a?.kind === 'open-my-data' || a?.kind === 'open-mydata') showMyData();
+      else if (settingsGroupForAction(a)) showMyData({ group: settingsGroupForAction(a) });   // devices, agents, the offer
       else if (a?.kind === 'open-shared-with-me') showSharedWithMe();
       // "wat wacht op jou": a chip opens where the thing lives — the circle (its votes are in its settings' banner)
       else if ((a?.kind === 'open-circle' || a?.kind === 'open-proposals') && a.circleId) showDetail(a.circleId);
     },
-    onMyData: showMyData,
     // the gear: the person's settings (Instellingen)
     onSettings: showSettingsHome,
     // The advanced surface — every surface-less op + the settable params (the default place).
@@ -4699,11 +4661,11 @@ async function showBlocked() {
 function showLogReport() {
   hideCircleTabBar(tabBarEl);
   const { text, n } = logReportView({ version: APP_VERSION || null, at: Date.now() });
-  renderLogReport(rootEl, { text, n, t, onBack: showMyData });
+  renderLogReport(rootEl, { text, n, t, onBack: () => showMyData({ group: 'my-data' }) });   // its door is in Mijn gegevens
 }
 
-// "My data": where your data lives (pod/relay) + privacy + usage + key
-// management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
+// A settings group's screen (from Instellingen, the gear on Mij): the group's declared sections, painted by the one
+// painter map; without a group, the settings home.
 /**
  * The ADVANCED surface (the "default places for any new opId" rule): every op without a
  * bespoke screen, listed and reachable — no-arg ops run through the waist, arg-taking ops
@@ -4845,6 +4807,10 @@ function ensurePagePanel() {
 async function showMyData(opts) {
   // a settings group's screen (from the gear on Mij): the same sections and handlers, only that group's, in its order
   const group = typeof opts?.group === 'string' ? settingsGroupFor(basisManifest, opts.group) : null;
+  // every section lives in a group now: without one there is nothing to show but the groups themselves
+  if (!group) { showSettingsHome(); return; }
+  // a ceremony or wizard that closes comes back to the screen it was opened from
+  const again = () => showMyData(opts);
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = []; let companions = []; let companionsPending = null;
@@ -4855,22 +4821,21 @@ async function showMyData(opts) {
   // same capability, and the manifest stops describing what the buttons do.
   const onSignIn = () => Promise.resolve(rawCallSkill('basis', 'signin', {}))
     .catch((e) => globalThis.alert?.(e?.message ?? t('circle.mydata.pod_sign_in_failed')));
-  // launch the existing backup/restore wizards in a modal overlay; reveal
+  // launch the existing restore wizard in a modal overlay; reveal
   // the recovery phrase via the pinboard `getMnemonicOnce` skill (shown once).
-  const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // The recovery file: the circle list, sealed to the phrase — save it, or load it after a restore.
   const onExportRecovery = () => mountMyDataWizard(renderRecoveryExportWizard);
-  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => showMyData() });
+  const onImportRecovery = () => mountMyDataWizard(renderRecoveryImportWizard, { onDispatched: () => again() });
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
   const onReceivePersonas = () => showReceivePersonas();
   // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
   // so the tombstone shows.
-  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
+  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => again() });
   // The replace ceremony: retire every other device in one act, after a restore.
-  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); showMyData(); } });
-  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => showMyData() });
+  const onReplaceDevice = () => showReplaceDeviceFlow({ onClosed: () => { circleSealStrategies.clear(); again(); } });
+  const onClaimCompanion = () => showClaimCompanionFlow({ onClosed: () => again() });
   // "Make this device my primary contact address": announce this device's address in every circle with the
   // primary flag — others then deliver here first (sync-policy §12). Said back with the count that took it.
   const onMakePrimary = async () => {
@@ -4965,13 +4930,13 @@ async function showMyData(opts) {
     names: { ...Object.fromEntries((circlesCache ?? []).map((c) => [c.id, c.name ?? ''])), [OWN_USAGE_SCOPE]: t('circle.mydata.frequent_own') }, t,
     labelOf: (scope, key) => { if (scope !== OWN_USAGE_SCOPE) return null; const a = PLUS_ACTS.find((x) => x.id === key); return a ? plusLabel(t, a) : key; },
   });
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: group ? showSettingsHome : showMij,
-    only: group ? group.sections.map((sec) => sec.id) : null, groupTitle: group ? t(group.labelKey) : null,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showSettingsHome,
+    only: group.sections.map((sec) => sec.id), groupTitle: t(group.labelKey),
     frequent: frequentRows(), onClearFrequent: () => { actionFrequency.clear(); rerender(); },
-    // the doors that sat on Mij (declared in the manifest, `myDataActions`), and the week switch + version line that went with them
+    // the doors a group's sections open, and the week switch
     doors: { availability: showAvailability, points: showConnectionPoints, sharedWithMe: showSharedWithMe, blocked: showBlocked, logReport: showLogReport },
-    weekOverview, version: APP_VERSION,
-    onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
+    weekOverview,
+    onSignIn, onViewMnemonic, onRestore, onEnroll, onReceivePersonas, devicesNeedPhrase: circleHouseholdAgent?.hasRecoverySeal?.() === false, onExportRecovery, onImportRecovery, onReplaceDevice, onClaimCompanion, onMakePrimary, devices, onRevokeDevice, notifications, onToggleNotifications,
     // MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there. The picker's
     // rows come from the node itself and the shared projection; the grant is one op through the waist.
     companions,
@@ -5130,6 +5095,7 @@ function showSettingsHome() {
       rawCallSkill('basis', d.target.opId, { screen: 'settingsHome' })
         .then((r) => { if (r?.error) globalThis.alert?.(String(r.error)); }).catch(() => {});
     },
+    version: APP_VERSION,
   });
 }
 
@@ -5143,7 +5109,7 @@ function showSettingsCircleChooser() {
   });
 }
 
-// mount one of the existing wizard renderers (encrypted-backup / restore)
+// mount one of the existing wizard renderers (restore, recovery file, …)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('pinboard', …)`).
 function mountMyDataWizard(renderWizard, extra = {}) {
@@ -5791,7 +5757,7 @@ async function showReceivePersonas() {
     const row = document.createElement('label');
     row.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
     const box = document.createElement('input');
-    box.type = 'checkbox';
+    box.type = 'checkbox';   // sets: form — a persona this device receives
     box.dataset.personaId = p.id;
     box.addEventListener('change', () => { if (box.checked) picked.add(p.id); else picked.delete(p.id); });
     const name = document.createElement('span');
@@ -5946,7 +5912,7 @@ function showEnrollDeviceFlow({ needs = null } = {}) {
           const label = document.createElement('label');
           label.style.cssText = 'display:flex;gap:.4rem;align-items:center;margin:.2rem 0;';
           const box = document.createElement('input');
-          box.type = 'checkbox';
+          box.type = 'checkbox';   // sets: form — a persona the enrolled device holds
           box.checked = row.checked;
           box.dataset.personaId = row.id;
           box.addEventListener('change', () => {
@@ -6712,7 +6678,6 @@ async function showAvailability() {
     t,
     onChange: (patch) => { working = mergeAvailability(working, patch); rerender(); },
     onSave: async () => { await availabilityStore.update(working); showMyData({ group: 'connection' }); },
-    onHop: showHop,
   });
   rerender();
   showTabBar('mij');
@@ -6997,15 +6962,20 @@ function showCircle(id, circle, policy) {
   // The menu as it stands NOW: rebuilt when the availability lands and again when the sealed-media path resolves —
   // built once, before media resolved, it left the file entry out of the "+" for good while the composer had the
   // media pipeline all along (no photo could be attached in a circle).
+  // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
+  let circleBlockTypesNow = [];
   const circleAttachEntriesNow = () => attachEntriesFor({
     manifestsByOrigin: circleManifestsByOrigin ?? {},
     availability: circleAvailabilityNow,
     mediaWired: !!circleMedia,
+    blockTypes: circleBlockTypesNow,
   });
   (async () => {
     try {
       const av = await circleOpAvailability(id);
       circleAvailabilityNow = av;
+      // the circle's own screen's blocks, and any of the person's pages' blocks that show this circle (a lists block)
+      try { circleBlockTypesNow = [...blockTypesOnScreen(await recipeStore.get(id), DEFAULT_SCREEN_RECIPE), ...blockTypesShowingCircle(await userScreenStore.get(), id)]; } catch { circleBlockTypesNow = []; }
       // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
       // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
       // over whether it works. Gating it on the catalogue would hide a working affordance to guard
@@ -8128,9 +8098,11 @@ function showRecipeEditor(circleId) {
   // wires the per-block modal automatically.
   let incomingRecipe = null;
 
+  let circlePolicy;   // the circle's policy: the palette offers a feature's block only where that feature is on
   const refresh = async () => {
     try { book = await recipeStore.get(circleId); }
     catch { book = { recipes: [], activeId: null }; }
+    try { circlePolicy = (await policyStore.get(circleId)) ?? {}; } catch { circlePolicy = {}; }
     if (mode === 'recipe' && !book.recipes.some((r) => r.id === editingRecipeId)) {
       mode = 'book'; editingRecipeId = null;
     }
@@ -8160,7 +8132,7 @@ function showRecipeEditor(circleId) {
 
   const rerender = () => {
     renderRecipeEditor(rootEl, {
-      book, mode, editingRecipeId, t,
+      book, mode, editingRecipeId, t, policy: circlePolicy,
       // γ-next.recipe — broadcast cache → editor → γ.3 resolver.  The
       // resolver is opt-in; when `incomingRecipe` is null the editor
       // renders untouched.  Applied / discarded both clear the cache.
@@ -8498,13 +8470,9 @@ let _govRerender = null;
 // "A decision opened" is RENDERED from the proposal statement on the log (`governanceNotices.js`, through
 // `chatRows`) — the appended `gov-notif` nudge that used to live here is retired (2-TER's rule: no write
 // whose payload is derivable from an entry already on the log). `type: 'notification'` keeps its real job.
-function govBroadcast(channel, circleId, event, opts) {
-  const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-  const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
-  // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
-  // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
-  const to = Array.isArray(opts?.to) ? opts.to : undefined;
-  rawCallSkill('pinboard', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
+function govBroadcast(channel, circleId, statement, opts) {
+  // the one shared fan (governanceAppWiring); `rawCallSkill` is read at call time
+  return makeGovernanceBroadcast((...args) => rawCallSkill(...args))(channel, circleId, statement, opts);
 }
 
 // Remove a reported post/message when an admin ACTS on it (the §8 report host's `act` calls
@@ -9145,6 +9113,8 @@ async function boot() {
       settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
       // The outbox — held messages + the dead-address verdict — survives a reload (device-local, never the pod).
       outboxPersistDb: { dbName: 'cc-outbox-state', storeName: 'outbox' },
+      // Push subscriptions: their own device-local store (never the pod, never a sibling).
+      pinboardPushPersistDb: { dbName: 'cc-push-device', storeName: 'subscriptions' },
       // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle
       // params ride the user's OWN pod (not a device-local island): `attachInner` write-throughs the local
       // cache to `<pod>/basis/settings/…`, sealed to this agent's key. Not signed in → null → local-only
@@ -9359,32 +9329,8 @@ async function boot() {
       sources = circleSourcesFromAgent({ callSkill: resolveSkill, helpCircleName: () => helpCircleSpec(t).name });
       // Phase 5 — build the circle composer's bot now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
-      // register a peer-router with the circle-chat-message
-      // handler + connect the NKN transport (best-effort; no-op when
-      // nkn-sdk failed to load).  The ingest hook mirrors the envelope
-      // into pinboard's itemStore so circle chat history is durable,
-      // searchable, and mute/eviction-filtered (parity with /post
-      // delivery via `ingestRemotePost`).  EventLog append still drives
-      // the live bubble render.
-      const ingestCircleMessage = async (payload, fromPeerAddr) => {
-        try {
-          return await agent.callSkill('pinboard', 'ingestCircleMessage', {
-            payload, fromPeerAddr,
-          });
-        } catch (err) {
-          console.warn('[circleApp] ingestCircleMessage failed:', err?.message ?? err);
-          return { error: String(err?.message ?? err) };
-        }
-      };
-      // ε.1 — single normalization gate.  Every circle-chat insert
-      // path (receiver / rehydrator / future catch-up / pod) routes
-      // through this inbox so envelope validation + msgId dedup +
-      // ingest mirror + eventLog append happen in ONE place with
-      // shared state.  Sibling of `eventLog` so the rehydrator's
-      // backfill + the live NKN handler dedupe through the same LRU.
-      // Delivery honesty + repaint — SHARED by the legacy-envelope inbox and the signed-statement
-      // receive path (one set of side effects, not two): a LIVE inbound insert answers the sender with
-      // a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
+      // Delivery honesty + repaint for a signed chat statement that lands: a LIVE inbound insert answers the sender
+      // with a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
       const onCircleStored = ((sendReceipt) => (info) => {
           try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
           // …and REPAINT, because a message that arrived while the circle is open has to APPEAR.
@@ -9415,29 +9361,9 @@ async function boot() {
         }));
       // The Nearby room confirms what lands with the SAME receipt (nearbyRoomBinding.js).
       try { ensureNearbyRoom(agent)?.setLandedHook(onCircleStored); } catch { /* the room works without receipts */ }
-      const circleChatInbox = createChatMessageInbox({
-        eventLog,
-        ingest: ingestCircleMessage,
-        onStored: onCircleStored,
-        // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
-        // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
-        // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
-        resolveRef: circleResolveRef,
-        // "Did I write this?" — so a message of mine read back out of storage (boot rehydrate,
-        // catch-up, pod replay) comes back as MINE (`LOCAL_ACTOR`) instead of as a stranger's.
-        // Per-circle by construction; never consulted on the live receive path (chatSelfAuthor.js).
-        isSelfAuthored: createSelfAuthorCheck({
-          whoAmI: () => agent.callSkill('pinboard', 'whoAmI', {}),
-          circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-        }),
-        localActor: LOCAL_ACTOR,
-        logger: console,
-      });
-      // (the legacy plain-envelope receive is gone — every live chat message arrives as a SIGNED statement)
       // The SIGNED chat receive path (the content re-root): a fanned statement verifies at the agent's
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
-      // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
-      // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
+      // entry (bubble + proof) — the device log is the record — with the delivery receipt and the repaint.
       // THE LANE TABLE, built once for every shell (`buildCircleLanes`): the five signed lanes with
       // their catch-ups, plus the personal ones — grants, the roster seed, and the turns this person's
       // own devices hand each other. This shell passes only its own reactions: what to repaint, where
@@ -9476,21 +9402,9 @@ async function boot() {
       govCatchUpShell     = circleLanes.catchUps.gov;
       memCatchUpShell     = circleLanes.catchUps.membership;
       keyCatchUpShell     = circleLanes.catchUps.key;
-      taskCatchUpShell    = circleLanes.catchUps.task;
+      itemsCatchUpShell    = circleLanes.catchUps.task;
       chatCatchUpShell    = circleLanes.catchUps.chat;
       podChatCatchUpShell = circleLanes.catchUps.podChat;
-      // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log): the log is the record now
-      // (durable since the persistence slice), so the store-era history lands on it ONCE through the
-      // shared inbox and a device-local latch skips every later boot. The per-boot rehydrate is retired
-      // — this was its final job.
-      migrateCircleChatHistory({
-        callSkill: agent.callSkill,
-        inbox:     circleChatInbox,
-        marker: {
-          get: () => { try { return localStorage.getItem(CHAT_MIGRATION_MARKER_KEY); } catch { return null; } },
-          set: (v) => { try { localStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v); } catch { /* retried next boot */ } },
-        },
-      }).catch(() => { /* logged inside */ });
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
       // recipes per-circle; the editor pulls on mount + passes via
       // γ.3's `incomingRecipe` opt.
@@ -9539,7 +9453,6 @@ async function boot() {
             circlePolicyLane.apply(cid, govShellRail).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
           } }),
-          'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // Calendar INBOUND — receive what the fan-out sends. invite persists
           // the event locally (→ shows on the calendar surface) + a circle
           // heads-up; rsvp/cancel apply to local calendar state. (A richer
@@ -9639,7 +9552,7 @@ async function boot() {
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       refreshUnreadMyRefs();
-      // A noticeboard post from another member LANDS in the circle store through the task lane (one carry);
+      // A noticeboard post from another member LANDS in the circle store through the items lane (one carry);
       // the shell bridges it into pinboard's index + the notification — the same handler the old envelope fed.
       agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
         // …resonating with the drivers of the self this device is in that circle (a persona's circle is the persona's)
@@ -9748,7 +9661,7 @@ async function boot() {
           // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
           // address — the requestAll kick below walks the roster, still empty on an enrolling boot.
           contentPulls: (circleId, siblingAddress) => Promise.allSettled([
-            taskCatchUpShell?.requestFrom(siblingAddress, circleId),
+            itemsCatchUpShell?.requestFrom(siblingAddress, circleId),
             chatCatchUpShell?.requestFrom(siblingAddress, circleId),
           ]),
         };
@@ -9764,7 +9677,7 @@ async function boot() {
           return r;
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         agent.bootstrapFromStashedOffer();
-        taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        itemsCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The shipped contact, once: added through the scanned-card path if the card is set and the
         // person is not in the book yet.

@@ -31,6 +31,7 @@
  * needs the booted agent's callSkill/sendPeerMessage — is attached after boot). No
  * production code changed; this uses only already-exported seams.
  */
+import { flushPendingSaves } from '@onderling/local-store';
 
 import { InternalBus, InternalTransport } from '@onderling/core';
 import {
@@ -75,10 +76,9 @@ import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
-import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
+import { makeItemsPeerHandler, ITEMS_BROADCAST } from '../../src/v2/itemsRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier, makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
@@ -126,7 +126,7 @@ export async function until(pred, { timeout = 4000, step = 10 } = {}) {
 const LIVE_NODES = new Set();
 
 /**
- * `taskLane: true` composes a DEVICE LOG into this node and registers the task-lane receiver, so item
+ * `itemsLane: true` composes a DEVICE LOG into this node and registers the items-lane receiver, so item
  * writes ride the signed lane instead of the legacy unsigned mirror — the production carry on both shells.
  *
  * It is opt-in rather than the harness default ON PURPOSE. A device log also turns on the membership
@@ -139,10 +139,10 @@ const LIVE_NODES = new Set();
  * makes — so an address-revoke fanned to it lands; two walks had wired that by hand. The full suite
  * stayed green: the equilibrium tests keep the minimal composition, which has no rail.)
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false, contactChannel = false, pairRoster: wantPairRoster = true } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, itemsLane = false, contactChannel = false, pairRoster: wantPairRoster = true } = {}) {
   const routerRef = { fn: null };
   // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
-  const deviceLog = taskLane ? new EventLog({ initial: [], muted: [] }) : null;
+  const deviceLog = itemsLane ? new EventLog({ initial: [], muted: [] }) : null;
   const received = [];
   // A sealed circle's log carries key-events + sealed content over the real transport. Key-events are recorded
   // by the PRODUCTION receive handler (`makeHandleGroupKeyEvent`) into the PRODUCTION per-circle key-event log
@@ -174,7 +174,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // A fresh, code-minting REAL circle must show only real members — keep demo
     // scaffolding off so rosters carry exactly the creator + real joiners.
     seedDemoData: false,
-    // Opt-in (see `taskLane` above): with a device log the factory builds the task rail + emitter, and
+    // Opt-in (see `itemsLane` above): with a device log the factory builds the items rail + emitter, and
     // the publish valve routes every item write onto the signed lane instead of the unsigned mirror.
     ...(deviceLog ? { deviceLog } : {}),
     // Per-test agent options, threaded straight into the production factory. The one this exists
@@ -193,17 +193,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const pendingMap = new Map();
   const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
-  // The REAL circle-chat receiver — the exact wiring circleApp.js uses (inbox + peer handler).
-  // The harness previously had NO 'circle-chat-message' handler, so chat fell to the defaultHandler
-  // stub: the blind spot that let a broken chat-receive pass node tests. Wire it for real.
+  // The circle chat's device log — what the chat rail below lands each verified statement on (the shells' wiring).
   const chatEventLog = new EventLog({ initial: [], muted: [] });
-  const chatInbox = createChatMessageInbox({
-    eventLog: chatEventLog,
-    // The MIGRATION gate only (the store copy's one-time carry-over): live receive is the signed
-    // statement path below.
-    ingest: (payload, fromPeerAddr) => callSkill('pinboard', 'ingestCircleMessage', { payload, fromPeerAddr }),
-    logger: QUIET,
-  });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
   // key↔ref binding) and lands as the ONE render entry. The harness's LEGACY pairing records no
   // circleAddress roster rows, so the DEFAULT binding here resolves through the live in-process node
@@ -286,7 +277,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     },
     identityOf: (addr) => agent.identityOfAddress?.(addr) ?? addr,
     announceOwn: (cid) => announceOwnCircleAddress({ agent, circleId: cid, logger: QUIET }),
-    myHandle: () => label.toLowerCase(),
+    // the handle this person joins under, as the shells read it (their own whoAmI handle), not the node's label
+    myHandle: async () => { try { return (await agent.callSkill('pinboard', 'whoAmI', {}))?.handle ?? null; } catch { return null; } },
     logger: process.env.PAIR_ROSTER_LOUD ? console : QUIET,
   });
   const contactThreadChannel = contactChannel
@@ -404,12 +396,13 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
         onChange: (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); },
       });
     })(),
-    'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: chatEventLog }),
-    // The task lane's receive half — the same registration both shells make (`circleApp.js` /
+    // a report is a signed statement on the same governance rail (this node's log, the same binding source)
+    'circle-report-broadcast':     makeCircleReportPeerHandler({ rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }) }),
+    // The items lane's receive half — the same registration both shells make (`circleApp.js` /
     // `ChatScreen.js`), over the rail the factory built on this node's device log. Its ingest verifies
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
-    ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+    ...(agent.itemsRail ? { [ITEMS_BROADCAST]: makeItemsPeerHandler({ rail: agent.itemsRail }) } : {}),
     // …and the person's own scope's catch-up between their devices, as the lane table registers it.
     ...(agent.ownStoreSync ? {
       [agent.ownStoreSync.subtypes.request]: agent.ownStoreSync.onRequest,
@@ -488,7 +481,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, pairRoster, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatRail, chatCatchUp, membershipCatchUp, deviceLog, contactThreadChannel, contactTurnsSeen, contactTurnsRefused, notedPeers, returned, _routerRef: routerRef };
   nodeRef.current = node;
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
@@ -881,6 +874,9 @@ export async function readRoster(node, groupId) {
 /** Best-effort shutdown of the underlying secure-mesh agents. */
 export async function teardown(...nodes) {
   for (const n of nodes) { try { LIVE_NODES.delete(n); } catch { /* */ } }
+  // what every shell does when it goes away (the box on stop, web on pagehide, mobile on background): the saves still
+  // waiting on their debounce are made now — else a node booted next on the same disk can miss the last write
+  try { await flushPendingSaves(); } catch { /* defensive */ }
   for (const n of nodes) {
     try { await n?.agent?.sa?.shutdown?.(); } catch { /* defensive */ }
   }

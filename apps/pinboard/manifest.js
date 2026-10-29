@@ -16,14 +16,14 @@
  *
  * Admin-only flows (`createGroupV2`, `editGroupRules`, `removeMember`,
  * `rotateMyGroupCode`, `postAnnouncement`) and plumbing
- * (`encryptedBackup`, `startPodSignIn`, attachments,
+ * (`startPodSignIn`, attachments,
  * push subscription, contact-QR exchange, …) stay un-manifested in D.1
  * — they are not slash-natural and the chat surface doesn't need
  * them.  They can be added in a follow-on D.x slice if the LLM layer
  * (D.2) wants tool-call access.
  *
  * F-SP1-a — every pinboard itemType is app-local (`ask`/`offer`/`lend`/
- *           `report`/`group-rules`/`rules-accept`/`group-leave`/
+ *           `report`/`group-rules`/`group-leave`/
  *           `request`) — none are canonical in `@onderling/item-types`.
  *           Permitted by `validateManifest`.
  * F-SP1-e — non-canonical verbs used here: `report`, `mute`, `set`,
@@ -53,8 +53,7 @@
  *
  * `surfaces.slash.match` is provided for ops whose body is a single
  * scalar (text/itemId/reason); ops requiring two-arg bodies
- * (`assignLend({itemId, borrowerWebid})`,
- * `setPeerReveal({peerWebid, showDisplayName})`) declare the slash
+ * (`assignLend({itemId, borrowerWebid})`) declare the slash
  * `command` only (no `match` parser); they remain reachable as
  * pure-command shells that surface the form / picker in the consumer.
  *
@@ -83,7 +82,6 @@ const ITEM_TYPES = [
   'lend',
   'report',
   'group-rules',
-  'rules-accept',
   'group-leave',
   'request',  // legacy V0 — preserved for back-compat
   // ── Part G dissolve (2026-06-17) — app-local types the chat-shell
@@ -366,7 +364,7 @@ export const pinboardManifest = {
           // positional slash → always needsForm at resolveDispatch.
           // The consumer's composer surfaces the form/picker UI; slash
           // bodies are line-oriented and can't bind two positional
-          // args cleanly.  Same pattern setPeerReveal uses.
+          // args cleanly.
           command: '/lend-assign',
           shape:   '/lend-assign <itemId> <borrower-webid>',
         },
@@ -403,69 +401,6 @@ export const pinboardManifest = {
           },
         },
         ui: { control: 'button', labelKey: 'circle.button.pinboard.markReturned' },
-      },
-    },
-
-    // ── Moderation ──────────────────────────────────────────────────
-    {
-      id:   'reportPost', visibility: 'authenticated',
-      circleScoped: true,
-      verb: 'report',  // F-SP1-e: non-canonical.  Resolved 2026-05-21
-                       // (owner): kept `report` (truer to intent).
-                       // Squeezing into canonical `add` would obscure
-                       // the action's nature.
-      writes: { scope: 'circle' },
-      appliesTo: { type: 'report' },
-      params: [
-        // Part G dissolve (2026-06-17) — `/report` was in BOTH manifests;
-        // the former mock added a `pickerSource` (label→id) + a row button.
-        { name: 'itemId', kind: 'string', required: true, ...ID_NONEMPTY,
-          pickerSource: { listOp: 'listFeed' } },
-        { name: 'reason', kind: 'string', ...STR_NONEMPTY },  // optional but if present must be non-empty
-      ],
-      surfaces: {
-        chat:  { hint: 'File a report on another item; visible to admins of the group.' },
-        slash: {
-          // Collision-free.  No NL synonym in V0; UI calls it
-          // "rapporteer".
-          command: '/report',
-          match: {
-            body:    'match',
-            onEmpty: { skillId: 'reportPost', args: {} },
-          },
-        },
-        ui: { control: 'button', labelKey: 'circle.button.pinboard.reportPost' },
-      },
-    },
-    // ── Profile / reveals ───────────────────────────────────────────
-    {
-      id:   'setPeerReveal', visibility: 'authenticated', group: 'compose',
-      verb: 'set',  // F-SP1-e: non-canonical — local-only reveal flag.
-      writes: { scope: 'device' },   // a reveal flag kept on this device
-      // Part G dissolve (2026-06-17) — `/reveal` was a COLLISION: the real
-      // op is `setPeerReveal`; the former mock declared `revealPeer` (a
-      // SEMANTIC alias of setPeerReveal via PINBOARD_OP_ALIAS) on the SAME
-      // `/reveal` command.  Resolved by keeping ONE op — `setPeerReveal`
-      // — with the RICHER mock `/reveal` slash (`body: 'flags'`, so
-      // `/reveal <peer> --action=on` parses the flag).  The `revealPeer`
-      // op AND its PINBOARD_OP_ALIAS entry are DROPPED (the op is gone).
-      //
-      // PARAMS keep the chat-shell presentation vocab (`peer` + `action`
-      // on|off) — the realAgent adapter's `peer→peerWebid` +
-      // `action→reveal(boolean)` transforms are KEPT (legitimate
-      // presentation→storage mapping, NOT a redundant rename).  The
-      // adaptPinboardReply branch now keys on `setPeerReveal`.
-      params: [
-        { name: 'peer',   kind: 'string', required: true, ...STR_NONEMPTY },
-        { name: 'action', kind: 'enum', of: ['on', 'off'], required: false },
-      ],
-      surfaces: {
-        chat:  { hint: 'reveal (or hide) a peer\'s real name' },
-        slash: {
-          command: '/reveal',
-          shape:   '/reveal <peer-webid> [on|off]',
-          body:    'flags',
-        },
       },
     },
 
@@ -775,16 +710,6 @@ export const pinboardManifest = {
 
     // ── Cluster C wizards — customRenderer ──
     {
-      id:   'restoreFromMnemonicWizard', visibility: 'private', verb: 'submit',
-      writes: { scope: 'device' },   // restores the identity onto this device
-      params: [],
-      surfaces: {
-        slash: { command: '/restore-from-mnemonic' },
-        chat:  { hint: 'recover from a saved mnemonic phrase (DESTRUCTIVE)' },
-        page:  { kind: 'side-panel', title: 'Restore identity' },
-      },
-    },
-    {
       id:   'conflictDisputeWizard', visibility: 'authenticated',
       circleScoped: false, verb: 'add',
       writes: { scope: 'circle' },
@@ -812,15 +737,6 @@ export const pinboardManifest = {
         slash: { command: '/post-audience', body: 'flags' },
         chat:  { hint: 'post with audience targeting (trust + tags + distance)' },
         page:  { kind: 'side-panel', title: 'Post with audience' },
-      },
-    },
-    {
-      id:   'encryptedBackupWizard', visibility: 'private', verb: 'list',
-      params: [],
-      surfaces: {
-        slash: { command: '/encrypted-backup' },
-        chat:  { hint: 'download a passphrase-encrypted snapshot of your data' },
-        page:  { kind: 'side-panel', title: 'Encrypted backup' },
       },
     },
     {
@@ -992,16 +908,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'getInterestProfile', visibility: 'authenticated', verb: 'list',
-      // Derived ON THE DEVICE from this person's own reading and posting. It leaves the device only
-      // through an explicit disclosure act, never as a side effect of someone reading their profile.
-      params: [],
-      surfaces: {
-        chat: { hint: "The interest profile derived locally from this person's own activity." },
-        ui:   { control: 'page' },
-      },
-    },
 
     // ── Waking a device ─────────────────────────────────────────────
     // Registration only. WHETHER something may wake you is the recipient's own attention setting,
@@ -1089,16 +995,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'encryptedBackup', visibility: 'authenticated', verb: 'list',
-      // Returns a SEALED archive. The passphrase never leaves the device and is not stored — losing it
-      // loses the archive, which is the point: nobody else can open it either.
-      params: [{ name: 'passphrase', kind: 'secret', required: true }],
-      surfaces: {
-        chat: { hint: "Produce a passphrase-sealed backup of this person's data." },
-        ui:   { control: 'button' },
-      },
-    },
 
     // ── Reading a circle back ───────────────────────────────────────
     // The catch-up reads. Each is scoped to ONE circle on purpose: you fetch the circle you are in,
@@ -1119,18 +1015,6 @@ export const pinboardManifest = {
       ],
       surfaces: {
         chat: { hint: 'Posts in one circle since a timestamp — the bulletin catch-up.' },
-        ui:   { control: 'page' },
-      },
-    },
-    {
-      id:   'listCircleChats', visibility: 'authenticated', verb: 'list',
-      params: [
-        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'sinceTs', kind: 'number' },
-        { name: 'limit',   kind: 'number' },
-      ],
-      surfaces: {
-        chat: { hint: 'Chat messages in one circle, newest first, optionally since a timestamp.' },
         ui:   { control: 'page' },
       },
     },
@@ -1567,7 +1451,7 @@ export const pinboardManifest = {
       },
     },
     {
-      id:   'broadcastCircleTask', visibility: 'authenticated', verb: 'share',
+      id:   'broadcastCircleItems', visibility: 'authenticated', verb: 'share',
       writes: { scope: 'circle' },
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1576,7 +1460,7 @@ export const pinboardManifest = {
         { name: 'ts',      kind: 'number' },
       ],
       surfaces: {
-        chat: { hint: 'Fan a task statement to a circle.' },
+        chat: { hint: 'Fan an item statement to a circle.' },
         ui:   { control: 'page' },
       },
     },
@@ -1645,34 +1529,6 @@ export const pinboardManifest = {
         ui:   { control: 'page' },
       },
     },
-    {
-      id:   'ingestCircleMessage', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      params: [
-        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'payload',      kind: 'object', required: true },
-      ],
-      resolves: [{ field: 'text', policy: 'content' }],
-      surfaces: {
-        chat: { hint: 'Ingest a circle message from an authenticated peer.' },
-        ui:   { control: 'page' },
-      },
-    },
-    {
-      id:   'ingestRemotePost', visibility: 'authenticated', verb: 'add',
-      writes: { scope: 'circle' },
-      params: [
-        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
-        { name: 'payload',      kind: 'object', required: true },
-      ],
-      resolves: [{ field: 'text', policy: 'content' }],
-      surfaces: {
-        chat: { hint: 'Ingest a bulletin post from an authenticated peer.' },
-        ui:   { control: 'page' },
-      },
-    },
   ],
 
   // first pinboard web page via renderWeb.
@@ -1683,20 +1539,10 @@ export const pinboardManifest = {
   // as the smallest read-only page (66 lines) — perfect fit for
   // `view.readOnly: true`.  Contacts (417 lines, heavy mutations) and
   // profile (591 lines, form-heavy) defer to later E.x slices.
-  // third pinboard web page via renderWeb:
-  // `settings.html` (per-device + per-actor preferences).  Picked over
-  // profile/contacts as the next-smallest-after-privacy + a clean fit
-  // for the existing contract: `getSettings({})` is a param-free
-  // dataSource skill (perfect fit) and the per-field mutations
-  // (`updateSettings({patch})`, `setHopMode({global})`) live outside
-  // the D.1 manifest as profile/plumbing skills (gap #4 territory).
-  // Profile (591 lines — avatar resize / mnemonic / geocoding / backup,
-  // many runtime-arg skills) and contacts (417 lines, heavy mutations)
-  // defer to later E.x slices.
   //
   // Pinboard has 16 web pages today (per Project Files/projects/audit-pinboard-folio-surfaces.md).
-  // After E.3, THREE pages are NavModel-driven (`mine.html`,
-  // `privacy.html`, `settings.html`); 13 pages remain hand-built
+  // TWO pages are NavModel-driven (`mine.html`, `privacy.html`; the
+  // settings page was removed with pinboard's settings); the rest remain hand-built
   // (`index.html` noticeboard, `chat.html`, `contacts.html`,
   // `create-group.html`, `group.html`, `profile.html`, `onboard.html`,
   // `sign-in.html`, `auth-callback.html`, `push.html`, `restore.html`,
@@ -1766,51 +1612,6 @@ export const pinboardManifest = {
   // section's `itemActions[]` — the page IGNORES them (privacy
   // renders text sections + key/value rows, not items).
   //
-  // ──── E.3 — settings view ──────────────────────────────
-  //
-  // `settings.html` is a per-actor + per-device preferences page:
-  // poll-interval (device), hop-relay (device), online-window (device),
-  // broadcastable + defaultShareLocation (shared / per-actor).  Read
-  // path = `getSettings({})` — perfect fit for `fetchSectionItems`'s
-  // static-args contract.  Mutation paths are the per-field skills
-  // (`updateSettings({patch})`, `setHopMode({global})`) — neither is
-  // in the D.1 manifest (they're profile/plumbing skills, outside the
-  // "primary chat/slash flows" set per D.1 line 14).  Same dataSource-
-  // outside-manifest gap #4 territory as privacy.
-  //
-  // The `settings` view's `type: 'group-rules'` is a placeholder
-  // (same pattern privacy uses) — `validateView` pins type ∈
-  // manifest.itemTypes, but the section's actual data is a SINGLETON
-  // record (settings object), not a list of items. substrate
-  // signal: NavModel sections assume `Array<item>`; "singleton-record"
-  // views (settings / profile / current-status) don't fit that shape
-  // cleanly. See substrate signals below.
-  //
-  // No `readOnly: true` — the page mutates via the per-field handlers.
-  // But because the per-field skills aren't manifest ops, NO creative-
-  // verb affordances surface here regardless of the readOnly flag (
-  // only auto-surfaces ops with surfaces.ui or add/register verbs).
-  // The wildcard `cancelRequest` itemAction surfaces in this section's
-  // itemActions[] (rule) — the page IGNORES it (settings renders a
-  // singleton record + per-field toggles, not items).
-  //
-  // ──── substrate signals surfaced by E.3 ──────────────────────
-  //   5. NavModel sections assume `Array<item>` data.  Settings is a
-  //      SINGLETON record (one merged object: per-device + per-actor
-  //      fields).  Today this works — `getSettings({})` returns
-  //      `{settings: {...}}` and the page extracts `.settings`
-  //      directly — but `fetchSectionItems`'s "items extraction"
-  //      contract doesn't apply. candidate: `view.shape:
-  //      'record'` flag, or a `dataSource.extract: 'settings'` path
-  //      that the helper honours, so adapters can render record views
-  //      without app-side special-casing.
-  //   6. Mutation paths for record-shaped views are per-field skills
-  //      (`updateSettings({patch})`, `setHopMode({global})`), not
-  //      add/remove of items. The current creative-verb model
-  //      doesn't have a slot for "patch a settings field"; manifest
-  //      ops would need a `verb: 'patch'` (non-canonical) or a new
-  //      `view.fields[].opId` schema.  Deferred — current pages drive
-  //      these directly until has a real signal-rich consumer.
   views: [
     {
       id:     'mine',
@@ -1835,72 +1636,6 @@ export const pinboardManifest = {
         skillId:         'getPrivacyNotice',
         argsFromContext: { lang: '$lang' },
       },
-    },
-    {
-      id:    'settings',
-      title: 'Instellingen',
-      type:  'group-rules',  // placeholder; settings is singleton-record,
-                             // not a list of group-rules items.
-      // (adopted 2026-05-21) — shape: 'record' marks this
-      // section as a singleton.  Adapter expects ONE record from
-      // `getSettings`, not an array — matches the reality of the
-      // settings page.
-      shape:       'record',
-      dataSource:  { skillId: 'getSettings' },
-      // (adopted 2026-05-22) — declare a representative
-      // subset of editable fields with patch declarations.  The
-      // settings.html UI is rich (localisation + per-field custom UX); the
-      // manifest is the source-of-truth for WHICH fields exist +
-      // their patch ops, but UI rendering stays hand-coded.
-      //
-      // signal — wrapped-patch convention: `updateSettings`
-      // takes `{patch: {<key>: <value>}}` (nested arg). 's
-      // `{opId, argName}` model is FLAT — for updateSettings-backed
-      // fields, `argName` is the settings-key name (semantic);
-      // adapter wraps in `{patch: {...}}` on dispatch.  A future
-      // could add `patch.argWrapper: 'patch'` to make this
-      // explicit in the substrate.
-      fields: [
-        {
-          name:     'hopThrough',
-          type:     'boolean',
-          label:    'Hop-relay (globaal)',
-          // localisation key for Dutch-first surfaces. Consumer
-          // side resolution; falls back to `label` if unknown.
-          labelKey: 'settings.hop_label',
-          // setHopMode takes `{global: <bool>}` directly — fits.
-          patch:    { opId: 'setHopMode', argName: 'global' },
-        },
-        {
-          name:     'pollIntervalMs',
-          type:     'enum',
-          label:    'Hoe vaak het prikbord ververst',
-          labelKey: 'settings.poll_interval_label',
-          choices:  [2000, 10000, 60000, 300000],
-          // Wrapped-patch convention: dispatch is
-          // `updateSettings({patch: {pollIntervalMs: <value>}})`.
-          // Adapter knows the convention; manifest stays semantic.
-          patch:    { opId: 'updateSettings', argName: 'pollIntervalMs' },
-        },
-        {
-          name:     'broadcastable',
-          type:     'boolean',
-          label:    'Auto-skill-match',
-          labelKey: 'settings.broadcastable_label',
-          patch:    { opId: 'updateSettings', argName: 'broadcastable' },
-        },
-        {
-          name:     'defaultShareLocation',
-          type:     'boolean',
-          label:    'Standaard locatie delen met nieuwe contacten?',
-          labelKey: 'settings.default_share_location_label',
-          patch:    { opId: 'updateSettings', argName: 'defaultShareLocation' },
-        },
-        // Other settings.html fields (online-every, online-duration,
-        // …) remain to be declared.  Pattern is the same; not
-        // surfacing all 8+ in this commit to keep the -adopt
-        // proof small.  Forward-additive extensions land per-field.
-      ],
     },
 
     // ──── E.4 — profile view (adopt) ─────────────────────────────
@@ -1927,7 +1662,7 @@ export const pinboardManifest = {
     // matches the established convention for record-shape views.
     //
     // `dataSource: { skillId: 'getMyProfile' }` — `getMyProfile()`
-    // returns `{entry, renderForCurrentGroup}`; the page already
+    // returns `{entry}`; the page already
     // extracts `.entry` (line 208 of profile.html: `r?.entry?.handle`).
     // Same "page extracts the record key from the envelope" pattern
     // settings uses with `.settings`.
@@ -1965,10 +1700,9 @@ export const pinboardManifest = {
     //  10. `location` is also list-/wizard-shape (search → preview →
     //      confirm) with an intermediate geocode skill call. No
     //      slot for "multi-step mutation".  Stays hand-coded.
-    //  11. `mnemonic` + `encryptedBackup` are SECURITY-sensitive
-    //      one-shot reveals (mnemonic shows once) + dangerous-action
-    //      flows (backup needs a passphrase). has no notion of
-    //      "consent gate" or "one-shot read".  Stays hand-coded.
+    //  11. `mnemonic` is a SECURITY-sensitive one-shot reveal (it
+    //      shows once). has no notion of "consent gate" or
+    //      "one-shot read".  Stays hand-coded.
     //
     // None of these block E.4: the -adopt proof-point is the
     // record + 3 flat fields.  The signals are forward-additive
@@ -1979,7 +1713,7 @@ export const pinboardManifest = {
       type:  'group-rules',  // placeholder; profile is singleton-record,
                              // not a list of group-rules items.
       // shape: 'record' marks this section as a singleton.
-      // `getMyProfile` returns `{entry, renderForCurrentGroup}`; the
+      // `getMyProfile` returns `{entry}`; the
       // page extracts `.entry` (mirrors settings's `.settings` envelope
       // extraction).
       shape:       'record',
@@ -2021,12 +1755,11 @@ export const pinboardManifest = {
           readSkill: { skillId: 'getHolidayMode' },
           // setHolidayMode takes `{on: <bool>}` directly — argName
           // is the *skill arg* (`on`), not the field-on-entry name
-          // (`holidayMode`).  Same semantic split settings's
-          // hopThrough → setHopMode({global}) uses.
+          // (`holidayMode`).
           patch:    { opId: 'setHolidayMode', argName: 'on' },
         },
         // Other profile.html fields (avatar, skills[], location,
-        // mnemonic, encryptedBackup, my-pods) stay hand-coded — see
+        // mnemonic, my-pods) stay hand-coded — see
         // signals (7–11) above. Forward-additive: any of them
         // can land per-field when the substrate has a fit.
       ],
@@ -2035,7 +1768,7 @@ export const pinboardManifest = {
     // ──── Part G dissolve (2026-06-17) — feed + contacts views ──────────
     // Folded in from the former mockPinboardManifest.  APPENDED after the
     // E.x web-page views so the existing navmodel section order
-    // (mine/privacy/settings/profile) is unchanged.  `validateView` pins
+    // (mine/privacy/profile) is unchanged.  `validateView` pins
     // `view.type ∈ manifest.itemTypes`; 'post' + 'contact' are declared
     // as app-local types above.
     { id: 'feed',     title: 'Feed',     type: 'post' },

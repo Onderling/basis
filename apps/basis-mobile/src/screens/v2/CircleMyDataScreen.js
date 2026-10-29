@@ -3,9 +3,9 @@
  *
  * RN mirror of web's circleMyData: where your data lives (getDataLocation +
  * podSignInStatus), the getPrivacyNotice disclosure, a getMetrics usage snapshot,
- * and the S5 key-management actions (back up · reveal recovery phrase · restore).
+ * and the S5 key-management actions (reveal recovery phrase · restore).
  * Self-contained: loads + mutates via the injected pinboard-capable `callSkill`.
- * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
+ * The restore flow reuses the existing RN wizard modal — no reimpl.
  */
 import Btn from './Btn.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,7 +42,6 @@ import { CONNECTION_MANIFESTS } from '../../../../basis/src/v2/connectionManifes
 import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
 import UserLlmSettings from './UserLlmSettings.js';
-import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import RecoveryFileWizardModal from '../../../../basis/src/rn/wizards/recoveryFileWizardModal.js';
 import { historyStatusLine } from '../../../../basis/src/v2/historyMirror.js';
@@ -58,11 +57,8 @@ import { deviceDelegationsOf, ownedNodesOf } from '@onderling/agent-registry';
 // MY AGENTS — what another agent may do on a node the person owns: the picker read and the grant's line are shared with web.
 import { loadCompanionGrantPicker, companionGrantText, loadCompanionGrantRows, companionRevokeText, pendingRevokeLine } from '../../../../basis/src/v2/companionGrant.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
-import { myDataActionsMobile } from '../../../../basis/src/v2/meActionProjection.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 import { personWeekOn, switchPersonWeek } from '../../../../basis/src/v2/personWeekOverview.js';
-import { versionLine } from '../../../../basis/src/v2/versionLine.js';
-import Constants from 'expo-constants';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
@@ -109,7 +105,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
   const [signInErr, setSignInErr] = useState('');
   const [privacy, setPrivacy] = useState([]);
   const [metrics, setMetrics] = useState({});
-  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | 'receive-personas' | null
+  const [wizard, setWizard] = useState(null);          // 'restore' | 'enroll' | 'receive-personas' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
   const [companions, setCompanions] = useState([]);    // the nodes this person owns: [{node, short}]
   const [companionsPending, setCompanionsPending] = useState(null);   // "intrekken onderweg bij n companion(s)", or null
@@ -482,7 +478,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           <Section title={t('circle.profile.week_switch')}>
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
-              <Switch testID="profile-week-toggle" value={weekOn === true} disabled={weekOn === null} onValueChange={() => toggleWeek()} />
+              <Switch /* sets: store:person-clock — your own week overview */ testID="profile-week-toggle" value={weekOn === true} disabled={weekOn === null} onValueChange={() => toggleWeek()} />
             </View>
           </Section>
         ) : null}
@@ -511,7 +507,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           {push.supported ? (
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>
-              <Switch testID="mydata-notif-toggle" value={push.granted === true} onValueChange={() => toggleNativePush()} />
+              <Switch /* sets: device:push — this phone's push permission */ testID="mydata-notif-toggle" value={push.granted === true} onValueChange={() => toggleNativePush()} />
             </View>
           ) : null}
         </Section>
@@ -602,7 +598,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
               <Text style={styles.switchLabel}>
                 {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
               </Text>
-              <Switch testID="address-sharing-toggle" value={shareNknAddress === true} onValueChange={() => toggleShareAddress()} />
+              <Switch /* sets: param:privacy.shareNknAddress — your global address */ testID="address-sharing-toggle" value={shareNknAddress === true} onValueChange={() => toggleShareAddress()} />
             </View>
           </Section>
         ) : null}
@@ -769,414 +765,423 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
         </Section>
       </>
     ),
-  };
-
-  if (Array.isArray(only)) {
-    return (
-      <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
-        <View style={styles.header}>
-          {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
-          <Text style={styles.title}>{groupTitle ?? t('circle.mydata.title')}</Text>
-        </View>
-        {only.map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}
-      </ScrollView>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-mydata">
-      <View style={styles.header}>
-        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
-        <Text style={styles.title}>{t('circle.mydata.title')}</Text>
-      </View>
-
-      {/* the doors that sat on Mij: availability · connection points · shared with me · blocked (web: circleMyData.js) */}
-      {myDataActionsMobile(basisManifest, doors).length ? (
-        <Section title={t('circle.profile.mydata_more')}>
-          {myDataActionsMobile(basisManifest, doors).map((d) => (
-            <Pressable key={d.id} style={styles.relaySave} onPress={d.open} testID={`mydata-door-${d.id}`}>
-              <Text style={styles.relaySaveText}>{t(d.labelKey)}</Text>
-            </Pressable>
-          ))}
-        </Section>
-      ) : null}
-      <Section title={t('circle.mydata.storage')}>
-        <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
-        {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
-        {!podSignedIn && (
-          <Text style={styles.relayHint} testID="pod-local-consequence">
-            {t('circle.mydata.pod_local_consequence')}
-          </Text>
-        )}
-        {dataLocation.podRoot ? <KV k={t('circle.mydata.pod_root')} v={dataLocation.podRoot} /> : null}
-        {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
-        {podCapable && !podSignedIn && (
-          <View style={styles.signin}>
-            <TextInput
-              style={styles.signinInput}
-              value={issuer}
-              onChangeText={setIssuer}
-              placeholder={t('circle.mydata.pod_issuer')}
-              placeholderTextColor={theme.color.inkSoft}
-              autoCapitalize="none"
-              autoCorrect={false}
-              testID="mydata-pod-issuer"
-            />
-            <Pressable style={[styles.action, signingIn && styles.actionMuted]} onPress={doSignIn} disabled={signingIn} testID="mydata-pod-signin">
-              <Text style={styles.actionLabel}>{signingIn ? t('circle.mydata.pod_connecting') : t('circle.mydata.pod_sign_in')}</Text>
-            </Pressable>
-            {signInErr ? <Text style={styles.signinErr}>{signInErr}</Text> : null}
-          </View>
-        )}
-        {podCapable && podSignedIn && (
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={doSignOut} testID="mydata-pod-signout">
-            <Text style={styles.actionMutedLabel}>{t('circle.mydata.pod_signout')}</Text>
-          </Pressable>
-        )}
-      </Section>
-
-      <Section title={t('circle.mydata.keys')}>
-        <Pressable style={styles.action} onPress={() => setWizard('backup')} testID="mydata-backup">
-          <Text style={styles.actionLabel}>{t('circle.mydata.backup')}</Text>
-        </Pressable>
-        <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
-          <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
-        </Pressable>
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
-        </Pressable>
-        {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
-        </Pressable>
-        {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
-        </Pressable>
-        {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
-        <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
-          <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
-        </Pressable>
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
-        </Pressable>
-        {/* The replace ceremony: after a restore, retire every other device in one act. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
-        </Pressable>
-        {/* A companion node of your own: claim it with the line it prints in its log. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
-          <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
-        </Pressable>
-        {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
-        {agent?.identityLinks ? (
-          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
-            <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
-          </Pressable>
-        ) : null}
-        {botLink ? (
-          <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
-            {!botLink.view?.bot?.ok ? (
-              <View>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
-                <TextInput
-                  style={styles.relayInput}
-                  value={botLink.text}
-                  onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  testID="mydata-link-bot-input"
-                />
-                {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
-              </View>
+    'devices': () => (
+      <>
+        {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
+            no door. The revoke button opens the phrase-proven ceremony for that device. */}
+        {devices.length > 0 && (
+          <Section title={t('circle.mydata.devices')}>
+            {/* without the recovery seal this device carries nothing of the person's own scope to the others */}
+            {agent?.hasRecoverySeal?.() === false ? (
+              <Text style={styles.privacyBody} testID="mydata-devices-needs-phrase">{t('circle.mydata.devices_needs_phrase')}</Text>
             ) : null}
-            {botLink.view?.bot?.ok && !botLink.made ? (
-              <View>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
+            {devices.map((d) => (
+              <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
+                  {d.label || d.deviceId}
+                </Text>
+                {!d.revoked && (
+                  <Pressable onPress={() => setRevokeTarget(d.deviceId)} testID={`mydata-revoke-${d.deviceId}`}>
+                    <Text style={styles.actionMutedLabel}>{t('circle.revoke.title')}</Text>
+                  </Pressable>
+                )}
+              </View>
+            ))}
+          </Section>
+        )}
+      </>
+    ),
+    'agents': () => (
+      <>
+        {/* MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there: "give
+            access" asks the node what it can give, then who (a contact — a bot linked above is one) and the ticks. Web
+            parity: circleMyData.js. */}
+        {companions.length > 0 && (
+          <Section title={t('circle.companionGrant.nodes')}>
+            {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
+            {companions.map((c) => {
+              const open = grant?.node === c.node ? grant : null;
+              const picker = open?.picker ?? null;
+              return (
+                <View key={c.node} style={{ paddingVertical: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.privacyBody}>{t('circle.companionGrant.node_row', { short: c.short })}</Text>
+                    <Pressable
+                      testID={`mydata-companion-give-${c.node.slice(0, 8)}`}
+                      onPress={async () => {
+                        setGrant({ node: c.node, picker: null, to: null, picked: [], line: null });
+                        const p = await loadCompanionGrantPicker({ callSkill, node: c.node, t });
+                        setGrant({ node: c.node, picker: p, to: p.ok ? (p.targets[0]?.key ?? null) : null, picked: [], line: null });
+                      }}
+                    >
+                      <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.give')}</Text>
+                    </Pressable>
+                  </View>
+                  {/* who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken" */}
+                  {holders[c.node]?.said ? <Text style={styles.privacyBody}>{holders[c.node].said}</Text> : null}
+                  {holders[c.node] && !holders[c.node].ok && <Text style={styles.privacyBody}>{holders[c.node].message}</Text>}
+                  {(holders[c.node]?.rows ?? []).map((h) => (
+                    <View key={h.to} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
+                      <Text style={[styles.privacyBody, { flex: 1, paddingRight: 8 }]}>{`${h.label} — ${h.may}`}</Text>
+                      <Pressable
+                        testID={`mydata-companion-revoke-${h.to.slice(0, 8)}`}
+                        onPress={async () => {
+                          const r = await callSkill('household', 'revokeCompanionGrant', { node: c.node, to: h.to }).catch(() => null);
+                          loadHolders(c.node, companionRevokeText(r, t));
+                        }}
+                      >
+                        <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.revoke')}</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                  {open && !picker && <Text style={styles.privacyBody}>{t('circle.companionGrant.loading')}</Text>}
+                  {open && open.line && <Text style={styles.privacyBody} testID="mydata-companion-line">{open.line}</Text>}
+                  {open && picker && !open.line && !picker.ok && <Text style={styles.privacyBody}>{picker.message}</Text>}
+                  {open && picker?.ok && !open.line && picker.targets.length === 0 && (
+                    <Text style={styles.privacyBody}>{t('circle.companionGrant.to_none')}</Text>
+                  )}
+                  {open && picker?.ok && !open.line && picker.targets.length > 0 && (
+                    <View>
+                      <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.to_label')}</Text>
+                      {picker.targets.map((tg) => (
+                        <Pressable key={tg.key} testID={`mydata-companion-to-${tg.key.slice(0, 8)}`} onPress={() => setGrant({ ...open, to: tg.key })}>
+                          <Text style={styles.privacyBody}>{(open.to === tg.key ? '◉ ' : '○ ') + tg.label}</Text>
+                        </Pressable>
+                      ))}
+                      <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.may_do')}</Text>
+                      {picker.choices.map((ch) => (
+                        <Pressable
+                          key={ch.id}
+                          testID={`mydata-companion-family-${ch.id}`}
+                          onPress={() => setGrant({ ...open, picked: open.picked.includes(ch.id) ? open.picked.filter((x) => x !== ch.id) : [...open.picked, ch.id] })}
+                        >
+                          <Text style={styles.privacyBody}>{(open.picked.includes(ch.id) ? '☑ ' : '☐ ') + ch.label}</Text>
+                        </Pressable>
+                      ))}
+                      <Pressable
+                        testID="mydata-companion-confirm"
+                        onPress={async () => {
+                          if (!open.to || open.picked.length === 0) { setGrant({ ...open, note: t('circle.companionGrant.nothing_ticked') }); return; }
+                          const r = await callSkill('household', 'grantCompanion', { node: c.node, to: open.to, families: open.picked }).catch(() => null);
+                          setGrant({ ...open, line: companionGrantText(r, t) });
+                          loadHolders(c.node);
+                        }}
+                      >
+                        <Text style={styles.actionLabel}>{t('circle.companionGrant.confirm')}</Text>
+                      </Pressable>
+                      {open.note ? <Text style={styles.privacyBody}>{open.note}</Text> : null}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </Section>
+        )}
+      </>
+    ),
+    'connections': () => (
+      <>
+        {/* CONNECTIONS — screens that are yours, somewhere else. Beside the devices list because it
+            answers the same question ("what else of mine is out there"); the two differ in what they
+            can DO — a device holds your keys, a connection holds only the ticks you gave it. */}
+        {connections.length > 0 && (
+          <Section title={t('circle.mydata.connections')}>
+            {connectionRows({ surfaces: connections }).map((c) => (
+              <View key={c.viewPubKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6 }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.privacyBody}>{c.label || c.short}</Text>
+                  <Text style={styles.privacyBody}>
+                    {c.sees
+                      ? t('circle.mydata.connection_sees', { what: [...c.sees.circles, ...(c.sees.device ? [t('circle.mydata.connection_device_section')] : [])].join(', ') })
+                      /* NOT "0 onderdelen": a connection that cannot read is a real shape. */
+                      : t('circle.mydata.connection_acts_only')}
+                  </Text>
+                  <Text style={styles.privacyBody}>{t('circle.mydata.connection_does', { count: c.opCount })}</Text>
+                </View>
                 <Pressable
-                  style={styles.action}
-                  testID="mydata-link-bot-make"
+                  testID={`mydata-unpair-${c.viewPubKey.slice(0, 8)}`}
                   onPress={async () => {
-                    const made = await botLink.view.offer().catch(() => ({ ok: false }));
-                    setBotLink((b) => ({ ...b, made }));
+                    try { await callSkill('household', 'revokeSurface', { viewPubKey: c.viewPubKey }); } catch { /* the list re-reads */ }
+                    load();
                   }}
                 >
-                  <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
+                  <Text style={styles.actionMutedLabel}>{t('circle.mydata.connection_unpair')}</Text>
                 </Pressable>
               </View>
-            ) : null}
-            {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
-            {botLink.made?.ok && !botLink.linked ? (
-              <View>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
-                <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
-                <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
-                  <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
-                </Pressable>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
-                <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
-                <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
-              </View>
-            ) : null}
-            {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
-          </View>
-        ) : null}
-        {/* The member's choice of which device others deliver to first — their primary contact address. */}
-        <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
-          <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
-        </Pressable>
-      </Section>
-
-      {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
-          no door. The revoke button opens the phrase-proven ceremony for that device. */}
-      {devices.length > 0 && (
-        <Section title={t('circle.mydata.devices')}>
-          {/* without the recovery seal this device carries nothing of the person's own scope to the others */}
-          {agent?.hasRecoverySeal?.() === false ? (
-            <Text style={styles.privacyBody} testID="mydata-devices-needs-phrase">{t('circle.mydata.devices_needs_phrase')}</Text>
-          ) : null}
-          {devices.map((d) => (
-            <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-              <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
-                {d.label || d.deviceId}
-              </Text>
-              {!d.revoked && (
-                <Pressable onPress={() => setRevokeTarget(d.deviceId)} testID={`mydata-revoke-${d.deviceId}`}>
-                  <Text style={styles.actionMutedLabel}>{t('circle.revoke.title')}</Text>
-                </Pressable>
-              )}
-            </View>
-          ))}
-        </Section>
-      )}
-
-      {/* MY AGENTS — the nodes this person owns, and what another agent (their household bot) may do there: "give
-          access" asks the node what it can give, then who (a contact — a bot linked above is one) and the ticks. Web
-          parity: circleMyData.js. */}
-      {companions.length > 0 && (
-        <Section title={t('circle.companionGrant.nodes')}>
-          {companionsPending ? <Text style={styles.privacyBody} testID="mydata-companion-pending">{companionsPending}</Text> : null}
-          {companions.map((c) => {
-            const open = grant?.node === c.node ? grant : null;
-            const picker = open?.picker ?? null;
+            ))}
+          </Section>
+        )}
+      </>
+    ),
+    'connection-add': () => (
+      <>
+        {/* Pair a new one. Two steps, as on web: paste what the other screen shows, and only THEN
+            see what you are about to hand over — deciding before you can see the choices is not
+            consent. Refusals name their own reason; a newer version is told to update, never guessed. */}
+        <Section title={t('circle.mydata.connection_add')}>
+          <TextInput
+            testID="mydata-connection-offer"
+            value={offerText}
+            onChangeText={setOfferText}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={t('circle.mydata.connection_offer_placeholder')}
+            placeholderTextColor={theme.muted}
+            style={styles.relayInput}
+          />
+          {offerText.trim() !== '' && (() => {
+            const parsed = parsePairingOffer(offerText.trim());
+            if (!parsed.ok) {
+              return <Text style={styles.privacyBody}>{t(`circle.mydata.connection_offer_${parsed.reason}`)}</Text>;
+            }
+            const opChoices = connectionOpChoices({ manifests: manifestsForConnections });
+            const sectionChoices = connectionSectionChoices({ circles: circlesForConnections });
+            const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
             return (
-              <View key={c.node} style={{ paddingVertical: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={styles.privacyBody}>{t('circle.companionGrant.node_row', { short: c.short })}</Text>
-                  <Pressable
-                    testID={`mydata-companion-give-${c.node.slice(0, 8)}`}
-                    onPress={async () => {
-                      setGrant({ node: c.node, picker: null, to: null, picked: [], line: null });
-                      const p = await loadCompanionGrantPicker({ callSkill, node: c.node, t });
-                      setGrant({ node: c.node, picker: p, to: p.ok ? (p.targets[0]?.key ?? null) : null, picked: [], line: null });
-                    }}
-                  >
-                    <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.give')}</Text>
+              <View>
+                <Text style={styles.privacyBody}>
+                  {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
+                </Text>
+                <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_do')}</Text>
+                {opChoices.map((o) => (
+                  <Pressable key={o.id} testID={`mydata-op-${o.id}`} onPress={() => toggle(pickedOps, setPickedOps, o.id)}>
+                    <Text style={styles.privacyBody}>{(pickedOps.includes(o.id) ? '☑ ' : '☐ ') + (o.label || o.id)}</Text>
                   </Pressable>
-                </View>
-                {/* who holds a grant here — asked of the node, one line each: "<who> — mag: … · intrekken" */}
-                {holders[c.node]?.said ? <Text style={styles.privacyBody}>{holders[c.node].said}</Text> : null}
-                {holders[c.node] && !holders[c.node].ok && <Text style={styles.privacyBody}>{holders[c.node].message}</Text>}
-                {(holders[c.node]?.rows ?? []).map((h) => (
-                  <View key={h.to} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
-                    <Text style={[styles.privacyBody, { flex: 1, paddingRight: 8 }]}>{`${h.label} — ${h.may}`}</Text>
-                    <Pressable
-                      testID={`mydata-companion-revoke-${h.to.slice(0, 8)}`}
-                      onPress={async () => {
-                        const r = await callSkill('household', 'revokeCompanionGrant', { node: c.node, to: h.to }).catch(() => null);
-                        loadHolders(c.node, companionRevokeText(r, t));
-                      }}
-                    >
-                      <Text style={styles.actionMutedLabel}>{t('circle.companionGrant.revoke')}</Text>
-                    </Pressable>
-                  </View>
                 ))}
-                {open && !picker && <Text style={styles.privacyBody}>{t('circle.companionGrant.loading')}</Text>}
-                {open && open.line && <Text style={styles.privacyBody} testID="mydata-companion-line">{open.line}</Text>}
-                {open && picker && !open.line && !picker.ok && <Text style={styles.privacyBody}>{picker.message}</Text>}
-                {open && picker?.ok && !open.line && picker.targets.length === 0 && (
-                  <Text style={styles.privacyBody}>{t('circle.companionGrant.to_none')}</Text>
-                )}
-                {open && picker?.ok && !open.line && picker.targets.length > 0 && (
-                  <View>
-                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.to_label')}</Text>
-                    {picker.targets.map((tg) => (
-                      <Pressable key={tg.key} testID={`mydata-companion-to-${tg.key.slice(0, 8)}`} onPress={() => setGrant({ ...open, to: tg.key })}>
-                        <Text style={styles.privacyBody}>{(open.to === tg.key ? '◉ ' : '○ ') + tg.label}</Text>
-                      </Pressable>
-                    ))}
-                    <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.companionGrant.may_do')}</Text>
-                    {picker.choices.map((ch) => (
-                      <Pressable
-                        key={ch.id}
-                        testID={`mydata-companion-family-${ch.id}`}
-                        onPress={() => setGrant({ ...open, picked: open.picked.includes(ch.id) ? open.picked.filter((x) => x !== ch.id) : [...open.picked, ch.id] })}
-                      >
-                        <Text style={styles.privacyBody}>{(open.picked.includes(ch.id) ? '☑ ' : '☐ ') + ch.label}</Text>
-                      </Pressable>
-                    ))}
-                    <Pressable
-                      testID="mydata-companion-confirm"
-                      onPress={async () => {
-                        if (!open.to || open.picked.length === 0) { setGrant({ ...open, note: t('circle.companionGrant.nothing_ticked') }); return; }
-                        const r = await callSkill('household', 'grantCompanion', { node: c.node, to: open.to, families: open.picked }).catch(() => null);
-                        setGrant({ ...open, line: companionGrantText(r, t) });
-                        loadHolders(c.node);
-                      }}
-                    >
-                      <Text style={styles.actionLabel}>{t('circle.companionGrant.confirm')}</Text>
-                    </Pressable>
-                    {open.note ? <Text style={styles.privacyBody}>{open.note}</Text> : null}
-                  </View>
-                )}
+                <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_see')}</Text>
+                {sectionChoices.map((sc) => (
+                  <Pressable key={sc.id} testID={`mydata-section-${sc.id}`} onPress={() => toggle(pickedSections, setPickedSections, sc.id)}>
+                    <Text style={styles.privacyBody}>
+                      {(pickedSections.includes(sc.id) ? '☑ ' : '☐ ') + (sc.label || t('circle.mydata.connection_device_section'))}
+                    </Text>
+                  </Pressable>
+                ))}
+                <Pressable
+                  testID="mydata-connection-confirm"
+                  onPress={async () => {
+                    const args = compileConnectionGrant({
+                      viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label,
+                    });
+                    if (!args) return;                 // a pick that grants nothing creates nothing
+                    try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
+                    catch { /* the list re-reads; a failure leaves no half-connection */ }
+                    setOfferText(''); setPickedOps([]); setPickedSections([]);
+                    load();
+                  }}
+                >
+                  <Text style={styles.actionLabel}>{t('circle.mydata.connection_confirm')}</Text>
+                </Pressable>
               </View>
             );
-          })}
+          })()}
         </Section>
-      )}
-
-      {/* CONNECTIONS — screens that are yours, somewhere else. Beside the devices list because it
-          answers the same question ("what else of mine is out there"); the two differ in what they
-          can DO — a device holds your keys, a connection holds only the ticks you gave it. */}
-      {connections.length > 0 && (
-        <Section title={t('circle.mydata.connections')}>
-          {connectionRows({ surfaces: connections }).map((c) => (
-            <View key={c.viewPubKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6 }}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={styles.privacyBody}>{c.label || c.short}</Text>
-                <Text style={styles.privacyBody}>
-                  {c.sees
-                    ? t('circle.mydata.connection_sees', { what: [...c.sees.circles, ...(c.sees.device ? [t('circle.mydata.connection_device_section')] : [])].join(', ') })
-                    /* NOT "0 onderdelen": a connection that cannot read is a real shape. */
-                    : t('circle.mydata.connection_acts_only')}
-                </Text>
-                <Text style={styles.privacyBody}>{t('circle.mydata.connection_does', { count: c.opCount })}</Text>
-              </View>
-              <Pressable
-                testID={`mydata-unpair-${c.viewPubKey.slice(0, 8)}`}
-                onPress={async () => {
-                  try { await callSkill('household', 'revokeSurface', { viewPubKey: c.viewPubKey }); } catch { /* the list re-reads */ }
-                  load();
-                }}
-              >
-                <Text style={styles.actionMutedLabel}>{t('circle.mydata.connection_unpair')}</Text>
-              </Pressable>
+      </>
+    ),
+    'keys': () => (
+      <>
+        <Section title={t('circle.mydata.keys')}>
+          <Pressable style={styles.action} onPress={revealMnemonic} testID="mydata-mnemonic">
+            <Text style={styles.actionLabel}>{t('circle.mydata.view_mnemonic')}</Text>
+          </Pressable>
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
+          </Pressable>
+          {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
+          </Pressable>
+          {/* After a restore (or any time): which of the person's personas this device also gets — the phrase is typed here. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('receive-personas')} testID="mydata-receive-personas">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.receive_personas')}</Text>
+          </Pressable>
+          {/* The recovery file: the circle list sealed to the phrase — save it, or load it after a restore. */}
+          <Pressable style={styles.action} onPress={() => setWizard('recovery-export')} testID="mydata-recovery-export">
+            <Text style={styles.actionLabel}>{t('circle.mydata.recovery_export')}</Text>
+          </Pressable>
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('recovery-import')} testID="mydata-recovery-import">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.recovery_import')}</Text>
+          </Pressable>
+          {/* The replace ceremony: after a restore, retire every other device in one act. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('replace')} testID="mydata-replace">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.replace_device')}</Text>
+          </Pressable>
+          {/* A companion node of your own: claim it with the line it prints in its log. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('claim-companion')} testID="mydata-claim-companion">
+            <Text style={styles.actionMutedLabel}>{t('circle.companionClaim.button')}</Text>
+          </Pressable>
+          {/* A household bot's `/koppel` link, pasted: link this person's Basis identity to their row there. */}
+          {agent?.identityLinks ? (
+            <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setBotLink(botLink ? null : { text: '', view: null, made: null, linked: false })} testID="mydata-link-bot">
+              <Text style={styles.actionMutedLabel}>{t('circle.identityLink.open')}</Text>
+            </Pressable>
+          ) : null}
+          {botLink ? (
+            <View testID="mydata-link-bot-panel" style={{ paddingVertical: 4 }}>
+              {!botLink.view?.bot?.ok ? (
+                <View>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.paste_link')}</Text>
+                  <TextInput
+                    style={styles.relayInput}
+                    value={botLink.text}
+                    onChangeText={(text) => setBotLink({ text, view: text.trim() ? agent.identityLinks.view(text.trim()) : null, made: null, linked: false })}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    testID="mydata-link-bot-input"
+                  />
+                  {botLink.text.trim() && botLink.view && !botLink.view.bot.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.not_a_link')}</Text> : null}
+                </View>
+              ) : null}
+              {botLink.view?.bot?.ok && !botLink.made ? (
+                <View>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.which_bot', { bot: botLink.view.label })}</Text>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.means')}</Text>
+                  <Pressable
+                    style={styles.action}
+                    testID="mydata-link-bot-make"
+                    onPress={async () => {
+                      const made = await botLink.view.offer().catch(() => ({ ok: false }));
+                      setBotLink((b) => ({ ...b, made }));
+                    }}
+                  >
+                    <Text style={styles.actionLabel}>{t('circle.identityLink.make')}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {botLink.made && !botLink.made.ok ? <Text style={styles.privacyBody}>{t('circle.identityLink.no_device_key')}</Text> : null}
+              {botLink.made?.ok && !botLink.linked ? (
+                <View>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.paste_this', { bot: botLink.view.label })}</Text>
+                  <Text selectable style={styles.privacyBody} testID="mydata-link-bot-line">{botLink.made.line}</Text>
+                  <Pressable onPress={() => { Share.share({ message: botLink.made.line }).catch(() => {}); }} testID="mydata-link-bot-share">
+                    <Text style={styles.actionMutedLabel}>{t('circle.identityLink.share')}</Text>
+                  </Pressable>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.code')}</Text>
+                  <Text style={[styles.privacyBody, { fontWeight: '600' }]} testID="mydata-link-bot-code">{botLink.made.code}</Text>
+                  <Text style={styles.privacyBody}>{t('circle.identityLink.waiting')}</Text>
+                </View>
+              ) : null}
+              {botLink.linked ? <Text style={styles.privacyBody} testID="mydata-link-bot-linked">{t('circle.identityLink.linked', { bot: botLink.view.label })}</Text> : null}
             </View>
-          ))}
+          ) : null}
+          {/* The member's choice of which device others deliver to first — their primary contact address. */}
+          <Pressable style={[styles.action, styles.actionMuted]} onPress={makePrimary} testID="mydata-make-primary">
+            <Text style={styles.actionMutedLabel}>{t('circle.mydata.make_primary')}</Text>
+          </Pressable>
         </Section>
-      )}
-
-      {/* Pair a new one. Two steps, as on web: paste what the other screen shows, and only THEN
-          see what you are about to hand over — deciding before you can see the choices is not
-          consent. Refusals name their own reason; a newer version is told to update, never guessed. */}
-      <Section title={t('circle.mydata.connection_add')}>
-        <TextInput
-          testID="mydata-connection-offer"
-          value={offerText}
-          onChangeText={setOfferText}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t('circle.mydata.connection_offer_placeholder')}
-          placeholderTextColor={theme.muted}
-          style={styles.relayInput}
-        />
-        {offerText.trim() !== '' && (() => {
-          const parsed = parsePairingOffer(offerText.trim());
-          if (!parsed.ok) {
-            return <Text style={styles.privacyBody}>{t(`circle.mydata.connection_offer_${parsed.reason}`)}</Text>;
-          }
-          const opChoices = connectionOpChoices({ manifests: manifestsForConnections });
-          const sectionChoices = connectionSectionChoices({ circles: circlesForConnections });
-          const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-          return (
-            <View>
-              <Text style={styles.privacyBody}>
-                {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
-              </Text>
-              <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_do')}</Text>
-              {opChoices.map((o) => (
-                <Pressable key={o.id} testID={`mydata-op-${o.id}`} onPress={() => toggle(pickedOps, setPickedOps, o.id)}>
-                  <Text style={styles.privacyBody}>{(pickedOps.includes(o.id) ? '☑ ' : '☐ ') + (o.label || o.id)}</Text>
-                </Pressable>
-              ))}
-              <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_see')}</Text>
-              {sectionChoices.map((sc) => (
-                <Pressable key={sc.id} testID={`mydata-section-${sc.id}`} onPress={() => toggle(pickedSections, setPickedSections, sc.id)}>
-                  <Text style={styles.privacyBody}>
-                    {(pickedSections.includes(sc.id) ? '☑ ' : '☐ ') + (sc.label || t('circle.mydata.connection_device_section'))}
-                  </Text>
-                </Pressable>
-              ))}
-              <Pressable
-                testID="mydata-connection-confirm"
-                onPress={async () => {
-                  const args = compileConnectionGrant({
-                    viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label,
-                  });
-                  if (!args) return;                 // a pick that grants nothing creates nothing
-                  try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
-                  catch { /* the list re-reads; a failure leaves no half-connection */ }
-                  setOfferText(''); setPickedOps([]); setPickedSections([]);
-                  load();
-                }}
-              >
-                <Text style={styles.actionLabel}>{t('circle.mydata.connection_confirm')}</Text>
+      </>
+    ),
+    'storage': () => (
+      <>
+        <Section title={t('circle.mydata.storage')}>
+          <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
+          {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
+          {!podSignedIn && (
+            <Text style={styles.relayHint} testID="pod-local-consequence">
+              {t('circle.mydata.pod_local_consequence')}
+            </Text>
+          )}
+          {dataLocation.podRoot ? <KV k={t('circle.mydata.pod_root')} v={dataLocation.podRoot} /> : null}
+          {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
+          {podCapable && !podSignedIn && (
+            <View style={styles.signin}>
+              <TextInput
+                style={styles.signinInput}
+                value={issuer}
+                onChangeText={setIssuer}
+                placeholder={t('circle.mydata.pod_issuer')}
+                placeholderTextColor={theme.color.inkSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="mydata-pod-issuer"
+              />
+              <Pressable style={[styles.action, signingIn && styles.actionMuted]} onPress={doSignIn} disabled={signingIn} testID="mydata-pod-signin">
+                <Text style={styles.actionLabel}>{signingIn ? t('circle.mydata.pod_connecting') : t('circle.mydata.pod_sign_in')}</Text>
               </Pressable>
+              {signInErr ? <Text style={styles.signinErr}>{signInErr}</Text> : null}
             </View>
-          );
-        })()}
-      </Section>
+          )}
+          {podCapable && podSignedIn && (
+            <Pressable style={[styles.action, styles.actionMuted]} onPress={doSignOut} testID="mydata-pod-signout">
+              <Text style={styles.actionMutedLabel}>{t('circle.mydata.pod_signout')}</Text>
+            </Pressable>
+          )}
+        </Section>
+      </>
+    ),
+    'log-report': () => (
+      <>
+        {typeof doors.logReport === 'function' ? (
+          <Section title={t('circle.profile.logReport')}>
+            <Pressable style={styles.doorRow} onPress={doors.logReport} accessibilityRole="button" testID="settings-door-log-report">
+              <Text style={styles.doorText}>{t('circle.profile.logReport')}</Text>
+              <Text style={styles.doorArrow}>→</Text>
+            </Pressable>
+          </Section>
+        ) : null}
+      </>
+    ),
+  };
 
-
-
-      <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
-      <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
-      {(wizard === 'recovery-export' || wizard === 'recovery-import') && (
-        <RecoveryFileWizardModal
-          visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t} theme={theme}
-          onClose={() => setWizard(null)} onDispatched={() => {}}
-          onSaveFile={async (text, name) => { await Share.share({ message: text, title: name }); }}
-          onPickFile={async () => {
-            const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
-            const asset = r?.assets?.[0];
-            if (r?.canceled || !asset?.uri) return null;
-            return { text: await FileSystem.readAsStringAsync(asset.uri), name: asset.name ?? null };
-          }}
+  // the wizards and sheets a section opens (restore, recovery file, enrol, replace, revoke, the phrase):
+  // mounted on whichever screen paints that section
+  const overlays = (
+    <>
+        <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} theme={theme} onClose={() => setWizard(null)} onDispatched={() => {}} />
+        {(wizard === 'recovery-export' || wizard === 'recovery-import') && (
+          <RecoveryFileWizardModal
+            visible mode={wizard === 'recovery-export' ? 'export' : 'import'} callSkill={callSkill} t={t} theme={theme}
+            onClose={() => setWizard(null)} onDispatched={() => {}}
+            onSaveFile={async (text, name) => { await Share.share({ message: text, title: name }); }}
+            onPickFile={async () => {
+              const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true });
+              const asset = r?.assets?.[0];
+              if (r?.canceled || !asset?.uri) return null;
+              return { text: await FileSystem.readAsStringAsync(asset.uri), name: asset.name ?? null };
+            }}
+          />
+        )}
+        <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
+        <ReceivePersonasModal visible={wizard === 'receive-personas'} callSkill={callSkill} onClose={() => setWizard(null)} />
+        {relayQuestionModal}
+        <CeremonyFlowModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
+        <CeremonyFlowModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
+          placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
+        <CeremonyFlowModal
+          visible={!!revokeTarget}
+          deviceId={revokeTarget}
+          callSkill={callSkill}
+          onClose={() => { setRevokeTarget(null); load(); }}
         />
-      )}
-      <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} beforeOffer={askRelayIfNone} />
-      <ReceivePersonasModal visible={wizard === 'receive-personas'} callSkill={callSkill} onClose={() => setWizard(null)} />
-      {relayQuestionModal}
-      <CeremonyFlowModal visible={wizard === 'replace'} flowId="replace-device" keyPrefix="replace" callSkill={callSkill} onClose={() => { forgetCircleSealStrategies(); setWizard(null); }} />
-      <CeremonyFlowModal visible={wizard === 'claim-companion'} flowId="claim-companion" keyPrefix="companionClaim" inputName="claim"
-        placeholderKey="circle.companionClaim.placeholder" callSkill={callSkill} onClose={() => setWizard(null)} />
-      <CeremonyFlowModal
-        visible={!!revokeTarget}
-        deviceId={revokeTarget}
-        callSkill={callSkill}
-        onClose={() => { setRevokeTarget(null); load(); }}
-      />
 
-      {/* S5 — one-time recovery-phrase reveal (pinboard getMnemonicOnce). */}
-      <Modal visible={!!mnemonic} animationType="fade" transparent onRequestClose={() => setMnemonic(null)}>
-        <Pressable style={styles.mBackdrop} onPress={() => setMnemonic(null)}>
-          <Pressable style={styles.mCard} onPress={(e) => e.stopPropagation()} testID="mydata-mnemonic-reveal">
-            <Text style={styles.mTitle}>{t('circle.mydata.mnemonic_title')}</Text>
-            {mnemonic?.words
-              ? (<>
-                  <Text style={styles.mWarn}>{t('circle.mydata.mnemonic_warn')}</Text>
-                  <Text style={styles.mWords} selectable>{mnemonic.words}</Text>
-                </>)
-              : (<Text style={styles.mWarn}>{t('circle.mydata.mnemonic_none')}</Text>)}
-            <Pressable style={styles.action} onPress={() => setMnemonic(null)}>
-              <Text style={styles.actionLabel}>{t('common.close')}</Text>
+        {/* S5 — one-time recovery-phrase reveal (pinboard getMnemonicOnce). */}
+        <Modal visible={!!mnemonic} animationType="fade" transparent onRequestClose={() => setMnemonic(null)}>
+          <Pressable style={styles.mBackdrop} onPress={() => setMnemonic(null)}>
+            <Pressable style={styles.mCard} onPress={(e) => e.stopPropagation()} testID="mydata-mnemonic-reveal">
+              <Text style={styles.mTitle}>{t('circle.mydata.mnemonic_title')}</Text>
+              {mnemonic?.words
+                ? (<>
+                    <Text style={styles.mWarn}>{t('circle.mydata.mnemonic_warn')}</Text>
+                    <Text style={styles.mWords} selectable>{mnemonic.words}</Text>
+                  </>)
+                : (<Text style={styles.mWarn}>{t('circle.mydata.mnemonic_none')}</Text>)}
+              <Pressable style={styles.action} onPress={() => setMnemonic(null)}>
+                <Text style={styles.actionLabel}>{t('common.close')}</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-      {/* the version this build was made from (its tree's exact clean tag, through the build; none → dev) — web's line */}
-      <Text style={styles.privacyBody} testID="mydata-version">{versionLine(Constants.expoConfig?.extra?.appVersion ?? null, t)}</Text>
+        </Modal>
+    </>
+  );
+
+  // every section lives in a settings group: this screen paints the group's declared sections, nothing else
+  return (
+    <ScrollView style={styles.wrap} contentContainerStyle={[styles.content, { paddingTop: 16 + insets.top }, { paddingBottom: FAB_CLEARANCE }]} testID="circle-settings-group">
+      <View style={styles.header}>
+        {typeof onBack === 'function' && <Pressable onPress={onBack} testID="mydata-back"><Text style={styles.back}>{t('circle.mydata.back')}</Text></Pressable>}
+        <Text style={styles.title}>{groupTitle ?? t('circle.settings_home.title')}</Text>
+      </View>
+      {(Array.isArray(only) ? only : []).map((id) => <React.Fragment key={id}>{painters[id]?.() ?? null}</React.Fragment>)}
+      {overlays}
     </ScrollView>
   );
 }

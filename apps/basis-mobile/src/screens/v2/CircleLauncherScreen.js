@@ -188,6 +188,7 @@ import { useRelayQuestion } from './RelayQuestionModal.js';
 // shell we ship can reach it.
 import OpPageModal from './OpPageModal.js';
 import { attachEntriesFor } from '../../../../basis/src/v2/attachEntries.js';
+import { blockTypesShowingCircle } from '../../../../basis/src/v2/userScreens.js';
 import { cardForCreatedItem, composerArgs } from '../../../../basis/src/v2/createdCard.js';
 import { computeEmbedButtons } from '../../../../basis/src/core/embedButtons.js';
 import { listsManifest } from '../../../../lists/manifest.js';
@@ -273,7 +274,6 @@ import CircleAvailabilityScreen from './CircleAvailabilityScreen.js';
 import CircleViewAsScreen from './CircleViewAsScreen.js';
 import CircleMemberCardScreen from './CircleMemberCardScreen.js';   // §2 — member-persona card + self-view
 import CircleAdvisorScreen from './CircleAdvisorScreen.js';
-import CircleHopScreen from './CircleHopScreen.js';
 import CircleOfferingEditorScreen from './CircleOfferingEditorScreen.js';
 import CircleFolioScreen from './CircleFolioScreen.js';
 import CircleRulesScreen from './CircleRulesScreen.js';
@@ -316,9 +316,7 @@ import { splitBySight, SIGHT } from '../../../../basis/src/v2/circleSight.js';
 import { makeSyncSelection } from '../../../../basis/src/v2/syncSelection.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
-import { bindCircleGovernance, openPolicyProposals } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
-import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
-import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
+import { bindCircleGovernance, openPolicyProposals, makeGovernanceBroadcast } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 reports + settings-consensus governance
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 import { launcherListPaint } from './launcherListPaint.js';
 import { DEVELOPER_PARAM_KEY } from '../../../../basis/src/v2/paramsService.js';
@@ -984,13 +982,7 @@ export default function CircleLauncherScreen({
   const fileCircleReportMobile = useCallback(async (targetType, targetRef, targetLabel = null, reason = '') => {
     const circleId = selected?.id; if (!circleId || !targetRef) return;
     try {
-      const broadcast = (channel, cid, event, opts) => {
-        const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-        const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
-        // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
-        const to = Array.isArray(opts?.to) ? opts.to : undefined;
-        bundle?.callSkill?.('pinboard', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
-      };
+      const broadcast = makeGovernanceBroadcast((...a) => bundle?.callSkill?.(...a));   // the one shared fan
       const gov = bindCircleGovernance({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
         myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
@@ -1118,12 +1110,7 @@ export default function CircleLauncherScreen({
   // wired setPolicy enactor) apply-on-approval; proposals cross devices because the events fan.
   const govPolicy = useMemo(() => {
     if (!bundle?.callSkill || !eventLog) return null;
-    const broadcast = (channel, cid, event, opts) => {
-      const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
-      const msgId = event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event);
-      const to = Array.isArray(opts?.to) ? opts.to : undefined;
-      bundle.callSkill('pinboard', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
-    };
+    const broadcast = makeGovernanceBroadcast((...a) => bundle.callSkill(...a));   // the one shared fan
     return bindCircleGovernance({
       eventLog, callSkill: bundle.callSkill, getPolicy: (cid) => policyStore.get(cid),
       myRef: (cid) => { try { return bundle?.agent?.circleSelf?.(cid)?.webid ?? (getCircleActorWebId() || ''); } catch { return getCircleActorWebId() || ''; } }, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
@@ -1737,15 +1724,12 @@ export default function CircleLauncherScreen({
       )) { setView('detail'); return true; }
       // Rules consent preview → back to rules editor.
       if (selected && view === 'rulesconsent') { setView('rules'); return true; }
-      // Hop screen lives under the Mij tab.
-      if (view === 'hop') { setView('availability'); return true; }
       if (view === 'blocked') { setView('contacten'); return true; }
-      if (view === 'logReport') { setView('mydata'); return true; }
+      if (view === 'logReport') { setSettingsGroupId('my-data'); setView('settingsGroup'); return true; }
       if (view === 'shareContact') { setView('profile'); return true; }
       // shared-with-me opens from Mij's chip; availability from the Verbinding settings (blocked from Contacten, above)
       if (view === 'sharedWithMe') { setView('profile'); return true; }
       if (view === 'availability' || view === 'points') { setSettingsGroupId('connection'); setView('settingsGroup'); return true; }
-      if (view === 'mydata') { setView('profile'); return true; }
       // the person's settings behind the gear: a group → the home → Mij; the circle chooser → the home
       if (view === 'settingsGroup' || view === 'settingsCircles') { setView('settingsHome'); return true; }
       if (view === 'settingsHome') { setView('profile'); return true; }
@@ -2198,7 +2182,7 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onMyData={() => setView('mydata')} onSettings={() => setView('settingsHome')} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} sources={mijSources} onOpenCircle={(id) => { const c = circles.find((x) => x.id === id); if (c) openCircle(c); }} onOpenProposals={(id) => { const c = circles.find((x) => x.id === id); if (c) openProposals(c); }} onSettings={() => setView('settingsHome')} onSettingsGroup={(id) => { setSettingsGroupId(id); setView('settingsGroup'); }} onSharedWithMe={() => setView('sharedWithMe')} onEditMe={() => setMyPersona('default')} onAdvanced={developerOn ? () => setView('advanced') : undefined} onMeAction={onMeAction} />
         <PersonaPanel
           personaId={myPersona} onClose={() => { setMyPersona(null); refreshHeaderAvatar(); }} styles={styles}
           callSkill={bundle?.callSkill} circles={circles}
@@ -2219,7 +2203,7 @@ export default function CircleLauncherScreen({
   if (view === 'logReport') {
     return (
       <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        <LogReportScreen onBack={() => setView('mydata')} />
+        <LogReportScreen onBack={() => { setSettingsGroupId('my-data'); setView('settingsGroup'); }} />
       </WithTabBar>
     );
   }
@@ -2264,14 +2248,6 @@ export default function CircleLauncherScreen({
           doors={{ availability: () => setView('availability'), points: () => setView('points'), sharedWithMe: () => setView('sharedWithMe'), blocked: () => setView('blocked'), logReport: () => setView('logReport') }}
           personClock={personClockRef.current} {...extra} />
   );
-  // S5 — "My data": data-location + privacy + usage (read-only); sub-view of Mij.
-  if (view === 'mydata') {
-    return (
-      <WithTabBar avatar={headerAvatar} onAvatar={openMyEditor} onPlus={() => { setPlusEdit(null); setPlusOpen(true); }} plusSheet={plusSheet} overlay={switcherModal} active="mij" onSelect={onTab} badges={tabBadges} hasMesh={!!bundle?.mdns}>
-        {myDataScreen()}
-      </WithTabBar>
-    );
-  }
   // The person's settings behind the gear on Mij (web parity: showSettingsHome / showSettingsCircleChooser).
   if (view === 'settingsHome') {
     return (
@@ -2310,7 +2286,6 @@ export default function CircleLauncherScreen({
         <CircleAvailabilityScreen
           store={availabilityStore}
           onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }}
-          onHop={() => setView('hop')}
         />
       </WithTabBar>
     );
@@ -2455,10 +2430,6 @@ export default function CircleLauncherScreen({
     // F-5.1 — real member directory loaded in onViewAs via listGroupMembers.
     return <CircleViewAsScreen members={viewAsMembers} policy={viewAsPolicy} onBack={() => setView('detail')} />;
   }
-  if (view === 'hop') {
-    // Hopping lives under the Mij tab (personal settings).
-    return <CircleHopScreen resolveSkill={resolveSkill} onBack={() => setView('availability')} />;
-  }
   if (view === 'points') {
     // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
     return <ConnectionPointsHost bundle={bundle} onBack={() => { setSettingsGroupId('connection'); setView('settingsGroup'); }} />;
@@ -2574,6 +2545,7 @@ export default function CircleLauncherScreen({
     return (
       <CircleRecipeEditorScreen
         book={recipeBook}
+        policy={selectedPolicy ?? undefined}
         mode={recipeEditorMode}
         editingRecipeId={recipeEditingId}
         // γ-next.recipe — broadcast cache → editor → γ.3 resolver.
@@ -2601,6 +2573,7 @@ export default function CircleLauncherScreen({
     return (
       <>
       <CircleDetail
+        pagesBook={screensBook}
         onPinEntry={(e) => { if (selected?.id) runScreenOp('screen-pin', { kind: 'bookmark', circleId: selected.id, appOrigin: e.appOrigin, opId: e.opId }); }}
         openOp={pendingPinOpen} onOpenOpDone={() => setPendingPinOpen(null)}
         selfProfileId={profileIdOfCircle(selected?.id)}
@@ -3067,7 +3040,7 @@ function CircleDetail({
   readMembershipStatements = null,
   eventLog,
   circles = [],
-  recipeStore = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  recipeStore = null, pagesBook = null, onPinboardEvent, emitMemberProps, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
@@ -3292,13 +3265,18 @@ function CircleDetail({
   const circleAvailability = useMemo(() => makeOpAvailability({
     catalogue: catalogue ?? null, manifestsByOrigin, policy: policy ?? null, capabilityMatrix: circleCapMatrix,
   }), [catalogue, manifestsByOrigin, policy, circleCapMatrix]);
+  // the open circle's screen blocks (materialized below); the "+" reads their types
+  const [screenBlocks, setScreenBlocks] = useState(null);
   const attachEntries = useMemo(() => attachEntriesFor({
     manifestsByOrigin,
     availability: circleAvailability,
     // An entry whose dispatch path is not wired is NOT painted (never offer what does not work): the
     // file entry rides the sealed-media pipeline, which a circle with no media composition lacks.
     mediaWired: !!circleMedia,
-  }), [manifestsByOrigin, circleAvailability, circleMedia]);
+    // the block types on this circle's screen: a feature whose surface is a block (lists) is offered only where it is on
+    // …and any of the person's pages' blocks that show this circle (a lists block for it)
+    blockTypes: [...(screenBlocks ?? []).map((b) => b?.type).filter(Boolean), ...blockTypesShowingCircle(pagesBook, circle?.id)],
+  }), [manifestsByOrigin, circleAvailability, circleMedia, screenBlocks, pagesBook, circle?.id]);
   // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
   // A ref, not state: the assistant's lane reads it when a line's turn comes (`followUpClaim`), after the turn before it.
   const pendingFollowUpRef = useRef(null);
@@ -3403,7 +3381,6 @@ function CircleDetail({
   // α.1e — materialized screen blocks for the active recipe.  null
   // until the load below resolves; [] when the book is empty.
   // D1 — `screenReloadTick` bumps after a quickActions tap to re-rank.
-  const [screenBlocks, setScreenBlocks] = useState(null);
   const [screenReloadTick, setScreenReloadTick] = useState(0);
   useEffect(() => {
     let alive = true;
@@ -3789,14 +3766,12 @@ function CircleDetail({
       appendCircleMessage({ actor: 'bot', text: circleReplyText(reply, { verb, t }), buttons, scope, embeds });
       // Remember the most-recent listing so a bulk "/done all" can fan out over it (web≡mobile).
       if (Array.isArray(reply?.payload?.items)) lastCircleListingRef.current = { appOrigin: entry?.appOrigin, items: reply.payload.items };
-      // Shared find-result enrichment (skill matches + hop prompt), web≡mobile via buildFindExtras. Best-effort.
+      // Shared find-result enrichment (skill matches), web≡mobile via buildFindExtras. Best-effort.
       try {
-        const { offeringMatches, hopCard } = await buildFindExtras({
-          query: reply?.payload?.query, groups: reply?.payload?.groups,
-          circleId: circle?.id, callSkill: (op, a) => rawCallSkill('pinboard', op, a), t,
+        const { offeringMatches } = await buildFindExtras({
+          query: reply?.payload?.query, circleId: circle?.id, callSkill: (op, a) => rawCallSkill('pinboard', op, a),
         });
         if (offeringMatches.length) appendCircleMessage({ actor: 'bot', text: `${t('circle.offeringMatches.title')}\n${offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n')}` });
-        if (hopCard) appendCircleMessage({ actor: 'bot', text: `${hopCard.title}\n${hopCard.body}` });
       } catch { /* enrichment is non-essential */ }
     }
   }, [catalogue, circle?.id, rawCallSkill, appendCircleMessage, manifestsByOrigin, policy, capabilitySources, overrideStore, capabilityDenyFor]);
@@ -5844,7 +5819,9 @@ function NearbyScreen({
   // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   return (
-    <View style={styles.page} testID="circle-nearby-screen">
+    // ONE scroll column for the whole room (the walk of 2026-10-26: the peer list took the full height and the sections
+    // below it sat at the bottom edge, unreachable): the peers are sized to their content and everything scrolls together.
+    <ScrollView style={styles.page} contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }} keyboardShouldPersistTaps="handled" testID="circle-nearby-screen">
       {/* no "← circles": Nearby is a tab of its own, not a page under Circles */}
       <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
       {firstUse ? (
@@ -5897,7 +5874,7 @@ function NearbyScreen({
           in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
       {rows.length === 0 ? null : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]}>
+        <View style={styles.list} testID="nearby-peers">
           {rows.map((row) => (
             <View
               key={row.id || row.pseudonym}
@@ -5931,7 +5908,7 @@ function NearbyScreen({
               ) : null}
             </View>
           ))}
-        </ScrollView>
+        </View>
       )}
       {/* Asks (step F). Every live ask shows, matching or not — filtering the room to what resonates
           would make it a recommender, and would leak my own drivers into what I am able to see. */}
@@ -6217,7 +6194,7 @@ function NearbyScreen({
         </View>
       ) : null}
 
-    </View>
+    </ScrollView>
   );
 }
 

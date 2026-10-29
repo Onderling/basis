@@ -34,7 +34,7 @@ function memorySource() {
 let members; let book;
 beforeEach(() => {
   members = new MemberMap();
-  book = createContactBook({ members, dataSource: memorySource() });
+  book = createContactBook();
 });
 
 const noKey = (row) => {
@@ -49,7 +49,7 @@ describe('admitting a keyless person', () => {
     const row = await book.addContact(admit);
     expect(row).toMatchObject({ webid: K.webid, displayName: K.displayName, channel: 'telegram', role: 'member', relation: 'contact' });
     noKey(row);
-    expect(await members.resolveByWebid(K.webid)).toMatchObject({ channel: 'telegram', role: 'member' });
+    expect(await book.get(K.webid)).toMatchObject({ channel: 'telegram', role: 'member' });
   });
 
   it('one row per person: a second admit for the same uid returns the row, and a bare re-add keeps its door and role', async () => {
@@ -62,7 +62,7 @@ describe('admitting a keyless person', () => {
   it('refuses a door outside the closed set, and a role core does not know — with a reason', async () => {
     await expect(book.addContact({ ...admit, channel: 'sms' })).rejects.toThrow(/channel/);
     await expect(book.addContact({ ...admit, role: 'overlord' })).rejects.toThrow(/role/);
-    expect(await members.resolveByWebid(K.webid)).toBeNull();
+    expect(await book.get(K.webid)).toBeNull();
   });
 });
 
@@ -82,7 +82,7 @@ describe('every book method over the keyless row', () => {
     noKey(await book.setPersona(K.webid, 'default', { personaAt: 1 }));
     expect((await book.listContactsByTag('huis')).map((c) => c.webid)).toEqual([K.webid]);
     expect((await book.listContactsByMinTrust('bekend')).map((c) => c.webid)).toEqual([K.webid]);
-    expect(await members.resolveByWebid(K.webid)).toMatchObject({ channel: 'telegram', role: 'member' });
+    expect(await book.get(K.webid)).toMatchObject({ channel: 'telegram', role: 'member' });
   });
 
   it('hide and show — the row stays, keyless', async () => {

@@ -146,10 +146,11 @@ describe('Pinboard V2 Phase 24 — ContactBook', () => {
     const { bundle } = await buildBundle();
     await callSkill(bundle.agent, 'addContact', { webid: BOB });
     await callSkill(bundle.agent, 'setContactFlag', { webid: BOB, flag: 'shareLocation', value: true });
-    await callSkill(bundle.agent, 'setContactFlag', { webid: BOB, flag: 'allowHopThrough', value: true });
+    // the hop flag went with the inert social hop: it is no flag any more
+    expect((await callSkill(bundle.agent, 'setContactFlag', { webid: BOB, flag: 'allowHopThrough', value: true })).error).toMatch(/invalid flag/);
     const c = (await callSkill(bundle.agent, 'listContacts', {})).contacts[0];
     expect(c.shareLocation).toBe(true);
-    expect(c.allowHopThrough).toBe(true);
+    expect(c.allowHopThrough).toBeUndefined();
     expect(c.allowAutomatching).toBe(true);   // default
   });
 });

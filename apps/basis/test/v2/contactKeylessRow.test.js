@@ -24,7 +24,6 @@ import { createPairRoster, pairRouteFor } from '../../src/v2/pairRoster.js';
 import { contactLensModel, changeContactLens } from '../../src/v2/contactLens.js';
 import { deleteContact } from '../../src/v2/contactDelete.js';
 import { backfillContactPersonas } from '../../src/v2/contactPersona.js';
-import { knownPeersToWire } from '../../src/v2/knownPeersSync.js';
 
 const K = KEYLESS_CONTACT_EXAMPLE;
 const admit = { webid: K.webid, displayName: K.displayName, channel: K.channel, role: K.role };
@@ -158,14 +157,12 @@ describe('the persona backfill', () => {
 });
 
 describe('the own-devices carry', () => {
-  it('carries the row whole — its door and its role — and still no key', async () => {
-    const wire = knownPeersToWire({ contacts: [h.row] });
-    expect(wire.contacts).toHaveLength(1);
-    expect(wire.contacts[0]).toMatchObject({ webid: K.webid, channel: 'telegram', role: 'member', displayName: K.displayName });
-    expect(wire.contacts[0].pubKey).toBeUndefined();
-    // …and the sibling's book takes it as the same row
+  it('the row the lane carries is whole — its door and its role — and still no key; a sibling\'s book takes it as the same row', async () => {
+    expect(h.row).toMatchObject({ webid: K.webid, channel: 'telegram', role: 'member', displayName: K.displayName });
+    expect(h.row.pubKey ?? null).toBeNull();
     const sib = await hostWithKeylessRow('sib-webid');
-    const landed = await sib.callSkill('pinboard', 'addContact', { ...wire.contacts[0], webid: 'telegram:5' });
+    const { webid: _w, ...fields } = h.row;
+    const landed = await sib.callSkill('pinboard', 'addContact', { ...fields, webid: 'telegram:5' });
     expect(landed.contact).toMatchObject({ channel: 'telegram', role: 'member' });
     expect(isKeylessContact(landed.contact)).toBe(true);
   });

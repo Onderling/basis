@@ -12,8 +12,9 @@
 export const basisManifest = {
   app:        'basis',
   // The network hosts this app's code reaches: the sign-in issuers it offers as presets (reached when
-  // the person picks one). The person's own pod and relay are endpoints they configure, not fixed hosts.
-  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org'],
+  // the person picks one), and Telegram's bot API for a box's alert chat (only when the box's operator set
+  // one). The person's own pod and relay are endpoints they configure, not fixed hosts.
+  hosts:      ['login.inrupt.com', 'solidcommunity.net', 'solidweb.org', 'api.telegram.org'],
   itemTypes:  ['chat-thread', 'chat-message'],
 
   // B · Layer 1 — domain (non-atom) verb: `help` (meta / shell command).

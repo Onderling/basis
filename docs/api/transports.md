@@ -296,12 +296,39 @@ for a name only multicast DNS answers, finds nothing, and the service is listed 
 household tablet, 2026-10-25: an empty room with the companion announcing correctly). A name that already ends in
 `.local` (a laptop that reports it that way) is kept as it is.
 
+### `defaultRouteInterface`
+
+**Kind:** function · **Import:** `defaultRouteInterface` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+defaultRouteInterface(routeTable)
+```
+
+The interface the default route leaves by, from the kernel's route table (`/proc/net/route`'s text): the home LAN's,
+the same rule the box's firewall uses (`lan_iface`). Null when there is no default route or no table.
+
+**Parameters**
+
+- `routeTable` `string`
+
+**Returns:** `string|null`
+
+### `lanAddressesOf`
+
+**Kind:** function · **Import:** `lanAddressesOf` from `'@onderling/transports/mdns-dnssd'`
+
+```js
+lanAddressesOf(interfaces, name)
+```
+
+The addresses an interface holds, in the shape `os.networkInterfaces()` reports them.
+
 ### `createDnsSdDiscovery`
 
 **Kind:** function · **Import:** `createDnsSdDiscovery` from `'@onderling/transports/mdns-dnssd'`
 
 ```js
-createDnsSdDiscovery({ bonjour = null, hostname = () => os.hostname() } = {})
+createDnsSdDiscovery({ bonjour = null, hostname = () => os.hostname(), // which interface is the room (the operator's override, else the default route's), and the host's interfaces (tests) lanInterface = () => process.env.COMPANION_NEARBY_IFACE || defaultRouteInterface(readRouteTable()), interfaces = () => os.networkInterfaces(), } = {})
 ```
 
 Build the DNS-SD seam.
@@ -311,6 +338,8 @@ Build the DNS-SD seam.
 - `[opts]` `object`
 - `[opts.bonjour]` `object` — inject an instance (tests); otherwise one is created lazily and shared
 - `[opts.hostname]` `() => string` — this host's name (tests); the OS's otherwise
+- `[opts.lanInterface]` `() => (string|null)` — the room's interface (COMPANION_NEARBY_IFACE, else the default route's)
+- `[opts.interfaces]` `() => object` — the host's interfaces (tests); `os.networkInterfaces()` otherwise
 
 **Returns:** `{advertise:Function, browse:Function, destroy:Function}`
 

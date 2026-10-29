@@ -31,6 +31,10 @@ import { replyFact, replyLines, isReadFamily } from '../v2/replyLine.js';
 import { createLastReads } from '../v2/lastRead.js';
 import { telegramPlain } from './telegramPlain.js';
 import { scrubSecrets } from '@onderling/logger';
+import { troubleCause, replyClass } from '../v2/modelWatch.js';
+
+/** The line a person gets when the model did not answer, by cause class. */
+const MODEL_DOWN_LINE = { refused: 'circle.bot.model_refused', slow: 'circle.bot.model_slow', unreachable: 'circle.bot.model_down' };
 
 // What an error may say in a chat, a note or the console: its message without credentials (a fetch error's message is
 // the request URL, and a bot's URL carries its token).
@@ -354,11 +358,13 @@ export function createTelegramRunner({ bridge, callSkill, catalogue: catalogueIn
     // reachable now — never "I did not understand" for a model that did not answer.
     onSlow: (ctx) => say(ctx.chatId, tc(ctx.chatId)('circle.bot.slow')),
     // Without the model (off, or not answering) the person is told what DOES work — the word rules and the commands —
-    // when the door can say it; else the old line.
+    // when the door can say it; else the old line. A model that does not answer is said by its cause, in plain words:
+    // refused (the admin is told), too slow, or not reachable — never a status, never the key.
     onLlmUnavailable: async (_text, ctx, info) => {
+      const down = info?.reason === 'unreachable' ? MODEL_DOWN_LINE[replyClass(troubleCause(info?.error))] : null;
       const lines = await basicHelp(ctx.id, ctx.chatId);
-      if (lines.length) return say(ctx.chatId, [tc(ctx.chatId)(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.bot.basic_head'), ...(info?.reason === 'unreachable' ? [tc(ctx.chatId)('circle.bot.basic_head')] : []), ...lines].join('\n'));
-      return say(ctx.chatId, tc(ctx.chatId)(info?.reason === 'unreachable' ? 'circle.bot.model_down' : 'circle.telegram.unknown'));
+      if (lines.length) return say(ctx.chatId, [tc(ctx.chatId)(down ?? 'circle.bot.basic_head'), ...(down ? [tc(ctx.chatId)('circle.bot.basic_head')] : []), ...lines].join('\n'));
+      return say(ctx.chatId, tc(ctx.chatId)(down ?? 'circle.telegram.unknown'));
     },
     onNoMatch: (_text, ctx, extra) => say(ctx.chatId, assistantReplyText(extra, t, 'circle.telegram.unknown')),
     claim: (text, ctx) => (claims(ctx.chatId, ctx.id, text) ? () => doorLine(ctx.chatId, ctx.id, text) : null),

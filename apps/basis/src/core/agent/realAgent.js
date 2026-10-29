@@ -7423,12 +7423,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // to EN for the chat surface.
     const TRUST_NL_TO_EN = { bekend: 'known', vertrouwd: 'trusted' };
     if (opId === 'listContacts' && Array.isArray(data.contacts)) {
-      if (typeof console !== 'undefined') {
-        console.log('[realAgent] listContacts result:', data.contacts.map((c) => ({
-          webid: String(c.webid).slice(0,32),
-          peerAddr: c.peerAddr ? (c.peerAddr.slice(0,16) + '…') : 'NONE',
-        })));
-      }
       return {
         // The book's own rows, under the name both shells' Contacten roster reads (`pinboardContactToRow` was
         // written for this shape: displayName, the Dutch trust words). Until 2026-09-18 only the chat-shell

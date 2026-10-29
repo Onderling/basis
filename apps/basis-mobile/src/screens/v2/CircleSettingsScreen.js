@@ -317,7 +317,7 @@ export default function CircleSettingsScreen({
         {offeredFeatures().map((f) => (   /* only features that have a surface (web parity) */
           <View key={f} style={styles.row}>
             <Text style={styles.rowLabel}>{t(`circle.settings.feat.${f}`)}</Text>
-            <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+            <Switch /* sets: policy:features — the circle's feature, an admin's statement */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
               value={!!working.features?.[f]}
               onValueChange={(v) => patch({ features: { [f]: v } })}
               testID={`feat-${f}`}
@@ -452,7 +452,7 @@ export default function CircleSettingsScreen({
                   <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}${cs.enabled ? '' : '-disabled'}`}>
                     <View style={styles.row}>
                       <Text style={styles.rowLabel}>{t(ctl.labelKey)}</Text>
-                      <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                      <Switch /* sets: op:* — the control's declared op */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                         disabled={!cs.enabled} value={!!(transport && ctl.stateKey && transport[ctl.stateKey])}
                         onValueChange={(v) => runControl(ctl.opId, { [ctl.arg]: v })} testID={`control-${ctl.id}-switch`} />
                     </View>
@@ -466,7 +466,7 @@ export default function CircleSettingsScreen({
                 <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}${cs.enabled ? '' : '-disabled'}`}>
                   <View style={styles.row}>
                     <Text style={styles.rowLabel}>{t(ctl.labelKey)}</Text>
-                    <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                    <Switch /* sets: policy:* — the control's declared policy field */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                       disabled={!cs.enabled} value={!!working[ctl.policyField]}
                       onValueChange={(v) => patch({ [ctl.policyField]: v })} testID={`control-${ctl.id}-switch`} />
                   </View>
@@ -560,7 +560,7 @@ export default function CircleSettingsScreen({
           return (
             <View key={app} style={styles.row}>
               <Text style={styles.rowLabel}>{t(`circle.settings.app.${app}`)}</Text>
-              <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+              <Switch /* sets: policy:apps — the circle's apps, an admin's statement */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                 value={current.includes(app)}
                 onValueChange={(on) => {
                   const set = new Set(current);
@@ -611,7 +611,7 @@ export default function CircleSettingsScreen({
                     <View key={key} style={styles.row}>
                       <Text style={styles.rowLabel}>{f.label}{f.required ? ' *' : ''}</Text>
                       {f.control === 'toggle' ? (
-                        <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                        <Switch /* sets: policy:settings — an app's declared circle setting */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                           value={!!f.value} onValueChange={(v) => patch({ settings: { [key]: v } })} testID={`setting-${key}`} />
                       ) : f.control === 'choice' ? (
                         <View style={styles.chipRow}>
@@ -649,7 +649,7 @@ export default function CircleSettingsScreen({
                     <View key={row.key} style={styles.capRow} testID={`cap-${row.key}`}>
                       <View style={styles.row}>
                         <Text style={styles.rowLabel}>{`${verbLabel(row.atom)} · ${row.noun}`}</Text>
-                        <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                        <Switch /* sets: policy:capabilities — a capability the circle allows */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                           value={row.enabled} onValueChange={(v) => patch({ capabilities: { [row.key]: { ...base, enabled: v } } })}
                           testID={`cap-${row.key}-enabled`} />
                       </View>

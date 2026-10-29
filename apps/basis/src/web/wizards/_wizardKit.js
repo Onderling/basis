@@ -141,7 +141,7 @@ export function mkCheck(body, doc, text, checked, onToggle) {
   const row = doc.createElement('label');
   row.className = 'cc-wizard-check';
   const input = doc.createElement('input');
-  input.type = 'checkbox';
+  input.type = 'checkbox';   // sets: form — a wizard step's answer, submitted with the wizard's op
   input.checked = checked;
   input.addEventListener('change', () => onToggle(input.checked));
   row.appendChild(input);

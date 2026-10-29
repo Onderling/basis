@@ -478,7 +478,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           <Section title={t('circle.profile.week_switch')}>
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>{t(weekOn ? 'circle.profile.week_on' : 'circle.profile.week_off')}</Text>
-              <Switch testID="profile-week-toggle" value={weekOn === true} disabled={weekOn === null} onValueChange={() => toggleWeek()} />
+              <Switch /* sets: store:person-clock — your own week overview */ testID="profile-week-toggle" value={weekOn === true} disabled={weekOn === null} onValueChange={() => toggleWeek()} />
             </View>
           </Section>
         ) : null}
@@ -507,7 +507,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
           {push.supported ? (
             <View style={styles.switchRow}>
               <Text style={styles.switchLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>
-              <Switch testID="mydata-notif-toggle" value={push.granted === true} onValueChange={() => toggleNativePush()} />
+              <Switch /* sets: device:push — this phone's push permission */ testID="mydata-notif-toggle" value={push.granted === true} onValueChange={() => toggleNativePush()} />
             </View>
           ) : null}
         </Section>
@@ -598,7 +598,7 @@ export default function CircleMyDataScreen({ callSkill, onBack, chatAi, userLlm,
               <Text style={styles.switchLabel}>
                 {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
               </Text>
-              <Switch testID="address-sharing-toggle" value={shareNknAddress === true} onValueChange={() => toggleShareAddress()} />
+              <Switch /* sets: param:privacy.shareNknAddress — your global address */ testID="address-sharing-toggle" value={shareNknAddress === true} onValueChange={() => toggleShareAddress()} />
             </View>
           </Section>
         ) : null}

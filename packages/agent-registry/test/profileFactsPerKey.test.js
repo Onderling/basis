@@ -64,3 +64,35 @@ describe('facts merge per key', () => {
     expect(isReservedPropertyKey(FACTS_KEYS_KEY)).toBe(true);
   });
 });
+
+// A DRIVER TAKEN OFF on one device stays off when another device's OLDER facts — still holding the driver and its
+// release in a circle — land: the removal is a per-key tombstone for the driver AND for each of its releases, written in
+// the one write that takes it off (as the host's removeDriver writes it: removeOwn + forgetDisclosureKey).
+describe('a driver removed on A, then B\'s older facts land on A', () => {
+  it('the driver stays gone and its release stays forgotten', async () => {
+    const { removeOwn, setOwn, forgetDisclosureKey, setDisclosure } = await import('../index.js');
+    const offer = { kind: 'offering', text: 'fietsen repareren', tags: [] };
+    const seeded = edit({}, base, 100);
+    // both devices: the driver, released in circle c1 (A wrote it; B received it — the same facts)
+    const withDriver = edit(seeded, {
+      ...seeded,
+      properties: setOwn(seeded.properties, 'offering:fietsen', offer),
+      disclosure: setDisclosure(seeded.disclosure, 'c1', 'offering:fietsen', { enabled: true }),
+    }, 200);
+    const onB = withDriver;
+    // A takes it off, later
+    const onA = edit(withDriver, {
+      ...withDriver,
+      properties: removeOwn(withDriver.properties, 'offering:fietsen'),
+      disclosure: forgetDisclosureKey(withDriver.disclosure, 'offering:fietsen'),
+    }, 300);
+    expect(profileFactsOf(onA).properties['offering:fietsen']).toBeUndefined();
+    // B's older facts land on A (and the other way round: B catches up)
+    for (const [here, there] of [[onA, onB], [onB, onA]]) {
+      const landed = withProfileFacts(here, mergeProfileFacts(profileFactsOf(here), profileFactsOf(there)));
+      expect(landed.properties['offering:fietsen'], 'the driver stays gone').toBeUndefined();
+      expect(landed.disclosure?.perContext?.c1?.['offering:fietsen'], 'its release stays forgotten').toBeUndefined();
+      expect(landed.properties.name).toEqual(own('Anna'));
+    }
+  });
+});

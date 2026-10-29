@@ -9,8 +9,9 @@
  * Other driver kinds (hobby, desire, motivation, …) show in Goals, so nothing that still matches is hidden; an add there
  * is a goal.
  */
-import { offeringKeyFor } from '../core/offeringsMigration.js';
-import { INTERESTS_DRIVER_KEY } from '../core/interestsMigration.js';
+import { offeringKeyFor } from './offeringKey.js';
+/** Interests are ONE driver under this key; its tags carry the meaning. */
+export const INTERESTS_DRIVER_KEY = 'interests';
 
 export const DRIVER_SECTION_IDS = Object.freeze(['offerings', 'interests', 'goals']);
 

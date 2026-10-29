@@ -66,7 +66,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
         <Text style={styles.section}>{t('circle.availability.holiday')}</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>{t('circle.availability.holiday_on')}</Text>
-          <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white} value={!!h.active} onValueChange={(v) => setHoliday({ active: v })} testID="holiday-active" />
+          <Switch /* sets: store:availability — your holiday */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white} value={!!h.active} onValueChange={(v) => setHoliday({ active: v })} testID="holiday-active" />
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.rowLabel}>{t('circle.availability.holiday_until')}</Text>
@@ -85,7 +85,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
         <Text style={styles.section}>{t('circle.availability.quietHours')}</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>{t('circle.availability.quiet_on')}</Text>
-          <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white} value={!!q.enabled} onValueChange={(v) => setQuiet({ enabled: v })} testID="quiet-enabled" />
+          <Switch /* sets: store:availability — your quiet hours */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white} value={!!q.enabled} onValueChange={(v) => setQuiet({ enabled: v })} testID="quiet-enabled" />
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.rowLabel}>{t('circle.availability.from')}</Text>
@@ -115,7 +115,7 @@ export default function CircleAvailabilityScreen({ store, onBack }) {
         </View>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>{t('circle.availability.weekends')}</Text>
-          <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white} value={!!q.weekends} onValueChange={(v) => setQuiet({ weekends: v })} testID="quiet-weekends" />
+          <Switch /* sets: store:availability — quiet at weekends */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white} value={!!q.weekends} onValueChange={(v) => setQuiet({ weekends: v })} testID="quiet-weekends" />
         </View>
       </ScrollView>
 

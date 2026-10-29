@@ -93,7 +93,7 @@ function toggle({ field, checked, label, onToggle }) {
   const row = document.createElement('label');
   row.className = 'circle-availability__toggle';
   const box = document.createElement('input');
-  box.type = 'checkbox';
+  box.type = 'checkbox';   // sets: store:availability — your availability, saved on Save
   box.checked = checked;
   box.dataset.field = field;
   box.addEventListener('change', () => onToggle(box.checked));

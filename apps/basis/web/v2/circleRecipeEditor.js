@@ -531,7 +531,7 @@ function renderCompactToggle(block, { tr, emit }) {
   const row = document.createElement('label');
   row.className = 'circle-recipe-editor__compact-row';
   const cb = document.createElement('input');
-  cb.type = 'checkbox';
+  cb.type = 'checkbox';   // sets: store:recipe — the circle's recipe block, fanned to its members
   cb.className = 'circle-recipe-editor__compact-checkbox';
   cb.checked = block.config?.compact === true;
   cb.addEventListener('change', () => emit({ compact: cb.checked }));

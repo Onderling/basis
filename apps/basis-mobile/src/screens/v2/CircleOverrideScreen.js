@@ -79,7 +79,7 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
         {TOP_TOGGLES.map((key) => (
           <View key={key} style={styles.row}>
             <Text style={styles.rowLabel}>{t(`circle.override.${key}`)}</Text>
-            <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+            <Switch /* sets: store:member-override — your own override for this circle */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
               value={!!working[key]}
               onValueChange={(v) => patch({ [key]: v })}
               testID={`override-${key}`}
@@ -91,7 +91,7 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
         {PUSH_TOGGLES.map(({ key, i18n }) => (
           <View key={key} style={styles.row}>
             <Text style={styles.rowLabel}>{t(`circle.member.notifications.${i18n}`)}</Text>
-            <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+            <Switch /* sets: store:member-override — push for this circle */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
               value={!!working.push?.[key]}
               onValueChange={(v) => patch({ push: { [key]: v } })}
               testID={`override-push-${key}`}
@@ -104,7 +104,7 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
         {noticeOverrideRows({ policy, override: working }).map((r) => (
           <View key={r.kind} style={styles.row}>
             <Text style={styles.rowLabel}>{t(r.labelKey)}</Text>
-            <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+            <Switch /* sets: store:member-override — which notices you get */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
               value={r.on}
               onValueChange={() => patch({ notices: r.next })}
               testID={`override-notice-${r.kind}`}
@@ -115,7 +115,7 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
         {FLOW_TOGGLES.map((key) => (
           <View key={key} style={styles.row}>
             <Text style={styles.rowLabel}>{t(`circle.override.${key}`)}</Text>
-            <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+            <Switch /* sets: store:member-override — what flows through */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
               value={!!working.flowThrough?.[key]}
               onValueChange={(v) => patch({ flowThrough: { [key]: v } })}
               testID={`override-${key}`}
@@ -133,7 +133,7 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
               return (
                 <View key={r.key} style={styles.row} testID={`override-cap-${r.key}`}>
                   <Text style={styles.rowLabel}>{`${verbLabel(r.atom)} · ${r.noun}${floorTag}`}</Text>
-                  <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                  <Switch /* sets: store:member-override — a capability you opt out of */ trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
                     value={!r.optedOut}
                     onValueChange={(participate) => {
                       const next = new Set(current);

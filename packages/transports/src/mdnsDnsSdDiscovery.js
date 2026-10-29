@@ -19,6 +19,7 @@
  * proves possession afterwards over TCP. A record without a `pubKey` is ignored rather than guessed at.
  */
 import os from 'node:os';
+import fs from 'node:fs';
 import Bonjour from 'bonjour-service';
 import { SERVICE_TYPE } from './MdnsTransport.js';
 
@@ -43,14 +44,54 @@ export function srvHost(hostname) {
 }
 
 /**
+ * The interface the default route leaves by, from the kernel's route table (`/proc/net/route`'s text): the home LAN's,
+ * the same rule the box's firewall uses (`lan_iface`). Null when there is no default route or no table.
+ * @param {string} routeTable
+ * @returns {string|null}
+ */
+export function defaultRouteInterface(routeTable) {
+  for (const line of String(routeTable ?? '').split('\n').slice(1)) {
+    const [iface, dest, , , , , , mask] = line.trim().split(/\s+/);
+    if (iface && dest === '00000000' && (mask === undefined || mask === '00000000')) return iface;
+  }
+  return null;
+}
+
+/** The addresses an interface holds, in the shape `os.networkInterfaces()` reports them. */
+export function lanAddressesOf(interfaces, name) {
+  return ((interfaces ?? {})[name] ?? []).filter((a) => a && !a.internal).map((a) => a.address);
+}
+
+// interfaces that are never the room: container bridges and their veths, VM bridges, overlay and VPN tunnels
+const NOT_THE_LAN = /^(docker|br-|veth|virbr|cni|flannel|cali|tailscale|zt|wg|tun|tap)/;
+
+/** The addresses a host may publish for itself: the LAN interface's, or (none known) every interface that is not a bridge or tunnel. */
+function publishableAddresses(interfaces, lan) {
+  if (lan && lanAddressesOf(interfaces, lan).length) return new Set(lanAddressesOf(interfaces, lan));
+  return new Set(Object.entries(interfaces ?? {}).filter(([n]) => !NOT_THE_LAN.test(n)).flatMap(([n]) => lanAddressesOf(interfaces, n)));
+}
+
+/** The kernel's route table, read where the process can see it (a container on host networking sees the host's). */
+function readRouteTable() {
+  try { return fs.readFileSync('/proc/net/route', 'utf8'); } catch { return ''; }
+}
+
+/**
  * Build the DNS-SD seam.
  *
  * @param {object} [opts]
  * @param {object} [opts.bonjour]  inject an instance (tests); otherwise one is created lazily and shared
  * @param {() => string} [opts.hostname]  this host's name (tests); the OS's otherwise
+ * @param {() => (string|null)} [opts.lanInterface]  the room's interface (COMPANION_NEARBY_IFACE, else the default route's)
+ * @param {() => object} [opts.interfaces]  the host's interfaces (tests); `os.networkInterfaces()` otherwise
  * @returns {{advertise:Function, browse:Function, destroy:Function}}
  */
-export function createDnsSdDiscovery({ bonjour = null, hostname = () => os.hostname() } = {}) {
+export function createDnsSdDiscovery({
+  bonjour = null, hostname = () => os.hostname(),
+  // which interface is the room (the operator's override, else the default route's), and the host's interfaces (tests)
+  lanInterface = () => process.env.COMPANION_NEARBY_IFACE || defaultRouteInterface(readRouteTable()),
+  interfaces = () => os.networkInterfaces(),
+} = {}) {
   let instance = bonjour;
   const ensure = () => (instance ??= new Bonjour());
 
@@ -69,6 +110,14 @@ export function createDnsSdDiscovery({ bonjour = null, hostname = () => os.hostn
         port,
         txt,
       });
+      // The host's address records: the library answers every non-internal interface, docker bridges included, and a
+      // phone that resolves this host then dials a bridge it cannot reach. Only the LAN's addresses are published. The
+      // library reads `records()` after its name probe, so narrowing it here is in time for the first announcement.
+      const allowed = publishableAddresses(interfaces(), lanInterface());
+      if (typeof service?.records === 'function') {
+        const all = service.records.bind(service);
+        service.records = () => all().filter((r) => (r?.type !== 'A' && r?.type !== 'AAAA') || allowed.has(r.data));
+      }
       return () => { try { service.stop?.(); } catch { /* unpublish is best-effort */ } };
     },
 

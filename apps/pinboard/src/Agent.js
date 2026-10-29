@@ -35,7 +35,7 @@ import { UsageMetrics }      from './lib/UsageMetrics.js';
 import { PushRegistry }      from './lib/PushRegistry.js';
 import { MemberMapCache }    from './lib/MemberMapCache.js';
 import { PushRegistryCache } from './lib/PushRegistryCache.js';
-import { createContactBook } from './lib/ContactBook.js';
+import { createContactBook, moveContactsFromMemberMap } from './lib/ContactBook.js';
 import { createMemorySelfProfile } from './lib/selfProfile.js';
 import { wireChat }          from './chat/wireChat.js';
 import { createRoutedStore } from './lib/routedStore.js';
@@ -465,6 +465,11 @@ export async function createNeighbourhoodAgent({
   // `kind: 'chat-message'` items linked by `source.threadId`.
   // the person's contacts: `contact` rows on their own-devices store, one per (self, contact) — lib/ContactBook.js
   const contacts = createContactBook({ store: contactStore, selfFor: contactSelfFor ?? (() => ({ id: 'default', writer: offeringMatchOpts.localActor ?? 'me' })) });
+  // …and what the old book held (MemberMap contact entries) moves into it once, before anything reads it
+  try {
+    const { moved, kept } = await moveContactsFromMemberMap({ members, contacts });
+    if (moved || kept) console.info(`[contacts] moved ${moved} contact(s) from the old book into the own-devices book${kept ? `; ${kept} kept (a self not held here)` : ''}`);
+  } catch (err) { console.warn(`[contacts] the old book could not be moved: ${err?.message ?? err}`); }
   const chat = wireChat({
     agent,
     itemStore,

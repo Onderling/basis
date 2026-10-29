@@ -237,3 +237,27 @@ export function createContactBook({ store = null, selfFor = null } = {}) {
     listContactsByMinTrust,
   };
 }
+
+/**
+ * THE ONE-TIME MOVE of the old contact book: a contact used to be a MemberMap entry marked `relation: 'contact'` (on a
+ * box, the household bot's admitted people among them). Each such entry is written once into the book, as the self it is
+ * filed under, and stops being a contact in the map (`group-member`: the marker, so a later boot moves nothing; the entry
+ * itself stays for the rosters that read it). An entry filed under a self this device does not hold stays as it was.
+ * Remove in the release after next, with the MemberMap.
+ * @returns {Promise<{moved: number, kept: number}>}
+ */
+export async function moveContactsFromMemberMap({ members, contacts }) {
+  let moved = 0; let kept = 0;
+  for (const m of (await members?.list?.()) ?? []) {
+    if (m?.relation !== 'contact' || !m.webid) continue;
+    try {
+      if (!(await contacts.get(m.webid))) {
+        const { relation: _relation, ...fields } = m;
+        await contacts.addContact(fields);
+      }
+      await members.addMember({ ...m, relation: 'group-member' });
+      moved += 1;
+    } catch { kept += 1; }
+  }
+  return { moved, kept };
+}

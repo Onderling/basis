@@ -317,7 +317,7 @@ describe('the register accept/reject decision cannot read circle membership', ()
   it('the only circle-aware input to the decision is the operator\'s own serving policy', () => {
     const circleLines = registerAsk.split('\n').map(normalise).filter(l => l && TOKEN_RE.test(l));
     expect(circleLines).toEqual([
-      'const { address, groupProof, rotationProof } = msg;',
+      'const { address, groupProof } = msg;',
       'const auth = groupAuth.verifyBound({',
       'proof: groupProof,',
       // Not an input: the answer the two lines above produced, written down so the SECOND frame of

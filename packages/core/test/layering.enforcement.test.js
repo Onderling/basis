@@ -77,7 +77,7 @@ describe('layering: core does not re-export or depend on vault / oidc-session', 
   it('the barrel no longer re-exports the on-pod identity family (import from @onderling/pod-client)', () => {
     // IdentityPodStore / IdentitySync / migrateVaultToPod store/migrate/sync
     // identity ON a pod — they were extracted OUT to @onderling/pod-client (SDK pod
-    // layer). Kernel identity (AgentIdentity / KeyRotation / Bootstrap) stays here.
+    // layer). Kernel identity (AgentIdentity / Bootstrap) stays here.
     for (const s of ['IdentityPodStore', 'IdentitySync', 'migrateVaultToPod']) {
       expect(core[s], `core should not re-export ${s} (it lives in @onderling/pod-client)`).toBeUndefined();
     }
@@ -85,7 +85,7 @@ describe('layering: core does not re-export or depend on vault / oidc-session', 
     expect(indexSrc).not.toMatch(/from\s+['"]\.\/identity\/IdentitySync\.js['"]/);
     expect(indexSrc).not.toMatch(/from\s+['"]\.\/identity\/migrateVaultToPod\.js['"]/);
     // Kernel identity must remain.
-    for (const s of ['AgentIdentity', 'KeyRotation', 'Bootstrap']) {
+    for (const s of ['AgentIdentity', 'Bootstrap']) {
       expect(core[s], `core must still export kernel identity ${s}`).toBeDefined();
     }
   });

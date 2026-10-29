@@ -8290,14 +8290,6 @@ export async function createRealHouseholdAgent(opts = {}) {
       return sa.removeHeld?.(a) ?? 0;
     },
 
-    /**
-     * Rotate the chat-agent's Ed25519 identity.  Old key stays valid
-     * for a 7-day grace period; KeyRotation.broadcast notifies known
-     * peers.  S6 autoLog fires 'identity.rotate'.
-     */
-    async rotateChatIdentity(rotateOpts = {}) {
-      return sa.rotateIdentity(rotateOpts);
-    },
 
     /** Diagnostic for /security-status (proxies through the factory). */
     securityStatus() { return sa.securityStatus(); },

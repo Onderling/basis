@@ -22,8 +22,8 @@
  * ONE hello and thereafter have their ordinary chat reach the victim's UI as somebody else.
  *
  * ── The rule now enforced ────────────────────────────────────────────────────────────────────────────
- * Establish if absent · no-op if identical · REFUSE if different, unless a valid rotation proof
- * accompanies it.
+ * Establish if absent · no-op if identical · REFUSE if different — with no exception for an inline rotation
+ * proof (2026-10-29: the push rotation is gone; a person's key moves through the root-gated ceremony).
  *
  * ── What Decision 1 changed here (2026-07-31) ────────────────────────────────────────────────────────
  * The rule is the same and the outcomes are the same; the DIAGNOSIS changed, and it changed to a more
@@ -45,11 +45,17 @@
 import { describe, it, expect }  from 'vitest';
 import { SecurityLayer, SEC }    from '../../src/security/SecurityLayer.js';
 import { AgentIdentity }         from '../../src/identity/AgentIdentity.js';
-import { KeyRotation }           from '../../src/identity/KeyRotation.js';
+import { encode as b64encode }   from '../../src/crypto/b64.js';
 import { VaultMemory }           from '@onderling/vault';
 import { mkEnvelope, P }         from '../../src/Envelope.js';
 
 const newIdentity = () => AgentIdentity.generate(new VaultMemory());
+/** The retired push rotation's proof, byte for byte as it was built: the OLD key's signature over its sorted JSON. */
+const pushProof = (oldId, newPubKey) => {
+  const unsigned = { type: 'key-rotation', oldPubKey: oldId.pubKey, newPubKey, issuedAt: Date.now(), gracePeriod: 604_800 };
+  const sorted = Object.fromEntries(Object.entries(unsigned).sort(([a], [b]) => a.localeCompare(b)));
+  return { ...unsigned, sig: b64encode(oldId.sign(new TextEncoder().encode(JSON.stringify(sorted)))) };
+};
 
 /** The per-circle address the roster says belongs to Alice. Mallory never controls the key behind it. */
 const ALICE_CIRCLE_ADDR = 'circle-addr-alice-circle';
@@ -223,7 +229,7 @@ describe('the establish half — first contact still works', () => {
   });
 });
 
-describe('a key that genuinely changed — routed through the rotation proof', () => {
+describe('a key that changed is never taken from an envelope', () => {
   it('a differing-key HI is heard, and moves nothing — the payload claim is not a binding', async () => {
     // An HI from the REAL key holder that merely ANNOUNCES a different key in its payload verifies and
     // is delivered, and the binding does not move. Since Decision 1 the crypto layer does not read that
@@ -251,7 +257,11 @@ describe('a key that genuinely changed — routed through the rotation proof', (
     expect(seen.payload.pubKey).toBe(aliceNew.pubKey);
   });
 
-  it('a differing-key HI WITH a valid rotation proof is honoured', async () => {
+  it('a differing-key HI carrying a rotation proof signed by the PREVIOUS key is refused — the old key cannot move the identity', async () => {
+    // The push rotation honoured this: a proof signed by the old key, inside an envelope signed by the new one, and
+    // the binding moved. A revoked device still holds the old seed, so whoever held the old key could rotate the
+    // identity away from its owner in every peer's view. A person's key moves only through the root-gated ceremony
+    // (the chain the contact pulls), never by an inline proof.
     const victimId = await newIdentity();
     const aliceId  = await newIdentity();
     const aliceNew = await newIdentity();
@@ -259,49 +269,20 @@ describe('a key that genuinely changed — routed through the rotation proof', (
     const victim = new SecurityLayer({ identity: victimId });
     victim.registerPeer(ALICE_CIRCLE_ADDR, aliceId.pubKey);
 
-    const proof = await KeyRotation.buildProof(aliceId, aliceNew.pubKey);
+    const proof = pushProof(aliceId, aliceNew.pubKey);
 
-    // The proof must be inside the signed bytes, so it is attached BEFORE signing, and the envelope is
-    // signed with the NEW key — exactly the shape `encrypt()` produces during a rotation grace window.
     const aliceNewSec = new SecurityLayer({ identity: aliceNew });
     const env = mkEnvelope(P.HI, ALICE_CIRCLE_ADDR, victimId.pubKey, { pubKey: aliceNew.pubKey });
     env._rotationProof = proof;
     const hi = aliceNewSec.encrypt(env);
 
-    const seen = victim.decryptAndVerify(hi);
-
-    expect(victim.getPeerKey(ALICE_CIRCLE_ADDR)).toBe(aliceNew.pubKey);
-    // The Agent._dispatch → PeerGraph mirror still gets its tag.
-    expect(seen._rotationMigrated).toEqual({
-      oldPubKey: aliceId.pubKey,
-      newPubKey: aliceNew.pubKey,
-      proof,
-    });
-    // Nothing was refused on the way: the rotation branch is now the FIRST thing consulted when the
-    // signing key differs from the binding, rather than a repair after a refusal was already counted.
-    expect(victim.refusedKeySubstitutions).toBe(0);
-  });
-
-  it('a retired key cannot be put back in service by an HI', async () => {
-    // `createSecureAgent`'s receive boundary registers the HI's canonical pubKey under itself
-    // (`learnPeerKey(payload.pubKey, payload.pubKey)`). After a rotation the map holds
-    // `oldPubKey → newPubKey`, so an HI asserting the RETIRED key would have reset that to `old → old`
-    // and re-enabled a key its owner deliberately withdrew. Same rule, same refusal.
-    const victimId = await newIdentity();
-    const aliceId  = await newIdentity();
-    const aliceNew = await newIdentity();
-
-    const victim = new SecurityLayer({ identity: victimId });
-    victim.registerPeer(aliceId.pubKey, aliceId.pubKey);
-    victim.migratePeerKey(aliceId.pubKey, aliceNew.pubKey);
-    expect(victim.getPeerKey(aliceId.pubKey)).toBe(aliceNew.pubKey);
-
-    expect(victim.learnPeerKey(aliceId.pubKey, aliceId.pubKey)).toBe('refused');
-    expect(victim.getPeerKey(aliceId.pubKey)).toBe(aliceNew.pubKey);
+    expect(() => victim.decryptAndVerify(hi)).toThrow();
+    expect(victim.getPeerKey(ALICE_CIRCLE_ADDR), 'the binding did not move').toBe(aliceId.pubKey);
+    expect(victim.refusedKeySubstitutions).toBe(1);
   });
 });
 
-describe('what IS guarded — the rotation path, for contrast', () => {
+describe('an old push-rotation proof stapled to an envelope changes nothing', () => {
   it('an inline rotation proof from a key we do not hold is ignored', async () => {
     const victimId  = await newIdentity();
     const aliceId   = await newIdentity();
@@ -311,10 +292,9 @@ describe('what IS guarded — the rotation path, for contrast', () => {
     victim.registerPeer(ALICE_CIRCLE_ADDR, aliceId.pubKey);
 
     // Mallory mints a proof "mallory-old → mallory-new" and staples it to an envelope from Alice's
-    // address. The guard is `mapped === proof.oldPubKey` (SecurityLayer.js:308): we hold Alice's key
-    // there, not Mallory's old one, so the migration never runs.
+    // address: refused, the binding intact.
     const malloryNew = await newIdentity();
-    const proof = await KeyRotation.buildProof(malloryId, malloryNew.pubKey);
+    const proof = pushProof(malloryId, malloryNew.pubKey);
 
     const mallorySec = new SecurityLayer({ identity: malloryId });
     mallorySec.registerPeer(victimId.pubKey, victimId.pubKey);
@@ -329,9 +309,9 @@ describe('what IS guarded — the rotation path, for contrast', () => {
     expect(victim.getPeerKey(ALICE_CIRCLE_ADDR)).toBe(aliceId.pubKey);   // intact
   });
 
-  it('a rotation mutation is rolled back when the signature fails', async () => {
-    // Alice's own key rotates, but the envelope carrying the proof is signed by nobody who holds the new
-    // key — the peers map must come back to Alice's old key.
+  it('a genuine proof from Alice, stapled to a bystander\'s envelope, moves nothing', async () => {
+    // The proof really is Alice's; the envelope is signed by nobody who holds the new key. Refused, and
+    // Alice's key stays bound.
     const victimId = await newIdentity();
     const aliceId  = await newIdentity();
     const aliceNew = await newIdentity();
@@ -339,10 +319,8 @@ describe('what IS guarded — the rotation path, for contrast', () => {
     const victim = new SecurityLayer({ identity: victimId });
     victim.registerPeer(ALICE_CIRCLE_ADDR, aliceId.pubKey);
 
-    const proof = await KeyRotation.buildProof(aliceId, aliceNew.pubKey);
+    const proof = pushProof(aliceId, aliceNew.pubKey);
 
-    // Signed by a bystander, with the proof stapled on AFTER signing — so the proof passes every rotation
-    // guard (it really is Alice's, really in grace), the migration runs, and only then does verify fail.
     const bystander = new SecurityLayer({ identity: await newIdentity() });
     bystander.registerPeer(victimId.pubKey, victimId.pubKey);
     const env = bystander.encrypt(
@@ -353,6 +331,6 @@ describe('what IS guarded — the rotation path, for contrast', () => {
     expect(() => victim.decryptAndVerify(env)).toThrow(
       expect.objectContaining({ code: SEC.BAD_SIG }),
     );
-    expect(victim.getPeerKey(ALICE_CIRCLE_ADDR)).toBe(aliceId.pubKey);   // rolled back
+    expect(victim.getPeerKey(ALICE_CIRCLE_ADDR)).toBe(aliceId.pubKey);   // intact
   });
 });

@@ -34,8 +34,9 @@
  * ── The rules for `#peers` on the inbound path ─────────────────────────────
  * An inbound envelope may ESTABLISH a key for an address we hold none for
  * (ordinary trust-on-first-use — genuine first contact has to work), and it
- * may CHANGE one only by carrying a valid rotation proof signed by the key we
- * already hold. It may never simply assert a different key. Since Decision 1
+ * may never CHANGE one: a different key at an address we hold is refused,
+ * whatever the envelope carries (a person's key moves through the root-gated
+ * ceremony a contact pulls; a circle address through its roster). Since Decision 1
  * this is defence in depth rather than the load-bearing wall it was on 07-30:
  * a substituted key no longer decides its own verification, it only fails to
  * match what we hold. Keeping it means an address whose binding was proved
@@ -62,7 +63,6 @@
 import { P, canonicalize }                          from '../Envelope.js';
 import { AgentIdentity }                             from '../identity/AgentIdentity.js';
 import { InternalTransport }                         from '../transport/InternalTransport.js';
-import { KeyRotation }                               from '../identity/KeyRotation.js';
 import { encode as b64encode, decode as b64decode }  from '../crypto/b64.js';
 import { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential }
   from './senderKey.js';
@@ -120,9 +120,8 @@ export class SecurityError extends Error {
  * Every outbound envelope carries the key that signed it, and every inbound one is verified against
  * the key IT carries — never against a key looked up by the address it claims. Peer pubkeys are
  * learned from HI envelopes — established when we hold none for that address, never replaced by one
- * (that needs a rotation proof); HI itself is signed but plaintext.
- * Also tracks key-rotation grace state so envelopes to/from a recently rotated key
- * still validate, and can attach an inline rotation proof to outbound envelopes.
+ * (a key change arrives through the ceremony or the roster, not an envelope); HI itself is signed but
+ * plaintext.
  */
 export class SecurityLayer {
   /** @type {import('../identity/AgentIdentity.js').AgentIdentity} */
@@ -133,24 +132,6 @@ export class SecurityLayer {
   #inProcessPeers = new Set();
   /** @type {Map<string, number>} _id → expiresAt (ms) */
   #dedup = new Map();
-  /**
-   * Group FF — self-rotation grace state.
-   *   oldPubKey → { identity: AgentIdentity, graceUntil: ms }
-   * During the grace window we still accept inbound envelopes addressed
-   * to our OLD pubkey (peers that missed the rotation broadcast) and
-   * decrypt them using the old identity's privkey.
-   * @type {Map<string, { identity: import('../identity/AgentIdentity.js').AgentIdentity, graceUntil: number }>}
-   */
-  #selfHistory = new Map();
-
-  /**
-   * Group FF+1 — inline proof attached to every outbound envelope during
-   * the sender's grace window, so receivers that missed the broadcast
-   * auto-migrate on the first post-rotation message.
-   * @type {{ proof: object, graceUntil: number } | null}
-   */
-  #inlineProof = null;
-
   /**
    * Count of inbound key substitutions refused (step 3 saw a DIFFERENT key
    * held for the address the envelope claims). Refusal is deliberately silent
@@ -281,60 +262,13 @@ export class SecurityLayer {
   get senderAuthorizationsByAbsence() { return this.#unauthorizedByAbsence; }
 
   /**
-   * Group FF — register an old identity for grace-period acceptance.
-   * Called by Agent.rotateIdentity (and by agent startup when the vault
-   * contains a still-in-grace previous key).  After the graceUntil
-   * timestamp passes, #decryptAndVerify stops accepting envelopes
-   * addressed to that pubkey.
-   *
-   * @param {import('../identity/AgentIdentity.js').AgentIdentity} oldIdentity
-   * @param {number} graceUntil  — ms epoch
-   */
-  registerSelfRotation(oldIdentity, graceUntil) {
-    this.#selfHistory.set(oldIdentity.pubKey, { identity: oldIdentity, graceUntil });
-    // Keep #peers self-registered under the old pubkey too, so envelopes
-    // signed BY us with the old key (e.g. the rotation proof itself,
-    // echoed back from a test) still verify.
-    this.#peers.set(oldIdentity.pubKey, oldIdentity.pubKey);
-  }
-
-  /**
-   * Group FF — swap the current identity after a rotation.
-   * Agent.rotateIdentity calls this AFTER registerSelfRotation so both
-   * old and new are valid during grace.
+   * Swap the current identity (the agent's mid-flight `swapIdentity`).
    *
    * @param {import('../identity/AgentIdentity.js').AgentIdentity} newIdentity
    */
   swapIdentity(newIdentity) {
     this.#identity = newIdentity;
     this.#peers.set(newIdentity.pubKey, newIdentity.pubKey);
-  }
-
-  /**
-   * Group FF+1 — install a signed rotation proof that will be attached
-   * to every outbound encrypted envelope until `graceUntil` passes.
-   * Peers that missed the broadcast OW thus auto-migrate on the first
-   * post-rotation message they receive from us.  Passing `null` clears.
-   *
-   * @param {object|null} proof
-   * @param {number|null} [graceUntil]
-   */
-  setInlineProof(proof, graceUntil = null) {
-    if (!proof) { this.#inlineProof = null; return; }
-    this.#inlineProof = { proof, graceUntil: graceUntil ?? Infinity };
-  }
-
-  /**
-   * True while an inline rotation proof is armed and still within its grace
-   * window — i.e. this layer is currently attaching a proof to every outbound
-   * encrypted envelope so un-notified peers auto-migrate. The B★ in-process
-   * fast-path checks this to STAY ON the wire path during rotation grace, so
-   * the inline-proof migration side-effect is never skipped (Group FF+1).
-   *
-   * @returns {boolean}
-   */
-  get inlineProofActive() {
-    return !!this.#inlineProof && Date.now() < this.#inlineProof.graceUntil;
   }
 
   /** @returns {string} — current self pubkey */
@@ -441,10 +375,8 @@ export class SecurityLayer {
    *   • identical → no-op
    *   • different → refuse; the held binding survives untouched
    *
-   * A legitimate key change is not refused, it is *routed*: it must arrive as
-   * a rotation proof signed by the key we already hold (`migratePeerKey` /
-   * the inline `_rotationProof` path), which is the only claim about a new key
-   * the current key holder can make and an impostor cannot.
+   * A legitimate key change does not come this way at all: a person's key
+   * through the root-gated ceremony, a circle address through its roster.
    *
    * Since Decision 1 `decryptAndVerify` no longer calls this: the inbound path
    * binds the key that DEMONSTRABLY signed the envelope, not one asserted in a
@@ -496,7 +428,7 @@ export class SecurityLayer {
 
   /**
    * The keys bound through `adoptInProcessPeer`, read now — the closed roster of this layer's bus
-   * (`createInProcessSenderAuthorizer`). A key a rotation migrated is the current one.
+   * (`createInProcessSenderAuthorizer`).
    * @returns {Set<string>}
    */
   inProcessPeerKeys() {
@@ -538,28 +470,6 @@ export class SecurityLayer {
   unregisterPeer(address) {
     this.#peers.delete(address);
     this.#inProcessPeers.delete(address);
-  }
-
-  /**
-   * Group FF — peer key rotation.
-   * Walk #peers and replace every entry whose value === `oldPubKey`
-   * with `newPubKey`.  Called by the key-rotation receive handler after
-   * a proof has been verified, so messages signed by the new key from
-   * the same transport addresses continue to verify.
-   *
-   * @param {string} oldPubKey
-   * @param {string} newPubKey
-   * @returns {number} number of entries migrated
-   */
-  migratePeerKey(oldPubKey, newPubKey) {
-    let n = 0;
-    for (const [addr, pk] of this.#peers) {
-      if (pk === oldPubKey) { this.#peers.set(addr, newPubKey); n++; }
-    }
-    // Also register the pubKey→pubKey mapping so envelopes addressed by
-    // the pubKey directly (relay's common case) resolve.
-    if (!this.#peers.has(newPubKey)) this.#peers.set(newPubKey, newPubKey);
-    return n;
   }
 
   // ── Outbound ───────────────────────────────────────────────────────────────
@@ -606,25 +516,11 @@ export class SecurityLayer {
 
     env.payload = { _box: b64encode(combined) };
 
-    // Group FF — canonicalise env._to to the *pubkey* the ciphertext was
-    // actually boxed for, so the receiver's decryptAndVerify can pick the
-    // right self-identity (current vs. grace-window previous).  Without
-    // this, a post-rotation peer that encrypts to the rotated recipient's
-    // new key would still tag env._to with the recipient's old transport
-    // address, and the receiver's grace logic would reach for the wrong
-    // privkey.  Transport routing (_put's `to` parameter) is unaffected —
+    // Canonicalise env._to to the *pubkey* the ciphertext was actually
+    // boxed for, so the receiver's decryptAndVerify picks the right
+    // self-identity (the canonical one or a per-circle one).  Transport routing (_put's `to` parameter) is unaffected —
     // it still uses the address the caller passed in.
     env._to = recipientKey;
-
-    // Group FF+1 — attach inline rotation proof if we're still in grace.
-    // Lazy-expire: once the window passes, drop the proof.
-    if (this.#inlineProof) {
-      if (Date.now() >= this.#inlineProof.graceUntil) {
-        this.#inlineProof = null;
-      } else {
-        env._rotationProof = this.#inlineProof.proof;
-      }
-    }
 
     return this.#sign(env, sender);
   }
@@ -698,19 +594,16 @@ export class SecurityLayer {
     // no longer decides which key verifies, it only refuses a key that is not the one we were told
     // belongs at this address. Kept because it holds with or without a roster authorizer, on every
     // transport, and it is what makes a proof-verified roster row the last word about an address.
+    // There is no exception for a key that "rotated": an inline proof signed by the key we hold used to move the
+    // binding, and a revoked device still holds that key. A person's key moves through the root-gated ceremony (the
+    // chain a contact pulls), a circle address through its roster — never by a claim inside an envelope.
     const held = this.#peers.get(env._from);
-    let inlineMigration = null;
     if (held !== undefined && held !== senderKey) {
-      // The one sanctioned route for a key that genuinely changed: a proof signed by the key we
-      // hold, naming the key that just signed this envelope.
-      inlineMigration = this.#acceptRotation(env, held, senderKey);
-      if (!inlineMigration) {
-        this.#refusedSubstitutions += 1;
-        throw new SecurityError(
-          SEC.SENDER_NOT_BOUND,
-          `Envelope ${env._id} is validly signed, but not by the key held for "${env._from}"`,
-        );
-      }
+      this.#refusedSubstitutions += 1;
+      throw new SecurityError(
+        SEC.SENDER_NOT_BOUND,
+        `Envelope ${env._id} is validly signed, but not by the key held for "${env._from}"`,
+      );
     }
 
     // 5b. AUTHORIZE — against the roster, through the injected port (L3). The kernel asks; it does
@@ -773,9 +666,6 @@ export class SecurityLayer {
       }
     }
 
-    // Tag the envelope with the migration info so Agent._dispatch can mirror it into PeerGraph.
-    if (inlineMigration) env._rotationMigrated = inlineMigration;
-
     // 6a. HI is plaintext — return as verified.
     if (env._p === P.HI) {
       return env;
@@ -793,28 +683,17 @@ export class SecurityLayer {
     const nonce      = combined.slice(0, 24);
     const ciphertext = combined.slice(24);
 
-    // Group FF — pick the right self-identity for nacl.box.open:
+    // Pick the right self-identity for nacl.box.open:
     //   • If env._to matches current self pubkey, use current.
     //   • Decision 4 — if env._to is one of OUR OTHER identities (a per-circle one), use that:
     //     the sender sealed to the key they hold for the address they dialled, and for circle
     //     traffic that is the per-circle key, not the canonical one.
-    //   • If env._to matches a still-in-grace previous self pubkey, use
-    //     that previous identity's privkey (peer hadn't received our
-    //     rotation broadcast yet, so they encrypted to our old key).
     //   • Otherwise try current as a best-effort — nacl.box.open will
     //     fail cleanly if the recipient doesn't match.
     let unboxIdentity = this.#identity;
     if (env._to && env._to !== this.#identity.pubKey) {
       const own  = this.selfIdentityFor(env._to);
       if (own) unboxIdentity = own;
-      const hist = this.#selfHistory.get(env._to);
-      if (hist && Date.now() < hist.graceUntil) {
-        unboxIdentity = hist.identity;
-      }
-      // Clean up expired entries opportunistically.
-      if (hist && Date.now() >= hist.graceUntil) {
-        this.#selfHistory.delete(env._to);
-      }
     }
     const plaintext  = unboxIdentity.unbox(ciphertext, nonce, senderKey);
     if (plaintext === null) {
@@ -845,28 +724,6 @@ export class SecurityLayer {
     };
     const sig = signer.sign(canonicalize(unsigned));
     return { ...unsigned, _sig: b64encode(sig) };
-  }
-
-  /**
-   * Step 5's rotation branch — the ONE sanctioned way the key we hold for an address may change.
-   *
-   * Runs AFTER the signature check (it could not, before Decision 1: verification needed the map to
-   * hold the new key already, which is why the migration used to happen first and had to be
-   * rolled back on failure). It can therefore be strictly stricter than the old one: the proof must
-   * name the key we hold as `old` AND the key that demonstrably signed this envelope as `new`.
-   *
-   * @param {object} env
-   * @param {string} held        the key currently bound to `env._from`
-   * @param {string} senderKey   the key that signed this envelope
-   * @returns {{oldPubKey: string, newPubKey: string, proof: object}|null}
-   */
-  #acceptRotation(env, held, senderKey) {
-    const proof = env._rotationProof;
-    if (!proof || proof.oldPubKey !== held || proof.newPubKey !== senderKey) return null;
-    if (!KeyRotation.verify(proof, held))            return null;
-    if (!KeyRotation.isWithinGracePeriod(proof))     return null;
-    this.#peers.set(env._from, senderKey);
-    return { oldPubKey: held, newPubKey: senderKey, proof };
   }
 
   /** Remove expired entries from the dedup cache. */

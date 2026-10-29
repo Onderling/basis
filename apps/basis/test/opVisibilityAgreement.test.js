@@ -63,7 +63,7 @@ describe('an op is registered at the visibility its manifest declares', () => {
       'revokeSurface'],
     // `settings` writes the relay endpoint among the device's controls; then the owner's session, the transport wiring,
     // what this device says about itself, and the person's own screen layout
-    basis: ['rotate-identity', 'debug-dump', 'audit-tail', 'set-relay', 'settings',
+    basis: ['debug-dump', 'audit-tail', 'set-relay', 'settings',
       'signin', 'signout',
       'transport-mode', 'transports', 'peer-connect', 'test-peer',
       'security-status', 'logs',

@@ -517,7 +517,7 @@ new IdentitySync({ vault, podStore, podClient, intervalMs = FIVE_MINUTES_MS } = 
 
 Bidirectional vault-pod sync.  Currently implements pod → vault pull;
 vault → pod push happens through `IdentityPodStore.writeResource` calls
-made directly by callers (e.g. `KeyRotation`, `GroupManager`).  This
+made directly by callers (e.g. `GroupManager`).  This
 class is the read-side cache that keeps the on-device working set
 fresh.
 

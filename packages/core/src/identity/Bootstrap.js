@@ -12,9 +12,6 @@
  *   - `Mnemonic.{generate,validate,seedTo,mnemonicToSeed}`
  *   - `AgentIdentity` (constructed with `vault: null` when we just need
  *     the derived Ed25519 keypair, without persisting).
- *   - `KeyRotation` (callers wire `Bootstrap.onKeyRotated(cb)` and invoke
- *     it from their rotate flow — KeyRotation is a static utility, not
- *     an event emitter; see B1.6 / TODO below).
  *
  * Spec refs:
  *   - HKDF derivation: identity-pod-schema.md §Encryption protocol →
@@ -29,7 +26,6 @@ import nacl from 'tweetnacl';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
-import { Emitter } from '../Emitter.js';
 import { assertProfileId } from './profileIds.js';
 import {
   generateMnemonic,
@@ -76,8 +72,6 @@ export class Bootstrap {
   #secret;
   /** @type {{ publicKey: Uint8Array, secretKey: Uint8Array } | null} */
   #signKP = null;
-  /** @type {Emitter} */
-  #emitter = new Emitter();
 
   /**
    * @param {Uint8Array} secret  32-byte bootstrap seed.
@@ -326,45 +320,6 @@ export class Bootstrap {
     let hex = '';
     for (let i = 0; i < digest.length; i++) hex += digest[i].toString(16).padStart(2, '0');
     return hex.slice(0, 16);
-  }
-
-  // ── Key-rotation hook (B1 step 6) ───────────────────────────────────────
-
-  /**
-   * Subscribe to bootstrap-level `key-rotated` notifications.  B2 will use
-   * this to write `device-key-rotated` entries to the auth-log.
-   *
-   * **Important — KeyRotation is a static utility class with no event
-   * emitter of its own.**  The existing rotation flow (`Agent.rotateIdentity`,
-   * `AgentIdentity.rotate`, `KeyRotation.broadcast`) does not emit events.
-   * Until that flow is wired through Bootstrap, callers performing a
-   * rotation must invoke `bootstrap.notifyKeyRotated(proof)` themselves.
-   *
-   * TODO(B2): when `IdentityPodStore.appendAuthEvent` is implemented,
-   * decide whether the hook lives on `Agent` (cleaner) or on `Bootstrap`
-   * (matches the launch prompt).  If it moves to `Agent`, this method
-   * becomes a thin re-export.
-   *
-   * @param   {(proof: object) => void} callback
-   * @returns {() => void} unsubscribe function.
-   */
-  onKeyRotated(callback) {
-    if (typeof callback !== 'function') {
-      throw new Error('onKeyRotated: callback must be a function');
-    }
-    this.#emitter.on('key-rotated', callback);
-    return () => this.#emitter.off('key-rotated', callback);
-  }
-
-  /**
-   * Manually fire a `key-rotated` event.  Called by the rotation flow
-   * (`Agent.rotateIdentity`) so subscribers can persist auth-log entries.
-   *
-   * @param {object} proof  the `KeyRotationProof` produced by
-   *                        `KeyRotation.buildProof(...)`.
-   */
-  notifyKeyRotated(proof) {
-    this.#emitter.emit('key-rotated', proof);
   }
 }
 

@@ -223,11 +223,6 @@ function _fastPathTarget(callerAgent, peerId, skillId, t, opts) {
     // holds no key for the peer, the wire path would throw on encrypt — let
     // it, so behaviour is unchanged.
     if (!sec.getPeerKey(peerId)) return null;
-    // Group FF+1: while EITHER side is in rotation grace, the SecurityLayer
-    // attaches / consumes an inline rotation proof on the wire envelope. The
-    // fast-path skips the SecurityLayer, so stay on the wire path to preserve
-    // that auto-migration side-effect.
-    if (sec.inlineProofActive || targetAgent.security?.inlineProofActive) return null;
   }
 
   // Streaming skills stay on the wire path (chunk/cancel machinery lives there).

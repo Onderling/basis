@@ -26,8 +26,8 @@
  *     than the hold is reconciled here; any one complete answer suffices).
  *
  * On landing, a binding is filed through `learnPeerKey`: ESTABLISH if absent, never replace — a
- * sibling's word can introduce a key, not overrule one this device holds (a key change arrives as a
- * rotation proof, on its own path).
+ * sibling's word can introduce a key, not overrule one this device holds (a person's key changes through
+ * the root-gated ceremony, on its own path).
  *
  * Pure — no DOM, no RN, no transport import. Web, mobile and the headless device share it; the agent
  * injects its sends, its sibling lookup and its security layer.

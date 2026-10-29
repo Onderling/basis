@@ -99,7 +99,7 @@ export { assertScopedScheme, needsCopyToLeaveAudience, SCOPED_SEAL_SCHEMES } fro
 // Identity-on-pod (extracted from @onderling/core — Track B / identity-pod-schema).
 // On-pod identity store, vault→pod migration, and the pod↔vault identity
 // sync engine. These operate ON a pod, so they live at the SDK pod layer;
-// AgentIdentity / Bootstrap / KeyRotation (kernel identity) stay in @onderling/core.
+// AgentIdentity / Bootstrap (kernel identity) stay in @onderling/core.
 export { IdentityPodStore } from './identity/IdentityPodStore.js';
 export { IdentitySync, vaultCacheKeyFor, resourcePathFromCacheKey } from './identity/IdentitySync.js';
 export { migrateVaultToPod } from './identity/migrateVaultToPod.js';

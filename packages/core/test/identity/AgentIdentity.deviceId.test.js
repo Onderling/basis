@@ -9,7 +9,6 @@
  *   different vault yields a DIFFERENT deviceId (same stableId).
  * - It is STABLE within an install — `restore()` returns the same
  *   value as the `generate()` / `fromMnemonic()` that initialised it.
- * - It survives `rotate()` — the same install keeps its deviceId.
  * - It is NOT touched by re-construction — the vault's stored value
  *   is the source of truth.
  */
@@ -46,14 +45,6 @@ describe('AgentIdentity — Phase 33.1 per-install deviceId', () => {
     expect(idA.stableId).toBe(idB.stableId);   // Phase 32 still holds
   });
 
-  it('rotate() preserves the install\'s deviceId on both old + new identities', async () => {
-    const vault = new VaultMemory();
-    const original = await AgentIdentity.generate(vault);
-    const { oldIdentity, newIdentity } = await AgentIdentity.rotate(vault);
-    expect(oldIdentity.deviceId).toBe(original.deviceId);
-    expect(newIdentity.deviceId).toBe(original.deviceId);
-  });
-
   it('back-compat: a legacy vault without `agent-device-id` lazy-inits on first read', async () => {
     // Simulate a V1/V2 vault: agent-privkey already set, no device id.
     const vault = new VaultMemory();
@@ -64,19 +55,5 @@ describe('AgentIdentity — Phase 33.1 per-install deviceId', () => {
     expect(restored.deviceId).toMatch(UUID_V4);
     const stored = await vault.get('agent-device-id');
     expect(stored).toBe(restored.deviceId);
-  });
-
-  it('detached identities (vault === null) report deviceId === null', async () => {
-    // Set up a vault with a previous identity inside the grace window.
-    const vault = new VaultMemory();
-    await AgentIdentity.generate(vault);
-    await AgentIdentity.rotate(vault);  // pushes the previous-identity blob
-
-    const { current, previous } = await AgentIdentity.restoreWithPrevious(vault);
-    expect(current.deviceId).toMatch(UUID_V4);
-    // previous identity was constructed with vault: null but carries the
-    // same stableId + deviceId because it lived on the same install.
-    expect(previous).not.toBeNull();
-    expect(previous.identity.deviceId).toBe(current.deviceId);
   });
 });

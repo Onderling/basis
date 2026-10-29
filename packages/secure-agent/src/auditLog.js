@@ -11,7 +11,7 @@
  *     id:     uuid,
  *     ts:     unix-ms,
  *     actor:  pubKey of signer,
- *     event:  'identity.rotate' | 'mute.add' | 'caps.issue' | ...
+ *     event:  'mute.add' | 'caps.issue' | ...
  *     subject?: arbitrary string (target of the action)
  *     data?:    { ...event-specific payload },
  *     prev:   base64url-sha256 of previous entry-with-sig, or null for the head

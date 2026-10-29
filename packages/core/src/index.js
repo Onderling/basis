@@ -34,7 +34,6 @@ export {
 // inversion; guarded by test/layering.enforcement.test.js).
 export { AgentIdentity }      from './identity/AgentIdentity.js';
 export { parseUntrustedJson, UNSAFE_JSON_KEYS } from './security/untrustedJson.js';
-export { KeyRotation }        from './identity/KeyRotation.js';
 export { Bootstrap, deriveVaultAtRestKeyFrom } from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)
 export { deriveCircleSeed, deriveCircleAddress, circleIdentity, deriveCircleId } from './identity/circleAddress.js';
@@ -75,7 +74,7 @@ export {
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod
 // (SDK pod layer), not kernel identity. Import them from '@onderling/pod-client'.
 // `core` no longer re-exports them (guarded by test/layering.enforcement.test.js).
-// AgentIdentity / KeyRotation / Bootstrap (kernel identity) stay here.
+// AgentIdentity / Bootstrap (kernel identity) stay here.
 export { CloudBackup }                 from './identity/CloudBackup.js';
 export { CloudAdapter, MemoryAdapter } from './identity/CloudAdapter.js';
 export {

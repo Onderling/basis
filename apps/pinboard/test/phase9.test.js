@@ -1,138 +1,14 @@
 /**
  * Pinboard V1 — Phase 9 tests.
  *
- * RotationScheduler (foreground-only periodic Agent.rotateIdentity)
  * PushPolicy (humanInTheLoop + per-day cap + quiet hours)
  * UsageMetrics (trivial counter)
  */
 
 import { describe, it, expect, vi } from 'vitest';
 
-import { RotationScheduler } from '../src/lib/RotationScheduler.js';
 import { PushPolicy }        from '../src/lib/PushPolicy.js';
 import { UsageMetrics }      from '../src/lib/UsageMetrics.js';
-
-// ── RotationScheduler ─────────────────────────────────────────────────────
-
-function buildClock() {
-  let now = 0;
-  const timers = [];
-  const setTimeoutFn = (fn, delay) => {
-    const id = timers.length;
-    timers.push({ fn, fireAt: now + delay, cancelled: false });
-    return id;
-  };
-  const clearTimeoutFn = (id) => { if (timers[id]) timers[id].cancelled = true; };
-  const advance = async (ms) => {
-    const target = now + ms;
-    while (true) {
-      let next = null;
-      for (const t of timers) {
-        if (!t.cancelled && t.fireAt <= target && (next == null || t.fireAt < next.fireAt)) next = t;
-      }
-      if (!next) break;
-      if (next.fireAt > now) now = next.fireAt;
-      next.cancelled = true;
-      await next.fn();
-    }
-    now = target;
-  };
-  return { advance, setTimeoutFn, clearTimeoutFn, getNow: () => now, setNow: (v) => { now = v; } };
-}
-
-describe('RotationScheduler — periodic rotation', () => {
-  it('does not rotate while background', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildClock();
-    const agent = { rotateIdentity: vi.fn().mockResolvedValue({ ok: true }) };
-    const sch = new RotationScheduler({
-      agent, intervalMs: 1000, gracePeriodMs: 100,
-      now: getNow, setTimeoutFn, clearTimeoutFn,
-    });
-    await advance(10_000);
-    expect(agent.rotateIdentity).not.toHaveBeenCalled();
-  });
-
-  it('rotates every intervalMs while foreground', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildClock();
-    const agent = { rotateIdentity: vi.fn().mockResolvedValue({ ok: true }) };
-    const sch = new RotationScheduler({
-      agent, intervalMs: 1000, gracePeriodMs: 100,
-      now: getNow, setTimeoutFn, clearTimeoutFn,
-    });
-    sch.setForeground(true);
-    await advance(3500);
-    expect(agent.rotateIdentity).toHaveBeenCalledTimes(3);
-    expect(sch.lastRotatedAt).toBeGreaterThan(0);
-  });
-
-  it('setForeground(false) disarms; no further rotations', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildClock();
-    const agent = { rotateIdentity: vi.fn().mockResolvedValue({}) };
-    const sch = new RotationScheduler({
-      agent, intervalMs: 1000, gracePeriodMs: 100,
-      now: getNow, setTimeoutFn, clearTimeoutFn,
-    });
-    sch.setForeground(true);
-    await advance(1500);
-    expect(agent.rotateIdentity).toHaveBeenCalledTimes(1);
-    sch.setForeground(false);
-    await advance(5000);
-    expect(agent.rotateIdentity).toHaveBeenCalledTimes(1);   // unchanged
-  });
-
-  it('rotateNow fires immediately + stamps lastRotatedAt', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow, setNow } = buildClock();
-    setNow(1_700_000_000_000);
-    const agent = { rotateIdentity: vi.fn().mockResolvedValue({ ok: true }) };
-    const sch = new RotationScheduler({
-      agent, intervalMs: 30 * 24 * 3600 * 1000, gracePeriodMs: 100,
-      now: getNow, setTimeoutFn, clearTimeoutFn,
-    });
-    await sch.rotateNow();
-    expect(agent.rotateIdentity).toHaveBeenCalledOnce();
-    expect(sch.lastRotatedAt).toBe(1_700_000_000_000);
-  });
-
-  it('passes gracePeriodSeconds to rotateIdentity', async () => {
-    const { setTimeoutFn, clearTimeoutFn, getNow } = buildClock();
-    const agent = { rotateIdentity: vi.fn().mockResolvedValue({}) };
-    const sch = new RotationScheduler({
-      agent, intervalMs: 1000, gracePeriodMs: 7_000,    // 7s grace
-      now: getNow, setTimeoutFn, clearTimeoutFn,
-    });
-    await sch.rotateNow();
-    expect(agent.rotateIdentity).toHaveBeenCalledWith({
-      gracePeriodSeconds: 7,
-      broadcast:          true,
-    });
-  });
-
-  it('emits rotated + error events', async () => {
-    const { advance, setTimeoutFn, clearTimeoutFn, getNow } = buildClock();
-    const agent = { rotateIdentity: vi.fn()
-      .mockResolvedValueOnce({ ok: true })
-      .mockRejectedValueOnce(new Error('fail')),
-    };
-    const sch = new RotationScheduler({
-      agent, intervalMs: 1000, gracePeriodMs: 100,
-      now: getNow, setTimeoutFn, clearTimeoutFn,
-    });
-    const events = [];
-    sch.on('rotated', (e) => events.push(['rotated', !!e.result]));
-    sch.on('error',   (e) => events.push(['error', e.error.message]));
-    sch.setForeground(true);
-    await advance(2500);
-    expect(events.some(([t]) => t === 'rotated')).toBe(true);
-    expect(events.some(([t, m]) => t === 'error' && m === 'fail')).toBe(true);
-  });
-
-  it('rejects construction without an agent.rotateIdentity', () => {
-    expect(() => new RotationScheduler({})).toThrow(/rotateIdentity/);
-    expect(() => new RotationScheduler({ agent: {} })).toThrow(/rotateIdentity/);
-  });
-});
-
-// ── PushPolicy ────────────────────────────────────────────────────────────
 
 describe('PushPolicy — humanInTheLoop + cap + quiet-hours', () => {
   it('rejects payloads that aren\'t humanInTheLoop', async () => {

@@ -22,6 +22,14 @@ const LIMIT_TOLD_EVERY_MS = 24 * 3600 * 1000;
 /** A refused key is told at most this often. */
 const KEY_TOLD_EVERY_MS = 3600 * 1000;
 
+/**
+ * Which words a refused check gets, by its status: a key that no longer works (401/403), a limit or credit (402/429),
+ * or a refusal of another kind. An alert that blames the key for a quota sends the operator to the wrong screen.
+ */
+export const keyAlertKey = (status) => ([401, 403].includes(Number(status)) ? 'circle.bot.secret_check_failed'
+  : [402, 429].includes(Number(status)) ? 'circle.bot.secret_check_limit'
+  : 'circle.bot.secret_check_refused');
+
 /** Does this provider error say the account is over its limit (not a wrong key)? */
 export const isOverLimit = (err) => /\b(exceeded|over)\b[^\n]*\blimit\b/i.test(String(err?.message ?? err ?? ''));
 
@@ -53,7 +61,7 @@ export function createModelWatch({ listModels, model, fallback, t, tellAdmin, pr
     if (status === 200) { keyToldAt = null; return; }
     if (keyToldAt !== null && now() - keyToldAt < KEY_TOLD_EVERY_MS) return;
     keyToldAt = now();
-    await alert(t('circle.bot.secret_check_failed', { secret: secretName, status: status || '—' }));
+    await alert(t(keyAlertKey(status), { secret: secretName, status: status || '—' }));
   };
   return {
     /** Use the key, then ask which models are served; tell the admin, once per model, when ours is not. */

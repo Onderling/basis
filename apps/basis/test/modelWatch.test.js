@@ -132,3 +132,26 @@ describe('a proxy that lists models but refuses completions', () => {
     expect(alerted).toHaveLength(1);
   });
 });
+
+describe('the alert names the cause class by status, so it does not send the operator to the wrong screen', () => {
+  const run = async (status) => {
+    const alerted = [];
+    const w = createModelWatch({ listModels: async () => [], model: null, fallback: null, t, tellAdmin: async () => {}, alertBox: async (x) => { alerted.push(x); },
+      probe: async () => { throw Object.assign(new Error('refused'), { status }); } });
+    await w.check();
+    return alerted[0] ?? '';
+  };
+  it('401 and 403: the key', async () => {
+    expect(await run(401)).toContain('circle.bot.secret_check_failed');
+    expect(await run(403)).toContain('circle.bot.secret_check_failed');
+  });
+  it('402 and 429: a limit or credit, not the key', async () => {
+    expect(await run(402)).toContain('circle.bot.secret_check_limit');
+    expect(await run(429)).toContain('circle.bot.secret_check_limit');
+  });
+  it('anything else: refused, with its status', async () => {
+    const said = await run(500);
+    expect(said).toContain('circle.bot.secret_check_refused');
+    expect(said).toContain('500');
+  });
+});

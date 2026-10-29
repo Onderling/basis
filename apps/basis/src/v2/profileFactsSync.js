@@ -5,9 +5,12 @@
  * inheritance markers and its disclosure policy (`profileFactsOf` in the agent registry). Without a pod the registry
  * lives on each device alone, so an edit on the phone reached the circles (the `member-props` statements) but not the
  * laptop's registry — and the laptop re-released the OLD values on its next edit. This carries the facts between the
- * devices that hold the same self, whole, newest-wins by `factsAt`:
- *   • LIVE — the facts changed here (any writer: the registry's one write seam stamps and fans): to this self's siblings.
- *   • CATCH-UP — on connect a device asks its siblings; each answers with its facts, and the newer stand.
+ * devices that hold the same self, merged PER KEY (each property and disclosure entry from the side that wrote it last,
+ * `mergeProfileFacts` in the agent registry; until 2026-10-26 the newer facts won whole and two devices editing
+ * different facts at once lost one):
+ *   • LIVE — the facts changed here (any writer: the registry's one write seam stamps the changed keys and fans): to this
+ *     self's siblings.
+ *   • CATCH-UP — on connect a device asks its siblings; each answers with its facts, and each key's newer side stands.
  * Per SELF: a persona's facts travel only between the devices holding that persona, over its own sibling addresses,
  * and a landing is bound to a self by WHO SENT IT (its proven sibling set), never by anything the payload says.
  * The registry's machine keys (device records, memberships, owned nodes) never ride: each has its own lane.
@@ -15,6 +18,7 @@
  * Pure — no DOM, no RN, no transport import. The agent injects the sends, the sibling lookup and the registry reads.
  */
 import { makeSiblingCarry } from './siblingCarry.js';
+import { mergeProfileFacts } from '@onderling/agent-registry';
 
 export const PROFILE_FACTS_CARRY = 'device-profile-facts';
 export const PROFILE_FACTS_CATCHUP_SUBTYPES = Object.freeze({ request: 'device-profile-facts-request' });
@@ -41,7 +45,7 @@ export function createProfileFactsSync({ siblings, sendToPeer, current, store, o
   // the ONE sibling carry (siblingCarry.js) for the live facts and the catch-up ask; an answer is a reply to one device
   const { carry } = makeSiblingCarry({ siblings: () => siblings(), sendToPeer, onWarn: () => {} });
   const admits = async (fromAddr) => { try { return ((await siblings()) ?? []).includes(fromAddr); } catch { return false; } };
-  const wire = (f) => ({ subtype: PROFILE_FACTS_CARRY, properties: f.properties, disclosure: f.disclosure, factsAt: f.factsAt });
+  const wire = (f) => ({ subtype: PROFILE_FACTS_CARRY, properties: f.properties, disclosure: f.disclosure, factsAt: f.factsAt, keyTimes: f.keyTimes ?? {} });
   const mine = async () => { try { return await current(); } catch { return null; } };
 
   return {
@@ -69,8 +73,12 @@ export function createProfileFactsSync({ siblings, sendToPeer, current, store, o
         if (!(await admits(fromAddr))) { refuse('not-a-sibling', fromAddr); return; }
         if (!validFacts(payload)) { refuse('malformed', fromAddr); return; }
         const here = await mine();
-        if (Number.isFinite(here?.factsAt) && payload.factsAt <= here.factsAt) return;   // older (or the same) news
-        try { await store({ properties: payload.properties, disclosure: payload.disclosure, factsAt: payload.factsAt }); }
+        // PER KEY: each fact from the side that wrote it last; a copy that brings nothing newer changes nothing
+        const there = { properties: payload.properties, disclosure: payload.disclosure, factsAt: payload.factsAt,
+          keyTimes: payload.keyTimes && typeof payload.keyTimes === 'object' ? payload.keyTimes : {} };
+        const merged = here ? mergeProfileFacts(here, there) : there;
+        if (here && JSON.stringify([merged.properties, merged.disclosure, merged.keyTimes ?? {}]) === JSON.stringify([here.properties, here.disclosure, here.keyTimes ?? {}])) return;
+        try { await store(merged); }
         catch { return; /* the next carry or catch-up retries */ }
         try { onLanded?.({ from: fromAddr, factsAt: payload.factsAt }); } catch { /* observability never throws */ }
       },

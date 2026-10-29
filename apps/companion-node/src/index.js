@@ -54,7 +54,7 @@
  */
 import { Agent, AgentIdentity, Parts, PodCapabilityToken, RoutingStrategy,
          PolicyEngine, TrustRegistry, TokenRegistry, CapabilityToken,
-         verifyDeviceStatement, verifyDeviceRevocation, createNonceWindow, STATEMENT_DOMAINS } from '@onderling/core';
+         verifyDeviceStatement, verifyDeviceRevocation, createNonceWindow, STATEMENT_DOMAINS, allowSender } from '@onderling/core';
 import { RelayTransport }              from '@onderling/transports';
 import { startRelay }                  from '@onderling/relay';
 import { VaultNodeFs }                 from '@onderling/vault';
@@ -591,6 +591,12 @@ export async function startCompanionNode(opts = {}) {
     // (taskExchange.js:467). Without it the engine is inert (the createSecureAgent
     // lesson: policyEngineAttach.test.js).
     agent.policyEngine = policyEngine;
+    // The LAYER admits any correctly signed sender, and says so on purpose: this node is in no circle, so there is no
+    // roster to authorize against, and every skill carries its own check — the token above for each data skill, the
+    // owner's signature or a sealed payload for the rest. `test/security/unknownEnvelope.test.js` asks every skill
+    // from an unknown key and holds each one to a refusal. With the gate off there is no such guarantee (a stranger
+    // reads and writes the pod), so no authorizer is installed there and the layer keeps its loud warning.
+    agent.security?.setSenderAuthorizer?.(() => allowSender('companion-skill-gated'));
   }
 
   // ── 5. Connect the host agent over the relay ──────────────────────────────

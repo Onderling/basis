@@ -5812,7 +5812,9 @@ function NearbyScreen({
   // "You here" opens on the FIRST-ever open only. so the card/chat toggles are discovered once.
   const [mineOpen, setMineOpen] = useState(() => firstNearbyMineOpen());
   return (
-    <View style={styles.page} testID="circle-nearby-screen">
+    // ONE scroll column for the whole room (the walk of 2026-10-26: the peer list took the full height and the sections
+    // below it sat at the bottom edge, unreachable): the peers are sized to their content and everything scrolls together.
+    <ScrollView style={styles.page} contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }} keyboardShouldPersistTaps="handled" testID="circle-nearby-screen">
       {/* no "← circles": Nearby is a tab of its own, not a page under Circles */}
       <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
       {firstUse ? (
@@ -5865,7 +5867,7 @@ function NearbyScreen({
           in at zero peers — so there is no second empty-state line under it. */}
       <Text style={styles.muted}>{headerText}</Text>
       {rows.length === 0 ? null : (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: FAB_CLEARANCE }]}>
+        <View style={styles.list} testID="nearby-peers">
           {rows.map((row) => (
             <View
               key={row.id || row.pseudonym}
@@ -5899,7 +5901,7 @@ function NearbyScreen({
               ) : null}
             </View>
           ))}
-        </ScrollView>
+        </View>
       )}
       {/* Asks (step F). Every live ask shows, matching or not — filtering the room to what resonates
           would make it a recommender, and would leak my own drivers into what I am able to see. */}
@@ -6185,7 +6187,7 @@ function NearbyScreen({
         </View>
       ) : null}
 
-    </View>
+    </ScrollView>
   );
 }
 

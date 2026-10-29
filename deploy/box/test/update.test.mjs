@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, rmSync, cpSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, rmSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 
@@ -195,14 +195,20 @@ test('install.sh (system steps skipped): writes box.conf + .env, clones at live,
   assert.equal(state.rolledBack, false);
   assert.match(readFileSync(join(box, 'data/caddy/Caddyfile'), 'utf8'), /relay\.example\.org \{[\s\S]*reverse_proxy relay:8787/);
   assert.match(r.stdout, /relay: wss:\/\/relay\.example\.org/);
-  // the HTML face: a static status page next to state.json + the log tail
+  // the HTML face: a static status page next to state.json — and no line of box.log, which is served to anyone
   const html = readFileSync(join(box, 'data/www/index.html'), 'utf8');
   assert.match(html, /v1\.0\.0/); assert.match(html, /updater frozen \(HOLD\)<\/dt><dd>no/);
-  assert.ok(existsSync(join(box, 'data/www/state.json')) && existsSync(join(box, 'data/www/log.txt')));
+  assert.ok(existsSync(join(box, 'data/www/state.json')));
+  // box.log takes raw command output too: whatever lands there stays off the public page, and a log.txt an older
+  // runner published is taken down at the next rewrite
+  appendFileSync(join(box, 'box.log'), 'caddy said token=SECRET-NOT-PUBLIC\n');
+  writeFileSync(join(box, 'data/www/log.txt'), 'an older runner published this\n');
   // a second install run keeps box.conf/.env (idempotent) and exits 0
   const r2 = spawnSync('bash', [join(RUNNER, 'install.sh')], { encoding: 'utf8', env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BOX_DIR: box, SKIP_SYSTEM: '1', PROFILE: 'relay', RELAY_DOMAIN: 'other', ACME_EMAIL: 'x@y.z', BOX_REPO_URL: remote, HEALTH_TIMEOUT: '2', HEALTH_POLL: '1' } });
   assert.equal(r2.status, 0, r2.stderr);
   assert.match(readFileSync(join(box, '.env'), 'utf8'), /RELAY_DOMAIN=relay\.example\.org/, 'existing .env kept');
+  assert.ok(!existsSync(join(box, 'data/www/log.txt')), 'no log file under the served directory');
+  assert.doesNotMatch(readFileSync(join(box, 'data/www/index.html'), 'utf8'), /SECRET-NOT-PUBLIC/, 'no log line on the page');
 });
 
 test('install.sh platform profile: four roles, pod hostname asked, both Caddy sites rendered', () => {

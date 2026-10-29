@@ -27,4 +27,18 @@ describe('the profile editor keeps what was typed across a repaint', () => {
     renderProfileBasics(el, { profile: { displayName: 'Bea Jansen' }, t });
     expect(el.querySelector('.cc-profile__display').value).toBe('Bea Jansen');
   });
+
+  it('the field being typed into is the same element after the repaint, still focused, so typing lands on it', () => {
+    const el = document.createElement('div'); document.body.appendChild(el);
+    const onSaveProfile = vi.fn();
+    renderProfileBasics(el, { profile: {}, t, onSaveProfile });
+    const typing = el.querySelector('.cc-profile__display');
+    typing.focus();                                                                    // the person starts typing
+    renderProfileBasics(el, { profile: { displayName: '' }, t, onSaveProfile });      // the load lands mid-typing
+    typing.value = 'Bea';                                                              // the rest of the keystrokes
+    expect(el.querySelector('.cc-profile__display'), 'the repaint kept the element').toBe(typing);
+    expect(document.activeElement, 'and its focus').toBe(typing);
+    el.querySelector('.cc-profile__save').click();
+    expect(onSaveProfile).toHaveBeenCalledWith({ handle: '', displayName: 'Bea' });
+  });
 });

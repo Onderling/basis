@@ -21,9 +21,12 @@ export function renderProfileBasics(container, {
   const tr = translatorOr(t, 'profileBasics.js');
   // A repaint keeps what the person typed: the editor paints at once and again when the profile arrives, and replacing
   // an edited field with the stored value wiped a name typed in between (Save then saw no change and sent nothing).
+  // It keeps the field ITSELF too, focus included: a new element swapped in mid-typing lost every keystroke after the
+  // swap to the old, detached one.
   const prevField = (cls) => container.querySelector(`.${cls}`);
   const prevHandle = prevField('cc-profile__handle');
   const prevDisplay = prevField('cc-profile__display');
+  const focused = [prevHandle, prevDisplay].find((f) => f && f === f.ownerDocument?.activeElement) ?? null;
   container.innerHTML = '';
   container.className = 'cc-profile';
 
@@ -39,6 +42,7 @@ export function renderProfileBasics(container, {
   });
   idSection.appendChild(save);
   container.appendChild(idSection);
+  if (focused) focused.focus();
 
   // ── location ──────────────────────────────────────────────────────────────
   const locSection = section(tr('circle.profile.location'));
@@ -104,11 +108,12 @@ export function renderProfileBasics(container, {
     const span = document.createElement('span');
     span.className = 'cc-profile__field-label';
     span.textContent = labelText;
-    const input = document.createElement('input');
+    const input = prev ?? document.createElement('input');
     input.type = 'text';
     input.className = cls;
+    const kept = fieldAfterLoad({ current: prev?.value ?? null, drawn: prev?.dataset?.drawn ?? null, loaded: value });
     input.dataset.drawn = value;   // what was painted: a value that differs from it is the person's own typing
-    input.value = fieldAfterLoad({ current: prev?.value ?? null, drawn: prev?.dataset?.drawn ?? null, loaded: value });
+    if (input.value !== kept) input.value = kept;
     wrap.appendChild(span);
     wrap.appendChild(input);
     return { wrap, input };

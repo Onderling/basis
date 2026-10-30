@@ -96,11 +96,18 @@ describe('the box checks its model key with a real completion', () => {
   it('the walk log keeps one secret-check record per tick: the secret NAME and the status', async () => {
     const d = keyed({ probe: refuses });
     await d.w.check();
-    expect(d.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401 });
+    expect(d.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401, ms: 0 });
     const ok = keyed({ probe: async () => ({ text: '.' }) });
     await ok.w.check();
-    expect(ok.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: true, status: 200 });
+    expect(ok.logged.find((e) => e.kind === 'secret-check')).toEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: true, status: 200, ms: 0 });
     expect(ok.alerted).toEqual([]);
+  });
+
+  it('the secret-check record carries how long the one-token call took: the provider\'s own latency, apart from any prompt', async () => {
+    let d = null;
+    d = keyed({ probe: async () => { d.advance(1234); return { text: '.' }; } });
+    await d.w.check();
+    expect(d.logged.find((e) => e.kind === 'secret-check')).toMatchObject({ ok: true, ms: 1234 });
   });
 
   it('no alert chat on this box: the admin hears it (as the episode\'s start)', async () => {
@@ -131,7 +138,7 @@ describe('a proxy that lists models but refuses completions', () => {
     const w = createModelWatch({ listModels: built.listModels, probe: built.probe, model: 'glm-5.3', fallback: 'glm-5.3-flash', t, tellAdmin: async () => {}, alertBox: async (x) => { alerted.push(x); }, log: (e) => logged.push(e) });
     await w.check();
     expect(logged).toContainEqual({ kind: 'model-watch', served: 2, missing: [] });
-    expect(logged).toContainEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401 });
+    expect(logged).toContainEqual({ kind: 'secret-check', secret: 'PRIVATEMODE_API_KEY', ok: false, status: 401, ms: expect.any(Number) });
     expect(alerted).toHaveLength(1);
   });
 });

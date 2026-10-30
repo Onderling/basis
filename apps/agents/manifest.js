@@ -225,6 +225,18 @@ export const agentsManifest = {
       surfaces: { chat: { reply: 'record', hint: 'Set a personal driver (goal/hobby/…) on a profile: a phrase + comma-separated tags.' } },
     },
     {
+      // Taking a driver off again (an offering, an interest, a goal): only a driver key; any other property is refused.
+      id:        'removeProfileDriver', visibility: 'authenticated', group: 'compose',
+      verb:      'remove',
+      writes: { scope: 'person' },
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'id',  kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'key', kind: 'string', required: true, schema: { minLength: 1 } },
+      ],
+      surfaces: { chat: { reply: 'record', hint: 'Remove a personal driver (an offering, an interest, a goal) from a profile, by its key.' } },
+    },
+    {
       id:        'getProfileDrivers', visibility: 'authenticated', group: 'data',
       verb:      'get',
       appliesTo: { type: 'agent' },

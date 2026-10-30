@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { own, inherit } from '../src/profileProperties.js';
 import { descriptor, createVocabulary, isPropertyType, PROPERTY_TYPES } from '../src/propertyVocabulary.js';
-import { createDisclosurePolicy, setDisclosure, getDisclosure, releasedValues, releasedForMatching, isDisclosed, isMatchable, isRequestable, changedReleaseKeys, releaseUnchanged } from '../src/disclosure.js';
+import { createDisclosurePolicy, setDisclosure, forgetDisclosureKey, getDisclosure, releasedValues, releasedForMatching, isDisclosed, isMatchable, isRequestable, changedReleaseKeys, releaseUnchanged } from '../src/disclosure.js';
 import { createDriver } from '../src/drivers.js';
 
 // a tiny profile registry: id → { properties }
@@ -266,5 +266,20 @@ describe('releasedForMatching — the matching surface, keyed off matchable, NOT
     policy = setDisclosure(policy, 'c', 'place', { matchable: true, rung: 'municipality' });
     expect(releasedForMatching({ getProfile: gp, profileId: 'default', defaultProfileId: 'default' },
       { items: [{ key: 'place' }] }, policy, 'c', vocab)).toEqual({});   // withheld, not leaked raw
+  });
+});
+
+describe('forgetDisclosureKey', () => {
+  it('drops one key in every context, keeps the others, drops a context it empties, never mutates', () => {
+    let policy = setDisclosure(createDisclosurePolicy(), 'a', 'zeilen', { enabled: true });
+    policy = setDisclosure(policy, 'a', 'place', { enabled: true });
+    policy = setDisclosure(policy, 'b', 'zeilen', { matchable: true });
+    const before = JSON.stringify(policy);
+    const after = forgetDisclosureKey(policy, 'zeilen');
+    expect(after.perContext).toEqual({ a: { place: getDisclosure(policy, 'a', 'place') } });
+    expect(isDisclosed(after, 'a', 'zeilen')).toBe(false);
+    expect(isMatchable(after, 'b', 'zeilen')).toBe(false);
+    expect(JSON.stringify(policy)).toBe(before);
+    expect(forgetDisclosureKey(undefined, 'x')).toEqual({ perContext: {} });
   });
 });

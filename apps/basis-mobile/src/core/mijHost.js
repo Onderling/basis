@@ -33,13 +33,6 @@ export async function setGeneralProperty({ callSkill, defaultId, key, value }) {
 export { offeringKeyFor } from '../../../basis/src/v2/offeringKey.js';
 import { newPersonaArgs } from '../../../basis/src/v2/newPersona.js';
 import { pictureRefOf } from '../../../basis/src/v2/personaAvatar.js';
-import { offeringKeyFor as sharedOfferingKeyFor } from '../../../basis/src/v2/offeringKey.js';
-
-/** Offerings — add an offering-kind driver ({text, tags}) to the GENERAL persona. */
-export async function addGeneralOffering({ callSkill, defaultId, text, tags }) {
-  const key = sharedOfferingKeyFor({ text, tags });
-  try { await callSkill('agents', 'setProfileDriver', { id: defaultId ?? 'default', key, kind: 'offering', text, tags }); } catch { /* */ }
-}
 
 /** Section-2 add-affordance — create a new persona (createProfile). */
 export async function createPersona({ callSkill, name, takeOfferings = false }) {

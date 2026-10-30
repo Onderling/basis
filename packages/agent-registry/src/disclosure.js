@@ -68,6 +68,20 @@ export function setDisclosure(policy, contextId, key, choice = {}) {
 }
 
 /**
+ * Forget one property's disclosure in EVERY context: what a removed property leaves behind would otherwise be a
+ * release with nothing under it, which comes back the day a property of the same key does. Returns a NEW policy; a
+ * context left empty goes too.
+ */
+export function forgetDisclosureKey(policy, key) {
+  const perContext = {};
+  for (const [contextId, ctx] of Object.entries(policy?.perContext || {})) {
+    const { [key]: _gone, ...rest } = ctx || {};
+    if (Object.keys(rest).length) perContext[contextId] = rest;
+  }
+  return { perContext };
+}
+
+/**
  * The disclosure choice for a key in a context, across all three axes. Default = full withhold
  * ({enabled:false, rung:null, matchable:false, requestable:false}). Backward-compatible: an old
  * entry carrying only {enabled,rung} reads as matchable:false/requestable:false.

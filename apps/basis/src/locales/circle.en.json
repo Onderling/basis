@@ -7131,32 +7131,6 @@
       "text": "What you're into or trying to do. Kept private on this device; used only to notice items that resonate.",
       "doc": "drivers#5 — honest framing: drivers stay on-device, drive matching."
     },
-    "driverkind": {
-      "hobby": {
-        "text": "Hobby",
-        "doc": "drivers#5 — driver kind."
-      },
-      "goal": {
-        "text": "Goal",
-        "doc": "drivers#5 — driver kind."
-      },
-      "desire": {
-        "text": "Desire",
-        "doc": "drivers#5 — driver kind."
-      },
-      "motivation": {
-        "text": "Motivation",
-        "doc": "drivers#5 — driver kind."
-      },
-      "driver": {
-        "text": "Driver",
-        "doc": "drivers#5 — generic driver kind."
-      },
-      "interest": {
-        "text": "Interest",
-        "doc": "interests→drivers fold-in (audit §4/Q6) — driver kind: what you engage with (learned from what you noticed)."
-      }
-    },
     "driver_label_ph": {
       "text": "label (e.g. sailing)",
       "doc": "drivers#5 — placeholder: the driver's key/label."
@@ -7474,11 +7448,11 @@
       "doc": "mij#personas — property without a value on the general persona."
     },
     "offerings_label": {
-      "text": "Offerings & drivers",
-      "doc": "mij#personas — row label for the skills/drivers chips."
+      "text": "Offerings",
+      "doc": "Mij → the Offerings section: what the person offers (drivers of kind offering)."
     },
     "offering_add": {
-      "text": "+ offering or driver",
+      "text": "+ offering",
       "doc": "mij#personas — dashed add button (potential-action grammar)."
     },
     "offering_text_ph": {
@@ -7640,6 +7614,30 @@
     "awaiting_shared": {
       "text": "Shared with you: {{count}}",
       "doc": "Mij's \"what is waiting for you\" block: copies people shared privately with you (opens the inbox)."
+    },
+    "interests_label": {
+      "text": "Interests",
+      "doc": "Mij → the person's interests: one driver whose tags say what they like (matched on the device, released per circle)."
+    },
+    "goals_label": {
+      "text": "Goals",
+      "doc": "Mij → the person's goals: drivers of kind goal, each a phrase and tags (matched on the device, released per circle)."
+    },
+    "goal_add": {
+      "text": "+ goal",
+      "doc": "Mij → Goals: opens the form to add a goal."
+    },
+    "goal_text_ph": {
+      "text": "what you want to achieve, in a sentence",
+      "doc": "Mij → Goals: the phrase field placeholder."
+    },
+    "interest_add_ph": {
+      "text": "an interest, e.g. gardening",
+      "doc": "Mij → Interests: the field to add one interest (a tag)."
+    },
+    "driver_remove": {
+      "text": "Remove {{what}}",
+      "doc": "Mij → a driver chip's remove button (aria label): what is taken off."
     }
   },
   "attach": {

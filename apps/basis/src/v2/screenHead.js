@@ -83,6 +83,8 @@ export function createScreenHead({ materialize, subscribe = [], debounceMs = SCR
       if (fresh) return blocks;
       return read(k);
     },
+    /** Whether a landing with this key would read nothing (the shell can skip its own cache-first paint). */
+    isFresh(k) { return fresh && k === key; },
     /** The screen went away: changes wait for the next landing. */
     hide() {
       shown = false;

@@ -62,7 +62,7 @@ describe('createTelegramRunner — a manifest surface over a MessagingBridge', (
     expect(out).not.toContain('circle.telegram.unknown');
   });
 
-  it('a model that REFUSES is said as such ("the admin has been told"), never as a status or "try again in a moment"', async () => {
+  it('a model that REFUSES is said as such ("the admin knows"), never as a status or "try again in a moment"', async () => {
     const interpret = async () => { throw Object.assign(new Error('ollama: 401 Unauthorized'), { status: 401 }); };
     const { say } = await boot({ interpret });
     const out = (await say('hoe gaat het eigenlijk met de planten')).map((m) => m.text).join('\n');

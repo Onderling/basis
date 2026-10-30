@@ -11,7 +11,7 @@ import { CachingDataSource } from '@onderling/local-store';
 import {
   bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown,
 } from '../support/pairRealAgents.js';
-import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
+import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 
 const CIRCLE = 'exits-on-the-lane';
 function wireMembershipReceiver(node) {
@@ -76,9 +76,61 @@ describe('a leave and a removal are statements on the lane, not rows in a pile',
     expect(cAddress, 'C had a per-circle address').toBeTruthy();
     expect(await until(async () => (removedAddrs.includes(cAddress) ? true : null), { timeout: 8000, step: 100 }),
       'C\'s address for the circle came off the relay when the evict folded').toBe(true);
-    await C.agent.callSkill('pinboard', 'postRequest', { groupId: CIRCLE, text: 'ik ben er nog', intent: 'ask' }).catch(() => null);
-    await new Promise((r) => { setTimeout(r, 2000); });
-    const aSees = ((await A.agent.callSkill('pinboard', 'listOpenRequests', {}))?.items ?? []).some((i) => (i.text ?? '').includes('ik ben er nog'));
-    expect(aSees, 'a line from the removed member does not land in the circle').toBe(false);
+    // A's content lanes bind every incoming statement against A's folded roster: one C signs with its circle key no longer binds
+    const aBinds = rosterBindingVerifier((...x) => A.agent.callSkill(...x));
+    expect(await aBinds({ author: cAddress, ref: C.pubKey, circleId: CIRCLE }), 'a line from the removed member does not land in the circle').toBe(false);
   }, 120_000);
+});
+
+describe('an exit the fold does not grant takes nobody out', () => {
+  let A; let B; let C;
+  afterAll(async () => { await teardown(A, B, C); });
+
+  // ingest's gate is signature + declared kind + author↔ref binding; it grants no authority. A plain member's signed
+  // `evict` of C, or a `leave` with C as subject that B wrote, lands on C's lane — and the fold keeps C in.
+  for (const kind of ['evict', 'leave']) {
+    it(`a plain member's ${kind} naming C: C stays in, its address stays registered, a line from C still binds on A`, async () => {
+      const CIRCLE2 = `exits-no-authority-${kind}`;   // a circle of its own: a local leave runs once per circle
+      if (!A) {
+        [A, B, C] = await Promise.all(['A', 'B', 'C'].map((l) => bootRealAgentNode(l, { itemsLane: true })));
+        await connectNodesOverBus([A, B, C]);
+        for (const n of [A, B, C]) wireMembershipReceiver(n);
+      }
+      {
+        await createCircle(A, { groupId: CIRCLE2, name: `Geen gezag ${kind}` });
+        for (const [n, h] of [[B, 'bram'], [C, 'cas']]) {
+          const j = await joinExistingCircle(A, n, { groupId: CIRCLE2, handle: h });
+          expect(j.joined?.ok, JSON.stringify(j.joined)).toBe(true);
+        }
+        await bindCircleAddresses([A, B, C], CIRCLE2);
+        // C must know B's per-circle address before B's statement can bind on C at all
+        const bOnC = async () => ((await C.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE2, spineless: true }))?.members ?? [])
+          .find((m) => (m.webid ?? m.addr) === B.pubKey && (m.circleAddress || (m.circleAddresses ?? []).length));
+        expect(await until(async () => ((await bOnC()) ? true : null), { timeout: 10000, step: 150 }), 'C holds B\'s circle address').toBe(true);        // A's gate binds a line C signs with its circle key, before anything happens (else the check below proves nothing)
+        expect(await rosterBindingVerifier((...x) => A.agent.callSkill(...x))({ author: C.agent.circleAddressFor(CIRCLE2), ref: C.pubKey, circleId: CIRCLE2 }),
+          'baseline: a line from C binds on A').toBe(true);
+      }
+      const removedAddrs = [];
+      const cAddress = C.agent.circleAddressFor?.(CIRCLE2) ?? null;
+      const relaysBefore = C.agent.sa.relays;
+      C.agent.sa.relays = { ...(relaysBefore ?? {}), list: () => [...(relaysBefore?.list?.() ?? []), { url: 'ws://recording.example', port: { removeAddress: (a) => { removedAddrs.push(a); } } }] };
+
+      const forged = await B.agent.membershipRail.append(CIRCLE2, { kind, subject: C.pubKey });
+      expect(forged?.statement, 'B could sign the statement').toBeTruthy();
+      const landed = await C.agent.membershipRail.ingest(CIRCLE2, forged.statement);
+      expect(landed?.ok, `the ${kind} passes ingest (signature + binding): ${JSON.stringify(landed)}`).toBe(true);
+      await new Promise((r) => { setTimeout(r, 1500); });
+
+      const cMine = await C.agent.callSkill('pinboard', 'listMyCircles', {});
+      expect(cMine?.circles ?? [], 'C still lists the circle').toContain(CIRCLE2);
+      expect(removedAddrs, 'C\'s address stays on the relay').not.toContain(cAddress);
+      // the same statement lands on A too (B fans it there); A's fold keeps C, so a line C signs still binds on A
+      expect((await A.agent.membershipRail.ingest(CIRCLE2, forged.statement))?.ok, 'it passes ingest on A as well').toBe(true);
+      const aMembers = ((await A.agent.callSkill('pinboard', 'listGroupMembers', { groupId: CIRCLE2 }))?.members ?? []).map((m) => m.webid);
+      expect(aMembers, 'A still has C on the roster').toContain(C.pubKey);
+      expect(await rosterBindingVerifier((...x) => A.agent.callSkill(...x))({ author: cAddress, ref: C.pubKey, circleId: CIRCLE2 }),
+        'a line from C still lands on A').toBe(true);
+      C.agent.sa.relays = relaysBefore;
+    }, 120_000);
+  }
 });

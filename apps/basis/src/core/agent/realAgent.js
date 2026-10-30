@@ -2814,6 +2814,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       return mine.length ? mine[mine.length - 1] : null;
     },
     ingestLeave: (circleId, statement) => membershipRail?.ingest?.(circleId, statement),
+    // the fold's word, not the landing's: out only when my last word there is an exit the fold granted and I am off its roster
+    outByFold: async (circleId) => {
+      const r = await rawPinboard('listMyCircles', {});
+      return (r?.left ?? []).includes(circleId) || (r?.removed ?? []).some((x) => x?.id === circleId);
+    },
     // PUT AWAY (opbergen): the mark lives on the circle's registry record (restore carries it); a sibling's newer lands
     sightOf: async (circleId) => (await readAllSelvesCircleMemberships().catch(() => ({})))?.[circleId]?.sight ?? null,
     setSight: (circleId, sight) => callSkill('agents', 'setProfileCircleMembership', { id: profileIdOf(circleId), circleId, sight }),
@@ -4675,9 +4680,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (cid) rosterReads.invalidate(cid); else rosterReads.invalidateAll();
         if (fn === 'ingest' && r?.ok && !r.existed) {
           retellDeparture(cid, a[1], adminsBefore);
-          // THIS DEVICE'S OWN SELF folded out (an admin's evict; a sibling's leave when the lane brings it): the local
-          // leave runs in the same tick — the circle's address off the relays, its authorize snapshot and member keys
-          // dropped — instead of on the next boot's list of "my circles".
+          // An exit naming THIS DEVICE'S OWN SELF landed (an admin's evict; a sibling's leave when the lane brings it):
+          // `foldedOut` asks the fold whether it holds — landing proves a signature, not authority — and if so the local
+          // leave runs in the same tick: the circle's address off the relays, its authorize snapshot and member keys
+          // dropped, instead of on the next boot's list of "my circles".
           const k = a[1]?.body?.kind;
           if (cid && (k === 'leave' || k === 'evict') && a[1]?.body?.subject === circleSelfRef(cid)) {
             circleFollowSync?.foldedOut?.(cid)?.catch?.(() => { /* the next fold landing tries again */ });

@@ -56,7 +56,7 @@ const validEntry = (c) => c && typeof c === 'object' && typeof c.id === 'string'
  *   through this device's membership rail (verified there like any statement)
  * @param {(r: {from: string, circleId: string, ok: boolean, steps: string[]}) => void} [a.onLanded]
  */
-export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, kringOn = () => true, consume, myLeft = null, leave = null, leaveStatementOf = null, ingestLeave = null, onLanded = null, sightOf = null, setSight = null } = {}) {
+export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, kringOn = () => true, consume, myLeft = null, leave = null, leaveStatementOf = null, ingestLeave = null, outByFold = null, onLanded = null, sightOf = null, setSight = null } = {}) {
   if (typeof siblings !== 'function') throw new Error('circleFollowSync: a `siblings` lookup is required');
   if (typeof sendToPeer !== 'function') throw new Error('circleFollowSync: `sendToPeer` is required');
   if (typeof myEntries !== 'function' || typeof isIn !== 'function' || typeof consume !== 'function') throw new Error('circleFollowSync: `myEntries`, `isIn` and `consume` are required');
@@ -80,10 +80,10 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
   const landedListeners = new Set();   // the shells' observability (a box's walk log) beside the composer's `onLanded`
   const inFlight = new Map();   // circleId → the landing's promise: a re-sent carry joins it, never runs the step twice
 
-  /** The local leave, once per circle per session. `force`: the fold already took this device out (no "am I in it"). */
-  async function landLeft(fromAddr, circleId, { force = false } = {}) {
+  /** The local leave, once per circle per session, for a circle this device is still in. */
+  async function landLeft(fromAddr, circleId) {
     if (leftHere.has(circleId)) return null;
-    if (!force && !(await isIn(circleId))) return null;
+    if (!(await isIn(circleId))) return null;
     leftHere.add(circleId);
     if (typeof leave !== 'function') return null;                  // a composition without the step leaves nothing
     let ok = false;
@@ -155,12 +155,17 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
     },
 
     /**
-     * THE FOLD TOOK THIS DEVICE'S SELF OUT of `circleId` (an admin's `evict`, or a leave the lane brought): run the
-     * local leave once, if this device is still in the circle.
+     * An exit naming this device's self LANDED on the lane: run the local leave once — only if the FOLD now has this
+     * self out (`outByFold`). Landing is not authority: ingest checks the signature and the key↔ref binding, so any
+     * member's signed `evict` of me, or a `leave` with me as subject that someone else wrote, lands; the fold alone
+     * grants an evict to an admin and a leave to its own subject.
      */
     async foldedOut(circleId) {
-      if (typeof circleId !== 'string' || !circleId) return null;
-      return landLeft(null, circleId, { force: true });
+      if (typeof circleId !== 'string' || !circleId || typeof outByFold !== 'function') return null;
+      let out = false;
+      try { out = (await outByFold(circleId)) === true; } catch { out = false; }
+      if (!out) return null;
+      return landLeft(null, circleId);
     },
 
     /** CATCH-UP: ask every sibling which circles it is in; each answers with one carry per circle, then one left per circle left. */
@@ -210,7 +215,7 @@ export function createCircleFollowSync({ siblings, sendToPeer, myEntries, isIn, 
         if (payload.statement && typeof ingestLeave === 'function') {
           try { await ingestLeave(circleId, payload.statement); } catch { /* the landing below still leaves locally */ }
         }
-        await landLeft(fromAddr, circleId, { force: true });
+        await landLeft(fromAddr, circleId);
       },
     },
   };

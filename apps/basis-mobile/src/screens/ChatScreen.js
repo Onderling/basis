@@ -1733,6 +1733,9 @@ export default function ChatScreen({
             activeEndpointUrl={() => bootState.kind === 'ready'
               ? (bootState.bundle.activeRelayUrl?.() ?? null)
               : null}
+            // which persona this device holds a circle as (the second-persona warning); inert here until this host
+            // passes `circles` too, like the launcher does
+            profileIdOf={(cid) => (bootState.kind === 'ready' ? (bootState.bundle.agent?.profileIdOf?.(cid) ?? null) : null)}
             // Post-join reachability (G13). Only consumed by JoinGroupWizardModal; other wizards ignore it.
             //
             // This host is where a TAPPED INVITE LINK lands, and it passed neither of the two things a join
